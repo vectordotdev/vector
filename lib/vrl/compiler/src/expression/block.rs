@@ -16,7 +16,8 @@ pub struct Block {
     /// environment, but once the block ends, the environment is reset to the
     /// state of the parent expression of the block.
     pub(crate) local_env: LocalEnv,
-    selection_vector: Vec<usize>,
+    selection_vector_this: Vec<usize>,
+    selection_vector_other: Vec<usize>,
 }
 
 impl Block {
@@ -25,7 +26,8 @@ impl Block {
         Self {
             inner,
             local_env,
-            selection_vector: vec![],
+            selection_vector_this: vec![],
+            selection_vector_other: vec![],
         }
     }
 
@@ -58,28 +60,28 @@ impl Expression for Block {
     }
 
     fn resolve_batch(&mut self, ctx: &mut BatchContext, selection_vector: &[usize]) {
-        self.selection_vector.resize(selection_vector.len(), 0);
-        self.selection_vector.copy_from_slice(selection_vector);
+        if self.inner.len() == 1 {
+            self.inner[0].resolve_batch(ctx, selection_vector);
+        } else {
+            self.selection_vector_this.resize(selection_vector.len(), 0);
+            self.selection_vector_this.copy_from_slice(selection_vector);
 
-        for block in &mut self.inner {
-            block.resolve_batch(ctx, &self.selection_vector);
+            for block in &mut self.inner {
+                block.resolve_batch(ctx, &self.selection_vector_this);
+                self.selection_vector_other.truncate(0);
 
-            let mut len = self.selection_vector.len();
-            let mut i = 0;
-            loop {
-                if i >= len {
-                    break;
+                for index in selection_vector {
+                    let index = *index;
+                    if ctx.resolved_values[index].is_ok() {
+                        self.selection_vector_other.push(index);
+                    }
                 }
 
-                let index = self.selection_vector[i];
-                if ctx.resolved_values[index].is_err() {
-                    len -= 1;
-                    self.selection_vector.swap(i, len);
-                } else {
-                    i += 1;
-                }
+                std::mem::swap(
+                    &mut self.selection_vector_this,
+                    &mut self.selection_vector_other,
+                );
             }
-            self.selection_vector.truncate(len);
         }
     }
 

@@ -130,12 +130,7 @@ impl Assignment {
 
                 err.insert_type_def(local, external, type_def, None);
 
-                Variant::Infallible {
-                    ok,
-                    err,
-                    expr: Box::new(expr),
-                    default: default_value,
-                }
+                Variant::infallible(ok, err, Box::new(expr), default_value)
             }
         };
 
@@ -227,6 +222,9 @@ impl fmt::Debug for Assignment {
                 err,
                 expr,
                 default: _,
+                selection_vector_ok: _,
+                selection_vector_err: _,
+                resolved_values_temp: _,
             } => {
                 write!(f, "Ok({:?}), Err({:?}) = {:?}", ok, err, expr)
             }
@@ -328,7 +326,7 @@ impl Target {
                             let state = &mut ctx.states[index];
                             let value = ctx.resolved_values[index]
                                 .clone()
-                                .expect("value is not an error");
+                                .expect("value must not be an error");
 
                             state.insert_variable(ident.clone(), value);
                         };
@@ -342,7 +340,7 @@ impl Target {
                     let state = &mut ctx.states[index];
                     let value = ctx.resolved_values[index]
                         .clone()
-                        .expect("value is not an error");
+                        .expect("value must not be an error");
 
                     match state.variable_mut(ident) {
                         Some(stored) => stored.insert_by_path(path, value),
@@ -448,6 +446,9 @@ pub(crate) enum Variant<T, U> {
 
         /// The default `ok` value used when the expression results in an error.
         default: Value,
+        selection_vector_ok: Vec<usize>,
+        selection_vector_err: Vec<usize>,
+        resolved_values_temp: Vec<Resolved>,
     },
 }
 
@@ -466,6 +467,9 @@ impl<T, U> Variant<T, U> {
             err,
             expr,
             default,
+            selection_vector_ok: vec![],
+            selection_vector_err: vec![],
+            resolved_values_temp: vec![],
         }
     }
 }
@@ -492,6 +496,9 @@ where
                 err,
                 expr,
                 default,
+                selection_vector_ok: _,
+                selection_vector_err: _,
+                resolved_values_temp: _,
             } => match expr.resolve(ctx) {
                 Ok(value) => {
                     ok.insert(value.clone(), ctx);
@@ -521,24 +528,13 @@ where
             } => {
                 expr.resolve_batch(ctx, selection_vector);
 
-                selection_vector_ok.resize(selection_vector.len(), 0);
-                selection_vector_ok.copy_from_slice(selection_vector);
-                let mut len = selection_vector_ok.len();
-                let mut i = 0;
-                loop {
-                    if i >= len {
-                        break;
-                    }
-
-                    let index = selection_vector_ok[i];
-                    if ctx.resolved_values[index].is_err() {
-                        len -= 1;
-                        selection_vector_ok.swap(i, len);
-                    } else {
-                        i += 1;
+                selection_vector_ok.truncate(0);
+                for index in selection_vector {
+                    let index = *index;
+                    if ctx.resolved_values[index].is_ok() {
+                        selection_vector_ok.push(index);
                     }
                 }
-                selection_vector_ok.truncate(len);
 
                 target.insert_batch(ctx, selection_vector_ok);
             }
@@ -547,30 +543,38 @@ where
                 err,
                 expr,
                 default,
+                ref mut selection_vector_ok,
+                ref mut selection_vector_err,
+                ref mut resolved_values_temp,
             } => {
                 expr.resolve_batch(ctx, selection_vector);
 
+                selection_vector_ok.truncate(0);
+                selection_vector_err.truncate(0);
+
                 for index in selection_vector {
                     let index = *index;
-                    let target = &mut *ctx.targets[index];
-                    let state = &mut ctx.states[index];
-                    let resolved = &mut ctx.resolved_values[index];
-
-                    let mut ctx = Context::new(target, state, &ctx.timezone);
-
-                    match resolved {
-                        Ok(value) => {
-                            ok.insert(value.clone(), &mut ctx);
-                            err.insert(Value::Null, &mut ctx);
-                        }
-                        Err(error) => {
-                            ok.insert(default.clone(), &mut ctx);
-                            let value = Value::from(error.to_string());
-                            err.insert(value.clone(), &mut ctx);
-                            *resolved = Ok(value);
-                        }
+                    if let Err(error) = &ctx.resolved_values[index] {
+                        selection_vector_err.push(index);
+                        ctx.resolved_values[index] = Ok(Value::from(error.to_string()));
+                    } else {
+                        selection_vector_ok.push(index);
                     }
                 }
+
+                ok.insert_batch(ctx, selection_vector_ok);
+                err.insert_batch(ctx, selection_vector_err);
+
+                resolved_values_temp.truncate(0);
+                resolved_values_temp.resize(selection_vector.len(), Ok(Value::Null));
+
+                std::mem::swap(ctx.resolved_values, resolved_values_temp);
+                err.insert_batch(ctx, selection_vector_ok);
+                for index in selection_vector_err.iter_mut() {
+                    ctx.resolved_values[*index] = Ok(default.clone());
+                }
+                ok.insert_batch(ctx, selection_vector_err);
+                std::mem::swap(ctx.resolved_values, resolved_values_temp);
             }
         }
     }
