@@ -36,6 +36,7 @@ pub enum Error {
     #[error("repl feature disabled, program input required")]
     ReplFeature,
 
+    #[cfg(feature = "repl")]
     #[error("error setting up readline: {}", .0)]
     Readline(#[from] rustyline::error::ReadlineError),
 }
