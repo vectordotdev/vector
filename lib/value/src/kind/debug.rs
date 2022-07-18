@@ -36,7 +36,12 @@ fn insert_kind(tree: &mut BTreeMap<String, Value>, kind: &Kind, show_unknown: bo
             }
             tree.insert("object".to_owned(), Value::Object(object_tree));
             if show_unknown {
-                insert_unknown(tree, fields.unknown_kind(),fields.is_unknown_exact(), "object");
+                insert_unknown(
+                    tree,
+                    fields.unknown_kind(),
+                    fields.is_unknown_exact(),
+                    "object",
+                );
             }
         }
 
@@ -49,13 +54,26 @@ fn insert_kind(tree: &mut BTreeMap<String, Value>, kind: &Kind, show_unknown: bo
             }
             tree.insert("array".to_owned(), Value::Object(array_tree));
             if show_unknown {
-                insert_unknown(tree, indices.unknown_kind(), indices.is_unknown_exact(), "array");
+                insert_unknown(
+                    tree,
+                    indices.unknown_kind(),
+                    indices.is_unknown_exact(),
+                    "array",
+                );
             }
         }
     }
 }
 
-fn insert_unknown(tree: &mut BTreeMap<String, Value>, unknown: Kind, unknown_exact: bool, prefix: &str) {
+fn insert_unknown(
+    tree: &mut BTreeMap<String, Value>,
+    unknown: Kind,
+    unknown_exact: bool,
+    prefix: &str,
+) {
+    if unknown.is_undefined() {
+        return;
+    }
     let mut unknown_tree = BTreeMap::new();
     insert_kind(&mut unknown_tree, &unknown, unknown_exact);
     if unknown.is_exact() {

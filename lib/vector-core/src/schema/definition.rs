@@ -194,9 +194,7 @@ impl Definition {
 
         // Ensure the path exists in the collection.
         assert!(
-            self.kind
-                .get(&path)
-                .contains_any_defined(),
+            self.kind.at_path(&path).contains_any_defined(),
             "meaning must point to a valid path"
         );
 
@@ -232,14 +230,7 @@ impl Definition {
             self.meaning.insert(other_id, meaning);
         }
 
-        self.kind.merge(
-            other.kind,
-            merge::Strategy {
-                collisions: merge::CollisionStrategy::Union,
-                indices: merge::Indices::Keep,
-            },
-        );
-
+        self.kind = self.kind.union(other.kind);
         self.log_namespaces.append(&mut other.log_namespaces);
         self
     }

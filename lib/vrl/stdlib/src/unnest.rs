@@ -187,9 +187,9 @@ impl Expression for UnnestFn {
 ///  ]`
 ///
 pub(crate) fn invert_array_at_path(typedef: &TypeDef, path: &LookupBuf) -> TypeDef {
-    let type_def = typedef.at_path(&path);
+    let kind = typedef.kind().at_path(path);
 
-    let mut array = if let Some(array) = Kind::from(type_def).into_array() {
+    let mut array = if let Some(array) = kind.into_array() {
         array
     } else {
         // guaranteed fallible
@@ -203,13 +203,12 @@ pub(crate) fn invert_array_at_path(typedef: &TypeDef, path: &LookupBuf) -> TypeD
         *kind = tdkind.clone();
     });
 
-    let mut tdkind = typedef.kind().clone();
-    let unknown = array.unknown().map(|unknown| {
-        tdkind.insert(path, unknown.to_existing_kind());
-        tdkind
-    });
-
-    array.set_unknown(unknown);
+    let unknown = array.unknown_kind();
+    if unknown.contains_any_defined() {
+        let mut tdkind = typedef.kind().clone();
+        tdkind.insert(path, unknown.without_undefined());
+        array.set_unknown(tdkind);
+    }
 
     TypeDef::array(array)
 }

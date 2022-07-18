@@ -9,7 +9,7 @@ pub use field::Field;
 pub use index::Index;
 pub use unknown::Unknown;
 
-use super::{merge, Kind};
+use super::Kind;
 
 /// The kinds of a collection (e.g. array or object).
 ///
@@ -32,6 +32,15 @@ pub struct Collection<T: Ord> {
 }
 
 impl<T: Ord + Clone> Collection<T> {
+    /// Create a new collection from its parts.
+    #[must_use]
+    pub(super) fn from_parts(known: BTreeMap<T, Kind>, unknown: impl Into<Option<Kind>>) -> Self {
+        Self {
+            known,
+            unknown: unknown.into().map(Into::into),
+        }
+    }
+
     pub(super) fn canonicalize(&self) -> Self {
         //TODO: canonicalize the Unknown (should be added once https://github.com/vectordotdev/vector/issues/13459 is done)
 
@@ -41,15 +50,6 @@ impl<T: Ord + Clone> Collection<T> {
             .known_mut()
             .retain(|i, i_kind| *i_kind != unknown_kind);
         output
-    }
-
-    /// Create a new collection from its parts.
-    #[must_use]
-    pub(super) fn from_parts(known: BTreeMap<T, Kind>, unknown: impl Into<Option<Kind>>) -> Self {
-        Self {
-            known,
-            unknown: unknown.into().map(Into::into),
-        }
     }
 
     /// Create a new collection with a defined "unknown fields" value, and no known fields.
@@ -97,12 +97,6 @@ impl<T: Ord + Clone> Collection<T> {
             && self.unknown.as_ref().map_or(false, Unknown::is_any)
     }
 
-    /// Get the "known" and "unknown" parts of the collection.
-    #[must_use]
-    pub(super) fn into_parts(self) -> (BTreeMap<T, Kind>, Option<Kind>) {
-        (self.known, self.unknown.map(|unknown| unknown.to_kind()))
-    }
-
     /// Get a reference to the "known" elements in the collection.
     #[must_use]
     pub fn known(&self) -> &BTreeMap<T, Kind> {
@@ -141,7 +135,7 @@ impl<T: Ord + Clone> Collection<T> {
     pub fn is_unknown_exact(&self) -> bool {
         match &self.unknown {
             Some(unknown) => unknown.is_exact(),
-            None => true
+            None => true,
         }
     }
 
@@ -295,30 +289,14 @@ impl<T: Ord + Clone> Collection<T> {
 
     /// Return the reduced `Kind` of the items within the collection.
     /// This only returns the type of _defined_ values in the collection. Accessing
-    /// a non-existing value can return null which is not added to the type here.
+    /// a non-existing value can return `undefined` which is not added to the type here.
     pub fn reduced_kind(&self) -> Kind {
-        let strategy = merge::Strategy {
-            collisions: merge::CollisionStrategy::Union,
-            indices: merge::Indices::Keep,
-        };
-
-        let mut kind = self
-            .known
+        self.known
             .values()
             .cloned()
-            .reduce(|mut lhs, rhs| {
-                lhs.merge(rhs, strategy);
-                lhs
-            })
-            .unwrap_or_else(Kind::never);
-
-        if let Some(unknown) = &self.unknown {
-            // TODO: this can be switched back to `to_kind` once "undefined" is added.
-            //   (undefined can be safely removed then, without losing type information)
-            // see: https://github.com/vectordotdev/vector/issues/13459
-            kind.merge(unknown.to_existing_kind(), strategy);
-        }
-        kind
+            .reduce(|lhs, rhs| lhs.union(rhs))
+            .unwrap_or_else(Kind::never)
+            .union(self.unknown_kind().without_undefined())
     }
 }
 
@@ -870,7 +848,7 @@ mod tests {
                 "any",
                 TestCase {
                     this: Collection::any(),
-                    want: Kind::any(),
+                    want: Kind::any().without_undefined(),
                 },
             ),
             (
@@ -894,7 +872,7 @@ mod tests {
                         BTreeMap::from([("foo", Kind::bytes())]),
                         Kind::any(),
                     ),
-                    want: Kind::any(),
+                    want: Kind::any().without_undefined(),
                 },
             ),
             (

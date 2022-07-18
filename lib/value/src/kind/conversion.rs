@@ -60,6 +60,17 @@ impl Kind {
         self.remove_object();
         self
     }
+
+    /// VRL has an interesting property where accessing an undefined value "upgrades"
+    /// it to a "null" value.
+    /// This should be used in places those implicit upgrade can occur.
+    // see: https://github.com/vectordotdev/vector/issues/13594
+    pub fn upgrade_undefined(mut self) -> Self {
+        if self.contains_undefined() {
+            self = self.without_undefined().or_null();
+        }
+        self
+    }
 }
 
 impl From<Collection<Field>> for Kind {

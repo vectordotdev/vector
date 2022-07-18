@@ -73,7 +73,7 @@ impl TypeDef {
     pub fn at_path(&self, path: &LookupBuf) -> TypeDef {
         let fallible = self.fallible;
 
-        let kind = self.kind.get(path);
+        let kind = self.kind.at_path(path);
 
         Self { fallible, kind }
     }
@@ -319,33 +319,12 @@ impl TypeDef {
 
     #[must_use]
     pub fn union(mut self, other: Self) -> Self {
-        self.merge(
-            other,
-            merge::Strategy {
-                collisions: merge::CollisionStrategy::Union,
-                indices: merge::Indices::Keep,
-            },
-        );
+        self.fallible |= other.fallible;
+        self.kind = self.kind.union(other.kind);
         self
     }
 
-    /// Merge two type definitions.
-    ///
-    /// When merging arrays, the elements of `other` are *appended* to the elements of `self`.
-    /// Meaning, the indices of `other` are updated, to continue onward from the last index of
-    /// `self`.
-    #[must_use]
-    pub fn merge_append(mut self, other: Self) -> Self {
-        self.merge(
-            other,
-            merge::Strategy {
-                collisions: merge::CollisionStrategy::Overwrite,
-                indices: merge::Indices::Append,
-            },
-        );
-        self
-    }
-
+    // deprecated
     pub fn merge(&mut self, other: Self, strategy: merge::Strategy) {
         self.fallible |= other.fallible;
         self.kind.merge(other.kind, strategy);
@@ -356,7 +335,6 @@ impl TypeDef {
         if path.is_root() {
             other
         } else {
-            // self.fallible |= other.fallible;
             let mut kind = self.kind;
             kind.insert(path, other.kind);
             Self {
@@ -367,12 +345,12 @@ impl TypeDef {
     }
 
     #[must_use]
+    // deprecated
     pub fn merge_overwrite(mut self, other: Self) -> Self {
         self.merge(
             other,
             merge::Strategy {
                 collisions: merge::CollisionStrategy::Overwrite,
-                indices: merge::Indices::Keep,
             },
         );
         self

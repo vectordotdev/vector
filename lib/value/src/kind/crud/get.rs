@@ -1,13 +1,25 @@
 //! All types related to finding a [`Kind`] nested into another one.
 
-use std::borrow::Cow;
+use crate::Kind;
 use lookup::lookup_v2::{BorrowedSegment, Path};
-use super::Kind;
+use std::borrow::Cow;
 
 impl Kind {
-    /// Insert the `Kind` at the given `path` within `self`.
-    /// This has the same behavior as `Value::get`.
+    /// Returns the type of a value that is retrieved from a certain path.
+    ///
+    /// This has the same behavior as `Value::get`, including
+    /// the implicit conversion of "undefined" to "null.
+    ///
+    /// If you want the type _without_ the implicit type conversion,
+    /// use `Kind::at_path` instead.
     pub fn get<'a>(&self, path: impl Path<'a>) -> Kind {
+        self.at_path(path).upgrade_undefined()
+    }
+
+    /// This retrieves the `Kind` at a given path. There is a subtle difference
+    /// between this and `Kind::get` where this function does _not_ convert undefined to null.
+    /// It is viewing the type of a value in-place, before it is retrieved.
+    pub fn at_path<'a>(&self, path: impl Path<'a>) -> Kind {
         self.get_recursive(path.segment_iter())
     }
 
@@ -152,14 +164,14 @@ mod tests {
     use crate::kind::Collection;
     #[test]
     #[allow(clippy::too_many_lines)]
-    fn test_get() {
+    fn test_at_path() {
         struct TestCase {
             kind: Kind,
             path: OwnedPath,
             want: Kind,
         }
 
-        for (title, TestCase { kind, path, want }) in HashMap::from([
+        for (title, TestCase { kind, path, want }) in [
             (
                 "get root",
                 TestCase {
@@ -454,273 +466,9 @@ mod tests {
                     want: Kind::never(),
                 },
             ),
-        ]) {
+        ] {
             println!("========== {} ==========", title);
-            assert_eq!(kind.get(&path), want, "test: {}", title);
-        }
-    }
-
-    #[test]
-    #[allow(clippy::too_many_lines)]
-    fn test_find_at_path() {
-        struct TestCase {
-            kind: Kind,
-            path: LookupBuf,
-            want: Result<Option<Kind>, Error>,
-        }
-
-        for (title, TestCase { kind, path, want }) in HashMap::from([
-            (
-                "primitive",
-                TestCase {
-                    kind: Kind::bytes(),
-                    path: "foo".into(),
-                    want: Ok(None),
-                },
-            ),
-            (
-                "multiple primitives",
-                TestCase {
-                    kind: Kind::integer().or_regex(),
-                    path: "foo".into(),
-                    want: Ok(None),
-                },
-            ),
-            (
-                "object w/ matching path",
-                TestCase {
-                    kind: Kind::object(BTreeMap::from([("foo".into(), Kind::integer())])),
-                    path: "foo".into(),
-                    want: Ok(Some(Kind::integer())),
-                },
-            ),
-            (
-                "object w/ unknown, w/o matching path",
-                TestCase {
-                    kind: Kind::object({
-                        let mut v =
-                            Collection::from(BTreeMap::from([("foo".into(), Kind::integer())]));
-                        v.set_unknown(Kind::boolean());
-                        v
-                    }),
-                    path: "bar".into(),
-                    want: Ok(Some(Kind::boolean())),
-                },
-            ),
-            (
-                "object w/o unknown, w/o matching path",
-                TestCase {
-                    kind: Kind::object(BTreeMap::from([("foo".into(), Kind::integer())])),
-                    path: "bar".into(),
-                    want: Ok(None),
-                },
-            ),
-            (
-                "array w/ matching path",
-                TestCase {
-                    kind: Kind::array(BTreeMap::from([(1.into(), Kind::integer())])),
-                    path: LookupBuf::from_str("[1]").unwrap(),
-                    want: Ok(Some(Kind::integer())),
-                },
-            ),
-            (
-                "array w/ unknown, w/o matching path",
-                TestCase {
-                    kind: Kind::array({
-                        let mut v = Collection::from(BTreeMap::from([(1.into(), Kind::integer())]));
-                        v.set_unknown(Kind::bytes());
-                        v
-                    }),
-                    path: LookupBuf::from_str("[2]").unwrap(),
-                    want: Ok(Some(Kind::bytes())),
-                },
-            ),
-            (
-                "array w/o unknown, w/o matching path",
-                TestCase {
-                    kind: Kind::array(BTreeMap::from([(1.into(), Kind::integer())])),
-                    path: LookupBuf::from_str("[2]").unwrap(),
-                    want: Ok(None),
-                },
-            ),
-            (
-                "array w/ negative indexing",
-                TestCase {
-                    kind: Kind::array(BTreeMap::from([(1.into(), Kind::integer())])),
-                    path: LookupBuf::from_str("[-1]").unwrap(),
-                    want: Err(Error::NegativeIndexPath),
-                },
-            ),
-            (
-                "complex pathing",
-                TestCase {
-                    kind: Kind::object(BTreeMap::from([(
-                        "foo".into(),
-                        Kind::array(BTreeMap::from([
-                            (1.into(), Kind::integer()),
-                            (
-                                2.into(),
-                                Kind::object(BTreeMap::from([
-                                    (
-                                        "bar".into(),
-                                        Kind::object(BTreeMap::from([(
-                                            "baz".into(),
-                                            Kind::integer().or_regex(),
-                                        )])),
-                                    ),
-                                    ("qux".into(), Kind::boolean()),
-                                ])),
-                            ),
-                        ])),
-                    )])),
-                    path: LookupBuf::from_str(".foo[2].bar").unwrap(),
-                    want: Ok(Some(Kind::object(BTreeMap::from([(
-                        "baz".into(),
-                        Kind::integer().or_regex(),
-                    )])))),
-                },
-            ),
-            (
-                "unknown kind for missing object path",
-                TestCase {
-                    kind: Kind::object({
-                        let mut v =
-                            Collection::from(BTreeMap::from([("foo".into(), Kind::timestamp())]));
-                        v.set_unknown(Kind::bytes().or_integer());
-                        v
-                    }),
-                    path: LookupBuf::from_str(".nope").unwrap(),
-                    want: Ok(Some(Kind::bytes().or_integer())),
-                },
-            ),
-            (
-                "unknown kind for missing array index",
-                TestCase {
-                    kind: Kind::array({
-                        let mut v =
-                            Collection::from(BTreeMap::from([(0.into(), Kind::timestamp())]));
-                        v.set_unknown(Kind::regex().or_null());
-                        v
-                    }),
-                    path: LookupBuf::from_str("[1]").unwrap(),
-                    want: Ok(Some(Kind::regex().or_null())),
-                },
-            ),
-            (
-                "or null for nested nullable path",
-                TestCase {
-                    kind: Kind::object(BTreeMap::from([("foo".into(), Kind::integer())])).or_null(),
-                    path: "foo".into(),
-                    want: Ok(Some(Kind::integer().or_null())),
-                },
-            ),
-            (
-                "coalesced segment folding",
-                TestCase {
-                    kind: Kind::object(BTreeMap::from([
-                        ("foo".into(), Kind::integer().or_null()),
-                        ("bar".into(), Kind::float()),
-                    ])),
-                    path: LookupBuf::from_str(".(foo | bar)").unwrap(),
-                    want: Ok(Some(Kind::integer().or_float())),
-                },
-            ),
-            (
-                "coalesced segment nullable",
-                TestCase {
-                    kind: Kind::object(BTreeMap::from([
-                        ("foo".into(), Kind::integer().or_null()),
-                        ("bar".into(), Kind::float().or_null()),
-                    ])),
-                    path: LookupBuf::from_str(".(foo | bar)").unwrap(),
-                    want: Ok(Some(Kind::integer().or_float().or_null())),
-                },
-            ),
-            (
-                "coalesced segment early-match",
-                TestCase {
-                    kind: Kind::object(BTreeMap::from([
-                        ("foo".into(), Kind::integer()),
-                        ("bar".into(), Kind::float()),
-                    ])),
-                    path: LookupBuf::from_str(".(foo | bar)").unwrap(),
-                    want: Ok(Some(Kind::integer())),
-                },
-            ),
-            (
-                "coalesced segment exact-null",
-                TestCase {
-                    kind: Kind::object(BTreeMap::from([
-                        ("foo".into(), Kind::integer()),
-                        ("bar".into(), Kind::float()),
-                    ])),
-                    path: LookupBuf::from_str(".(baz | foo | bar)").unwrap(),
-                    want: Ok(Some(Kind::integer())),
-                },
-            ),
-            (
-                "coalesced segment multiple objects",
-                TestCase {
-                    kind: Kind::object(BTreeMap::from([
-                        (
-                            "foo".into(),
-                            Kind::null().or_object(BTreeMap::from([
-                                ("one".into(), Kind::integer()),
-                                ("two".into(), Kind::integer()),
-                            ])),
-                        ),
-                        (
-                            "bar".into(),
-                            Kind::object(BTreeMap::from([
-                                ("two".into(), Kind::boolean()),
-                                ("three".into(), Kind::boolean()),
-                            ])),
-                        ),
-                    ])),
-                    path: LookupBuf::from_str(".(foo | bar)").unwrap(),
-                    // TODO: This is returning a type more general than it could be, but it is "correct"
-                    //       otherwise
-                    // The type system currently doesn't distinguish between "null" and "undefined",
-                    // but the runtime behavior of coalescing _does_, so in general types
-                    // for coalesced paths won't be as accurate as possible.
-                    // (This specific example could be fixed though)
-                    want: Ok(Some(Kind::object(BTreeMap::from([
-                        ("one".into(), Kind::integer().or_null()),
-                        ("two".into(), Kind::integer().or_boolean()),
-                        ("three".into(), Kind::boolean().or_null()),
-                    ])))),
-                },
-            ),
-            (
-                "coalesced segment null arms",
-                TestCase {
-                    kind: Kind::object(BTreeMap::from([
-                        ("foo".into(), Kind::null()),
-                        ("bar".into(), Kind::null()),
-                    ])),
-                    path: LookupBuf::from_str(".(foo | bar)").unwrap(),
-                    want: Ok(Some(Kind::null())),
-                },
-            ),
-            (
-                "no matching arms",
-                TestCase {
-                    kind: Kind::object(BTreeMap::from([
-                        ("foo".into(), Kind::null()),
-                        ("bar".into(), Kind::null()),
-                    ])),
-                    path: LookupBuf::from_str(".(baz | qux)").unwrap(),
-                    want: Ok(Some(Kind::null())),
-                },
-            ),
-        ]) {
-            assert_eq!(
-                kind.find_at_path(&path.to_lookup())
-                    .map(|v| v.map(std::borrow::Cow::into_owned)),
-                want,
-                "returned: {}",
-                title
-            );
+            assert_eq!(kind.at_path(&path), want, "test: {}", title);
         }
     }
 }

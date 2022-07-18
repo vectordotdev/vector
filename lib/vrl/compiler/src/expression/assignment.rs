@@ -238,8 +238,7 @@ fn verify_overwriteable(
     // or index, check the segment before it, and ensure that its kind is an
     // object or array.
     while let Some(last) = path.pop_back() {
-        let parent_kind = root_kind
-            .get(&path);
+        let parent_kind = root_kind.at_path(&path);
 
         let (variant, segment_span, valid) = match last {
             segment @ (SegmentBuf::Field(_) | SegmentBuf::Coalesce(_)) => {

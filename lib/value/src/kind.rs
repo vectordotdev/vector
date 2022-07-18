@@ -4,11 +4,13 @@ mod builder;
 mod collection;
 mod comparison;
 mod conversion;
+mod crud;
 mod debug;
-pub mod find;
-pub mod insert;
+
 pub mod merge;
 pub mod remove;
+
+pub use crud::*;
 
 use std::collections::BTreeMap;
 
