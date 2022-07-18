@@ -127,10 +127,9 @@ impl InternalEvent for BufferStopping {
             record_id,
         } = self;
         error!(
-            message = "Disk buffer has received a negative acknowledgement, stopping processing.",
             data_dir = ?data_dir,
             record_id = %record_id,
+            "Disk buffer has received a negative acknowledgement, stopping processing. To correct, run: `vector buffer-advance --record-id {record_id} {data_dir:?}`",
         );
-        info!("To correct this problem, run: `vector buffer-advance --record-id {record_id} {data_dir:?}`");
     }
 }
