@@ -9,7 +9,7 @@ mod tests {
             Logs::{LogRecord, ResourceLogs, ScopeLogs},
             Resource as OtelResource,
         },
-        sources::opentelemetry::{log::LOGS, OpentelemetryConfig},
+        sources::opentelemetry::{OpentelemetryConfig, LOGS},
         test_util::{
             self,
             components::{assert_source_compliance, SOURCE_TAGS},
