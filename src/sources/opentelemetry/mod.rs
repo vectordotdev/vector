@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod tests;
+
 mod log;
 
 use crate::config::SourceDescription;
