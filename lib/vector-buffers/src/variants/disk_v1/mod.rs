@@ -414,16 +414,19 @@ fn build<T: Bufferable>(
         let data_dir = path.into();
         tokio::spawn(async move {
             while let Some((status, amount)) = stream.next().await {
-                if !acknowledgements || status == BatchStatus::Delivered {
-                    let amount = amount.try_into().expect("too many records on 32-bit");
-                    ack_counter.fetch_add(amount, Ordering::Relaxed);
-                    read_waker.notify_one();
-                } else {
-                    emit(BufferStopping {
-                        data_dir,
-                        record_id: delete_offset.load(Ordering::Relaxed) as u64,
-                    });
-                    break;
+                match (acknowledgements, status) {
+                    (false, _) | (_, BatchStatus::Delivered) => {
+                        let amount = amount.try_into().expect("too many records on 32-bit");
+                        ack_counter.fetch_add(amount, Ordering::Relaxed);
+                        read_waker.notify_one();
+                    }
+                    (true, BatchStatus::Errored | BatchStatus::Rejected) => {
+                        emit(BufferStopping {
+                            data_dir,
+                            record_id: delete_offset.load(Ordering::Relaxed) as u64,
+                        });
+                        break;
+                    }
                 }
             }
             reader_done.store(true, Ordering::Relaxed);

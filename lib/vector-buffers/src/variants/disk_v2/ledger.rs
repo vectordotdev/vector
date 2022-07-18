@@ -729,15 +729,18 @@ where
         let acknowledgements = self.acknowledgements;
         tokio::spawn(async move {
             while let Some((status, amount)) = stream.next().await {
-                if !acknowledgements || status == BatchStatus::Delivered {
-                    self.increment_pending_acks(amount);
-                    self.notify_writer_waiters();
-                } else {
-                    emit(BufferStopping {
-                        data_dir,
-                        record_id: self.state().get_last_reader_record_id(),
-                    });
-                    break;
+                match (acknowledgements, status) {
+                    (false, _) | (_, BatchStatus::Delivered) => {
+                        self.increment_pending_acks(amount);
+                        self.notify_writer_waiters();
+                    }
+                    (true, BatchStatus::Errored | BatchStatus::Rejected) => {
+                        emit(BufferStopping {
+                            data_dir,
+                            record_id: self.state().get_last_reader_record_id(),
+                        });
+                        break;
+                    }
                 }
             }
             self.stop_reader();
