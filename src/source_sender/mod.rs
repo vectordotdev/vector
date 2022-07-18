@@ -1,12 +1,15 @@
 use std::collections::HashMap;
 
+use chrono::Utc;
 use futures::{Stream, StreamExt};
+use metrics::histogram;
+use value::Value;
 use vector_buffers::topology::channel::{self, LimitedReceiver, LimitedSender};
 #[cfg(test)]
 use vector_core::event::{into_event_stream, EventStatus};
 use vector_core::{
-    config::Output,
-    event::{array, Event, EventArray, EventContainer},
+    config::{log_schema, Output},
+    event::{array, Event, EventArray, EventContainer, EventRef},
     internal_event::{EventsSent, DEFAULT_OUTPUT},
     ByteSizeOf,
 };
@@ -213,6 +216,10 @@ impl Inner {
     }
 
     async fn send(&mut self, events: EventArray) -> Result<(), ClosedError> {
+        let reference = Utc::now().timestamp_millis();
+        events
+            .iter_events()
+            .for_each(|event| emit_lag_time(event, reference));
         let byte_size = events.size_of();
         let count = events.len();
         self.inner.send(events).await.map_err(|_| ClosedError)?;
@@ -248,7 +255,12 @@ impl Inner {
         let mut count = 0;
         let mut byte_size = 0;
 
-        let events = events.into_iter().map(Into::into);
+        let reference = Utc::now().timestamp_millis();
+        let events = events.into_iter().map(|event| {
+            let event = event.into();
+            emit_lag_time(EventRef::from(&event), reference);
+            event
+        });
         for events in array::events_into_arrays(events, Some(CHUNK_SIZE)) {
             let this_count = events.len();
             let this_size = events.size_of();
@@ -275,5 +287,124 @@ impl Inner {
         });
 
         Ok(())
+    }
+}
+
+/// Calculate the difference between the reference time and the
+/// timestamp stored in the given event reference, and emit the
+/// different, as expressed in milliseconds, as a histogram.
+fn emit_lag_time(event: EventRef<'_>, reference: i64) {
+    let timestamp = match event {
+        EventRef::Log(log) => log
+            .get(log_schema().timestamp_key())
+            .and_then(get_timestamp_millis),
+        EventRef::Metric(metric) => metric
+            .timestamp()
+            .map(|timestamp| timestamp.timestamp_millis()),
+        EventRef::Trace(trace) => trace
+            .get(log_schema().timestamp_key())
+            .and_then(get_timestamp_millis),
+    };
+    if let Some(timestamp) = timestamp {
+        // This will truncate precision for values larger than 2**52, but at that point the user
+        // probably has much larger problems than precision.
+        let lag_time = (reference - timestamp) as f64 / 1000.0;
+        histogram!("lag_time_seconds", lag_time);
+    }
+}
+
+fn get_timestamp_millis(value: &Value) -> Option<i64> {
+    match value {
+        Value::Timestamp(timestamp) => Some(timestamp.timestamp_millis()),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use chrono::{DateTime, Duration};
+    use rand::{thread_rng, Rng};
+    use vector_core::event::{LogEvent, Metric, MetricKind, MetricValue, TraceEvent};
+
+    use super::*;
+    use crate::metrics::{self, Controller};
+
+    #[tokio::test]
+    async fn emits_lag_time_for_log() {
+        emit_and_test(|timestamp| {
+            let mut log = LogEvent::from("Log message");
+            log.insert("timestamp", timestamp);
+            Event::Log(log)
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn emits_lag_time_for_metric() {
+        emit_and_test(|timestamp| {
+            Event::Metric(
+                Metric::new(
+                    "name",
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 123.4 },
+                )
+                .with_timestamp(Some(timestamp)),
+            )
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn emits_lag_time_for_trace() {
+        emit_and_test(|timestamp| {
+            let mut trace = TraceEvent::default();
+            trace.insert("timestamp", timestamp);
+            Event::Trace(trace)
+        })
+        .await;
+    }
+
+    async fn emit_and_test(make_event: impl FnOnce(DateTime<Utc>) -> Event) {
+        let _ = metrics::init_test();
+        let (mut sender, _stream) = SourceSender::new_test();
+        let millis = thread_rng().gen_range(10..10000);
+        let timestamp = Utc::now() - Duration::milliseconds(millis);
+        let expected = millis as f64 / 1000.0;
+
+        let event = make_event(timestamp);
+        sender
+            .send_event(event)
+            .await
+            .expect("Send should not fail");
+
+        let lag_times = Controller::get()
+            .expect("There must be a controller")
+            .capture_metrics()
+            .into_iter()
+            .filter(|metric| metric.name() == "lag_time_seconds")
+            .collect::<Vec<_>>();
+        assert_eq!(lag_times.len(), 1);
+
+        let lag_time = &lag_times[0];
+        match lag_time.value() {
+            MetricValue::AggregatedHistogram {
+                buckets,
+                count,
+                sum,
+            } => {
+                let mut done = false;
+                for bucket in buckets {
+                    if !done && bucket.upper_limit >= expected {
+                        assert_eq!(bucket.count, 1);
+                        done = true;
+                    } else {
+                        assert_eq!(bucket.count, 0);
+                    }
+                }
+                assert_eq!(*count, 1);
+                assert!((*sum - expected).abs() <= 0.001);
+            }
+            _ => panic!("lag_time_seconds has invalid type"),
+        }
     }
 }
