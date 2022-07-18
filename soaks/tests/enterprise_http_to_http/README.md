@@ -2,7 +2,8 @@
 
 This enterprise-related soak test tracks the throughput overhead of enterprise
 reporting components: `internal_metrics`, `internal_logs`, `datadog_metrics`,
-`datadog_logs`, etc. The user-configured Vector topology is kept simple.
+`datadog_logs`, etc. The user-configured Vector topology is simply an `http`
+source feeding directly in to an `http` sink.
 
 ## Method
 
