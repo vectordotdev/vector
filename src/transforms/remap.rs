@@ -581,12 +581,7 @@ where
         self.run_vrl_batch(&mut batch_targets);
 
         for (i, (target, value)) in targets.into_iter().zip(self.values.iter_mut()).enumerate() {
-            let result = {
-                let mut moved = Ok(Value::Null);
-                std::mem::swap(value, &mut moved);
-                moved
-            }
-            .map_err(Terminate::from);
+            let result = unsafe { (value as *mut Resolved).read() }.map_err(Terminate::from);
             match result {
                 Ok(_) => match target.into_events() {
                     TargetEvents::One(event) => {
@@ -651,6 +646,8 @@ where
                 }
             }
         }
+
+        unsafe { self.values.set_len(0) };
     }
 }
 

@@ -1,7 +1,6 @@
-use std::fmt;
+use std::{fmt, ptr::addr_of_mut};
 
 use diagnostic::{DiagnosticMessage, Label, Note, Urls};
-use value::Value;
 
 use crate::{
     expression::{Expr, Resolved},
@@ -46,13 +45,9 @@ impl Expression for Not {
         self.inner.resolve_batch(ctx, selection_vector);
 
         for index in selection_vector {
-            let resolved = &mut ctx.resolved_values[*index];
-            let temp = {
-                let mut moved = Ok(Value::Null);
-                std::mem::swap(resolved, &mut moved);
-                moved
-            };
-            *resolved = (|| Ok((!temp?.try_boolean()?).into()))();
+            let resolved = addr_of_mut!(ctx.resolved_values[*index]);
+            let result = (|| Ok((!unsafe { resolved.read() }?.try_boolean()?).into()))();
+            unsafe { resolved.write(result) };
         }
     }
 

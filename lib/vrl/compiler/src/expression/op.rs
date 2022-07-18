@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, ptr::addr_of_mut};
 
 use diagnostic::{DiagnosticMessage, Label, Note, Span, Urls};
 use value::Value;
@@ -206,233 +206,139 @@ impl Expression for Op {
             Mul => {
                 for index in &self.selection_vector_ok {
                     let index = *index;
-                    let resolved = &mut ctx.resolved_values[index];
-                    let lhs = {
-                        let mut moved = Ok(Value::Null);
-                        std::mem::swap(resolved, &mut moved);
-                        moved
-                    }
-                    .expect("value is not an error");
-                    let rhs = {
-                        let mut moved = Ok(Value::Null);
-                        std::mem::swap(&mut self.resolved_values_rhs[index], &mut moved);
-                        moved
-                    }
-                    .expect("value is not an error");
-                    *resolved = lhs.try_mul(rhs).map_err(Into::into);
+                    let resolved = addr_of_mut!(ctx.resolved_values[index]);
+                    let lhs = unsafe { resolved.read() }.expect("value is not an error");
+                    let rhs = unsafe { addr_of_mut!(self.resolved_values_rhs[index]).read() }
+                        .expect("value is not an error");
+                    let result = lhs.try_mul(rhs).map_err(Into::into);
+                    unsafe { resolved.write(result) };
                 }
             }
             Div => {
                 for index in &self.selection_vector_ok {
                     let index = *index;
-                    let resolved = &mut ctx.resolved_values[index];
-                    let lhs = {
-                        let mut moved = Ok(Value::Null);
-                        std::mem::swap(resolved, &mut moved);
-                        moved
-                    }
-                    .expect("value is not an error");
-                    let rhs = {
-                        let mut moved = Ok(Value::Null);
-                        std::mem::swap(&mut self.resolved_values_rhs[index], &mut moved);
-                        moved
-                    }
-                    .expect("value is not an error");
-                    *resolved = lhs.try_div(rhs).map_err(Into::into);
+                    let resolved = addr_of_mut!(ctx.resolved_values[index]);
+                    let lhs = unsafe { resolved.read() }.expect("value is not an error");
+                    let rhs = unsafe { addr_of_mut!(self.resolved_values_rhs[index]).read() }
+                        .expect("value is not an error");
+                    let result = lhs.try_div(rhs).map_err(Into::into);
+                    unsafe { resolved.write(result) };
                 }
             }
             Add => {
                 for index in &self.selection_vector_ok {
                     let index = *index;
-                    let resolved = &mut ctx.resolved_values[index];
-                    let lhs = {
-                        let mut moved = Ok(Value::Null);
-                        std::mem::swap(resolved, &mut moved);
-                        moved
-                    }
-                    .expect("value is not an error");
-                    let rhs = {
-                        let mut moved = Ok(Value::Null);
-                        std::mem::swap(&mut self.resolved_values_rhs[index], &mut moved);
-                        moved
-                    }
-                    .expect("value is not an error");
-                    *resolved = lhs.try_add(rhs).map_err(Into::into);
+                    let resolved = addr_of_mut!(ctx.resolved_values[index]);
+                    let lhs = unsafe { resolved.read() }.expect("value is not an error");
+                    let rhs = unsafe { addr_of_mut!(self.resolved_values_rhs[index]).read() }
+                        .expect("value is not an error");
+                    let result = lhs.try_add(rhs).map_err(Into::into);
+                    unsafe { resolved.write(result) };
                 }
             }
             Sub => {
                 for index in &self.selection_vector_ok {
                     let index = *index;
-                    let resolved = &mut ctx.resolved_values[index];
-                    let lhs = {
-                        let mut moved = Ok(Value::Null);
-                        std::mem::swap(resolved, &mut moved);
-                        moved
-                    }
-                    .expect("value is not an error");
-                    let rhs = {
-                        let mut moved = Ok(Value::Null);
-                        std::mem::swap(&mut self.resolved_values_rhs[index], &mut moved);
-                        moved
-                    }
-                    .expect("value is not an error");
-                    *resolved = lhs.try_sub(rhs).map_err(Into::into);
+                    let resolved = addr_of_mut!(ctx.resolved_values[index]);
+                    let lhs = unsafe { resolved.read() }.expect("value is not an error");
+                    let rhs = unsafe { addr_of_mut!(self.resolved_values_rhs[index]).read() }
+                        .expect("value is not an error");
+                    let result = lhs.try_sub(rhs).map_err(Into::into);
+                    unsafe { resolved.write(result) };
                 }
             }
             Rem => {
                 for index in &self.selection_vector_ok {
                     let index = *index;
-                    let resolved = &mut ctx.resolved_values[index];
-                    let lhs = {
-                        let mut moved = Ok(Value::Null);
-                        std::mem::swap(resolved, &mut moved);
-                        moved
-                    }
-                    .expect("value is not an error");
-                    let rhs = {
-                        let mut moved = Ok(Value::Null);
-                        std::mem::swap(&mut self.resolved_values_rhs[index], &mut moved);
-                        moved
-                    }
-                    .expect("value is not an error");
-                    *resolved = lhs.try_rem(rhs).map_err(Into::into);
+                    let resolved = addr_of_mut!(ctx.resolved_values[index]);
+                    let lhs = unsafe { resolved.read() }.expect("value is not an error");
+                    let rhs = unsafe { addr_of_mut!(self.resolved_values_rhs[index]).read() }
+                        .expect("value is not an error");
+                    let result = lhs.try_rem(rhs).map_err(Into::into);
+                    unsafe { resolved.write(result) };
                 }
             }
             Eq => {
                 for index in &self.selection_vector_ok {
                     let index = *index;
-                    let resolved = &mut ctx.resolved_values[index];
-                    let lhs = {
-                        let mut moved = Ok(Value::Null);
-                        std::mem::swap(resolved, &mut moved);
-                        moved
-                    }
-                    .expect("value is not an error");
-                    let rhs = {
-                        let mut moved = Ok(Value::Null);
-                        std::mem::swap(&mut self.resolved_values_rhs[index], &mut moved);
-                        moved
-                    }
-                    .expect("value is not an error");
-                    *resolved = Ok(lhs.eq_lossy(&rhs).into());
+                    let resolved = addr_of_mut!(ctx.resolved_values[index]);
+                    let lhs = unsafe { resolved.read() }.expect("value is not an error");
+                    let rhs = unsafe { addr_of_mut!(self.resolved_values_rhs[index]).read() }
+                        .expect("value is not an error");
+                    let result = Ok(lhs.eq_lossy(&rhs).into());
+                    unsafe { resolved.write(result) };
                 }
             }
             Ne => {
                 for index in &self.selection_vector_ok {
                     let index = *index;
-                    let resolved = &mut ctx.resolved_values[index];
-                    let lhs = {
-                        let mut moved = Ok(Value::Null);
-                        std::mem::swap(resolved, &mut moved);
-                        moved
-                    }
-                    .expect("value is not an error");
-                    let rhs = {
-                        let mut moved = Ok(Value::Null);
-                        std::mem::swap(&mut self.resolved_values_rhs[index], &mut moved);
-                        moved
-                    }
-                    .expect("value is not an error");
-                    *resolved = Ok((!lhs.eq_lossy(&rhs)).into());
+                    let resolved = addr_of_mut!(ctx.resolved_values[index]);
+                    let lhs = unsafe { resolved.read() }.expect("value is not an error");
+                    let rhs = unsafe { addr_of_mut!(self.resolved_values_rhs[index]).read() }
+                        .expect("value is not an error");
+                    let result = Ok((!lhs.eq_lossy(&rhs)).into());
+                    unsafe { resolved.write(result) };
                 }
             }
             Gt => {
                 for index in &self.selection_vector_ok {
                     let index = *index;
-                    let resolved = &mut ctx.resolved_values[index];
-                    let lhs = {
-                        let mut moved = Ok(Value::Null);
-                        std::mem::swap(resolved, &mut moved);
-                        moved
-                    }
-                    .expect("value is not an error");
-                    let rhs = {
-                        let mut moved = Ok(Value::Null);
-                        std::mem::swap(&mut self.resolved_values_rhs[index], &mut moved);
-                        moved
-                    }
-                    .expect("value is not an error");
-                    *resolved = lhs.try_gt(rhs).map_err(Into::into);
+                    let resolved = addr_of_mut!(ctx.resolved_values[index]);
+                    let lhs = unsafe { resolved.read() }.expect("value is not an error");
+                    let rhs = unsafe { addr_of_mut!(self.resolved_values_rhs[index]).read() }
+                        .expect("value is not an error");
+                    let result = lhs.try_gt(rhs).map_err(Into::into);
+                    unsafe { resolved.write(result) };
                 }
             }
             Ge => {
                 for index in &self.selection_vector_ok {
                     let index = *index;
-                    let resolved = &mut ctx.resolved_values[index];
-                    let lhs = {
-                        let mut moved = Ok(Value::Null);
-                        std::mem::swap(resolved, &mut moved);
-                        moved
-                    }
-                    .expect("value is not an error");
-                    let rhs = {
-                        let mut moved = Ok(Value::Null);
-                        std::mem::swap(&mut self.resolved_values_rhs[index], &mut moved);
-                        moved
-                    }
-                    .expect("value is not an error");
-                    *resolved = lhs.try_ge(rhs).map_err(Into::into);
+                    let resolved = addr_of_mut!(ctx.resolved_values[index]);
+                    let lhs = unsafe { resolved.read() }.expect("value is not an error");
+                    let rhs = unsafe { addr_of_mut!(self.resolved_values_rhs[index]).read() }
+                        .expect("value is not an error");
+                    let result = lhs.try_ge(rhs).map_err(Into::into);
+                    unsafe { resolved.write(result) };
                 }
             }
             Lt => {
                 for index in &self.selection_vector_ok {
                     let index = *index;
-                    let resolved = &mut ctx.resolved_values[index];
-                    let lhs = {
-                        let mut moved = Ok(Value::Null);
-                        std::mem::swap(resolved, &mut moved);
-                        moved
-                    }
-                    .expect("value is not an error");
-                    let rhs = {
-                        let mut moved = Ok(Value::Null);
-                        std::mem::swap(&mut self.resolved_values_rhs[index], &mut moved);
-                        moved
-                    }
-                    .expect("value is not an error");
-                    *resolved = lhs.try_lt(rhs).map_err(Into::into);
+                    let resolved = addr_of_mut!(ctx.resolved_values[index]);
+                    let lhs = unsafe { resolved.read() }.expect("value is not an error");
+                    let rhs = unsafe { addr_of_mut!(self.resolved_values_rhs[index]).read() }
+                        .expect("value is not an error");
+                    let result = lhs.try_lt(rhs).map_err(Into::into);
+                    unsafe { resolved.write(result) };
                 }
             }
             Le => {
                 for index in &self.selection_vector_ok {
                     let index = *index;
-                    let resolved = &mut ctx.resolved_values[index];
-                    let lhs = {
-                        let mut moved = Ok(Value::Null);
-                        std::mem::swap(resolved, &mut moved);
-                        moved
-                    }
-                    .expect("value is not an error");
-                    let rhs = {
-                        let mut moved = Ok(Value::Null);
-                        std::mem::swap(&mut self.resolved_values_rhs[index], &mut moved);
-                        moved
-                    }
-                    .expect("value is not an error");
-                    *resolved = lhs.try_le(rhs).map_err(Into::into);
+                    let resolved = addr_of_mut!(ctx.resolved_values[index]);
+                    let lhs = unsafe { resolved.read() }.expect("value is not an error");
+                    let rhs = unsafe { addr_of_mut!(self.resolved_values_rhs[index]).read() }
+                        .expect("value is not an error");
+                    let result = lhs.try_le(rhs).map_err(Into::into);
+                    unsafe { resolved.write(result) };
                 }
             }
             Merge => {
                 for index in &self.selection_vector_ok {
                     let index = *index;
-                    let resolved = &mut ctx.resolved_values[index];
-                    let lhs = {
-                        let mut moved = Ok(Value::Null);
-                        std::mem::swap(resolved, &mut moved);
-                        moved
-                    }
-                    .expect("value is not an error");
-                    let rhs = {
-                        let mut moved = Ok(Value::Null);
-                        std::mem::swap(&mut self.resolved_values_rhs[index], &mut moved);
-                        moved
-                    }
-                    .expect("value is not an error");
-                    *resolved = lhs.try_merge(rhs).map_err(Into::into);
+                    let resolved = addr_of_mut!(ctx.resolved_values[index]);
+                    let lhs = unsafe { resolved.read() }.expect("value is not an error");
+                    let rhs = unsafe { addr_of_mut!(self.resolved_values_rhs[index]).read() }
+                        .expect("value is not an error");
+                    let result = lhs.try_merge(rhs).map_err(Into::into);
+                    unsafe { resolved.write(result) };
                 }
             }
             And | Or | Err => unreachable!(),
         }
+
+        unsafe { self.resolved_values_rhs.set_len(0) };
     }
 
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {

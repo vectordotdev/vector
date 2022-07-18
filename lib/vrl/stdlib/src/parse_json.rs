@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ptr::addr_of_mut};
 
 use ::value::Value;
 use serde_json::{
@@ -204,13 +204,8 @@ impl Expression for ParseJsonFn {
 
         for index in selection_vector {
             let index = *index;
-            let resolved = &mut ctx.resolved_values[index];
-            let temp = {
-                let mut moved = Ok(Value::Null);
-                std::mem::swap(resolved, &mut moved);
-                moved
-            };
-            *resolved = temp.and_then(parse_json)
+            let resolved = addr_of_mut!(ctx.resolved_values[index]);
+            unsafe { resolved.write(resolved.read().and_then(parse_json)) };
         }
     }
 

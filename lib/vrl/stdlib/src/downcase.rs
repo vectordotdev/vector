@@ -1,3 +1,5 @@
+use std::ptr::addr_of_mut;
+
 use ::value::Value;
 use vrl::prelude::*;
 
@@ -57,13 +59,8 @@ impl Expression for DowncaseFn {
 
         for index in selection_vector {
             let index = *index;
-            let resolved = &mut ctx.resolved_values[index];
-            let temp = {
-                let mut moved = Ok(Value::Null);
-                std::mem::swap(resolved, &mut moved);
-                moved
-            };
-            *resolved = temp.and_then(downcase)
+            let resolved = addr_of_mut!(ctx.resolved_values[index]);
+            unsafe { resolved.write(resolved.read().and_then(downcase)) };
         }
     }
 
