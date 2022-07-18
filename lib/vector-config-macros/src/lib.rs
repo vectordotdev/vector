@@ -20,10 +20,10 @@ mod configurable_component;
 /// use vector_config::configurable_component;
 /// use serde;
 ///
-/// /// Configuration for the Something struct
+/// /// Batching configurations.
 /// #[configurable_component]
 /// #[derive(Clone, Debug)]
-/// pub struct Something {
+/// pub struct BatchSettings {
 ///   // ...
 /// }
 /// ```
@@ -37,7 +37,7 @@ mod configurable_component;
 /// use vector_config::configurable_component;
 /// use serde;
 ///
-/// /// Configuration for the `kafka` source
+/// /// Configuration for the `kafka` source.
 /// #[configurable_component(source)]
 /// #[derive(Clone, Debug)]
 /// pub struct KafkaSourceConfig {
@@ -58,16 +58,20 @@ mod configurable_component;
 /// ```no_run
 /// use vector_config::configurable_component;
 ///
-/// // This keeps the automatic derive for `Serialize` but doesn't bother deriving `Deserialize`:
+/// /// Helper type with custom deserialization logic.
 /// #[configurable_component(no_deser)]
+/// # #[derive(::serde::Deserialize)]
 /// pub struct HelperTypeWithCustomDeser {
-///   // ...
+///   // This type brings its own implementation of `Deserialize` so we simply avoid bringing it in
+///   // via `#[configurable_component]` but `Serialize` is still being automatically derived for us.
 /// }
 ///
-/// // If we don't require either, we can disable them both:
+/// /// Helper type with entirely custom (de)serialization logic.
 /// #[configurable_component(no_deser, no_ser)]
+/// # #[derive(::serde::Deserialize, ::serde::Serialize)]
 /// pub struct HelperTypeWithCustomDeserAndSer {
-///   // ...
+///   // This type brings its own implementation of `Deserialize` _and_ `Serialize` so we've avoided
+///   // having them automatically derived via `#[configurable_component]`.
 /// }
 /// ```
 #[proc_macro_attribute]
