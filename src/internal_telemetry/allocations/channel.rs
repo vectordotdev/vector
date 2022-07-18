@@ -27,6 +27,7 @@ impl<const CHUNK_LEN: usize, T: Copy> Chunk<CHUNK_LEN, T> {
     /// The caller is responsible for ensuring that they have exclusive access to this chunk, as the mutable reference
     /// is created in a way that circumvents normal aliasing rules.
     #[inline]
+    #[allow(clippy::mut_from_ref)]
     unsafe fn as_mut(&self) -> &mut [T] {
         slice::from_raw_parts_mut(self.0.as_ptr() as *mut _, CHUNK_LEN)
     }
@@ -194,7 +195,7 @@ impl<const CHUNK_LEN: usize, const CHUNKS: usize, T> Producer<CHUNK_LEN, CHUNKS,
 where
     T: Copy + 'static,
 {
-    fn from_inner(inner: &'static Inner<CHUNK_LEN, CHUNKS, T>) -> Self {
+    const fn from_inner(inner: &'static Inner<CHUNK_LEN, CHUNKS, T>) -> Self {
         Self {
             inner,
             current_chunk: None,
@@ -380,14 +381,15 @@ where
     //
     // As we know that there will only be one producer and one consumer attached to any given state object, we only have
     // two places that need to coordinate around when it's safe to unleak/drop the memory. Additionally, and thankfully,
-    // we have another invariant on our side: we can generate references tied to the lifetime of the producer and consumer, breaking the link to the lifetime
-    //   of the state itself
+    // we have another invariant on our side: we can generate references tied to the lifetime of the producer and
+    //   consumer, breaking the link to the lifetime of the state itself.
     //
     // Essentially, when a producer is dropped, we mark the inner state to indicate as much. This implies the producer
-    // is fully done, and that there are no outstanding chunk writes happening, based on how we generate the chunk writer guard
-    // object. With that, the consumer can poll for this state to figure out when it's safe to stop processing.. as if
-    // there's no more readable chunks, and the producer has dropped, there's no reason to keep trying to consume from
-    // the channel. When this happens, we can also safely unleak the inner state and correctly drop it.
+    // is fully done, and that there are no outstanding chunk writes happening, based on how we generate the chunk
+    // writer guard object. With that, the consumer can poll for this state to figure out when it's safe to stop
+    // processing.. as if there's no more readable chunks, and the producer has dropped, there's no reason to keep
+    // trying to consume from the channel. When this happens, we can also safely unleak the inner state and correctly
+    // drop it.
     //
     // This assumes that the consumer task will be around as long or longer than producer tasks, but bugs happen and the
     // consumer task could also potentially crash. This would be bad from a cleanup standup, but also from a deadlock

@@ -25,18 +25,18 @@
 // in this proposed method.
 //
 // TODO: We should explore a design where we essentially bring in `tracking-allocator` directly and tweak it such that
-// we collapse a majority of the various thread locals, and combine it with the channel data structures. For example,
-// what if there was a single thread local that held a producer, and the producer had its own temporary internal buffer
-// that held on to a chunk such that we could as cheaply as possible write individual events into it, and once we tried
-// to write and it had no space, it would send and then fetch a new chunk, etc etc. Basically, reduce the amount of
-// memory copies, other thread local variables, needing to access/enter them, etc etc. It's not as modular but
-// modularity doesn't mean shit when you're adding 50% overhead.
-
-#![allow(dead_code)]
+// we collapse a majority of the various thread locals, and lean more on what we already do, specifically related to the
+// span stack.
+//
+// Essentially, since we always need to coordinate with the span stack to enter in and out, could we use the span stack
+// to actually store the (de)alloc counts and amounts and then push them as an aggregated event when the current group
+// is popped off the stack? We'd still have to enter the thread local in `alloc`/`dealloc` so it might be a wash, and
+// there's also the question of how we handle tasks that infrquently yield (aka would exit the span) or don't yield at
+// all... then we're back in "tracked a bunch of events but never sent them" territory... but... there might be
+// something we could do here *shrug*
 
 use std::{
     cell::UnsafeCell,
-    num::NonZeroUsize,
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc,
@@ -66,7 +66,7 @@ thread_local! {
 }
 
 fn get_registrations() -> &'static Registrations {
-    REGISTRATIONS.get_or_init(|| Registrations::new())
+    REGISTRATIONS.get_or_init(Registrations::new)
 }
 
 //#[inline]
@@ -101,15 +101,8 @@ fn register_event_channel() -> Producer<BATCH_SIZE, BATCHES, AllocatorEvent> {
 
 #[derive(Clone, Copy)]
 enum AllocatorEvent {
-    Allocation {
-        group_id: NonZeroUsize,
-        wrapped_size: usize,
-    },
-
-    Deallocation {
-        source_group_id: NonZeroUsize,
-        wrapped_size: usize,
-    },
+    Allocation,
+    Deallocation,
 }
 
 struct Registrations {
@@ -155,7 +148,7 @@ impl Registrations {
 
 struct Collector {
     consumers: Slab<Consumer<BATCH_SIZE, BATCHES, AllocatorEvent>>,
-    consumer_empty: Vec<usize>,
+    //consumer_empty: Vec<usize>,
     registrations: &'static Registrations,
 }
 
@@ -165,7 +158,7 @@ impl Collector {
 
         Self {
             consumers: Slab::new(),
-            consumer_empty: Vec::new(),
+            //consumer_empty: Vec::new(),
             registrations,
         }
     }
@@ -176,23 +169,8 @@ impl Collector {
         let allocs = Arc::new(AtomicUsize::new(0));
         let deallocs = Arc::new(AtomicUsize::new(0));
 
-        {
-            let allocs = Arc::clone(&allocs);
-            let deallocs = Arc::clone(&deallocs);
-
-            let alloc_reporter = thread::Builder::new().name("vector-alloc-reporter".to_string());
-            alloc_reporter
-                .spawn(move || loop {
-                    thread::sleep(Duration::from_secs(1));
-
-                    /*println!(
-                        "allocator activity: allocs={} deallocs={}",
-                        allocs.load(Ordering::Relaxed),
-                        deallocs.load(Ordering::Relaxed)
-                    );*/
-                })
-                .unwrap();
-        }
+        // Run the allocation reporter in the background.
+        //run_allocation_reporter(Arc::clone(&allocs), Arc::clone(&deallocs));
 
         // We don't want to track allocator events here, because speed is the name of the game, and also, things could
         // potentially get into a not-so-great feedback loop.
@@ -237,7 +215,7 @@ impl Collector {
                     // Loop over every consumer, trying to consume a readable chunk if one is available.
                     let mut consumed = false;
                     for (_, consumer) in self.consumers.iter_mut() {
-                        if let Some(_) = consumer.try_consume(&mut processor) {
+                        if consumer.try_consume(&mut processor).is_some() {
                             consumed = true;
                         }
                     }
@@ -263,6 +241,22 @@ impl Collector {
     }
 }
 
+#[allow(dead_code)]
+fn run_allocation_reporter(allocs: Arc<AtomicUsize>, deallocs: Arc<AtomicUsize>) {
+    let alloc_reporter = thread::Builder::new().name("vector-alloc-reporter".to_string());
+    alloc_reporter
+        .spawn(move || loop {
+            thread::sleep(Duration::from_secs(1));
+
+            info!(
+                total_allocations = allocs.load(Ordering::Relaxed),
+                total_deallocations = deallocs.load(Ordering::Relaxed),
+                "Allocator activity.",
+            );
+        })
+        .unwrap();
+}
+
 struct Tracker;
 
 impl AllocationTracker for Tracker {
@@ -270,14 +264,11 @@ impl AllocationTracker for Tracker {
         &self,
         _addr: usize,
         _object_size: usize,
-        wrapped_size: usize,
-        group_id: AllocationGroupId,
+        _wrapped_size: usize,
+        _group_id: AllocationGroupId,
     ) {
         with_local_event_producer(|producer| {
-            producer.write(AllocatorEvent::Allocation {
-                group_id: group_id.as_usize(),
-                wrapped_size,
-            });
+            producer.write(AllocatorEvent::Allocation);
         });
     }
 
@@ -285,15 +276,12 @@ impl AllocationTracker for Tracker {
         &self,
         _addr: usize,
         _object_size: usize,
-        wrapped_size: usize,
-        source_group_id: AllocationGroupId,
+        _wrapped_size: usize,
+        _source_group_id: AllocationGroupId,
         _current_group_id: AllocationGroupId,
     ) {
         with_local_event_producer(|producer| {
-            producer.write(AllocatorEvent::Deallocation {
-                source_group_id: source_group_id.as_usize(),
-                wrapped_size,
-            });
+            producer.write(AllocatorEvent::Deallocation);
         });
     }
 }
@@ -305,7 +293,7 @@ pub fn init_allocation_tracking() {
     let alloc_processor = thread::Builder::new().name("vector-alloc-processor".to_string());
     alloc_processor.spawn(move || collector.run()).unwrap();
 
-    let _ = AllocationRegistry::set_global_tracker(Tracker)
+    AllocationRegistry::set_global_tracker(Tracker)
         .expect("no other global tracker should be set yet");
 
     AllocationRegistry::enable_tracking();
