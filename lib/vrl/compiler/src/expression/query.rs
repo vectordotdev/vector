@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, ptr::addr_of_mut};
 
 use lookup::LookupBuf;
 use value::{kind::remove, Kind, Value};
@@ -126,19 +126,15 @@ impl Expression for Query {
         };
 
         for index in selection_vector {
-            let resolved_value = &mut ctx.resolved_values[*index];
-            let resolved = {
-                let mut moved = Ok(Value::Null);
-                std::mem::swap(resolved_value, &mut moved);
-                moved
-            };
-
-            *resolved_value = resolved.map(|value| {
+            let resolved = addr_of_mut!(ctx.resolved_values[*index]);
+            let result = unsafe { resolved.read() }.map(|value| {
                 value
                     .get_by_path(&self.path)
                     .cloned()
                     .unwrap_or(Value::Null)
             });
+
+            unsafe { resolved.write(result) };
         }
     }
 

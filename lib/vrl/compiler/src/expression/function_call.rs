@@ -1,8 +1,7 @@
-use std::{fmt, sync::Arc};
+use std::{fmt, ptr::addr_of_mut, sync::Arc};
 
 use anymap::AnyMap;
 use diagnostic::{DiagnosticMessage, Label, Note, Urls};
-use value::Value;
 
 use super::Block;
 use crate::{
@@ -618,13 +617,8 @@ impl Expression for FunctionCall {
         self.expr.resolve_batch(ctx, selection_vector);
 
         for index in selection_vector {
-            let resolved = &mut ctx.resolved_values[*index];
-            let temp = {
-                let mut moved = Ok(Value::Null);
-                std::mem::swap(resolved, &mut moved);
-                moved
-            };
-            *resolved = temp.map_err(|err| match err {
+            let resolved = addr_of_mut!(ctx.resolved_values[*index]);
+            let result = unsafe { resolved.read() }.map_err(|err| match err {
                 #[cfg(feature = "expr-abort")]
                 ExpressionError::Abort { .. } => {
                     panic!("abort errors must only be defined by `abort` statement")
@@ -649,6 +643,7 @@ impl Expression for FunctionCall {
                     }
                 }
             });
+            unsafe { resolved.write(result) };
         }
     }
 
