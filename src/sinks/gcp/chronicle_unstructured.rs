@@ -1,5 +1,6 @@
-//! This sink send data to Google Chronicles unstructured log entries endpoint.
-//! see https://cloud.google.com/chronicle/docs/reference/ingestion-api#unstructuredlogentries
+//! This sink sends data to Google Chronicles unstructured log entries endpoint.
+//! See https://cloud.google.com/chronicle/docs/reference/ingestion-api#unstructuredlogentries
+//! for more information.
 use bytes::{Bytes, BytesMut};
 use futures_util::{future::BoxFuture, task::Poll};
 use goauth::scopes::Scope;
@@ -87,7 +88,6 @@ pub struct ChronicleUnstructuredConfig {
     pub auth: GcpAuthConfig,
     #[serde(default)]
     pub batch: BatchConfig<BulkSizeBasedDefaultBatchSettings>,
-    #[serde(flatten)]
     pub encoding: EncodingConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
