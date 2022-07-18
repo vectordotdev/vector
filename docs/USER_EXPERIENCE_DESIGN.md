@@ -11,26 +11,30 @@ experience -- the purpose of this document.
 
 <!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
 
-1. [Principles](#principles)
-   1. [Don't please everyone](#dont-please-everyone)
-   1. [Be opinionated & reduce decisions](#be-opinionated--reduce-decisions)
-   1. [Build momentum with consistency](#build-momentum-with-consistency)
-1. [Goals](#goals)
-   1. [Performance](#performance)
-   1. [Safety](#safety)
-1. [Guidelines](#guidelines)
-   1. [Defaults](#defaults)
-      1. [Don't lose data](#dont-lose-data)
-   1. [Logical boundaries](#logical-boundaries)
-      1. [Source & sink boundaries](#source--sink-boundaries)
-      1. [Transform boundaries](#transform-boundaries)
-1. [Adherence](#adherence)
-   1. [Roles](#roles)
-      1. [Contributors](#contributors)
-      1. [User experience committee](#user-experience-committee)
-   1. [Responsibilities](#responsibilities)
-      1. [Contributors](#contributors-1)
-      1. [User experience committee](#user-experience-committee-1)
+- [User Experience Design](#user-experience-design)
+  - [Principles](#principles)
+    - [Don't please everyone](#dont-please-everyone)
+    - [Be opinionated & reduce decisions](#be-opinionated--reduce-decisions)
+    - [Build momentum with consistency](#build-momentum-with-consistency)
+  - [Goals](#goals)
+    - [Performance](#performance)
+    - [Safety](#safety)
+  - [Guidelines](#guidelines)
+    - [Data model](#data-model)
+      - [Log schemas should be fluid](#log-schemas-should-be-fluid)
+    - [Defaults](#defaults)
+      - [Don't lose data](#dont-lose-data)
+    - [Logical boundaries](#logical-boundaries)
+      - [Source & sink boundaries](#source--sink-boundaries)
+      - [Transform boundaries](#transform-boundaries)
+    - [Upfront configuration](#upfront-configuration)
+  - [Adherence](#adherence)
+    - [Roles](#roles)
+      - [Contributors](#contributors)
+      - [User experience committee](#user-experience-committee)
+    - [Responsibilities](#responsibilities)
+      - [Contributors](#contributors-1)
+      - [User experience committee](#user-experience-committee-1)
 
 <!-- /MarkdownTOC -->
 
@@ -201,6 +205,20 @@ Examples:
   transforms.
 * A `filter` transform as opposed to a `filter_regex`, `filter_datadog_search`,
   etc transforms.
+
+### Upfront configuration
+
+Vector should never require manual intervention of Vector to remedy normal
+processing failures during; instead Vector should require any necessary
+configuration to handle these failures a priori.
+
+For example, rather than requiring users to intervene to unblock processing
+whenever events fail to be sent to sinks by manually skipping them, instead
+Vector should let users define dead-letter queues to send events to when the
+primary sink rejects events.
+
+Users may need to intervene to update invalid configuration, for example in the
+case of rotating invalid API keys.
 
 ## Adherence
 
