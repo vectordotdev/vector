@@ -9,7 +9,6 @@ use md5::Digest;
 use tower::Service;
 use tracing::Instrument;
 use vector_core::{
-    buffers::Ackable,
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_event::EventsSent,
     stream::DriverResponse,
@@ -24,12 +23,6 @@ pub struct S3Request {
     pub metadata: S3Metadata,
     pub content_encoding: Option<&'static str>,
     pub options: S3Options,
-}
-
-impl Ackable for S3Request {
-    fn ack_size(&self) -> usize {
-        self.metadata.count
-    }
 }
 
 impl Finalizable for S3Request {

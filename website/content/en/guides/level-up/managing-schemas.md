@@ -158,7 +158,7 @@ source = "del(.email)"
 healthcheck = true
 inputs = ["not_gdpr", "gdpr_stripped"]
 type = "console"
-encoding = "json"
+encoding.codec = "json"
 [sinks.console.buffer]
 type = "memory"
 max_events = 500
@@ -307,7 +307,7 @@ output format
   type = "console"
   inputs = ["source0"]
   target = "stdout"
-  encoding = "json"
+  encoding.codec = "json"
 ```
 
 You can also use a transform like [`remap`][docs.transforms.remap] or to parse out

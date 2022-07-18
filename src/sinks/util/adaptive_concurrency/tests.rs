@@ -155,7 +155,7 @@ struct TestConfig {
 #[async_trait::async_trait]
 #[typetag::serialize(name = "test")]
 impl SinkConfig for TestConfig {
-    async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck), crate::Error> {
+    async fn build(&self, _cx: SinkContext) -> Result<(VectorSink, Healthcheck), crate::Error> {
         let mut batch_settings = BatchSettings::default();
         batch_settings.size.bytes = 9999;
         batch_settings.size.events = 1;
@@ -168,7 +168,6 @@ impl SinkConfig for TestConfig {
                 TestSink::new(self),
                 VecBuffer::new(batch_settings.size),
                 batch_settings.timeout,
-                cx.acker(),
             )
             .with_flat_map(|event| stream::iter(Some(Ok(EncodedEvent::new(event, 0)))))
             .sink_map_err(|error| panic!("Fatal test sink error: {}", error));

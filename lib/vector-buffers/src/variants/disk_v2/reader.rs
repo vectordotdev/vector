@@ -123,6 +123,9 @@ where
     /// writing logic of the buffer, or a record that does not use a symmetrical encoding scheme,
     /// which is also not supported.
     EmptyRecord,
+
+    /// The reader has been stopped due to an acknowledgement error.
+    Stopped,
 }
 
 impl<T> ReaderError<T>
@@ -132,35 +135,38 @@ where
     fn is_bad_read(&self) -> bool {
         matches!(
             self,
-            ReaderError::Checksum { .. }
-                | ReaderError::Deserialization { .. }
-                | ReaderError::PartialWrite
+            Self::Checksum { .. } | Self::Deserialization { .. } | Self::PartialWrite
         )
+    }
+
+    pub(crate) fn is_stopped(&self) -> bool {
+        matches!(self, Self::Stopped)
     }
 
     fn as_error_code(&self) -> &'static str {
         match self {
-            ReaderError::Io { .. } => "io_error",
-            ReaderError::Deserialization { .. } => "deser_failed",
-            ReaderError::Checksum { .. } => "checksum_mismatch",
-            ReaderError::Decode { .. } => "decode_failed",
-            ReaderError::Incompatible { .. } => "incompatible_record_version",
-            ReaderError::PartialWrite => "partial_write",
-            ReaderError::EmptyRecord => "empty_record",
+            Self::Io { .. } => "io_error",
+            Self::Deserialization { .. } => "deser_failed",
+            Self::Checksum { .. } => "checksum_mismatch",
+            Self::Decode { .. } => "decode_failed",
+            Self::Incompatible { .. } => "incompatible_record_version",
+            Self::PartialWrite => "partial_write",
+            Self::EmptyRecord => "empty_record",
+            Self::Stopped => "reader_stopped",
         }
     }
 
-    pub fn as_recoverable_error(&self) -> Option<BufferReadError> {
+    pub(crate) fn as_recoverable_error(&self) -> Option<BufferReadError> {
         let error = self.to_string();
         let error_code = self.as_error_code();
 
         match self {
-            ReaderError::Io { .. } | ReaderError::EmptyRecord => None,
-            ReaderError::Deserialization { .. }
-            | ReaderError::Checksum { .. }
-            | ReaderError::Decode { .. }
-            | ReaderError::Incompatible { .. }
-            | ReaderError::PartialWrite => Some(BufferReadError { error_code, error }),
+            Self::Io { .. } | Self::EmptyRecord | Self::Stopped => None,
+            Self::Deserialization { .. }
+            | Self::Checksum { .. }
+            | Self::Decode { .. }
+            | Self::Incompatible { .. }
+            | Self::PartialWrite => Some(BufferReadError { error_code, error }),
         }
     }
 }
@@ -940,6 +946,10 @@ where
                 .await
                 .context(IoSnafu)?;
             force_check_pending_data_files = false;
+
+            if self.ledger.is_reader_done() {
+                return Err(ReaderError::Stopped);
+            }
 
             // If the writer has marked themselves as done, and the buffer has been emptied, then
             // we're done and can return.  We have to look at something besides simply the writer

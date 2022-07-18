@@ -7,7 +7,6 @@ use futures_util::{
 };
 use tower::Service;
 use vector_core::{
-    buffers::Acker,
     config::log_schema,
     event::Event,
     partition::Partitioner,
@@ -17,7 +16,6 @@ use vector_core::{
 
 use super::service::TraceApiRequest;
 use crate::{
-    config::SinkContext,
     internal_events::DatadogTracesEncodingError,
     sinks::{datadog::traces::request_builder::DatadogTracesRequestBuilder, util::SinkBuilderExt},
 };
@@ -63,7 +61,6 @@ impl Partitioner for EventPartitioner {
 
 pub struct TracesSink<S> {
     service: S,
-    acker: Acker,
     request_builder: DatadogTracesRequestBuilder,
     batch_settings: BatcherSettings,
 }
@@ -75,15 +72,13 @@ where
     S::Future: Send + 'static,
     S::Response: DriverResponse,
 {
-    pub fn new(
-        cx: SinkContext,
+    pub const fn new(
         service: S,
         request_builder: DatadogTracesRequestBuilder,
         batch_settings: BatcherSettings,
     ) -> Self {
         TracesSink {
             service,
-            acker: cx.acker(),
             request_builder,
             batch_settings,
         }
@@ -108,7 +103,7 @@ where
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(self.service, self.acker);
+            .into_driver(self.service);
 
         sink.run().await
     }

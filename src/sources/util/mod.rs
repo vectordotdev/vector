@@ -3,7 +3,7 @@ mod body_decoding;
 mod encoding_config;
 #[cfg(all(unix, feature = "sources-dnstap"))]
 pub mod framestream;
-#[cfg(feature = "sources-vector")]
+#[cfg(any(feature = "sources-vector", feature = "sources-opentelemetry"))]
 pub mod grpc;
 #[cfg(any(
     feature = "sources-utils-http-auth",

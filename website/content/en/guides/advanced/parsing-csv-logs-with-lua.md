@@ -58,7 +58,7 @@ data_dir = "."
 [sinks.console]
   inputs = ["lua"]
   type = "console"
-  encoding = "json"
+  encoding.codec = "json"
 ```
 
 This config sets up a [pipeline][docs.meta.glossary#pipeline] that reads log files, pipes them through the parsing

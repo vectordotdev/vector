@@ -8,6 +8,7 @@ use schemars::{
         SchemaObject, SingleOrVec, SubschemaValidation,
     },
 };
+use serde::Serialize;
 use serde_json::{Map, Value};
 
 use crate::{num::ConfigurableNumber, Configurable, CustomAttribute, Metadata};
@@ -24,12 +25,12 @@ use crate::{num::ConfigurableNumber, Configurable, CustomAttribute, Metadata};
 /// manually determine when we should register a schema as a referencable schema within the schema
 /// generator. As well, we need to handle applying metadata to these schemas such that we preserve
 /// the intended behavior.
-pub fn finalize_schema<'de, T>(
+pub fn finalize_schema<T>(
     gen: &mut SchemaGenerator,
     schema: &mut SchemaObject,
-    metadata: Metadata<'de, T>,
+    metadata: Metadata<T>,
 ) where
-    T: Configurable<'de>,
+    T: Configurable + Serialize,
 {
     // If the type that this schema represents is referencable, check to see if it's been defined
     // before, and if not, then go ahead and define it.
@@ -57,9 +58,9 @@ pub fn finalize_schema<'de, T>(
 ///
 /// Metadata can include semantic information (title, description, etc), validation (min/max, allowable
 /// patterns, etc), as well as actual arbitrary key/value data.
-pub fn apply_metadata<'de, T>(schema: &mut SchemaObject, metadata: Metadata<'de, T>)
+pub fn apply_metadata<T>(schema: &mut SchemaObject, metadata: Metadata<T>)
 where
-    T: Configurable<'de>,
+    T: Serialize,
 {
     // Set the title/description of this schema.
     //
@@ -152,9 +153,9 @@ pub fn generate_string_schema() -> SchemaObject {
     }
 }
 
-pub fn generate_number_schema<'de, N>() -> SchemaObject
+pub fn generate_number_schema<N>() -> SchemaObject
 where
-    N: Configurable<'de> + ConfigurableNumber,
+    N: Configurable + ConfigurableNumber,
 {
     let minimum = N::get_enforced_min_bound();
     let maximum = N::get_enforced_max_bound();
@@ -187,12 +188,9 @@ where
     schema
 }
 
-pub fn generate_array_schema<'de, T>(
-    gen: &mut SchemaGenerator,
-    metadata: Metadata<'de, T>,
-) -> SchemaObject
+pub fn generate_array_schema<T>(gen: &mut SchemaGenerator, metadata: Metadata<T>) -> SchemaObject
 where
-    T: Configurable<'de>,
+    T: Configurable,
 {
     // We generate the schema for `T` itself, and then apply any of `T`'s metadata to the given schema.
     let element_schema = T::generate_schema(gen, metadata);
@@ -207,12 +205,9 @@ where
     }
 }
 
-pub fn generate_set_schema<'de, T>(
-    gen: &mut SchemaGenerator,
-    metadata: Metadata<'de, T>,
-) -> SchemaObject
+pub fn generate_set_schema<T>(gen: &mut SchemaGenerator, metadata: Metadata<T>) -> SchemaObject
 where
-    T: Configurable<'de>,
+    T: Configurable,
 {
     // We generate the schema for `T` itself, and then apply any of `T`'s metadata to the given schema.
     let element_schema = T::generate_schema(gen, metadata);
@@ -228,12 +223,9 @@ where
     }
 }
 
-pub fn generate_map_schema<'de, V>(
-    gen: &mut SchemaGenerator,
-    metadata: Metadata<'de, V>,
-) -> SchemaObject
+pub fn generate_map_schema<V>(gen: &mut SchemaGenerator, metadata: Metadata<V>) -> SchemaObject
 where
-    V: Configurable<'de>,
+    V: Configurable,
 {
     // We generate the schema for `V` itself, and then apply any of `V`'s metadata to the given schema.
     let element_schema = V::generate_schema(gen, metadata);
@@ -269,12 +261,9 @@ pub fn generate_struct_schema(
     }
 }
 
-pub fn generate_optional_schema<'de, T>(
-    gen: &mut SchemaGenerator,
-    metadata: Metadata<'de, T>,
-) -> SchemaObject
+pub fn generate_optional_schema<T>(gen: &mut SchemaGenerator, metadata: Metadata<T>) -> SchemaObject
 where
-    T: Configurable<'de>,
+    T: Configurable,
 {
     // We generate the schema for `T` itself, and then apply any of `T`'s metadata to the given schema.
     let mut schema = T::generate_schema(gen, metadata);
@@ -361,9 +350,9 @@ pub fn generate_internal_tagged_variant_schema(tag: String, value: String) -> Sc
     generate_struct_schema(properties, required, None)
 }
 
-pub fn generate_root_schema<'de, T>() -> RootSchema
+pub fn generate_root_schema<T>() -> RootSchema
 where
-    T: Configurable<'de>,
+    T: Configurable,
 {
     let mut schema_gen = SchemaSettings::draft2019_09().into_generator();
 
