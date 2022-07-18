@@ -42,12 +42,13 @@ impl JsonSerializer {
     }
 
     /// Encode event and represent it as JSON value.
-    pub fn to_json_value(&self, event: Event) -> Result<serde_json::Value, serde_json::Error> {
+    pub fn to_json_value(&self, event: Event) -> Result<serde_json::Value, vector_core::Error> {
         match event {
             Event::Log(log) => serde_json::to_value(&log),
             Event::Metric(metric) => serde_json::to_value(&metric),
             Event::Trace(trace) => serde_json::to_value(&trace),
         }
+        .map_err(|e| e.to_string().into())
     }
 }
 

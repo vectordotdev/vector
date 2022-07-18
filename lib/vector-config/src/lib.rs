@@ -85,10 +85,8 @@
 #![deny(warnings)]
 
 use core::fmt;
-use core::marker::PhantomData;
 
 use num::ConfigurableNumber;
-use serde::{Deserialize, Serialize};
 
 pub mod schema;
 
@@ -119,7 +117,7 @@ pub mod validation {
 }
 
 #[derive(Clone)]
-pub struct Metadata<'de, T: Configurable<'de>> {
+pub struct Metadata<T> {
     title: Option<&'static str>,
     description: Option<&'static str>,
     default_value: Option<T>,
@@ -127,10 +125,9 @@ pub struct Metadata<'de, T: Configurable<'de>> {
     deprecated: bool,
     transparent: bool,
     validations: Vec<validation::Validation>,
-    _de: PhantomData<&'de ()>,
 }
 
-impl<'de, T: Configurable<'de>> Metadata<'de, T> {
+impl<T> Metadata<T> {
     pub fn with_title(title: &'static str) -> Self {
         Self {
             title: Some(title),
@@ -169,6 +166,10 @@ impl<'de, T: Configurable<'de>> Metadata<'de, T> {
         self.description = None;
     }
 
+    pub fn default_value(&self) -> Option<&T> {
+        self.default_value.as_ref()
+    }
+
     pub fn with_default_value(default: T) -> Self {
         Self {
             default_value: Some(default),
@@ -176,22 +177,18 @@ impl<'de, T: Configurable<'de>> Metadata<'de, T> {
         }
     }
 
-    pub fn default_value(&self) -> Option<T> {
-        self.default_value.clone()
-    }
-
     pub fn set_default_value(&mut self, default_value: T) {
         self.default_value = Some(default_value);
     }
 
-    pub fn clear_default_value(&mut self) {
-        self.default_value = None;
+    pub fn consume_default_value(&mut self) -> Option<T> {
+        self.default_value.take()
     }
 
-    pub fn map_default_value<F, U>(self, f: F) -> Metadata<'de, U>
+    pub fn map_default_value<F, U>(self, f: F) -> Metadata<U>
     where
         F: FnOnce(T) -> U,
-        U: Configurable<'de>,
+        U: Configurable,
     {
         Metadata {
             title: self.title,
@@ -201,7 +198,6 @@ impl<'de, T: Configurable<'de>> Metadata<'de, T> {
             deprecated: self.deprecated,
             transparent: self.transparent,
             validations: self.validations,
-            _de: PhantomData,
         }
     }
 
@@ -253,7 +249,7 @@ impl<'de, T: Configurable<'de>> Metadata<'de, T> {
         self.validations.clear();
     }
 
-    pub fn merge(mut self, other: Metadata<'de, T>) -> Self {
+    pub fn merge(mut self, other: Metadata<T>) -> Self {
         self.custom_attributes.extend(other.custom_attributes);
         self.validations.extend(other.validations);
 
@@ -265,14 +261,13 @@ impl<'de, T: Configurable<'de>> Metadata<'de, T> {
             deprecated: other.deprecated,
             transparent: other.transparent,
             validations: self.validations,
-            _de: PhantomData,
         }
     }
 
     /// Converts this metadata from holding a default value of `T` to `U`.
     ///
     /// If a default value was present before, it is dropped.
-    pub fn convert<U: Configurable<'de>>(self) -> Metadata<'de, U> {
+    pub fn convert<U>(self) -> Metadata<U> {
         Metadata {
             title: self.title,
             description: self.description,
@@ -281,7 +276,6 @@ impl<'de, T: Configurable<'de>> Metadata<'de, T> {
             deprecated: self.deprecated,
             transparent: self.transparent,
             validations: self.validations,
-            _de: PhantomData,
         }
     }
 
@@ -293,7 +287,6 @@ impl<'de, T: Configurable<'de>> Metadata<'de, T> {
         Self {
             title: self.title,
             description: self.description,
-            default_value: self.default_value.clone(),
             custom_attributes: Vec::new(),
             transparent: self.transparent,
             ..Default::default()
@@ -301,8 +294,8 @@ impl<'de, T: Configurable<'de>> Metadata<'de, T> {
     }
 }
 
-impl<'de, T: Configurable<'de>> Metadata<'de, Option<T>> {
-    pub fn flatten_default(self) -> Metadata<'de, T> {
+impl<T> Metadata<Option<T>> {
+    pub fn flatten_default(self) -> Metadata<T> {
         Metadata {
             title: self.title,
             description: self.description,
@@ -311,12 +304,11 @@ impl<'de, T: Configurable<'de>> Metadata<'de, Option<T>> {
             deprecated: self.deprecated,
             transparent: self.transparent,
             validations: self.validations,
-            _de: PhantomData,
         }
     }
 }
 
-impl<'de, T: Configurable<'de>> Default for Metadata<'de, T> {
+impl<T> Default for Metadata<T> {
     fn default() -> Self {
         Self {
             title: None,
@@ -326,12 +318,11 @@ impl<'de, T: Configurable<'de>> Default for Metadata<'de, T> {
             deprecated: false,
             transparent: false,
             validations: Vec::new(),
-            _de: PhantomData,
         }
     }
 }
 
-impl<'de, T: Configurable<'de>> fmt::Debug for Metadata<'de, T> {
+impl<T> fmt::Debug for Metadata<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Metadata")
             .field("title", &self.title)
@@ -360,9 +351,9 @@ impl<'de, T: Configurable<'de>> fmt::Debug for Metadata<'de, T> {
 /// `Configurable` provides the machinery to allow describing and encoding the shape of a type, recursively, so that by
 /// instrumenting all transitive types of the configuration, the schema can be discovered by generating the schema from
 /// some root type.
-pub trait Configurable<'de>: Serialize + Deserialize<'de> + Sized
+pub trait Configurable
 where
-    Self: Clone,
+    Self: Sized,
 {
     /// Gets the referencable name of this value, if any.
     ///
@@ -387,7 +378,7 @@ where
     }
 
     /// Gets the metadata for this value.
-    fn metadata() -> Metadata<'de, Self> {
+    fn metadata() -> Metadata<Self> {
         let mut metadata = Metadata::default();
         if let Some(description) = Self::description() {
             metadata.set_description(description);
@@ -398,14 +389,14 @@ where
     /// Generates the schema for this value.
     fn generate_schema(
         gen: &mut schemars::gen::SchemaGenerator,
-        overrides: Metadata<'de, Self>,
+        overrides: Metadata<Self>,
     ) -> schemars::schema::SchemaObject;
 }
 
 #[doc(hidden)]
-pub fn __ensure_numeric_validation_bounds<'de, N>(metadata: &Metadata<'de, N>)
+pub fn __ensure_numeric_validation_bounds<N>(metadata: &Metadata<N>)
 where
-    N: Configurable<'de> + ConfigurableNumber,
+    N: Configurable + ConfigurableNumber,
 {
     // In `Validation::ensure_conformance`, we do some checks on any supplied numeric bounds to try and ensure they're
     // no larger than the largest f64 value where integer/floasting-point conversions are still lossless.  What we

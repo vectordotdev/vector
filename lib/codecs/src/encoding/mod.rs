@@ -8,17 +8,18 @@ use std::fmt::Debug;
 
 use bytes::BytesMut;
 pub use format::{
-    AvroSerializer, AvroSerializerConfig, AvroSerializerOptions, JsonSerializer,
-    JsonSerializerConfig, LogfmtSerializer, LogfmtSerializerConfig, NativeJsonSerializer,
-    NativeJsonSerializerConfig, NativeSerializer, NativeSerializerConfig, RawMessageSerializer,
-    RawMessageSerializerConfig, TextSerializer, TextSerializerConfig,
+    AvroSerializer, AvroSerializerConfig, AvroSerializerOptions, GelfSerializer,
+    GelfSerializerConfig, JsonSerializer, JsonSerializerConfig, LogfmtSerializer,
+    LogfmtSerializerConfig, NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer,
+    NativeSerializerConfig, RawMessageSerializer, RawMessageSerializerConfig, TextSerializer,
+    TextSerializerConfig,
 };
 pub use framing::{
     BoxedFramer, BoxedFramingError, BytesEncoder, BytesEncoderConfig, CharacterDelimitedEncoder,
     CharacterDelimitedEncoderConfig, CharacterDelimitedEncoderOptions, LengthDelimitedEncoder,
     LengthDelimitedEncoderConfig, NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig,
 };
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 use vector_core::{config::DataType, event::Event, schema};
 
 /// An error that occurred while building an encoder.
@@ -50,23 +51,29 @@ impl From<std::io::Error> for Error {
     }
 }
 
-/// Configuration for building a `Framer`.
+/// Framing configuration.
 // Unfortunately, copying options of the nested enum variants is necessary
 // since `serde` doesn't allow `flatten`ing these:
 // https://github.com/serde-rs/serde/issues/1402.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[configurable_component]
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(tag = "method", rename_all = "snake_case")]
 pub enum FramingConfig {
-    /// Configures the `BytesEncoder`.
+    /// Event data is not delimited at all.
     Bytes,
-    /// Configures the `CharacterDelimitedEncoder`.
+
+    /// Event data is delimited by a single ASCII (7-bit) character.
     CharacterDelimited {
         /// Options for the character delimited encoder.
         character_delimited: CharacterDelimitedEncoderOptions,
     },
-    /// Configures the `LengthDelimitedEncoder`.
+
+    /// Event data is prefixed with its length in bytes.
+    ///
+    /// The prefix is a 32-bit unsigned integer, little endian.
     LengthDelimited,
-    /// Configures the `NewlineDelimitedEncoder`.
+
+    /// Event data is delimited by a newline (LF) character.
     NewlineDelimited,
 }
 
@@ -179,34 +186,57 @@ impl tokio_util::codec::Encoder<()> for Framer {
 }
 
 /// Configuration for building a `Serializer`.
-// Unfortunately, copying options of the nested enum variants is necessary
-// since `serde` doesn't allow `flatten`ing these:
-// https://github.com/serde-rs/serde/issues/1402.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(tag = "codec", rename_all = "snake_case")]
 pub enum SerializerConfig {
-    /// Configures the `AvroSerializer`.
+    /// Apache Avro serialization.
     Avro {
-        /// Options for the avro serializer.
+        /// Apache Avro serializer options.
         avro: AvroSerializerOptions,
     },
-    /// Configures the `JsonSerializer`.
+
+    /// GELF serialization.
+    Gelf,
+
+    /// JSON serialization.
     Json,
-    /// Configures the `LogfmtSerializer`.
+
+    /// Logfmt serialization.
     Logfmt,
-    /// Configures the `NativeSerializer`.
+
+    /// Native Vector serialization based on Protocol Buffers.
     Native,
-    /// Configures the `NativeJsonSerializer`.
+
+    /// Native Vector serialization based on JSON.
     NativeJson,
-    /// Configures the `RawMessageSerializer`.
+
+    /// No serialization.
+    ///
+    /// This encoding, specifically, will only encode the `message` field of a log event. Users should take care if
+    /// they're modifying their log events (such as by using a `remap` transform, etc) and removing the message field
+    /// while doing additional parsing on it, as this could lead to the encoding emitting empty strings for the given
+    /// event.
     RawMessage,
-    /// Configures the `TextSerializer`.
+
+    /// Plaintext serialization.
+    ///
+    /// This encoding, specifically, will only encode the `message` field of a log event. Users should take care if
+    /// they're modifying their log events (such as by using a `remap` transform, etc) and removing the message field
+    /// while doing additional parsing on it, as this could lead to the encoding emitting empty strings for the given
+    /// event.
     Text,
 }
 
 impl From<AvroSerializerConfig> for SerializerConfig {
     fn from(config: AvroSerializerConfig) -> Self {
         Self::Avro { avro: config.avro }
+    }
+}
+
+impl From<GelfSerializerConfig> for SerializerConfig {
+    fn from(_: GelfSerializerConfig) -> Self {
+        Self::Gelf
     }
 }
 
@@ -253,6 +283,7 @@ impl SerializerConfig {
             SerializerConfig::Avro { avro } => Ok(Serializer::Avro(
                 AvroSerializerConfig::new(avro.schema.clone()).build()?,
             )),
+            SerializerConfig::Gelf => Ok(Serializer::Gelf(GelfSerializerConfig::new().build())),
             SerializerConfig::Json => Ok(Serializer::Json(JsonSerializerConfig.build())),
             SerializerConfig::Logfmt => Ok(Serializer::Logfmt(LogfmtSerializerConfig.build())),
             SerializerConfig::Native => Ok(Serializer::Native(NativeSerializerConfig.build())),
@@ -272,6 +303,7 @@ impl SerializerConfig {
             SerializerConfig::Avro { avro } => {
                 AvroSerializerConfig::new(avro.schema.clone()).input_type()
             }
+            SerializerConfig::Gelf { .. } => GelfSerializerConfig::input_type(),
             SerializerConfig::Json => JsonSerializerConfig.input_type(),
             SerializerConfig::Logfmt => LogfmtSerializerConfig.input_type(),
             SerializerConfig::Native => NativeSerializerConfig.input_type(),
@@ -287,6 +319,7 @@ impl SerializerConfig {
             SerializerConfig::Avro { avro } => {
                 AvroSerializerConfig::new(avro.schema.clone()).schema_requirement()
             }
+            SerializerConfig::Gelf { .. } => GelfSerializerConfig::schema_requirement(),
             SerializerConfig::Json => JsonSerializerConfig.schema_requirement(),
             SerializerConfig::Logfmt => LogfmtSerializerConfig.schema_requirement(),
             SerializerConfig::Native => NativeSerializerConfig.schema_requirement(),
@@ -302,6 +335,8 @@ impl SerializerConfig {
 pub enum Serializer {
     /// Uses an `AvroSerializer` for serialization.
     Avro(AvroSerializer),
+    /// Uses a `GelfSerializer` for serialization.
+    Gelf(GelfSerializer),
     /// Uses a `JsonSerializer` for serialization.
     Json(JsonSerializer),
     /// Uses a `LogfmtSerializer` for serialization.
@@ -317,10 +352,10 @@ pub enum Serializer {
 }
 
 impl Serializer {
-    /// Check if the serializer supports encoding to JSON via `Serializer::to_json_value`.
+    /// Check if the serializer supports encoding an event to JSON via `Serializer::to_json_value`.
     pub fn supports_json(&self) -> bool {
         match self {
-            Serializer::Json(_) | Serializer::NativeJson(_) => true,
+            Serializer::Json(_) | Serializer::NativeJson(_) | Serializer::Gelf(_) => true,
             Serializer::Avro(_)
             | Serializer::Logfmt(_)
             | Serializer::Text(_)
@@ -335,8 +370,9 @@ impl Serializer {
     ///
     /// Panics if the serializer does not support encoding to JSON. Call `Serializer::supports_json`
     /// if you need to determine the capability to encode to JSON at runtime.
-    pub fn to_json_value(&self, event: Event) -> Result<serde_json::Value, serde_json::Error> {
+    pub fn to_json_value(&self, event: Event) -> Result<serde_json::Value, vector_core::Error> {
         match self {
+            Serializer::Gelf(serializer) => serializer.to_json_value(event),
             Serializer::Json(serializer) => serializer.to_json_value(event),
             Serializer::NativeJson(serializer) => serializer.to_json_value(event),
             Serializer::Avro(_)
@@ -353,6 +389,12 @@ impl Serializer {
 impl From<AvroSerializer> for Serializer {
     fn from(serializer: AvroSerializer) -> Self {
         Self::Avro(serializer)
+    }
+}
+
+impl From<GelfSerializer> for Serializer {
+    fn from(serializer: GelfSerializer) -> Self {
+        Self::Gelf(serializer)
     }
 }
 
@@ -398,6 +440,7 @@ impl tokio_util::codec::Encoder<Event> for Serializer {
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         match self {
             Serializer::Avro(serializer) => serializer.encode(event, buffer),
+            Serializer::Gelf(serializer) => serializer.encode(event, buffer),
             Serializer::Json(serializer) => serializer.encode(event, buffer),
             Serializer::Logfmt(serializer) => serializer.encode(event, buffer),
             Serializer::Native(serializer) => serializer.encode(event, buffer),

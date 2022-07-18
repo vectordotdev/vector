@@ -983,9 +983,9 @@ dependencies = [
 
 [[package]]
 name = "axum"
-version = "0.5.12"
+version = "0.5.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d16705af05732b7d3258ec0f7b73c03a658a28925e050d8852d5b568ee8bcf4e"
+checksum = "6b9496f0c1d1afb7a2af4338bbe1d969cddfead41d87a9fb3aaa6d0bbc7af648"
 dependencies = [
  "async-trait",
  "axum-core",
@@ -1576,9 +1576,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "3.2.10"
+version = "3.2.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "69c5a7f9997be616e47f0577ee38c91decb33392c5be4866494f34cdf329a9aa"
+checksum = "ab8b79fe3946ceb4a0b1c080b4018992b8d27e9ff363644c1c9b6387c854614d"
 dependencies = [
  "atty",
  "bitflags",
@@ -1654,6 +1654,7 @@ dependencies = [
  "serde",
  "serde_json",
  "smallvec",
+ "snafu",
  "syslog_loose",
  "tokio",
  "tokio-util 0.7.1",
@@ -2387,9 +2388,9 @@ dependencies = [
 
 [[package]]
 name = "dyn-clone"
-version = "1.0.6"
+version = "1.0.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "140206b78fb2bc3edbcfc9b5ccbd0b30699cfe8d348b8b31b330e47df5291a5a"
+checksum = "9d07a982d1fb29db01e5a59b1918e03da4df7297eaeee7686ac45542fd4e59c8"
 
 [[package]]
 name = "ed25519"
@@ -4136,6 +4137,8 @@ dependencies = [
  "serde_json",
  "snafu",
  "tracing 0.1.34",
+ "vector_config",
+ "vector_config_macros",
 ]
 
 [[package]]
@@ -7454,10 +7457,11 @@ checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 
 [[package]]
 name = "tokio"
-version = "1.19.2"
+version = "1.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c51a52ed6686dd62c320f9b89299e9dfb46f730c7a48e635c19f21d116cb1439"
+checksum = "57aec3cfa4c296db7255446efb4928a6be304b431a806216105542a67b6ca82e"
 dependencies = [
+ "autocfg",
  "bytes 1.1.0",
  "libc",
  "memchr",
@@ -7612,15 +7616,15 @@ dependencies = [
 
 [[package]]
 name = "tokio-tungstenite"
-version = "0.17.1"
+version = "0.17.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06cda1232a49558c46f8a504d5b93101d42c0bf7f911f12a105ba48168f821ae"
+checksum = "f714dd15bead90401d77e04243611caec13726c2408afd5b31901dfcdcb3b181"
 dependencies = [
  "futures-util",
  "log",
  "rustls 0.20.4",
  "tokio",
- "tungstenite 0.17.2",
+ "tungstenite 0.17.3",
 ]
 
 [[package]]
@@ -8088,9 +8092,9 @@ dependencies = [
 
 [[package]]
 name = "tungstenite"
-version = "0.17.2"
+version = "0.17.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d96a2dea40e7570482f28eb57afbe42d97551905da6a9400acc5c328d24004f5"
+checksum = "e27992fd6a8c29ee7eef28fc78349aa244134e10ad447ce3b9f0ac0ed0fa4ce0"
 dependencies = [
  "base64",
  "byteorder",
@@ -8406,7 +8410,7 @@ dependencies = [
  "bytesize",
  "chrono",
  "cidr-utils",
- "clap 3.2.10",
+ "clap 3.2.12",
  "codecs",
  "colored",
  "console-subscriber",
@@ -8518,7 +8522,7 @@ dependencies = [
  "tokio-postgres",
  "tokio-stream",
  "tokio-test",
- "tokio-tungstenite 0.17.1",
+ "tokio-tungstenite 0.17.2",
  "tokio-util 0.7.1",
  "toml",
  "tonic",
@@ -8568,7 +8572,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "tokio-stream",
- "tokio-tungstenite 0.17.1",
+ "tokio-tungstenite 0.17.2",
  "url",
  "uuid 1.1.2",
 ]
@@ -8591,7 +8595,7 @@ dependencies = [
  "async-trait",
  "bytecheck",
  "bytes 1.1.0",
- "clap 3.2.10",
+ "clap 3.2.12",
  "crc32fast",
  "criterion",
  "crossbeam-queue",
@@ -8797,7 +8801,7 @@ dependencies = [
 name = "vrl-cli"
 version = "0.1.0"
 dependencies = [
- "clap 3.2.10",
+ "clap 3.2.12",
  "exitcode",
  "indoc",
  "lookup",
@@ -8935,7 +8939,7 @@ dependencies = [
  "ansi_term",
  "chrono",
  "chrono-tz",
- "clap 3.2.10",
+ "clap 3.2.12",
  "enrichment",
  "glob",
  "lookup",

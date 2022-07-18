@@ -35,8 +35,8 @@ impl NativeJsonSerializer {
     }
 
     /// Encode event and represent it as native JSON value.
-    pub fn to_json_value(&self, event: Event) -> Result<serde_json::Value, serde_json::Error> {
-        serde_json::to_value(&event)
+    pub fn to_json_value(&self, event: Event) -> Result<serde_json::Value, vector_core::Error> {
+        serde_json::to_value(&event).map_err(|e| e.to_string().into())
     }
 }
 

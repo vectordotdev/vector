@@ -31,7 +31,7 @@ pub struct ThrottleConfig {
 
     /// The name of the log field whose value will be hashed to determine if the event should be rate limited.
     ///
-    /// Each unique key will create a buckets of related events to be rate limited separately. If left unspecified, or if the event doesn’t have `key_field`, the event be will not be rate limited separately.
+    /// Each unique key will create a bucket of related events to be rate limited separately. If left unspecified, or if the event doesn’t have `key_field`, the event be will not be rate limited separately.
     #[configurable(metadata(templatable))]
     key_field: Option<Template>,
 
