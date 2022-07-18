@@ -53,8 +53,7 @@ pub enum GcsHealthcheckError {
 
 const NAME: &str = "gcp_cloud_storage";
 
-#[derive(Deserialize, Serialize, Debug)]
-#[serde(deny_unknown_fields)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct GcsSinkConfig {
     bucket: String,
     acl: Option<GcsPredefinedAcl>,

@@ -25,7 +25,8 @@ pub(crate) mod dd_proto {
     include!(concat!(env!("OUT_DIR"), "/dd_trace.rs"));
 }
 
-use crate::{config::SinkDescription, sinks::datadog::traces::config::DatadogTracesConfig};
+pub use self::config::DatadogTracesConfig;
+use crate::config::SinkDescription;
 
 inventory::submit! {
     SinkDescription::new::<DatadogTracesConfig>("datadog_traces")

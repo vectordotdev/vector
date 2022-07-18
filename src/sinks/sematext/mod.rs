@@ -1,5 +1,7 @@
-mod logs;
-mod metrics;
+pub mod logs;
+pub mod metrics;
+
+pub use self::{logs::SematextLogsConfig, metrics::SematextMetricsConfig};
 
 use serde::{Deserialize, Serialize};
 

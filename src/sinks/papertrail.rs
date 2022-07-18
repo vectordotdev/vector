@@ -16,9 +16,9 @@ use crate::{
     tls::TlsEnableableConfig,
 };
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub(self) struct PapertrailConfig {
+pub struct PapertrailConfig {
     endpoint: UriSerde,
     encoding: EncodingConfig,
     keepalive: Option<TcpKeepaliveConfig>,

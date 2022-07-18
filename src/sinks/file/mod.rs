@@ -37,8 +37,7 @@ use std::convert::TryFrom;
 
 use bytes_path::BytesPath;
 
-#[derive(Deserialize, Serialize, Debug)]
-#[serde(deny_unknown_fields)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct FileSinkConfig {
     pub path: Template,
     pub idle_timeout_secs: Option<u64>,
