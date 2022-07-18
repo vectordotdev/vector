@@ -186,8 +186,7 @@ fn repl(objects: Vec<Value>, timezone: TimeZone, vrl_runtime: VrlRuntime) -> Res
         })
         .collect();
 
-    repl::run(objects, timezone, vrl_runtime);
-    Ok(())
+    repl::run(objects, timezone, vrl_runtime).map_err(Into::into)
 }
 
 #[cfg(not(feature = "repl"))]
