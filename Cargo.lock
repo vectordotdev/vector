@@ -6378,7 +6378,7 @@ dependencies = [
  "libc",
  "log",
  "memchr",
- "nix 0.24.1",
+ "nix 0.24.2",
  "scopeguard",
  "unicode-segmentation",
  "unicode-width",
