@@ -25,7 +25,7 @@ pub(crate) async fn cmd(opts: &Opts) -> exitcode::ExitCode {
     let config = match DiskBufferConfigBuilder::from_path(&opts.data_dir).build() {
         Ok(config) => config,
         Err(error) => {
-            eprintln!("Could not build disk buffer config: {}", error);
+            error!(message = "Could not build disk buffer config.", ?error);
             return exitcode::CONFIG;
         }
     };
@@ -39,44 +39,44 @@ pub(crate) async fn cmd(opts: &Opts) -> exitcode::ExitCode {
     {
         Ok(buffer) => buffer,
         Err(error) => {
-            eprintln!("Could not open disk buffer: {}", error);
+            error!(message = "Could not open disk buffer.", ?error);
             return exitcode::IOERR;
         }
     };
 
     let state = ledger.state();
-    println!(
-        "Next writer record ID: {}",
-        state.get_next_writer_record_id()
-    );
-    println!(
-        "Last reader record ID: {}",
-        state.get_last_reader_record_id()
-    );
+    info!(next_writer_record_id = state.get_next_writer_record_id());
+    info!(last_reader_record_id = state.get_last_reader_record_id());
 
     match reader.next().await {
         Ok(Some(record)) => {
             let mut record = ManuallyDrop::new(record);
             let count = record.event_count();
-            println!("Next record size: {} events", count);
+            info!(next_record_event_size = count);
 
             if let Some(record_id) = opts.record_id {
                 if record_id == state.get_last_reader_record_id() {
                     record
                         .take_finalizers()
                         .update_status(EventStatus::Delivered);
-                    println!("Marked record {} as delivered.", record_id);
+                    info!(message = "Marked record as delivered.", ?record_id);
                 } else {
-                    println!(
-                        "Record ID {} does not match last reader record ID.",
-                        record_id
+                    warn!(
+                        message = "Record ID does not match last reader record ID.",
+                        ?record_id
                     );
                 }
             }
         }
-        Ok(None) => println!("Buffer has no more records to read."),
+        Ok(None) => {
+            error!("Buffer has no more records to read.");
+            return exitcode::DATAERR;
+        }
         Err(error) => {
-            eprintln!("Error reading next record from the buffer: {}", error);
+            error!(
+                message = "Error reading next record from the buffer.",
+                ?error
+            );
             return exitcode::IOERR;
         }
     }
