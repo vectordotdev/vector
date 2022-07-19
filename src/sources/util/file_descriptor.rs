@@ -24,6 +24,7 @@ pub trait FileDescriptorConfig {
     fn host_key(&self) -> Option<String>;
     fn framing(&self) -> Option<FramingConfig>;
     fn decoding(&self) -> DeserializerConfig;
+    fn description(&self) -> String;
 }
 
 pub fn file_descriptor_source<R, C>(
@@ -55,8 +56,9 @@ where
     // This is recommended by Tokio, as otherwise the process will not shut down
     // until another newline is entered. See
     // https://github.com/tokio-rs/tokio/blob/a73428252b08bf1436f12e76287acbc4600ca0e5/tokio/src/io/stdin.rs#L33-L42
+    let description = config.description();
     thread::spawn(move || {
-        info!("Capturing fd.");
+        info!("Capturing {}.", description);
 
         loop {
             let (buffer, len) = match reader.fill_buf() {

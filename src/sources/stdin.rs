@@ -49,6 +49,9 @@ impl FileDescriptorConfig for StdinConfig {
     fn decoding(&self) -> DeserializerConfig {
         self.decoding.clone()
     }
+    fn description(&self) -> String {
+        "stdin".to_string()
+    }
 }
 
 impl Default for StdinConfig {

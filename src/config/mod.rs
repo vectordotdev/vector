@@ -639,6 +639,77 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn conflicting_stdin_and_fd_resources() {
+        let result = load(
+            r#"
+            [sources.stdin]
+            type = "stdin"
+
+            [sources.pipe]
+            type = "pipe"
+            fd = 0
+
+            [sinks.out]
+            type = "basic_sink"
+            inputs = ["stdin", "pipe"]
+            "#,
+            Format::Toml,
+        )
+        .await;
+
+        let expected = Err(vec!["Resource `fd: 0` is claimed by multiple components: {ComponentKey { id: \"stdin\" }, ComponentKey { id: \"pipe\" }}".to_string()]);
+        assert_eq!(result, expected);
+    }
+
+    #[tokio::test]
+    async fn conflicting_fd_resources() {
+        let result = load(
+            r#"
+            [sources.pipe1]
+            type = "pipe"
+            fd = 10
+
+            [sources.pipe2]
+            type = "pipe"
+            fd = 10
+
+            [sinks.out]
+            type = "basic_sink"
+            inputs = ["pipe1", "pipe2"]
+            "#,
+            Format::Toml,
+        )
+        .await;
+
+        let expected = Err(vec!["Resource `fd: 10` is claimed by multiple components: {ComponentKey { id: \"pipe1\" }, ComponentKey { id: \"pipe2\" }}".to_string()]);
+        assert_eq!(result, expected);
+    }
+
+    #[tokio::test]
+    async fn no_conflict_fd_resources() {
+        let result = load(
+            r#"
+            [sources.pipe1]
+            type = "pipe"
+            fd = 10
+
+            [sources.pipe2]
+            type = "pipe"
+            fd = 20
+
+            [sinks.out]
+            type = "basic_sink"
+            inputs = ["pipe1", "pipe2"]
+            "#,
+            Format::Toml,
+        )
+        .await;
+
+        let expected = Ok(vec![]);
+        assert_eq!(result, expected);
+    }
+
+    #[tokio::test]
     async fn warnings() {
         let warnings = load(
             r#"

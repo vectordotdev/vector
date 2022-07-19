@@ -54,6 +54,9 @@ impl FileDescriptorConfig for PipeConfig {
     fn decoding(&self) -> DeserializerConfig {
         self.decoding.clone()
     }
+    fn description(&self) -> String {
+        format!("fd {}", self.fd)
+    }
 }
 
 inventory::submit! {
@@ -63,7 +66,7 @@ inventory::submit! {
 impl GenerateConfig for PipeConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(indoc! {r#"
-            fd = 500
+            fd = 10
         "#})
         .unwrap()
     }
@@ -85,7 +88,7 @@ impl SourceConfig for PipeConfig {
     }
 
     fn resources(&self) -> Vec<Resource> {
-        vec![Resource::Fd(0)]
+        vec![Resource::Fd(self.fd)]
     }
 
     fn can_acknowledge(&self) -> bool {
