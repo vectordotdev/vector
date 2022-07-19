@@ -4,9 +4,8 @@ use async_trait::async_trait;
 use futures_util::{stream::BoxStream, Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot::{channel, Receiver, Sender};
-use vector_buffers::Acker;
 use vector_core::{
-    config::{AcknowledgementsConfig, DataType, Input, Output},
+    config::{AcknowledgementsConfig, DataType, Input, LogNamespace, Output},
     event::{Event, EventArray, EventContainer, LogEvent},
     schema::Definition,
     sink::{StreamSink, VectorSink},
@@ -75,7 +74,7 @@ struct OneshotSourceConfig {
 #[async_trait]
 #[typetag::serde(name = "oneshot")]
 impl SourceConfig for OneshotSourceConfig {
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::all())]
     }
 
@@ -121,15 +120,12 @@ impl SinkConfig for OneshotSinkConfig {
         None
     }
 
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let tx = {
             let mut guard = self.tx.lock().expect("who cares if the lock is poisoned");
             guard.take()
         };
-        let sink = Box::new(OneshotSink {
-            acker: cx.acker,
-            tx,
-        });
+        let sink = Box::new(OneshotSink { tx });
 
         let healthcheck = Box::pin(async { Ok(()) });
 
@@ -138,7 +134,6 @@ impl SinkConfig for OneshotSinkConfig {
 }
 
 struct OneshotSink {
-    acker: Acker,
     tx: Option<Sender<EventArray>>,
 }
 
@@ -150,7 +145,6 @@ impl StreamSink<EventArray> for OneshotSink {
             .next()
             .await
             .expect("must always get an item in oneshot sink");
-        self.acker.ack(events.len());
         let _ = tx.send(events);
 
         Ok(())

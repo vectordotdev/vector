@@ -37,6 +37,7 @@ mod unix;
 use parser::parse;
 #[cfg(unix)]
 use unix::{statsd_unix, UnixConfig};
+use vector_core::config::LogNamespace;
 
 /// Configuration for the `statsd` source.
 #[configurable_component(source)]
@@ -167,7 +168,7 @@ impl SourceConfig for StatsdConfig {
         }
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(config::DataType::Metric)]
     }
 
@@ -210,7 +211,11 @@ impl StatsdDeserializer {
 }
 
 impl decoding::format::Deserializer for StatsdDeserializer {
-    fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
+    fn parse(
+        &self,
+        bytes: Bytes,
+        _log_namespace: LogNamespace,
+    ) -> crate::Result<SmallVec<[Event; 1]>> {
         if let Some(mode) = self.socket_mode {
             emit!(SocketBytesReceived {
                 mode,

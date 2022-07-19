@@ -32,6 +32,6 @@ async fn to_real_traces_endpoint() {
 
     let stream = map_event_batch_stream(stream::iter(trace), Some(batch));
 
-    let _ = sink.run(stream).await.unwrap();
+    sink.run(stream).await.unwrap();
     assert_eq!(receiver.await, BatchStatus::Delivered);
 }

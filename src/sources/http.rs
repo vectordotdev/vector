@@ -11,6 +11,7 @@ use http::StatusCode;
 use lookup::path;
 use tokio_util::codec::Decoder as _;
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 use warp::http::{HeaderMap, HeaderValue};
 
 use crate::{
@@ -238,7 +239,7 @@ impl SourceConfig for SimpleHttpConfig {
             (framing, decoding)
         };
 
-        let decoder = DecodingConfig::new(framing, decoding).build();
+        let decoder = DecodingConfig::new(framing, decoding, LogNamespace::Legacy).build();
         let source = SimpleHttpSource {
             headers: self.headers.clone(),
             query_parameters: self.query_parameters.clone(),
@@ -257,7 +258,7 @@ impl SourceConfig for SimpleHttpConfig {
         )
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(
             self.decoding
                 .as_ref()

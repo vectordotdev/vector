@@ -118,9 +118,9 @@ const fn default_enable_logs_reporting() -> bool {
     true
 }
 
-/// By default, report to Datadog every 5 seconds.
+/// By default, scrape internal metrics and report to Datadog every 1 seconds.
 const fn default_reporting_interval_secs() -> f64 {
-    5.0
+    1.0
 }
 
 /// By default, keep retrying (recoverable) failed reporting
@@ -956,7 +956,8 @@ mod test {
             "tags" => Kind::object(BTreeMap::new()),
         }));
         assert!(
-            vrl::compile_with_state(vrl.as_str(), vrl_stdlib::all().as_ref(), &mut state).is_ok()
+            vrl::compile_with_external(vrl.as_str(), vrl_stdlib::all().as_ref(), &mut state)
+                .is_ok()
         );
     }
 

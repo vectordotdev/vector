@@ -4,6 +4,7 @@ use futures::{future, FutureExt};
 use serde::{Deserialize, Serialize};
 use stream_cancel::{Trigger, Tripwire};
 use tokio::sync::Mutex;
+use vector_core::config::LogNamespace;
 
 use crate::{
     config::{Config, DataType, Output, SourceConfig, SourceContext},
@@ -52,7 +53,7 @@ impl SourceConfig for MockSourceConfig {
         ))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 

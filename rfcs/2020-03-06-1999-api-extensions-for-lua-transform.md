@@ -475,7 +475,7 @@ Here `event` is an encoded event to be produced by the transform, and `lane` is 
 >    [sinks.example_console]
 >      type = "console"
 >      inputs = ["example_transform.example_lane"] # would output the event from `example_lane`
->      encoding = "text"
+>      encoding.codec = "text"
 >    ```
 >
 > Other components connected to the same transform, but with different lanes names or without lane names at all would not receive any event.

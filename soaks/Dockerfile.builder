@@ -1,4 +1,4 @@
-FROM docker.io/rust:1.61-bullseye@sha256:816886827dbc6c248ebb29119fc9d8b2b74418a1a113463beae0c0b8460c5c5f as builder
+FROM docker.io/rust:1.62-bullseye@sha256:5709afe04a23c0a447b02077b3ab8ff3d9458e80e1f9898e40873df36a34981b as builder
 RUN apt-get update && \
     apt-get dist-upgrade -y && \
     apt-get -y --no-install-recommends install build-essential git clang cmake libclang-dev \

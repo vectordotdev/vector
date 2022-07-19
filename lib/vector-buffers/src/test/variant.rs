@@ -6,6 +6,7 @@ use std::{
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
 use tracing::Span;
+use vector_common::finalization::Finalizable;
 
 use crate::{
     topology::{
@@ -50,7 +51,7 @@ pub enum Variant {
 impl Variant {
     pub async fn create_sender_receiver<T>(&self) -> (BufferSender<T>, BufferReceiver<T>)
     where
-        T: Bufferable + Clone,
+        T: Bufferable + Clone + Finalizable,
     {
         let mut builder = TopologyBuilder::default();
         match self {
@@ -85,7 +86,7 @@ impl Variant {
             }
         };
 
-        let (sender, receiver, _acker) = builder
+        let (sender, receiver) = builder
             .build(String::from("benches"), Span::none())
             .await
             .expect("topology build should not fail");

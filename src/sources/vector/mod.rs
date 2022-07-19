@@ -2,6 +2,7 @@ pub mod v1;
 pub mod v2;
 
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 
 use crate::config::{
     GenerateConfig, Output, Resource, SourceConfig, SourceContext, SourceDescription,
@@ -85,7 +86,7 @@ impl SourceConfig for VectorConfig {
         }
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         match self {
             VectorConfig::V1(v1) => v1.config.outputs(),
             VectorConfig::V2(v2) => v2.config.outputs(),

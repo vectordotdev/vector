@@ -18,6 +18,7 @@ pub use parser::{parse_dnstap_data, DnstapParser};
 pub mod schema;
 use dnsmsg_parser::{dns_message, dns_message_parser};
 pub use schema::DnstapEventSchema;
+use vector_core::config::LogNamespace;
 
 /// Configuration for the `dnstap` source.
 #[configurable_component(source)]
@@ -118,7 +119,7 @@ impl SourceConfig for DnstapConfig {
         build_framestream_unix_source(frame_handler, cx.shutdown, cx.out)
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 

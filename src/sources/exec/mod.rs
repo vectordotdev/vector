@@ -38,6 +38,7 @@ use crate::{
     SourceSender,
 };
 use lookup::path;
+use vector_core::config::LogNamespace;
 
 pub mod sized_bytes_codec;
 
@@ -227,7 +228,8 @@ impl SourceConfig for ExecConfig {
             .framing
             .clone()
             .unwrap_or_else(|| self.decoding.default_stream_framing());
-        let decoder = DecodingConfig::new(framing, self.decoding.clone()).build();
+        let decoder =
+            DecodingConfig::new(framing, self.decoding.clone(), LogNamespace::Legacy).build();
 
         match &self.mode {
             Mode::Scheduled => {
@@ -259,7 +261,7 @@ impl SourceConfig for ExecConfig {
         }
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(self.decoding.output_type())]
     }
 

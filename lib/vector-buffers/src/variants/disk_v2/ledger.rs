@@ -14,7 +14,10 @@ use futures::StreamExt;
 use rkyv::{with::Atomic, Archive, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::{fs, io::AsyncWriteExt, sync::Notify};
-use vector_common::{finalizer::OrderedFinalizer, shutdown::ShutdownSignal};
+use vector_common::{
+    finalization::BatchStatus, finalizer::OrderedFinalizer, internal_event::emit,
+    shutdown::ShutdownSignal,
+};
 
 use super::{
     backed_archive::BackedArchive,
@@ -23,7 +26,7 @@ use super::{
     ser::SerializeError,
     Filesystem,
 };
-use crate::buffer_usage_data::BufferUsageHandle;
+use crate::{buffer_usage_data::BufferUsageHandle, internal_events::BufferStopping};
 
 pub const LEDGER_LEN: usize = align16(mem::size_of::<ArchivedLedgerState>());
 
@@ -205,7 +208,7 @@ impl ArchivedLedgerState {
 }
 
 /// Tracks the internal state of the buffer.
-pub struct Ledger<FS>
+pub(crate) struct Ledger<FS>
 where
     FS: Filesystem,
 {
@@ -232,6 +235,8 @@ where
     last_flush: AtomicCell<Instant>,
     // Tracks usage data about the buffer.
     usage_handle: BufferUsageHandle,
+    // Tracks when a negative acknowledgement has been received
+    reader_done: AtomicBool,
 }
 
 impl<FS> Ledger<FS>
@@ -274,12 +279,12 @@ where
     /// leads to behavior where writes and reads will change this value only by the size of the
     /// records being written and read, while data files on disk will grow incrementally, and be
     /// deleted in full.
-    pub(super) fn get_total_buffer_size(&self) -> u64 {
+    pub fn get_total_buffer_size(&self) -> u64 {
         self.total_buffer_size.load(Ordering::Acquire)
     }
 
     /// Increments the total number of bytes for all unread records in the buffer.
-    pub(super) fn increment_total_buffer_size(&self, amount: u64) {
+    pub fn increment_total_buffer_size(&self, amount: u64) {
         let last_total_buffer_size = self.total_buffer_size.fetch_add(amount, Ordering::AcqRel);
         trace!(
             previous_buffer_size = last_total_buffer_size,
@@ -289,7 +294,7 @@ where
     }
 
     /// Decrements the total number of bytes for all unread records in the buffer.
-    pub(super) fn decrement_total_buffer_size(&self, amount: u64) {
+    pub fn decrement_total_buffer_size(&self, amount: u64) {
         let last_total_buffer_size = self.total_buffer_size.fetch_sub(amount, Ordering::AcqRel);
         trace!(
             previous_buffer_size = last_total_buffer_size,
@@ -411,6 +416,16 @@ where
     /// Returns `true` if the writer was marked as done.
     pub fn is_writer_done(&self) -> bool {
         self.writer_done.load(Ordering::Acquire)
+    }
+
+    /// Marks the reader as finished.
+    fn stop_reader(&self) {
+        self.reader_done.store(true, Ordering::Release);
+    }
+
+    /// Returns `true` if the reader was marked as done.
+    pub(super) fn is_reader_done(&self) -> bool {
+        self.reader_done.load(Ordering::Acquire)
     }
 
     /// Increments the pending acknowledgement counter by the given amount.
@@ -650,6 +665,7 @@ where
             unacked_reader_file_id_offset: AtomicU16::new(0),
             last_flush: AtomicCell::new(Instant::now()),
             usage_handle,
+            reader_done: AtomicBool::new(false),
         };
         ledger.update_buffer_size().await?;
 
@@ -706,11 +722,24 @@ where
     #[must_use]
     pub(super) fn spawn_finalizer(self: Arc<Self>) -> OrderedFinalizer<u64> {
         let (finalizer, mut stream) = OrderedFinalizer::new(ShutdownSignal::noop());
+        let data_dir = self.config.data_dir.clone();
         tokio::spawn(async move {
-            while let Some((_status, amount)) = stream.next().await {
-                self.increment_pending_acks(amount);
-                self.notify_reader_waiters();
+            while let Some((status, amount)) = stream.next().await {
+                match status {
+                    BatchStatus::Delivered => {
+                        self.increment_pending_acks(amount);
+                        self.notify_writer_waiters();
+                    }
+                    BatchStatus::Errored | BatchStatus::Rejected => {
+                        emit(BufferStopping {
+                            data_dir,
+                            record_id: self.state().get_last_reader_record_id(),
+                        });
+                        break;
+                    }
+                }
             }
+            self.stop_reader();
         });
         finalizer
     }

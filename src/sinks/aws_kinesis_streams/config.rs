@@ -9,18 +9,18 @@ use tower::ServiceBuilder;
 use super::service::KinesisResponse;
 use crate::{
     aws::{create_client, is_retriable_error, AwsAuthentication, ClientBuilder, RegionOrEndpoint},
-    codecs::Encoder,
-    config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
+    codecs::{Encoder, EncodingConfig},
+    config::{
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig,
+        SinkContext,
+    },
     sinks::{
         aws_kinesis_streams::{
             request_builder::KinesisRequestBuilder, service::KinesisService, sink::KinesisSink,
         },
         util::{
-            encoding::{
-                EncodingConfig, EncodingConfigAdapter, StandardEncodings, StandardEncodingsMigrator,
-            },
-            retries::RetryLogic,
-            BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig,
+            retries::RetryLogic, BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings,
+            TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -75,8 +75,7 @@ pub struct KinesisSinkConfig {
     pub partition_key_field: Option<String>,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    pub encoding:
-        EncodingConfigAdapter<EncodingConfig<StandardEncodings>, StandardEncodingsMigrator>,
+    pub encoding: EncodingConfig,
     #[serde(default)]
     pub compression: Compression,
     #[serde(default)]
@@ -156,7 +155,7 @@ impl SinkConfig for KinesisSinkConfig {
             });
 
         let transformer = self.encoding.transformer();
-        let serializer = self.encoding.encoding()?;
+        let serializer = self.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
 
         let request_builder = KinesisRequestBuilder {
@@ -166,7 +165,7 @@ impl SinkConfig for KinesisSinkConfig {
 
         let sink = KinesisSink {
             batch_settings,
-            acker: cx.acker(),
+
             service,
             request_builder,
             partition_key_field: self.partition_key_field.clone(),
@@ -175,7 +174,7 @@ impl SinkConfig for KinesisSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::new(self.encoding.config().input_type())
+        Input::new(self.encoding.config().input_type() & DataType::Log)
     }
 
     fn sink_type(&self) -> &'static str {

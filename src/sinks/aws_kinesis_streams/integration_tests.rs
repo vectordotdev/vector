@@ -3,6 +3,7 @@
 
 use aws_sdk_kinesis::model::{Record, ShardIteratorType};
 use aws_sdk_kinesis::types::DateTime;
+use codecs::TextSerializerConfig;
 use tokio::time::{sleep, Duration};
 
 use super::*;
@@ -11,10 +12,7 @@ use crate::{
     config::{ProxyConfig, SinkConfig, SinkContext},
     sinks::{
         aws_kinesis_streams::config::KinesisClientBuilder,
-        util::{
-            encoding::{EncodingConfig, StandardEncodings},
-            BatchConfig, Compression,
-        },
+        util::{BatchConfig, Compression},
     },
     test_util::{
         components::{run_and_assert_sink_compliance, AWS_SINK_TAGS},
@@ -39,7 +37,7 @@ async fn kinesis_put_records() {
         stream_name: stream.clone(),
         partition_key_field: None,
         region: RegionOrEndpoint::with_both("localstack", kinesis_address().as_str()),
-        encoding: EncodingConfig::from(StandardEncodings::Text).into(),
+        encoding: TextSerializerConfig::new().into(),
         compression: Compression::None,
         batch,
         request: Default::default(),

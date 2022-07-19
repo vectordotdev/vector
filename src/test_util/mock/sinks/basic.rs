@@ -3,7 +3,7 @@ use futures_util::{stream::BoxStream, FutureExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tokio::sync::oneshot;
-use vector_buffers::Acker;
+use vector_common::finalization::Finalizable;
 use vector_core::{
     config::{AcknowledgementsConfig, Input},
     event::Event,
@@ -72,7 +72,7 @@ enum HealthcheckError {
 #[async_trait]
 #[typetag::serde(name = "basic_sink")]
 impl SinkConfig for BasicSinkConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         // If this sink is set to not be healthy, just send the healthcheck error immediately over
         // the oneshot.. otherwise, pass the sender to the sink so it can send it only once it has
         // started running, so that tests can request the topology be healthy before proceeding.
@@ -86,7 +86,6 @@ impl SinkConfig for BasicSinkConfig {
         };
 
         let sink = MockSink {
-            acker: cx.acker(),
             sink: self.sink.clone(),
             health_tx,
         };
@@ -110,7 +109,6 @@ impl SinkConfig for BasicSinkConfig {
 }
 
 struct MockSink {
-    acker: Acker,
     sink: Mode,
     health_tx: Option<oneshot::Sender<crate::Result<()>>>,
 }
@@ -125,12 +123,12 @@ impl StreamSink<Event> for MockSink {
                 }
 
                 // We have an inner sink, so forward the input normally
-                while let Some(event) = input.next().await {
+                while let Some(mut event) = input.next().await {
+                    let finalizers = event.take_finalizers();
                     if let Err(error) = sink.send_event(event).await {
                         error!(message = "Ingesting an event failed at mock sink.", %error);
                     }
-
-                    self.acker.ack(1);
+                    drop(finalizers);
                 }
             }
             Mode::Dead => {

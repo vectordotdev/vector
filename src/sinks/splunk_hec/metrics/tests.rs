@@ -344,7 +344,7 @@ async fn splunk_passthrough_token() {
         Event::from(get_counter()),
     ];
 
-    let _ = sink.run_events(events).await.unwrap();
+    sink.run_events(events).await.unwrap();
 
     let mut tokens = rx
         .take(3)

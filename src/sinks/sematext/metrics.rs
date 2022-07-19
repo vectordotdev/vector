@@ -118,7 +118,7 @@ impl SinkConfig for SematextMetricsConfig {
         };
 
         let healthcheck = healthcheck(endpoint.clone(), client.clone()).boxed();
-        let sink = SematextMetricsService::new(self.clone(), write_uri(&endpoint)?, cx, client)?;
+        let sink = SematextMetricsService::new(self.clone(), write_uri(&endpoint)?, client)?;
 
         Ok((sink, healthcheck))
     }
@@ -152,7 +152,6 @@ impl SematextMetricsService {
     pub fn new(
         config: SematextMetricsConfig,
         endpoint: http::Uri,
-        cx: SinkContext,
         client: HttpClient,
     ) -> Result<VectorSink> {
         let batch = config.batch.into_batch_settings()?;
@@ -173,7 +172,6 @@ impl SematextMetricsService {
                 sematext_service,
                 MetricsBuffer::new(batch.size),
                 batch.timeout,
-                cx.acker(),
             )
             .with_flat_map(move |event: Event| {
                 stream::iter({
@@ -420,7 +418,7 @@ mod tests {
             events.push(event);
         }
 
-        let _ = sink.run_events(events).await.unwrap();
+        sink.run_events(events).await.unwrap();
 
         let output = rx.take(metrics.len()).collect::<Vec<_>>().await;
         assert_eq!("os,metric_type=counter,os.host=somehost,token=atoken swap.size=324292 1597784400000000000", output[0].1);

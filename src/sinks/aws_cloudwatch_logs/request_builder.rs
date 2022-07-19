@@ -8,11 +8,11 @@ use vector_core::{
 
 use super::TemplateRenderingError;
 use crate::{
-    codecs::Encoder,
+    codecs::{Encoder, Transformer},
     config::LogSchema,
     event::{Event, Value},
     internal_events::{AwsCloudwatchLogsEncoderError, AwsCloudwatchLogsMessageSizeError},
-    sinks::{aws_cloudwatch_logs::CloudwatchKey, util::encoding::Transformer},
+    sinks::aws_cloudwatch_logs::CloudwatchKey,
     template::Template,
 };
 

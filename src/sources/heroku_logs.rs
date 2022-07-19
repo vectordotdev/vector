@@ -30,6 +30,7 @@ use crate::{
     tls::TlsEnableableConfig,
 };
 use lookup::path;
+use vector_core::config::LogNamespace;
 
 /// Configuration for `heroku_logs` source.
 #[configurable_component(source)]
@@ -110,7 +111,12 @@ impl HttpSource for LogplexSource {
 #[typetag::serde(name = "heroku_logs")]
 impl SourceConfig for LogplexConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
+        let decoder = DecodingConfig::new(
+            self.framing.clone(),
+            self.decoding.clone(),
+            LogNamespace::Legacy,
+        )
+        .build();
         let source = LogplexSource {
             query_parameters: self.query_parameters.clone(),
             decoder,
@@ -127,7 +133,7 @@ impl SourceConfig for LogplexConfig {
         )
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(self.decoding.output_type())]
     }
 
@@ -158,8 +164,8 @@ impl SourceConfig for LogplexCompatConfig {
         self.0.build(cx).await
     }
 
-    fn outputs(&self) -> Vec<Output> {
-        self.0.outputs()
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        self.0.outputs(global_log_namespace)
     }
 
     fn source_type(&self) -> &'static str {
@@ -290,7 +296,7 @@ fn line_to_events(mut decoder: Decoder, line: String) -> SmallVec<[Event; 1]> {
             internal_log_rate_secs = 10
         );
 
-        events.push(LogEvent::from(line).into())
+        events.push(LogEvent::from_str_legacy(line).into())
     };
 
     let now = Utc::now();

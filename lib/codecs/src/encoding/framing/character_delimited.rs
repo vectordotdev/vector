@@ -1,6 +1,7 @@
 use bytes::{BufMut, BytesMut};
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Encoder;
+use vector_config::configurable_component;
 
 use super::BoxedFramingError;
 
@@ -25,10 +26,11 @@ impl CharacterDelimitedEncoderConfig {
     }
 }
 
-/// Options for building a `CharacterDelimitedEncoder`.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+/// Configuration for character-delimited framing.
+#[configurable_component]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CharacterDelimitedEncoderOptions {
-    /// The character that delimits byte sequences.
+    /// The ASCII (7-bit) character that delimits byte sequences.
     #[serde(with = "vector_core::serde::ascii_char")]
     pub delimiter: u8,
 }

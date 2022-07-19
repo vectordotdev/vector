@@ -381,7 +381,7 @@ impl Value {
                 // replace an existing value, or insert to the front of the
                 // array.
                 if index.is_negative() {
-                    let abs = index.abs() as usize;
+                    let abs = index.unsigned_abs();
 
                     // left-padded with null values
                     for _ in 1..abs - array.len() {

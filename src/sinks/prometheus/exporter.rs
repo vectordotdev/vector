@@ -21,7 +21,6 @@ use snafu::Snafu;
 use stream_cancel::{Trigger, Tripwire};
 use tracing::{Instrument, Span};
 use vector_core::{
-    buffers::Acker,
     event::metric::MetricSeries,
     internal_event::{BytesSent, EventsSent},
     ByteSizeOf,
@@ -129,7 +128,7 @@ impl GenerateConfig for PrometheusExporterConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "prometheus_exporter")]
 impl SinkConfig for PrometheusExporterConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         if self.flush_period_secs.as_secs() < MIN_FLUSH_PERIOD_SECS {
             return Err(Box::new(BuildError::FlushPeriodTooShort {
                 min: MIN_FLUSH_PERIOD_SECS,
@@ -138,7 +137,7 @@ impl SinkConfig for PrometheusExporterConfig {
 
         validate_quantiles(&self.quantiles)?;
 
-        let sink = PrometheusExporter::new(self.clone(), cx.acker());
+        let sink = PrometheusExporter::new(self.clone());
         let healthcheck = future::ok(()).boxed();
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
@@ -197,7 +196,6 @@ struct PrometheusExporter {
     server_shutdown_trigger: Option<Trigger>,
     config: PrometheusExporterConfig,
     metrics: Arc<RwLock<IndexMap<MetricRef, (Metric, MetricMetadata)>>>,
-    acker: Acker,
 }
 
 /// Expiration metadata for a metric.
@@ -367,12 +365,11 @@ fn handle(
 }
 
 impl PrometheusExporter {
-    fn new(config: PrometheusExporterConfig, acker: Acker) -> Self {
+    fn new(config: PrometheusExporterConfig) -> Self {
         Self {
             server_shutdown_trigger: None,
             config,
             metrics: Arc::new(RwLock::new(IndexMap::new())),
-            acker,
         }
     }
 
@@ -524,7 +521,6 @@ impl StreamSink<Event> for PrometheusExporter {
             }
 
             drop(finalizers);
-            self.acker.ack(1);
         }
 
         Ok(())
@@ -726,9 +722,8 @@ mod tests {
             tls: None,
             ..Default::default()
         };
-        let cx = SinkContext::new_test();
 
-        let sink = PrometheusExporter::new(config, cx.acker());
+        let sink = PrometheusExporter::new(config);
 
         let m1 = Metric::new(
             "absolute",
@@ -789,9 +784,8 @@ mod tests {
             ..Default::default()
         };
         let buckets = config.buckets.clone();
-        let cx = SinkContext::new_test();
 
-        let sink = PrometheusExporter::new(config, cx.acker());
+        let sink = PrometheusExporter::new(config);
 
         // Define a series of incremental distribution updates.
         let base_summary_metric = Metric::new(
@@ -909,9 +903,8 @@ mod tests {
             distributions_as_summaries: true,
             ..Default::default()
         };
-        let cx = SinkContext::new_test();
 
-        let sink = PrometheusExporter::new(config, cx.acker());
+        let sink = PrometheusExporter::new(config);
 
         // Define a series of incremental distribution updates.
         let base_summary_metric = Metric::new(
