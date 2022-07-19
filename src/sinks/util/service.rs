@@ -4,6 +4,7 @@ use futures_util::{future::BoxFuture, stream::BoxStream, TryStream, TryStreamExt
 use serde::{Deserialize, Serialize};
 use tower::{
     balance::p2c::Balance,
+    buffer::{Buffer, BufferLayer},
     discover::Change,
     layer::{util::Stack, Layer},
     limit::RateLimit,
@@ -14,7 +15,6 @@ use tower::{
 use vector_buffers::Acker;
 
 pub use crate::sinks::util::service::{
-    clone::{CloneLayer, CloneService},
     concurrency::{concurrency_is_none, Concurrency},
     health::HealthService,
     map::Map,
@@ -32,7 +32,6 @@ use crate::{
     },
 };
 
-mod clone;
 mod concurrency;
 mod health;
 mod map;
@@ -42,11 +41,12 @@ pub type Svc<S, L> = InnerSvc<Timeout<S>, L>;
 pub type TowerBatchedSink<S, B, RL> = BatchSink<Svc<S, RL>, B>;
 pub type TowerPartitionSink<S, B, RL, K> = PartitionBatchSink<Svc<S, RL>, B, K>;
 pub type DistributedService<S, RL, K, Req> = InnerSvc<
-    CloneService<
+    Buffer<
         Balance<
             BoxStream<'static, Result<Change<K, HealthService<Timeout<S>, RL>>, crate::Error>>,
             Req,
         >,
+        Req,
     >,
     RL,
 >;
@@ -311,7 +311,9 @@ impl TowerRequestSettings {
                 retry_logic,
                 _pd: std::marker::PhantomData,
             })
-            .layer(CloneLayer)
+            // There are other mechanisms limiting the number of concurrent requests/poll_ready
+            // so we don't need to do that here, hence usize::MAX.
+            .layer(BufferLayer::new(usize::MAX))
             .service(Balance::new(Box::pin(services) as Pin<Box<_>>))
     }
 }
