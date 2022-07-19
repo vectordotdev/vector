@@ -80,9 +80,13 @@ pub fn init(color: bool, json: bool, levels: &str) {
         subscriber.with(console_layer)
     };
 
-    #[cfg(feature = "allocation-tracking")]
-    let subscriber =
-        subscriber.with(tracking_allocator::AllocationLayer::new().with_filter(LevelFilter::ERROR));
+    #[cfg(feature = "allocation-tracing")]
+    let subscriber = {
+        let allocation_layer = crate::internal_telemetry::allocations::AllocationLayer::new()
+            .with_filter(LevelFilter::ERROR);
+
+        subscriber.with(allocation_layer)
+    };
 
     if json {
         let formatter = tracing_subscriber::fmt::layer().json().flatten_event(true);

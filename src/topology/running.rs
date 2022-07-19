@@ -802,15 +802,15 @@ impl RunningTopology {
         );
 
         let task_span = span.or_current();
-        #[cfg(feature = "allocation-tracking")]
+        #[cfg(feature = "allocation-tracing")]
         {
-            let allocation_token =
-                crate::internal_telemetry::allocations::acquire_allocation_group_token(vec![
+            let group_id =
+                crate::internal_telemetry::allocations::acquire_allocation_group_id(vec![
                     (String::from("component_kind"), String::from("sink")),
                     (String::from("component_type"), task.typetag().to_string()),
                     (String::from("component_id"), task.id().to_string()),
                 ]);
-            allocation_token.attach_to_span(&task_span);
+            group_id.attach_to_span(&task_span);
         }
 
         let task_name = format!(">> {} ({})", task.typetag(), task.id());
@@ -833,15 +833,15 @@ impl RunningTopology {
         );
 
         let task_span = span.or_current();
-        #[cfg(feature = "allocation-tracking")]
+        #[cfg(feature = "allocation-tracing")]
         {
-            let allocation_token =
-                crate::internal_telemetry::allocations::acquire_allocation_group_token(vec![
+            let group_id =
+                crate::internal_telemetry::allocations::acquire_allocation_group_id(vec![
                     (String::from("component_kind"), String::from("transform")),
                     (String::from("component_type"), task.typetag().to_string()),
                     (String::from("component_id"), task.id().to_string()),
                 ]);
-            allocation_token.attach_to_span(&task_span);
+            group_id.attach_to_span(&task_span);
         }
 
         let task_name = format!(">> {} ({}) >>", task.typetag(), task.id());
@@ -864,15 +864,15 @@ impl RunningTopology {
         );
 
         let task_span = span.or_current();
-        #[cfg(feature = "allocation-tracking")]
+        #[cfg(feature = "allocation-tracing")]
         {
-            let allocation_token =
-                crate::internal_telemetry::allocations::acquire_allocation_group_token(vec![
+            let group_id =
+                crate::internal_telemetry::allocations::acquire_allocation_group_id(vec![
                     (String::from("component_kind"), String::from("source")),
                     (String::from("component_type"), task.typetag().to_string()),
                     (String::from("component_id"), task.id().to_string()),
                 ]);
-            allocation_token.attach_to_span(&task_span);
+            group_id.attach_to_span(&task_span);
         }
 
         let task_name = format!("{} ({}) >>", task.typetag(), task.id());

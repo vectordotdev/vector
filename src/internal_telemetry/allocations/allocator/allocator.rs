@@ -1,38 +1,35 @@
-use std::{alloc::{System, GlobalAlloc, handle_alloc_error, Layout}};
+use std::alloc::{handle_alloc_error, GlobalAlloc, Layout};
 
-use super::token::{AllocationGroupId, try_with_suspended_allocation_group};
+use super::{
+    is_allocation_tracing_enabled,
+    token::{try_with_suspended_allocation_group, AllocationGroupId},
+    tracer::Tracer,
+};
 
-/// Tracking allocator implementation.
+/// A tracing allocator that groups allocation events by groups.
 ///
 /// This allocator can only be used when specified via `#[global_allocator]`.
-pub struct Allocator<A> {
-    inner: A,
+pub struct GroupedTraceableAllocator<A, T> {
+    allocator: A,
+    tracer: T,
 }
 
-impl<A> Allocator<A> {
-    /// Creates a new `Allocator` that wraps another allocator.
+impl<A, T> GroupedTraceableAllocator<A, T> {
+    /// Creates a new `GroupedTraceableAllocator` that wraps the given allocator and tracer.
     #[must_use]
-    pub const fn from_allocator(allocator: A) -> Self {
-        Self { inner: allocator }
+    pub const fn new(allocator: A, tracer: T) -> Self {
+        Self { allocator, tracer }
     }
 }
 
-impl Allocator<System> {
-    /// Creates a new `Allocator` that wraps the system allocator.
-    #[must_use]
-    pub const fn system() -> Allocator<System> {
-        Self::from_allocator(System)
-    }
-}
-
-impl<A: GlobalAlloc> Allocator<A> {
+impl<A: GlobalAlloc, T: Tracer> GroupedTraceableAllocator<A, T> {
     unsafe fn get_wrapped_allocation(
         &self,
         object_layout: Layout,
     ) -> (*mut usize, *mut u8, Layout) {
         // Allocate our wrapped layout and make sure the allocation succeeded.
         let (actual_layout, offset_to_object) = get_wrapped_layout(object_layout);
-        let actual_ptr = self.inner.alloc(actual_layout);
+        let actual_ptr = self.allocator.alloc(actual_layout);
         if actual_ptr.is_null() {
             handle_alloc_error(actual_layout);
         }
@@ -53,33 +50,25 @@ impl<A: GlobalAlloc> Allocator<A> {
     }
 }
 
-impl Default for Allocator<System> {
-    fn default() -> Self {
-        Self::from_allocator(System)
-    }
-}
-
-unsafe impl<A: GlobalAlloc> GlobalAlloc for Allocator<A> {
+unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator<A, T> {
     #[track_caller]
     unsafe fn alloc(&self, object_layout: Layout) -> *mut u8 {
         let (group_id_ptr, object_ptr, wrapped_layout) = self.get_wrapped_allocation(object_layout);
-        let object_addr = object_ptr as usize;
-        let object_size = object_layout.size();
         let wrapped_size = wrapped_layout.size();
 
-        if let Some(tracker) = get_global_tracker() {
+        if is_allocation_tracing_enabled() {
             try_with_suspended_allocation_group(
                 #[inline(always)]
                 |group_id| {
-                    // We only set the group ID in the wrapper header if we're tracking an allocation, because when it
+                    // We only set the group ID in the wrapper header if we're tracing an allocation, because when it
                     // comes back to us during deallocation, we want to skip doing any checks at all if it's already
                     // zero.
                     //
-                    // If we never track the allocation, tracking the deallocation will only produce incorrect numbers,
+                    // If we never trace the allocation, tracing the deallocation will only produce incorrect numbers,
                     // and that includes even if we just used the rule of "always attribute allocations to the root
                     // allocation group by default".
-                    group_id_ptr.write(group_id.as_usize().get());
-                    tracker.allocated(object_addr, object_size, wrapped_size, group_id);
+                    group_id_ptr.write(group_id.as_raw());
+                    self.tracer.trace_allocation(wrapped_size, group_id);
                 },
             );
         }
@@ -105,24 +94,17 @@ unsafe impl<A: GlobalAlloc> GlobalAlloc for Allocator<A> {
         let raw_group_id = actual_ptr.cast::<usize>().read();
 
         // Deallocate before tracking, just to make sure we're reclaiming memory as soon as possible.
-        self.inner.dealloc(actual_ptr, wrapped_layout);
+        self.allocator.dealloc(actual_ptr, wrapped_layout);
 
-        let object_addr = object_ptr as usize;
-        let object_size = object_layout.size();
         let wrapped_size = wrapped_layout.size();
 
-        if let Some(tracker) = get_global_tracker() {
+        if is_allocation_tracing_enabled() {
             if let Some(source_group_id) = AllocationGroupId::from_raw(raw_group_id) {
                 try_with_suspended_allocation_group(
                     #[inline(always)]
-                    |current_group_id| {
-                        tracker.deallocated(
-                            object_addr,
-                            object_size,
-                            wrapped_size,
-                            source_group_id,
-                            current_group_id,
-                        );
+                    |_| {
+                        self.tracer
+                            .trace_deallocation(wrapped_size, source_group_id)
                     },
                 );
             }

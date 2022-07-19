@@ -26,7 +26,6 @@ impl<const CHUNK_LEN: usize, T: Copy> Chunk<CHUNK_LEN, T> {
     ///
     /// The caller is responsible for ensuring that they have exclusive access to this chunk, as the mutable reference
     /// is created in a way that circumvents normal aliasing rules.
-    #[inline]
     #[allow(clippy::mut_from_ref)]
     unsafe fn as_mut(&self) -> &mut [T] {
         slice::from_raw_parts_mut(self.0.as_ptr() as *mut _, CHUNK_LEN)
@@ -45,7 +44,6 @@ impl<const CHUNK_LEN: usize, T: Copy> Chunk<CHUNK_LEN, T> {
     /// by the producer. If the length caused a slice reference to be created that extended past the number of elements
     /// written, even if it was still in bounds in terms of the chunk size, it would constitute immediate UB, even if
     /// somehow `T` could be represented by the underlying data in the backing allocation.
-    #[inline]
     unsafe fn as_bounded_slice(&self, len: usize) -> &[T] {
         slice::from_raw_parts(self.0.as_ptr() as *const _, len)
     }
@@ -120,7 +118,6 @@ impl<const CHUNK_LEN: usize, const CHUNKS: usize, T: Copy> Inner<CHUNK_LEN, CHUN
         None
     }
 
-    #[inline]
     fn try_find_writable_chunk_pos(&self) -> Option<usize> {
         for idx in 0..CHUNKS {
             // SAFETY: We only get `idx` from iterating from 0 to `CHUNKS`, and `self.chunk_state` is a fixed-size
@@ -140,7 +137,6 @@ impl<const CHUNK_LEN: usize, const CHUNKS: usize, T: Copy> Inner<CHUNK_LEN, CHUN
     /// If a readable chunk is found, `Some(ChunkReader)` is returned, which wraps read access to the chunk with a
     /// guard, `ChunkReader`, that provides convenience methods for reading the chunk, as well as ensuring
     /// the chunk is always returned to the producer when it is no longer being reference.
-    #[inline]
     fn try_find_readable_chunk(&self) -> Option<(usize, &[T])> {
         self.try_find_readable_chunk_pos().map(|idx| {
             let data_len = self.chunk_lens[idx].load(Ordering::Acquire);
@@ -159,7 +155,6 @@ impl<const CHUNK_LEN: usize, const CHUNKS: usize, T: Copy> Inner<CHUNK_LEN, CHUN
     /// If a writable chunk is found, `Some(ChunkWriter)` is returned, which wraps write access to the chunk with a
     /// guard, `ChunkWriter`, that provides convenience methods for writing and sending the chunk, as well as ensuring
     /// the chunk is always returned to the consumer by the time the chunk writer is dropped.
-    #[inline]
     fn try_find_writable_chunk(&self) -> Option<(usize, &Chunk<CHUNK_LEN, T>)> {
         self.try_find_writable_chunk_pos()
             .map(|idx| (idx, &self.chunks[idx]))
@@ -168,14 +163,12 @@ impl<const CHUNK_LEN: usize, const CHUNKS: usize, T: Copy> Inner<CHUNK_LEN, CHUN
     /// Marks a chunk as readable.
     ///
     /// This also updates the chunk length so that a valid slice reference can be created when the chunk is read by the consumer.
-    #[inline]
     fn mark_chunk_readable(&self, idx: usize, len: usize) {
         self.chunk_lens[idx].store(len, Ordering::Relaxed);
         self.chunk_state[idx].store(READABLE, Ordering::Release);
     }
 
     /// Marks a chunk as writable.
-    #[inline]
     fn mark_chunk_writable(&self, idx: usize) {
         self.chunk_state[idx].store(WRITABLE, Ordering::Release);
     }
@@ -218,25 +211,23 @@ where
 
             // Make sure we have capacity in the current chunk. Otherwise, send the chunk to the
             // consumer and then get a new one to start writing into.
-            let available = CHUNK_LEN - self.current_chunk_len;
-            if available == 0 {
+            if self.current_chunk_len == CHUNK_LEN - 1 {
                 self.send_current_chunk();
                 continue;
             }
 
             let buffer = self
                 .current_chunk
-                .map(|chunk| unsafe { &mut chunk.as_mut()[self.current_chunk_len..] })
+                .map(|chunk| unsafe { chunk.as_mut() })
                 .expect("current chunk must exist at this point");
 
-            buffer[0] = data;
+            buffer[self.current_chunk_len] = data;
             self.current_chunk_len += 1;
 
             break;
         }
     }
 
-    #[inline]
     fn acquire_chunk(&mut self) {
         loop {
             if let Some((idx, chunk)) = self.inner.try_find_writable_chunk() {
@@ -320,7 +311,6 @@ where
     */
 
     /// Marks a chunk as writable.
-    #[inline]
     fn mark_chunk_writable(&self, idx: usize) {
         self.inner.mark_chunk_writable(idx)
     }

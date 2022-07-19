@@ -1,2 +1,2 @@
-#[cfg(feature = "allocation-tracking")]
+#[cfg(feature = "allocation-tracing")]
 pub mod allocations;

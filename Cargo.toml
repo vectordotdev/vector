@@ -218,7 +218,6 @@ vrl = { path = "lib/vrl/vrl" }
 vrl-stdlib = { path = "lib/vrl/stdlib" }
 
 # External libs
-arrayvec = { version = "0.7.2", default-features = false, optional = true }
 arc-swap = { version = "1.5", default-features = false, optional = true }
 async-compression = { version = "0.3.12", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
 avro-rs = { version = "0.13.0", default-features = false, optional = true }
@@ -300,7 +299,6 @@ tokio-postgres = { version = "0.7.6", default-features = false, features = ["run
 tokio-tungstenite = {version = "0.17.2", default-features = false, features = ["connect"], optional = true}
 toml = { version = "0.5.9", default-features = false }
 tonic = { version = "0.7.2", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "compression"] }
-tracking-allocator = { version = "0.4.0", default-features = false, features = ["tracing-compat"], optional = true }
 trust-dns-proto = { version = "0.21.0", default-features = false, features = ["dnssec"], optional = true }
 typetag = { version = "0.2.1", default-features = false }
 url = { version = "2.2.2", default-features = false, features = ["serde"] }
@@ -391,8 +389,8 @@ target-powerpc64le-unknown-linux-gnu = ["api", "api-client", "enrichment-tables"
 target-powerpc-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vrl-cli", "enterprise"]
 
 # Enables features that work only on systems providing `cfg(unix)`
-unix = ["tikv-jemallocator", "allocation-tracking"]
-allocation-tracking = ["dep:arrayvec", "dep:crossbeam-queue", "dep:slab", "dep:thread_local", "dep:tracking-allocator"]
+unix = ["tikv-jemallocator", "allocation-tracing"]
+allocation-tracing = ["dep:crossbeam-queue", "dep:slab"]
 
 # Enables kubernetes dependencies and shared code. Kubernetes-related sources,
 # transforms and sinks should depend on this feature.

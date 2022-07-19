@@ -49,14 +49,18 @@ use crossbeam_queue::ArrayQueue;
 use crossbeam_utils::Backoff;
 use once_cell::sync::OnceCell;
 use slab::Slab;
-use tracking_allocator::{
-    AllocationGroupId, AllocationGroupToken, AllocationRegistry, AllocationTracker,
-};
 
 mod allocator;
 
 mod channel;
-use self::channel::{create_channel, Consumer, Producer};
+use self::{
+    allocator::{enable_allocation_tracing, without_allocation_tracing, Tracer},
+    channel::{create_channel, Consumer, Producer},
+};
+
+pub(crate) use self::allocator::{AllocationGroupId, AllocationLayer, GroupedTraceableAllocator};
+
+pub type Allocator<A> = GroupedTraceableAllocator<A, LocalProducerTracer>;
 
 const BATCH_SIZE: usize = 256;
 const BATCHES: usize = 256;
@@ -71,7 +75,6 @@ fn get_registrations() -> &'static Registrations {
     REGISTRATIONS.get_or_init(Registrations::new)
 }
 
-//#[inline]
 fn with_local_event_producer<F>(mut f: F)
 where
     F: FnMut(&mut Producer<BATCH_SIZE, BATCHES, AllocatorEvent>),
@@ -99,6 +102,10 @@ fn register_event_channel() -> Producer<BATCH_SIZE, BATCHES, AllocatorEvent> {
     registrations.register(consumer);
 
     producer
+}
+
+pub const fn get_grouped_tracing_allocator<A>(allocator: A) -> Allocator<A> {
+    GroupedTraceableAllocator::new(allocator, LocalProducerTracer)
 }
 
 #[derive(Clone, Copy)]
@@ -150,7 +157,6 @@ impl Registrations {
 
 struct Collector {
     consumers: Slab<Consumer<BATCH_SIZE, BATCHES, AllocatorEvent>>,
-    //consumer_empty: Vec<usize>,
     registrations: &'static Registrations,
 }
 
@@ -160,7 +166,6 @@ impl Collector {
 
         Self {
             consumers: Slab::new(),
-            //consumer_empty: Vec::new(),
             registrations,
         }
     }
@@ -176,7 +181,7 @@ impl Collector {
 
         // We don't want to track allocator events here, because speed is the name of the game, and also, things could
         // potentially get into a not-so-great feedback loop.
-        AllocationRegistry::untracked(|| {
+        without_allocation_tracing(|| {
             loop {
                 // Check if any consumers are pending registration.
                 if self.registrations.has_pending_registrations() {
@@ -259,54 +264,39 @@ fn run_allocation_reporter(allocs: Arc<AtomicUsize>, deallocs: Arc<AtomicUsize>)
         .unwrap();
 }
 
-struct Tracker;
+pub struct LocalProducerTracer;
 
-impl AllocationTracker for Tracker {
-    fn allocated(
-        &self,
-        _addr: usize,
-        _object_size: usize,
-        _wrapped_size: usize,
-        _group_id: AllocationGroupId,
-    ) {
+impl Tracer for LocalProducerTracer {
+    fn trace_allocation(&self, _wrapped_size: usize, _group_id: AllocationGroupId) {
         with_local_event_producer(|producer| {
             producer.write(AllocatorEvent::Allocation);
         });
     }
 
-    fn deallocated(
-        &self,
-        _addr: usize,
-        _object_size: usize,
-        _wrapped_size: usize,
-        _source_group_id: AllocationGroupId,
-        _current_group_id: AllocationGroupId,
-    ) {
+    fn trace_deallocation(&self, _wrapped_size: usize, _source_group_id: AllocationGroupId) {
         with_local_event_producer(|producer| {
             producer.write(AllocatorEvent::Deallocation);
         });
     }
 }
 
-/// Initializes allocation tracking.
-pub fn init_allocation_tracking() {
+/// Initializes allocation tracing.
+pub fn init_allocation_tracing() {
     let mut collector = Collector::new();
 
     let alloc_processor = thread::Builder::new().name("vector-alloc-processor".to_string());
     alloc_processor.spawn(move || collector.run()).unwrap();
 
-    AllocationRegistry::set_global_tracker(Tracker)
-        .expect("no other global tracker should be set yet");
-
-    AllocationRegistry::enable_tracking();
+    enable_allocation_tracing();
 }
 
-/// Acquires an allocation group token.
+/// Acquires an allocation group ID.
 ///
 /// This creates an allocation group which allows callers to enter/exit the allocation group context, associating all
-/// (de)allocations within the context with that group.  That token can (and typically is) associated with a
-/// /// `tracing::Span` such that the context is entered and exited as the span is entered and exited. This allows
-/// ensuring that we track all (de)allocations when the span is active.
+/// (de)allocations within the context with that group. An allocation group ID must be "attached" to
+/// a [`tracing::Span`] to achieve this" we utilize the logical invariants provided by spans --
+/// entering, exiting, and how spans exist as a stack -- in order to handle keeping the "current
+/// allocation group" accurate across all threads.
 ///
 /// # Tags
 ///
@@ -314,9 +304,9 @@ pub fn init_allocation_tracking() {
 /// the traditional `metrics`/`tracing` are collected, as the metrics are updated directly rather than emitted via the
 /// traditional `metrics` macros, so the given tags should match the span fields that would traditionally be set for a
 /// given span in order to ensure that they match.
-pub fn acquire_allocation_group_token(_tags: Vec<(String, String)>) -> AllocationGroupToken {
+pub fn acquire_allocation_group_id(_tags: Vec<(String, String)>) -> AllocationGroupId {
     // TODO: register the allocation group token with its tags via `Collector`: we can't do it via `Registrations`
     // because that gets checked lazily/periodically, and we need to be able to associate a group ID with its tags
     // immediately so that we don't misassociate events
-    AllocationGroupToken::register().expect("failed to register allocation group token")
+    AllocationGroupId::register().expect("failed to register allocation group token")
 }

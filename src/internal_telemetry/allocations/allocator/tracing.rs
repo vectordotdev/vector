@@ -5,12 +5,12 @@ use tracing_subscriber::{layer::Context, registry::LookupSpan, Layer};
 
 use super::token::AllocationGroupToken;
 
-pub(crate) struct WithAllocationGroup {
+pub(super) struct WithAllocationGroup {
     with_allocation_group: fn(&Dispatch, &Id, AllocationGroupToken),
 }
 
 impl WithAllocationGroup {
-    pub fn with_allocation_group(
+    pub(super) fn with_allocation_group(
         &self,
         dispatch: &Dispatch,
         id: &Id,
@@ -48,11 +48,7 @@ where
         }
     }
 
-    fn with_allocation_group(
-        dispatch: &Dispatch,
-        id: &Id,
-        group_token: AllocationGroupToken,
-    ) {
+    fn with_allocation_group(dispatch: &Dispatch, id: &Id, group_token: AllocationGroupToken) {
         let subscriber = dispatch
             .downcast_ref::<S>()
             .expect("subscriber should downcast to expected type; this is a bug!");
@@ -70,10 +66,7 @@ where
 {
     fn on_enter(&self, id: &Id, ctx: Context<'_, S>) {
         if let Some(span_ref) = ctx.span(id) {
-            if let Some(token) = span_ref
-                .extensions_mut()
-                .get_mut::<AllocationGroupToken>()
-            {
+            if let Some(token) = span_ref.extensions_mut().get_mut::<AllocationGroupToken>() {
                 token.enter();
             }
         }
@@ -81,10 +74,7 @@ where
 
     fn on_exit(&self, id: &Id, ctx: Context<'_, S>) {
         if let Some(span_ref) = ctx.span(id) {
-            if let Some(token) = span_ref
-                .extensions_mut()
-                .get_mut::<AllocationGroupToken>()
-            {
+            if let Some(token) = span_ref.extensions_mut().get_mut::<AllocationGroupToken>() {
                 token.exit();
             }
         }
@@ -98,14 +88,5 @@ where
             }
             _ => None,
         }
-    }
-}
-
-impl<S> Default for AllocationLayer<S>
-where
-    S: Subscriber + for<'span> LookupSpan<'span>,
-{
-    fn default() -> Self {
-        AllocationLayer::new()
     }
 }
