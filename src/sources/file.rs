@@ -407,6 +407,7 @@ pub fn file_source(
         None => Bytes::from(config.line_delimiter.clone()),
     };
 
+    let line_delimiter_len = line_delimiter_as_bytes.len();
     let checkpointer = Checkpointer::new(&data_dir);
     let file_server = FileServer {
         paths_provider,
@@ -548,6 +549,7 @@ pub fn file_source(
                 line.text,
                 &line.filename,
                 line.offset,
+                line_delimiter_len,
                 &host_key,
                 &hostname,
                 &file_key,
@@ -630,10 +632,12 @@ fn wrap_with_line_agg(
     )
 }
 
+
 fn create_event(
     line: Bytes,
     file: &str,
     line_end_offset: u64,
+    line_delimiter_len: usize,
     host_key: &str,
     hostname: &Option<String>,
     file_key: &Option<String>,
@@ -653,7 +657,7 @@ fn create_event(
     event.insert(log_schema().source_type_key(), Bytes::from("file"));
 
     if let Some(offset_key) = &offset_key {
-        let line_start_offset: u64 = line_end_offset - line_len as u64 - 1;
+        let line_start_offset: u64 = line_end_offset - line_len as u64 - line_delimiter_len as u64;
         event.insert(offset_key.as_str(), line_start_offset.to_string());
     }
 
