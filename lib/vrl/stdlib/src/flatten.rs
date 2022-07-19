@@ -48,7 +48,6 @@ impl Function for Flatten {
                 kind: kind::BYTES,
                 required: false,
             },
-
         ]
     }
 
@@ -97,7 +96,7 @@ impl Expression for FlattenFn {
             .as_ref()
             .map(|expr| expr.resolve(ctx))
             .transpose()?;
-    
+
         flatten(self.value.resolve(ctx)?, separator)
     }
 
@@ -130,7 +129,11 @@ impl<'a> MapFlatten<'a> {
         }
     }
 
-    fn new_from_parent(parent: String, values: btree_map::Iter<'a, String, Value>, separator: String) -> Self {
+    fn new_from_parent(
+        parent: String,
+        values: btree_map::Iter<'a, String, Value>,
+        separator: String,
+    ) -> Self {
         Self {
             values,
             separator,
