@@ -9,7 +9,7 @@ use vector_core::config::LogNamespace;
 use crate::{
     config::{Config, DataType, Output, SourceConfig, SourceContext},
     sinks::blackhole::BlackholeConfig,
-    sources::{stdin::StdinConfig, Source},
+    sources::{file_descriptors::stdin::StdinConfig, Source},
     test_util::{mock::transforms::BasicTransformConfig, start_topology, trace_init},
     Error,
 };

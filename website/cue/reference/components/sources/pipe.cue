@@ -72,7 +72,7 @@ components: sources: pipe: {
 	}
 
 	output: logs: line: {
-		description: "An individual event from STDIN."
+		description: "An individual event from the pipe."
 		fields: {
 			host:      fields._local_host
 			message:   fields._raw_line

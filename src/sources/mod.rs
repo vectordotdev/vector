@@ -24,6 +24,8 @@ pub mod eventstoredb_metrics;
 pub mod exec;
 #[cfg(feature = "sources-file")]
 pub mod file;
+#[cfg(any(feature = "sources-stdin", all(unix, feature = "sources-pipe")))]
+pub mod file_descriptors;
 #[cfg(feature = "sources-fluent")]
 pub mod fluent;
 #[cfg(feature = "sources-gcp_pubsub")]
@@ -54,8 +56,6 @@ pub mod nats;
 pub mod nginx_metrics;
 #[cfg(feature = "sources-opentelemetry")]
 pub mod opentelemetry;
-#[cfg(all(unix, feature = "sources-pipe"))]
-pub mod pipe;
 #[cfg(feature = "sources-postgresql_metrics")]
 pub mod postgresql_metrics;
 #[cfg(feature = "sources-prometheus")]
@@ -68,8 +68,6 @@ pub mod socket;
 pub mod splunk_hec;
 #[cfg(feature = "sources-statsd")]
 pub mod statsd;
-#[cfg(feature = "sources-stdin")]
-pub mod stdin;
 #[cfg(feature = "sources-syslog")]
 pub mod syslog;
 #[cfg(feature = "sources-vector")]
@@ -204,6 +202,10 @@ pub enum Sources {
     #[cfg(feature = "sources-nginx_metrics")]
     NginxMetrics(#[configurable(derived)] nginx_metrics::NginxMetricsConfig),
 
+    /// Pipe.
+    #[cfg(all(unix, feature = "sources-pipe"))]
+    Pipe(#[configurable(derived)] file_descriptors::pipe::PipeConfig),
+
     /// PostgreSQL Metrics.
     #[cfg(feature = "sources-postgresql_metrics")]
     PostgresqlMetrics(#[configurable(derived)] postgresql_metrics::PostgresqlMetricsConfig),
@@ -234,7 +236,7 @@ pub enum Sources {
 
     /// Stdin.
     #[cfg(feature = "sources-stdin")]
-    Stdin(#[configurable(derived)] stdin::StdinConfig),
+    Stdin(#[configurable(derived)] file_descriptors::stdin::StdinConfig),
 
     /// Syslog.
     #[cfg(feature = "sources-syslog")]

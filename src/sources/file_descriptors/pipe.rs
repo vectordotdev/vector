@@ -3,7 +3,7 @@ use std::io;
 use std::os::raw::c_int;
 use std::os::unix::io::FromRawFd;
 
-use super::util::file_descriptor::{file_descriptor_source, FileDescriptorConfig};
+use super::{file_descriptor_source, FileDescriptorConfig};
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use indoc::indoc;
 use vector_config::configurable_component;
@@ -75,7 +75,7 @@ impl GenerateConfig for PipeConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "pipe")]
 impl SourceConfig for PipeConfig {
-    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+    async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
         pipe_source(self.clone(), cx.shutdown, cx.out)
     }
 
@@ -100,7 +100,7 @@ pub fn pipe_source(
     config: PipeConfig,
     shutdown: ShutdownSignal,
     out: SourceSender,
-) -> crate::Result<super::Source> {
+) -> crate::Result<crate::sources::Source> {
     let pipe = io::BufReader::new(unsafe { File::from_raw_fd(config.fd) });
     file_descriptor_source(pipe, config, shutdown, out, "pipe")
 }

@@ -20,6 +20,11 @@ use crate::{
     SourceSender,
 };
 
+#[cfg(all(unix, feature = "sources-pipe"))]
+pub mod pipe;
+#[cfg(feature = "sources-stdin")]
+pub mod stdin;
+
 pub trait FileDescriptorConfig {
     fn host_key(&self) -> Option<String>;
     fn framing(&self) -> Option<FramingConfig>;
@@ -107,7 +112,6 @@ where
                         }
                     }
                     Err(error) => {
-                        println!("Got an error: {:?}", error);
                         // Error is logged by `crate::codecs::Decoder`, no
                         // further handling is needed here.
                         if !error.can_continue() {

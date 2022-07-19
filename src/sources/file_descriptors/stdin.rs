@@ -11,7 +11,7 @@ use crate::{
     SourceSender,
 };
 
-use super::util::file_descriptor::{file_descriptor_source, FileDescriptorConfig};
+use super::{file_descriptor_source, FileDescriptorConfig};
 
 /// Configuration for the `stdin` source.
 #[configurable_component(source)]
@@ -74,7 +74,7 @@ impl_generate_config_from_default!(StdinConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "stdin")]
 impl SourceConfig for StdinConfig {
-    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+    async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
         stdin_source(
             io::BufReader::new(io::stdin()),
             self.clone(),
@@ -105,7 +105,7 @@ pub fn stdin_source<R>(
     config: StdinConfig,
     shutdown: ShutdownSignal,
     out: SourceSender,
-) -> crate::Result<super::Source>
+) -> crate::Result<crate::sources::Source>
 where
     R: Send + io::BufRead + 'static,
 {
