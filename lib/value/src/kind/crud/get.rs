@@ -122,13 +122,14 @@ impl Kind {
                 let field_kind = self.get_field(field);
 
                 // the remaining segments if this match succeeded
+                #[allow(clippy::needless_collect)]
+                // need to collect to prevent infinite recursive iterator type
                 let match_iter = iter
                     .clone()
                     .skip_while(|segment| matches!(segment, BorrowedSegment::CoalesceField(_)))
                     // skip the CoalesceEnd, which always exists after CoalesceFields
-                    .skip(1);
-                // need to collect to prevent infinite recursive iterator type
-                // .collect::<Vec<_>>();
+                    .skip(1)
+                    .collect::<Vec<_>>();
 
                 // This is the resulting type, assuming the match succeeded.
                 let match_type = field_kind
