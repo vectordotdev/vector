@@ -47,6 +47,7 @@ USAGE:
 
 FLAGS:
     -y                      Disable confirmation prompt.
+        --prefix            The directory where the files should be placed, default: "$HOME/.vector"
         --no-modify-path    Don't configure the PATH environment variable
     -h, --help              Prints help information
 EOF
@@ -58,11 +59,16 @@ main() {
 
     local prompt=yes
     local modify_path=yes
+    local prefix="$HOME/.vector"
     for arg in "$@"; do
         case "$arg" in
             -h|--help)
                 usage
                 exit 0
+                ;;
+            --prefix)
+                prefix="$2"
+                shift 2
                 ;;
             --no-modify-path)
                 modify_path=no
@@ -104,7 +110,7 @@ main() {
         echo ""
     fi
 
-    install_from_archive $modify_path
+    install_from_archive $modify_path $prefix
 }
 
 install_from_archive() {
@@ -120,8 +126,12 @@ install_from_archive() {
 
     get_architecture || return 1
     local modify_path="$1"
+    local prefix="$2"
     local _arch="$RETVAL"
     assert_nz "$_arch" "arch"
+
+    # this path could be a relative, get the absolute path, ref: https://stackoverflow.com/a/21188136/11667450
+    prefix="$(cd "$(dirname "$prefix")" && pwd)/$(basename "$prefix")"
 
     local _archive_arch=""
     case "$_arch" in
@@ -161,15 +171,14 @@ install_from_archive() {
     ensure downloader "$_url" "$_file"
     printf " ✓\n"
 
-    printf "%s Unpacking archive to $HOME/.vector ..." "$_prompt"
-    ensure mkdir -p "$HOME/.vector"
-    ensure tar -xzf "$_file" --directory="$HOME/.vector" --strip-components=2
+    printf "%s Unpacking archive to $prefix ..." "$_prompt"
+    ensure mkdir -p "$prefix"
+    ensure tar -xzf "$_file" --directory="$prefix" --strip-components=2
 
     printf " ✓\n"
 
     if [ "$modify_path" = "yes" ]; then
-      # shellcheck disable=SC2016 # We don't want to expand here.
-      local _path='export PATH="$PATH:$HOME/.vector/bin"'
+      local _path="export PATH=$PATH:$prefix"
       add_to_path "${HOME}/.zprofile" "${_path}"
       add_to_path "${HOME}/.profile" "${_path}"
     fi
@@ -177,7 +186,7 @@ install_from_archive() {
     printf "%s Install succeeded! 🚀\n" "$_prompt"
     printf "%s To start Vector:\n" "$_prompt"
     printf "\n"
-    printf "%s vector --config ~/.vector/config/vector.toml\n" "$_indent"
+    printf "%s vector --config $prefix/config/vector.toml\n" "$_indent"
     printf "\n"
     printf "%s More information at https://vector.dev/docs/\n" "$_prompt"
 
