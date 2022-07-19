@@ -105,17 +105,59 @@ pub(crate) fn decode_log_body(
                 Ok(Some((events, _byte_size))) => {
                     for mut event in events {
                         if let Event::Log(ref mut log) = event {
-                            log.try_insert(path!("status"), status.clone());
-                            log.try_insert(path!("timestamp"), timestamp);
-                            log.try_insert(path!("hostname"), hostname.clone());
-                            log.try_insert(path!("service"), service.clone());
-                            log.try_insert(path!("ddsource"), ddsource.clone());
-                            log.try_insert(path!("ddtags"), ddtags.clone());
-                            log.try_insert(
+                            let namespace = &source.log_namespace;
+                            let source_name = "datadog_agent";
+
+                            namespace.insert_source_metadata(
+                                source_name,
+                                log,
+                                path!("status"),
+                                status.clone(),
+                            );
+                            namespace.insert_source_metadata(
+                                source_name,
+                                log,
+                                path!("timestamp"),
+                                timestamp,
+                            );
+                            namespace.insert_source_metadata(
+                                source_name,
+                                log,
+                                path!("hostname"),
+                                hostname.clone(),
+                            );
+                            namespace.insert_source_metadata(
+                                source_name,
+                                log,
+                                path!("service"),
+                                service.clone(),
+                            );
+                            namespace.insert_source_metadata(
+                                source_name,
+                                log,
+                                path!("ddsource"),
+                                ddsource.clone(),
+                            );
+                            namespace.insert_source_metadata(
+                                source_name,
+                                log,
+                                path!("ddtags"),
+                                ddtags.clone(),
+                            );
+
+                            namespace.insert_vector_metadata(
+                                log,
                                 path!(source.log_schema_source_type_key),
+                                path!("source_type"),
                                 Bytes::from("datadog_agent"),
                             );
-                            log.try_insert(path!(source.log_schema_timestamp_key), now);
+                            namespace.insert_vector_metadata(
+                                log,
+                                path!(source.log_schema_timestamp_key),
+                                path!("ingest_timestamp"),
+                                now,
+                            );
+
                             if let Some(k) = &api_key {
                                 log.metadata_mut().set_datadog_api_key(Arc::clone(k));
                             }

@@ -132,7 +132,7 @@ impl DatadogTracesConfig {
 }
 
 impl DatadogTracesConfig {
-    pub fn build_sink(&self, client: HttpClient, cx: SinkContext) -> crate::Result<VectorSink> {
+    pub fn build_sink(&self, client: HttpClient) -> crate::Result<VectorSink> {
         let default_api_key: Arc<str> = Arc::from(self.default_api_key.clone().as_str());
         let request_limits = self.request.unwrap_with(&DEFAULT_REQUEST_LIMITS);
         let endpoints = self.generate_traces_endpoint_configuration()?;
@@ -151,7 +151,7 @@ impl DatadogTracesConfig {
             self.compression.unwrap_or_else(Compression::gzip_default),
             PAYLOAD_LIMIT,
         )?;
-        let sink = TracesSink::new(cx, service, request_builder, batcher_settings);
+        let sink = TracesSink::new(service, request_builder, batcher_settings);
         Ok(VectorSink::from_event_streamsink(sink))
     }
 
@@ -180,7 +180,7 @@ impl SinkConfig for DatadogTracesConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.build_client(&cx.proxy)?;
         let healthcheck = self.build_healthcheck(client.clone())?;
-        let sink = self.build_sink(client, cx)?;
+        let sink = self.build_sink(client)?;
         Ok((sink, healthcheck))
     }
 

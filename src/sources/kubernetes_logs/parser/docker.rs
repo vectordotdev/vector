@@ -206,7 +206,11 @@ pub mod tests {
     fn test_parsing() {
         trace_init();
 
-        test_util::test_parser(|| Transform::function(Docker), Event::from, cases());
+        test_util::test_parser(
+            || Transform::function(Docker),
+            |s| Event::Log(LogEvent::from(s)),
+            cases(),
+        );
     }
 
     #[test]

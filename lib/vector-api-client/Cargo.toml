@@ -9,8 +9,8 @@ license = "MPL-2.0"
 [dependencies]
 
 # Serde
-serde = { version = "1.0.137", default-features = false, features = ["derive"] }
-serde_json = { version = "1.0.81", default-features = false, features = ["raw_value"] }
+serde = { version = "1.0.139", default-features = false, features = ["derive"] }
+serde_json = { version = "1.0.82", default-features = false, features = ["raw_value"] }
 
 # Error handling
 anyhow = { version = "1.0.58", default-features = false, features = ["std"] }
@@ -18,7 +18,7 @@ anyhow = { version = "1.0.58", default-features = false, features = ["std"] }
 # Tokio / Futures
 async-trait = { version = "0.1", default-features = false }
 futures = { version = "0.3", default-features = false, features = ["compat", "io-compat"] }
-tokio = { version = "1.19.2", default-features = false, features = ["macros", "rt", "sync"] }
+tokio = { version = "1.20.0", default-features = false, features = ["macros", "rt", "sync"] }
 tokio-stream = { version = "0.1.9", default-features = false, features = ["sync"] }
 
 # GraphQL
@@ -26,7 +26,7 @@ graphql_client = { version = "0.11.0", default-features = false, features = ["gr
 
 # HTTP / WebSockets
 reqwest = { version = "0.11.11", default-features = false, features = ["json"] }
-tokio-tungstenite = { version = "0.17.1", default-features = false, features = ["connect", "rustls"] }
+tokio-tungstenite = { version = "0.17.2", default-features = false, features = ["connect", "rustls"] }
 
 # External libs
 chrono = { version = "0.4.6", default-features = false, features = ["serde"] }

@@ -42,7 +42,7 @@ async fn start_test(
     let (batch, receiver) = BatchNotifier::new_with_receiver();
     let stream = map_event_batch_stream(stream::iter(events), Some(batch));
 
-    let _ = sink.run(stream).await.unwrap();
+    sink.run(stream).await.unwrap();
     assert_eq!(receiver.await, batch_status);
 
     rx

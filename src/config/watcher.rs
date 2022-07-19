@@ -145,7 +145,7 @@ mod tests {
         let file_path = temp_file();
         let mut file = File::create(&file_path).unwrap();
 
-        let _ = spawn_thread(&[file_path.parent().unwrap().to_path_buf()], delay).unwrap();
+        spawn_thread(&[file_path.parent().unwrap().to_path_buf()], delay).unwrap();
 
         if !test(&mut file, delay * 5).await {
             panic!("Test timed out");
@@ -160,7 +160,7 @@ mod tests {
         let file_path = temp_file();
         let mut file = File::create(&file_path).unwrap();
 
-        let _ = spawn_thread(&[file_path], delay).unwrap();
+        spawn_thread(&[file_path], delay).unwrap();
 
         if !test(&mut file, delay * 5).await {
             panic!("Test timed out");
@@ -177,7 +177,7 @@ mod tests {
         let mut file = File::create(&file_path).unwrap();
         std::os::unix::fs::symlink(&file_path, &sym_file).unwrap();
 
-        let _ = spawn_thread(&[sym_file], delay).unwrap();
+        spawn_thread(&[sym_file], delay).unwrap();
 
         if !test(&mut file, delay * 5).await {
             panic!("Test timed out");

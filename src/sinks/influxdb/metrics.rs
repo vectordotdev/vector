@@ -108,7 +108,7 @@ impl SinkConfig for InfluxDbConfig {
             client.clone(),
         )?;
         validate_quantiles(&self.quantiles)?;
-        let sink = InfluxDbSvc::new(self.clone(), cx, client)?;
+        let sink = InfluxDbSvc::new(self.clone(), client)?;
         Ok((sink, healthcheck))
     }
 
@@ -126,11 +126,7 @@ impl SinkConfig for InfluxDbConfig {
 }
 
 impl InfluxDbSvc {
-    pub fn new(
-        config: InfluxDbConfig,
-        cx: SinkContext,
-        client: HttpClient,
-    ) -> crate::Result<VectorSink> {
+    pub fn new(config: InfluxDbConfig, client: HttpClient) -> crate::Result<VectorSink> {
         let settings = influxdb_settings(
             config.influxdb1_settings.clone(),
             config.influxdb2_settings.clone(),
@@ -163,7 +159,6 @@ impl InfluxDbSvc {
                 influxdb_http_service,
                 MetricsBuffer::new(batch.size),
                 batch.timeout,
-                cx.acker(),
             )
             .with_flat_map(move |event: Event| {
                 stream::iter({
@@ -362,7 +357,10 @@ fn get_type_and_fields(
                         )
                     })
                     .collect::<HashMap<_, _>>();
-                fields.insert("count".to_owned(), Field::UnsignedInt(ddsketch.count()));
+                fields.insert(
+                    "count".to_owned(),
+                    Field::UnsignedInt(u64::from(ddsketch.count())),
+                );
                 fields.insert(
                     "min".to_owned(),
                     Field::Float(ddsketch.min().unwrap_or(f64::MAX)),
@@ -1103,7 +1101,7 @@ mod integration_tests {
         }
 
         let client = HttpClient::new(None, cx.proxy()).unwrap();
-        let sink = InfluxDbSvc::new(config, cx, client).unwrap();
+        let sink = InfluxDbSvc::new(config, client).unwrap();
         run_and_assert_sink_compliance(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
 
         let mut body = std::collections::HashMap::new();

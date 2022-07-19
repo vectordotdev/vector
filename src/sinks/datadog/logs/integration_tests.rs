@@ -22,6 +22,6 @@ async fn to_real_v2_endpoint() {
     let generator = |index| format!("this is a log with index {}", index);
     let (_, events) = generate_lines_with_stream(generator, 10, Some(batch));
 
-    let _ = sink.run(events).await.unwrap();
+    sink.run(events).await.unwrap();
     assert_eq!(receiver.await, BatchStatus::Delivered);
 }

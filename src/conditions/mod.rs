@@ -6,6 +6,7 @@ mod check_fields;
 pub(self) mod datadog_search;
 pub(crate) mod is_log;
 pub(crate) mod is_metric;
+pub(crate) mod is_trace;
 mod vrl;
 
 pub use self::vrl::VrlConfig;
@@ -14,6 +15,7 @@ use self::{
     datadog_search::{DatadogSearchConfig, DatadogSearchRunner},
     is_log::{check_is_log, check_is_log_with_context},
     is_metric::{check_is_metric, check_is_metric_with_context},
+    is_trace::{check_is_trace, check_is_trace_with_context},
     vrl::Vrl,
 };
 
@@ -24,6 +26,9 @@ pub enum Condition {
 
     /// Matches an event if it is a metric.
     IsMetric,
+
+    /// Matches an event if it is a trace.
+    IsTrace,
 
     /// Matches an event with a [Vector Remap Language](https://vector.dev/docs/reference/vrl) (VRL) [boolean expression](https://vector.dev/docs/reference/vrl#boolean-expressions).
     Vrl(Vrl),
@@ -54,6 +59,7 @@ impl Condition {
         match self {
             Condition::IsLog => check_is_log(e),
             Condition::IsMetric => check_is_metric(e),
+            Condition::IsTrace => check_is_trace(e),
             Condition::Vrl(x) => x.check(e),
             Condition::CheckFields(x) => x.check(e),
             Condition::DatadogSearch(x) => x.check(e),
@@ -70,6 +76,7 @@ impl Condition {
         match self {
             Condition::IsLog => check_is_log_with_context(e),
             Condition::IsMetric => check_is_metric_with_context(e),
+            Condition::IsTrace => check_is_trace_with_context(e),
             Condition::Vrl(x) => x.check_with_context(e),
             Condition::CheckFields(x) => x.check_with_context(e),
             Condition::DatadogSearch(x) => x.check_with_context(e),
@@ -100,6 +107,9 @@ pub enum ConditionConfig {
     /// Matches an event if it is a metric.
     IsMetric,
 
+    /// Matches an event if it is a trace.
+    IsTrace,
+
     /// Matches an event with a [Vector Remap Language](https://vector.dev/docs/reference/vrl) (VRL) [boolean expression](https://vector.dev/docs/reference/vrl#boolean-expressions).
     Vrl(#[configurable(derived)] VrlConfig),
 
@@ -115,6 +125,7 @@ impl ConditionConfig {
         match self {
             ConditionConfig::IsLog => Ok(Condition::IsLog),
             ConditionConfig::IsMetric => Ok(Condition::IsMetric),
+            ConditionConfig::IsTrace => Ok(Condition::IsTrace),
             ConditionConfig::Vrl(x) => x.build(enrichment_tables),
             ConditionConfig::CheckFields(x) => x.build(enrichment_tables),
             ConditionConfig::DatadogSearch(x) => x.build(enrichment_tables),

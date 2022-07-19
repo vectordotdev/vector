@@ -9,6 +9,7 @@ use codecs::{
 };
 use futures::{channel::mpsc, executor, SinkExt, StreamExt};
 use tokio_util::{codec::FramedRead, io::StreamReader};
+use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -45,7 +46,7 @@ where
     let framing = config
         .framing()
         .unwrap_or_else(|| decoding.default_stream_framing());
-    let decoder = DecodingConfig::new(framing, decoding).build();
+    let decoder = DecodingConfig::new(framing, decoding, LogNamespace::Legacy).build();
 
     let (mut sender, receiver) = mpsc::channel(1024);
 

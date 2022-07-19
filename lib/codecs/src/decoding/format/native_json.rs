@@ -1,10 +1,12 @@
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
+use value::kind::Collection;
 use value::Kind;
 use vector_core::{config::DataType, event::Event, schema};
 
 use super::Deserializer;
+use vector_core::config::LogNamespace;
 
 /// Config used to build a `NativeJsonDeserializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -22,8 +24,13 @@ impl NativeJsonDeserializerConfig {
     }
 
     /// The schema produced by the deserializer.
-    pub fn schema_definition(&self) -> schema::Definition {
-        schema::Definition::empty().unknown_fields(Kind::json())
+    pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
+        match log_namespace {
+            LogNamespace::Vector => schema::Definition::new(Kind::json(), [log_namespace]),
+            LogNamespace::Legacy => {
+                schema::Definition::new(Kind::object(Collection::json()), [log_namespace])
+            }
+        }
     }
 }
 
@@ -33,7 +40,11 @@ impl NativeJsonDeserializerConfig {
 pub struct NativeJsonDeserializer;
 
 impl Deserializer for NativeJsonDeserializer {
-    fn parse(&self, bytes: Bytes) -> vector_core::Result<SmallVec<[Event; 1]>> {
+    fn parse(
+        &self,
+        bytes: Bytes,
+        _log_namespace: LogNamespace,
+    ) -> vector_core::Result<SmallVec<[Event; 1]>> {
         // It's common to receive empty frames when parsing NDJSON, since it
         // allows multiple empty newlines. We proceed without a warning here.
         if bytes.is_empty() {
@@ -71,7 +82,7 @@ mod test {
         let json_array = json!([{ "log": json1 }, { "log": json2 }]);
         let input = Bytes::from(serde_json::to_vec(&json_array).unwrap());
 
-        let events = deserializer.parse(input).unwrap();
+        let events = deserializer.parse(input, LogNamespace::Legacy).unwrap();
 
         let event1 = Event::try_from(json1).unwrap();
         let event2 = Event::try_from(json2).unwrap();

@@ -2,6 +2,7 @@ use std::io;
 
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 
 use crate::{
     config::{Output, Resource, SourceConfig, SourceContext, SourceDescription},
@@ -79,7 +80,7 @@ impl SourceConfig for StdinConfig {
         )
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(self.decoding.output_type())]
     }
 

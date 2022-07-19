@@ -133,9 +133,6 @@ pub fn build_unix_stream_source(
             );
         }
 
-        // Cleanup
-        drop(stream);
-
         // Wait for open connections to finish
         while connection_open.any_open() {
             sleep(Duration::from_millis(10)).await;

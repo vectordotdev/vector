@@ -35,6 +35,8 @@ where
     let listener = tls_settings.bind(&address).await?;
     let stream = listener.accept_stream();
 
+    info!(message = "Building gRPC server.", address = %address);
+
     Server::builder()
         .trace_fn(move |_| span.clone())
         // This layer explicitly decompresses payloads, if compressed, and reports the number of message bytes we've

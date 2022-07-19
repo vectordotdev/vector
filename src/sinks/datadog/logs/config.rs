@@ -9,14 +9,15 @@ use vector_core::config::proxy::ProxyConfig;
 
 use super::{service::LogApiRetry, sink::LogSinkBuilder};
 use crate::{
+    codecs::Transformer,
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     schema,
     sinks::{
         datadog::{get_api_validate_endpoint, healthcheck, logs::service::LogApiService, Region},
         util::{
-            encoding::Transformer, service::ServiceBuilderExt, BatchConfig, Compression,
-            SinkBatchSettings, TowerRequestConfig,
+            service::ServiceBuilderExt, BatchConfig, Compression, SinkBatchSettings,
+            TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -114,11 +115,7 @@ impl DatadogLogsConfig {
 }
 
 impl DatadogLogsConfig {
-    pub fn build_processor(
-        &self,
-        client: HttpClient,
-        cx: SinkContext,
-    ) -> crate::Result<VectorSink> {
+    pub fn build_processor(&self, client: HttpClient) -> crate::Result<VectorSink> {
         let default_api_key: Arc<str> = Arc::from(self.default_api_key.clone().as_str());
         let request_limits = self.request.unwrap_with(&Default::default());
 
@@ -135,7 +132,7 @@ impl DatadogLogsConfig {
             .settings(request_limits, LogApiRetry)
             .service(LogApiService::new(client, self.get_uri(), self.enterprise));
 
-        let sink = LogSinkBuilder::new(self.encoding.clone(), service, cx, default_api_key, batch)
+        let sink = LogSinkBuilder::new(self.encoding.clone(), service, default_api_key, batch)
             .compression(self.compression.unwrap_or_default())
             .build();
 
@@ -167,7 +164,7 @@ impl SinkConfig for DatadogLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.create_client(&cx.proxy)?;
         let healthcheck = self.build_healthcheck(client.clone())?;
-        let sink = self.build_processor(client, cx)?;
+        let sink = self.build_processor(client)?;
         Ok((sink, healthcheck))
     }
 

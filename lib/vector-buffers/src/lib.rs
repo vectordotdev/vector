@@ -13,9 +13,6 @@
 #[macro_use]
 extern crate tracing;
 
-mod acknowledgements;
-pub use acknowledgements::{Ackable, Acker};
-
 mod buffer_usage_data;
 
 pub mod config;
@@ -37,7 +34,7 @@ use std::fmt::Debug;
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
 use serde::{Deserialize, Serialize};
-use vector_common::byte_size_of::ByteSizeOf;
+use vector_common::{byte_size_of::ByteSizeOf, finalization::AddBatchNotifier};
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Copy, Clone)]
 #[serde(rename_all = "snake_case")]
@@ -71,13 +68,31 @@ impl Arbitrary for WhenFull {
 ///
 /// This supertrait serves as the base trait for any item that can be pushed into a buffer.
 pub trait Bufferable:
-    ByteSizeOf + Encodable + EventCount + Debug + Send + Sync + Unpin + Sized + 'static
+    AddBatchNotifier
+    + ByteSizeOf
+    + Encodable
+    + EventCount
+    + Debug
+    + Send
+    + Sync
+    + Unpin
+    + Sized
+    + 'static
 {
 }
 
 // Blanket implementation for anything that is already bufferable.
 impl<T> Bufferable for T where
-    T: ByteSizeOf + Encodable + EventCount + Debug + Send + Sync + Unpin + Sized + 'static
+    T: AddBatchNotifier
+        + ByteSizeOf
+        + Encodable
+        + EventCount
+        + Debug
+        + Send
+        + Sync
+        + Unpin
+        + Sized
+        + 'static
 {
 }
 

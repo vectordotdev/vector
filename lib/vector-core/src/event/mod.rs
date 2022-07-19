@@ -4,6 +4,7 @@ use std::{
     fmt::Debug,
 };
 
+use crate::ByteSizeOf;
 pub use ::value::Value;
 pub use array::{into_event_stream, EventArray, EventContainer, LogArray, MetricArray, TraceArray};
 pub use finalization::{
@@ -20,8 +21,6 @@ use vector_buffers::EventCount;
 use vector_common::{finalization, EventDataEq};
 #[cfg(feature = "vrl")]
 pub use vrl_target::{TargetEvents, VrlTarget};
-
-use crate::ByteSizeOf;
 
 pub mod array;
 pub mod discriminant;
@@ -351,7 +350,16 @@ impl From<proto::DistributionSample> for metric::Sample {
     }
 }
 
-impl From<metric::Bucket> for proto::HistogramBucket {
+impl From<proto::HistogramBucket> for metric::Bucket {
+    fn from(bucket: proto::HistogramBucket) -> Self {
+        Self {
+            upper_limit: bucket.upper_limit,
+            count: u64::from(bucket.count),
+        }
+    }
+}
+
+impl From<metric::Bucket> for proto::HistogramBucket3 {
     fn from(bucket: metric::Bucket) -> Self {
         Self {
             upper_limit: bucket.upper_limit,
@@ -360,8 +368,8 @@ impl From<metric::Bucket> for proto::HistogramBucket {
     }
 }
 
-impl From<proto::HistogramBucket> for metric::Bucket {
-    fn from(bucket: proto::HistogramBucket) -> Self {
+impl From<proto::HistogramBucket3> for metric::Bucket {
+    fn from(bucket: proto::HistogramBucket3) -> Self {
         Self {
             upper_limit: bucket.upper_limit,
             count: bucket.count,
@@ -384,12 +392,6 @@ impl From<proto::SummaryQuantile> for metric::Quantile {
             quantile: quantile.quantile,
             value: quantile.value,
         }
-    }
-}
-
-impl From<String> for Event {
-    fn from(line: String) -> Self {
-        LogEvent::from(line).into()
     }
 }
 

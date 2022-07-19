@@ -7,6 +7,7 @@ use super::util::file_descriptor::{file_descriptor_source, FileDescriptorConfig}
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use indoc::indoc;
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 
 use crate::{
     config::{GenerateConfig, Output, Resource, SourceConfig, SourceContext, SourceDescription},
@@ -75,7 +76,7 @@ impl SourceConfig for PipeConfig {
         pipe_source(self.clone(), cx.shutdown, cx.out)
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(self.decoding.output_type())]
     }
 

@@ -8,7 +8,7 @@ metadata:
     app.kubernetes.io/name: vector
     app.kubernetes.io/instance: vector
     app.kubernetes.io/component: Aggregator
-    app.kubernetes.io/version: "0.22.2-distroless-libc"
+    app.kubernetes.io/version: "0.23.0-distroless-libc"
 spec:
   replicas: 1
   podManagementPolicy: OrderedReady
@@ -25,12 +25,13 @@ spec:
         app.kubernetes.io/name: vector
         app.kubernetes.io/instance: vector
         app.kubernetes.io/component: Aggregator
+        vector.dev/exclude: "true"
     spec:
       serviceAccountName: vector
       dnsPolicy: ClusterFirst
       containers:
         - name: vector
-          image: "timberio/vector:0.22.2-distroless-libc"
+          image: "timberio/vector:0.23.0-distroless-libc"
           imagePullPolicy: IfNotPresent
           args:
             - --config-dir

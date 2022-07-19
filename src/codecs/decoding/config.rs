@@ -1,5 +1,6 @@
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use serde::{Deserialize, Serialize};
+use vector_core::config::LogNamespace;
 
 use crate::codecs::Decoder;
 
@@ -10,13 +11,23 @@ pub struct DecodingConfig {
     framing: FramingConfig,
     /// The decoding config.
     decoding: DeserializerConfig,
+    /// The namespace used when decoding.
+    log_namespace: LogNamespace,
 }
 
 impl DecodingConfig {
     /// Creates a new `DecodingConfig` with the provided `FramingConfig` and
     /// `DeserializerConfig`.
-    pub const fn new(framing: FramingConfig, decoding: DeserializerConfig) -> Self {
-        Self { framing, decoding }
+    pub const fn new(
+        framing: FramingConfig,
+        decoding: DeserializerConfig,
+        log_namespace: LogNamespace,
+    ) -> Self {
+        Self {
+            framing,
+            decoding,
+            log_namespace,
+        }
     }
 
     /// Builds a `Decoder` from the provided configuration.
@@ -27,6 +38,6 @@ impl DecodingConfig {
         // Build the deserializer.
         let deserializer = self.decoding.build();
 
-        Decoder::new(framer, deserializer)
+        Decoder::new(framer, deserializer).with_log_namespace(self.log_namespace)
     }
 }

@@ -15,7 +15,6 @@ use tower::Service;
 use tracing::Instrument;
 use vector_common::internal_event::BytesSent;
 use vector_core::{
-    buffers::Ackable,
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_event::EventsSent,
     stream::DriverResponse,
@@ -34,12 +33,6 @@ pub struct NewRelicApiRequest {
     pub credentials: Arc<NewRelicCredentials>,
     pub payload: Bytes,
     pub compression: Compression,
-}
-
-impl Ackable for NewRelicApiRequest {
-    fn ack_size(&self) -> usize {
-        self.metadata.event_count()
-    }
 }
 
 impl Finalizable for NewRelicApiRequest {

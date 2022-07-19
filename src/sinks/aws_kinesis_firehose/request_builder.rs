@@ -3,14 +3,12 @@ use std::io;
 use aws_sdk_firehose::model::Record;
 use aws_sdk_firehose::types::Blob;
 use bytes::Bytes;
-use vector_core::{buffers::Ackable, ByteSizeOf};
+use vector_core::ByteSizeOf;
 
 use crate::{
-    codecs::Encoder,
+    codecs::{Encoder, Transformer},
     event::{Event, EventFinalizers, Finalizable, LogEvent},
-    sinks::util::{
-        encoding::Transformer, request_builder::EncodeResult, Compression, RequestBuilder,
-    },
+    sinks::util::{request_builder::EncodeResult, Compression, RequestBuilder},
 };
 
 pub struct KinesisRequestBuilder {
@@ -28,12 +26,6 @@ pub struct KinesisRequest {
     pub record: Record,
     pub finalizers: EventFinalizers,
     pub event_byte_size: usize,
-}
-
-impl Ackable for KinesisRequest {
-    fn ack_size(&self) -> usize {
-        1
-    }
 }
 
 impl Finalizable for KinesisRequest {

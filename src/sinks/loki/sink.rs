@@ -7,7 +7,6 @@ use regex::Regex;
 use snafu::Snafu;
 use tokio_util::codec::Encoder as _;
 use vector_core::{
-    buffers::Acker,
     event::{self, Event, EventFinalizers, Finalizable, Value},
     partition::Partitioner,
     sink::StreamSink,
@@ -21,8 +20,8 @@ use super::{
     service::{LokiRequest, LokiRetryLogic, LokiService},
 };
 use crate::{
-    codecs::Encoder,
-    config::{log_schema, SinkContext},
+    codecs::{Encoder, Transformer},
+    config::log_schema,
     http::HttpClient,
     internal_events::{
         LokiEventUnlabeled, LokiOutOfOrderEventDropped, LokiOutOfOrderEventRewritten,
@@ -30,7 +29,6 @@ use crate::{
     },
     sinks::util::{
         builder::SinkBuilderExt,
-        encoding::Transformer,
         metadata::{RequestMetadata, RequestMetadataBuilder},
         request_builder::EncodeResult,
         service::{ServiceBuilderExt, Svc},
@@ -314,7 +312,6 @@ impl RecordFilter {
 }
 
 pub struct LokiSink {
-    acker: Acker,
     request_builder: LokiRequestBuilder,
     pub(super) encoder: EventEncoder,
     batch_settings: BatcherSettings,
@@ -324,7 +321,7 @@ pub struct LokiSink {
 
 impl LokiSink {
     #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
-    pub fn new(config: LokiConfig, client: HttpClient, cx: SinkContext) -> crate::Result<Self> {
+    pub fn new(config: LokiConfig, client: HttpClient) -> crate::Result<Self> {
         let compression = config.compression;
 
         // if Vector is configured to allow events with out of order timestamps, then then we can
@@ -349,11 +346,10 @@ impl LokiSink {
             .service(LokiService::new(client, config.endpoint, config.auth)?);
 
         let transformer = config.encoding.transformer();
-        let serializer = config.encoding.encoding()?;
+        let serializer = config.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
 
         Ok(Self {
-            acker: cx.acker(),
             request_builder: LokiRequestBuilder {
                 compression,
                 encoder: Default::default(),
@@ -422,7 +418,7 @@ impl LokiSink {
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(self.service, self.acker);
+            .into_driver(self.service);
 
         sink.run().await
     }
@@ -590,7 +586,7 @@ mod tests {
         let base = chrono::Utc::now();
         let events = random_lines(100)
             .take(20)
-            .map(Event::from)
+            .map(|e| Event::Log(LogEvent::from(e)))
             .enumerate()
             .map(|(i, mut event)| {
                 let log = event.as_mut_log();
