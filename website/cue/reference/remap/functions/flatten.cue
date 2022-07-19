@@ -13,6 +13,12 @@ remap: functions: flatten: {
 			required:    true
 			type: ["array", "object"]
 		},
+		{
+			name:        "separator"
+			description: "The separator to be used to join nested keys"
+			required:    false
+			type: ["string"]
+		},
 	]
 	internal_failure_reasons: []
 	return: {
