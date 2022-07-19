@@ -374,7 +374,7 @@ urls: {
 	percent_encoding_userinfo:                  "https://url.spec.whatwg.org/#userinfo-percent-encode-set"
 	percent_encoding_component:                 "https://url.spec.whatwg.org/#component-percent-encode-set"
 	percent_encoding_www_form_urlencoded:       "https://url.spec.whatwg.org/#application-x-www-form-urlencoded-percent-encode-set"
-	pipe:                                        "\(wikipedia)/wiki/File_descriptor"
+	pipe:                                       "\(wikipedia)/wiki/File_descriptor"
 	posix_acls:                                 "https://www.usenix.org/legacy/publications/library/proceedings/usenix03/tech/freenix03/full_papers/gruenbacher/gruenbacher_html/main.html"
 	postgresql:                                 "https://www.postgresql.org/"
 	postgresql_csvlog:                          "https://www.postgresql.org/docs/current/runtime-config-logging.html#RUNTIME-CONFIG-LOGGING-CSVLOG"
