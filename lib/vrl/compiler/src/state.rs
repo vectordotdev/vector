@@ -61,6 +61,9 @@ pub struct ExternalEnv {
     /// The external target of the program.
     target: Details,
 
+    /// The type of metadata
+    metadata: Kind,
+
     read_only_paths: BTreeSet<ReadOnlyPath>,
 
     /// Custom context injected by the external environment
@@ -83,7 +86,10 @@ pub struct ReadOnlyPath {
 
 impl Default for ExternalEnv {
     fn default() -> Self {
-        Self::new_with_kind(Kind::object(Collection::any()))
+        Self::new_with_kind(
+            Kind::object(Collection::any()),
+            Kind::object(Collection::any()),
+        )
     }
 }
 
@@ -91,12 +97,13 @@ impl ExternalEnv {
     /// Creates a new external environment that starts with an initial given
     /// [`Kind`].
     #[must_use]
-    pub fn new_with_kind(kind: Kind) -> Self {
+    pub fn new_with_kind(target: Kind, metadata: Kind) -> Self {
         Self {
             target: Details {
-                type_def: kind.into(),
+                type_def: target.into(),
                 value: None,
             },
+            metadata,
             custom: AnyMap::new(),
             read_only_paths: BTreeSet::new(),
         }
@@ -162,9 +169,17 @@ impl ExternalEnv {
         self.target().type_def.kind()
     }
 
+    pub fn metadata_kind(&self) -> &Kind {
+        &self.metadata
+    }
+
     #[cfg(any(feature = "expr-assignment", feature = "expr-query"))]
     pub(crate) fn update_target(&mut self, details: Details) {
         self.target = details;
+    }
+
+    pub fn update_metadata(&mut self, kind: Kind) {
+        self.metadata = kind;
     }
 
     /// Sets the external context data for VRL functions to use.

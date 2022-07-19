@@ -551,12 +551,15 @@ mod tests {
         ];
 
         let local = state::LocalEnv::default();
-        let external = state::ExternalEnv::new_with_kind(Kind::object(btreemap! {
-            "hostname" => Kind::bytes(),
-            "events" => Kind::array(Collection::from_unknown(Kind::object(btreemap! {
-                Field::from("message") => Kind::bytes(),
-            })),
-        )}));
+        let external = state::ExternalEnv::new_with_kind(
+            Kind::object(btreemap! {
+                "hostname" => Kind::bytes(),
+                "events" => Kind::array(Collection::from_unknown(Kind::object(btreemap! {
+                    Field::from("message") => Kind::bytes(),
+                })),
+            )}),
+            Kind::object(Collection::empty()),
+        );
 
         let tz = TimeZone::default();
         for (object, expected, func, expected_typedef) in cases {
