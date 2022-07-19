@@ -1244,13 +1244,12 @@ dependencies = [
 
 [[package]]
 name = "bson"
-version = "2.2.0"
+version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f60a2c7c80a7850b56df4b8e98e8e4932c34877b8add4f13e8350499cc1e4572"
+checksum = "a24ecf39f5a314493ede1bb015984735d41aa6aedb59cafb95492d40cd893330"
 dependencies = [
  "ahash",
  "base64",
- "chrono",
  "hex",
  "indexmap",
  "lazy_static",
@@ -1258,6 +1257,7 @@ dependencies = [
  "serde",
  "serde_bytes",
  "serde_json",
+ "time",
  "uuid 0.8.2",
 ]
 
@@ -4388,9 +4388,9 @@ checksum = "717e29a243b81f8130e31e24e04fb151b04a44b5a7d05370935f7d937e9de06d"
 
 [[package]]
 name = "mongodb"
-version = "2.2.2"
+version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28f3943e379e9dcaaab9dc319c308a8caaf9e7ff083c6838dff740afbba59df7"
+checksum = "b95afe97b0c799fdf69cd960272a2cb9662d077bd6efd84eb722bb9805d47554"
 dependencies = [
  "async-trait",
  "base64",
@@ -7331,7 +7331,14 @@ dependencies = [
  "libc",
  "num_threads",
  "serde",
+ "time-macros",
 ]
+
+[[package]]
+name = "time-macros"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "42657b1a6f4d817cda8e7a0ace261fe0cc946cf3a80314390b22cc61ae080792"
 
 [[package]]
 name = "tiny-keccak"
