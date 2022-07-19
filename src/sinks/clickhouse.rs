@@ -324,6 +324,7 @@ mod integration_tests {
         future::{ok, ready},
         stream,
     };
+    use serde::Deserialize;
     use serde_json::Value;
     use tokio::time::{timeout, Duration};
     use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};

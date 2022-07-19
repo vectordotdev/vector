@@ -224,7 +224,7 @@ pub enum S3CannedAcl {
 
     /// Object is private, except to the bucket owner.
     ///
-    /// The object owner is granted the `FULL_CONTROL` permission, and the bucket owner is granted the `READ` permission.   
+    /// The object owner is granted the `FULL_CONTROL` permission, and the bucket owner is granted the `READ` permission.
     ///
     /// Only relevant when specified for an object: this canned ACL is otherwise ignored when
     /// specified for a bucket.

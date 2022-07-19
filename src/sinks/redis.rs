@@ -1,16 +1,13 @@
-use std::{
-    convert::TryFrom,
-    task::{Context, Poll},
-};
+use std::task::{Context, Poll};
 
 use bytes::{Bytes, BytesMut};
 use futures::{future::BoxFuture, stream, FutureExt, SinkExt, StreamExt};
 use redis::{aio::ConnectionManager, RedisError, RedisResult};
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
 use tower::{Service, ServiceBuilder};
 use vector_common::internal_event::BytesSent;
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -43,36 +40,67 @@ enum RedisSinkError {
     KeyTemplate { source: TemplateParseError },
 }
 
-#[derive(Copy, Clone, Debug, Derivative, Deserialize, Serialize)]
+/// Redis data type to store messages in.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(rename_all = "lowercase")]
 pub enum DataTypeConfig {
+    /// The Redis `list` type.
+    ///
+    /// This resembles a deque, where messages can be popped and pushed from either end.
+    ///
+    /// This is the default.
     #[derivative(Default)]
     List,
+
+    /// The Redis `channel` type.
+    ///
+    /// Redis channels function in a pub/sub fashion, allowing many-to-many broadcasting and receiving.
     Channel,
 }
 
-#[derive(Copy, Clone, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
+/// List-specific options.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub struct ListOption {
+    /// The method to use for pushing messages into a `list`.
     method: Method,
 }
 
-#[derive(Copy, Clone, Debug, Derivative, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Derivative)]
 #[derivative(Default)]
-#[serde(rename_all = "lowercase")]
 pub enum DataType {
+    /// The Redis `list` type.
+    ///
+    /// This resembles a deque, where messages can be popped and pushed from either end.
     #[derivative(Default)]
     List(Method),
+
+    /// The Redis `channel` type.
+    ///
+    /// Redis channels function in a pub/sub fashion, allowing many-to-many broadcasting and receiving.
     Channel,
 }
 
-#[derive(Copy, Clone, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
+/// Method for pushing messages into a `list`.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
 #[derivative(Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Method {
+    /// Use the `rpush` method.
+    ///
+    /// This pushes messages onto the tail of the list.
+    ///
+    /// This is the default.
     #[derivative(Default)]
     RPush,
+
+    /// Use the `lpush` method.
+    ///
+    /// This pushes messages onto the head of the list.
     LPush,
 }
 
@@ -85,20 +113,42 @@ impl SinkBatchSettings for RedisDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 1.0;
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+/// Configuration for the `redis`gsink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct RedisSinkConfig {
+    #[configurable(derived)]
     encoding: EncodingConfig,
+
+    #[configurable(derived)]
     #[serde(default)]
     data_type: DataTypeConfig,
+
+    #[configurable(derived)]
     #[serde(alias = "list")]
     list_option: Option<ListOption>,
+
+    /// The Redis URL to connect to.
+    ///
+    /// The URL _must_ take the form of `protocol://server:port/db` where the protocol can either be
+    /// `redis` or `rediss` for connections secured via TLS.
     url: String,
-    key: String,
+
+    /// The Redis key to publish messages to.
+    #[configurable(metadata(templateable))]
+    #[configurable(validation(length(min = 1)))]
+    key: Template,
+
+    #[configurable(derived)]
     #[serde(default)]
     batch: BatchConfig<RedisDefaultBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     request: TowerRequestConfig,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -159,7 +209,7 @@ impl RedisSinkConfig {
             ..Default::default()
         });
 
-        let key = Template::try_from(self.key.clone()).context(KeyTemplateSnafu)?;
+        let key = self.key.clone();
 
         let transformer = self.encoding.transformer();
         let serializer = self.encoding.build()?;

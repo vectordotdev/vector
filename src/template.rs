@@ -41,6 +41,13 @@ pub struct Template {
     has_fields: bool,
 }
 
+impl Template {
+    /// Returns `true` if this template string has a length of zero, and `false` otherwise.
+    pub fn is_empty(&self) -> bool {
+        self.src.is_empty()
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Snafu)]
 pub enum TemplateParseError {
     #[snafu(display("Invalid strftime item"))]
