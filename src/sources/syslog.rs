@@ -13,6 +13,7 @@ use smallvec::SmallVec;
 use tokio::net::UdpSocket;
 use tokio_util::udp::UdpFramed;
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 
 use crate::codecs::Decoder;
 #[cfg(unix)]
@@ -209,7 +210,7 @@ impl SourceConfig for SyslogConfig {
         }
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -359,6 +360,7 @@ fn enrich_syslog_event(event: &mut Event, host_key: &str, default_host: Option<B
 
 #[cfg(test)]
 mod test {
+    use lookup::path;
     use std::{
         collections::{BTreeMap, HashMap},
         fmt,
@@ -378,7 +380,7 @@ mod test {
     use super::*;
     use crate::{
         config::log_schema,
-        event::Event,
+        event::{Event, LogEvent},
         test_util::{
             components::{assert_source_compliance, SOCKET_PUSH_SOURCE_TAGS},
             next_addr, random_maps, random_string, send_encodable, send_lines, wait_for_tcp,
@@ -392,7 +394,7 @@ mod test {
         bytes: Bytes,
     ) -> Option<Event> {
         let parser = SyslogDeserializer;
-        let mut events = parser.parse(bytes).ok()?;
+        let mut events = parser.parse(bytes, LogNamespace::Legacy).ok()?;
         handle_events(&mut events, host_key, default_host);
         Some(events.remove(0))
     }
@@ -557,7 +559,7 @@ mod test {
             msg
         );
 
-        let mut expected = Event::from(msg);
+        let mut expected = Event::Log(LogEvent::from(msg));
 
         {
             let expected = expected.as_mut_log();
@@ -596,7 +598,7 @@ mod test {
             r#"[incorrect x]"#, msg
         );
 
-        let mut expected = Event::from(msg);
+        let mut expected = Event::Log(LogEvent::from(msg));
         {
             let expected = expected.as_mut_log();
             expected.insert(
@@ -630,10 +632,9 @@ mod test {
         fn there_is_map_called_empty(event: Event) -> bool {
             event
                 .as_log()
-                .all_fields()
-                .unwrap()
-                .find(|(key, _)| (&key[..]).starts_with("empty"))
-                == None
+                .get("empty")
+                .expect("empty exists")
+                .is_object()
         }
 
         let msg = format!(
@@ -666,7 +667,7 @@ mod test {
         );
 
         let event = event_from_bytes("host", None, msg.into()).unwrap();
-        assert!(!there_is_map_called_empty(event));
+        assert!(there_is_map_called_empty(event));
     }
 
     #[test]
@@ -684,12 +685,23 @@ mod test {
     }
 
     #[test]
+    fn handles_dots_in_sdata() {
+        let raw =
+            r#"<190>Feb 13 21:31:56 74794bfb6795 liblogging-stdlog:  [origin foo.bar="baz"] hello"#;
+        let event = event_from_bytes("host", None, raw.to_owned().into()).unwrap();
+        assert_eq!(
+            event.as_log().get(r#"origin."foo.bar""#),
+            Some(&Value::from("baz"))
+        );
+    }
+
+    #[test]
     fn syslog_ng_default_network() {
         let msg = "i am foobar";
         let raw = format!(r#"<13>Feb 13 20:07:26 74794bfb6795 root[8539]: {}"#, msg);
         let event = event_from_bytes("host", None, raw.into()).unwrap();
 
-        let mut expected = Event::from(msg);
+        let mut expected = Event::Log(LogEvent::from(msg));
         {
             let value = event.as_log().get("timestamp").unwrap();
             let year = value.as_timestamp().unwrap().naive_local().year();
@@ -719,7 +731,7 @@ mod test {
         );
         let event = event_from_bytes("host", None, raw.into()).unwrap();
 
-        let mut expected = Event::from(msg);
+        let mut expected = Event::Log(LogEvent::from(msg));
         {
             let value = event.as_log().get("timestamp").unwrap();
             let year = value.as_timestamp().unwrap().naive_local().year();
@@ -736,8 +748,8 @@ mod test {
             expected.insert("appname", "liblogging-stdlog");
             expected.insert("origin.software", "rsyslogd");
             expected.insert("origin.swVersion", "8.24.0");
-            expected.insert("origin.x-pid", "8979");
-            expected.insert("origin.x-info", "http://www.rsyslog.com");
+            expected.insert(path!("origin", "x-pid"), "8979");
+            expected.insert(path!("origin", "x-info"), "http://www.rsyslog.com");
         }
 
         assert_event_data_eq!(event, expected);
@@ -751,7 +763,7 @@ mod test {
             msg
         );
 
-        let mut expected = Event::from(msg);
+        let mut expected = Event::Log(LogEvent::from(msg));
         {
             let expected = expected.as_mut_log();
             expected.insert(
@@ -768,8 +780,8 @@ mod test {
             expected.insert("appname", "liblogging-stdlog");
             expected.insert("origin.software", "rsyslogd");
             expected.insert("origin.swVersion", "8.24.0");
-            expected.insert("origin.x-pid", "9043");
-            expected.insert("origin.x-info", "http://www.rsyslog.com");
+            expected.insert(path!("origin", "x-pid"), "9043");
+            expected.insert(path!("origin", "x-info"), "http://www.rsyslog.com");
         }
 
         assert_event_data_eq!(

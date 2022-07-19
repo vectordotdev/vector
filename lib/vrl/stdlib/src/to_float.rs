@@ -3,7 +3,7 @@ use vector_common::conversion::Conversion;
 use vrl::prelude::*;
 
 fn to_float(value: Value) -> Resolved {
-    use Value::*;
+    use Value::{Boolean, Bytes, Float, Integer, Null, Timestamp};
     match value {
         Float(_) => Ok(value),
         Integer(v) => Ok(Value::from_f64_or_zero(v as f64)),
@@ -162,7 +162,7 @@ mod tests {
 
         timestamp {
              args: func_args![value: Utc.ymd(2014, 7, 8).and_hms_milli(9, 10, 11, 12)],
-             want: Ok(1404810611.012),
+             want: Ok(1_404_810_611.012),
              tdef: TypeDef::float().infallible(),
         }
     ];

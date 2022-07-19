@@ -12,7 +12,8 @@ type = "internal_metrics"
 [sources.logs]
 type = "http"
 address = "0.0.0.0:8282"
-encoding = "ndjson"
+framing.method = "newline_delimited"
+decoding.codec = "json"
 
 ##
 ## Transforms

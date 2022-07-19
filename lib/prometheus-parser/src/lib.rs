@@ -85,14 +85,14 @@ pub struct SummaryMetric {
 #[derive(Debug, Default, PartialEq, PartialOrd)]
 pub struct HistogramBucket {
     pub bucket: f64,
-    pub count: u32,
+    pub count: u64,
 }
 
 #[derive(Debug, Default, PartialEq)]
 pub struct HistogramMetric {
     pub buckets: Vec<HistogramBucket>,
     pub sum: f64,
-    pub count: u32,
+    pub count: u64,
 }
 
 #[derive(Debug, Default, PartialEq)]
@@ -173,7 +173,7 @@ impl GroupKind {
                     let (_, bucket) = line::Metric::parse_value(&bucket)
                         .map_err(Into::into)
                         .context(ParseLabelValueSnafu)?;
-                    let count = try_f64_to_u32(metric.value)?;
+                    let count = try_f64_to_u64(metric.value)?;
                     matching_group(metrics, key)
                         .buckets
                         .push(HistogramBucket { bucket, count });
@@ -183,7 +183,7 @@ impl GroupKind {
                     matching_group(metrics, key).sum = sum;
                 }
                 "_count" => {
-                    let count = try_f64_to_u32(metric.value)?;
+                    let count = try_f64_to_u64(metric.value)?;
                     matching_group(metrics, key).count = count;
                 }
                 _ => {
@@ -240,6 +240,14 @@ pub struct MetricGroup {
 fn try_f64_to_u32(f: f64) -> Result<u32, ParserError> {
     if 0.0 <= f && f <= u32::MAX as f64 {
         Ok(f as u32)
+    } else {
+        Err(ParserError::ValueOutOfRange { value: f })
+    }
+}
+
+fn try_f64_to_u64(f: f64) -> Result<u64, ParserError> {
+    if 0.0 <= f && f <= u64::MAX as f64 {
+        Ok(f as u64)
     } else {
         Err(ParserError::ValueOutOfRange { value: f })
     }
@@ -491,6 +499,13 @@ mod test {
             http_request_duration_seconds_sum 53423
             http_request_duration_seconds_count 144320
 
+            # A histogram with a very large count.
+            # HELP go_gc_heap_allocs_by_size_bytes A histogram of something gc
+            # TYPE go_gc_heap_allocs_by_size_bytes histogram
+            go_gc_heap_allocs_by_size_bytes_bucket{le="24.999999999999996"} 1.8939392877e+10
+            go_gc_heap_allocs_by_size_bytes_sum 5
+            go_gc_heap_allocs_by_size_bytes_count 10
+
             # Finally a summary, which has a complex representation, too:
             # HELP rpc_duration_seconds A summary of the RPC duration in seconds.
             # TYPE rpc_duration_seconds summary
@@ -503,7 +518,7 @@ mod test {
             rpc_duration_seconds_count 2693
             "##;
         let output = parse_text(input).unwrap();
-        assert_eq!(output.len(), 6);
+        assert_eq!(output.len(), 7);
         match_group!(output[0], "http_requests_total", Counter => |metrics: &MetricMap<SimpleMetric>| {
             assert_eq!(metrics.len(), 2);
             assert_eq!(
@@ -555,7 +570,23 @@ mod test {
                 },
             ));
         });
-        match_group!(output[5], "rpc_duration_seconds", Summary => |metrics: &MetricMap<SummaryMetric>| {
+        match_group!(output[5], "go_gc_heap_allocs_by_size_bytes", Histogram => |metrics: &MetricMap<HistogramMetric>| {
+            assert_eq!(metrics.len(), 1);
+            assert_eq!(metrics.get_index(0).unwrap(), (
+                &GroupKey {
+                    timestamp: None,
+                    labels: labels!(),
+                },
+                &HistogramMetric {
+                    buckets: vec![
+                        HistogramBucket { bucket: 24.999999999999996, count: 18_939_392_877},
+                    ],
+                    count: 10,
+                    sum: 5.0,
+                },
+            ));
+        });
+        match_group!(output[6], "rpc_duration_seconds", Summary => |metrics: &MetricMap<SummaryMetric>| {
             assert_eq!(metrics.len(), 1);
             assert_eq!(metrics.get_index(0).unwrap(), (
                 &GroupKey {
@@ -601,6 +632,31 @@ mod test {
 
         assert_eq!(try_f64_to_u32(0.0).unwrap(), 0);
         assert_eq!(try_f64_to_u32(u32::MAX as f64).unwrap(), u32::MAX);
+    }
+
+    #[test]
+    fn test_f64_to_u64() {
+        let value = -1.0;
+        let error = try_f64_to_u64(value).unwrap_err();
+        assert_eq!(error, ParserError::ValueOutOfRange { value });
+
+        let value = f64::NAN;
+        let error = try_f64_to_u64(value).unwrap_err();
+        assert!(matches!(error, ParserError::ValueOutOfRange { value } if value.is_nan()));
+
+        let value = f64::INFINITY;
+        let error = try_f64_to_u64(value).unwrap_err();
+        assert_eq!(error, ParserError::ValueOutOfRange { value });
+
+        let value = f64::NEG_INFINITY;
+        let error = try_f64_to_u64(value).unwrap_err();
+        assert_eq!(error, ParserError::ValueOutOfRange { value });
+
+        assert_eq!(try_f64_to_u64(0.0).unwrap(), 0);
+        assert_eq!(try_f64_to_u64(u64::MAX as f64).unwrap(), u64::MAX);
+
+        // The following tests fails because we lose accuracy converting from u64 to f64
+        // assert_eq!(try_f64_to_u64((u64::MAX - 1) as f64).unwrap(), u64::MAX - 1);
     }
 
     #[test]

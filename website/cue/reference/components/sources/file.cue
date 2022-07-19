@@ -172,7 +172,7 @@ components: sources: file: {
 		}
 		max_line_bytes: {
 			common:      false
-			description: "The maximum number of a bytes a line can contain before being discarded. This protects against malformed lines or tailing incorrect files."
+			description: "The maximum number of bytes a line can contain before being discarded. This protects against malformed lines or tailing incorrect files."
 			required:    false
 			type: uint: {
 				default: 102_400

@@ -499,7 +499,7 @@ impl IngestorProcess {
         let aws_region = Bytes::from(s3_event.aws_region.as_str().as_bytes().to_vec());
 
         let mut stream = lines.filter_map(move |line| {
-            let mut log = LogEvent::from(line).with_batch_notifier_option(&batch);
+            let mut log = LogEvent::from_bytes_legacy(&line).with_batch_notifier_option(&batch);
 
             log.insert(path!("bucket"), bucket_name.clone());
             log.insert(path!("object"), object_key.clone());

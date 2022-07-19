@@ -1,3 +1,4 @@
+use darling::{error::Accumulator, util::path_to_string, FromMeta};
 use serde_derive_internals::{ast as serde_ast, attr as serde_attr};
 
 mod container;
@@ -7,7 +8,9 @@ mod variant;
 
 pub use container::Container;
 pub use field::Field;
+use syn::NestedMeta;
 pub use variant::Variant;
+use vector_config_common::attributes::CustomAttribute;
 
 /// The style of a data container, applying to both enum variants and structs.
 ///
@@ -92,4 +95,65 @@ impl From<&serde_attr::TagType> for Tagging {
 pub enum Data<'a> {
     Enum(Vec<Variant<'a>>),
     Struct(Style, Vec<Field<'a>>),
+}
+
+/// Metadata items defined on containers, variants, or fields.
+#[derive(Clone, Debug)]
+pub struct Metadata {
+    items: Vec<CustomAttribute>,
+}
+
+impl Metadata {
+    pub fn attributes(&self) -> impl Iterator<Item = CustomAttribute> {
+        self.items.clone().into_iter()
+    }
+}
+
+impl FromMeta for Metadata {
+    fn from_list(items: &[NestedMeta]) -> darling::Result<Self> {
+        let mut errors = Accumulator::default();
+
+        // Can't be empty.
+        if items.is_empty() {
+            errors.push(darling::Error::too_few_items(1));
+        }
+
+        errors = errors.checkpoint()?;
+
+        // Can't either be name/value pairs or single items i.e. flags.
+        let meta_items = items
+            .iter()
+            .filter_map(|nmeta| match nmeta {
+                NestedMeta::Meta(meta) => match meta {
+                    syn::Meta::Path(path) => match path.get_ident() {
+                        Some(ident) => Some(CustomAttribute::Flag(ident.to_string())),
+                        None => {
+                            errors.push(darling::Error::unknown_value("flag attributes must be simple strings i.e. `flag` or `my_flag`").with_span(nmeta));
+                            None
+                        },
+                    }
+                    syn::Meta::List(_) => {
+                        errors.push(darling::Error::unexpected_type("list").with_span(nmeta));
+                        None
+                    }
+                    syn::Meta::NameValue(nv) => match &nv.lit {
+                        syn::Lit::Str(s) => Some(CustomAttribute::KeyValue {
+                            key: path_to_string(&nv.path),
+                            value: s.value(),
+                        }),
+                        lit => {
+                            errors.push(darling::Error::unexpected_lit_type(lit));
+                            None
+                        }
+                    },
+                },
+                NestedMeta::Lit(_) => {
+                    errors.push(darling::Error::unexpected_type("literal").with_span(nmeta));
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+
+        errors.finish_with(Metadata { items: meta_items })
+    }
 }

@@ -6,6 +6,7 @@ use codecs::{
 use prost::Message;
 use smallvec::{smallvec, SmallVec};
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -119,7 +120,11 @@ impl VectorConfig {
 struct VectorDeserializer;
 
 impl decoding::format::Deserializer for VectorDeserializer {
-    fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
+    fn parse(
+        &self,
+        bytes: Bytes,
+        _log_namespace: LogNamespace,
+    ) -> crate::Result<SmallVec<[Event; 1]>> {
         let byte_size = bytes.len();
         emit!(BytesReceived {
             byte_size,
@@ -185,10 +190,10 @@ mod test {
 
     use super::VectorConfig;
     use crate::{
-        config::{ComponentKey, GlobalOptions, SinkContext, SourceContext},
+        config::{ComponentKey, GlobalOptions, SourceContext},
         event::{
             metric::{MetricKind, MetricValue},
-            Event, Metric,
+            Event, LogEvent, Metric,
         },
         shutdown::ShutdownSignal,
         sinks::vector::v1::VectorConfig as SinkConfig,
@@ -216,18 +221,17 @@ mod test {
         tokio::spawn(server);
         wait_for_tcp(addr).await;
 
-        let cx = SinkContext::new_test();
-        let (sink, _) = sink.build(cx).await.unwrap();
+        let (sink, _) = sink.build().await.unwrap();
 
         let events = vec![
-            Event::from("test"),
-            Event::from("events"),
-            Event::from("to roundtrip"),
-            Event::from("through"),
-            Event::from("the native"),
-            Event::from("sink"),
-            Event::from("and"),
-            Event::from("source"),
+            Event::Log(LogEvent::from("test")),
+            Event::Log(LogEvent::from("events")),
+            Event::Log(LogEvent::from("to roundtrip")),
+            Event::Log(LogEvent::from("through")),
+            Event::Log(LogEvent::from("the native")),
+            Event::Log(LogEvent::from("sink")),
+            Event::Log(LogEvent::from("and")),
+            Event::Log(LogEvent::from("source")),
             Event::Metric(Metric::new(
                 String::from("also test a metric"),
                 MetricKind::Absolute,
@@ -307,6 +311,7 @@ mod test {
                 proxy: Default::default(),
                 acknowledgements: false,
                 schema_definitions: HashMap::default(),
+                schema: Default::default(),
             })
             .await
             .unwrap();
@@ -346,12 +351,13 @@ mod test {
                 proxy: Default::default(),
                 acknowledgements: false,
                 schema_definitions: HashMap::default(),
+                schema: Default::default(),
             })
             .await
             .unwrap();
         tokio::spawn(server);
 
-        let event = proto::EventWrapper::from(Event::from("short"));
+        let event = proto::EventWrapper::from(Event::Log(LogEvent::from("short")));
         let event_len = event.encoded_len();
         let full_len = event_len + 4;
 

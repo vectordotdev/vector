@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
+use vector_core::config::LogNamespace;
 use vector_core::{
     config::{DataType, Output},
     source::Source,
@@ -26,7 +27,7 @@ impl SourceConfig for PanicSourceConfig {
         Ok(Box::pin(async { panic!() }))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 

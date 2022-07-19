@@ -325,7 +325,6 @@ fn default_config_paths() -> Vec<ConfigPath> {
     test,
     feature = "sinks-elasticsearch",
     feature = "transforms-pipelines",
-    feature = "transforms-regex_parser",
     feature = "transforms-sample",
     feature = "sources-demo_logs",
     feature = "sinks-console"

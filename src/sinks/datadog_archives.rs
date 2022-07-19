@@ -33,7 +33,7 @@ use vector_core::{
 
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},
-    codecs::Encoder,
+    codecs::{Encoder, Transformer},
     config::{GenerateConfig, Input, SinkConfig, SinkContext},
     gcp::{GcpAuthConfig, GcpAuthenticator},
     http::HttpClient,
@@ -60,7 +60,6 @@ use crate::{
             sink::S3Sink,
         },
         util::{
-            encoding::Transformer,
             metadata::{RequestMetadata, RequestMetadataBuilder},
             partitioner::KeyPartitioner,
             request_builder::EncodeResult,
@@ -198,7 +197,7 @@ impl DatadogArchivesSinkConfig {
                         .await?;
                 let client = service.client();
                 let svc = self
-                    .build_s3_sink(&s3_config.options, service, cx)
+                    .build_s3_sink(&s3_config.options, service)
                     .map_err(|error| error.to_string())?;
                 Ok((
                     svc,
@@ -209,14 +208,14 @@ impl DatadogArchivesSinkConfig {
                 let azure_config = self
                     .azure_blob
                     .as_ref()
-                    .expect("azire blob config wasn't provided");
+                    .expect("azure blob config wasn't provided");
                 let client = azure_common::config::build_client(
                     Some(azure_config.connection_string.clone()),
                     None,
                     self.bucket.clone(),
                 )?;
                 let svc = self
-                    .build_azure_sink(Arc::<ContainerClient>::clone(&client), cx)
+                    .build_azure_sink(Arc::<ContainerClient>::clone(&client))
                     .map_err(|error| error.to_string())?;
                 let healthcheck =
                     azure_common::config::build_healthcheck(self.bucket.clone(), client)?;
@@ -238,7 +237,7 @@ impl DatadogArchivesSinkConfig {
                     auth.clone(),
                 )?;
                 let sink = self
-                    .build_gcs_sink(client, base_url, auth, cx)
+                    .build_gcs_sink(client, base_url, auth)
                     .map_err(|error| error.to_string())?;
                 Ok((sink, healthcheck))
             }
@@ -253,7 +252,6 @@ impl DatadogArchivesSinkConfig {
         &self,
         s3_options: &S3Options,
         service: S3Service,
-        cx: SinkContext,
     ) -> std::result::Result<VectorSink, ConfigError> {
         // we use lower default limits, because we send 100mb batches,
         // thus no need of the higher number of outcoming requests
@@ -289,7 +287,7 @@ impl DatadogArchivesSinkConfig {
             self.encoding.clone(),
         );
 
-        let sink = S3Sink::new(cx, service, request_builder, partitioner, batcher_settings);
+        let sink = S3Sink::new(service, request_builder, partitioner, batcher_settings);
 
         Ok(VectorSink::from_event_streamsink(sink))
     }
@@ -299,7 +297,6 @@ impl DatadogArchivesSinkConfig {
         client: HttpClient,
         base_url: String,
         auth: GcpAuthenticator,
-        cx: SinkContext,
     ) -> crate::Result<VectorSink> {
         let request = self.request.unwrap_with(&Default::default());
 
@@ -344,16 +341,12 @@ impl DatadogArchivesSinkConfig {
 
         let partitioner = DatadogArchivesSinkConfig::build_partitioner();
 
-        let sink = GcsSink::new(cx, svc, request_builder, partitioner, batcher_settings);
+        let sink = GcsSink::new(svc, request_builder, partitioner, batcher_settings);
 
         Ok(VectorSink::from_event_streamsink(sink))
     }
 
-    fn build_azure_sink(
-        &self,
-        client: Arc<ContainerClient>,
-        cx: SinkContext,
-    ) -> crate::Result<VectorSink> {
+    fn build_azure_sink(&self, client: Arc<ContainerClient>) -> crate::Result<VectorSink> {
         let request_limits = self.request.unwrap_with(&Default::default());
         let service = ServiceBuilder::new()
             .settings(request_limits, AzureBlobRetryLogic)
@@ -370,7 +363,7 @@ impl DatadogArchivesSinkConfig {
             encoding: DatadogArchivesEncoding::new(self.encoding.clone()),
         };
 
-        let sink = AzureBlobSink::new(cx, service, request_builder, partitioner, batcher_settings);
+        let sink = AzureBlobSink::new(service, request_builder, partitioner, batcher_settings);
 
         Ok(VectorSink::from_event_streamsink(sink))
     }
@@ -782,7 +775,7 @@ mod tests {
 
     #[test]
     fn encodes_event() {
-        let mut event = Event::from("test message");
+        let mut event = Event::Log(LogEvent::from("test message"));
         let log_mut = event.as_mut_log();
         log_mut.insert("service", "test-service");
         log_mut.insert("not_a_reserved_attribute", "value");
@@ -877,7 +870,7 @@ mod tests {
 
     #[test]
     fn generates_valid_id() {
-        let log1 = Event::from("test event 1");
+        let log1 = Event::Log(LogEvent::from("test event 1"));
         let mut writer = Cursor::new(Vec::new());
         let encoding = DatadogArchivesEncoding::new(Default::default());
         let _ = encoding.encode_input(vec![log1], &mut writer);
@@ -892,7 +885,7 @@ mod tests {
         validate_event_id(id1);
 
         // check that id is different for the next event
-        let log2 = Event::from("test event 2");
+        let log2 = Event::Log(LogEvent::from("test event 2"));
         let mut writer = Cursor::new(Vec::new());
         let _ = encoding.encode_input(vec![log2], &mut writer);
         let encoded = writer.into_inner();
@@ -909,7 +902,7 @@ mod tests {
 
     #[test]
     fn generates_date_if_missing() {
-        let log = Event::from("test message");
+        let log = Event::Log(LogEvent::from("test message"));
         let mut writer = Cursor::new(Vec::new());
         let encoding = DatadogArchivesEncoding::new(Default::default());
         let _ = encoding.encode_input(vec![log], &mut writer);
@@ -948,7 +941,7 @@ mod tests {
     #[test]
     fn s3_build_request() {
         let fake_buf = Bytes::new();
-        let mut log = Event::from("test message");
+        let mut log = Event::Log(LogEvent::from("test message"));
         let timestamp = DateTime::parse_from_rfc3339("2021-08-23T18:00:27.879+02:00")
             .expect("invalid test case")
             .with_timezone(&Utc);
@@ -976,7 +969,7 @@ mod tests {
         assert_eq!(uuid1.len(), 36);
 
         // check that the second batch has a different UUID
-        let log2 = Event::new_empty_log();
+        let log2 = LogEvent::default().into();
 
         let key = partitioner.partition(&log2).expect("key wasn't provided");
         let (metadata, _events) = request_builder.split_input((key, vec![log2]));

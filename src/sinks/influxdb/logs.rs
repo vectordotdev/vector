@@ -7,6 +7,7 @@ use indoc::indoc;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    codecs::Transformer,
     config::{
         log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
         SinkDescription,
@@ -19,7 +20,6 @@ use crate::{
             InfluxDb1Settings, InfluxDb2Settings, ProtocolVersion,
         },
         util::{
-            encoding::Transformer,
             http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
             BatchConfig, Buffer, Compression, SinkBatchSettings, TowerRequestConfig,
         },
@@ -142,7 +142,6 @@ impl SinkConfig for InfluxDbLogsConfig {
             request,
             batch.timeout,
             client,
-            cx.acker(),
         )
         .sink_map_err(|error| error!(message = "Fatal influxdb_logs sink error.", %error));
 
@@ -330,7 +329,7 @@ mod tests {
 
     #[test]
     fn test_encode_event_apply_rules() {
-        let mut event = Event::from("hello");
+        let mut event = Event::Log(LogEvent::from("hello"));
         event.as_mut_log().insert("host", "aws.cloud.eur");
         event.as_mut_log().insert("timestamp", ts());
 
@@ -371,7 +370,7 @@ mod tests {
 
     #[test]
     fn test_encode_event_v1() {
-        let mut event = Event::from("hello");
+        let mut event = Event::Log(LogEvent::from("hello"));
         event.as_mut_log().insert("host", "aws.cloud.eur");
         event.as_mut_log().insert("source_type", "file");
 
@@ -416,7 +415,7 @@ mod tests {
 
     #[test]
     fn test_encode_event() {
-        let mut event = Event::from("hello");
+        let mut event = Event::Log(LogEvent::from("hello"));
         event.as_mut_log().insert("host", "aws.cloud.eur");
         event.as_mut_log().insert("source_type", "file");
 
@@ -461,7 +460,7 @@ mod tests {
 
     #[test]
     fn test_encode_event_without_tags() {
-        let mut event = Event::from("hello");
+        let mut event = Event::Log(LogEvent::from("hello"));
 
         event.as_mut_log().insert("value", 100);
         event.as_mut_log().insert("timestamp", ts());
@@ -491,18 +490,14 @@ mod tests {
 
     #[test]
     fn test_encode_nested_fields() {
-        let mut event = Event::new_empty_log();
+        let mut event = LogEvent::default();
 
-        event.as_mut_log().insert("a", 1);
-        event.as_mut_log().insert("nested.field", "2");
-        event.as_mut_log().insert("nested.bool", true);
-        event
-            .as_mut_log()
-            .insert("nested.array[0]", "example-value");
-        event
-            .as_mut_log()
-            .insert("nested.array[2]", "another-value");
-        event.as_mut_log().insert("nested.array[3]", 15);
+        event.insert("a", 1);
+        event.insert("nested.field", "2");
+        event.insert("nested.bool", true);
+        event.insert("nested.array[0]", "example-value");
+        event.insert("nested.array[2]", "another-value");
+        event.insert("nested.array[3]", 15);
 
         let sink = create_sink(
             "http://localhost:9999",
@@ -513,7 +508,7 @@ mod tests {
         );
         let mut encoder = sink.build_encoder();
 
-        let bytes = encoder.encode_event(event).unwrap();
+        let bytes = encoder.encode_event(event.into()).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
 
         let line_protocol = split_line_protocol(string);
@@ -536,7 +531,7 @@ mod tests {
 
     #[test]
     fn test_add_tag() {
-        let mut event = Event::from("hello");
+        let mut event = Event::Log(LogEvent::from("hello"));
         event.as_mut_log().insert("source_type", "file");
 
         event.as_mut_log().insert("as_a_tag", 10);

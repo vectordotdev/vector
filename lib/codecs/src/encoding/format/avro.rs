@@ -2,6 +2,7 @@ use crate::encoding::BuildError;
 use bytes::{BufMut, BytesMut};
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Encoder;
+use vector_config::configurable_component;
 use vector_core::{config::DataType, event::Event, schema};
 
 /// Config used to build a `AvroSerializer`.
@@ -38,8 +39,9 @@ impl AvroSerializerConfig {
     }
 }
 
-/// Options for building an `AvroSerializer`.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+/// Apache Avro serializer options.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct AvroSerializerOptions {
     /// The Avro schema.
     pub schema: String,
@@ -76,15 +78,15 @@ mod tests {
     use bytes::BytesMut;
     use indoc::indoc;
     use vector_common::btreemap;
-    use vector_core::event::Value;
+    use vector_core::event::{LogEvent, Value};
 
     use super::*;
 
     #[test]
     fn serialize_avro() {
-        let event = Event::from(btreemap! {
+        let event = Event::Log(LogEvent::from(btreemap! {
             "foo" => Value::from("bar")
-        });
+        }));
         let schema = indoc! {r#"
             {
                 "type": "record",

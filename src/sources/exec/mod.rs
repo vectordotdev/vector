@@ -38,6 +38,7 @@ use crate::{
     SourceSender,
 };
 use lookup::path;
+use vector_core::config::LogNamespace;
 
 pub mod sized_bytes_codec;
 
@@ -227,7 +228,8 @@ impl SourceConfig for ExecConfig {
             .framing
             .clone()
             .unwrap_or_else(|| self.decoding.default_stream_framing());
-        let decoder = DecodingConfig::new(framing, self.decoding.clone()).build();
+        let decoder =
+            DecodingConfig::new(framing, self.decoding.clone(), LogNamespace::Legacy).build();
 
         match &self.mode {
             Mode::Scheduled => {
@@ -259,7 +261,7 @@ impl SourceConfig for ExecConfig {
         }
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(self.decoding.output_type())]
     }
 
@@ -587,7 +589,7 @@ mod tests {
     use futures::task::Poll;
 
     use super::*;
-    use crate::test_util::trace_init;
+    use crate::{event::LogEvent, test_util::trace_init};
 
     #[test]
     fn test_generate_config() {
@@ -601,7 +603,7 @@ mod tests {
         let data_stream = Some(STDOUT.to_string());
         let pid = Some(8888_u32);
 
-        let mut event = Bytes::from("hello world").into();
+        let mut event = LogEvent::from("hello world").into();
         handle_event(&config, &hostname, &data_stream, pid, &mut event);
         let log = event.as_log();
 
@@ -621,7 +623,7 @@ mod tests {
         let data_stream = Some(STDOUT.to_string());
         let pid = Some(8888_u32);
 
-        let mut event = Bytes::from("hello world").into();
+        let mut event = LogEvent::from("hello world").into();
         handle_event(&config, &hostname, &data_stream, pid, &mut event);
         let log = event.as_log();
 

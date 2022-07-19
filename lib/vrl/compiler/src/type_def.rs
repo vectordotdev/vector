@@ -72,6 +72,11 @@ impl TypeDef {
         &self.kind
     }
 
+    #[must_use]
+    pub fn kind_mut(&mut self) -> &mut Kind {
+        &mut self.kind
+    }
+
     pub fn at_path(&self, path: &Lookup<'_>) -> TypeDef {
         let fallible = self.fallible;
 
@@ -97,6 +102,7 @@ impl TypeDef {
                     coalesced_path: CoalescedPath::Reject,
                 },
             )
+            // This in incorrect. See: https://github.com/vectordotdev/vector/issues/13460
             .unwrap_or(self.kind);
 
         Self { fallible, kind }

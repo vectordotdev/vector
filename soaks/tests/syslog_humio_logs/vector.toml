@@ -26,6 +26,6 @@ address = "0.0.0.0:9090"
 type = "humio_logs"
 inputs = ["syslog"]
 endpoint = "http://localhost:8080"
-encoding = "json"
+encoding.codec = "json"
 token = "humio_token"
 healthcheck.enabled = false

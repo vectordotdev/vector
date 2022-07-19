@@ -1,8 +1,8 @@
 use std::{marker::PhantomData, num::NonZeroUsize, time::Duration};
 
 use derivative::Derivative;
-use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use vector_config::configurable_component;
 use vector_core::stream::BatcherSettings;
 
 use super::EncodedEvent;
@@ -84,10 +84,20 @@ pub struct Merged;
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Unmerged;
 
-#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
-pub struct BatchConfig<D: SinkBatchSettings, S = Unmerged> {
+/// Event batching behavior.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct BatchConfig<D: SinkBatchSettings + Clone, S = Unmerged>
+where
+    S: Clone,
+{
+    /// The maximum size of a batch, in bytes, before it is flushed.
     pub max_bytes: Option<usize>,
+
+    /// The maximum size of a batch, in events, before it is flushed.
     pub max_events: Option<usize>,
+
+    /// The maximum age of a batch, in seconds, before it is flushed.
     pub timeout_secs: Option<f64>,
 
     #[serde(skip)]
@@ -96,7 +106,7 @@ pub struct BatchConfig<D: SinkBatchSettings, S = Unmerged> {
     _s: PhantomData<S>,
 }
 
-impl<D: SinkBatchSettings> BatchConfig<D, Unmerged> {
+impl<D: SinkBatchSettings + Clone> BatchConfig<D, Unmerged> {
     pub fn validate(self) -> Result<BatchConfig<D, Merged>, BatchError> {
         let config = BatchConfig {
             max_bytes: self.max_bytes.or(D::MAX_BYTES),
@@ -137,7 +147,7 @@ impl<D: SinkBatchSettings> BatchConfig<D, Unmerged> {
     }
 }
 
-impl<D: SinkBatchSettings> BatchConfig<D, Merged> {
+impl<D: SinkBatchSettings + Clone> BatchConfig<D, Merged> {
     pub const fn validate(self) -> Result<BatchConfig<D, Merged>, BatchError> {
         Ok(self)
     }
@@ -217,8 +227,8 @@ impl<D: SinkBatchSettings> BatchConfig<D, Merged> {
 // been validated/limited.
 impl<D1, D2> From<BatchConfig<D1, Merged>> for BatchConfig<D2, Unmerged>
 where
-    D1: SinkBatchSettings,
-    D2: SinkBatchSettings,
+    D1: SinkBatchSettings + Clone,
+    D2: SinkBatchSettings + Clone,
 {
     fn from(config: BatchConfig<D1, Merged>) -> Self {
         BatchConfig {
@@ -306,7 +316,7 @@ pub trait Batch: Sized {
     /// and deal with the proper behavior of `max_size` and if
     /// `max_bytes` may be set. This is in the trait to ensure all batch
     /// buffers implement it.
-    fn get_settings_defaults<D: SinkBatchSettings>(
+    fn get_settings_defaults<D: SinkBatchSettings + Clone>(
         config: BatchConfig<D, Merged>,
     ) -> Result<BatchConfig<D, Merged>, BatchError> {
         Ok(config)
@@ -354,7 +364,7 @@ impl<B: Batch> Batch for FinalizersBatch<B> {
     type Input = EncodedEvent<B::Input>;
     type Output = EncodedBatch<B::Output>;
 
-    fn get_settings_defaults<D: SinkBatchSettings>(
+    fn get_settings_defaults<D: SinkBatchSettings + Clone>(
         config: BatchConfig<D, Merged>,
     ) -> Result<BatchConfig<D, Merged>, BatchError> {
         B::get_settings_defaults(config)
@@ -438,7 +448,7 @@ impl<B: Batch> Batch for StatefulBatch<B> {
     type Input = B::Input;
     type Output = B::Output;
 
-    fn get_settings_defaults<D: SinkBatchSettings>(
+    fn get_settings_defaults<D: SinkBatchSettings + Clone>(
         config: BatchConfig<D, Merged>,
     ) -> Result<BatchConfig<D, Merged>, BatchError> {
         B::get_settings_defaults(config)

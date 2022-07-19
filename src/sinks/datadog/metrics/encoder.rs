@@ -29,7 +29,7 @@ const SERIES_PAYLOAD_HEADER: &[u8] = b"{\"series\":[";
 const SERIES_PAYLOAD_FOOTER: &[u8] = b"]}";
 const SERIES_PAYLOAD_DELIMITER: &[u8] = b",";
 
-mod ddsketch_proto {
+mod ddmetric_proto {
     include!(concat!(env!("OUT_DIR"), "/datadog.agentpayload.rs"));
 }
 
@@ -204,7 +204,7 @@ impl DatadogMetricsEncoder {
                     {
                         return Ok(Some(metric));
                     }
-                    let _ = serde_json::to_writer(&mut self.state.buf, series)
+                    serde_json::to_writer(&mut self.state.buf, series)
                         .context(JsonEncodingFailedSnafu)?;
                 }
             }
@@ -268,7 +268,7 @@ impl DatadogMetricsEncoder {
         }
 
         // We should be safe to write our holding buffer to the compressor and store the metric.
-        let _ = self.state.writer.write_all(&self.state.buf)?;
+        self.state.writer.write_all(&self.state.buf)?;
         self.state.written += n;
         Ok(true)
     }
@@ -323,7 +323,7 @@ impl DatadogMetricsEncoder {
 
         // Consume of all of the "pending" metrics and try to write them out as sketches.
         let pending = mem::take(&mut self.state.pending);
-        let _ = write_sketches(
+        write_sketches(
             &pending,
             &self.default_namespace,
             self.log_schema,
@@ -349,7 +349,7 @@ impl DatadogMetricsEncoder {
 
     pub fn finish(&mut self) -> Result<(Bytes, Vec<Metric>, usize), FinishError> {
         // Try to encode any pending metrics we had stored up.
-        let _ = self.try_encode_pending()?;
+        self.try_encode_pending()?;
 
         // Write any payload footer necessary for the configured endpoint.
         let n = write_payload_footer(self.endpoint, &mut self.state.writer)
@@ -520,12 +520,12 @@ where
                     let k = bins.into_iter().map(Into::into).collect();
                     let n = counts.into_iter().map(Into::into).collect();
 
-                    let sketch = ddsketch_proto::sketch_payload::Sketch {
+                    let sketch = ddmetric_proto::sketch_payload::Sketch {
                         metric: name,
                         tags,
                         host,
                         distributions: Vec::new(),
-                        dogsketches: vec![ddsketch_proto::sketch_payload::sketch::Dogsketch {
+                        dogsketches: vec![ddmetric_proto::sketch_payload::sketch::Dogsketch {
                             ts,
                             cnt,
                             min,
@@ -546,7 +546,7 @@ where
         }
     }
 
-    let sketch_payload = ddsketch_proto::SketchPayload {
+    let sketch_payload = ddmetric_proto::SketchPayload {
         // TODO: The "common metadata" fields are things that only very loosely apply to Vector, or
         // are hard to characterize -- for example, what's the API key for a sketch that didn't originate
         // from the Datadog Agent? -- so we're just omitting it here in the hopes it doesn't

@@ -366,7 +366,7 @@ mod test {
             ],
             want: Ok(Value::Object(btreemap! {
                 "date_access" => "13/Jul/2016:10:55:36",
-                "duration" => 202000000,
+                "duration" => 202_000_000,
                 "http" => btreemap! {
                     "auth" => "frank",
                     "ident" => "-",

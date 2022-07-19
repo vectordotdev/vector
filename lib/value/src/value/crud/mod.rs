@@ -1,5 +1,6 @@
 use crate::Value;
-use std::borrow::Borrow;
+use lookup::lookup_v2::BorrowedSegment;
+use std::borrow::{Borrow, Cow};
 use std::collections::BTreeMap;
 
 mod get;
@@ -140,6 +141,58 @@ impl ValueCollection for Vec<Value> {
     }
 }
 
+/// Returns the last coalesce key
+pub fn skip_remaining_coalesce_segments<'a>(
+    path_iter: &mut impl Iterator<Item = BorrowedSegment<'a>>,
+) -> Cow<'a, str> {
+    loop {
+        match path_iter.next() {
+            Some(BorrowedSegment::CoalesceField(field)) => { /* skip */ }
+            Some(BorrowedSegment::CoalesceEnd(field)) => {
+                return field;
+            }
+            _ => unreachable!("malformed path. This is a bug."),
+        }
+    }
+}
+
+/// Returns the first matching coalesce key.
+/// If none matches, returns Err with the last key.
+pub fn get_matching_coalesce_key<'a>(
+    initial_key: Cow<'a, str>,
+    map: &BTreeMap<String, Value>,
+    path_iter: &mut impl Iterator<Item = BorrowedSegment<'a>>,
+) -> Result<Cow<'a, str>, Cow<'a, str>> {
+    let mut key = initial_key;
+    let mut coalesce_finished = false;
+    let matched_key = loop {
+        match map.get_value(key.as_ref()) {
+            Some(_) => {
+                if !coalesce_finished {
+                    skip_remaining_coalesce_segments(path_iter);
+                }
+                break key;
+            }
+            None => {
+                if coalesce_finished {
+                    return Err(key);
+                }
+                match path_iter.next() {
+                    Some(BorrowedSegment::CoalesceField(field)) => {
+                        key = field;
+                    }
+                    Some(BorrowedSegment::CoalesceEnd(field)) => {
+                        key = field;
+                        coalesce_finished = true;
+                    }
+                    _ => unreachable!("malformed path. This is a bug."),
+                }
+            }
+        }
+    };
+    Ok(matched_key)
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -258,6 +311,7 @@ mod test {
         assert_eq!(value.get_mut(key), Some(&mut marker));
         assert_eq!(value.remove(key, false), Some(marker));
     }
+
     #[test]
     fn field_with_nested_index_field() {
         let mut value = Value::from(BTreeMap::default());

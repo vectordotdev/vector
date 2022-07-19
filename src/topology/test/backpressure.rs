@@ -278,9 +278,10 @@ mod test_source {
     use async_trait::async_trait;
     use futures::FutureExt;
     use serde::{Deserialize, Serialize};
+    use vector_core::config::LogNamespace;
 
     use crate::config::{DataType, Output, SourceConfig, SourceContext};
-    use crate::event::Event;
+    use crate::event::{Event, LogEvent};
     use crate::sources::Source;
 
     #[derive(Debug, Serialize, Deserialize)]
@@ -297,7 +298,10 @@ mod test_source {
             let counter = Arc::clone(&self.counter);
             Ok(async move {
                 for i in 0.. {
-                    let _result = cx.out.send_event(Event::from(format!("event-{}", i))).await;
+                    let _result = cx
+                        .out
+                        .send_event(Event::Log(LogEvent::from(format!("event-{}", i))))
+                        .await;
                     counter.fetch_add(1, Ordering::AcqRel);
                     // Place ourselves at the back of tokio's task queue, giving downstream
                     // components a chance to process the event we just sent before sending more.
@@ -312,7 +316,7 @@ mod test_source {
             .boxed())
         }
 
-        fn outputs(&self) -> Vec<Output> {
+        fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
             vec![Output::default(DataType::all())]
         }
 

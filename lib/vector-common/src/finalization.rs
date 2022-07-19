@@ -48,6 +48,9 @@ impl ByteSizeOf for EventFinalizers {
 }
 
 impl EventFinalizers {
+    /// Default empty finalizer set for use in `const` contexts.
+    pub const DEFAULT: Self = Self(Vec::new());
+
     /// Creates a new `EventFinalizers` based on the given event finalizer.
     #[must_use]
     pub fn new(finalizer: EventFinalizer) -> Self {
@@ -95,6 +98,12 @@ impl EventFinalizers {
 impl Finalizable for EventFinalizers {
     fn take_finalizers(&mut self) -> EventFinalizers {
         mem::take(self)
+    }
+}
+
+impl std::iter::FromIterator<EventFinalizers> for EventFinalizers {
+    fn from_iter<T: IntoIterator<Item = EventFinalizers>>(iter: T) -> Self {
+        Self(iter.into_iter().flat_map(|f| f.0.into_iter()).collect())
     }
 }
 

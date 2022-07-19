@@ -9,8 +9,10 @@ use std::{
 
 use ::value::Value;
 use clap::Parser;
+use lookup::LookupBuf;
 use value::Secrets;
 use vector_common::TimeZone;
+use vrl::state::ExternalEnv;
 use vrl::{diagnostic::Formatter, state, Program, Runtime, Target, VrlRuntime};
 
 #[cfg(feature = "repl")]
@@ -63,7 +65,7 @@ impl Opts {
 
     fn read_program(&self) -> Result<String, Error> {
         match self.program.as_ref() {
-            Some(source) => Ok(source.to_owned()),
+            Some(source) => Ok(source.clone()),
             None => match self.program_file.as_ref() {
                 Some(path) => read(File::open(path)?),
                 None => Ok("".to_owned()),
@@ -91,6 +93,7 @@ impl Opts {
     }
 }
 
+#[must_use]
 pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     match run(opts) {
         Ok(_) => exitcode::OK,
@@ -116,13 +119,21 @@ fn run(opts: &Opts) -> Result<(), Error> {
             default_objects()
         };
 
-        repl(repl_objects, &tz, opts.runtime)
+        repl(repl_objects, tz, opts.runtime)
     } else {
         let objects = opts.read_into_objects()?;
         let source = opts.read_program()?;
-        let (program, warnings) = vrl::compile(&source, &stdlib::all()).map_err(|diagnostics| {
-            Error::Parse(Formatter::new(&source, diagnostics).colored().to_string())
-        })?;
+
+        let mut external = ExternalEnv::default();
+        // The CLI should be moved out of the "vrl" module, and then it can use the `vector-core::compile_vrl` function which includes this automatically
+        external.set_read_only_metadata_path(LookupBuf::from("vector"), true);
+
+        let (program, warnings) =
+            vrl::compile_with_external(&source, &stdlib::all(), &mut external).map_err(
+                |diagnostics| {
+                    Error::Parse(Formatter::new(&source, diagnostics).colored().to_string())
+                },
+            )?;
 
         #[allow(clippy::print_stderr)]
         if opts.print_warnings {
@@ -141,7 +152,7 @@ fn run(opts: &Opts) -> Result<(), Error> {
             let state = state::Runtime::default();
             let runtime = Runtime::new(state);
 
-            let result = execute(&mut target, &program, &tz, runtime, opts.runtime).map(|v| {
+            let result = execute(&mut target, &program, tz, runtime, opts.runtime).map(|v| {
                 if opts.print_object {
                     object.to_string()
                 } else {
@@ -162,7 +173,8 @@ fn run(opts: &Opts) -> Result<(), Error> {
 }
 
 #[cfg(feature = "repl")]
-fn repl(objects: Vec<Value>, timezone: &TimeZone, vrl_runtime: VrlRuntime) -> Result<(), Error> {
+#[allow(clippy::unnecessary_wraps)]
+fn repl(objects: Vec<Value>, timezone: TimeZone, vrl_runtime: VrlRuntime) -> Result<(), Error> {
     use core::TargetValue;
 
     let objects = objects
@@ -174,25 +186,25 @@ fn repl(objects: Vec<Value>, timezone: &TimeZone, vrl_runtime: VrlRuntime) -> Re
         })
         .collect();
 
-    repl::run(objects, timezone, vrl_runtime);
-    Ok(())
+    repl::run(objects, timezone, vrl_runtime).map_err(Into::into)
 }
 
 #[cfg(not(feature = "repl"))]
-fn repl(_objects: Vec<Value>, _timezone: &TimeZone, _vrl_runtime: VrlRuntime) -> Result<(), Error> {
+#[allow(clippy::needless_pass_by_value)]
+fn repl(_objects: Vec<Value>, _timezone: TimeZone, _vrl_runtime: VrlRuntime) -> Result<(), Error> {
     Err(Error::ReplFeature)
 }
 
 fn execute(
     object: &mut impl Target,
     program: &Program,
-    timezone: &TimeZone,
+    timezone: TimeZone,
     mut runtime: Runtime,
     vrl_runtime: VrlRuntime,
 ) -> Result<Value, Error> {
     match vrl_runtime {
         VrlRuntime::Ast => runtime
-            .resolve(object, program, timezone)
+            .resolve(object, program, &timezone)
             .map_err(Error::Runtime),
     }
 }

@@ -1,4 +1,4 @@
-use std::collections::{hash_map::Entry, HashMap};
+use std::collections::{hash_map::Entry, BTreeSet, HashMap};
 
 use anymap::AnyMap;
 use lookup::LookupBuf;
@@ -61,20 +61,23 @@ pub struct ExternalEnv {
     /// The external target of the program.
     target: Details,
 
-    read_only_paths: Vec<ReadOnlyPath>,
+    /// The type of metadata
+    metadata: Kind,
+
+    read_only_paths: BTreeSet<ReadOnlyPath>,
 
     /// Custom context injected by the external environment
     custom: AnyMap,
 }
 
 // temporary until paths can point to metadata
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Ord, Eq, PartialEq, PartialOrd)]
 pub enum PathRoot {
     Event,
     Metadata,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Ord, Eq, PartialEq, PartialOrd)]
 pub struct ReadOnlyPath {
     path: LookupBuf,
     recursive: bool,
@@ -83,7 +86,10 @@ pub struct ReadOnlyPath {
 
 impl Default for ExternalEnv {
     fn default() -> Self {
-        Self::new_with_kind(Kind::object(Collection::any()))
+        Self::new_with_kind(
+            Kind::object(Collection::any()),
+            Kind::object(Collection::any()),
+        )
     }
 }
 
@@ -91,14 +97,15 @@ impl ExternalEnv {
     /// Creates a new external environment that starts with an initial given
     /// [`Kind`].
     #[must_use]
-    pub fn new_with_kind(kind: Kind) -> Self {
+    pub fn new_with_kind(target: Kind, metadata: Kind) -> Self {
         Self {
             target: Details {
-                type_def: kind.into(),
+                type_def: target.into(),
                 value: None,
             },
+            metadata,
             custom: AnyMap::new(),
-            read_only_paths: vec![],
+            read_only_paths: BTreeSet::new(),
         }
     }
 
@@ -117,12 +124,12 @@ impl ExternalEnv {
             }
 
             // any paths that are a parent of read-only paths also can't be modified
-            if read_only_path.path.starts_with(path) {
+            if read_only_path.path.can_start_with(path) {
                 return true;
             }
 
             if read_only_path.recursive {
-                if path.starts_with(&read_only_path.path) {
+                if path.can_start_with(&read_only_path.path) {
                     return true;
                 }
             } else if path == &read_only_path.path {
@@ -134,31 +141,20 @@ impl ExternalEnv {
 
     /// Adds a path that is considered read only. Assignments to any paths that match
     /// will fail at compile time.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the path contains coalescing.
-    pub(crate) fn add_read_only_path(&mut self, path: LookupBuf, recursive: bool, root: PathRoot) {
-        assert!(
-            !path
-                .as_segments()
-                .iter()
-                .any(lookup::SegmentBuf::is_coalesce),
-            "Coalesced paths not supported for read-only paths"
-        );
-        self.read_only_paths.push(ReadOnlyPath {
+    pub(crate) fn set_read_only_path(&mut self, path: LookupBuf, recursive: bool, root: PathRoot) {
+        self.read_only_paths.insert(ReadOnlyPath {
             path,
             recursive,
             root,
         });
     }
 
-    pub fn add_read_only_event_path(&mut self, path: LookupBuf, recursive: bool) {
-        self.add_read_only_path(path, recursive, PathRoot::Event);
+    pub fn set_read_only_event_path(&mut self, path: LookupBuf, recursive: bool) {
+        self.set_read_only_path(path, recursive, PathRoot::Event);
     }
 
-    pub fn add_read_only_metadata_path(&mut self, path: LookupBuf, recursive: bool) {
-        self.add_read_only_path(path, recursive, PathRoot::Metadata);
+    pub fn set_read_only_metadata_path(&mut self, path: LookupBuf, recursive: bool) {
+        self.set_read_only_path(path, recursive, PathRoot::Metadata);
     }
 
     pub(crate) fn target(&self) -> &Details {
@@ -173,9 +169,17 @@ impl ExternalEnv {
         self.target().type_def.kind()
     }
 
+    pub fn metadata_kind(&self) -> &Kind {
+        &self.metadata
+    }
+
     #[cfg(any(feature = "expr-assignment", feature = "expr-query"))]
     pub(crate) fn update_target(&mut self, details: Details) {
         self.target = details;
+    }
+
+    pub fn update_metadata(&mut self, kind: Kind) {
+        self.metadata = kind;
     }
 
     /// Sets the external context data for VRL functions to use.
@@ -186,8 +190,8 @@ impl ExternalEnv {
     /// Marks everything as read only. Any mutations on read-only values will result in a
     /// compile time error.
     pub fn read_only(mut self) -> Self {
-        self.add_read_only_event_path(LookupBuf::root(), true);
-        self.add_read_only_metadata_path(LookupBuf::root(), true);
+        self.set_read_only_event_path(LookupBuf::root(), true);
+        self.set_read_only_metadata_path(LookupBuf::root(), true);
         self
     }
 

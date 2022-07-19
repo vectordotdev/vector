@@ -5,8 +5,8 @@ use tracing::{Metadata, Span};
 
 use super::{open, Reader, Writer};
 use crate::{
-    buffer_usage_data::BufferUsageHandle, test::common::install_tracing_helpers,
-    variants::disk_v1::reader::FLUSH_INTERVAL, Acker, Bufferable,
+    buffer_usage_data::BufferUsageHandle, test::install_tracing_helpers,
+    variants::disk_v1::reader::FLUSH_INTERVAL, Bufferable,
 };
 
 mod acknowledgements;
@@ -19,7 +19,7 @@ mod size_limits;
 const DEFAULT_DISK_BUFFER_V1_SIZE_BYTES: NonZeroU64 =
     unsafe { NonZeroU64::new_unchecked(1024 * 1024 * 1024) };
 
-pub(crate) fn create_default_buffer_v1<P, R>(data_dir: P) -> (Writer<R>, Reader<R>, Acker)
+pub(crate) fn create_default_buffer_v1<P, R>(data_dir: P) -> (Writer<R>, Reader<R>)
 where
     P: AsRef<Path>,
     R: Bufferable + Clone,
@@ -37,13 +37,13 @@ where
 
 pub(crate) fn create_default_buffer_v1_with_usage<P, R>(
     data_dir: P,
-) -> (Writer<R>, Reader<R>, Acker, BufferUsageHandle)
+) -> (Writer<R>, Reader<R>, BufferUsageHandle)
 where
     P: AsRef<Path>,
     R: Bufferable + Clone,
 {
     let usage_handle = BufferUsageHandle::noop();
-    let (writer, reader, acker) = open(
+    let (writer, reader) = open(
         data_dir.as_ref(),
         "disk_buffer_v1",
         DEFAULT_DISK_BUFFER_V1_SIZE_BYTES,
@@ -52,13 +52,13 @@ where
     )
     .expect("should not fail to create buffer");
 
-    (writer, reader, acker, usage_handle)
+    (writer, reader, usage_handle)
 }
 
 pub(crate) fn create_default_buffer_v1_with_max_buffer_size<P, R>(
     data_dir: P,
     max_buffer_size: u64,
-) -> (Writer<R>, Reader<R>, Acker)
+) -> (Writer<R>, Reader<R>)
 where
     P: AsRef<Path>,
     R: Bufferable + Clone,
@@ -66,7 +66,7 @@ where
     let max_buffer_size =
         NonZeroU64::new(max_buffer_size).expect("max buffer size must be non-zero");
     let usage_handle = BufferUsageHandle::noop();
-    let (writer, reader, acker) = open(
+    let (writer, reader) = open(
         data_dir.as_ref(),
         "disk_buffer_v1",
         max_buffer_size,
@@ -75,7 +75,7 @@ where
     )
     .expect("should not fail to create buffer");
 
-    (writer, reader, acker)
+    (writer, reader)
 }
 
 async fn drive_reader_to_flush<T: Bufferable>(reader: &mut Reader<T>) {
@@ -130,11 +130,14 @@ macro_rules! assert_reader_writer_v1_positions {
 #[macro_export]
 macro_rules! assert_reader_v1_delete_position {
     ($reader:expr, $expected_reader:expr) => {{
-        let delete_offset = $reader.delete_offset;
+        use std::sync::atomic::Ordering;
+        let delete_offset = &$reader.delete_offset;
         assert_eq!(
-            delete_offset, $expected_reader,
+            delete_offset.load(Ordering::Relaxed),
+            $expected_reader,
             "expected delete offset of {}, got {} instead",
-            $expected_reader, delete_offset
+            $expected_reader,
+            delete_offset.load(Ordering::Relaxed),
         );
     }};
 }
@@ -192,4 +195,15 @@ macro_rules! assert_buffer_usage_metrics {
     ($usage:expr, $($tail:tt)*) => {{
         assert_buffer_usage_metrics!($usage, @asserts (), $($tail)*);
     }};
+}
+
+pub(crate) async fn read_next<T>(reader: &mut Reader<T>) -> T
+where
+    T: Bufferable,
+{
+    reader
+        .next()
+        .await
+        .expect("read should not fail")
+        .expect("read should not be none")
 }

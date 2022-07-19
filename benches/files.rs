@@ -1,6 +1,7 @@
 use std::{convert::TryInto, path::PathBuf};
 
 use bytes::Bytes;
+use codecs::{encoding::FramingConfig, TextSerializerConfig};
 use criterion::{criterion_group, BatchSize, Criterion, SamplingMode, Throughput};
 use futures::{stream, SinkExt, StreamExt};
 use tempfile::tempdir;
@@ -54,10 +55,7 @@ fn benchmark_files_no_partitions(c: &mut Criterion) {
                     sinks::file::FileSinkConfig {
                         path: output.try_into().unwrap(),
                         idle_timeout_secs: None,
-                        encoding: sinks::util::encoding::EncodingConfig::from(
-                            sinks::file::Encoding::Text,
-                        )
-                        .into(),
+                        encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
                         compression: sinks::file::Compression::None,
                         acknowledgements: Default::default(),
                     },

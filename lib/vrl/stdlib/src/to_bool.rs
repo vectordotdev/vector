@@ -3,7 +3,7 @@ use vector_common::conversion::Conversion;
 use vrl::prelude::*;
 
 fn to_bool(value: Value) -> Resolved {
-    use Value::*;
+    use Value::{Boolean, Bytes, Float, Integer, Null};
 
     match value {
         Boolean(_) => Ok(value),

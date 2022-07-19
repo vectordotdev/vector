@@ -7,5 +7,6 @@
 // expose a custom type that gets used downstream...
 
 #![deny(warnings)]
+pub mod attributes;
 pub mod num;
 pub mod validation;

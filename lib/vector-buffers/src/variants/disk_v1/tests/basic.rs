@@ -1,11 +1,12 @@
 use std::{sync::atomic::Ordering, time::Duration};
 
 use futures::FutureExt;
+use vector_common::finalization::Finalizable;
 
 use super::{create_default_buffer_v1, create_default_buffer_v1_with_usage};
 use crate::{
     assert_buffer_usage_metrics, assert_reader_writer_v1_positions,
-    test::common::{with_temp_dir, MultiEventRecord, PoisonPillMultiEventRecord, SizedRecord},
+    test::{acknowledge, with_temp_dir, MultiEventRecord, PoisonPillMultiEventRecord, SizedRecord},
     variants::disk_v1::{reader::FLUSH_INTERVAL, tests::drive_reader_to_flush},
     EventCount,
 };
@@ -17,14 +18,14 @@ async fn basic_read_write_loop() {
 
         async move {
             // Create a regular buffer, no customizations required.
-            let (mut writer, mut reader, acker) = create_default_buffer_v1(data_dir);
+            let (mut writer, mut reader) = create_default_buffer_v1(data_dir);
             assert_reader_writer_v1_positions!(reader, writer, 0, 0);
 
             let expected_items = (512..768)
                 .into_iter()
                 .cycle()
                 .take(2000)
-                .map(SizedRecord)
+                .map(SizedRecord::new)
                 .collect::<Vec<_>>();
             let input_items = expected_items.clone();
             let expected_position = expected_items
@@ -44,11 +45,9 @@ async fn basic_read_write_loop() {
 
             let read_task = tokio::spawn(async move {
                 let mut items = Vec::new();
-                while let Some(record) = reader.next().await {
-                    let events_len = record.event_count();
-
+                while let Ok(Some(mut record)) = reader.next().await {
+                    acknowledge(record.take_finalizers()).await;
                     items.push(record);
-                    acker.ack(events_len);
                 }
                 (reader, items)
             });
@@ -66,7 +65,7 @@ async fn basic_read_write_loop() {
             drive_reader_to_flush(&mut reader).await;
 
             let reader_position = reader.read_offset;
-            let delete_position = reader.delete_offset;
+            let delete_position = &reader.delete_offset;
             assert_eq!(
                 expected_position, writer_position,
                 "expected writer offset of {}, got {}",
@@ -78,9 +77,11 @@ async fn basic_read_write_loop() {
                 expected_position, reader_position
             );
             assert_eq!(
-                expected_position, delete_position,
+                expected_position,
+                delete_position.load(Ordering::Relaxed),
                 "expected delete offset of {}, got {}",
-                expected_position, delete_position
+                expected_position,
+                delete_position.load(Ordering::Relaxed)
             );
         }
     })
@@ -94,13 +95,13 @@ async fn basic_read_write_loop_multievents() {
 
         async move {
             // Create a regular buffer, no customizations required.
-            let (mut writer, mut reader, acker) = create_default_buffer_v1(data_dir);
+            let (mut writer, mut reader) = create_default_buffer_v1(data_dir);
 
             let expected_items = (512..768)
                 .into_iter()
                 .cycle()
                 .take(2000)
-                .map(MultiEventRecord)
+                .map(MultiEventRecord::new)
                 .collect::<Vec<_>>();
             let input_items = expected_items.clone();
             let expected_position = expected_items
@@ -120,10 +121,9 @@ async fn basic_read_write_loop_multievents() {
 
             let read_task = tokio::spawn(async move {
                 let mut items = Vec::new();
-                while let Some(record) = reader.next().await {
-                    let events_len = record.event_count();
+                while let Ok(Some(mut record)) = reader.next().await {
+                    acknowledge(record.take_finalizers()).await;
                     items.push(record);
-                    acker.ack(events_len);
                 }
                 (reader, items)
             });
@@ -141,7 +141,7 @@ async fn basic_read_write_loop_multievents() {
             drive_reader_to_flush(&mut reader).await;
 
             let reader_position = reader.read_offset;
-            let delete_position = reader.delete_offset;
+            let delete_position = &reader.delete_offset;
             assert_eq!(
                 expected_position, writer_position,
                 "expected writer offset of {}, got {}",
@@ -153,9 +153,11 @@ async fn basic_read_write_loop_multievents() {
                 expected_position, reader_position
             );
             assert_eq!(
-                expected_position, delete_position,
+                expected_position,
+                delete_position.load(Ordering::Relaxed),
                 "expected delete offset of {}, got {}",
-                expected_position, delete_position
+                expected_position,
+                delete_position.load(Ordering::Relaxed),
             );
         }
     })
@@ -169,19 +171,22 @@ async fn initial_size_correct_with_multievents() {
 
         async move {
             // Create a regular buffer, no customizations required.
-            let (mut writer, _, _) = create_default_buffer_v1(data_dir.clone());
+            let (mut writer, _) = create_default_buffer_v1(data_dir.clone());
 
             let input_items = (512..768)
                 .into_iter()
                 .cycle()
                 .take(2000)
-                .map(MultiEventRecord)
+                .map(MultiEventRecord::new)
                 .collect::<Vec<_>>();
             let expected_events = input_items
                 .iter()
                 .map(EventCount::event_count)
                 .sum::<usize>();
-            let expected_bytes = input_items.iter().map(|e| e.encoded_size()).sum::<usize>();
+            let expected_bytes = input_items
+                .iter()
+                .map(MultiEventRecord::encoded_size)
+                .sum::<usize>();
 
             // Write a bunch of records so the buffer has events when we reload it.
             for item in input_items {
@@ -191,7 +196,7 @@ async fn initial_size_correct_with_multievents() {
 
             // Now drop our buffer and reopen it.
             drop(writer);
-            let (_, _, _, usage) =
+            let (_, _, usage) =
                 create_default_buffer_v1_with_usage::<_, MultiEventRecord>(data_dir);
 
             // Make sure our usage data agrees with our expected event count and byte size:
@@ -215,8 +220,7 @@ async fn ensure_buffer_metrics_accurate_with_poisoned_multievents() {
 
         async move {
             // Create a regular buffer, no customizations required, and ensure everything is zeroed out:
-            let (mut writer, reader, _, usage) =
-                create_default_buffer_v1_with_usage(data_dir.clone());
+            let (mut writer, reader, usage) = create_default_buffer_v1_with_usage(data_dir.clone());
             assert_reader_writer_v1_positions!(reader, writer, 0, 0);
             assert_buffer_usage_metrics!(usage, empty);
 
@@ -230,7 +234,7 @@ async fn ensure_buffer_metrics_accurate_with_poisoned_multievents() {
                 total_write_offset += count as usize;
                 assert_reader_writer_v1_positions!(reader, writer, 0, last_write_offset);
 
-                let record = PoisonPillMultiEventRecord(count);
+                let record = PoisonPillMultiEventRecord::new(count);
 
                 writer.send(record).await;
                 writer.flush();
@@ -285,7 +289,7 @@ async fn ensure_buffer_metrics_accurate_with_poisoned_multievents() {
             drop(reader);
             drop(usage);
 
-            let (writer, mut reader, acker, usage) =
+            let (writer, mut reader, usage) =
                 create_default_buffer_v1_with_usage::<_, PoisonPillMultiEventRecord>(data_dir);
 
             let expected_write_offset = last_write_offset;
@@ -306,11 +310,15 @@ async fn ensure_buffer_metrics_accurate_with_poisoned_multievents() {
                 let expected_event_count = counts[count_idx] as usize;
                 count_idx += 1;
 
-                let record = reader.next().await.expect("record should be present");
+                let record = reader
+                    .next()
+                    .await
+                    .expect("read should not error")
+                    .expect("record should be present");
                 let actual_event_count = record.event_count();
                 assert_eq!(expected_event_count, actual_event_count);
 
-                acker.ack(actual_event_count);
+                acknowledge(record).await;
             }
             info!("Read four valid records.");
 
@@ -321,7 +329,7 @@ async fn ensure_buffer_metrics_accurate_with_poisoned_multievents() {
             tokio::time::advance(FLUSH_INTERVAL.saturating_add(Duration::from_millis(1))).await;
 
             let final_read = reader.next().now_or_never();
-            assert_eq!(None, final_read);
+            assert_eq!(final_read, None);
 
             // At this point, we've read all four valid records, and since the undecodable record
             // was deleted when the buffer was initialized on the second load, our buffer metrics

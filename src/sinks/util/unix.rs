@@ -7,11 +7,11 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::{net::UnixStream, time::sleep};
 use tokio_util::codec::Encoder;
-use vector_core::{buffers::Acker, ByteSizeOf};
+use vector_core::ByteSizeOf;
 
 use crate::{
-    config::SinkContext,
-    event::Event,
+    codecs::Transformer,
+    event::{Event, Finalizable},
     internal_events::{
         ConnectionOpen, OpenGauge, SocketMode, UnixSocketConnectionError,
         UnixSocketConnectionEstablished, UnixSocketError,
@@ -19,7 +19,6 @@ use crate::{
     sink::VecSinkExt,
     sinks::{
         util::{
-            encoding::Transformer,
             retries::ExponentialBackoff,
             socket_bytes_sink::{BytesSink, ShutdownCheck},
             EncodedEvent, StreamSink,
@@ -46,12 +45,11 @@ impl UnixSinkConfig {
 
     pub fn build(
         &self,
-        cx: SinkContext,
         transformer: Transformer,
         encoder: impl Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync + 'static,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let connector = UnixConnector::new(self.path.clone());
-        let sink = UnixSink::new(connector.clone(), cx.acker(), transformer, encoder);
+        let sink = UnixSink::new(connector.clone(), transformer, encoder);
         Ok((
             VectorSink::from_event_streamsink(sink),
             Box::pin(async move { connector.healthcheck().await }),
@@ -109,7 +107,6 @@ where
     E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync,
 {
     connector: UnixConnector,
-    acker: Acker,
     transformer: Transformer,
     encoder: E,
 }
@@ -118,15 +115,9 @@ impl<E> UnixSink<E>
 where
     E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync,
 {
-    pub const fn new(
-        connector: UnixConnector,
-        acker: Acker,
-        transformer: Transformer,
-        encoder: E,
-    ) -> Self {
+    pub const fn new(connector: UnixConnector, transformer: Transformer, encoder: E) -> Self {
         Self {
             connector,
-            acker,
             transformer,
             encoder,
         }
@@ -134,12 +125,7 @@ where
 
     async fn connect(&mut self) -> BytesSink<UnixStream> {
         let stream = self.connector.connect_backoff().await;
-        BytesSink::new(
-            stream,
-            |_| ShutdownCheck::Alive,
-            self.acker.clone(),
-            SocketMode::Unix,
-        )
+        BytesSink::new(stream, |_| ShutdownCheck::Alive, SocketMode::Unix)
     }
 }
 
@@ -155,8 +141,10 @@ where
         let mut input = input
             .map(|mut event| {
                 let byte_size = event.size_of();
-                let finalizers = event.metadata_mut().take_finalizers();
+
                 transformer.transform(&mut event);
+
+                let finalizers = event.take_finalizers();
                 let mut bytes = BytesMut::new();
                 if encoder.encode(event, &mut bytes).is_ok() {
                     let item = bytes.freeze();
@@ -175,10 +163,7 @@ where
             let mut sink = self.connect().await;
             let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
 
-            let result = match sink
-                .send_all_peekable(&mut (&mut input).map(|item| item.item).peekable())
-                .await
-            {
+            let result = match sink.send_all_peekable(&mut (&mut input).peekable()).await {
                 Ok(()) => sink.close().await,
                 Err(error) => Err(error),
             };
@@ -197,7 +182,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use codecs::encoding::Framer;
+    use codecs::{encoding::Framer, NewlineDelimitedEncoder, TextSerializer};
     use tokio::net::UnixListener;
 
     use super::*;
@@ -216,9 +201,8 @@ mod tests {
         let _listener = UnixListener::bind(&good_path).unwrap();
         assert!(UnixSinkConfig::new(good_path)
             .build(
-                SinkContext::new_test(),
                 Default::default(),
-                Encoder::<Framer>::default()
+                Encoder::<()>::new(TextSerializer::new().into())
             )
             .unwrap()
             .1
@@ -228,9 +212,8 @@ mod tests {
         let bad_path = temp_uds_path("no_one_listening");
         assert!(UnixSinkConfig::new(bad_path)
             .build(
-                SinkContext::new_test(),
                 Default::default(),
-                Encoder::<Framer>::default()
+                Encoder::<()>::new(TextSerializer::new().into())
             )
             .unwrap()
             .1
@@ -248,9 +231,14 @@ mod tests {
 
         // Set up Sink
         let config = UnixSinkConfig::new(out_path);
-        let cx = SinkContext::new_test();
         let (sink, _healthcheck) = config
-            .build(cx, Default::default(), Encoder::<Framer>::default())
+            .build(
+                Default::default(),
+                Encoder::<Framer>::new(
+                    NewlineDelimitedEncoder::new().into(),
+                    TextSerializer::new().into(),
+                ),
+            )
             .unwrap();
 
         // Send the test data

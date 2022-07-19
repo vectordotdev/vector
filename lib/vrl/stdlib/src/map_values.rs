@@ -75,8 +75,8 @@ impl Function for MapValues {
 
         Ok(Box::new(MapValuesFn {
             value,
-            closure,
             recursive,
+            closure,
         }))
     }
 

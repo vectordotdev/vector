@@ -185,14 +185,14 @@ fn main() {
 
         // Set some read-only paths that can be tested
         for (path, recursive) in &test.read_only_paths {
-            external_env.add_read_only_event_path(path.clone(), *recursive);
+            external_env.set_read_only_event_path(path.clone(), *recursive);
         }
         for (path, recursive) in &test.read_only_metadata_paths {
-            external_env.add_read_only_metadata_path(path.clone(), *recursive);
+            external_env.set_read_only_metadata_path(path.clone(), *recursive);
         }
 
         let compile_start = Instant::now();
-        let program = vrl::compile_with_state(&test.source, &functions, &mut external_env);
+        let program = vrl::compile_with_external(&test.source, &functions, &mut external_env);
         let compile_end = compile_start.elapsed();
 
         let want = test.result.clone();

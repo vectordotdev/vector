@@ -33,7 +33,7 @@ components: sinks: aws_kinesis_firehose: components._aws & {
 				enabled: true
 				codec: {
 					enabled: true
-					enum: ["json", "text", "ndjson"]
+					enum: ["json", "text"]
 				}
 			}
 			proxy: enabled: true

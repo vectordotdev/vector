@@ -216,7 +216,7 @@ mod tests {
         }
 
         big_number {
-            args: func_args![value: 11222333444.56789,
+            args: func_args![value: 11_222_333_444.567_89,
                              scale: 3,
                              decimal_separator: ",",
                              grouping_separator: "."],

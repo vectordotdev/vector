@@ -27,7 +27,8 @@ components: sinks: file: {
 				enabled: true
 				codec: {
 					enabled: true
-					enum: ["ndjson", "text"]
+					framing: true
+					enum: ["json", "text"]
 				}
 			}
 			request: enabled: false

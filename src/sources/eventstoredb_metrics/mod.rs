@@ -5,6 +5,7 @@ use http::Uri;
 use hyper::{Body, Request};
 use tokio_stream::wrappers::IntervalStream;
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
 use self::types::Stats;
@@ -64,7 +65,7 @@ impl SourceConfig for EventStoreDbConfig {
         )
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(config::DataType::Metric)]
     }
 

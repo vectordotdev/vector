@@ -77,7 +77,7 @@ macro_rules! log_event {
     ($($key:expr => $value:expr),*  $(,)?) => {
         #[allow(unused_variables)]
         {
-            let mut event = crate::event::Event::Log(crate::event::LogEvent::default());
+            let mut event = $crate::event::Event::Log($crate::event::LogEvent::default());
             let log = event.as_mut_log();
             $(
                 log.insert($key, $value);
@@ -239,7 +239,10 @@ pub fn generate_lines_with_stream<Gen: FnMut(usize) -> String>(
     batch: Option<BatchNotifier>,
 ) -> (Vec<String>, impl Stream<Item = EventArray>) {
     let lines = (0..count).map(generator).collect::<Vec<_>>();
-    let stream = map_batch_stream(stream::iter(lines.clone()).map(LogEvent::from), batch);
+    let stream = map_batch_stream(
+        stream::iter(lines.clone()).map(LogEvent::from_str_legacy),
+        batch,
+    );
     (lines, stream)
 }
 
@@ -271,7 +274,7 @@ pub fn random_events_with_stream(
     batch: Option<BatchNotifier>,
 ) -> (Vec<Event>, impl Stream<Item = EventArray>) {
     let events = (0..count)
-        .map(|_| Event::from(random_string(len)))
+        .map(|_| Event::from(LogEvent::from_str_legacy(random_string(len))))
         .collect::<Vec<_>>();
     let stream = map_batch_stream(
         stream::iter(events.clone()).map(|event| event.into_log()),
@@ -287,12 +290,13 @@ pub fn random_updated_events_with_stream<F>(
     update_fn: F,
 ) -> (Vec<Event>, impl Stream<Item = EventArray>)
 where
-    F: Fn((usize, Event)) -> Event,
+    F: Fn((usize, LogEvent)) -> LogEvent,
 {
     let events = (0..count)
-        .map(|_| Event::from(random_string(len)))
+        .map(|_| LogEvent::from_str_legacy(random_string(len)))
         .enumerate()
         .map(update_fn)
+        .map(Event::Log)
         .collect::<Vec<_>>();
     let stream = map_batch_stream(
         stream::iter(events.clone()).map(|event| event.into_log()),
