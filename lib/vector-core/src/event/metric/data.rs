@@ -79,47 +79,37 @@ impl MetricData {
     /// Updates this metric by adding the value from `other`.
     #[must_use]
     pub fn update(&mut self, other: &Self) -> bool {
-        self.value.add(&other.value) && {
-            let (new_ts, new_interval) = match (
-                self.time.timestamp,
-                self.time.interval_ms,
-                other.time.timestamp,
-                other.time.interval_ms,
-            ) {
-                (Some(t1), Some(i1), Some(t2), Some(i2)) => {
-                    if t1 > t2 {
-                        // The interval window starts from the beginning of `other` (aka `t2`)
-                        // and goes to the end of `self` (which is `t1 + i1`).
-                        (
-                            Some(t2),
-                            NonZeroU32::new(
-                                TryInto::<u32>::try_into(
-                                    t1.timestamp_millis() - t2.timestamp_millis(),
-                                )
-                                .unwrap_or(0)
-                                    + i1.get(),
-                            ),
-                        )
-                    } else {
-                        // The interval window starts from the beginning of `self` (aka `t1`)
-                        // and goes to the end of `other` (which is `t2 + i2`).
-                        (
-                            Some(t1),
-                            NonZeroU32::new(
-                                TryInto::<u32>::try_into(
-                                    t2.timestamp_millis() - t1.timestamp_millis(),
-                                )
-                                .unwrap_or(0)
-                                    + i2.get(),
-                            ),
-                        )
-                    }
-                }
-                (Some(t), _, None, _) | (None, _, Some(t), _) => (Some(t), None),
-                (Some(t1), _, Some(t2), _) => (Some(t1.max(t2)), None),
-                (_, _, _, _) => (None, None),
-            };
+        let (new_ts, new_interval) = match (
+            self.time.timestamp,
+            self.time.interval_ms,
+            other.time.timestamp,
+            other.time.interval_ms,
+        ) {
+            (Some(t1), Some(i1), Some(t2), Some(i2)) => {
+                let delta_t = match TryInto::<u32>::try_into(
+                    t1.timestamp_millis().abs_diff(t2.timestamp_millis()),
+                ) {
+                    Ok(delta_t) => delta_t,
+                    Err(_) => return false,
+                };
 
+                if t1 > t2 {
+                    // The interval window starts from the beginning of `other` (aka `t2`)
+                    // and goes to the end of `self` (which is `t1 + i1`).
+                    (Some(t2), NonZeroU32::new(delta_t + i1.get()))
+                } else {
+                    // The interval window starts from the beginning of `self` (aka `t1`)
+                    // and goes to the end of `other` (which is `t2 + i2`).
+
+                    (Some(t1), NonZeroU32::new(delta_t + i2.get()))
+                }
+            }
+            (Some(t), _, None, _) | (None, _, Some(t), _) => (Some(t), None),
+            (Some(t1), _, Some(t2), _) => (Some(t1.max(t2)), None),
+            (_, _, _, _) => (None, None),
+        };
+
+        self.value.add(&other.value) && {
             self.time.timestamp = new_ts;
             self.time.interval_ms = new_interval;
             true

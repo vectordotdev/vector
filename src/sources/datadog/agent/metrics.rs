@@ -315,7 +315,6 @@ pub(crate) fn decode_ddseries_v2(
                     .points
                     .iter()
                     .map(|dd_point| {
-                        // serie.interval is in seconds
                         let i = Some(serie.interval)
                             .filter(|v| *v != 0)
                             .map(|v| v as u32)
@@ -328,6 +327,7 @@ pub(crate) fn decode_ddseries_v2(
                             },
                         )
                         .with_timestamp(Some(Utc.timestamp(dd_point.timestamp, 0)))
+                        // serie.interval is in seconds, convert to ms
                         .with_interval_ms(NonZeroU32::new(i * 1000))
                         .with_tags(Some(tags.clone()))
                         .with_namespace(namespace)
@@ -465,7 +465,7 @@ fn into_vector_metric(
                     },
                 )
                 .with_timestamp(Some(Utc.timestamp(dd_point.0, 0)))
-                // interval is in second in the ddog world, this need to be changed to at least ms
+                // dd_metric.interval is in seconds, convert to ms
                 .with_interval_ms(NonZeroU32::new(i * 1000))
                 .with_tags(Some(tags.clone()))
                 .with_namespace(namespace)

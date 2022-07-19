@@ -1047,4 +1047,60 @@ mod test {
         let converted = distrib_value.distribution_to_sketch();
         assert!(matches!(converted, Some(MetricValue::Sketch { .. })));
     }
+
+    #[test]
+    fn merge_non_contiguous_interval() {
+        let mut gauge = Metric::new(
+            "gauge",
+            MetricKind::Incremental,
+            MetricValue::Gauge { value: 12.0 },
+        )
+        .with_timestamp(Some(ts()))
+        .with_interval_ms(std::num::NonZeroU32::new(10));
+
+        let delta = Metric::new(
+            "gauge",
+            MetricKind::Incremental,
+            MetricValue::Gauge { value: -5.0 },
+        )
+        .with_timestamp(Some(ts() + chrono::Duration::milliseconds(20)))
+        .with_interval_ms(std::num::NonZeroU32::new(15));
+
+        let expected = gauge
+            .clone()
+            .with_value(MetricValue::Gauge { value: 7.0 })
+            .with_timestamp(Some(ts()))
+            .with_interval_ms(std::num::NonZeroU32::new(35));
+
+        assert!(gauge.data.add(&delta.data));
+        assert_eq!(gauge, expected);
+    }
+
+    #[test]
+    fn merge_contiguous_interval() {
+        let mut gauge = Metric::new(
+            "gauge",
+            MetricKind::Incremental,
+            MetricValue::Gauge { value: 12.0 },
+        )
+        .with_timestamp(Some(ts()))
+        .with_interval_ms(std::num::NonZeroU32::new(10));
+
+        let delta = Metric::new(
+            "gauge",
+            MetricKind::Incremental,
+            MetricValue::Gauge { value: -5.0 },
+        )
+        .with_timestamp(Some(ts() + chrono::Duration::milliseconds(5)))
+        .with_interval_ms(std::num::NonZeroU32::new(15));
+
+        let expected = gauge
+            .clone()
+            .with_value(MetricValue::Gauge { value: 7.0 })
+            .with_timestamp(Some(ts()))
+            .with_interval_ms(std::num::NonZeroU32::new(20));
+
+        assert!(gauge.data.add(&delta.data));
+        assert_eq!(gauge, expected);
+    }
 }

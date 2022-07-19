@@ -448,6 +448,7 @@ fn generate_series_metrics(
         (MetricValue::Counter { value }, Some(i)) => vec![DatadogSeriesMetric {
             metric: name,
             r#type: DatadogMetricType::Rate,
+            // Datadog expects interval to be in seconds and a rate metric to be per second
             interval: Some(i.get() / 1000),
             points: vec![DatadogPoint(ts, (*value) * 1000.0 / (i.get() as f64))],
             tags,
