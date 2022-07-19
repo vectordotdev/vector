@@ -124,7 +124,7 @@ impl Expression for SetMetadataFieldFn {
                 }
                 QueryTarget::Container(_)
                 | QueryTarget::FunctionCall(_)
-                | QueryTarget::Internal(_) => { /* unsupported query types */ }
+                | QueryTarget::Internal(_) => unreachable!("only external queries are allowed"),
             }
         }
         Ok(())
