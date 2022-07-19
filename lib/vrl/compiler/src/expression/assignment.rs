@@ -537,7 +537,12 @@ where
 
         match self {
             Single { expr, .. } => expr.type_def(state),
-            Infallible { expr, .. } => expr.type_def(state).infallible(),
+            Infallible { expr, .. } => {
+                // return type is either the "expr" type, or "bytes" (the error message)
+                let mut type_def = expr.type_def(state);
+                type_def.kind_mut().add_bytes();
+                type_def.infallible()
+            }
         }
     }
 }

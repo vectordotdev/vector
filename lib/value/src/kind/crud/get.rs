@@ -156,9 +156,7 @@ impl Kind {
 mod tests {
     use lookup::lookup_v2::{parse_path, OwnedPath};
     use lookup::owned_path;
-    use std::collections::{BTreeMap, HashMap};
-
-    use lookup::LookupBuf;
+    use std::collections::BTreeMap;
 
     use super::*;
     use crate::kind::Collection;

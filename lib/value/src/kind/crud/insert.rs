@@ -3,7 +3,7 @@
 use lookup::lookup_v2::{BorrowedSegment, Path};
 use std::collections::btree_map::Entry;
 
-use crate::kind::{Collection, Unknown};
+use crate::kind::Collection;
 use crate::Kind;
 use lookup::path;
 
@@ -47,9 +47,8 @@ impl Kind {
                         // the minimum size of the resulting array
                         let len_required = -index as usize;
 
-                        if let Some(unknown) = collection.unknown() {
-                            let unknown_kind = unknown.to_kind();
-
+                        let unknown_kind = collection.unknown_kind();
+                        if unknown_kind.contains_any_defined() {
                             // the array may be larger, but this is the largest we can prove the array is from the type information
                             let min_length = collection.min_length();
 
@@ -147,7 +146,7 @@ impl Kind {
                             return;
                         }
                         debug_assert!(
-                            collection.unknown().is_none(),
+                            collection.unknown_kind().is_undefined(),
                             "all cases with an unknown have been handled"
                         );
 
@@ -241,7 +240,6 @@ mod tests {
     use lookup::lookup_v2::{parse_path, OwnedPath};
     use lookup::owned_path;
     use std::collections::BTreeMap;
-    use std::collections::HashMap;
 
     use super::*;
     use crate::kind::Collection;

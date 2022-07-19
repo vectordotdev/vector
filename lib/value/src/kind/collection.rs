@@ -24,27 +24,24 @@ pub struct Collection<T: Ord> {
     /// For example, an array collection might be known to have an "integer" state at the 0th
     /// index, but it has an unknown length. It is however known that whatever length the array
     /// has, its values can only be integers or floats, so the `unknown` state is set to those two.
-    ///
-    /// If this field is `None`, it means it is *known* for there to be no unknown fields. This is
-    /// the case for example if you have a literal array, which either has X number of known
-    /// elements, or it's an empty array with no known, but also no unknown elements.
-    unknown: Option<Unknown>,
+    unknown: Unknown,
 }
 
 impl<T: Ord + Clone> Collection<T> {
     /// Create a new collection from its parts.
     #[must_use]
-    pub(super) fn from_parts(known: BTreeMap<T, Kind>, unknown: impl Into<Option<Kind>>) -> Self {
+    pub fn from_parts(known: BTreeMap<T, Kind>, unknown: impl Into<Kind>) -> Self {
         Self {
             known,
-            unknown: unknown.into().map(Into::into),
+            unknown: unknown.into().into(),
         }
     }
 
     pub(super) fn canonicalize(&self) -> Self {
-        //TODO: canonicalize the Unknown (should be added once https://github.com/vectordotdev/vector/issues/13459 is done)
-
         let mut output = (*self).clone();
+
+        output.unknown = self.unknown.canonicalize();
+
         let unknown_kind = self.unknown_kind();
         output
             .known_mut()
@@ -54,10 +51,10 @@ impl<T: Ord + Clone> Collection<T> {
 
     /// Create a new collection with a defined "unknown fields" value, and no known fields.
     #[must_use]
-    pub fn from_unknown(unknown: impl Into<Option<Kind>>) -> Self {
+    pub fn from_unknown(unknown: impl Into<Kind>) -> Self {
         Self {
             known: BTreeMap::default(),
-            unknown: unknown.into().map(Into::into),
+            unknown: unknown.into().into(),
         }
     }
 
@@ -66,7 +63,7 @@ impl<T: Ord + Clone> Collection<T> {
     pub fn empty() -> Self {
         Self {
             known: BTreeMap::default(),
-            unknown: None,
+            unknown: Kind::undefined().into(),
         }
     }
 
@@ -75,7 +72,7 @@ impl<T: Ord + Clone> Collection<T> {
     pub fn any() -> Self {
         Self {
             known: BTreeMap::default(),
-            unknown: Some(Unknown::any()),
+            unknown: Unknown::any(),
         }
     }
 
@@ -84,7 +81,7 @@ impl<T: Ord + Clone> Collection<T> {
     pub fn json() -> Self {
         Self {
             known: BTreeMap::default(),
-            unknown: Some(Unknown::json()),
+            unknown: Unknown::json(),
         }
     }
 
@@ -93,8 +90,7 @@ impl<T: Ord + Clone> Collection<T> {
     /// This returns `false` if at least _one_ field kind is known.
     #[must_use]
     pub fn is_any(&self) -> bool {
-        self.known.values().all(Kind::is_any)
-            && self.unknown.as_ref().map_or(false, Unknown::is_any)
+        self.known.values().all(Kind::is_any) && self.unknown_kind().is_any()
     }
 
     /// Get a reference to the "known" elements in the collection.
@@ -109,23 +105,10 @@ impl<T: Ord + Clone> Collection<T> {
         &mut self.known
     }
 
-    /// Get a reference to the "unknown" elements in the collection.
-    ///
-    /// If `None` is returned, it means all elements within the collection are known, i.e. it's
-    /// a "closed" collection.
-    #[must_use]
-    // deprecated
-    pub fn unknown(&self) -> Option<&Unknown> {
-        self.unknown.as_ref()
-    }
-
     /// Gets the type of "unknown" elements in the collection.
     /// The returned type will always have "undefined" included.
     pub fn unknown_kind(&self) -> Kind {
-        match &self.unknown {
-            None => Kind::undefined(),
-            Some(x) => x.to_kind(),
-        }
+        self.unknown.to_kind()
     }
 
     /// Returns true if the unknown variant is "Exact" (vs "Infinite").
@@ -133,20 +116,17 @@ impl<T: Ord + Clone> Collection<T> {
     /// Once the unknown is infinite, this will return false and all unknowns after that
     /// will return the same kind.
     pub fn is_unknown_exact(&self) -> bool {
-        match &self.unknown {
-            Some(unknown) => unknown.is_exact(),
-            None => true,
-        }
+        self.unknown.is_exact()
     }
 
     /// Set all "unknown" collection elements to the given kind.
-    pub fn set_unknown(&mut self, unknown: impl Into<Option<Kind>>) {
-        self.unknown = unknown.into().map(Unknown::from);
+    pub fn set_unknown(&mut self, unknown: impl Into<Kind>) {
+        self.unknown = unknown.into().into();
     }
 
     /// Returns a new collection with the unknown set
     #[must_use]
-    pub fn with_unknown(mut self, unknown: impl Into<Option<Kind>>) -> Self {
+    pub fn with_unknown(mut self, unknown: impl Into<Kind>) -> Self {
         self.set_unknown(unknown);
         self
     }
@@ -169,15 +149,11 @@ impl<T: Ord + Clone> Collection<T> {
                 lhs.merge_keep(rhs.clone(), false);
                 lhs
             })
-            .cloned();
+            .cloned()
+            .unwrap_or(Kind::never());
 
         self.known.clear();
-
-        match (self.unknown.as_mut(), known_unknown) {
-            (None, Some(rhs)) => self.unknown = Some(rhs.into()),
-            (Some(lhs), Some(rhs)) => lhs.merge(rhs.into(), false),
-            _ => {}
-        };
+        self.unknown = self.unknown.to_kind().union(known_unknown).into();
     }
 
     /// Check if `self` is a superset of `other`.
@@ -193,11 +169,9 @@ impl<T: Ord + Clone> Collection<T> {
     #[must_use]
     pub fn is_superset(&self, other: &Self) -> bool {
         // `self`'s `unknown` needs to be  a superset of `other`'s.
-        match (&self.unknown, &other.unknown) {
-            (None, Some(_)) => return false,
-            (Some(lhs), Some(rhs)) if !lhs.is_superset(rhs) => return false,
-            _ => {}
-        };
+        if !self.unknown.is_superset(&other.unknown) {
+            return false;
+        }
 
         // All known fields in `other` need to either be a subset of a matching known field in
         // `self`, or a subset of self's `unknown` type state.
@@ -206,10 +180,7 @@ impl<T: Ord + Clone> Collection<T> {
             .iter()
             .all(|(key, other_kind)| match self.known.get(key) {
                 Some(self_kind) => self_kind.is_superset(other_kind),
-                None => self
-                    .unknown
-                    .clone()
-                    .map_or(false, |unknown| unknown.to_kind().is_superset(other_kind)),
+                None => self.unknown_kind().is_superset(other_kind),
             })
         {
             return false;
@@ -221,10 +192,7 @@ impl<T: Ord + Clone> Collection<T> {
             .iter()
             .all(|(key, self_kind)| match other.known.get(key) {
                 Some(_) => true,
-                None => other
-                    .unknown
-                    .as_ref()
-                    .map_or(false, |unknown| self_kind.is_superset(&unknown.to_kind())),
+                None => self_kind.is_superset(&other.unknown_kind()),
             })
     }
 
@@ -251,11 +219,11 @@ impl<T: Ord + Clone> Collection<T> {
                 } else {
                     self_kind.merge_keep(other_kind, overwrite);
                 }
-            } else if let Some(other_unknown) = other.unknown() {
+            } else if other.unknown_kind().contains_any_defined() {
                 if overwrite {
-                    *self_kind = other_unknown.to_kind();
+                    *self_kind = other.unknown_kind();
                 } else {
-                    self_kind.merge_keep(other_unknown.to_kind(), overwrite);
+                    self_kind.merge_keep(other.unknown_kind(), overwrite);
                 }
             } else if !overwrite {
                 // other is missing this field, which returns null
@@ -263,8 +231,8 @@ impl<T: Ord + Clone> Collection<T> {
             }
         }
 
-        let self_unknown_kind = self.unknown().map(Unknown::to_kind);
-        if let Some(self_unknown_kind) = self_unknown_kind {
+        let self_unknown_kind = self.unknown_kind();
+        if self_unknown_kind.contains_any_defined() {
             for (key, mut other_kind) in other.known {
                 if !overwrite {
                     other_kind.merge_keep(self_unknown_kind.clone(), overwrite);
@@ -279,12 +247,7 @@ impl<T: Ord + Clone> Collection<T> {
                 self.known.insert(key, other_kind.or_null());
             }
         }
-
-        match (self.unknown.as_mut(), other.unknown) {
-            (None, Some(rhs)) => self.unknown = Some(rhs),
-            (Some(lhs), Some(rhs)) => lhs.merge(rhs, overwrite),
-            _ => {}
-        };
+        self.unknown.merge(other.unknown, overwrite);
     }
 
     /// Return the reduced `Kind` of the items within the collection.
@@ -304,14 +267,14 @@ impl<T: Ord> From<BTreeMap<T, Kind>> for Collection<T> {
     fn from(known: BTreeMap<T, Kind>) -> Self {
         Self {
             known,
-            unknown: None,
+            unknown: Kind::undefined().into(),
         }
     }
 }
 
 impl std::fmt::Display for Collection<Field> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.unknown.is_some() || self.known.is_empty() {
+        if self.unknown_kind().contains_any_defined() || self.known.is_empty() {
             // Simple representation, we can improve upon this in the future.
             return f.write_str("object");
         }
@@ -334,7 +297,7 @@ impl std::fmt::Display for Collection<Field> {
 
 impl std::fmt::Display for Collection<Index> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.unknown.is_some() || self.known.is_empty() {
+        if self.unknown_kind().contains_any_defined() || self.known.is_empty() {
             // Simple representation, we can improve upon this in the future.
             return f.write_str("array");
         }
@@ -484,7 +447,7 @@ mod tests {
                 overwrite: strategy,
                 want,
             },
-        ) in HashMap::from([
+        ) in [
             (
                 "any merge (deep)",
                 TestCase {
@@ -629,7 +592,7 @@ mod tests {
                     want: Collection::from_unknown(Kind::bytes().or_integer()),
                 },
             ),
-        ]) {
+        ] {
             this.merge(other, strategy);
 
             assert_eq!(this, want, "{}", title);
@@ -663,7 +626,7 @@ mod tests {
                 "integer known / no unknown",
                 TestCase {
                     this: Collection::from(BTreeMap::from([("foo", Kind::integer())])),
-                    want: Collection::from_unknown(Kind::integer()),
+                    want: Collection::from_unknown(Kind::integer().or_undefined()),
                 },
             ),
             (
@@ -685,7 +648,7 @@ mod tests {
                         v.set_unknown(Kind::bytes());
                         v
                     },
-                    want: Collection::from_unknown(Kind::integer().or_bytes()),
+                    want: Collection::from_unknown(Kind::integer().or_bytes().or_undefined()),
                 },
             ),
             (
@@ -709,7 +672,8 @@ mod tests {
                         Kind::boolean()
                             .or_array(BTreeMap::from([(0.into(), Kind::timestamp())]))
                             .or_bytes()
-                            .or_object(BTreeMap::from([("baz".into(), Kind::regex())])),
+                            .or_object(BTreeMap::from([("baz".into(), Kind::regex())]))
+                            .or_undefined(),
                     ),
                 },
             ),

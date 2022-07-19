@@ -31,6 +31,12 @@ pub(super) enum Inner {
 }
 
 impl Unknown {
+    /// Returns a standard representation of an "unknown" type.
+    #[must_use]
+    pub(crate) fn canonicalize(&self) -> Self {
+        self.to_kind().or_undefined().into()
+    }
+
     /// Get the `any` state for `Unknown`.
     #[must_use]
     pub(crate) fn any() -> Self {
@@ -73,17 +79,6 @@ impl Unknown {
     #[must_use]
     pub const fn is_exact(&self) -> bool {
         matches!(self.0, Inner::Exact(_))
-    }
-
-    /// Get a reference to the "exact" `Kind` this `Unknown` represents.
-    ///
-    /// Returns `None` if this `Unknown` is marked as "any".
-    #[must_use]
-    pub fn as_exact(&self) -> Option<&Kind> {
-        match &self.0 {
-            Inner::Infinite(..) => None,
-            Inner::Exact(kind) => Some(kind.as_ref()),
-        }
     }
 
     /// Get the `Kind` stored in this `Unknown`.
@@ -346,7 +341,7 @@ impl<T: Ord> From<Infinite> for Collection<T> {
     fn from(infinite: Infinite) -> Self {
         Self {
             known: BTreeMap::default(),
-            unknown: Some(Unknown::infinite(infinite)),
+            unknown: Unknown::infinite(infinite),
         }
     }
 }

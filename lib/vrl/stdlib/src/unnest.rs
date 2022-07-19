@@ -386,8 +386,6 @@ mod tests {
                 ] },
             },
             // Coalesce with known path first
-            // This result is "correct", but the coalescing can be improved once "undefined" is a type
-            // see: https://github.com/vectordotdev/vector/issues/13459
             TestCase {
                 old: type_def! { object {
                     "nonk" => type_def! { object {
@@ -407,28 +405,13 @@ mod tests {
                                 type_def! { object {
                                     "noog" => type_def! { bytes },
                                     "nork" => type_def! { bytes },
-                                } }.union(
-                                    type_def! { array [
-                                    type_def! { object {
-                                        "noog" => type_def! { bytes },
-                                        "nork" => type_def! { bytes },
-                                    } },
-                                ] }
-                                )
+                                } }
                             },
                         } },
-                        "nork" => type_def! { object {
-                            "shnoog" => type_def! { object {
-                                    "noog" => type_def! { bytes },
-                                    "nork" => type_def! { bytes },
-                                } },
-                        } }.union(TypeDef::null()),
                     } },
                 ] },
             },
             // Coalesce with known path second
-            // This result is "correct", but the coalescing can be improved once "undefined" is a type
-            // see: https://github.com/vectordotdev/vector/issues/13459
             TestCase {
                 old: type_def! { object {
                     unknown => type_def! { bytes },
@@ -456,12 +439,6 @@ mod tests {
                             } },
                         ] }),
                         } },
-                        "nork" => type_def! { object {
-                            "shnoog" => type_def! { object {
-                                "noog" => type_def! { bytes },
-                                "nork" => type_def! { bytes },
-                            } },
-                        } }.union(TypeDef::bytes()).union(TypeDef::null()),
                     } },
                 ] },
             },
@@ -471,12 +448,8 @@ mod tests {
                     "nonk" => type_def! { bytes },
                 } },
                 path: ".norg",
-                new: type_def! { array [
-                    type_def! { object {
-                        "nonk" => type_def! { bytes },
-                        "norg" => type_def! { unknown },
-                    } },
-                ] },
+                // guaranteed to fail at runtime
+                new: TypeDef::never().fallible(),
             },
         ];
 
@@ -509,17 +482,8 @@ mod tests {
                 value!({"hostname": "localhost", "events": [{"message": "hello"}, {"message": "world"}]}),
                 Err("expected array, got null".to_owned()),
                 UnnestFn::new("unknown"),
-                type_def! { array [
-                    type_def! { object {
-                        "hostname" => type_def! { bytes },
-                        "unknown" => type_def! { unknown },
-                        "events" => type_def! { array [
-                            type_def! { object {
-                                "message" => type_def! { bytes },
-                            } },
-                        ] },
-                    } },
-                ] },
+                // guaranteed to always fail
+                TypeDef::never().fallible(),
             ),
             (
                 value!({"hostname": "localhost", "events": [{"message": "hello"}, {"message": "world"}]}),
@@ -551,6 +515,11 @@ mod tests {
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
 
             assert_eq!(got, expected);
+
+            if got_typedef != expected_typedef {
+                println!("Got: {:?}", got_typedef.debug_info());
+                println!("Expected: {:?}", expected_typedef.debug_info());
+            }
             assert_eq!(got_typedef, expected_typedef);
         }
     }

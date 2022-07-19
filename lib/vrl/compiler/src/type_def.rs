@@ -283,11 +283,11 @@ impl TypeDef {
     #[must_use]
     pub fn collect_subtypes(mut self) -> Self {
         if let Some(object) = self.kind.as_object_mut() {
-            object.set_unknown(None);
+            object.set_unknown(Kind::undefined());
             object.anonymize();
         }
         if let Some(array) = self.kind.as_array_mut() {
-            array.set_unknown(None);
+            array.set_unknown(Kind::undefined());
             array.anonymize();
         }
 

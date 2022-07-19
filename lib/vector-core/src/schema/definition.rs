@@ -2,10 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::config::LogNamespace;
 use lookup::LookupBuf;
-use value::{
-    kind::{merge, Collection},
-    Kind,
-};
+use value::{kind::Collection, Kind};
 
 /// The definition of a schema.
 ///
@@ -205,7 +202,7 @@ impl Definition {
 
     /// Set the kind for all unknown fields.
     #[must_use]
-    pub fn unknown_fields(mut self, unknown: impl Into<Option<Kind>>) -> Self {
+    pub fn unknown_fields(mut self, unknown: impl Into<Kind>) -> Self {
         let unknown = unknown.into();
         if let Some(object) = self.kind.as_object_mut() {
             object.set_unknown(unknown.clone());
