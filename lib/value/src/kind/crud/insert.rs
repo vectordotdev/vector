@@ -12,7 +12,7 @@ impl Kind {
     /// This has the same behavior as `Value::insert`.
     #[allow(clippy::needless_pass_by_value)] // only reference types implement Path
     pub fn insert<'a>(&'a mut self, path: impl Path<'a>, kind: Self) {
-        self.insert_recursive(path.segment_iter(), kind)
+        self.insert_recursive(path.segment_iter(), kind.upgrade_undefined())
     }
 
     /// Insert the `Kind` at the given `path` within `self`.
