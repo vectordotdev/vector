@@ -1,6 +1,0 @@
-# result: { "object": { "foo": { "object": { "a": { "bytes": true }, "b": { "integer": true } } } } }
-
-. = {}
-.foo.a = "string"
-.foo.b = 5
-type_def(.)

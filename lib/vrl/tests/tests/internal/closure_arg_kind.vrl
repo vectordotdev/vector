@@ -39,9 +39,9 @@
 #                   },
 #                   "subscription_filters": {
 #                     "array": {},
-#                     "array_unknown_exact": {
+#                     "array_unknown_infinite": {
 #                       "bytes": true,
-#                       "null": true
+#                       "undefined": true
 #                     }
 #                   }
 #                 }
@@ -87,9 +87,9 @@
 #                   },
 #                   "subscription_filters": {
 #                     "array": {},
-#                     "array_unknown_exact": {
+#                     "array_unknown_infinite": {
 #                       "bytes": true,
-#                       "null": true
+#                       "undefined": true
 #                     }
 #                   }
 #                 }

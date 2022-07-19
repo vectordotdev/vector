@@ -193,7 +193,9 @@ pub(crate) fn invert_array_at_path(typedef: &TypeDef, path: &LookupBuf) -> TypeD
         array
     } else {
         // guaranteed fallible
-        return TypeDef::never().fallible();
+        // this can't actually be set to "fallible", or it will cause problems due to
+        // https://github.com/vectordotdev/vector/issues/13527
+        return TypeDef::never();
     };
 
     array.known_mut().values_mut().for_each(|kind| {
@@ -210,7 +212,7 @@ pub(crate) fn invert_array_at_path(typedef: &TypeDef, path: &LookupBuf) -> TypeD
         array.set_unknown(tdkind);
     }
 
-    TypeDef::array(array)
+    TypeDef::array(array).infallible()
 }
 
 #[cfg(test)]
@@ -449,7 +451,7 @@ mod tests {
                 } },
                 path: ".norg",
                 // guaranteed to fail at runtime
-                new: TypeDef::never().fallible(),
+                new: TypeDef::never(),
             },
         ];
 
@@ -483,14 +485,14 @@ mod tests {
                 Err("expected array, got null".to_owned()),
                 UnnestFn::new("unknown"),
                 // guaranteed to always fail
-                TypeDef::never().fallible(),
+                TypeDef::never(),
             ),
             (
                 value!({"hostname": "localhost", "events": [{"message": "hello"}, {"message": "world"}]}),
                 Err("expected array, got string".to_owned()),
                 UnnestFn::new("hostname"),
                 // guaranteed to always fail
-                TypeDef::never().fallible(),
+                TypeDef::never(),
             ),
         ];
 
