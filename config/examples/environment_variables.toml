@@ -28,6 +28,6 @@ data_dir = "/var/lib/vector"
 # Print the data to STDOUT for inspection
 # Docs: https://vector.dev/docs/reference/sinks/console
 [sinks.out]
-  inputs       = ["add_host"]
-  type         = "console"
-  encoding     = "json"
+  inputs         = ["add_host"]
+  type           = "console"
+  encoding.codec = "json"

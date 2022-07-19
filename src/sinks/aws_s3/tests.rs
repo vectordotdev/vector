@@ -15,6 +15,7 @@ mod integration_tests {
     use aws_sdk_s3::types::SdkError;
     use aws_sdk_s3::Client as S3Client;
     use bytes::Buf;
+    use codecs::{encoding::FramingConfig, TextSerializerConfig};
     use flate2::read::MultiGzDecoder;
     use futures::{stream, Stream};
     use pretty_assertions::assert_eq;
@@ -32,10 +33,7 @@ mod integration_tests {
         sinks::{
             aws_s3::S3SinkConfig,
             s3_common::config::S3Options,
-            util::{
-                encoding::{EncodingConfig, StandardEncodings},
-                BatchConfig, Compression, TowerRequestConfig,
-            },
+            util::{BatchConfig, Compression, TowerRequestConfig},
         },
         test_util::{
             components::{run_and_assert_sink_compliance, AWS_SINK_TAGS},
@@ -59,7 +57,7 @@ mod integration_tests {
         config.key_prefix = Some("test-prefix".to_string());
         let prefix = config.key_prefix.clone();
         let service = config.create_service(&cx.globals.proxy).await.unwrap();
-        let sink = config.build_processor(service, cx).unwrap();
+        let sink = config.build_processor(service).unwrap();
 
         let (lines, events, receiver) = make_events_batch(100, 10);
         run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
@@ -93,7 +91,7 @@ mod integration_tests {
         config.key_prefix = Some("test-prefix/".to_string());
         let prefix = config.key_prefix.clone();
         let service = config.create_service(&cx.globals.proxy).await.unwrap();
-        let sink = config.build_processor(service, cx).unwrap();
+        let sink = config.build_processor(service).unwrap();
 
         let (lines, events, receiver) = make_events_batch(100, 10);
         run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
@@ -131,7 +129,7 @@ mod integration_tests {
         };
         let prefix = config.key_prefix.clone();
         let service = config.create_service(&cx.globals.proxy).await.unwrap();
-        let sink = config.build_processor(service, cx).unwrap();
+        let sink = config.build_processor(service).unwrap();
 
         let (lines, _events) = random_lines_with_stream(100, 30, None);
 
@@ -190,7 +188,7 @@ mod integration_tests {
 
         let prefix = config.key_prefix.clone();
         let service = config.create_service(&cx.globals.proxy).await.unwrap();
-        let sink = config.build_processor(service, cx).unwrap();
+        let sink = config.build_processor(service).unwrap();
 
         let (lines, events, receiver) = make_events_batch(100, batch_size * batch_multiplier);
         run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
@@ -252,7 +250,7 @@ mod integration_tests {
         let config = config(&bucket, 1000000);
         let prefix = config.key_prefix.clone();
         let service = config.create_service(&cx.globals.proxy).await.unwrap();
-        let sink = config.build_processor(service, cx).unwrap();
+        let sink = config.build_processor(service).unwrap();
 
         let (lines, events, receiver) = make_events_batch(100, 10);
         run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
@@ -284,7 +282,7 @@ mod integration_tests {
         config.bucket = format!("BREAK{}IT", config.bucket);
         let prefix = config.key_prefix.clone();
         let service = config.create_service(&cx.globals.proxy).await.unwrap();
-        let sink = config.build_processor(service, cx).unwrap();
+        let sink = config.build_processor(service).unwrap();
 
         let (_lines, events, receiver) = make_events_batch(1, 1);
         sink.run(events).await.unwrap();
@@ -352,7 +350,7 @@ mod integration_tests {
             filename_extension: None,
             options: S3Options::default(),
             region: RegionOrEndpoint::with_both("minio", s3_address()),
-            encoding: EncodingConfig::from(StandardEncodings::Text).into(),
+            encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
             compression: Compression::None,
             batch,
             request: TowerRequestConfig::default(),

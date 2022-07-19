@@ -6,12 +6,12 @@ use tracing::Instrument;
 
 use super::{
     create_buffer_v2_with_data_file_count_limit, create_buffer_v2_with_max_data_file_size,
-    create_buffer_v2_with_max_record_size,
+    create_buffer_v2_with_max_record_size, read_next, read_next_some,
 };
 use crate::{
     assert_buffer_is_empty, assert_buffer_records, assert_buffer_size, assert_enough_bytes_written,
     assert_reader_writer_v2_file_positions,
-    test::{install_tracing_helpers, with_temp_dir, SizedRecord},
+    test::{acknowledge, install_tracing_helpers, with_temp_dir, SizedRecord},
     variants::disk_v2::{
         common::align16,
         tests::{get_corrected_max_record_size, get_minimum_data_file_size_for_record_payload},
@@ -35,7 +35,7 @@ async fn writer_error_when_record_is_over_the_limit() {
             let second_record = SizedRecord::new(second_write_size);
 
             let max_record_size = get_corrected_max_record_size(&first_record);
-            let (mut writer, _reader, _acker, ledger) =
+            let (mut writer, _reader, ledger) =
                 create_buffer_v2_with_max_record_size(data_dir, max_record_size).await;
 
             assert_buffer_is_empty!(ledger);
@@ -86,7 +86,7 @@ async fn writer_waits_when_buffer_is_full() {
             let second_record = SizedRecord::new(second_write_size);
 
             let max_data_file_size = get_minimum_data_file_size_for_record_payload(&second_record);
-            let (mut writer, mut reader, acker, ledger) =
+            let (mut writer, mut reader, ledger) =
                 create_buffer_v2_with_data_file_count_limit(data_dir, max_data_file_size, 2).await;
 
             assert_buffer_is_empty!(ledger);
@@ -135,8 +135,8 @@ async fn writer_waits_when_buffer_is_full() {
             // Now do a read, which would theoretically make enough space available, but wait! We
             // actually have to acknowledge the read, too, to update the buffer size.  This read
             // will complete but the second write should still be blocked/not woken up:
-            let first_record_read = reader.next().await.expect("read should not fail");
-            assert_eq!(first_record_read, Some(first_record));
+            let first_record_read = read_next_some(&mut reader).await;
+            assert_eq!(first_record_read, first_record);
 
             // We haven't yet acknowledged the record, so nothing has changed yet:
             assert_pending!(second_record_write.poll());
@@ -161,8 +161,7 @@ async fn writer_waits_when_buffer_is_full() {
                 .was_closed()
                 .finalize();
 
-            let mut second_record_read =
-                spawn(async { reader.next().await.expect("read should not fail") });
+            let mut second_record_read = spawn(read_next(&mut reader));
 
             assert!(!got_past_wait_for_waiter.try_assert());
             assert!(!notified_waiting_writers.try_assert());
@@ -171,7 +170,7 @@ async fn writer_waits_when_buffer_is_full() {
             // Now acknowledge the first record we read.  This will wake up our second read, so it
             // can at least handle the pending acknowledgements logic, but it won't actually be ready,
             // because the second write hasn't completed yet:
-            acker.ack(1);
+            acknowledge(first_record_read).await;
             while !(got_past_wait_for_waiter.try_assert() && notified_waiting_writers.try_assert())
             {
                 assert_pending!(second_record_read.poll());
@@ -195,14 +194,15 @@ async fn writer_waits_when_buffer_is_full() {
             // And now our second read, after having been woken up to drive the pending
             // acknowledgement, should now be woken up again and be able to read the second write,
             // but again, we haven't acknowledged it yet, so the ledger is not yet updated:
-            let second_record_read_result = second_record_read.await;
-            assert_eq!(second_record_read_result, Some(second_record));
+            let second_record_read_result =
+                second_record_read.await.expect("read task should not fail");
+            assert_eq!(second_record_read_result, second_record);
             assert_buffer_size!(ledger, 1, second_bytes_written);
 
             // Now acknowledge the record, and do our final read:
-            acker.ack(1);
+            acknowledge(second_record_read_result).await;
 
-            let final_record_read = reader.next().await.expect("read should not fail");
+            let final_record_read = read_next(&mut reader).await;
             assert_eq!(final_record_read, None);
             assert_buffer_is_empty!(ledger);
         }
@@ -231,7 +231,7 @@ async fn writer_rolls_data_files_when_the_limit_is_exceeded() {
             let second_record = SizedRecord::new(second_write_size);
 
             let max_data_file_size = get_minimum_data_file_size_for_record_payload(&second_record);
-            let (mut writer, mut reader, acker, ledger) =
+            let (mut writer, mut reader, ledger) =
                 create_buffer_v2_with_max_data_file_size(data_dir, max_data_file_size).await;
 
             assert_buffer_is_empty!(ledger);
@@ -266,21 +266,21 @@ async fn writer_rolls_data_files_when_the_limit_is_exceeded() {
             assert_reader_writer_v2_file_positions!(ledger, 0, 1);
 
             // Now read both records, make sure they are what we expect, etc.
-            let first_record_read = reader.next().await.expect("read should not fail");
-            assert_eq!(first_record_read, Some(first_record));
-            acker.ack(1);
+            let first_record_read = read_next_some(&mut reader).await;
+            assert_eq!(first_record_read, first_record);
+            acknowledge(first_record_read).await;
 
             assert_buffer_size!(ledger, 2, (first_bytes_written + second_bytes_written));
             assert_reader_writer_v2_file_positions!(ledger, 0, 1);
 
-            let second_record_read = reader.next().await.expect("read should not fail");
-            assert_eq!(second_record_read, Some(second_record));
-            acker.ack(1);
+            let second_record_read = read_next_some(&mut reader).await;
+            assert_eq!(second_record_read, second_record);
+            acknowledge(second_record_read).await;
 
             assert_buffer_size!(ledger, 1, second_bytes_written);
             assert_reader_writer_v2_file_positions!(ledger, 1, 1);
 
-            let final_empty_read = reader.next().await.expect("read should not fail");
+            let final_empty_read = read_next(&mut reader).await;
             assert_eq!(final_empty_read, None);
 
             assert_buffer_is_empty!(ledger);
@@ -310,7 +310,7 @@ async fn writer_rolls_data_files_when_the_limit_is_exceeded_after_reload() {
             let second_record = SizedRecord::new(second_write_size);
 
             let max_data_file_size = get_minimum_data_file_size_for_record_payload(&second_record);
-            let (mut writer, _, _, ledger) =
+            let (mut writer, _, ledger) =
                 create_buffer_v2_with_max_data_file_size(data_dir.clone(), max_data_file_size)
                     .await;
 
@@ -341,7 +341,7 @@ async fn writer_rolls_data_files_when_the_limit_is_exceeded_after_reload() {
             let open_wait = Duration::from_secs(5);
             let second_buffer_open =
                 create_buffer_v2_with_max_data_file_size(data_dir, max_data_file_size);
-            let (mut writer, mut reader, acker, ledger) = timeout(open_wait, second_buffer_open)
+            let (mut writer, mut reader, ledger) = timeout(open_wait, second_buffer_open)
                 .await
                 .expect("failed to open buffer a second time in the expected timeframe");
             assert_buffer_size!(ledger, 1, first_bytes_written);
@@ -362,21 +362,21 @@ async fn writer_rolls_data_files_when_the_limit_is_exceeded_after_reload() {
             assert_reader_writer_v2_file_positions!(ledger, 0, 1);
 
             // Now read both records, make sure they are what we expect, etc.
-            let first_record_read = reader.next().await.expect("read should not fail");
-            assert_eq!(first_record_read, Some(first_record));
-            acker.ack(1);
+            let first_record_read = read_next_some(&mut reader).await;
+            assert_eq!(first_record_read, first_record);
+            acknowledge(first_record_read).await;
 
             assert_buffer_size!(ledger, 2, (first_bytes_written + second_bytes_written));
             assert_reader_writer_v2_file_positions!(ledger, 0, 1);
 
-            let second_record_read = reader.next().await.expect("read should not fail");
-            assert_eq!(second_record_read, Some(second_record));
-            acker.ack(1);
+            let second_record_read = read_next_some(&mut reader).await;
+            assert_eq!(second_record_read, second_record);
+            acknowledge(second_record_read).await;
 
             assert_buffer_size!(ledger, 1, second_bytes_written);
             assert_reader_writer_v2_file_positions!(ledger, 1, 1);
 
-            let final_empty_read = reader.next().await.expect("read should not fail");
+            let final_empty_read = read_next(&mut reader).await;
             assert_eq!(final_empty_read, None);
 
             assert_buffer_is_empty!(ledger);
@@ -401,7 +401,7 @@ async fn writer_try_write_returns_when_buffer_is_full() {
             let second_record = SizedRecord::new(write_size);
 
             let max_data_file_size = get_minimum_data_file_size_for_record_payload(&second_record);
-            let (mut writer, _, _, ledger) =
+            let (mut writer, _, ledger) =
                 create_buffer_v2_with_data_file_count_limit(data_dir, max_data_file_size, 2).await;
 
             assert_buffer_is_empty!(ledger);
@@ -440,7 +440,7 @@ async fn writer_can_validate_last_write_when_buffer_is_full() {
             let second_record = SizedRecord::new(write_size);
 
             let max_data_file_size = get_minimum_data_file_size_for_record_payload(&second_record);
-            let (mut writer, _, _, ledger) = create_buffer_v2_with_data_file_count_limit(
+            let (mut writer, _, ledger) = create_buffer_v2_with_data_file_count_limit(
                 data_dir.clone(),
                 max_data_file_size,
                 2,
@@ -470,7 +470,7 @@ async fn writer_can_validate_last_write_when_buffer_is_full() {
             drop(writer);
             drop(ledger);
 
-            let (_, _, _, ledger) = create_buffer_v2_with_data_file_count_limit::<_, SizedRecord>(
+            let (_, _, ledger) = create_buffer_v2_with_data_file_count_limit::<_, SizedRecord>(
                 data_dir,
                 max_data_file_size,
                 2,

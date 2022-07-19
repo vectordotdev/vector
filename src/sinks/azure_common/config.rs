@@ -8,7 +8,7 @@ use bytes::Bytes;
 use futures::FutureExt;
 use http::StatusCode;
 use snafu::Snafu;
-use vector_core::{buffers::Ackable, internal_event::EventsSent, stream::DriverResponse};
+use vector_core::{internal_event::EventsSent, stream::DriverResponse};
 
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
@@ -21,12 +21,6 @@ pub struct AzureBlobRequest {
     pub content_encoding: Option<&'static str>,
     pub content_type: &'static str,
     pub metadata: AzureBlobMetadata,
-}
-
-impl Ackable for AzureBlobRequest {
-    fn ack_size(&self) -> usize {
-        self.metadata.count
-    }
 }
 
 impl Finalizable for AzureBlobRequest {

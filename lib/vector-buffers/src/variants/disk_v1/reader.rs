@@ -3,7 +3,7 @@ use std::{
     fmt,
     marker::PhantomData,
     sync::{
-        atomic::{AtomicU64, AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
         Arc,
     },
     time::Duration,
@@ -57,7 +57,7 @@ pub struct Reader<T> {
     /// First uncompacted key
     pub(crate) compacted_offset: usize,
     /// First not deleted key
-    pub(crate) delete_offset: usize,
+    pub(crate) delete_offset: Arc<AtomicUsize>,
     /// Reader is notified by Writers through this Waker.
     /// Shared with Writers.
     pub(crate) read_waker: Arc<Notify>,
@@ -90,6 +90,14 @@ pub struct Reader<T> {
     pub(crate) usage_handle: BufferUsageHandle,
     pub(crate) phantom: PhantomData<T>,
     pub(crate) finalizer: OrderedFinalizer<u64>,
+    pub(super) reader_done: Arc<AtomicBool>,
+}
+
+/// Error that occurred during calls to [`Reader::next`]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ReaderError {
+    /// The reader has been stopped due to an acknowledgement error.
+    Stopped,
 }
 
 impl<T> Reader<T>
@@ -97,11 +105,16 @@ where
     T: Bufferable,
 {
     #[cfg_attr(test, instrument(skip(self), level = "debug"))]
-    pub async fn next(&mut self) -> Option<T> {
+    pub async fn next(&mut self) -> Result<Option<T>, ReaderError> {
         loop {
             // Check for any pending acknowledgements which may make a read eligible to finally be
             // deleted from the buffer entirely.
             self.try_flush();
+
+            // If we received a negative acknowledgement, stop returning results.
+            if self.reader_done.load(Ordering::Relaxed) {
+                return Err(ReaderError::Stopped);
+            }
 
             // If we have no buffered items, do a read from LevelDB.
             if self.buffer.is_empty() {
@@ -135,7 +148,7 @@ where
                         let (batch, receiver) = BatchNotifier::new_with_receiver();
                         item.add_batch_notifier(batch);
                         self.finalizer.add(count as u64, receiver);
-                        return Some(item);
+                        return Ok(Some(item));
                     }
                     Err(error) => {
                         error!(%error, "Error deserializing event.");
@@ -146,7 +159,7 @@ where
                 if Arc::strong_count(&self.db) == 1 {
                     // There are no writers left, and we've consumed all remaining items in the
                     // buffer, so we need to signal to this to caller by returning `None`.
-                    return None;
+                    return Ok(None);
                 }
 
                 // We have no more buffered reads, and we always make sure to do a read if our
@@ -261,7 +274,8 @@ impl<T> Reader<T> {
             // We adjust the delete offset/remaining acks here so that the next call to
             // `get_next_eligible_delete` has updated offsets so we can optimally drain as many
             // eligible deletes as possible in one go.
-            self.delete_offset = key.wrapping_add(event_count);
+            self.delete_offset
+                .store(key.wrapping_add(event_count), Ordering::Relaxed);
 
             total_records += 1;
             total_events += event_count;
@@ -272,7 +286,7 @@ impl<T> Reader<T> {
         // and update our buffer usage metrics.
         if total_records > 0 {
             debug!(
-                delete_offset = self.delete_offset,
+                delete_offset = self.delete_offset.load(Ordering::Relaxed),
                 "Deleting {} records from buffer: {} items, {} bytes.",
                 total_records,
                 total_events,
@@ -281,7 +295,7 @@ impl<T> Reader<T> {
             self.db.write(WriteOptions::new(), &delete_batch).unwrap();
 
             assert!(
-                self.delete_offset <= self.read_offset,
+                self.delete_offset.load(Ordering::Relaxed) <= self.read_offset,
                 "tried to ack beyond read offset"
             );
 
@@ -340,10 +354,12 @@ impl<T> Reader<T> {
             self.uncompacted_size = 0;
 
             debug!("Compacting disk buffer.");
-            self.db
-                .compact(&Key(self.compacted_offset), &Key(self.delete_offset));
+            self.db.compact(
+                &Key(self.compacted_offset),
+                &Key(self.delete_offset.load(Ordering::Relaxed)),
+            );
 
-            self.compacted_offset = self.delete_offset;
+            self.compacted_offset = self.delete_offset.load(Ordering::Relaxed);
             self.last_compaction = Instant::now();
         }
     }

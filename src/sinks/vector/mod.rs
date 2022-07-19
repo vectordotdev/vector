@@ -65,7 +65,7 @@ impl SinkConfig for VectorConfig {
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         match self {
-            VectorConfig::V1(v1) => v1.config.build(cx).await,
+            VectorConfig::V1(v1) => v1.config.build().await,
             VectorConfig::V2(v2) => v2.config.build(cx).await,
         }
     }

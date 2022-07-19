@@ -8,13 +8,13 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::{
+    codecs::Transformer,
     config::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
     },
     event::Event,
     http::{Auth, HttpClient},
     sinks::util::{
-        encoding::Transformer,
         http::{HttpEventEncoder, HttpSink, PartitionHttpSink},
         BatchConfig, BoxedRawValue, JsonArrayBuffer, PartitionBuffer, PartitionInnerBuffer,
         RealtimeSizeBasedDefaultBatchSettings, TowerRequestConfig, UriSerde,
@@ -92,7 +92,6 @@ impl SinkConfig for LogdnaConfig {
             request_settings,
             batch_settings.timeout,
             client.clone(),
-            cx.acker(),
         )
         .sink_map_err(|error| error!(message = "Fatal logdna sink error.", %error));
 

@@ -1,7 +1,10 @@
 use crate::lookup_v2::{parse_path, BorrowedSegment, Path};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use vector_config::configurable_component;
 
+/// A lookup path.
+#[configurable_component]
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[serde(from = "String", into = "String")]
 pub struct OwnedPath {
     pub segments: Vec<OwnedSegment>,
 }
@@ -36,27 +39,20 @@ impl OwnedPath {
     }
 }
 
-impl<'de> Deserialize<'de> for OwnedPath {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let path: String = Deserialize::deserialize(deserializer)?;
-        Ok(parse_path(&path))
+impl From<String> for OwnedPath {
+    fn from(raw_path: String) -> Self {
+        parse_path(raw_path.as_str())
     }
 }
 
-impl Serialize for OwnedPath {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        if self.segments.is_empty() {
-            serializer.serialize_str("<invalid>")
+impl From<OwnedPath> for String {
+    fn from(owned: OwnedPath) -> Self {
+        if owned.segments.is_empty() {
+            String::from("<invalid>")
         } else {
             let mut coalesce_i = 0;
 
-            let path = self
+            owned
                 .segments
                 .iter()
                 .enumerate()
@@ -93,8 +89,7 @@ impl Serialize for OwnedPath {
                     }
                 })
                 .collect::<Vec<_>>()
-                .join("");
-            serializer.serialize_str(&path)
+                .join("")
         }
     }
 }
@@ -146,7 +141,7 @@ impl<'a, const N: usize> From<[BorrowedSegment<'a>; N]> for OwnedPath {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum OwnedSegment {
     Field(String),
     Index(isize),

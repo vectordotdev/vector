@@ -21,13 +21,13 @@ async fn interpolate_labels() {
         r#"
         endpoint = "http://localhost:3100"
         labels = {label1 = "{{ foo }}", label2 = "some-static-label", label3 = "{{ foo }}", "{{ foo }}" = "{{ foo }}"}
-        encoding = "json"
+        encoding.codec = "json"
         remove_label_fields = true
     "#,
     )
     .unwrap();
-    let client = config.build_client(cx.clone()).unwrap();
-    let mut sink = LokiSink::new(config, client, cx).unwrap();
+    let client = config.build_client(cx).unwrap();
+    let mut sink = LokiSink::new(config, client).unwrap();
 
     let mut e1 = Event::Log(LogEvent::from("hello world"));
 
@@ -67,8 +67,8 @@ async fn use_label_from_dropped_fields() {
         "#,
     )
     .unwrap();
-    let client = config.build_client(cx.clone()).unwrap();
-    let mut sink = LokiSink::new(config, client, cx).unwrap();
+    let client = config.build_client(cx).unwrap();
+    let mut sink = LokiSink::new(config, client).unwrap();
 
     let mut e1 = Event::Log(LogEvent::from("hello world"));
 
@@ -92,7 +92,7 @@ async fn healthcheck_includes_auth() {
         r#"
             endpoint = "http://localhost:3100"
             labels = {test_name = "placeholder"}
-            encoding = "json"
+            encoding.codec = "json"
 			auth.strategy = "basic"
 			auth.user = "username"
 			auth.password = "some_password"
@@ -134,7 +134,7 @@ async fn healthcheck_grafana_cloud() {
     let (config, _cx) = load_sink::<LokiConfig>(
         r#"
             endpoint = "http://logs-prod-us-central1.grafana.net"
-            encoding = "json"
+            encoding.codec = "json"
             labels = {test_name = "placeholder"}
         "#,
     )

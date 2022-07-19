@@ -11,26 +11,30 @@ experience -- the purpose of this document.
 
 <!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
 
-1. [Principles](#principles)
-   1. [Don't please everyone](#dont-please-everyone)
-   1. [Be opinionated & reduce decisions](#be-opinionated--reduce-decisions)
-   1. [Build momentum with consistency](#build-momentum-with-consistency)
-1. [Goals](#goals)
-   1. [Performance](#performance)
-   1. [Safety](#safety)
-1. [Guidelines](#guidelines)
-   1. [Defaults](#defaults)
-      1. [Don't lose data](#dont-lose-data)
-   1. [Logical boundaries](#logical-boundaries)
-      1. [Source & sink boundaries](#source--sink-boundaries)
-      1. [Transform boundaries](#transform-boundaries)
-1. [Adherence](#adherence)
-   1. [Roles](#roles)
-      1. [Contributors](#contributors)
-      1. [User experience committee](#user-experience-committee)
-   1. [Responsibilities](#responsibilities)
-      1. [Contributors](#contributors-1)
-      1. [User experience committee](#user-experience-committee-1)
+1. [User Experience Design](#user-experience-design)
+   1. [Principles](#principles)
+      1. [Don't please everyone](#dont-please-everyone)
+      2. [Be opinionated & reduce decisions](#be-opinionated--reduce-decisions)
+      3. [Build momentum with consistency](#build-momentum-with-consistency)
+   2. [Goals](#goals)
+      1. [Performance](#performance)
+      2. [Safety](#safety)
+   3. [Guidelines](#guidelines)
+      1. [Data model](#data-model)
+         1. [Log schemas should be fluid](#log-schemas-should-be-fluid)
+      2. [Defaults](#defaults)
+         1. [Don't lose data](#dont-lose-data)
+      3. [Logical boundaries](#logical-boundaries)
+         1. [Source & sink boundaries](#source--sink-boundaries)
+         2. [Transform boundaries](#transform-boundaries)
+      4. [Upfront configuration](#upfront-configuration)
+   4. [Adherence](#adherence)
+      1. [Roles](#roles)
+         1. [Contributors](#contributors)
+         2. [User experience committee](#user-experience-committee)
+      2. [Responsibilities](#responsibilities)
+         1. [Contributors](#contributors-1)
+         2. [User experience committee](#user-experience-committee-1)
 
 <!-- /MarkdownTOC -->
 
@@ -50,9 +54,9 @@ _observability data pipeline_ and we strive to be the best in this domain.
 
 Examples:
 
-* Avoiding analytics specific use cases.
-* Leaning into tools like Kafka instead of trying to completely replace them.
-* Building a data processing DSL optimized our [design goals](#goals) as opposed
+- Avoiding analytics specific use cases.
+- Leaning into tools like Kafka instead of trying to completely replace them.
+- Building a data processing DSL optimized our [design goals](#goals) as opposed
   to offering multiple languages for processing (i.e., javascript)
 
 ### Be opinionated & reduce decisions
@@ -66,9 +70,9 @@ purpose and not leave them as creative exercises for the user.
 
 Examples:
 
-* Vector's `pipelines` transform as a solution to team collaboration as opposed
+- Vector's `pipelines` transform as a solution to team collaboration as opposed
   to generic config files.
-* Vector's metric data model as a solution for metrics interoperability as
+- Vector's metric data model as a solution for metrics interoperability as
   opposed to specifically structured log lines.
 
 ### Build momentum with consistency
@@ -84,8 +88,8 @@ error handling, since this often results in data loss.
 
 Examples:
 
-* Using the same `codec` option name in both sources and sinks that support it.
-* Defaulting to applying back pressure regardless of the component or topology.
+- Using the same `codec` option name in both sources and sinks that support it.
+- Defaulting to applying back pressure regardless of the component or topology.
 
 ## Goals
 
@@ -104,11 +108,11 @@ this area.
 
 Examples:
 
-* Choosing a fast, yet more difficult, language, like Rust, to build
+- Choosing a fast, yet more difficult, language, like Rust, to build
   Vector in.
-* Investing into performance-related infrastructure for regression control and
+- Investing into performance-related infrastructure for regression control and
   analysis.
-* Creating ARC to eliminate a common real-world performance problem.
+- Creating ARC to eliminate a common real-world performance problem.
 
 ### Safety
 
@@ -120,8 +124,8 @@ is Vector's secondary design goal.
 
 Examples:
 
-* Creating a type-safe data processing DSL designed for performance.
-* Implementing end-to-end type safety for Vector's configuration.
+- Creating a type-safe data processing DSL designed for performance.
+- Implementing end-to-end type safety for Vector's configuration.
 
 ## Guidelines
 
@@ -159,8 +163,8 @@ an opt-in choice by the user.
 
 Examples:
 
-* Choose back pressure over shedding load
-* Retry failed requests in sinks until the service recovers
+- Choose back pressure over shedding load
+- Retry failed requests in sinks until the service recovers
 
 ### Logical boundaries
 
@@ -179,11 +183,11 @@ composability.
 
 Examples:
 
-* A `syslog` source as opposed to a `syslogng` source since it aligns with the
+- A `syslog` source as opposed to a `syslogng` source since it aligns with the
   Syslog protocol.
-* A `datadog_agent` source as opposed to a `datadog_api` source since it aligns
+- A `datadog_agent` source as opposed to a `datadog_api` source since it aligns
   on intent and reduces scope.
-* Again, a `syslog` source _in addition_ to a `socket` source with the `codec`
+- Again, a `syslog` source _in addition_ to a `socket` source with the `codec`
   option set to `syslog` since it is more specific and discoverable.
 
 #### Transform boundaries
@@ -197,10 +201,24 @@ both.
 
 Examples:
 
-* A `remap` transform as opposed to multiple `parse_json`, `parse_syslog`, etc
+- A `remap` transform as opposed to multiple `parse_json`, `parse_syslog`, etc
   transforms.
-* A `filter` transform as opposed to a `filter_regex`, `filter_datadog_search`,
+- A `filter` transform as opposed to a `filter_regex`, `filter_datadog_search`,
   etc transforms.
+
+### Upfront configuration
+
+Vector should never require manual intervention of Vector to remedy normal
+processing failures during; instead Vector should require any necessary
+configuration to handle these failures a priori.
+
+For example, rather than requiring users to intervene to unblock processing
+whenever events fail to be sent to sinks by manually skipping them, instead
+Vector should let users define dead-letter queues to send events to when the
+primary sink rejects events.
+
+Users may need to intervene to update invalid configuration, for example in the
+case of rotating invalid API keys.
 
 ## Adherence
 
@@ -226,22 +244,22 @@ experience.
 As a Vector contributor you are responsible for coupling the following non-code
 changes with your code changes:
 
-* Reference docs changes located in the [`/website/cue` folder](../website/cue)
+- Reference docs changes located in the [`/website/cue` folder](../website/cue)
   (generally configuration changes)
-* Existing guide changes located in the [`/website/content` folder](../website/content)
-* If relevant, [highlighting] your change for future release notes
+- Existing guide changes located in the [`/website/content` folder](../website/content)
+- If relevant, [highlighting] your change for future release notes
 
 You are _not_ responsible for:
 
-* Writing new guides related to your change
+- Writing new guides related to your change
 
 #### User experience committee
 
 As a user experience design committee member, you are responsible for:
 
-* The resulting user experience.
-* Reviewing and approving proposed user experience changes in RFCs.
-* Reviewing and approving user-facing changes in pull requests.
-* Updating and evolving guides to reflect new Vector changes.
+- The resulting user experience.
+- Reviewing and approving proposed user experience changes in RFCs.
+- Reviewing and approving user-facing changes in pull requests.
+- Updating and evolving guides to reflect new Vector changes.
 
 [Hicks Law]: https://en.wikipedia.org/wiki/Hick%27s_law

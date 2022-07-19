@@ -26,6 +26,6 @@ address = "0.0.0.0:9090"
 type = "splunk_hec_logs"
 inputs = ["syslog"]
 endpoint = "http://localhost:8080"
-encoding = "json"
+encoding.codec = "json"
 token = "abcd1234"
 healthcheck.enabled = false

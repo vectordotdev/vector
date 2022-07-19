@@ -31,7 +31,7 @@ fn random_events_with_stream(
     (
         lines,
         stream.map(|mut events| {
-            events.for_each_log(|log| {
+            events.iter_logs_mut().for_each(|log| {
                 log.insert("title", "All!");
                 log.insert("invalid", "Tik");
             });
@@ -128,7 +128,7 @@ async fn api_key_in_metadata() {
     let (expected, events) = random_events_with_stream(100, 10, None);
 
     let events = events.map(|mut events| {
-        events.for_each_log(|log| {
+        events.iter_logs_mut().for_each(|log| {
             log.metadata_mut()
                 .set_datadog_api_key(Arc::from("from_metadata"));
         });

@@ -12,8 +12,8 @@
 //! that can be used within sinks. The simplest type being the `StreamSink`
 //! type should be used when you do not want to batch events but you want
 //! to _stream_ them to the downstream service. `BatchSink` and `PartitionBatchSink`
-//! are similar in the sense that they both take some `tower::Service`, `Batch` and
-//! `Acker` and will provide full batching, request dispatching and acking based on
+//! are similar in the sense that they both take some `tower::Service`, and `Batch`
+//! and will provide full batching, and request dispatching based on
 //! the settings passed.
 //!
 //! For more advanced use cases like HTTP based sinks, one should use the
@@ -51,8 +51,8 @@ use tokio::{
 use tower::{Service, ServiceBuilder};
 use tracing::Instrument;
 // === StreamSink<Event> ===
+use vector_core::internal_event::EventsSent;
 pub use vector_core::sink::StreamSink;
-use vector_core::{buffers::Acker, internal_event::EventsSent};
 
 use super::{
     batch::{Batch, EncodedBatch, FinalizersBatch, PushResult, StatefulBatch},
@@ -101,12 +101,12 @@ where
     S::Response: Response + Send + 'static,
     B: Batch,
 {
-    pub fn new(service: S, batch: B, timeout: Duration, acker: Acker) -> Self {
+    pub fn new(service: S, batch: B, timeout: Duration) -> Self {
         let service = ServiceBuilder::new()
             .map(|req: PartitionInnerBuffer<B::Output, ()>| req.into_parts().0)
             .service(service);
         let batch = PartitionBuffer::new(batch);
-        let inner = PartitionBatchSink::new(service, batch, timeout, acker);
+        let inner = PartitionBatchSink::new(service, batch, timeout);
         Self { inner }
     }
 }
@@ -202,9 +202,9 @@ where
     S::Error: Into<crate::Error> + Send + 'static,
     S::Response: Response + Send + 'static,
 {
-    pub fn new(service: S, batch: B, timeout: Duration, acker: Acker) -> Self {
+    pub fn new(service: S, batch: B, timeout: Duration) -> Self {
         Self {
-            service: ServiceSink::new(service, acker),
+            service: ServiceSink::new(service),
             buffer: None,
             batch: StatefulBatch::from(FinalizersBatch::from(batch)),
             partitions: HashMap::new(),
@@ -318,9 +318,8 @@ where
                     let batch = this.partitions.remove(partition).unwrap();
                     this.lingers.remove(partition);
 
-                    let batch_size = batch.num_items();
                     let batch = batch.finish();
-                    let future = tokio::spawn(this.service.call(batch, batch_size));
+                    let future = tokio::spawn(this.service.call(batch));
 
                     if let Some(map) = this.in_flight.as_mut() {
                         map.insert(partition.clone(), future.map(|_| ()).fuse().boxed());
@@ -393,11 +392,7 @@ where
 
 struct ServiceSink<S, Request> {
     service: S,
-    in_flight: FuturesUnordered<oneshot::Receiver<(usize, usize)>>,
-    acker: Acker,
-    seq_head: usize,
-    seq_tail: usize,
-    pending_acks: HashMap<usize, usize>,
+    in_flight: FuturesUnordered<oneshot::Receiver<()>>,
     next_request_id: usize,
     _pd: PhantomData<Request>,
 }
@@ -409,14 +404,10 @@ where
     S::Error: Into<crate::Error> + Send + 'static,
     S::Response: Response + Send + 'static,
 {
-    fn new(service: S, acker: Acker) -> Self {
+    fn new(service: S) -> Self {
         Self {
             service,
             in_flight: FuturesUnordered::new(),
-            acker,
-            seq_head: 0,
-            seq_tail: 0,
-            pending_acks: HashMap::new(),
             next_request_id: 0,
             _pd: PhantomData,
         }
@@ -426,15 +417,13 @@ where
         self.service.poll_ready(cx).map_err(Into::into)
     }
 
-    fn call(&mut self, batch: EncodedBatch<Request>, batch_size: usize) -> BoxFuture<'static, ()> {
+    fn call(&mut self, batch: EncodedBatch<Request>) -> BoxFuture<'static, ()> {
         let EncodedBatch {
             items,
             finalizers,
             count,
             byte_size,
         } = batch;
-        let seqno = self.seq_head;
-        self.seq_head += 1;
 
         let (tx, rx) = oneshot::channel();
 
@@ -465,7 +454,7 @@ where
                 // If the rx end is dropped we still completed
                 // the request so this is a weird case that we can
                 // ignore for now.
-                let _ = tx.send((seqno, batch_size));
+                let _ = tx.send(());
             })
             .instrument(info_span!("request", %request_id).or_current())
             .boxed()
@@ -474,17 +463,7 @@ where
     fn poll_complete(&mut self, cx: &mut Context<'_>) -> Poll<()> {
         while !self.in_flight.is_empty() {
             match ready!(Pin::new(&mut self.in_flight).poll_next(cx)) {
-                Some(Ok((seqno, batch_size))) => {
-                    self.pending_acks.insert(seqno, batch_size);
-
-                    let mut num_to_ack = 0;
-                    while let Some(ack_size) = self.pending_acks.remove(&self.seq_tail) {
-                        num_to_ack += ack_size;
-                        self.seq_tail += 1
-                    }
-                    trace!(message = "Acking events.", acking_num = num_to_ack);
-                    self.acker.ack(num_to_ack);
-                }
+                Some(Ok(())) => {}
                 Some(Err(_)) => panic!("ServiceSink service sender dropped."),
                 None => break,
             }
@@ -501,10 +480,6 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ServiceSink")
             .field("service", &self.service)
-            .field("acker", &self.acker)
-            .field("seq_head", &self.seq_head)
-            .field("seq_tail", &self.seq_tail)
-            .field("pending_acks", &self.pending_acks)
             .finish()
     }
 }
@@ -580,13 +555,15 @@ impl<'a> Response for &'a str {}
 mod tests {
     use std::{
         convert::Infallible,
-        sync::{atomic::Ordering::Relaxed, Arc, Mutex},
+        sync::{atomic::AtomicUsize, atomic::Ordering::Relaxed, Arc, Mutex},
     };
 
     use bytes::Bytes;
     use futures::{future, stream, task::noop_waker_ref, SinkExt, StreamExt};
     use tokio::{task::yield_now, time::Instant};
-    use vector_buffers::Acker;
+    use vector_common::finalization::{
+        BatchNotifier, BatchStatus, EventFinalizer, EventFinalizers,
+    };
 
     use super::*;
     use crate::{
@@ -608,45 +585,77 @@ mod tests {
         tokio::time::resume();
     }
 
+    type Counter = Arc<AtomicUsize>;
+
+    struct Request(usize, EventFinalizers);
+
+    impl Request {
+        fn new(value: usize, counter: &Counter) -> Self {
+            let (batch, receiver) = BatchNotifier::new_with_receiver();
+            let counter = Arc::clone(counter);
+            tokio::spawn(async move {
+                if receiver.await == BatchStatus::Delivered {
+                    counter.fetch_add(value, Relaxed);
+                }
+            });
+            Self(value, EventFinalizers::new(EventFinalizer::new(batch)))
+        }
+
+        fn encoded(value: usize, counter: &Counter) -> EncodedEvent<Self> {
+            let mut item = Self::new(value, counter);
+            let finalizers = std::mem::take(&mut item.1);
+            EncodedEvent {
+                item,
+                finalizers,
+                byte_size: 0,
+            }
+        }
+    }
+
+    impl EncodedLength for Request {
+        fn encoded_length(&self) -> usize {
+            22
+        }
+    }
+
     #[tokio::test]
     async fn batch_sink_acking_sequential() {
-        let (acker, ack_counter) = Acker::basic();
+        let ack_counter = Counter::default();
 
         let svc = tower::service_fn(|_| future::ok::<_, std::io::Error>(()));
         let mut batch_settings = BatchSettings::default();
         batch_settings.size.bytes = 9999;
         batch_settings.size.events = 10;
 
-        let buffered = BatchSink::new(svc, VecBuffer::new(batch_settings.size), TIMEOUT, acker);
+        let buffered = BatchSink::new(svc, VecBuffer::new(batch_settings.size), TIMEOUT);
 
         buffered
             .sink_map_err(drop)
-            .send_all(&mut stream::iter(0..22).map(|item| Ok(EncodedEvent::new(item, 0))))
+            .send_all(
+                &mut stream::iter(1..=22).map(|item| Ok(Request::encoded(item, &ack_counter))),
+            )
             .await
             .unwrap();
 
-        assert_eq!(ack_counter.load(Relaxed), 22);
+        assert_eq!(ack_counter.load(Relaxed), 22 * 23 / 2);
     }
 
     #[tokio::test]
     async fn batch_sink_acking_unordered() {
+        let ack_counter = Counter::default();
+
         trace_init();
 
         // Services future will be spawned and work between `yield_now` calls.
-        let (acker, ack_counter) = Acker::basic();
-
-        let svc = tower::service_fn(|req: Vec<usize>| async move {
-            let duration = match req[0] {
-                0 => Duration::from_secs(1),
-                1 => Duration::from_secs(1),
-                2 => Duration::from_secs(1),
+        let svc = tower::service_fn(|req: Vec<Request>| async move {
+            let duration = match req[0].0 {
+                1 | 2 | 3 => Duration::from_secs(1),
 
                 // The 4th request will introduce some sort of
                 // latency spike to ensure later events don't
                 // get acked.
-                3 => Duration::from_secs(5),
-                4 => Duration::from_secs(1),
-                5 => Duration::from_secs(1),
+                4 => Duration::from_secs(5),
+                5 | 6 => Duration::from_secs(1),
                 _ => unreachable!(),
             };
 
@@ -658,33 +667,19 @@ mod tests {
         batch_settings.size.bytes = 9999;
         batch_settings.size.events = 1;
 
-        let mut sink = BatchSink::new(svc, VecBuffer::new(batch_settings.size), TIMEOUT, acker);
+        let mut sink = BatchSink::new(svc, VecBuffer::new(batch_settings.size), TIMEOUT);
 
         let mut cx = Context::from_waker(noop_waker_ref());
-        assert!(matches!(
-            sink.poll_ready_unpin(&mut cx),
-            Poll::Ready(Ok(()))
-        ));
-        assert!(matches!(
-            sink.start_send_unpin(EncodedEvent::new(0, 0)),
-            Ok(())
-        ));
-        assert!(matches!(
-            sink.poll_ready_unpin(&mut cx),
-            Poll::Ready(Ok(()))
-        ));
-        assert!(matches!(
-            sink.start_send_unpin(EncodedEvent::new(1, 0)),
-            Ok(())
-        ));
-        assert!(matches!(
-            sink.poll_ready_unpin(&mut cx),
-            Poll::Ready(Ok(()))
-        ));
-        assert!(matches!(
-            sink.start_send_unpin(EncodedEvent::new(2, 0)),
-            Ok(())
-        ));
+        for item in 1..=3 {
+            assert!(matches!(
+                sink.poll_ready_unpin(&mut cx),
+                Poll::Ready(Ok(()))
+            ));
+            assert!(matches!(
+                sink.start_send_unpin(Request::encoded(item, &ack_counter)),
+                Ok(())
+            ));
+        }
 
         // Clear internal buffer
         assert!(matches!(sink.poll_flush_unpin(&mut cx), Poll::Pending));
@@ -694,49 +689,30 @@ mod tests {
         advance_time(Duration::from_secs(3)).await;
         yield_now().await;
 
-        assert!(matches!(
-            sink.poll_flush_unpin(&mut cx),
-            Poll::Ready(Ok(()))
-        ));
-        assert!(matches!(
-            sink.poll_flush_unpin(&mut cx),
-            Poll::Ready(Ok(()))
-        ));
-        assert!(matches!(
-            sink.poll_flush_unpin(&mut cx),
-            Poll::Ready(Ok(()))
-        ));
+        for _ in 1..=3 {
+            assert!(matches!(
+                sink.poll_flush_unpin(&mut cx),
+                Poll::Ready(Ok(()))
+            ));
+        }
 
-        assert_eq!(ack_counter.load(Relaxed), 3);
+        // Events 1,2,3 should have been acked at this point.
+        assert_eq!(ack_counter.load(Relaxed), 6);
 
-        assert!(matches!(
-            sink.poll_ready_unpin(&mut cx),
-            Poll::Ready(Ok(()))
-        ));
-        assert!(matches!(
-            sink.start_send_unpin(EncodedEvent::new(3, 0)),
-            Ok(())
-        ));
-        assert!(matches!(
-            sink.poll_ready_unpin(&mut cx),
-            Poll::Ready(Ok(()))
-        ));
-        assert!(matches!(
-            sink.start_send_unpin(EncodedEvent::new(4, 0)),
-            Ok(())
-        ));
-        assert!(matches!(
-            sink.poll_ready_unpin(&mut cx),
-            Poll::Ready(Ok(()))
-        ));
-        assert!(matches!(
-            sink.start_send_unpin(EncodedEvent::new(5, 0)),
-            Ok(())
-        ));
+        for item in 4..=6 {
+            assert!(matches!(
+                sink.poll_ready_unpin(&mut cx),
+                Poll::Ready(Ok(()))
+            ));
+            assert!(matches!(
+                sink.start_send_unpin(Request::encoded(item, &ack_counter)),
+                Ok(())
+            ));
+        }
 
         // Clear internal buffer
         assert!(matches!(sink.poll_flush_unpin(&mut cx), Poll::Pending));
-        assert_eq!(ack_counter.load(Relaxed), 3);
+        assert_eq!(ack_counter.load(Relaxed), 6);
 
         yield_now().await;
         advance_time(Duration::from_secs(2)).await;
@@ -744,33 +720,25 @@ mod tests {
 
         assert!(matches!(sink.poll_flush_unpin(&mut cx), Poll::Pending));
 
-        // Check that events 3,4,5 have not been acked yet
-        // only the three previous should be acked.
-        assert_eq!(ack_counter.load(Relaxed), 3);
+        // Check that events 1-3,5,6 have been acked
+        assert_eq!(ack_counter.load(Relaxed), 17);
 
         yield_now().await;
         advance_time(Duration::from_secs(5)).await;
         yield_now().await;
 
-        assert!(matches!(
-            sink.poll_flush_unpin(&mut cx),
-            Poll::Ready(Ok(()))
-        ));
-        assert!(matches!(
-            sink.poll_flush_unpin(&mut cx),
-            Poll::Ready(Ok(()))
-        ));
-        assert!(matches!(
-            sink.poll_flush_unpin(&mut cx),
-            Poll::Ready(Ok(()))
-        ));
+        for _ in 4..=6 {
+            assert!(matches!(
+                sink.poll_flush_unpin(&mut cx),
+                Poll::Ready(Ok(()))
+            ));
+        }
 
-        assert_eq!(ack_counter.load(Relaxed), 6);
+        assert_eq!(ack_counter.load(Relaxed), 21);
     }
 
     #[tokio::test]
     async fn batch_sink_buffers_messages_until_limit() {
-        let (acker, _) = Acker::basic();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
@@ -784,7 +752,7 @@ mod tests {
         let mut batch_settings = BatchSettings::default();
         batch_settings.size.bytes = 9999;
         batch_settings.size.events = 10;
-        let buffered = BatchSink::new(svc, VecBuffer::new(batch_settings.size), TIMEOUT, acker);
+        let buffered = BatchSink::new(svc, VecBuffer::new(batch_settings.size), TIMEOUT);
 
         buffered
             .sink_map_err(drop)
@@ -805,7 +773,6 @@ mod tests {
 
     #[tokio::test]
     async fn batch_sink_flushes_below_min_on_close() {
-        let (acker, _) = Acker::basic();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
@@ -817,7 +784,7 @@ mod tests {
         let mut batch_settings = BatchSettings::default();
         batch_settings.size.bytes = 9999;
         batch_settings.size.events = 10;
-        let mut buffered = BatchSink::new(svc, VecBuffer::new(batch_settings.size), TIMEOUT, acker);
+        let mut buffered = BatchSink::new(svc, VecBuffer::new(batch_settings.size), TIMEOUT);
 
         let mut cx = Context::from_waker(noop_waker_ref());
         assert!(matches!(
@@ -845,7 +812,6 @@ mod tests {
 
     #[tokio::test]
     async fn batch_sink_expired_linger() {
-        let (acker, _) = Acker::basic();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
@@ -857,7 +823,7 @@ mod tests {
         let mut batch_settings = BatchSettings::default();
         batch_settings.size.bytes = 9999;
         batch_settings.size.events = 10;
-        let mut buffered = BatchSink::new(svc, VecBuffer::new(batch_settings.size), TIMEOUT, acker);
+        let mut buffered = BatchSink::new(svc, VecBuffer::new(batch_settings.size), TIMEOUT);
 
         let mut cx = Context::from_waker(noop_waker_ref());
         assert!(matches!(
@@ -892,7 +858,6 @@ mod tests {
 
     #[tokio::test]
     async fn partition_batch_sink_buffers_messages_until_limit() {
-        let (acker, _) = Acker::basic();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
@@ -905,8 +870,7 @@ mod tests {
         batch_settings.size.bytes = 9999;
         batch_settings.size.events = 10;
 
-        let sink =
-            PartitionBatchSink::new(svc, VecBuffer::new(batch_settings.size), TIMEOUT, acker);
+        let sink = PartitionBatchSink::new(svc, VecBuffer::new(batch_settings.size), TIMEOUT);
 
         sink.sink_map_err(drop)
             .send_all(&mut stream::iter(0..22).map(|item| Ok(EncodedEvent::new(item, 0))))
@@ -926,7 +890,6 @@ mod tests {
 
     #[tokio::test]
     async fn partition_batch_sink_buffers_by_partition_buffer_size_one() {
-        let (acker, _) = Acker::basic();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
@@ -939,8 +902,7 @@ mod tests {
         batch_settings.size.bytes = 9999;
         batch_settings.size.events = 1;
 
-        let sink =
-            PartitionBatchSink::new(svc, VecBuffer::new(batch_settings.size), TIMEOUT, acker);
+        let sink = PartitionBatchSink::new(svc, VecBuffer::new(batch_settings.size), TIMEOUT);
 
         let input = vec![Partitions::A, Partitions::B];
         sink.sink_map_err(drop)
@@ -955,7 +917,6 @@ mod tests {
 
     #[tokio::test]
     async fn partition_batch_sink_buffers_by_partition_buffer_size_two() {
-        let (acker, _) = Acker::basic();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
@@ -968,8 +929,7 @@ mod tests {
         batch_settings.size.bytes = 9999;
         batch_settings.size.events = 2;
 
-        let sink =
-            PartitionBatchSink::new(svc, VecBuffer::new(batch_settings.size), TIMEOUT, acker);
+        let sink = PartitionBatchSink::new(svc, VecBuffer::new(batch_settings.size), TIMEOUT);
 
         let input = vec![Partitions::A, Partitions::B, Partitions::A, Partitions::B];
         sink.sink_map_err(drop)
@@ -990,7 +950,6 @@ mod tests {
 
     #[tokio::test]
     async fn partition_batch_sink_submits_after_linger() {
-        let (acker, _) = Acker::basic();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
@@ -1003,8 +962,7 @@ mod tests {
         batch_settings.size.bytes = 9999;
         batch_settings.size.events = 10;
 
-        let mut sink =
-            PartitionBatchSink::new(svc, VecBuffer::new(batch_settings.size), TIMEOUT, acker);
+        let mut sink = PartitionBatchSink::new(svc, VecBuffer::new(batch_settings.size), TIMEOUT);
 
         let mut cx = Context::from_waker(noop_waker_ref());
         assert!(matches!(
@@ -1030,30 +988,34 @@ mod tests {
 
     #[tokio::test]
     async fn service_sink_doesnt_propagate_error() {
+        let ack_counter = Counter::default();
+
         // We need a mock executor here because we need to ensure
         // that we poll the service futures within the mock clock
         // context. This allows us to manually advance the time on the
         // "spawned" futures.
-        let (acker, ack_counter) = Acker::basic();
-
-        let svc = tower::service_fn(|req: u8| {
-            if req == 3 {
+        let svc = tower::service_fn(|req: Request| {
+            if req.0 == 3 {
                 future::err("bad")
             } else {
                 future::ok("good")
             }
         });
-        let mut sink = ServiceSink::new(svc, acker);
-        let req = |items: u8| EncodedBatch {
-            items,
-            finalizers: Default::default(),
-            count: items as usize,
-            byte_size: 1,
+        let mut sink = ServiceSink::new(svc);
+        let req = |items: usize| {
+            let mut req = Request::new(items, &ack_counter);
+            let finalizers = std::mem::take(&mut req.1);
+            EncodedBatch {
+                items: req,
+                finalizers,
+                count: items,
+                byte_size: 1,
+            }
         };
 
         // send some initial requests
-        let mut fut1 = sink.call(req(1), 1);
-        let mut fut2 = sink.call(req(2), 2);
+        let mut fut1 = sink.call(req(1));
+        let mut fut2 = sink.call(req(2));
 
         assert_eq!(ack_counter.load(Relaxed), 0);
 
@@ -1062,23 +1024,24 @@ mod tests {
         assert!(matches!(fut2.poll_unpin(&mut cx), Poll::Ready(())));
         assert!(matches!(sink.poll_complete(&mut cx), Poll::Ready(())));
 
+        yield_now().await;
         assert_eq!(ack_counter.load(Relaxed), 3);
 
         // send one request that will error and one normal
-        let mut fut3 = sink.call(req(3), 3); // I will error
-        let mut fut4 = sink.call(req(4), 4);
+        let mut fut3 = sink.call(req(3)); // I will error
+        let mut fut4 = sink.call(req(4));
 
         // make sure they all "worked"
         assert!(matches!(fut3.poll_unpin(&mut cx), Poll::Ready(())));
         assert!(matches!(fut4.poll_unpin(&mut cx), Poll::Ready(())));
         assert!(matches!(sink.poll_complete(&mut cx), Poll::Ready(())));
 
-        assert_eq!(ack_counter.load(Relaxed), 10);
+        yield_now().await;
+        assert_eq!(ack_counter.load(Relaxed), 7);
     }
 
     #[tokio::test]
     async fn partition_batch_sink_ordering_per_partition() {
-        let (acker, _) = Acker::basic();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let mut delay = true;
@@ -1103,8 +1066,7 @@ mod tests {
         batch_settings.size.bytes = 9999;
         batch_settings.size.events = 10;
 
-        let mut sink =
-            PartitionBatchSink::new(svc, VecBuffer::new(batch_settings.size), TIMEOUT, acker);
+        let mut sink = PartitionBatchSink::new(svc, VecBuffer::new(batch_settings.size), TIMEOUT);
         sink.ordered();
 
         let input = (0..20)
@@ -1150,24 +1112,6 @@ mod tests {
     }
 
     impl Partition<Bytes> for usize {
-        fn partition(&self) -> Bytes {
-            "key".into()
-        }
-    }
-
-    impl Partition<Bytes> for u8 {
-        fn partition(&self) -> Bytes {
-            "key".into()
-        }
-    }
-
-    impl Partition<Bytes> for i32 {
-        fn partition(&self) -> Bytes {
-            "key".into()
-        }
-    }
-
-    impl Partition<Bytes> for Vec<i32> {
         fn partition(&self) -> Bytes {
             "key".into()
         }
