@@ -15,8 +15,8 @@ use http::StatusCode;
 use hyper::{body, Body};
 use indexmap::IndexMap;
 use pin_project::pin_project;
-use serde::{Deserialize, Serialize};
 use tower::Service;
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use super::{
@@ -512,12 +512,14 @@ where
     }
 }
 
-/// A helper config struct
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
-#[serde(deny_unknown_fields)]
+/// Outbound HTTP request settings.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
 pub struct RequestConfig {
     #[serde(flatten)]
     pub tower: TowerRequestConfig,
+
+    /// Additional HTTP headers to add to every HTTP request.
     #[serde(default)]
     pub headers: IndexMap<String, String>,
 }

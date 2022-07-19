@@ -1,9 +1,7 @@
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
-use syn::{
-    parse_macro_input, DeriveInput, ExprPath, GenericParam, Ident, Lifetime, LifetimeDef, Type,
-};
+use syn::{parse_macro_input, parse_quote, DeriveInput, ExprPath, Ident, Type};
 use vector_config_common::{attributes::CustomAttribute, validation::Validation};
 
 use crate::ast::{Container, Data, Field, Style, Tagging, Variant};
@@ -23,26 +21,25 @@ pub fn derive_configurable_impl(input: TokenStream) -> TokenStream {
         }
     };
 
-    // We build the "impl" generics separately from the "type" generics, because the lifetime for
-    // `Configurable` only matters to `impl`, not to the type that `Configurable` is being
-    // implemented on, and we can't add it after calling `split_for_impl`.
-    //
-    // Essentially, we want to see this:
-    //
-    //    impl<'conf, ['a, 'b, ...]> Configurable<'conf> for Struct<['a, 'b, ...]>
-    //
-    // but if we added `'conf` to `generics` first, we would actually end up with the following:
-    //
-    //     impl<'conf, ['a, 'b, ...]> Configurable<'conf> for Struct<'conf, ['a, 'b, ...]>
-    //
-    // which isn't right because `'conf` is not actually a part of `Struct`.
-    let mut modified_generics = container.generics().clone();
-    let (clt, clt_def) = get_configurable_lifetime();
-    modified_generics
-        .params
-        .push(GenericParam::Lifetime(clt_def));
-    let (impl_generics, _, _) = modified_generics.split_for_impl();
-    let (_, ty_generics, where_clause) = container.generics().split_for_impl();
+    let mut generics = container.generics().clone();
+
+    // We need to construct an updated where clause that properly constrains any generic types which are used as fields
+    // on the container. We _only_ care about fields that are pure generic types, because anything that's a concrete
+    // type -- Foo<T> -- will be checked when the schema is generated, but we want generic types to be able to be
+    // resolved for compatibility at the point of usage, not the point of definition.
+    let generic_field_types = container.generic_field_types();
+    if !generic_field_types.is_empty() {
+        let where_clause = generics.make_where_clause();
+        for typ in generic_field_types {
+            let ty = &typ.ident;
+            let predicate =
+                parse_quote! { #ty: ::vector_config::Configurable + ::serde::Serialize };
+
+            where_clause.predicates.push(predicate);
+        }
+    }
+
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
     // Now we can go ahead and actually generate the method bodies for our `Configurable` impl,
     // which are varied based on whether we have a struct or enum container.
@@ -63,7 +60,7 @@ pub fn derive_configurable_impl(input: TokenStream) -> TokenStream {
         const _: () = {
             #[automatically_derived]
             #[allow(unused_qualifications)]
-            impl #impl_generics ::vector_config::Configurable<#clt> for #name #ty_generics #where_clause {
+            impl #impl_generics ::vector_config::Configurable for #name #ty_generics #where_clause {
                 fn referencable_name() -> Option<&'static str> {
                     Some(std::concat!(std::module_path!(), "::", #ref_name))
                 }
@@ -78,13 +75,11 @@ pub fn derive_configurable_impl(input: TokenStream) -> TokenStream {
 }
 
 fn build_metadata_fn(container: &Container<'_>) -> proc_macro2::TokenStream {
-    let (clt, _) = get_configurable_lifetime();
-
     let meta_ident = Ident::new("metadata", Span::call_site());
     let container_metadata = generate_container_metadata(&meta_ident, container);
 
     quote! {
-        fn metadata() -> ::vector_config::Metadata<#clt, Self> {
+        fn metadata() -> ::vector_config::Metadata<Self> {
             #container_metadata
             #meta_ident
         }
@@ -92,24 +87,20 @@ fn build_metadata_fn(container: &Container<'_>) -> proc_macro2::TokenStream {
 }
 
 fn build_virtual_newtype_schema_fn(virtual_ty: Type) -> proc_macro2::TokenStream {
-    let (clt, _) = get_configurable_lifetime();
-
     quote! {
-        fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator, overrides: ::vector_config::Metadata<#clt, Self>) -> ::vector_config::schemars::schema::SchemaObject {
+        fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator, overrides: ::vector_config::Metadata<Self>) -> ::vector_config::schemars::schema::SchemaObject {
             // Virtual newtypes always shuttle their schema's metadata/overridden metadata when generating the schema
             // for the wrapped type, otherwise we wouldn't be able to effectively document them. This does mean we end
             // up dropping any default value for _this_ schema's metadata, including overridden metadata, so the wrapped
             // type must have a default value for itself if having a default value is required.
             let overrides = Self::metadata().merge(overrides).convert();
 
-            <#virtual_ty as ::vector_config::Configurable<#clt>>::generate_schema(schema_gen, overrides)
+            <#virtual_ty as ::vector_config::Configurable>::generate_schema(schema_gen, overrides)
         }
     }
 }
 
 fn build_enum_generate_schema_fn(variants: &[Variant<'_>]) -> proc_macro2::TokenStream {
-    let (clt, _) = get_configurable_lifetime();
-
     let mapped_variants = variants
         .iter()
         // Don't map this variant if it's marked to be skipped for both serialization and deserialization.
@@ -117,7 +108,7 @@ fn build_enum_generate_schema_fn(variants: &[Variant<'_>]) -> proc_macro2::Token
         .map(generate_enum_variant_schema);
 
     quote! {
-        fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator, overrides: ::vector_config::Metadata<#clt, Self>) -> ::vector_config::schemars::schema::SchemaObject {
+        fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator, overrides: ::vector_config::Metadata<Self>) -> ::vector_config::schemars::schema::SchemaObject {
             let mut subschemas = ::std::vec::Vec::new();
 
             let schema_metadata = Self::metadata().merge(overrides);
@@ -229,8 +220,6 @@ fn build_named_struct_generate_schema_fn(
     container: &Container<'_>,
     fields: &[Field<'_>],
 ) -> proc_macro2::TokenStream {
-    let (clt, _) = get_configurable_lifetime();
-
     let mapped_fields = fields
         .iter()
         // Don't map this field if it's marked to be skipped for both serialization and deserialization.
@@ -238,7 +227,7 @@ fn build_named_struct_generate_schema_fn(
         .map(|field| generate_named_struct_field(container, field));
 
     quote! {
-        fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator, overrides: ::vector_config::Metadata<#clt, Self>) -> ::vector_config::schemars::schema::SchemaObject {
+        fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator, overrides: ::vector_config::Metadata<Self>) -> ::vector_config::schemars::schema::SchemaObject {
             let mut properties = ::vector_config::indexmap::IndexMap::new();
             let mut required = ::std::collections::BTreeSet::new();
             let mut flattened_subschemas = ::std::vec::Vec::new();
@@ -266,8 +255,6 @@ fn build_named_struct_generate_schema_fn(
 }
 
 fn build_tuple_struct_generate_schema_fn(fields: &[Field<'_>]) -> proc_macro2::TokenStream {
-    let (clt, _) = get_configurable_lifetime();
-
     let mapped_fields = fields
         .iter()
         // Don't map this field if it's marked to be skipped for both serialization and deserialization.
@@ -275,7 +262,7 @@ fn build_tuple_struct_generate_schema_fn(fields: &[Field<'_>]) -> proc_macro2::T
         .map(generate_tuple_struct_field);
 
     quote! {
-        fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator, overrides: ::vector_config::Metadata<#clt, Self>) -> ::vector_config::schemars::schema::SchemaObject {
+        fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator, overrides: ::vector_config::Metadata<Self>) -> ::vector_config::schemars::schema::SchemaObject {
             let mut subschemas = ::std::collections::Vec::new();
 
             let metadata = Self::metadata().merge(overrides);
@@ -290,8 +277,6 @@ fn build_tuple_struct_generate_schema_fn(fields: &[Field<'_>]) -> proc_macro2::T
 }
 
 fn build_newtype_struct_generate_schema_fn(fields: &[Field<'_>]) -> proc_macro2::TokenStream {
-    let (clt, _) = get_configurable_lifetime();
-
     // Map the fields normally, but we should end up with a single field at the end.
     let mut mapped_fields = fields
         .iter()
@@ -307,7 +292,7 @@ fn build_newtype_struct_generate_schema_fn(fields: &[Field<'_>]) -> proc_macro2:
     let field_schema = mapped_fields.remove(0);
 
     quote! {
-        fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator, overrides: ::vector_config::Metadata<#clt, Self>) -> ::vector_config::schemars::schema::SchemaObject {
+        fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator, overrides: ::vector_config::Metadata<Self>) -> ::vector_config::schemars::schema::SchemaObject {
             let metadata = Self::metadata().merge(overrides);
 
             #field_schema
@@ -383,19 +368,16 @@ fn generate_variant_metadata(
 }
 
 fn get_field_type_as_configurable(field: &Field<'_>) -> proc_macro2::TokenStream {
-    let (clt, _) = get_configurable_lifetime();
     let field_ty = field.ty();
-    quote! { <#field_ty as ::vector_config::Configurable<#clt>> }
+    quote! { <#field_ty as ::vector_config::Configurable> }
 }
 
 fn get_variant_type_as_configurable() -> proc_macro2::TokenStream {
-    let (clt, _) = get_configurable_lifetime();
-
     // We hardcode this to a unit tuple because we don't have access to the actual type of the variant's enum container,
     // at least not without parsing it specifically as a type token from an amalgamated version of the enum ident... but
     // it doesn't actually matter because enums don't support default values, which is the only spot in `Metadata<T>`
     // where the `T` gets used, so we can carry all the other pertinent details with `()`... it's still a littlw wonky, though.
-    quote! { <() as ::vector_config::Configurable<#clt>> }
+    quote! { <() as ::vector_config::Configurable> }
 }
 
 fn get_metadata_title(
@@ -838,11 +820,4 @@ fn generate_enum_variant_subschema(
             subschemas.push(subschema);
         }
     }
-}
-
-fn get_configurable_lifetime() -> (Lifetime, LifetimeDef) {
-    let lifetime = Lifetime::new("'configurable", Span::call_site());
-    let lifetime_def = LifetimeDef::new(lifetime.clone());
-
-    (lifetime, lifetime_def)
 }

@@ -182,7 +182,7 @@ serde-toml-merge = { version = "0.3.0", default-features = false }
 serde_bytes = { version = "0.11.6", default-features = false, features = ["std"], optional = true }
 serde_json = { version = "1.0.82", default-features = false, features = ["raw_value"] }
 serde_with = { version = "1.14.0", default-features = false, features = ["macros"], optional = true }
-serde_yaml = { version = "0.8.25", default-features = false }
+serde_yaml = { version = "0.8.26", default-features = false }
 
 # Messagepack
 rmp-serde = { version = "1.1.0", default-features = false, optional = true }
@@ -197,8 +197,8 @@ goauth = { version = "0.13.0", optional = true }
 smpl_jwt = { version = "0.7.1", default-features = false, optional = true }
 
 # API
-async-graphql = { version = "4.0.4", default-features = false, optional = true, features = ["chrono"] }
-async-graphql-warp = { version = "4.0.4", default-features = false, optional = true }
+async-graphql = { version = "4.0.5", default-features = false, optional = true, features = ["chrono"] }
+async-graphql-warp = { version = "4.0.5", default-features = false, optional = true }
 itertools = { version = "0.10.3", default-features = false, optional = true }
 
 # API client
@@ -221,7 +221,7 @@ vrl-stdlib = { path = "lib/vrl/stdlib" }
 arc-swap = { version = "1.5", default-features = false, optional = true }
 async-compression = { version = "0.3.12", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
 avro-rs = { version = "0.13.0", default-features = false, optional = true }
-axum = { version = "0.5.12", default-features = false }
+axum = { version = "0.5.13", default-features = false }
 base64 = { version = "0.13.0", default-features = false, optional = true }
 bloom = { version = "0.3.2", default-features = false, optional = true }
 bollard = { version = "0.13.0", default-features = false, features = ["ssl"] }
@@ -234,7 +234,7 @@ colored = { version = "2.0.0", default-features = false }
 csv = { version = "1.1", default-features = false, optional = true }
 derivative = { version = "2.2.0", default-features = false }
 dirs-next = { version = "2.0.0", default-features = false, optional = true }
-dyn-clone = { version = "1.0.6", default-features = false }
+dyn-clone = { version = "1.0.8", default-features = false }
 encoding_rs = { version = "0.8.31", default-features = false, features = ["serde"] }
 exitcode = { version = "1.1.2", default-features = false }
 flate2 = { version = "1.0.24", default-features = false, features = ["default"] }
@@ -317,7 +317,7 @@ security-framework = "2.6.1"
 
 [target.'cfg(unix)'.dependencies]
 atty = { version = "0.2.14", default-features = false }
-nix = { version = "0.24.1", default-features = false, features = ["socket", "signal"] }
+nix = { version = "0.24.2", default-features = false, features = ["socket", "signal"] }
 
 [build-dependencies]
 prost-build = { version = "0.10.4", default-features = false, optional = true }
@@ -427,6 +427,8 @@ protobuf-build = ["dep:tonic-build", "dep:prost-build"]
 
 gcp = ["dep:base64", "dep:goauth", "dep:smpl_jwt"]
 
+opentelemetry = ["dep:hex", "dep:tonic", "protobuf-build"]
+
 # Enrichment Tables
 enrichment-tables = ["enrichment-tables-file","enrichment-tables-geoip"]
 enrichment-tables-file = [ "dep:csv", "dep:seahash", "dep:hash_hasher" ]
@@ -453,6 +455,7 @@ sources-logs = [
   "sources-kubernetes_logs",
   "sources-logstash",
   "sources-nats",
+  "sources-opentelemetry",
   "sources-redis",
   "sources-socket",
   "sources-splunk_hec",
@@ -500,6 +503,7 @@ sources-logstash = ["listenfd", "tokio-util/net", "sources-utils-tcp-keepalive",
 sources-mongodb_metrics = ["dep:mongodb"]
 sources-nats = ["dep:nats", "dep:nkeys"]
 sources-nginx_metrics = ["dep:nom"]
+sources-opentelemetry = ["sources-vector", "opentelemetry"]
 sources-postgresql_metrics = ["dep:postgres-openssl", "dep:tokio-postgres"]
 sources-prometheus = ["dep:prometheus-parser", "sinks-prometheus", "sources-http", "sources-utils-http"]
 sources-redis= ["dep:redis"]

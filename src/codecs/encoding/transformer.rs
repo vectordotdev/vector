@@ -6,28 +6,52 @@ use lookup::{
     lookup_v2::{parse_path, OwnedPath},
     path,
 };
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer};
 use value::Value;
+use vector_config::configurable_component;
 use vector_core::event::{LogEvent, MaybeAsLogMut};
 
 use crate::{event::Event, serde::skip_serializing_if_default};
 
 /// Transformations to prepare an event for serialization.
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
-pub struct Transformer(TransformerInner);
+#[configurable_component(no_deser)]
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Transformer {
+    /// List of fields that will be included in the encoded event.
+    #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
+    only_fields: Option<Vec<OwnedPath>>,
+
+    /// List of fields that will be excluded from the encoded event.
+    #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
+    except_fields: Option<Vec<String>>,
+
+    /// Format used for timestamp fields.
+    #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
+    timestamp_format: Option<TimestampFormat>,
+}
 
 impl<'de> Deserialize<'de> for Transformer {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        let transformer: TransformerInner = Deserialize::deserialize(deserializer)?;
-        Self::validate_fields(
-            transformer.only_fields.as_deref(),
-            transformer.except_fields.as_deref(),
+        #[derive(Deserialize)]
+        struct TransformerInner {
+            #[serde(default)]
+            only_fields: Option<Vec<OwnedPath>>,
+            #[serde(default)]
+            except_fields: Option<Vec<String>>,
+            #[serde(default)]
+            timestamp_format: Option<TimestampFormat>,
+        }
+
+        let inner: TransformerInner = Deserialize::deserialize(deserializer)?;
+        Self::new(
+            inner.only_fields,
+            inner.except_fields,
+            inner.timestamp_format,
         )
-        .map_err(serde::de::Error::custom)?;
-        Ok(Self(transformer))
+        .map_err(serde::de::Error::custom)
     }
 }
 
@@ -41,38 +65,36 @@ impl Transformer {
         except_fields: Option<Vec<String>>,
         timestamp_format: Option<TimestampFormat>,
     ) -> Result<Self, crate::Error> {
-        let inner = TransformerInner {
+        Self::validate_fields(only_fields.as_ref(), except_fields.as_ref())?;
+
+        Ok(Self {
             only_fields,
             except_fields,
             timestamp_format,
-        };
-
-        Self::validate_fields(inner.only_fields.as_deref(), inner.except_fields.as_deref())?;
-
-        Ok(Self(inner))
+        })
     }
 
     /// Get the `Transformer`'s `only_fields`.
     pub const fn only_fields(&self) -> &Option<Vec<OwnedPath>> {
-        &self.0.only_fields
+        &self.only_fields
     }
 
     /// Get the `Transformer`'s `except_fields`.
     pub const fn except_fields(&self) -> &Option<Vec<String>> {
-        &self.0.except_fields
+        &self.except_fields
     }
 
     /// Get the `Transformer`'s `timestamp_format`.
     pub const fn timestamp_format(&self) -> &Option<TimestampFormat> {
-        &self.0.timestamp_format
+        &self.timestamp_format
     }
 
     /// Check if `except_fields` and `only_fields` items are mutually exclusive.
     ///
     /// If an error is returned, the entire encoding configuration should be considered inoperable.
     fn validate_fields(
-        only_fields: Option<&[OwnedPath]>,
-        except_fields: Option<&[String]>,
+        only_fields: Option<&Vec<OwnedPath>>,
+        except_fields: Option<&Vec<String>>,
     ) -> crate::Result<()> {
         if let (Some(only_fields), Some(except_fields)) = (only_fields, except_fields) {
             if except_fields.iter().any(|f| {
@@ -99,7 +121,7 @@ impl Transformer {
     }
 
     fn apply_only_fields(&self, log: &mut LogEvent) {
-        if let Some(only_fields) = &self.0.only_fields {
+        if let Some(only_fields) = self.only_fields.as_ref() {
             let mut to_remove = match log.keys() {
                 Some(keys) => keys
                     .filter(|field| {
@@ -124,7 +146,7 @@ impl Transformer {
     }
 
     fn apply_except_fields(&self, log: &mut LogEvent) {
-        if let Some(except_fields) = &self.0.except_fields {
+        if let Some(except_fields) = self.except_fields.as_ref() {
             for field in except_fields {
                 log.remove(field.as_str());
             }
@@ -132,7 +154,7 @@ impl Transformer {
     }
 
     fn apply_timestamp_format(&self, log: &mut LogEvent) {
-        if let Some(timestamp_format) = &self.0.timestamp_format {
+        if let Some(timestamp_format) = self.timestamp_format.as_ref() {
             match timestamp_format {
                 TimestampFormat::Unix => {
                     if log.value().is_object() {
@@ -168,45 +190,22 @@ impl Transformer {
     /// Returns `Err` if the new `except_fields` fail validation, i.e. are not mutually exclusive
     /// with `only_fields`.
     pub fn set_except_fields(&mut self, except_fields: Option<Vec<String>>) -> crate::Result<()> {
-        let transformer = TransformerInner {
-            only_fields: self.0.only_fields.clone(),
-            except_fields,
-            timestamp_format: self.0.timestamp_format,
-        };
+        Self::validate_fields(self.only_fields.as_ref(), except_fields.as_ref())?;
 
-        Self::validate_fields(
-            transformer.only_fields.as_deref(),
-            transformer.except_fields.as_deref(),
-        )?;
-
-        self.0 = transformer;
+        self.except_fields = except_fields;
 
         Ok(())
     }
 }
 
-impl From<TransformerInner> for Transformer {
-    fn from(inner: TransformerInner) -> Self {
-        Self(inner)
-    }
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Deserialize, Serialize)]
-struct TransformerInner {
-    #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
-    only_fields: Option<Vec<OwnedPath>>,
-    #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
-    except_fields: Option<Vec<String>>,
-    #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
-    timestamp_format: Option<TimestampFormat>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq)]
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
 /// The format in which a timestamp should be represented.
 pub enum TimestampFormat {
     /// Represent the timestamp as a Unix timestamp.
     Unix,
+
     /// Represent the timestamp as a RFC 3339 timestamp.
     Rfc3339,
 }

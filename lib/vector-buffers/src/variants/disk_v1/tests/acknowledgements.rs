@@ -5,10 +5,13 @@ use super::{create_default_buffer_v1, read_next};
 use crate::{
     assert_reader_v1_delete_position, assert_reader_writer_v1_positions,
     test::{
-        acknowledge, install_tracing_helpers, with_temp_dir, MultiEventRecord,
+        acknowledge, acknowledge_error, install_tracing_helpers, with_temp_dir, MultiEventRecord,
         PoisonPillMultiEventRecord, SizedRecord,
     },
-    variants::disk_v1::{reader::FLUSH_INTERVAL, tests::drive_reader_to_flush},
+    variants::disk_v1::{
+        reader::{ReaderError, FLUSH_INTERVAL},
+        tests::drive_reader_to_flush,
+    },
     EventCount,
 };
 
@@ -246,4 +249,46 @@ async fn acking_when_undecodable_records_present() {
 
         tokio::time::resume();
     }
+}
+
+#[tokio::test]
+async fn negative_acknowledgement_stops_reader() {
+    let _a = install_tracing_helpers();
+    with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            // Create a regular buffer, no customizations required.
+            let (mut writer, mut reader) = create_default_buffer_v1(data_dir);
+            assert_reader_writer_v1_positions!(reader, writer, 0, 0);
+
+            // Write in some records to read back
+            for _ in 1..5 {
+                let record = SizedRecord::new(360);
+                assert_eq!(record.event_count(), 1); // Math below depends on this
+                writer.send(SizedRecord::new(360)).await;
+            }
+            writer.flush();
+            tokio::time::pause();
+
+            // Read out the first one and acknowledge it, checking the delete offset.
+            let read_record = read_next(&mut reader).await;
+            assert_reader_v1_delete_position!(reader, 0);
+            acknowledge(read_record).await;
+            tokio::time::advance(FLUSH_INTERVAL).await;
+            // assert_reader_v1_delete_position!(reader, 1); // advancement happens after next read
+
+            // Read out the second one and nack it, this should *not* advance the delete offset.
+            let read_record = read_next(&mut reader).await;
+            assert_reader_v1_delete_position!(reader, 1);
+            acknowledge_error(read_record).await;
+            tokio::time::advance(FLUSH_INTERVAL).await;
+            assert_reader_v1_delete_position!(reader, 1);
+
+            assert_eq!(reader.next().await, Err(ReaderError::Stopped));
+            tokio::time::advance(FLUSH_INTERVAL).await;
+            assert_reader_v1_delete_position!(reader, 1);
+        }
+    })
+    .await;
 }
