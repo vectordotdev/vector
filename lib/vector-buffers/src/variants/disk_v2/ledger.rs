@@ -510,7 +510,7 @@ where
     ///
     /// If there is an error while flushing the ledger to disk, an error variant will be returned
     /// describing the error.
-    pub(super) fn flush(&self) -> io::Result<()> {
+    pub fn flush(&self) -> io::Result<()> {
         self.state.get_backing_ref().flush()
     }
 

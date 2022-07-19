@@ -60,6 +60,10 @@ pub(crate) async fn cmd(opts: &Opts) -> exitcode::ExitCode {
                         .take_finalizers()
                         .update_status(EventStatus::Delivered);
                     info!(message = "Marked record as delivered.", ?record_id);
+                    if let Err(error) = ledger.flush() {
+                        error!(message = "Could not flush the ledger.", ?error);
+                        return exitcode::IOERR;
+                    }
                 } else {
                     warn!(
                         message = "Record ID does not match last reader record ID.",
