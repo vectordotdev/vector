@@ -17,13 +17,13 @@ pub struct Definition {
     /// The type of the event
     event_kind: Kind,
 
-    /// The type of the metadata
+    /// The type of the metadata.
     metadata_kind: Kind,
 
     /// Semantic meaning assigned to fields within the collection.
     ///
     /// The value within this map points to a path inside the `event_kind`.
-    /// Meanings current can't point to metadata
+    /// Meanings currently can't point to metadata.
     meaning: BTreeMap<String, MeaningPointer>,
 
     /// Type definitions of components can change depending on the log namespace chosen.
