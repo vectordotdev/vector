@@ -92,6 +92,10 @@ pub struct Histogram {
 }
 
 impl Histogram {
+    const MIN_BUCKET: f64 = 0.015_625; // (-6_f64).exp2() is not const yet
+    const MIN_BUCKET_EXP: isize = -6;
+    const BUCKETS: usize = 20;
+
     pub(crate) fn new() -> Self {
         // Box to avoid having this large array inline to the structure, blowing
         // out cache coherence.
@@ -100,27 +104,28 @@ impl Histogram {
         // suitable for different distributions but since our present use case
         // is mostly non-negative and measures smallish latencies we cluster
         // around but never quite get to zero with an increasingly coarse
-        // long-tail.
+        // long-tail. This also lets us find the right bucket to record into using simple
+        // constant-time math operations instead of a loop-and-compare construct.
         let buckets = Box::new([
-            (0.015_625, AtomicU32::new(0)),
-            (0.03125, AtomicU32::new(0)),
-            (0.0625, AtomicU32::new(0)),
-            (0.125, AtomicU32::new(0)),
-            (0.25, AtomicU32::new(0)),
-            (0.5, AtomicU32::new(0)),
-            (1.0, AtomicU32::new(0)),
-            (2.0, AtomicU32::new(0)),
-            (4.0, AtomicU32::new(0)),
-            (8.0, AtomicU32::new(0)),
-            (16.0, AtomicU32::new(0)),
-            (32.0, AtomicU32::new(0)),
-            (64.0, AtomicU32::new(0)),
-            (128.0, AtomicU32::new(0)),
-            (256.0, AtomicU32::new(0)),
-            (512.0, AtomicU32::new(0)),
-            (1024.0, AtomicU32::new(0)),
-            (2048.0, AtomicU32::new(0)),
-            (4096.0, AtomicU32::new(0)),
+            ((-6_f64).exp2(), AtomicU32::new(0)),
+            ((-5_f64).exp2(), AtomicU32::new(0)),
+            ((-4_f64).exp2(), AtomicU32::new(0)),
+            ((-3_f64).exp2(), AtomicU32::new(0)),
+            ((-2_f64).exp2(), AtomicU32::new(0)),
+            ((-1_f64).exp2(), AtomicU32::new(0)),
+            (0_f64.exp2(), AtomicU32::new(0)),
+            (1_f64.exp2(), AtomicU32::new(0)),
+            (2_f64.exp2(), AtomicU32::new(0)),
+            (3_f64.exp2(), AtomicU32::new(0)),
+            (4_f64.exp2(), AtomicU32::new(0)),
+            (5_f64.exp2(), AtomicU32::new(0)),
+            (6_f64.exp2(), AtomicU32::new(0)),
+            (7_f64.exp2(), AtomicU32::new(0)),
+            (8_f64.exp2(), AtomicU32::new(0)),
+            (9_f64.exp2(), AtomicU32::new(0)),
+            (10_f64.exp2(), AtomicU32::new(0)),
+            (11_f64.exp2(), AtomicU32::new(0)),
+            (12_f64.exp2(), AtomicU32::new(0)),
             (f64::INFINITY, AtomicU32::new(0)),
         ]);
         Self {
@@ -131,13 +136,12 @@ impl Histogram {
     }
 
     pub(crate) fn record(&self, value: f64) {
-        for (bound, bucket) in self.buckets.iter() {
-            if value <= *bound {
-                bucket.fetch_add(1, Ordering::Relaxed);
-                break;
-            }
-        }
-
+        // The buckets are all powers of two, so calculate the ceiling of the log_2 of the value,
+        // and offset and limit it appropriately.
+        let bucket = ((value.max(Self::MIN_BUCKET).log2().ceil()) as isize - Self::MIN_BUCKET_EXP)
+            .max(0)
+            .min(Self::BUCKETS as isize - 1) as usize;
+        self.buckets[bucket].1.fetch_add(1, Ordering::Relaxed);
         self.count.fetch_add(1, Ordering::Relaxed);
         let _ = self
             .sum
@@ -233,6 +237,8 @@ impl Gauge {
 
 #[cfg(test)]
 mod test {
+    use std::sync::atomic::Ordering;
+
     use quickcheck::{QuickCheck, TestResult};
 
     use crate::metrics::handle::{Counter, Histogram};
@@ -281,6 +287,32 @@ mod test {
             .tests(1_000)
             .max_tests(2_000)
             .quickcheck(inner as fn(Vec<f64>) -> TestResult);
+    }
+
+    #[test]
+    fn historgram_uses_right_buckets() {
+        // Record some arbitrary values to ensure it puts them in the right buckets.
+
+        let sut = Histogram::new();
+        assert!(sut.buckets().all(|(_, count)| count == 0));
+
+        sut.record(0.0);
+        assert_eq!(sut.buckets[0].1.load(Ordering::Relaxed), 1);
+
+        sut.record(0.1);
+        assert_eq!(sut.buckets[3].1.load(Ordering::Relaxed), 1);
+
+        sut.record(1.0);
+        assert_eq!(sut.buckets[6].1.load(Ordering::Relaxed), 1);
+
+        sut.record(10.0);
+        assert_eq!(sut.buckets[10].1.load(Ordering::Relaxed), 1);
+
+        sut.record(8.00000001);
+        assert_eq!(sut.buckets[10].1.load(Ordering::Relaxed), 2);
+
+        sut.record(9999.0);
+        assert_eq!(sut.buckets[19].1.load(Ordering::Relaxed), 1);
     }
 
     #[test]
