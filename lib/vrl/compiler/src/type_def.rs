@@ -70,6 +70,7 @@ impl TypeDef {
         &mut self.kind
     }
 
+    #[must_use]
     pub fn at_path(&self, path: &LookupBuf) -> TypeDef {
         let fallible = self.fallible;
 

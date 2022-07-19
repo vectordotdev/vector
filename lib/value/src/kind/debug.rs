@@ -65,6 +65,8 @@ fn insert_kind(tree: &mut BTreeMap<String, Value>, kind: &Kind, show_unknown: bo
     }
 }
 
+// clippy complains with "needless_borrow" if you try to fix this
+#[allow(clippy::needless_pass_by_value)]
 fn insert_unknown(
     tree: &mut BTreeMap<String, Value>,
     unknown: Kind,

@@ -8,7 +8,7 @@ use super::{Collection, Kind};
 impl Kind {
     /// Merge `other` into `self`, using the provided `Strategy`.
     pub fn merge(&mut self, other: Self, strategy: Strategy) {
-        self.merge_keep(other, strategy.collisions.is_shallow())
+        self.merge_keep(other, strategy.collisions.is_shallow());
     }
 
     fn merge_primitives(&mut self, other: &Self) {
@@ -31,7 +31,8 @@ impl Kind {
     }
 
     /// Returns the union of self and other.
-    #[must_use] pub fn union(&self, other: Self) -> Self {
+    #[must_use]
+    pub fn union(&self, other: Self) -> Self {
         let mut kind = self.clone();
         kind.merge_keep(other, false);
         kind

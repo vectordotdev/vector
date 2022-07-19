@@ -12,6 +12,8 @@ impl Kind {
     ///
     /// If you want the type _without_ the implicit type conversion,
     /// use `Kind::at_path` instead.
+    #[must_use]
+    #[allow(clippy::needless_pass_by_value)] // only references are implemented for `Path`
     pub fn get<'a>(&self, path: impl Path<'a>) -> Self {
         self.at_path(path).upgrade_undefined()
     }
@@ -19,12 +21,14 @@ impl Kind {
     /// This retrieves the `Kind` at a given path. There is a subtle difference
     /// between this and `Kind::get` where this function does _not_ convert undefined to null.
     /// It is viewing the type of a value in-place, before it is retrieved.
+    #[must_use]
+    #[allow(clippy::needless_pass_by_value)] // only references are implemented for `Path`
     pub fn at_path<'a>(&self, path: impl Path<'a>) -> Self {
         self.get_recursive(path.segment_iter())
     }
 
-    fn get_field<'a>(&self, field: Cow<'a, str>) -> Self {
-        if let Some(object) = self.as_object() {
+    fn get_field(&self, field: Cow<'_, str>) -> Self {
+        self.as_object().map_or_else(Self::undefined, |object| {
             let mut kind = object
                 .known()
                 .get(&field.into_owned().into())
@@ -35,9 +39,7 @@ impl Kind {
                 kind = kind.or_undefined();
             }
             kind
-        } else {
-            Self::undefined()
-        }
+        })
     }
 
     fn get_recursive<'a>(
@@ -86,16 +88,16 @@ impl Kind {
                                 }
                             }
                             return kind.get_recursive(iter);
+                        }
+
+                        // there are no unknown indices, so we can determine the exact positive index
+                        let exact_len = largest_known_index.map_or(0, |x| x + 1);
+                        if exact_len >= len_required {
+                            // make the index positive, then continue below
+                            index += exact_len as isize;
                         } else {
-                            // there are no unknown indices, so we can determine the exact positive index
-                            let exact_len = largest_known_index.map_or(0, |x| x + 1);
-                            if exact_len >= len_required {
-                                // make the index positive, then continue below
-                                index += exact_len as isize;
-                            } else {
-                                // out of bounds index
-                                return Self::undefined();
-                            }
+                            // out of bounds index
+                            return Self::undefined();
                         }
                     }
 
@@ -124,9 +126,9 @@ impl Kind {
                     .clone()
                     .skip_while(|segment| matches!(segment, BorrowedSegment::CoalesceField(_)))
                     // skip the CoalesceEnd, which always exists after CoalesceFields
-                    .skip(1)
-                    // need to collect to prevent infinite recursive iterator type
-                    .collect::<Vec<_>>();
+                    .skip(1);
+                // need to collect to prevent infinite recursive iterator type
+                // .collect::<Vec<_>>();
 
                 // This is the resulting type, assuming the match succeeded.
                 let match_type = field_kind
@@ -465,7 +467,6 @@ mod tests {
                 },
             ),
         ] {
-            println!("========== {} ==========", title);
             assert_eq!(kind.at_path(&path), want, "test: {}", title);
         }
     }

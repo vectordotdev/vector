@@ -515,11 +515,6 @@ mod tests {
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
 
             assert_eq!(got, expected);
-
-            if got_typedef != expected_typedef {
-                println!("Got: {:?}", got_typedef.debug_info());
-                println!("Expected: {:?}", expected_typedef.debug_info());
-            }
             assert_eq!(got_typedef, expected_typedef);
         }
     }

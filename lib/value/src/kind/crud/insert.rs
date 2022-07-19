@@ -12,7 +12,7 @@ impl Kind {
     /// This has the same behavior as `Value::insert`.
     #[allow(clippy::needless_pass_by_value)] // only reference types implement Path
     pub fn insert<'a>(&'a mut self, path: impl Path<'a>, kind: Self) {
-        self.insert_recursive(path.segment_iter(), kind.upgrade_undefined())
+        self.insert_recursive(path.segment_iter(), kind.upgrade_undefined());
     }
 
     /// Insert the `Kind` at the given `path` within `self`.
@@ -53,10 +53,6 @@ impl Kind {
                             let min_length = collection.min_length();
 
                             if len_required > min_length {
-                                println!("largest known index: {:?}", largest_known_index);
-                                println!("min length: {:?}", min_length);
-                                println!("len required: {:?}", len_required);
-
                                 // We can't prove the array is large enough, so "holes" may be created
                                 // which set the value to null.
                                 // Holes are inserted to the front, which shifts everything to the right.
@@ -66,12 +62,6 @@ impl Kind {
                                 // The number of possible shifts is 0 ..= max_shifts.
                                 // Each shift will be calculated independently and merged into the collection.
                                 // A shift of 0 is the original collection, so that is skipped
-                                println!(
-                                    "Shift count {} = {:?}",
-                                    0,
-                                    Self::array(collection.clone()).debug_info()
-                                );
-
                                 let zero_shifts = collection.clone();
                                 for shift_count in 1..=max_shifts {
                                     let mut shifted_collection = zero_shifts.clone();
@@ -97,12 +87,6 @@ impl Kind {
                                             .insert(*i + shift_count, i_kind.clone());
                                     }
 
-                                    println!(
-                                        "Shift count {} = {:?}",
-                                        shift_count,
-                                        Self::array(shifted_collection.clone()).debug_info()
-                                    );
-
                                     // add this shift count as another possible type definition
                                     collection.merge(shifted_collection, false);
                                 }
@@ -121,7 +105,7 @@ impl Kind {
                                 collection
                                     .known_mut()
                                     .entry(i.into())
-                                    .or_insert(unknown_kind.clone())
+                                    .or_insert_with(|| unknown_kind.clone())
                                     // These indices are guaranteed to exist, so they can't be undefined
                                     .remove_undefined();
                             }
@@ -202,9 +186,9 @@ impl Kind {
                         .clone()
                         .skip_while(|segment| matches!(segment, BorrowedSegment::CoalesceField(_)))
                         // skip the CoalesceEnd, which always exists after CoalesceFields
-                        .skip(1)
-                        // need to collect to prevent infinite recursive iterator type
-                        .collect::<Vec<_>>();
+                        .skip(1);
+                    // need to collect to prevent infinite recursive iterator type
+                    // .collect::<Vec<_>>();
 
                     // This is the resulting type, assuming the match succeeded.
                     let mut match_type = self.clone();
