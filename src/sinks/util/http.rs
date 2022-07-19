@@ -57,6 +57,8 @@ pub trait HttpSink: Send + Sync + 'static {
 /// to be able to send it to the inner batch type and sink. Because of
 /// this we must provide a single buffer slot. To ensure the buffer is
 /// fully flushed make sure `poll_flush` returns ready.
+///
+/// Note: This has been deprecated, please do not use when creating new Sinks.
 #[pin_project]
 pub struct BatchedHttpSink<T, B, RL = HttpRetryLogic>
 where
@@ -194,6 +196,7 @@ where
     }
 }
 
+/// Note: This has been deprecated, please do not use when creating new Sinks.
 #[pin_project]
 pub struct PartitionHttpSink<T, B, K, RL = HttpRetryLogic>
 where
