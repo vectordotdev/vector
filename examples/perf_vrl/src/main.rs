@@ -59,6 +59,7 @@ fn main() {
     stdin.read_line(&mut runtime).unwrap();
 
     let mut targets = Vec::new();
+    let duration;
 
     match runtime.as_str().trim() {
         "ast" => {
@@ -94,13 +95,11 @@ fn main() {
                 run_vrl();
             }
 
-            println!("target: {:?}", targets[0]);
-            println!("result: {:?}", resolved_values[0]);
+            duration = std::time::Instant::now().duration_since(start);
 
-            println!(
-                "Duration: {:?}",
-                std::time::Instant::now().duration_since(start)
-            )
+            print!("Press enter to end.");
+            stdout.flush().unwrap();
+            stdin.read_line(&mut String::new()).unwrap();
         }
         "ast_batched" => {
             let mut run_vrl_batched = || {
@@ -148,14 +147,21 @@ fn main() {
                 run_vrl_batched();
             }
 
-            println!("target: {:?}", targets[0]);
-            println!("result: {:?}", resolved_values[0]);
+            duration = std::time::Instant::now().duration_since(start);
 
-            println!(
-                "Duration: {:?}",
-                std::time::Instant::now().duration_since(start)
-            )
+            print!("Press enter to end.");
+            stdout.flush().unwrap();
+            stdin.read_line(&mut String::new()).unwrap();
         }
         runtime => panic!("Invalid runtime {runtime}"),
     };
+
+    println!("program: {}", source);
+    println!("target: {:?}", targets[0]);
+    println!("num_iterations_warmup: {}", num_iterations_warmup);
+    println!("num_iterations: {}", num_iterations);
+    println!("batch_size: {}", batch_size);
+    println!("runtime: {}", runtime);
+    println!("result: {:?}", resolved_values[0]);
+    println!("duration: {:?}", duration);
 }

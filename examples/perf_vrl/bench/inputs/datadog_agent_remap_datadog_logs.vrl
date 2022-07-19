@@ -1,0 +1,4 @@
+pyld, err = parse_json(.message)
+if err == null {
+    .message = pyld.mineral
+}
