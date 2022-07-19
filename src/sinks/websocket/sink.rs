@@ -38,6 +38,7 @@ use crate::{
     codecs::{Encoder, Transformer},
     dns, emit,
     event::{Event, EventStatus, Finalizable},
+    http::Auth,
     internal_events::{
         ConnectionOpen, OpenGauge, WsConnectionError, WsConnectionEstablished,
         WsConnectionFailedError, WsConnectionShutdown,
@@ -66,10 +67,11 @@ pub struct WebSocketConnector {
     host: String,
     port: u16,
     tls: MaybeTlsSettings,
+    auth: Option<Auth>,
 }
 
 impl WebSocketConnector {
-    pub fn new(uri: String, tls: MaybeTlsSettings) -> Result<Self, WebSocketError> {
+    pub fn new(uri: String, tls: MaybeTlsSettings, auth: Option<Auth>) -> Result<Self, WebSocketError> {
         let request = (&uri).into_client_request().context(CreateFailedSnafu)?;
         let (host, port) = Self::extract_host_and_port(&request).context(CreateFailedSnafu)?;
 
@@ -78,6 +80,7 @@ impl WebSocketConnector {
             host,
             port,
             tls,
+            auth,
         })
     }
 
@@ -118,9 +121,14 @@ impl WebSocketConnector {
     }
 
     async fn connect(&self) -> Result<WsStream<MaybeTlsStream<TcpStream>>, WebSocketError> {
-        let request = (&self.uri)
+        let mut request = (&self.uri)
             .into_client_request()
             .context(CreateFailedSnafu)?;
+
+        if let Some(auth) = &self.auth {
+            auth.apply(&mut request);
+        }
+
         let maybe_tls = self.tls_connect().await?;
 
         let ws_config = WebSocketConfig {
@@ -398,6 +406,7 @@ mod tests {
             ping_interval: None,
             ping_timeout: None,
             acknowledgements: Default::default(),
+            auth: None,
         };
         let tls = MaybeTlsSettings::Raw(());
 
@@ -427,6 +436,7 @@ mod tests {
             ping_timeout: None,
             ping_interval: None,
             acknowledgements: Default::default(),
+            auth: Some(Auth::Bearer{token: "OiJIUzI1NiIsInR5cCI6IkpXVCJ".to_string()}),
         };
 
         send_events_and_assert(addr, config, tls).await;
@@ -444,6 +454,7 @@ mod tests {
             ping_interval: None,
             ping_timeout: None,
             acknowledgements: Default::default(),
+            auth: None
         };
         let tls = MaybeTlsSettings::Raw(());
 

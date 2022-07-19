@@ -5,6 +5,7 @@ use snafu::ResultExt;
 use crate::{
     codecs::EncodingConfig,
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
+    http::Auth,
     sinks::{
         websocket::sink::{ConnectSnafu, WebSocketConnector, WebSocketError, WebSocketSink},
         Healthcheck, VectorSink,
@@ -25,6 +26,7 @@ pub struct WebSocketSinkConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+    pub auth: Option<Auth>,
 }
 
 impl GenerateConfig for WebSocketSinkConfig {
@@ -36,6 +38,7 @@ impl GenerateConfig for WebSocketSinkConfig {
             ping_interval: None,
             ping_timeout: None,
             acknowledgements: Default::default(),
+            auth: None,
         })
         .unwrap()
     }
@@ -70,7 +73,7 @@ impl SinkConfig for WebSocketSinkConfig {
 impl WebSocketSinkConfig {
     fn build_connector(&self) -> Result<WebSocketConnector, WebSocketError> {
         let tls = MaybeTlsSettings::from_config(&self.tls, false).context(ConnectSnafu)?;
-        WebSocketConnector::new(self.uri.clone(), tls)
+        WebSocketConnector::new(self.uri.clone(), tls, self.auth.clone())
     }
 }
 
