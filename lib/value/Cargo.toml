@@ -17,7 +17,7 @@ snafu = { version = "0.7.1", default-features = false }
 tracing = { version = "0.1.34", default-features = false, features = ["attributes"] }
 
 # Optional
-async-graphql = { version = "4.0.4", default-features = false, optional = true }
+async-graphql = { version = "4.0.5", default-features = false, optional = true }
 mlua = { version = "0.8.1", default-features = false, features = ["lua54", "send", "vendored"], optional = true}
 serde = { version = "1.0.139", default-features = false, features = ["derive", "rc"], optional = true }
 serde_json = { version = "1.0.82", optional = true }
@@ -32,7 +32,7 @@ test = []
 arbitrary = ["dep:quickcheck"]
 
 [dev-dependencies]
-async-graphql = { version = "4.0.4", default-features = false }
+async-graphql = { version = "4.0.5", default-features = false }
 indoc = { version = "1.0.6", default-features = false }
 quickcheck = "1.0.3"
 lookup = { path = "../lookup", default-features = false, features = ["arbitrary"] }

@@ -94,9 +94,7 @@ impl HttpRequestBuilder {
         builder = builder.header("Content-Type", "application/x-ndjson");
 
         if let Some(ce) = self.compression.content_encoding() {
-            builder = builder
-                .header("Content-Encoding", ce)
-                .header("Accept-Encoding", ce);
+            builder = builder.header("Content-Encoding", ce);
         }
 
         for (header, value) in &self.http_request_config.headers {
