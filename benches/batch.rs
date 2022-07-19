@@ -106,6 +106,7 @@ criterion_group!(
     targets = benchmark_batch
 );
 
+/// Note: This has been deprecated, please do not use when creating new Sinks.
 pub struct PartitionedBuffer {
     inner: Buffer,
     key: Option<Bytes>,
