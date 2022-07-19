@@ -178,9 +178,9 @@ impl From<S3ServerSideEncryption> for ServerSideEncryption {
 
 /// S3 Canned ACLs.
 ///
-/// More information on each canned ACL and when they apply can be found in the [AWS documentation][aws_docs].
+/// For more information, see [Canned ACL][canned_acl].
 ///
-/// [aws_docs]: https://docs.aws.amazon.com/AmazonS3/latest/userguide/acl-overview.html#canned-acl
+/// [canned_acl]: https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#canned-acl
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Derivative)]
 #[derivative(Default)]
@@ -189,7 +189,9 @@ pub enum S3CannedAcl {
     /// Bucket/object are private.
     ///
     /// The bucket/object owner is granted the `FULL_CONTROL` permission, and no one else has
-    /// access. This is the default.
+    /// access.
+    ///
+    /// This is the default.
     #[derivative(Default)]
     Private,
 

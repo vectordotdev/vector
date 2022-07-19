@@ -3,6 +3,7 @@
 #![allow(dead_code)]
 #![allow(unreachable_pub)]
 use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub(crate) struct DatadogSeriesMetric {
@@ -30,10 +31,15 @@ pub(crate) enum DatadogMetricType {
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub(crate) struct DatadogPoint<T>(pub(crate) i64, pub(crate) T);
 
-#[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
+/// A Datadog region.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum Region {
+    /// US region.
     Us,
+
+    /// EU region.
     Eu,
 }
 
