@@ -228,7 +228,7 @@ where
         FS::File: Unpin,
     {
         let ledger = if must_exist {
-            Ledger::load(config, usage_handle, must_exist).await
+            Ledger::load(config, usage_handle).await
         } else {
             Ledger::load_or_create(config, usage_handle).await
         }

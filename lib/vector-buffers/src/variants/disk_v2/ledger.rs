@@ -568,10 +568,25 @@ where
             .await
             .context(IoSnafu)?;
 
-        Self::load(config, usage_handle, false).await
+        Self::load_inner(config, usage_handle, false).await
     }
 
-    pub async fn load(
+    /// Loads a ledger for the given [`DiskBufferConfig`].
+    ///
+    /// # Errors
+    ///
+    /// If the ledger does not exist, there is an error during either serialization of the new,
+    /// default ledger state, or deserializing existing data in the ledger file, or generally during
+    /// the underlying I/O operations, an error variant will be returned describing the error.
+    #[cfg_attr(test, instrument(skip_all, level = "trace"))]
+    pub(super) async fn load(
+        config: DiskBufferConfig<FS>,
+        usage_handle: BufferUsageHandle,
+    ) -> Result<Ledger<FS>, LedgerLoadCreateError> {
+        Self::load_inner(config, usage_handle, true).await
+    }
+
+    async fn load_inner(
         config: DiskBufferConfig<FS>,
         usage_handle: BufferUsageHandle,
         must_exist: bool,
