@@ -334,8 +334,9 @@ impl TowerRequestSettings {
                 _pd: std::marker::PhantomData,
             })
             // There are other mechanisms limiting the number of concurrent requests/poll_ready
-            // so we don't need to do that here, hence usize::MAX.
-            .layer(BufferLayer::new(usize::MAX))
+            // so we don't need to do that here, hence usize::MAX. But underlying library supports less
+            // so >>3 is used as per tokio semaphore documentation.
+            .layer(BufferLayer::new(usize::MAX >> 3))
             .service(Balance::new(Box::pin(services) as Pin<Box<_>>))
     }
 }
