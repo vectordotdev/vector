@@ -9,6 +9,7 @@ use serde_json::{json, map};
 use snafu::Snafu;
 
 use crate::{
+    codecs::Transformer,
     config::{log_schema, AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
@@ -16,7 +17,6 @@ use crate::{
     sinks::{
         gcs_common::config::healthcheck_response,
         util::{
-            encoding::Transformer,
             http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
             BatchConfig, BoxedRawValue, JsonArrayBuffer, RealtimeSizeBasedDefaultBatchSettings,
             TowerRequestConfig,
@@ -146,7 +146,6 @@ impl SinkConfig for StackdriverConfig {
             request,
             batch.timeout,
             client,
-            cx.acker(),
         )
         .sink_map_err(|error| error!(message = "Fatal gcp_stackdriver_logs sink error.", %error));
 

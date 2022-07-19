@@ -110,12 +110,13 @@ impl Encoder<Framer> {
                 "application/x-ndjson"
             }
             (
-                Serializer::Json(_) | Serializer::NativeJson(_),
+                Serializer::Gelf(_) | Serializer::Json(_) | Serializer::NativeJson(_),
                 Framer::CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' }),
             ) => "application/json",
             (Serializer::Native(_), _) => "application/octet-stream",
             (
                 Serializer::Avro(_)
+                | Serializer::Gelf(_)
                 | Serializer::Json(_)
                 | Serializer::Logfmt(_)
                 | Serializer::NativeJson(_)

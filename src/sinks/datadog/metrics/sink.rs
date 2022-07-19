@@ -8,7 +8,6 @@ use futures_util::{
 };
 use tower::Service;
 use vector_core::{
-    buffers::Acker,
     event::{Event, Metric, MetricValue},
     partition::Partitioner,
     sink::StreamSink,
@@ -20,7 +19,6 @@ use super::{
     request_builder::DatadogMetricsRequestBuilder, service::DatadogMetricsRequest,
 };
 use crate::{
-    config::SinkContext,
     internal_events::DatadogMetricsEncodingError,
     sinks::util::{
         buffer::metrics::sort::sort_for_compression,
@@ -56,7 +54,6 @@ impl Partitioner for DatadogMetricsTypePartitioner {
 
 pub(crate) struct DatadogMetricsSink<S> {
     service: S,
-    acker: Acker,
     request_builder: DatadogMetricsRequestBuilder,
     batch_settings: BatcherSettings,
 }
@@ -69,15 +66,13 @@ where
     S::Response: DriverResponse,
 {
     /// Creates a new `DatadogMetricsSink`.
-    pub fn new(
-        cx: SinkContext,
+    pub const fn new(
         service: S,
         request_builder: DatadogMetricsRequestBuilder,
         batch_settings: BatcherSettings,
     ) -> Self {
         DatadogMetricsSink {
             service,
-            acker: cx.acker(),
             request_builder,
             batch_settings,
         }
@@ -128,8 +123,8 @@ where
                 }
             })
             // Finally, we generate the driver which will take our requests, send them off, and appropriately handle
-            // finalization of the events, acking for buffers, and logging/metrics, as the requests are responded to.
-            .into_driver(self.service, self.acker);
+            // finalization of the events, and logging/metrics, as the requests are responded to.
+            .into_driver(self.service);
 
         sink.run().await
     }

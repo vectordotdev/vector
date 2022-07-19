@@ -915,7 +915,7 @@ mod tests {
                 [sinks.out]
                   type = "console"
                   inputs = ["in"]
-                  encoding = "json"
+                  encoding.codec = "json"
             "#},
             Format::Toml,
         )
@@ -948,7 +948,7 @@ mod tests {
                 [sinks.out]
                   type = "console"
                   inputs = ["in"]
-                  encoding = "json"
+                  encoding.codec = "json"
             "#},
             Format::Toml,
         )
@@ -980,7 +980,7 @@ mod tests {
                 [sinks.out]
                   type = "console"
                   inputs = ["in"]
-                  encoding = "json"
+                  encoding.codec = "json"
             "#},
             Format::Toml,
         )
@@ -1147,18 +1147,18 @@ mod acknowledgements_tests {
                 [sinks.out1]
                     type = "file"
                     inputs = ["in1"]
-                    encoding = "text"
+                    encoding.codec = "text"
                     path = "/path/to/out1"
                 [sinks.out2]
                     type = "file"
                     inputs = ["in2"]
-                    encoding = "text"
+                    encoding.codec = "text"
                     path = "/path/to/out2"
                     acknowledgements = true
                 [sinks.out3]
                     type = "file"
                     inputs = ["parse3"]
-                    encoding = "text"
+                    encoding.codec = "text"
                     path = "/path/to/out3"
                     acknowledgements.enabled = true
             "#},
@@ -1316,7 +1316,7 @@ mod resource_tests {
                 [sinks.out]
                   type = "console"
                   inputs = ["in0","in1"]
-                  encoding = "json"
+                  encoding.codec = "json"
             "#},
             Format::Toml,
         )
@@ -1363,7 +1363,7 @@ mod pipelines_tests {
                 [sinks.out]
                   type = "console"
                   inputs = ["processing"]
-                  encoding = "json"
+                  encoding.codec = "json"
             "#},
             Format::Toml,
         );

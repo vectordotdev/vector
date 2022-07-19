@@ -73,7 +73,7 @@ impl DatadogEventsConfig {
         Ok(healthcheck(client, validate_endpoint, self.default_api_key.clone()).boxed())
     }
 
-    fn build_sink(&self, client: HttpClient, cx: SinkContext) -> crate::Result<VectorSink> {
+    fn build_sink(&self, client: HttpClient) -> crate::Result<VectorSink> {
         let service = DatadogEventsService::new(
             self.get_api_events_endpoint(),
             self.default_api_key.clone(),
@@ -88,10 +88,7 @@ impl DatadogEventsConfig {
             .settings(request_settings, retry_logic)
             .service(service);
 
-        let sink = DatadogEventsSink {
-            service,
-            acker: cx.acker(),
-        };
+        let sink = DatadogEventsSink { service };
 
         Ok(VectorSink::from_event_streamsink(sink))
     }
@@ -103,7 +100,7 @@ impl SinkConfig for DatadogEventsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.build_client(cx.proxy())?;
         let healthcheck = self.build_healthcheck(client.clone())?;
-        let sink = self.build_sink(client, cx)?;
+        let sink = self.build_sink(client)?;
 
         Ok((sink, healthcheck))
     }

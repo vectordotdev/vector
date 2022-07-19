@@ -10,7 +10,7 @@ use super::record::Record;
 
 /// Input action for the model/system under test.
 ///
-/// These actions map directly to methods that can be called from the reader, writer, or acker.
+/// These actions map directly to methods that can be called from the reader or writer.
 ///
 /// One notable difference compared to the real types is that acknowledgements here are only
 /// allowed to acknowledge one read at a time.

@@ -228,6 +228,51 @@ async fn topology_reload_with_new_components() {
     .await;
 }
 
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn topology_readd_input() {
+    // TODO: Write a test source that emits only metrics, and a test sink that can bind a TCP listener, so we can
+    // replace `internal_metrics` and `prometheus_exporter` here. We additionally need to ensure the metrics subsystem
+    // is enabled to use `internal_metrics`, otherwise it throws an error when trying to build the component.
+    let _ = crate::metrics::init_test();
+
+    let address_0 = next_addr();
+
+    let mut old_config = Config::builder();
+    old_config.add_source("in1", internal_metrics_source());
+    old_config.add_source("in2", internal_metrics_source());
+    old_config.add_sink("out", &["in1", "in2"], prom_exporter_sink(address_0, 1));
+    let (mut topology, crash) = start_topology(old_config.build().unwrap(), false).await;
+
+    // remove in2
+    let mut new_config = Config::builder();
+    new_config.add_source("in1", internal_metrics_source());
+    new_config.add_source("in2", internal_metrics_source());
+    new_config.add_sink("out", &["in1"], prom_exporter_sink(address_0, 1));
+    assert!(topology
+        .reload_config_and_respawn(new_config.build().unwrap())
+        .await
+        .unwrap());
+
+    // re-add in2
+    let mut new_config = Config::builder();
+    new_config.add_source("in1", internal_metrics_source());
+    new_config.add_source("in2", internal_metrics_source());
+    new_config.add_sink("out", &["in1", "in2"], prom_exporter_sink(address_0, 1));
+    assert!(topology
+        .reload_config_and_respawn(new_config.build().unwrap())
+        .await
+        .unwrap());
+
+    sleep(Duration::from_secs(1)).await;
+    topology.stop().await;
+
+    // sink should not crash
+    assert!(UnboundedReceiverStream::new(crash)
+        .collect::<Vec<_>>()
+        .await
+        .is_empty());
+}
+
 async fn reload_sink_test(
     old_config: Config,
     new_config: Config,

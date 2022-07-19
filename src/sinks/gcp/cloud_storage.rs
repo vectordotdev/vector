@@ -2,10 +2,7 @@ use std::{collections::HashMap, convert::TryFrom, io};
 
 use bytes::Bytes;
 use chrono::Utc;
-use codecs::{
-    encoding::{Framer, Serializer},
-    CharacterDelimitedEncoder, LengthDelimitedEncoder, NewlineDelimitedEncoder,
-};
+use codecs::encoding::Framer;
 use http::header::{HeaderName, HeaderValue};
 use indoc::indoc;
 use serde::{Deserialize, Serialize};
@@ -16,7 +13,7 @@ use uuid::Uuid;
 use vector_core::event::{EventFinalizers, Finalizable};
 
 use crate::{
-    codecs::Encoder,
+    codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
     config::{
         AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
         SinkDescription,
@@ -35,10 +32,6 @@ use crate::{
         },
         util::{
             batch::BatchConfig,
-            encoding::{
-                EncodingConfig, EncodingConfigWithFramingAdapter, StandardEncodings,
-                StandardEncodingsWithFramingMigrator, Transformer,
-            },
             metadata::{RequestMetadata, RequestMetadataBuilder},
             partitioner::KeyPartitioner,
             request_builder::EncodeResult,
@@ -72,10 +65,7 @@ pub struct GcsSinkConfig {
     filename_append_uuid: Option<bool>,
     filename_extension: Option<String>,
     #[serde(flatten)]
-    encoding: EncodingConfigWithFramingAdapter<
-        EncodingConfig<StandardEncodings>,
-        StandardEncodingsWithFramingMigrator,
-    >,
+    encoding: EncodingConfigWithFraming,
     #[serde(default)]
     compression: Compression,
     #[serde(default)]
@@ -94,7 +84,7 @@ pub struct GcsSinkConfig {
 }
 
 #[cfg(test)]
-fn default_config(e: StandardEncodings) -> GcsSinkConfig {
+fn default_config(encoding: EncodingConfigWithFraming) -> GcsSinkConfig {
     GcsSinkConfig {
         bucket: Default::default(),
         acl: Default::default(),
@@ -104,7 +94,7 @@ fn default_config(e: StandardEncodings) -> GcsSinkConfig {
         filename_time_format: Default::default(),
         filename_append_uuid: Default::default(),
         filename_extension: Default::default(),
-        encoding: EncodingConfig::from(e).into(),
+        encoding,
         compression: Compression::gzip_default(),
         batch: Default::default(),
         request: Default::default(),
@@ -123,7 +113,8 @@ impl GenerateConfig for GcsSinkConfig {
         toml::from_str(indoc! {r#"
             bucket = "my-bucket"
             credentials_path = "/path/to/credentials.json"
-            encoding.codec = "ndjson"
+            framing.method = "newline_delimited"
+            encoding.codec = "json"
         "#})
         .unwrap()
     }
@@ -143,7 +134,7 @@ impl SinkConfig for GcsSinkConfig {
             base_url.clone(),
             auth.clone(),
         )?;
-        let sink = self.build_sink(client, base_url, auth, cx)?;
+        let sink = self.build_sink(client, base_url, auth)?;
 
         Ok((sink, healthcheck))
     }
@@ -167,7 +158,6 @@ impl GcsSinkConfig {
         client: HttpClient,
         base_url: String,
         auth: GcpAuthenticator,
-        cx: SinkContext,
     ) -> crate::Result<VectorSink> {
         let request = self.request.unwrap_with(&TowerRequestConfig {
             rate_limit_num: Some(1000),
@@ -184,7 +174,7 @@ impl GcsSinkConfig {
 
         let request_settings = RequestSettings::new(self)?;
 
-        let sink = GcsSink::new(cx, svc, request_settings, partitioner, batch_settings);
+        let sink = GcsSink::new(svc, request_settings, partitioner, batch_settings);
 
         Ok(VectorSink::from_event_streamsink(sink))
     }
@@ -280,21 +270,7 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
 impl RequestSettings {
     fn new(config: &GcsSinkConfig) -> crate::Result<Self> {
         let transformer = config.encoding.transformer();
-        let (framer, serializer) = config.encoding.encoding()?;
-        let framer = match (framer, &serializer) {
-            (Some(framer), _) => framer,
-            (None, Serializer::Json(_)) => CharacterDelimitedEncoder::new(b',').into(),
-            (None, Serializer::Avro(_) | Serializer::Native(_)) => {
-                LengthDelimitedEncoder::new().into()
-            }
-            (
-                None,
-                Serializer::Logfmt(_)
-                | Serializer::NativeJson(_)
-                | Serializer::RawMessage(_)
-                | Serializer::Text(_),
-            ) => NewlineDelimitedEncoder::new().into(),
-        };
+        let (framer, serializer) = config.encoding.build(SinkType::MessageBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
         let acl = config
             .acl
@@ -350,6 +326,8 @@ fn make_header((name, value): (&String, &String)) -> crate::Result<(HeaderName, 
 
 #[cfg(test)]
 mod tests {
+    use codecs::encoding::FramingConfig;
+    use codecs::{JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig};
     use futures_util::{future::ready, stream};
     use vector_core::partition::Partitioner;
 
@@ -376,14 +354,9 @@ mod tests {
         let client =
             HttpClient::new(tls, context.proxy()).expect("should not fail to create HTTP client");
 
-        let config = default_config(StandardEncodings::Json);
+        let config = default_config((None::<FramingConfig>, JsonSerializerConfig::new()).into());
         let sink = config
-            .build_sink(
-                client,
-                mock_endpoint.to_string(),
-                GcpAuthenticator::None,
-                context,
-            )
+            .build_sink(client, mock_endpoint.to_string(), GcpAuthenticator::None)
             .expect("failed to build sink");
 
         let event = Event::Log(LogEvent::from("simple message"));
@@ -400,7 +373,7 @@ mod tests {
 
         let sink_config = GcsSinkConfig {
             key_prefix: Some("key: {{ key }}".into()),
-            ..default_config(StandardEncodings::Text)
+            ..default_config((None::<FramingConfig>, TextSerializerConfig::new()).into())
         };
         let key = sink_config
             .key_partitioner()
@@ -422,7 +395,13 @@ mod tests {
             filename_extension: extension.map(Into::into),
             filename_append_uuid: Some(uuid),
             compression,
-            ..default_config(StandardEncodings::Ndjson)
+            ..default_config(
+                (
+                    Some(NewlineDelimitedEncoderConfig::new()),
+                    JsonSerializerConfig::new(),
+                )
+                    .into(),
+            )
         };
         let log = LogEvent::default().into();
         let key = sink_config
