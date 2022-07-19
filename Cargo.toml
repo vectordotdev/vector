@@ -268,6 +268,7 @@ nom = { version = "7.1.1", default-features = false, optional = true }
 notify = { version = "4.0.17", default-features = false }
 once_cell = { version = "1.12", default-features = false }
 openssl = { version = "0.10.40", default-features = false, features = ["vendored"] }
+openssl-src = { version = "111", default-features = false }
 openssl-probe = { version = "0.1.5", default-features = false }
 ordered-float = { version = "3.0.0", default-features = false }
 percent-encoding = { version = "2.1.0", default-features = false }
@@ -352,6 +353,8 @@ leveldb-sys = { git = "https://github.com/vectordotdev/leveldb-sys.git", branch 
 chrono = { git = "https://github.com/vectordotdev/chrono.git", branch = "no-default-time" }
 # Adds `Status::is_reset` test, remove after the next version is released.
 h2 = { git = "https://github.com/hyperium/h2.git", rev = "f6aa3be6719270cd7b4094ee1940751b5f4ec88e" }
+# Enables OpenSSL ENGINE support during cross compilation to musl
+openssl-src = { git = "https://github.com/vectordotdev/openssl-src-rs.git", branch  = "enable_engine" }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
