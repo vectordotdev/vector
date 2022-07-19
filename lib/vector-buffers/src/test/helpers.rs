@@ -100,8 +100,3 @@ pub(crate) async fn acknowledge(mut event: impl Finalizable) {
     // Finalizers are implicitly dropped here, sending the status update.
     tokio::task::yield_now().await;
 }
-
-pub(crate) async fn acknowledge_error(mut event: impl Finalizable) {
-    event.take_finalizers().update_status(EventStatus::Errored);
-    tokio::task::yield_now().await;
-}

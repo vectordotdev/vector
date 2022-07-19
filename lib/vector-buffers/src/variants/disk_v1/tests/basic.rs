@@ -45,7 +45,7 @@ async fn basic_read_write_loop() {
 
             let read_task = tokio::spawn(async move {
                 let mut items = Vec::new();
-                while let Ok(Some(mut record)) = reader.next().await {
+                while let Some(mut record) = reader.next().await {
                     acknowledge(record.take_finalizers()).await;
                     items.push(record);
                 }
@@ -65,7 +65,7 @@ async fn basic_read_write_loop() {
             drive_reader_to_flush(&mut reader).await;
 
             let reader_position = reader.read_offset;
-            let delete_position = &reader.delete_offset;
+            let delete_position = reader.delete_offset;
             assert_eq!(
                 expected_position, writer_position,
                 "expected writer offset of {}, got {}",
@@ -77,11 +77,9 @@ async fn basic_read_write_loop() {
                 expected_position, reader_position
             );
             assert_eq!(
-                expected_position,
-                delete_position.load(Ordering::Relaxed),
+                expected_position, delete_position,
                 "expected delete offset of {}, got {}",
-                expected_position,
-                delete_position.load(Ordering::Relaxed)
+                expected_position, delete_position
             );
         }
     })
@@ -121,7 +119,7 @@ async fn basic_read_write_loop_multievents() {
 
             let read_task = tokio::spawn(async move {
                 let mut items = Vec::new();
-                while let Ok(Some(mut record)) = reader.next().await {
+                while let Some(mut record) = reader.next().await {
                     acknowledge(record.take_finalizers()).await;
                     items.push(record);
                 }
@@ -141,7 +139,7 @@ async fn basic_read_write_loop_multievents() {
             drive_reader_to_flush(&mut reader).await;
 
             let reader_position = reader.read_offset;
-            let delete_position = &reader.delete_offset;
+            let delete_position = reader.delete_offset;
             assert_eq!(
                 expected_position, writer_position,
                 "expected writer offset of {}, got {}",
@@ -153,11 +151,9 @@ async fn basic_read_write_loop_multievents() {
                 expected_position, reader_position
             );
             assert_eq!(
-                expected_position,
-                delete_position.load(Ordering::Relaxed),
+                expected_position, delete_position,
                 "expected delete offset of {}, got {}",
-                expected_position,
-                delete_position.load(Ordering::Relaxed),
+                expected_position, delete_position
             );
         }
     })
@@ -310,11 +306,7 @@ async fn ensure_buffer_metrics_accurate_with_poisoned_multievents() {
                 let expected_event_count = counts[count_idx] as usize;
                 count_idx += 1;
 
-                let record = reader
-                    .next()
-                    .await
-                    .expect("read should not error")
-                    .expect("record should be present");
+                let record = reader.next().await.expect("record should be present");
                 let actual_event_count = record.event_count();
                 assert_eq!(expected_event_count, actual_event_count);
 
@@ -329,7 +321,7 @@ async fn ensure_buffer_metrics_accurate_with_poisoned_multievents() {
             tokio::time::advance(FLUSH_INTERVAL.saturating_add(Duration::from_millis(1))).await;
 
             let final_read = reader.next().now_or_never();
-            assert_eq!(final_read, None);
+            assert_eq!(None, final_read);
 
             // At this point, we've read all four valid records, and since the undecodable record
             // was deleted when the buffer was initialized on the second load, our buffer metrics
