@@ -31,7 +31,7 @@ impl Kind {
     }
 
     /// Returns the union of self and other.
-    pub fn union(&self, other: Self) -> Self {
+    #[must_use] pub fn union(&self, other: Self) -> Self {
         let mut kind = self.clone();
         kind.merge_keep(other, false);
         kind

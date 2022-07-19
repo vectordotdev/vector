@@ -12,18 +12,18 @@ impl Kind {
     ///
     /// If you want the type _without_ the implicit type conversion,
     /// use `Kind::at_path` instead.
-    pub fn get<'a>(&self, path: impl Path<'a>) -> Kind {
+    pub fn get<'a>(&self, path: impl Path<'a>) -> Self {
         self.at_path(path).upgrade_undefined()
     }
 
     /// This retrieves the `Kind` at a given path. There is a subtle difference
     /// between this and `Kind::get` where this function does _not_ convert undefined to null.
     /// It is viewing the type of a value in-place, before it is retrieved.
-    pub fn at_path<'a>(&self, path: impl Path<'a>) -> Kind {
+    pub fn at_path<'a>(&self, path: impl Path<'a>) -> Self {
         self.get_recursive(path.segment_iter())
     }
 
-    fn get_field<'a>(&self, field: Cow<'a, str>) -> Kind {
+    fn get_field<'a>(&self, field: Cow<'a, str>) -> Self {
         if let Some(object) = self.as_object() {
             let mut kind = object
                 .known()
@@ -36,21 +36,21 @@ impl Kind {
             }
             kind
         } else {
-            Kind::undefined()
+            Self::undefined()
         }
     }
 
     fn get_recursive<'a>(
         &self,
         mut iter: impl Iterator<Item = BorrowedSegment<'a>> + Clone,
-    ) -> Kind {
+    ) -> Self {
         if self.is_never() {
             // a terminating expression by definition can "never" resolve to a value
-            return Kind::never();
+            return Self::never();
         }
 
         match iter.next() {
-            Some(BorrowedSegment::Field(field)) | Some(BorrowedSegment::CoalesceEnd(field)) => {
+            Some(BorrowedSegment::Field(field) | BorrowedSegment::CoalesceEnd(field)) => {
                 self.get_field(field).get_recursive(iter)
             }
             Some(BorrowedSegment::Index(mut index)) => {
@@ -94,7 +94,7 @@ impl Kind {
                                 index += exact_len as isize;
                             } else {
                                 // out of bounds index
-                                return Kind::undefined();
+                                return Self::undefined();
                             }
                         }
                     }
@@ -113,7 +113,7 @@ impl Kind {
                     }
                     kind.get_recursive(iter)
                 } else {
-                    Kind::undefined()
+                    Self::undefined()
                 }
             }
             Some(BorrowedSegment::CoalesceField(field)) => {
@@ -145,7 +145,7 @@ impl Kind {
             }
             Some(BorrowedSegment::Invalid) => {
                 // Value::get returns `None` in this case, which means the value is not defined
-                Kind::undefined()
+                Self::undefined()
             }
             None => self.clone(),
         }

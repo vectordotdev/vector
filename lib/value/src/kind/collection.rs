@@ -107,7 +107,7 @@ impl<T: Ord + Clone> Collection<T> {
 
     /// Gets the type of "unknown" elements in the collection.
     /// The returned type will always have "undefined" included.
-    pub fn unknown_kind(&self) -> Kind {
+    #[must_use] pub fn unknown_kind(&self) -> Kind {
         self.unknown.to_kind()
     }
 
@@ -115,7 +115,7 @@ impl<T: Ord + Clone> Collection<T> {
     /// This can be used to determine when to stop recursing into an unknown kind.
     /// Once the unknown is infinite, this will return false and all unknowns after that
     /// will return the same kind.
-    pub fn is_unknown_exact(&self) -> bool {
+    #[must_use] pub fn is_unknown_exact(&self) -> bool {
         self.unknown.is_exact()
     }
 
@@ -253,7 +253,7 @@ impl<T: Ord + Clone> Collection<T> {
     /// Return the reduced `Kind` of the items within the collection.
     /// This only returns the type of _defined_ values in the collection. Accessing
     /// a non-existing value can return `undefined` which is not added to the type here.
-    pub fn reduced_kind(&self) -> Kind {
+    #[must_use] pub fn reduced_kind(&self) -> Kind {
         self.known
             .values()
             .cloned()

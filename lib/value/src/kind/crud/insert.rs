@@ -69,7 +69,7 @@ impl Kind {
                                 println!(
                                     "Shift count {} = {:?}",
                                     0,
-                                    Kind::array(collection.clone()).debug_info()
+                                    Self::array(collection.clone()).debug_info()
                                 );
 
                                 let zero_shifts = collection.clone();
@@ -100,7 +100,7 @@ impl Kind {
                                     println!(
                                         "Shift count {} = {:?}",
                                         shift_count,
-                                        Kind::array(shifted_collection.clone()).debug_info()
+                                        Self::array(shifted_collection.clone()).debug_info()
                                     );
 
                                     // add this shift count as another possible type definition
