@@ -639,6 +639,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(unix)]
     async fn conflicting_stdin_and_fd_resources() {
         let result = load(
             r#"
@@ -662,6 +663,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(unix)]
     async fn conflicting_fd_resources() {
         let result = load(
             r#"
@@ -686,6 +688,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(unix)]
     async fn no_conflict_fd_resources() {
         let result = load(
             r#"
