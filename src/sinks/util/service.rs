@@ -1,7 +1,6 @@
 use std::{hash::Hash, marker::PhantomData, pin::Pin, sync::Arc, time::Duration};
 
 use futures_util::{future::BoxFuture, stream::BoxStream, TryStream, TryStreamExt};
-use serde::{Deserialize, Serialize};
 use tower::{
     balance::p2c::Balance,
     buffer::{Buffer, BufferLayer},

@@ -351,7 +351,7 @@ impl SinkConfig for ElasticsearchConfig {
                 reactivate_delay,
             );
 
-            let sink = ElasticsearchSink::new(&common, self, cx.acker(), service)?;
+            let sink = ElasticsearchSink::new(&common, self, service)?;
             VectorSink::from_event_streamsink(sink)
         } else {
             // Single service
@@ -363,7 +363,7 @@ impl SinkConfig for ElasticsearchConfig {
                 .settings(request_limits, ElasticsearchRetryLogic)
                 .service(service);
 
-            let sink = ElasticsearchSink::new(&common, self, cx.acker(), service)?;
+            let sink = ElasticsearchSink::new(&common, self, service)?;
             VectorSink::from_event_streamsink(sink)
         };
 

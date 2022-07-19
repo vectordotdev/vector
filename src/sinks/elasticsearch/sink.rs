@@ -54,7 +54,6 @@ impl<S> ElasticsearchSink<S> {
     pub fn new(
         common: &ElasticsearchCommon,
         config: &ElasticsearchConfig,
-        acker: Acker,
         service: S,
     ) -> crate::Result<Self> {
         let batch_settings = config.batch.into_batcher_settings()?;
@@ -64,7 +63,6 @@ impl<S> ElasticsearchSink<S> {
             request_builder: common.request_builder.clone(),
             transformer: config.encoding.clone(),
             service,
-            acker,
             metric_to_log: common.metric_to_log.clone(),
             mode: common.mode.clone(),
             id_key_field: config.id_key.clone(),
