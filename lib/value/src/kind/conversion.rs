@@ -65,7 +65,8 @@ impl Kind {
     /// it to a "null" value.
     /// This should be used in places those implicit upgrade can occur.
     // see: https://github.com/vectordotdev/vector/issues/13594
-    #[must_use] pub fn upgrade_undefined(mut self) -> Self {
+    #[must_use]
+    pub fn upgrade_undefined(mut self) -> Self {
         if self.contains_undefined() {
             self = self.without_undefined().or_null();
         }

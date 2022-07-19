@@ -460,7 +460,8 @@ impl Kind {
     /// Remove the `undefined` state from the type.
     ///
     /// If the type previously included this state, true is returned.
-    #[must_use] pub fn without_undefined(mut self) -> Self {
+    #[must_use]
+    pub fn without_undefined(mut self) -> Self {
         self.remove_undefined();
         self
     }
