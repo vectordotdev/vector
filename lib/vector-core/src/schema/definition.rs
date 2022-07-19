@@ -156,7 +156,7 @@ impl Definition {
             }
         }
 
-        self.kind.insert(&path, kind);
+        self.kind.set_at_path(&path, kind);
 
         if let Some(meaning) = meaning {
             self.meaning.insert(meaning, MeaningPointer::Valid(path));

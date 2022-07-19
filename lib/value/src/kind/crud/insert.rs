@@ -15,6 +15,14 @@ impl Kind {
         self.insert_recursive(path.segment_iter(), kind.upgrade_undefined());
     }
 
+    /// Set the `Kind` at the given `path` within `self`.
+    /// There is a subtle difference
+    /// between this and `Kind::insert` where this function does _not_ convert undefined to null.
+    #[allow(clippy::needless_pass_by_value)] // only reference types implement Path
+    pub fn set_at_path<'a>(&'a mut self, path: impl Path<'a>, kind: Self) {
+        self.insert_recursive(path.segment_iter(), kind);
+    }
+
     /// Insert the `Kind` at the given `path` within `self`.
     /// This has the same behavior as `Value::insert`.
     #[allow(clippy::too_many_lines)]
