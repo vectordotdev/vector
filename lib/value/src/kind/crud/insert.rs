@@ -1,7 +1,6 @@
 //! All types related to inserting one [`Kind`] into another.
 
 use lookup::lookup_v2::{BorrowedSegment, Path};
-use std::collections::btree_map::Entry;
 
 use crate::kind::Collection;
 use crate::Kind;
@@ -44,13 +43,15 @@ impl Kind {
                 BorrowedSegment::Field(field) | BorrowedSegment::CoalesceEnd(field) => {
                     // Field insertion converts the value to an object, so remove all other types.
                     *self = Self::object(self.object.clone().unwrap_or_else(Collection::empty));
-                    let collection = self.object.as_mut().expect("object was just inserted");
 
-                    match collection.known_mut().entry(field.into_owned().into()) {
-                        Entry::Occupied(entry) => entry.into_mut(),
-                        Entry::Vacant(entry) => entry.insert(Self::null()),
-                    }
-                    .insert_recursive(iter, kind);
+                    let collection = self.object.as_mut().expect("object was just inserted");
+                    let unknown_kind = collection.unknown_kind();
+
+                    collection
+                        .known_mut()
+                        .entry(field.into_owned().into())
+                        .or_insert(unknown_kind)
+                        .insert_recursive(iter, kind);
                 }
                 BorrowedSegment::Index(mut index) => {
                     // Array insertion converts the value to an array, so remove all other types.
@@ -174,10 +175,11 @@ impl Kind {
                         }
                     }
 
+                    let unknown_kind = collection.unknown_kind();
                     collection
                         .known_mut()
                         .entry(index.into())
-                        .or_insert(Self::null())
+                        .or_insert(unknown_kind)
                         .insert_recursive(iter, kind);
                 }
                 BorrowedSegment::CoalesceField(field) => {
@@ -677,6 +679,74 @@ mod tests {
                     path: parse_path(".x"),
                     kind: Kind::undefined(),
                     expected: Kind::object(BTreeMap::from([("x".into(), Kind::null())])),
+                },
+            ),
+            (
+                "array insert into any",
+                TestCase {
+                    this: Kind::any(),
+                    path: owned_path!(2),
+                    kind: Kind::bytes(),
+                    expected: Kind::array(
+                        Collection::from(BTreeMap::from([
+                            (0.into(), Kind::any().without_undefined()),
+                            (1.into(), Kind::any().without_undefined()),
+                            (2.into(), Kind::bytes()),
+                        ]))
+                        .with_unknown(Kind::any()),
+                    ),
+                },
+            ),
+            (
+                "object insert into any",
+                TestCase {
+                    this: Kind::any(),
+                    path: owned_path!("b"),
+                    kind: Kind::bytes(),
+                    expected: Kind::object(
+                        Collection::from(BTreeMap::from([("b".into(), Kind::bytes())]))
+                            .with_unknown(Kind::any()),
+                    ),
+                },
+            ),
+            (
+                "nested object/array insert into any",
+                TestCase {
+                    this: Kind::any(),
+                    path: owned_path!("x", 2),
+                    kind: Kind::bytes(),
+                    expected: Kind::object(
+                        Collection::from(BTreeMap::from([(
+                            "x".into(),
+                            Kind::array(
+                                Collection::from(BTreeMap::from([
+                                    (0.into(), Kind::any().without_undefined()),
+                                    (1.into(), Kind::any().without_undefined()),
+                                    (2.into(), Kind::bytes()),
+                                ]))
+                                .with_unknown(Kind::any()),
+                            ),
+                        )]))
+                        .with_unknown(Kind::any()),
+                    ),
+                },
+            ),
+            (
+                "nested array/array insert into any",
+                TestCase {
+                    this: Kind::any(),
+                    path: owned_path!(0, 0),
+                    kind: Kind::bytes(),
+                    expected: Kind::array(
+                        Collection::from(BTreeMap::from([(
+                            0.into(),
+                            Kind::array(
+                                Collection::from(BTreeMap::from([(0.into(), Kind::bytes())]))
+                                    .with_unknown(Kind::any()),
+                            ),
+                        )]))
+                        .with_unknown(Kind::any()),
+                    ),
                 },
             ),
         ] {
