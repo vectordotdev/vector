@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
-use metrics::{GaugeValue, Key, Recorder, Unit};
-use metrics_util::MetricKind;
+use metrics::{Counter, Gauge, Histogram, Key, KeyName, Recorder, Unit};
 use once_cell::unsync::OnceCell;
 
-use super::Registry;
-use crate::metrics::handle::Handle;
+use super::storage::VectorStorage;
 
-thread_local!(static LOCAL_REGISTRY: OnceCell<Registry>=OnceCell::new());
+pub(super) type Registry = metrics_util::registry::Registry<Key, VectorStorage>;
+
+thread_local!(static LOCAL_REGISTRY: OnceCell<Registry> = OnceCell::new());
 
 /// [`VectorRecorder`] is a [`metrics::Recorder`] implementation that's suitable
 /// for the advanced usage that we have in Vector.
@@ -19,7 +19,7 @@ pub(super) enum VectorRecorder {
 
 impl VectorRecorder {
     pub(super) fn new_global() -> Self {
-        let registry = Arc::new(Registry::untracked());
+        let registry = Arc::new(Registry::new(VectorStorage));
         Self::Global(registry)
     }
 
@@ -36,58 +36,26 @@ impl VectorRecorder {
     }
 
     fn with_thread_local<T>(doit: impl FnOnce(&Registry) -> T) -> T {
-        LOCAL_REGISTRY.with(|oc| doit(oc.get_or_init(Registry::untracked)))
+        LOCAL_REGISTRY.with(|oc| doit(oc.get_or_init(|| Registry::new(VectorStorage))))
     }
 }
 
 impl Recorder for VectorRecorder {
-    fn register_counter(&self, key: &Key, _unit: Option<Unit>, _description: Option<&'static str>) {
-        self.with_registry(|r| r.op(MetricKind::Counter, key, |_| {}, Handle::counter));
+    fn register_counter(&self, key: &Key) -> Counter {
+        self.with_registry(|r| r.get_or_create_counter(key, |c| c.clone().into()))
     }
 
-    fn register_gauge(&self, key: &Key, _unit: Option<Unit>, _description: Option<&'static str>) {
-        self.with_registry(|r| r.op(MetricKind::Gauge, key, |_| {}, Handle::gauge));
+    fn register_gauge(&self, key: &Key) -> Gauge {
+        self.with_registry(|r| r.get_or_create_gauge(key, |g| g.clone().into()))
     }
 
-    fn register_histogram(
-        &self,
-        key: &Key,
-        _unit: Option<Unit>,
-        _description: Option<&'static str>,
-    ) {
-        self.with_registry(|r| r.op(MetricKind::Histogram, key, |_| {}, Handle::histogram));
+    fn register_histogram(&self, key: &Key) -> Histogram {
+        self.with_registry(|r| r.get_or_create_histogram(key, |h| h.clone().into()))
     }
 
-    fn increment_counter(&self, key: &Key, value: u64) {
-        self.with_registry(|r| {
-            r.op(
-                MetricKind::Counter,
-                key,
-                |handle| handle.increment_counter(value),
-                Handle::counter,
-            );
-        });
-    }
+    fn describe_counter(&self, _: KeyName, _: Option<Unit>, _: &'static str) {}
 
-    fn update_gauge(&self, key: &Key, value: GaugeValue) {
-        self.with_registry(|r| {
-            r.op(
-                MetricKind::Gauge,
-                key,
-                |handle| handle.update_gauge(value),
-                Handle::gauge,
-            );
-        });
-    }
+    fn describe_gauge(&self, _: KeyName, _: Option<Unit>, _: &'static str) {}
 
-    fn record_histogram(&self, key: &Key, value: f64) {
-        self.with_registry(|r| {
-            r.op(
-                MetricKind::Histogram,
-                key,
-                |handle| handle.record_histogram(value),
-                Handle::histogram,
-            );
-        });
-    }
+    fn describe_histogram(&self, _: KeyName, _: Option<Unit>, _: &'static str) {}
 }

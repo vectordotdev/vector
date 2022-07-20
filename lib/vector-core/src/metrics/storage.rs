@@ -1,12 +1,32 @@
-use std::{
-    slice,
-    sync::{
-        atomic::{AtomicU32, AtomicU64, Ordering},
-        Arc,
-    },
+use std::sync::{
+    atomic::{AtomicU32, AtomicU64, Ordering},
+    Arc,
 };
 
-use metrics::GaugeValue;
+use metrics::HistogramFn;
+use metrics_util::registry::Storage;
+
+use crate::event::{metric::Bucket, MetricValue};
+
+pub(super) struct VectorStorage;
+
+impl<K> Storage<K> for VectorStorage {
+    type Counter = Arc<AtomicU64>;
+    type Gauge = Arc<AtomicU64>;
+    type Histogram = Arc<Histogram>;
+
+    fn counter(&self, _: &K) -> Self::Counter {
+        Arc::new(AtomicU64::new(0))
+    }
+
+    fn gauge(&self, _: &K) -> Self::Gauge {
+        Arc::new(AtomicU64::new(0))
+    }
+
+    fn histogram(&self, _: &K) -> Self::Histogram {
+        Arc::new(Histogram::new())
+    }
+}
 
 #[derive(Debug)]
 struct AtomicF64 {
@@ -42,50 +62,8 @@ impl AtomicF64 {
     }
 }
 
-#[derive(Clone, Debug)]
-pub enum Handle {
-    Gauge(Arc<Gauge>),
-    Counter(Arc<Counter>),
-    Histogram(Arc<Histogram>),
-}
-
-impl Handle {
-    pub(crate) fn counter() -> Self {
-        Handle::Counter(Arc::new(Counter::new()))
-    }
-
-    pub(crate) fn increment_counter(&self, value: u64) {
-        match self {
-            Handle::Counter(counter) => counter.record(value),
-            _ => unreachable!(),
-        }
-    }
-
-    pub(crate) fn gauge() -> Self {
-        Handle::Gauge(Arc::new(Gauge::new()))
-    }
-
-    pub(crate) fn update_gauge(&self, value: GaugeValue) {
-        match self {
-            Handle::Gauge(gauge) => gauge.record(value),
-            _ => unreachable!(),
-        }
-    }
-
-    pub(crate) fn histogram() -> Self {
-        Handle::Histogram(Arc::new(Histogram::new()))
-    }
-
-    pub(crate) fn record_histogram(&self, value: f64) {
-        match self {
-            Handle::Histogram(h) => h.record(value),
-            _ => unreachable!(),
-        };
-    }
-}
-
 #[derive(Debug)]
-pub struct Histogram {
+pub(super) struct Histogram {
     buckets: Box<[(f64, AtomicU32); 20]>,
     count: AtomicU64,
     sum: AtomicF64,
@@ -147,7 +125,35 @@ impl Histogram {
         index.min(Self::BUCKETS - 1)
     }
 
-    pub(crate) fn record(&self, value: f64) {
+    pub(super) fn count(&self) -> u64 {
+        self.count.load(Ordering::Relaxed)
+    }
+
+    pub(super) fn sum(&self) -> f64 {
+        self.sum.load(Ordering::Relaxed)
+    }
+
+    fn buckets(&self) -> Vec<Bucket> {
+        self.buckets
+            .iter()
+            .map(|(upper_limit, count)| Bucket {
+                upper_limit: *upper_limit,
+                count: count.load(Ordering::Relaxed) as u64,
+            })
+            .collect()
+    }
+
+    pub(super) fn make_metric(&self) -> MetricValue {
+        MetricValue::AggregatedHistogram {
+            buckets: self.buckets(),
+            count: self.count(),
+            sum: self.sum(),
+        }
+    }
+}
+
+impl HistogramFn for Histogram {
+    fn record(&self, value: f64) {
         let index = Self::bucket_index(value);
         self.buckets[index].1.fetch_add(1, Ordering::Relaxed);
         self.count.fetch_add(1, Ordering::Relaxed);
@@ -155,99 +161,14 @@ impl Histogram {
             .sum
             .fetch_update(Ordering::AcqRel, Ordering::Relaxed, |cur| Some(cur + value));
     }
-
-    pub fn count(&self) -> u64 {
-        self.count.load(Ordering::Relaxed)
-    }
-
-    pub fn sum(&self) -> f64 {
-        self.sum.load(Ordering::Relaxed)
-    }
-
-    pub fn buckets(&self) -> BucketIter<'_> {
-        BucketIter {
-            inner: self.buckets.iter(),
-        }
-    }
-}
-
-pub struct BucketIter<'a> {
-    inner: slice::Iter<'a, (f64, AtomicU32)>,
-}
-
-impl<'a> Iterator for BucketIter<'a> {
-    type Item = (f64, u32);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.inner
-            .next()
-            .map(|(k, v)| (*k, v.load(Ordering::Relaxed)))
-    }
-}
-
-#[derive(Debug)]
-pub struct Counter {
-    inner: AtomicU64,
-}
-
-impl Counter {
-    pub(crate) fn with_count(count: u64) -> Self {
-        Self {
-            inner: AtomicU64::new(count),
-        }
-    }
-
-    pub(crate) fn new() -> Self {
-        Self {
-            inner: AtomicU64::new(0),
-        }
-    }
-
-    pub(crate) fn record(&self, value: u64) {
-        self.inner.fetch_add(value, Ordering::Relaxed);
-    }
-
-    pub fn count(&self) -> u64 {
-        self.inner.load(Ordering::Relaxed)
-    }
-}
-
-#[derive(Debug)]
-pub struct Gauge {
-    inner: AtomicF64,
-}
-
-impl Gauge {
-    pub(crate) fn new() -> Self {
-        Self {
-            inner: AtomicF64::new(0.0),
-        }
-    }
-
-    #[allow(clippy::needless_pass_by_value)] // see https://github.com/vectordotdev/vector/pull/7341#discussion_r626693005
-    pub(crate) fn record(&self, value: GaugeValue) {
-        // Because Rust lacks an atomic f64 we store gauges as AtomicU64
-        // and transmute back and forth to an f64 here. They have the
-        // same size so this operation is safe, just don't read the
-        // AtomicU64 directly.
-        let _ = self
-            .inner
-            .fetch_update(Ordering::AcqRel, Ordering::Relaxed, |cur| {
-                let val = value.update_value(cur);
-                Some(val)
-            });
-    }
-
-    pub fn gauge(&self) -> f64 {
-        self.inner.load(Ordering::Relaxed)
-    }
 }
 
 #[cfg(test)]
 mod test {
+    use metrics::HistogramFn;
     use quickcheck::{QuickCheck, TestResult};
 
-    use crate::metrics::handle::{Counter, Histogram};
+    use super::Histogram;
 
     // Adapted from https://users.rust-lang.org/t/assert-eq-for-float-numbers/7034/4?u=blt
     fn nearly_equal(a: f64, b: f64) -> bool {
@@ -310,27 +231,5 @@ mod test {
             .tests(1_000)
             .max_tests(2_000)
             .quickcheck(inner as fn(Vec<f64>) -> TestResult);
-    }
-
-    #[test]
-    #[allow(clippy::needless_pass_by_value)] // `&[T]` does not implement `Arbitrary`
-    fn count() {
-        fn inner(values: Vec<u64>) -> TestResult {
-            let sut = Counter::new();
-            let mut model: u64 = 0;
-
-            for val in &values {
-                sut.record(*val);
-                model = model.wrapping_add(*val);
-
-                assert_eq!(sut.count(), model);
-            }
-            TestResult::passed()
-        }
-
-        QuickCheck::new()
-            .tests(1_000)
-            .max_tests(2_000)
-            .quickcheck(inner as fn(Vec<u64>) -> TestResult);
     }
 }

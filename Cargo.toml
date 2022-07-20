@@ -148,8 +148,8 @@ tracing-subscriber = { version = "0.3.14", default-features = false, features = 
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", default-features = false, rev = "e0642d949891546a3bb7e47080365ee7274f05cd" }
 
 # Metrics
-metrics = { version = "0.17.1", default-features = false, features = ["std"] }
-metrics-tracing-context = { version = "0.9.0", default-features = false }
+metrics = "0.19.0"
+metrics-tracing-context = { version = "0.11.0", default-features = false }
 
 # AWS - Official SDK
 aws-config = { version = "0.15.0", default-features = false, features = ["rustls"], optional = true }

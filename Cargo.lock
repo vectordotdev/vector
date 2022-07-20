@@ -2035,16 +2035,6 @@ dependencies = [
 
 [[package]]
 name = "dashmap"
-version = "4.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e77a43b28d0668df09411cb0bc9a8c2adc40f9a048afe863e05fd43251e8e39c"
-dependencies = [
- "cfg-if 1.0.0",
- "num_cpus",
-]
-
-[[package]]
-name = "dashmap"
 version = "5.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4c8858831f7781322e539ea39e72449c46b059638250c14344fec8d0aa6e539c"
@@ -2588,7 +2578,7 @@ dependencies = [
  "chrono",
  "crc",
  "criterion",
- "dashmap 5.2.0",
+ "dashmap",
  "flate2",
  "futures 0.3.21",
  "glob",
@@ -2924,7 +2914,7 @@ version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "19775995ee20209163239355bc3ad2f33f83da35d9ef72dea26e5af753552c87"
 dependencies = [
- "dashmap 5.2.0",
+ "dashmap",
  "futures 0.3.21",
  "futures-timer",
  "no-std-compat",
@@ -4207,9 +4197,9 @@ dependencies = [
 
 [[package]]
 name = "metrics"
-version = "0.17.1"
+version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "55586aa936c35f34ba8aa5d97356d554311206e1ce1f9e68fe7b07288e5ad827"
+checksum = "142c53885123b68d94108295a09d4afe1a1388ed95b54d5dacd9a454753030f2"
 dependencies = [
  "ahash",
  "metrics-macros",
@@ -4217,24 +4207,22 @@ dependencies = [
 
 [[package]]
 name = "metrics-macros"
-version = "0.4.1"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0daa0ab3a0ae956d0e2c1f42511422850e577d36a255357d1a7d08d45ee3a2f1"
+checksum = "49e30813093f757be5cf21e50389a24dc7dbb22c49f23b7e8f51d69b508a5ffa"
 dependencies = [
- "lazy_static",
  "proc-macro2",
  "quote",
- "regex",
  "syn",
 ]
 
 [[package]]
 name = "metrics-tracing-context"
-version = "0.9.0"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7927d28bccc322a3f48fc445bffe7cb491ab8a43ea28f7c5f75bc16fc4e5d6bd"
+checksum = "91c0b6603313b4625101251a1c0749df7deef27ab410d430d79f2fcb9d8480aa"
 dependencies = [
- "itoa 0.4.8",
+ "itoa 1.0.1",
  "lockfree-object-pool",
  "metrics",
  "metrics-util",
@@ -4246,16 +4234,14 @@ dependencies = [
 
 [[package]]
 name = "metrics-util"
-version = "0.10.2"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1174223789e331d9d47a4a953dac36e397db60fa8d2a111ac505388c6c7fe32e"
+checksum = "fd1f4b69bef1e2b392b2d4a12902f2af90bb438ba4a66aa222d1023fa6561b50"
 dependencies = [
- "ahash",
  "aho-corasick",
  "atomic-shim",
  "crossbeam-epoch",
  "crossbeam-utils",
- "dashmap 4.0.2",
  "hashbrown 0.11.2",
  "indexmap",
  "metrics",
@@ -6893,9 +6879,9 @@ checksum = "7bd3e3206899af3f8b12af284fafc038cc1dc2b41d1b89dd17297221c5d225de"
 
 [[package]]
 name = "sketches-ddsketch"
-version = "0.1.2"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76a77a8fd93886010f05e7ea0720e569d6d16c65329dbe3ec033bbbccccb017b"
+checksum = "04d2ecae5fcf33b122e2e6bd520a57ccf152d2dde3b38c71039df1a6867264ee"
 
 [[package]]
 name = "slab"
@@ -7789,7 +7775,7 @@ name = "tracing-limit"
 version = "0.1.0"
 dependencies = [
  "criterion",
- "dashmap 5.2.0",
+ "dashmap",
  "mock_instant",
  "tracing 0.1.34",
  "tracing-core 0.1.28",
