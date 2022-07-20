@@ -102,6 +102,7 @@ impl TypeDef {
                     coalesced_path: CoalescedPath::Reject,
                 },
             )
+            // This in incorrect. See: https://github.com/vectordotdev/vector/issues/13460
             .unwrap_or(self.kind);
 
         Self { fallible, kind }
