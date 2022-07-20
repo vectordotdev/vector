@@ -93,7 +93,7 @@ pub struct Histogram {
 
 impl Histogram {
     const MIN_BUCKET: f64 = 0.015_625; // (-6_f64).exp2() is not const yet
-    const MIN_BUCKET_EXP: isize = -6;
+    const MIN_BUCKET_EXP: f64 = -6.0;
     const BUCKETS: usize = 20;
 
     pub(crate) fn new() -> Self {
@@ -135,13 +135,20 @@ impl Histogram {
         }
     }
 
+    pub(self) fn bucket_index(value: f64) -> usize {
+        // The buckets are all powers of two, so compute the ceiling of the log_2 of the
+        // value. Apply a lower bound to prevent zero or negative values from blowing up the log.
+        let log = value.max(Self::MIN_BUCKET).log2().ceil();
+        // Offset it based on the minimum bucket's exponent. The result will be non-negative thanks
+        // to the `.max` above, so we can coerce it directly to `usize`.
+        let index = (log - Self::MIN_BUCKET_EXP) as usize;
+        // Now bound the value for values larger than the largest bucket.
+        index.min(Self::BUCKETS - 1)
+    }
+
     pub(crate) fn record(&self, value: f64) {
-        // The buckets are all powers of two, so calculate the ceiling of the log_2 of the value,
-        // and offset and limit it appropriately.
-        let bucket = ((value.max(Self::MIN_BUCKET).log2().ceil()) as isize - Self::MIN_BUCKET_EXP)
-            .max(0)
-            .min(Self::BUCKETS as isize - 1) as usize;
-        self.buckets[bucket].1.fetch_add(1, Ordering::Relaxed);
+        let index = Self::bucket_index(value);
+        self.buckets[index].1.fetch_add(1, Ordering::Relaxed);
         self.count.fetch_add(1, Ordering::Relaxed);
         let _ = self
             .sum
@@ -237,8 +244,6 @@ impl Gauge {
 
 #[cfg(test)]
 mod test {
-    use std::sync::atomic::Ordering;
-
     use quickcheck::{QuickCheck, TestResult};
 
     use crate::metrics::handle::{Counter, Histogram};
@@ -269,13 +274,30 @@ mod test {
             let mut model_count: u64 = 0;
             let mut model_sum: f64 = 0.0;
 
-            for val in &values {
-                if val.is_infinite() || val.is_nan() {
+            for value in values {
+                if value.is_infinite() || value.is_nan() {
                     continue;
                 }
-                sut.record(*val);
+
+                let index = Histogram::bucket_index(value);
+                assert!(
+                    value <= sut.buckets[index].0,
+                    "Value {} is not less than the upper limit {}.",
+                    value,
+                    sut.buckets[index].0
+                );
+                if index > 0 {
+                    assert!(
+                        value > sut.buckets[index - 1].0,
+                        "Value {} is not greater than the previous upper limit {}.",
+                        value,
+                        sut.buckets[index - 1].0
+                    );
+                }
+
+                sut.record(value);
                 model_count = model_count.wrapping_add(1);
-                model_sum += *val;
+                model_sum += value;
 
                 assert_eq!(sut.count(), model_count);
                 assert!(nearly_equal(sut.sum(), model_sum));
@@ -287,32 +309,6 @@ mod test {
             .tests(1_000)
             .max_tests(2_000)
             .quickcheck(inner as fn(Vec<f64>) -> TestResult);
-    }
-
-    #[test]
-    fn historgram_uses_right_buckets() {
-        // Record some arbitrary values to ensure it puts them in the right buckets.
-
-        let sut = Histogram::new();
-        assert!(sut.buckets().all(|(_, count)| count == 0));
-
-        sut.record(0.0);
-        assert_eq!(sut.buckets[0].1.load(Ordering::Relaxed), 1);
-
-        sut.record(0.1);
-        assert_eq!(sut.buckets[3].1.load(Ordering::Relaxed), 1);
-
-        sut.record(1.0);
-        assert_eq!(sut.buckets[6].1.load(Ordering::Relaxed), 1);
-
-        sut.record(10.0);
-        assert_eq!(sut.buckets[10].1.load(Ordering::Relaxed), 1);
-
-        sut.record(8.00000001);
-        assert_eq!(sut.buckets[10].1.load(Ordering::Relaxed), 2);
-
-        sut.record(9999.0);
-        assert_eq!(sut.buckets[19].1.load(Ordering::Relaxed), 1);
     }
 
     #[test]
