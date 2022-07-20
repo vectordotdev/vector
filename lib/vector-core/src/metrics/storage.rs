@@ -3,7 +3,7 @@ use std::sync::{
     Arc,
 };
 
-use metrics::HistogramFn;
+use metrics::{GaugeFn, HistogramFn};
 use metrics_util::registry::Storage;
 
 use crate::event::{metric::Bucket, MetricValue};
@@ -12,7 +12,7 @@ pub(super) struct VectorStorage;
 
 impl<K> Storage<K> for VectorStorage {
     type Counter = Arc<AtomicU64>;
-    type Gauge = Arc<AtomicU64>;
+    type Gauge = Arc<AtomicF64>;
     type Histogram = Arc<Histogram>;
 
     fn counter(&self, _: &K) -> Self::Counter {
@@ -20,7 +20,7 @@ impl<K> Storage<K> for VectorStorage {
     }
 
     fn gauge(&self, _: &K) -> Self::Gauge {
-        Arc::new(AtomicU64::new(0))
+        Arc::new(AtomicF64::new(0.0))
     }
 
     fn histogram(&self, _: &K) -> Self::Histogram {
@@ -29,7 +29,7 @@ impl<K> Storage<K> for VectorStorage {
 }
 
 #[derive(Debug)]
-struct AtomicF64 {
+pub(super) struct AtomicF64 {
     inner: AtomicU64,
 }
 
@@ -40,25 +40,35 @@ impl AtomicF64 {
         }
     }
 
-    fn fetch_update<F>(
+    fn fetch_update(
         &self,
         set_order: Ordering,
         fetch_order: Ordering,
-        mut f: F,
-    ) -> Result<f64, f64>
-    where
-        F: FnMut(f64) -> Option<f64>,
-    {
-        let res = self.inner.fetch_update(set_order, fetch_order, |x| {
-            let opt: Option<f64> = f(f64::from_bits(x));
-            opt.map(f64::to_bits)
-        });
-
-        res.map(f64::from_bits).map_err(f64::from_bits)
+        mut f: impl FnMut(f64) -> f64,
+    ) {
+        self.inner
+            .fetch_update(set_order, fetch_order, |x| {
+                Some(f(f64::from_bits(x)).to_bits())
+            })
+            .expect("Cannot fail");
     }
 
-    fn load(&self, order: Ordering) -> f64 {
+    pub(super) fn load(&self, order: Ordering) -> f64 {
         f64::from_bits(self.inner.load(order))
+    }
+}
+
+impl GaugeFn for AtomicF64 {
+    fn increment(&self, amount: f64) {
+        self.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |value| value + amount);
+    }
+
+    fn decrement(&self, amount: f64) {
+        self.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |value| value - amount);
+    }
+
+    fn set(&self, value: f64) {
+        self.inner.store(f64::to_bits(value), Ordering::Relaxed);
     }
 }
 
@@ -157,9 +167,8 @@ impl HistogramFn for Histogram {
         let index = Self::bucket_index(value);
         self.buckets[index].1.fetch_add(1, Ordering::Relaxed);
         self.count.fetch_add(1, Ordering::Relaxed);
-        let _ = self
-            .sum
-            .fetch_update(Ordering::AcqRel, Ordering::Relaxed, |cur| Some(cur + value));
+        self.sum
+            .fetch_update(Ordering::AcqRel, Ordering::Relaxed, |cur| cur + value);
     }
 }
 

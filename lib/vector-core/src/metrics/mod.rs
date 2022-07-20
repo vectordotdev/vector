@@ -140,7 +140,7 @@ impl Controller {
             });
             registry.visit_gauges(|key, gauge| {
                 // NOTE this will truncate if the value is greater than 2**52.
-                let value = gauge.load(Ordering::Relaxed) as f64;
+                let value = gauge.load(Ordering::Relaxed);
                 let value = MetricValue::Gauge { value };
                 metrics.push(Metric::from_metric_kv(key, value, timestamp));
             });
