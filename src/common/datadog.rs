@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 pub(crate) struct DatadogSeriesMetric {
     pub(crate) metric: String,
     pub(crate) r#type: DatadogMetricType,
-    pub(crate) interval: Option<i64>,
+    pub(crate) interval: Option<u32>,
     pub(crate) points: Vec<DatadogPoint<f64>>,
     pub(crate) tags: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]

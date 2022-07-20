@@ -91,6 +91,7 @@ message Metric {
     AggregatedSummary3 aggregated_summary3 = 17;
   }
   string namespace = 11;
+  uint32 interval_ms = 18;
 }
 
 message Counter {

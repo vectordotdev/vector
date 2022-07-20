@@ -41,18 +41,29 @@ impl Function for GetMetadataField {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        (_local, external): (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let key = get_metadata_key(&mut arguments)?;
-        Ok(Box::new(GetMetadataFieldFn { key }))
+        let kind = match &key {
+            MetadataKey::Legacy(_) => Kind::bytes().or_null(),
+            MetadataKey::Query(query) => external
+                .metadata_kind()
+                .find_at_path(&query.path().to_lookup())
+                .ok()
+                .flatten()
+                .map(|x| x.into_owned())
+                .unwrap_or_else(Kind::any),
+        };
+        Ok(Box::new(GetMetadataFieldFn { key, kind }))
     }
 }
 
 #[derive(Debug, Clone)]
 struct GetMetadataFieldFn {
     key: MetadataKey,
+    kind: Kind,
 }
 
 impl Expression for GetMetadataFieldFn {
@@ -61,12 +72,6 @@ impl Expression for GetMetadataFieldFn {
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
-        match &self.key {
-            MetadataKey::Legacy(_) => TypeDef::bytes().add_null().infallible(),
-            MetadataKey::Query(_query) => {
-                // TODO: use metadata schema when it exists to return a better value here
-                TypeDef::any().infallible()
-            }
-        }
+        TypeDef::from(self.kind.clone()).infallible()
     }
 }
