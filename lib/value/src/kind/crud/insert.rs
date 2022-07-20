@@ -32,6 +32,13 @@ impl Kind {
         mut iter: impl Iterator<Item = BorrowedSegment<'b>> + Clone,
         kind: Self,
     ) {
+        if self.is_never() || kind.is_never() {
+            // If `self` or `kind` is `never`, the program would have already terminated
+            // so this assignment can't happen.
+            *self = Self::never();
+            return;
+        }
+
         if let Some(segment) = iter.next() {
             match segment {
                 BorrowedSegment::Field(field) | BorrowedSegment::CoalesceEnd(field) => {
@@ -643,6 +650,33 @@ mod tests {
                         "b".into(),
                         Kind::object(BTreeMap::from([("x".into(), Kind::bytes())])),
                     )]))),
+                },
+            ),
+            (
+                "insert into never",
+                TestCase {
+                    this: Kind::never(),
+                    path: parse_path(".x"),
+                    kind: Kind::bytes(),
+                    expected: Kind::never(),
+                },
+            ),
+            (
+                "insert never",
+                TestCase {
+                    this: Kind::object(Collection::empty()),
+                    path: parse_path(".x"),
+                    kind: Kind::never(),
+                    expected: Kind::never(),
+                },
+            ),
+            (
+                "insert undefined",
+                TestCase {
+                    this: Kind::object(Collection::empty()),
+                    path: parse_path(".x"),
+                    kind: Kind::undefined(),
+                    expected: Kind::object(BTreeMap::from([("x".into(), Kind::null())])),
                 },
             ),
         ] {
