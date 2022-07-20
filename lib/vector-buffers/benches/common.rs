@@ -2,7 +2,7 @@ use std::{error, fmt, path::PathBuf};
 
 use bytes::{Buf, BufMut};
 use metrics_tracing_context::{MetricsLayer, TracingContextLayer};
-use metrics_util::{layers::Layer, DebuggingRecorder};
+use metrics_util::{debugging::DebuggingRecorder, layers::Layer};
 use tracing::Span;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use vector_buffers::{
