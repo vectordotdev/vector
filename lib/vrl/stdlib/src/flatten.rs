@@ -5,18 +5,15 @@ use vrl::prelude::*;
 
 static DEFAULT_SEPARATOR: &str = ".";
 
-fn flatten(value: Value, separator: Option<Value>) -> Resolved {
-    let separator = match separator {
-        None => DEFAULT_SEPARATOR.to_string(),
-        Some(separator) => separator.try_bytes_utf8_lossy()?.to_string(),
-    };
+fn flatten(value: Value, separator: Value) -> Resolved {
+    let separator = separator.try_bytes_utf8_lossy()?;
 
     match value {
         Value::Array(arr) => Ok(Value::Array(
             ArrayFlatten::new(arr.iter()).cloned().collect(),
         )),
         Value::Object(map) => Ok(Value::Object(
-            MapFlatten::new(map.iter(), separator)
+            MapFlatten::new(map.iter(), &separator)
                 .map(|(k, v)| (k, v.clone()))
                 .collect(),
         )),
@@ -77,7 +74,9 @@ impl Function for Flatten {
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
-        let separator = arguments.optional("separator");
+        let separator = arguments
+            .optional("separator")
+            .unwrap_or_else(|| expr!(DEFAULT_SEPARATOR));
         let value = arguments.required("value");
         Ok(Box::new(FlattenFn { value, separator }))
     }
@@ -86,18 +85,15 @@ impl Function for Flatten {
 #[derive(Debug, Clone)]
 struct FlattenFn {
     value: Box<dyn Expression>,
-    separator: Option<Box<dyn Expression>>,
+    separator: Box<dyn Expression>,
 }
 
 impl Expression for FlattenFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let separator = self
-            .separator
-            .as_ref()
-            .map(|expr| expr.resolve(ctx))
-            .transpose()?;
+        let value = self.value.resolve(ctx)?;
+        let separator = self.separator.resolve(ctx)?;
 
-        flatten(self.value.resolve(ctx)?, separator)
+        flatten(value, separator)
     }
 
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
@@ -114,13 +110,13 @@ impl Expression for FlattenFn {
 /// An iterator to walk over maps allowing us to flatten nested maps to a single level.
 struct MapFlatten<'a> {
     values: btree_map::Iter<'a, String, Value>,
-    separator: String,
+    separator: &'a str,
     inner: Option<Box<MapFlatten<'a>>>,
     parent: Option<String>,
 }
 
 impl<'a> MapFlatten<'a> {
-    fn new(values: btree_map::Iter<'a, String, Value>, separator: String) -> Self {
+    fn new(values: btree_map::Iter<'a, String, Value>, separator: &'a str) -> Self {
         Self {
             values,
             separator,
@@ -132,7 +128,7 @@ impl<'a> MapFlatten<'a> {
     fn new_from_parent(
         parent: String,
         values: btree_map::Iter<'a, String, Value>,
-        separator: String,
+        separator: &'a str,
     ) -> Self {
         Self {
             values,
@@ -169,7 +165,7 @@ impl<'a> std::iter::Iterator for MapFlatten<'a> {
                 self.inner = Some(Box::new(MapFlatten::new_from_parent(
                     self.new_key(key),
                     value.iter(),
-                    self.separator.clone(),
+                    self.separator,
                 )));
                 self.next()
             }
