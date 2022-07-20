@@ -1,58 +1,9 @@
-use std::{collections::BTreeMap, fmt, sync::Arc};
+use std::collections::BTreeMap;
 
-use ::value::Value;
-use vrl::{
-    diagnostic::{Label, Span},
-    prelude::*,
-};
+use datadog_grok::parse_grok_rules;
+use vrl::prelude::*;
 
-fn parse_grok(value: Value, pattern: Arc<grok::Pattern>) -> Resolved {
-    let bytes = value.try_bytes_utf8_lossy()?;
-    match pattern.match_against(&bytes) {
-        Some(matches) => {
-            let mut result = BTreeMap::new();
-
-            for (name, value) in matches.iter() {
-                result.insert(name.to_string(), Value::from(value));
-            }
-
-            Ok(Value::from(result))
-        }
-        None => Err("unable to parse input with grok pattern".into()),
-    }
-}
-
-#[derive(Debug)]
-pub(crate) enum Error {
-    InvalidGrokPattern(grok::Error),
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Error::InvalidGrokPattern(err) => err.fmt(f),
-        }
-    }
-}
-
-impl std::error::Error for Error {}
-
-impl DiagnosticMessage for Error {
-    fn code(&self) -> usize {
-        109
-    }
-
-    fn labels(&self) -> Vec<Label> {
-        match self {
-            Error::InvalidGrokPattern(err) => {
-                vec![Label::primary(
-                    format!("grok pattern error: {}", err),
-                    Span::default(),
-                )]
-            }
-        }
-    }
-}
+use crate::parse_groks::{Error, ParseGroksFn};
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseGrok;
@@ -73,6 +24,11 @@ impl Function for ParseGrok {
                 keyword: "pattern",
                 kind: kind::BYTES,
                 required: true,
+            },
+            Parameter {
+                keyword: "aliases",
+                kind: kind::OBJECT,
+                required: false,
             },
         ]
     }
@@ -110,66 +66,95 @@ impl Function for ParseGrok {
             .try_bytes_utf8_lossy()
             .expect("grok pattern not bytes")
             .into_owned();
+        let patterns = [pattern];
 
-        let mut grok = grok::Grok::with_default_patterns();
-        let pattern =
-            Arc::new(grok.compile(&pattern, true).map_err(|e| {
-                Box::new(Error::InvalidGrokPattern(e)) as Box<dyn DiagnosticMessage>
-            })?);
+        let aliases = arguments
+            .optional_object("aliases")?
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(key, expr)| {
+                let alias = expr
+                    .as_value()
+                    .ok_or(vrl::function::Error::ExpectedStaticExpression {
+                        keyword: "aliases",
+                        expr,
+                    })
+                    .map(|e| {
+                        e.try_bytes_utf8_lossy()
+                            .expect("should be a string")
+                            .into_owned()
+                    })?;
+                Ok((key, alias))
+            })
+            .collect::<std::result::Result<BTreeMap<String, String>, vrl::function::Error>>()?;
 
-        Ok(Box::new(ParseGrokFn { value, pattern }))
+        // we use a datadog library here because it is a superset of grok
+        let grok_rules = parse_grok_rules::parse_grok_rules(&patterns, aliases)
+            .map_err(|e| Box::new(Error::InvalidGrokPattern(e)) as Box<dyn DiagnosticMessage>)?;
+
+        Ok(Box::new(ParseGroksFn { value, grok_rules }))
     }
 
     fn compile_argument(
         &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
+        args: &[(&'static str, Option<FunctionArgument>)],
         _ctx: &mut FunctionCompileContext,
         name: &str,
         expr: Option<&expression::Expr>,
     ) -> CompiledArgument {
         match (name, expr) {
             ("pattern", Some(expr)) => {
+                let aliases: Option<&FunctionArgument> = args.iter().find_map(|(name, arg)| {
+                    if *name == "aliases" {
+                        arg.as_ref()
+                    } else {
+                        None
+                    }
+                });
+
                 let pattern = expr
                     .as_literal("pattern")?
                     .try_bytes_utf8_lossy()
                     .expect("grok pattern not bytes")
                     .into_owned();
+                let patterns = [pattern];
 
-                let mut grok = grok::Grok::with_default_patterns();
-                let pattern = Arc::new(grok.compile(&pattern, true).map_err(|e| {
-                    Box::new(Error::InvalidGrokPattern(e)) as Box<dyn DiagnosticMessage>
-                })?);
+                let aliases = aliases
+                .map(|aliases| {
+                    aliases
+                        .as_value()
+                        .unwrap()
+                        .try_object()
+                        .unwrap()
+                        .into_iter()
+                        .map(|(key, expr)| {
+                            let alias = expr
+                                .try_bytes_utf8_lossy()
+                                .expect("should be a string")
+                                .into_owned();
+                            Ok((key, alias))
+                        })
+                    .collect::<std::result::Result<BTreeMap<String, String>, vrl::function::Error>>().unwrap()
+                })
+                .unwrap_or_default();
 
-                Ok(Some(Box::new(pattern) as _))
+                // We use a datadog library here because it is a superset of grok.
+                let grok_rules =
+                    parse_grok_rules::parse_grok_rules(&patterns, aliases).map_err(|e| {
+                        Box::new(Error::InvalidGrokPattern(e)) as Box<dyn DiagnosticMessage>
+                    })?;
+
+                Ok(Some(Box::new(grok_rules) as _))
             }
+            ("aliases", Some(_)) => Ok(None),
             _ => Ok(None),
         }
     }
 }
 
-#[derive(Clone, Debug)]
-struct ParseGrokFn {
-    value: Box<dyn Expression>,
-
-    // Wrapping pattern in an Arc, as cloning the pattern could otherwise be expensive.
-    pattern: Arc<grok::Pattern>,
-}
-
-impl Expression for ParseGrokFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
-        let pattern = self.pattern.clone();
-
-        parse_grok(value, pattern)
-    }
-
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
-        TypeDef::object(Collection::any()).fallible()
-    }
-}
-
 #[cfg(test)]
 mod test {
+    use ::value::Value;
     use vector_common::btreemap;
 
     use super::*;
@@ -180,21 +165,21 @@ mod test {
         invalid_grok {
             args: func_args![ value: "foo",
                               pattern: "%{NOG}"],
-            want: Err("The given pattern definition name \"NOG\" could not be found in the definition map"),
+            want: Err("failed to parse grok expression '\\A%{NOG}\\z': The given pattern definition name \"NOG\" could not be found in the definition map"),
             tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
         error {
             args: func_args![ value: "an ungrokkable message",
                               pattern: "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"],
-            want: Err("unable to parse input with grok pattern"),
+            want: Err("unable to parse grok: value does not match any rule"),
             tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
         error2 {
             args: func_args![ value: "2020-10-02T23:22:12.223222Z an ungrokkable message",
                               pattern: "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"],
-            want: Err("unable to parse input with grok pattern"),
+            want: Err("unable to parse grok: value does not match any rule"),
             tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
@@ -213,6 +198,7 @@ mod test {
             args: func_args![ value: "2020-10-02T23:22:12.223222Z",
                               pattern: "(%{TIMESTAMP_ISO8601:timestamp}|%{LOGLEVEL:level})"],
             want: Ok(Value::from(btreemap! {
+                "level" => "",
                 "timestamp" => "2020-10-02T23:22:12.223222Z",
             })),
             tdef: TypeDef::object(Collection::any()).fallible(),
