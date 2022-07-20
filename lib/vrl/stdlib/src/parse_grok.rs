@@ -35,9 +35,8 @@ impl Function for ParseGrok {
             title: "parse grok pattern",
             source: indoc! {r#"
                 value = "2020-10-02T23:22:12.223222Z info Hello world"
-                pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
 
-                parse_grok!(value, pattern)
+                parse_grok!(value, "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}")
             "#},
             result: Ok(indoc! {r#"
                 {
