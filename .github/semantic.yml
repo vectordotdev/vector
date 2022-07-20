@@ -147,6 +147,7 @@ scopes:
   - logstash source # Anything `logstash` source related
   - mongodb_metrics source # Anything `mongodb_metrics` source related
   - nginx_metrics source # Anything `nginx_metrics` source related
+  - opentelemetry source # Anything `opentelemetry` source related
   - postgresql_metrics source # Anything `postgresql_metrics` source related
   - prometheus_remote_write source # Anything `prometheus_remote_write` source related
   - prometheus_scrape source # Anything `prometheus_scrape` source related
@@ -181,7 +182,6 @@ scopes:
   - aws_kinesis_streams sink # Anything `aws_kinesis_streams` sink related
   - aws_s3 sink # Anything `aws_s3` sink related
   - aws_sqs sink # Anything `aws_sqs` sink related
-  - axiom sink # Anything `axiom` sink related
   - azure_blob sink # Anything `azure_blob` sink related
   - azure_monitor_logs sink # Anything `azure_monitor_logs` sink related
   - blackhole sink # Anything `blackhole` sink related
@@ -209,6 +209,7 @@ scopes:
   - nats sink # Anything `nats` sink related
   - new_relic sink # Anything `new_relic` sink related
   - new_relic_logs sink # Anything `new_relic_logs` sink related
+  - opentelemetry sink # Anything `opentelemetry` sink related
   - papertrail sink # Anything `papertrail` sink related
   - prometheus_exporter sink # Anything `prometheus_exporter` sink related
   - prometheus_remote_write sink # Anything `prometheus_remote_write` sink related
