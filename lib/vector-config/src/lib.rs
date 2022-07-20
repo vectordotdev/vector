@@ -81,6 +81,32 @@
 // can essentially define flags i.e. `docs:templateable` as a metadata value for marking a field as working with
 // Vector's template syntax, since doing `templateable = true` is weird given that we never otherwise specifically
 // disable it. In other words, we want a way to define feature flags in metadata.
+//
+// TODO: Should we add a way, and/or make it the default, that if you only supply a description of a
+// field, it concats the description of the type of the field? for example, you have:
+//
+// /// Predefined ACLs.
+// ///
+// /// For more information, see this link.
+// pub enum PredefinedAcl { ... }
+//
+// and then somewhere else, you use it like this:
+//
+// /// The Predefined ACL to apply to newly created objects.
+// field: PredefinedAcl,
+//
+// the resulting docs for `field` should look as if we wrote this:
+//
+// /// The Predefined ACL to apply to newly created objects.
+// ///
+// /// For more information, see this link.
+//
+// basically, we're always documenting these shared types fully, but sometimes their title is
+// written in an intentionally generic way, and we may want to spice up the wording so it's
+// context-specific i.e. we're using predefined ACLs for new objects, or using it for new firewall
+// rules, or ... so on and so forth. and by concating the existing description on the shared type,
+// we can continue to include high-quality doc comments with contextual links, examples, etc and
+// avoid duplication.
 
 #![deny(warnings)]
 
