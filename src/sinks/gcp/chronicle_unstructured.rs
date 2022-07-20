@@ -141,6 +141,8 @@ pub fn build_healthcheck(
 pub enum ChronicleError {
     #[snafu(display("Region or endpoint not defined"))]
     RegionOrEndpoint,
+    #[snafu(display("You can only specify one of region or endpoint"))]
+    BothRegionAndEndpoint,
 }
 
 #[async_trait::async_trait]
@@ -152,10 +154,10 @@ impl SinkConfig for ChronicleUnstructuredConfig {
         let tls = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls, cx.proxy())?;
 
-        let endpoint = self.endpoint("v2/unstructuredlogentries:batchCreate")?;
+        let endpoint = self.create_endpoint("v2/unstructuredlogentries:batchCreate")?;
 
         // For the healthcheck we see if we can fetch the list of available log types.
-        let healthcheck_endpoint = self.endpoint("v2/logtypes")?;
+        let healthcheck_endpoint = self.create_endpoint("v2/logtypes")?;
 
         let healthcheck = build_healthcheck(client.clone(), &healthcheck_endpoint, creds.clone())?;
         let sink = self.build_sink(client, endpoint, creds)?;
@@ -209,13 +211,14 @@ impl ChronicleUnstructuredConfig {
         Ok(KeyPartitioner::new(self.log_type.clone()))
     }
 
-    fn endpoint(&self, path: &str) -> Result<String, ChronicleError> {
+    fn create_endpoint(&self, path: &str) -> Result<String, ChronicleError> {
         Ok(format!(
             "{}/{}",
             match (&self.endpoint, self.region) {
                 (Some(endpoint), None) => endpoint.trim_end_matches('/'),
                 (None, Some(region)) => region.endpoint(),
-                _ => return Err(ChronicleError::RegionOrEndpoint),
+                (Some(_), Some(_)) => return Err(ChronicleError::BothRegionAndEndpoint),
+                (None, None) => return Err(ChronicleError::RegionOrEndpoint),
             },
             path
         ))
@@ -440,8 +443,10 @@ mod integration_tests {
         random_events_with_stream, random_string, trace_init,
     };
 
+    const ADDRESS_ENV_VAR: &str = "CHRONICLE_ADDRESS";
+
     fn config(log_type: &str) -> ChronicleUnstructuredConfig {
-        let address = std::env::var("CHRONICLE_ADDRESS").unwrap();
+        let address = std::env::var(ADDRESS_ENV_VAR).unwrap();
         let config = format!(
             indoc! { r#"
              endpoint = "{}"
@@ -501,7 +506,7 @@ mod integration_tests {
     }
 
     async fn request(method: Method, path: &str, log_type: &str) -> Response {
-        let address = std::env::var("CHRONICLE_ADDRESS").unwrap();
+        let address = std::env::var(ADDRESS_ENV_VAR).unwrap();
         let url = format!("{}/{}", address, path);
         Client::new()
             .request(method.clone(), &url)
