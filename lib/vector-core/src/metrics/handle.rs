@@ -141,6 +141,7 @@ impl Histogram {
         let log = value.max(Self::MIN_BUCKET).log2().ceil();
         // Offset it based on the minimum bucket's exponent. The result will be non-negative thanks
         // to the `.max` above, so we can coerce it directly to `usize`.
+        #[allow(clippy::cast_possible_truncation)] // The log will always be smaller than `usize`.
         let index = (log - Self::MIN_BUCKET_EXP) as usize;
         // Now bound the value for values larger than the largest bucket.
         index.min(Self::BUCKETS - 1)
