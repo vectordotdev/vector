@@ -63,7 +63,7 @@ impl Kind {
 
     /// VRL has an interesting property where accessing an undefined value "upgrades"
     /// it to a "null" value.
-    /// This should be used in places those implicit upgrade can occur.
+    /// This should be used in places those implicit upgrades can occur.
     // see: https://github.com/vectordotdev/vector/issues/13594
     #[must_use]
     pub fn upgrade_undefined(mut self) -> Self {

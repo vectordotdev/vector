@@ -76,17 +76,12 @@ impl Kind {
                                     // clear all known values and replace with new ones. (in-place shift can overwrite)
                                     shifted_collection.known_mut().clear();
 
-                                    // add the "null" from holes. Index 0 is handled below
+                                    // add the "null" from holes.
                                     for i in 1..shift_count {
                                         shifted_collection
                                             .known_mut()
                                             .insert(i.into(), Self::null());
                                     }
-
-                                    // Index 0 is always the inserted value if shifts are happening
-                                    let mut item = Self::null();
-                                    item.insert(&iter.clone().collect::<Vec<_>>(), kind.clone());
-                                    shifted_collection.known_mut().insert(0.into(), item);
 
                                     // shift known values by the exact "shift_count"
                                     for (i, i_kind) in zero_shifts.known() {
@@ -108,13 +103,12 @@ impl Kind {
 
                             // Apply the current "unknown" to indices that don't have an explicit known
                             // since the "unknown" is about to change.
-                            // These values are guaranteed to exist, so "undefined" is removed.
                             for i in 0..len_required {
                                 collection
                                     .known_mut()
                                     .entry(i.into())
                                     .or_insert_with(|| unknown_kind.clone())
-                                    // These indices are guaranteed to exist, so they can't be undefined
+                                    // These indices are guaranteed to exist, so they can't be undefined.
                                     .remove_undefined();
                             }
                             for (i, i_kind) in collection.known_mut() {
@@ -173,14 +167,11 @@ impl Kind {
                         }
                     }
 
-                    match collection.known_mut().entry(index.into()) {
-                        Entry::Occupied(entry) => entry.into_mut(),
-                        Entry::Vacant(entry) => {
-                            // null is a placeholder that will be overwritten with the recursion
-                            entry.insert(Self::null())
-                        }
-                    }
-                    .insert_recursive(iter, kind);
+                    collection
+                        .known_mut()
+                        .entry(index.into())
+                        .or_insert(Self::null())
+                        .insert_recursive(iter, kind);
                 }
                 BorrowedSegment::CoalesceField(field) => {
                     let field_kind = self.at_path(path!(field.as_ref()));
@@ -189,9 +180,9 @@ impl Kind {
                         return self.insert_recursive(iter, kind);
                     }
 
-                    // the remaining segments if this match succeeded
-                    #[allow(clippy::needless_collect)]
                     // need to collect to prevent infinite recursive iterator type
+                    #[allow(clippy::needless_collect)]
+                    // the remaining segments if this match succeeded
                     let match_iter = iter
                         .clone()
                         .skip_while(|segment| matches!(segment, BorrowedSegment::CoalesceField(_)))
@@ -216,7 +207,7 @@ impl Kind {
                         return;
                     }
 
-                    // the first field may or may not succeed. Try both.
+                    // The first field may or may not succeed. Try both.
                     self.insert_recursive(iter, kind);
                     *self = self.clone().union(match_type);
                 }

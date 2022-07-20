@@ -137,15 +137,6 @@ impl Unknown {
     }
 }
 
-// impl From<Unknown> for Kind {
-//     fn from(unknown: Unknown) -> Self {
-//         match unknown.0 {
-//             Inner::Infinite(infinite) => infinite.into(),
-//             Inner::Exact(exact) => *exact,
-//         }
-//     }
-// }
-
 impl From<Kind> for Unknown {
     fn from(kind: Kind) -> Self {
         (&kind).into()
