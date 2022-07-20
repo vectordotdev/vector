@@ -17,6 +17,7 @@ remap: functions: flatten: {
 			name:        "separator"
 			description: "The separator to be used to join nested keys"
 			required:    false
+			default:     "."
 			type: ["string"]
 		},
 	]
