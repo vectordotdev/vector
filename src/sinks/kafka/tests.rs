@@ -271,7 +271,7 @@ mod integration_test {
                 header_1_key.to_owned(),
                 Value::Bytes(Bytes::from(header_1_value)),
             );
-            events.for_each_log(move |log| {
+            events.iter_logs_mut().for_each(move |log| {
                 log.insert(headers_key.as_str(), header_values.clone());
             });
             events

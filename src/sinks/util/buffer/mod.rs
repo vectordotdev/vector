@@ -11,7 +11,7 @@ pub mod metrics;
 pub mod partition;
 pub mod vec;
 
-pub use compression::{Compression, GZIP_FAST};
+pub use compression::Compression;
 pub use partition::{Partition, PartitionBuffer, PartitionInnerBuffer};
 
 #[derive(Debug)]
@@ -48,8 +48,12 @@ impl Buffer {
             let writer = BytesMut::with_capacity(bytes).writer();
             match compression {
                 Compression::None => InnerBuffer::Plain(writer),
-                Compression::Gzip(level) => InnerBuffer::Gzip(GzEncoder::new(writer, level)),
-                Compression::Zlib(level) => InnerBuffer::Zlib(ZlibEncoder::new(writer, level)),
+                Compression::Gzip(level) => {
+                    InnerBuffer::Gzip(GzEncoder::new(writer, level.as_flate2()))
+                }
+                Compression::Zlib(level) => {
+                    InnerBuffer::Zlib(ZlibEncoder::new(writer, level.as_flate2()))
+                }
             }
         })
     }
