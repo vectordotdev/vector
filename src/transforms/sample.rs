@@ -143,7 +143,11 @@ impl FunctionTransform for Sample {
         let value = self
             .key_field
             .as_ref()
-            .and_then(|key_field| event.as_log().get(key_field.as_str()))
+            .and_then(|key_field| match &event {
+                Event::Log(event) => event.get(key_field.as_str()),
+                Event::Trace(event) => event.get(key_field.as_str()),
+                Event::Metric(_) => panic!("component can never receive metric events"),
+            })
             .map(|v| v.to_string_lossy());
 
         let num = if let Some(value) = value {
@@ -155,9 +159,11 @@ impl FunctionTransform for Sample {
         self.count = (self.count + 1) % self.rate;
 
         if num % self.rate == 0 {
-            event
-                .as_mut_log()
-                .insert("sample_rate", self.rate.to_string());
+            match event {
+                Event::Log(ref mut event) => event.insert("sample_rate", self.rate.to_string()),
+                Event::Trace(ref mut event) => event.insert("sample_rate", self.rate.to_string()),
+                Event::Metric(_) => panic!("component can never receive metric events"),
+            };
             output.push(event);
         } else {
             emit!(SampleEventDiscarded);
