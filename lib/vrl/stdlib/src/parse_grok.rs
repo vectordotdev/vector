@@ -1,9 +1,6 @@
-use std::collections::BTreeMap;
-
-use datadog_grok::parse_grok_rules;
 use vrl::prelude::*;
 
-use crate::parse_groks::{Error, ParseGroksFn};
+use crate::parse_groks::ParseGroks;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseGrok;
@@ -58,41 +55,12 @@ impl Function for ParseGrok {
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
-        let value = arguments.required("value");
+        let value = arguments.required_expr("value");
+        let pattern = arguments.required_expr("pattern");
+        let patterns = vec![pattern];
+        let aliases = arguments.optional_object("aliases")?.unwrap_or_default();
 
-        let pattern = arguments
-            .required_literal("pattern")?
-            .to_value()
-            .try_bytes_utf8_lossy()
-            .expect("grok pattern not bytes")
-            .into_owned();
-        let patterns = [pattern];
-
-        let aliases = arguments
-            .optional_object("aliases")?
-            .unwrap_or_default()
-            .into_iter()
-            .map(|(key, expr)| {
-                let alias = expr
-                    .as_value()
-                    .ok_or(vrl::function::Error::ExpectedStaticExpression {
-                        keyword: "aliases",
-                        expr,
-                    })
-                    .map(|e| {
-                        e.try_bytes_utf8_lossy()
-                            .expect("should be a string")
-                            .into_owned()
-                    })?;
-                Ok((key, alias))
-            })
-            .collect::<std::result::Result<BTreeMap<String, String>, vrl::function::Error>>()?;
-
-        // we use a datadog library here because it is a superset of grok
-        let grok_rules = parse_grok_rules::parse_grok_rules(&patterns, aliases)
-            .map_err(|e| Box::new(Error::InvalidGrokPattern(e)) as Box<dyn DiagnosticMessage>)?;
-
-        Ok(Box::new(ParseGroksFn { value, grok_rules }))
+        ParseGroks::compile(value, patterns, aliases)
     }
 
     fn compile_argument(
@@ -104,7 +72,10 @@ impl Function for ParseGrok {
     ) -> CompiledArgument {
         match (name, expr) {
             ("pattern", Some(expr)) => {
-                let aliases: Option<&FunctionArgument> = args.iter().find_map(|(name, arg)| {
+                let pattern = expr.as_literal("pattern")?;
+                let patterns = vec![pattern];
+
+                let aliases = args.iter().find_map::<&FunctionArgument, _>(|(name, arg)| {
                     if *name == "aliases" {
                         arg.as_ref()
                     } else {
@@ -112,39 +83,7 @@ impl Function for ParseGrok {
                     }
                 });
 
-                let pattern = expr
-                    .as_literal("pattern")?
-                    .try_bytes_utf8_lossy()
-                    .expect("grok pattern not bytes")
-                    .into_owned();
-                let patterns = [pattern];
-
-                let aliases = aliases
-                .map(|aliases| {
-                    aliases
-                        .as_value()
-                        .unwrap()
-                        .try_object()
-                        .unwrap()
-                        .into_iter()
-                        .map(|(key, expr)| {
-                            let alias = expr
-                                .try_bytes_utf8_lossy()
-                                .expect("should be a string")
-                                .into_owned();
-                            Ok((key, alias))
-                        })
-                    .collect::<std::result::Result<BTreeMap<String, String>, vrl::function::Error>>().unwrap()
-                })
-                .unwrap_or_default();
-
-                // We use a datadog library here because it is a superset of grok.
-                let grok_rules =
-                    parse_grok_rules::parse_grok_rules(&patterns, aliases).map_err(|e| {
-                        Box::new(Error::InvalidGrokPattern(e)) as Box<dyn DiagnosticMessage>
-                    })?;
-
-                Ok(Some(Box::new(grok_rules) as _))
+                ParseGroks::compile_pattern_argument(patterns, aliases)
             }
             ("aliases", Some(_)) => Ok(None),
             _ => Ok(None),
