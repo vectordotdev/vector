@@ -27,7 +27,7 @@ use vector::{
         SourceContext, TransformConfig, TransformContext,
     },
     event::{
-        metric::{self, MetricData, MetricValue},
+        metric::{self, MetricData, MetricTime, MetricValue},
         Event, EventArray, EventContainer, Value,
     },
     schema,
@@ -275,8 +275,11 @@ impl FunctionTransform for MockTransform {
                 };
                 if let Some(increment) = increment {
                     assert!(metric.add(&MetricData {
+                        time: MetricTime {
+                            interval_ms: metric.interval_ms(),
+                            timestamp: metric.timestamp(),
+                        },
                         kind: metric.kind(),
-                        timestamp: metric.timestamp(),
                         value: increment,
                     }));
                 }

@@ -4,8 +4,7 @@ use vector_common::finalization::{EventStatus, Finalizable};
 
 use crate::{
     buffer_usage_data::BufferUsageHandle,
-    topology::builder::IntoBuffer,
-    topology::channel::{Received, ReceiverAdapter},
+    topology::{builder::IntoBuffer, channel::ReceiverAdapter},
     variants::{
         disk_v2::{build_disk_v2_buffer, get_disk_v2_data_dir_path},
         DiskV1Buffer,
@@ -73,7 +72,7 @@ where
     info!("Detected old `disk_v1`-based buffer for the `{}` sink. Automatically migrating to `disk_v2`.", id);
 
     let mut migrated_records = 0;
-    while let Received::Some(mut old_record) = src_reader.next().await {
+    while let Some(mut old_record) = src_reader.next().await {
         let old_record_event_count = old_record.event_count();
         let finalizers = ManuallyDrop::new(old_record.take_finalizers());
 
