@@ -92,6 +92,10 @@ pub struct Histogram {
 }
 
 impl Histogram {
+    const MIN_BUCKET: f64 = 0.015_625; // (-6_f64).exp2() is not const yet
+    const MIN_BUCKET_EXP: f64 = -6.0;
+    const BUCKETS: usize = 20;
+
     pub(crate) fn new() -> Self {
         // Box to avoid having this large array inline to the structure, blowing
         // out cache coherence.
@@ -100,27 +104,28 @@ impl Histogram {
         // suitable for different distributions but since our present use case
         // is mostly non-negative and measures smallish latencies we cluster
         // around but never quite get to zero with an increasingly coarse
-        // long-tail.
+        // long-tail. This also lets us find the right bucket to record into using simple
+        // constant-time math operations instead of a loop-and-compare construct.
         let buckets = Box::new([
-            (0.015_625, AtomicU32::new(0)),
-            (0.03125, AtomicU32::new(0)),
-            (0.0625, AtomicU32::new(0)),
-            (0.125, AtomicU32::new(0)),
-            (0.25, AtomicU32::new(0)),
-            (0.5, AtomicU32::new(0)),
-            (1.0, AtomicU32::new(0)),
-            (2.0, AtomicU32::new(0)),
-            (4.0, AtomicU32::new(0)),
-            (8.0, AtomicU32::new(0)),
-            (16.0, AtomicU32::new(0)),
-            (32.0, AtomicU32::new(0)),
-            (64.0, AtomicU32::new(0)),
-            (128.0, AtomicU32::new(0)),
-            (256.0, AtomicU32::new(0)),
-            (512.0, AtomicU32::new(0)),
-            (1024.0, AtomicU32::new(0)),
-            (2048.0, AtomicU32::new(0)),
-            (4096.0, AtomicU32::new(0)),
+            ((-6_f64).exp2(), AtomicU32::new(0)),
+            ((-5_f64).exp2(), AtomicU32::new(0)),
+            ((-4_f64).exp2(), AtomicU32::new(0)),
+            ((-3_f64).exp2(), AtomicU32::new(0)),
+            ((-2_f64).exp2(), AtomicU32::new(0)),
+            ((-1_f64).exp2(), AtomicU32::new(0)),
+            (0_f64.exp2(), AtomicU32::new(0)),
+            (1_f64.exp2(), AtomicU32::new(0)),
+            (2_f64.exp2(), AtomicU32::new(0)),
+            (3_f64.exp2(), AtomicU32::new(0)),
+            (4_f64.exp2(), AtomicU32::new(0)),
+            (5_f64.exp2(), AtomicU32::new(0)),
+            (6_f64.exp2(), AtomicU32::new(0)),
+            (7_f64.exp2(), AtomicU32::new(0)),
+            (8_f64.exp2(), AtomicU32::new(0)),
+            (9_f64.exp2(), AtomicU32::new(0)),
+            (10_f64.exp2(), AtomicU32::new(0)),
+            (11_f64.exp2(), AtomicU32::new(0)),
+            (12_f64.exp2(), AtomicU32::new(0)),
             (f64::INFINITY, AtomicU32::new(0)),
         ]);
         Self {
@@ -130,14 +135,21 @@ impl Histogram {
         }
     }
 
-    pub(crate) fn record(&self, value: f64) {
-        for (bound, bucket) in self.buckets.iter() {
-            if value <= *bound {
-                bucket.fetch_add(1, Ordering::Relaxed);
-                break;
-            }
-        }
+    pub(self) fn bucket_index(value: f64) -> usize {
+        // The buckets are all powers of two, so compute the ceiling of the log_2 of the
+        // value. Apply a lower bound to prevent zero or negative values from blowing up the log.
+        let log = value.max(Self::MIN_BUCKET).log2().ceil();
+        // Offset it based on the minimum bucket's exponent. The result will be non-negative thanks
+        // to the `.max` above, so we can coerce it directly to `usize`.
+        #[allow(clippy::cast_possible_truncation)] // The log will always be smaller than `usize`.
+        let index = (log - Self::MIN_BUCKET_EXP) as usize;
+        // Now bound the value for values larger than the largest bucket.
+        index.min(Self::BUCKETS - 1)
+    }
 
+    pub(crate) fn record(&self, value: f64) {
+        let index = Self::bucket_index(value);
+        self.buckets[index].1.fetch_add(1, Ordering::Relaxed);
         self.count.fetch_add(1, Ordering::Relaxed);
         let _ = self
             .sum
@@ -263,13 +275,30 @@ mod test {
             let mut model_count: u64 = 0;
             let mut model_sum: f64 = 0.0;
 
-            for val in &values {
-                if val.is_infinite() || val.is_nan() {
+            for value in values {
+                if value.is_infinite() || value.is_nan() {
                     continue;
                 }
-                sut.record(*val);
+
+                let index = Histogram::bucket_index(value);
+                assert!(
+                    value <= sut.buckets[index].0,
+                    "Value {} is not less than the upper limit {}.",
+                    value,
+                    sut.buckets[index].0
+                );
+                if index > 0 {
+                    assert!(
+                        value > sut.buckets[index - 1].0,
+                        "Value {} is not greater than the previous upper limit {}.",
+                        value,
+                        sut.buckets[index - 1].0
+                    );
+                }
+
+                sut.record(value);
                 model_count = model_count.wrapping_add(1);
-                model_sum += *val;
+                model_sum += value;
 
                 assert_eq!(sut.count(), model_count);
                 assert!(nearly_equal(sut.sum(), model_sum));
