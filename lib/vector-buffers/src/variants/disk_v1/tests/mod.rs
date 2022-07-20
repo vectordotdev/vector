@@ -130,14 +130,11 @@ macro_rules! assert_reader_writer_v1_positions {
 #[macro_export]
 macro_rules! assert_reader_v1_delete_position {
     ($reader:expr, $expected_reader:expr) => {{
-        use std::sync::atomic::Ordering;
-        let delete_offset = &$reader.delete_offset;
+        let delete_offset = $reader.delete_offset;
         assert_eq!(
-            delete_offset.load(Ordering::Relaxed),
-            $expected_reader,
+            delete_offset, $expected_reader,
             "expected delete offset of {}, got {} instead",
-            $expected_reader,
-            delete_offset.load(Ordering::Relaxed),
+            $expected_reader, delete_offset
         );
     }};
 }
@@ -201,9 +198,5 @@ pub(crate) async fn read_next<T>(reader: &mut Reader<T>) -> T
 where
     T: Bufferable,
 {
-    reader
-        .next()
-        .await
-        .expect("read should not fail")
-        .expect("read should not be none")
+    reader.next().await.expect("read should not fail")
 }

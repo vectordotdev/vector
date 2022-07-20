@@ -8,13 +8,8 @@ use vector_common::finalization::Finalizable;
 use super::{create_default_buffer_v2, read_next, read_next_some};
 use crate::{
     assert_buffer_is_empty, assert_buffer_records,
-    test::{
-        acknowledge, acknowledge_error, install_tracing_helpers, with_temp_dir, MultiEventRecord,
-        SizedRecord,
-    },
-    variants::disk_v2::{
-        reader::ReaderError, tests::create_default_buffer_v2_with_usage, writer::RecordWriter,
-    },
+    test::{acknowledge, install_tracing_helpers, with_temp_dir, MultiEventRecord, SizedRecord},
+    variants::disk_v2::{tests::create_default_buffer_v2_with_usage, writer::RecordWriter},
     EventCount,
 };
 
@@ -28,7 +23,12 @@ async fn basic_read_write_loop() {
             let (mut writer, mut reader, ledger) = create_default_buffer_v2(data_dir).await;
             assert_buffer_is_empty!(ledger);
 
-            let expected_items = make_items(10, SizedRecord::new);
+            let expected_items = (512..768)
+                .into_iter()
+                .cycle()
+                .take(10)
+                .map(SizedRecord::new)
+                .collect::<Vec<_>>();
             let input_items = expected_items.clone();
 
             // Now create a reader and writer task that will take a set of input messages, buffer
@@ -150,7 +150,12 @@ async fn initial_size_correct_with_multievents() {
             // Create a regular buffer, no customizations required.
             let (mut writer, _, _) = create_default_buffer_v2(data_dir.clone()).await;
 
-            let input_items = make_items(2000, MultiEventRecord::new);
+            let input_items = (512..768)
+                .into_iter()
+                .cycle()
+                .take(2000)
+                .map(MultiEventRecord::new)
+                .collect::<Vec<_>>();
             let expected_records = input_items.len();
             let expected_events = input_items
                 .iter()
@@ -226,49 +231,4 @@ async fn initial_size_correct_with_multievents() {
         }
     })
     .await;
-}
-
-#[tokio::test]
-async fn reader_stops_after_negative_acknowledgement() {
-    with_temp_dir(|dir| {
-        let data_dir = dir.to_path_buf();
-
-        async move {
-            let (mut writer, mut reader, ledger) = create_default_buffer_v2(data_dir).await;
-            assert_buffer_is_empty!(ledger);
-
-            // Now create a reader and writer task that will take a set of input messages, buffer
-            // them, read them out, and then make sure nothing was missed.
-            let write_task = tokio::spawn(async move {
-                for item in make_items(5, SizedRecord::new) {
-                    writer
-                        .write_record(item)
-                        .await
-                        .expect("write should not fail");
-                }
-                writer.flush().await.expect("writer flush should not fail");
-                writer.close();
-            });
-
-            let record = read_next(&mut reader).await.expect("First read failed");
-            acknowledge(record).await;
-
-            let record = read_next(&mut reader).await.expect("Second read failed");
-            acknowledge_error(record).await;
-
-            assert_eq!(reader.next().await, Err(ReaderError::Stopped));
-
-            write_task.await.expect("write task should not panic");
-        }
-    })
-    .await;
-}
-
-fn make_items<T>(count: usize, map: impl Fn(u32) -> T) -> Vec<T> {
-    (512..768)
-        .into_iter()
-        .cycle()
-        .take(count)
-        .map(map)
-        .collect()
 }

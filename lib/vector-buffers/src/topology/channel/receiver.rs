@@ -51,44 +51,25 @@ impl<T: Bufferable> From<disk_v2::Reader<T, ProductionFilesystem>> for ReceiverA
     }
 }
 
-pub(crate) enum Received<T> {
-    None,
-    Some(T),
-    Stopped,
-}
-
-impl<T> From<Option<T>> for Received<T> {
-    fn from(that: Option<T>) -> Self {
-        match that {
-            None => Self::None,
-            Some(that) => Self::Some(that),
-        }
-    }
-}
-
 impl<T> ReceiverAdapter<T>
 where
     T: Bufferable,
 {
-    pub(crate) async fn next(&mut self) -> Received<T> {
+    pub(crate) async fn next(&mut self) -> Option<T> {
         match self {
-            ReceiverAdapter::InMemory(rx) => rx.next().await.into(),
-            ReceiverAdapter::DiskV1(reader) => match reader.next().await {
-                Ok(result) => result.into(),
-                Err(_) => Received::Stopped,
-            },
+            ReceiverAdapter::InMemory(rx) => rx.next().await,
+            ReceiverAdapter::DiskV1(reader) => reader.next().await,
             ReceiverAdapter::DiskV2(reader) => loop {
                 match reader.next().await {
-                    Ok(result) => break result.into(),
-                    Err(e) => match (e.is_stopped(), e.as_recoverable_error()) {
-                        (true, _) => break Received::Stopped,
-                        (false, Some(re)) => {
+                    Ok(result) => break result,
+                    Err(e) => match e.as_recoverable_error() {
+                        Some(re) => {
                             // If we've hit a recoverable error, we'll emit an event to indicate as much but we'll still
                             // keep trying to read the next available record.
                             emit(re);
                             continue;
                         }
-                        (false, None) => panic!("Reader encountered unrecoverable error: {:?}", e),
+                        None => panic!("Reader encountered unrecoverable error: {:?}", e),
                     },
                 }
             },
@@ -109,7 +90,6 @@ pub struct BufferReceiver<T: Bufferable> {
     base: ReceiverAdapter<T>,
     overflow: Option<Box<BufferReceiver<T>>>,
     instrumentation: Option<BufferUsageHandle>,
-    stopped: bool,
 }
 
 impl<T: Bufferable> BufferReceiver<T> {
@@ -119,7 +99,6 @@ impl<T: Bufferable> BufferReceiver<T> {
             base,
             overflow: None,
             instrumentation: None,
-            stopped: false,
         }
     }
 
@@ -129,7 +108,6 @@ impl<T: Bufferable> BufferReceiver<T> {
             base,
             overflow: Some(Box::new(overflow)),
             instrumentation: None,
-            stopped: false,
         }
     }
 
@@ -149,12 +127,6 @@ impl<T: Bufferable> BufferReceiver<T> {
 
     #[async_recursion]
     pub async fn next(&mut self) -> Option<T> {
-        // If the base receiver indicated it has been stopped by a negative acknowledgement, then
-        // stop receiving from the overflow as well.
-        if self.stopped {
-            return None;
-        }
-
         // We want to poll both our base and overflow receivers without waiting for one or the
         // other to entirely drain before checking the other.  This ensures that we're fairly
         // servicing both receivers, and avoiding stalls in one or the other.
@@ -167,24 +139,13 @@ impl<T: Bufferable> BufferReceiver<T> {
 
         let (item, from_base) = match overflow {
             None => match self.base.next().await {
-                Received::Some(item) => (item, true),
-                Received::None => return None,
-                Received::Stopped => {
-                    self.stopped = true;
-                    return None;
-                }
+                Some(item) => (item, true),
+                None => return None,
             },
             Some(mut overflow) => {
                 select! {
                     Some(item) = overflow.next() => (item, false),
-                    next = self.base.next() => match next {
-                        Received::Some(item) => (item, true),
-                        Received::None => return None,
-                        Received::Stopped => {
-                            self.stopped = true;
-                            return None;
-                        }
-                    },
+                    Some(item) = self.base.next() => (item, true),
                     else => return None,
                 }
             }

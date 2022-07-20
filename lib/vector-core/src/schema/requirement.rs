@@ -98,7 +98,7 @@ impl Requirement {
             match maybe_meaning_path {
                 Some(path) => {
                     // Get the kind at the path for the given semantic meaning.
-                    let definition_kind = definition.kind().at_path(path);
+                    let definition_kind = definition.event_kind().at_path(path);
 
                     if !req_meaning.kind.is_superset(&definition_kind) {
                         // The semantic meaning kind does not match the expected
