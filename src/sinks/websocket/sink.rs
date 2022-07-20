@@ -71,7 +71,11 @@ pub struct WebSocketConnector {
 }
 
 impl WebSocketConnector {
-    pub fn new(uri: String, tls: MaybeTlsSettings, auth: Option<Auth>) -> Result<Self, WebSocketError> {
+    pub fn new(
+        uri: String,
+        tls: MaybeTlsSettings,
+        auth: Option<Auth>,
+    ) -> Result<Self, WebSocketError> {
         let request = (&uri).into_client_request().context(CreateFailedSnafu)?;
         let (host, port) = Self::extract_host_and_port(&request).context(CreateFailedSnafu)?;
 
@@ -436,7 +440,9 @@ mod tests {
             ping_timeout: None,
             ping_interval: None,
             acknowledgements: Default::default(),
-            auth: Some(Auth::Bearer{token: "OiJIUzI1NiIsInR5cCI6IkpXVCJ".to_string()}),
+            auth: Some(Auth::Bearer {
+                token: "OiJIUzI1NiIsInR5cCI6IkpXVCJ".to_string(),
+            }),
         };
 
         send_events_and_assert(addr, config, tls).await;
@@ -454,7 +460,7 @@ mod tests {
             ping_interval: None,
             ping_timeout: None,
             acknowledgements: Default::default(),
-            auth: None
+            auth: None,
         };
         let tls = MaybeTlsSettings::Raw(());
 
