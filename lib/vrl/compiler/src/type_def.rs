@@ -331,7 +331,7 @@ impl TypeDef {
     }
 
     #[must_use]
-    pub fn with_type_set_at_path(self, path: &LookupBuf, other: Self) -> Self {
+    pub fn with_type_inserted(self, path: &LookupBuf, other: Self) -> Self {
         if path.is_root() {
             other
         } else {

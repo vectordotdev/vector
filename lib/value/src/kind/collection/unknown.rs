@@ -13,7 +13,7 @@ use crate::Kind;
 ///
 /// "unknown" values can either be "undefined" or the "unknown" type.
 /// For example, an array with an infinite unknown of "integer" doesn't imply that _every_
-/// index contains an array. Rather, it says every index contains an "integer" or is "undefined"
+/// index contains an array. Rather, it says every index contains an "integer" or is "undefined".
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]
 pub struct Unknown(pub(super) Inner);
 
@@ -84,7 +84,7 @@ impl Unknown {
     /// Get the `Kind` stored in this `Unknown`.
     /// This represents the kind of any type not "known".
     /// It will always include "undefined", since unknown
-    /// values are not guaranteed to exist
+    /// values are not guaranteed to exist.
     #[must_use]
     pub fn to_kind(&self) -> Kind {
         self.to_existing_kind().or_undefined()

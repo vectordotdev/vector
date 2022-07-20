@@ -74,7 +74,7 @@ impl Expression for AppendFn {
         let items_array = items.as_array().expect("must be an array");
 
         if let Some(exact_len) = self_array.exact_length() {
-            // the exact array length is known
+            // The exact array length is known.
             for (i, i_kind) in items_array.known() {
                 self_array
                     .known_mut()

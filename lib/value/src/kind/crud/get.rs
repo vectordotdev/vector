@@ -59,18 +59,18 @@ impl Kind {
                 if let Some(array) = self.as_array() {
                     if index < 0 {
                         let largest_known_index = array.known().keys().map(|i| i.to_usize()).max();
-                        // the minimum size of the resulting array
+                        // The minimum size of the resulting array.
                         let len_required = -index as usize;
 
                         if array.unknown_kind().contains_any_defined() {
-                            // the exact length is not known. We can't know for sure if the index
+                            // The exact length is not known. We can't know for sure if the index
                             // will point to a known or unknown type, so the union of the unknown type
-                            // plus any possible known type must be taken. Just the unknown type alone is not sufficient
+                            // plus any possible known type must be taken. Just the unknown type alone is not sufficient.
 
-                            // the array may be larger, but this is the largest we can prove the array is from the type information
+                            // The array may be larger, but this is the largest we can prove the array is from the type information.
                             let min_length = largest_known_index.map_or(0, |i| i + 1);
 
-                            // We can prove the positive index won't be less than "min_index"
+                            // We can prove the positive index won't be less than "min_index".
                             let min_index = (min_length as isize + index).max(0) as usize;
                             let can_underflow = (min_length as isize + index) < 0;
 
@@ -90,13 +90,13 @@ impl Kind {
                             return kind.get_recursive(iter);
                         }
 
-                        // there are no unknown indices, so we can determine the exact positive index
+                        // There are no unknown indices, so we can determine the exact positive index.
                         let exact_len = largest_known_index.map_or(0, |x| x + 1);
                         if exact_len >= len_required {
-                            // make the index positive, then continue below
+                            // Make the index positive, then continue below.
                             index += exact_len as isize;
                         } else {
-                            // out of bounds index
+                            // Out of bounds index.
                             return Self::undefined();
                         }
                     }
@@ -121,33 +121,33 @@ impl Kind {
             Some(BorrowedSegment::CoalesceField(field)) => {
                 let field_kind = self.get_field(field);
 
-                // the remaining segments if this match succeeded
+                // The remaining segments if this match succeeded.
                 #[allow(clippy::needless_collect)]
-                // need to collect to prevent infinite recursive iterator type
+                // Need to collect to prevent infinite recursive iterator type.
                 let match_iter = iter
                     .clone()
                     .skip_while(|segment| matches!(segment, BorrowedSegment::CoalesceField(_)))
-                    // skip the CoalesceEnd, which always exists after CoalesceFields
+                    // Skip the `CoalesceEnd`, which always exists after `CoalesceFields`.
                     .skip(1)
                     .collect::<Vec<_>>();
 
                 // This is the resulting type, assuming the match succeeded.
                 let match_type = field_kind
                     .clone()
-                    // This type is only valid if the match succeeded, which means this type wasn't undefined
+                    // This type is only valid if the match succeeded, which means this type wasn't undefined.
                     .without_undefined()
                     .get_recursive(match_iter.into_iter());
 
                 if !field_kind.contains_undefined() {
-                    // this coalesce field will always be defined, so skip the others.
+                    // This coalesce field will always be defined, so skip the others.
                     return match_type;
                 }
 
-                // the first field may or may not succeed. Try both.
+                // The first field may or may not succeed. Try both.
                 self.get_recursive(iter).union(match_type)
             }
             Some(BorrowedSegment::Invalid) => {
-                // Value::get returns `None` in this case, which means the value is not defined
+                // Value::get returns `None` in this case, which means the value is not defined.
                 Self::undefined()
             }
             None => self.clone(),

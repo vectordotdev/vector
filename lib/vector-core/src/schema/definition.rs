@@ -190,19 +190,19 @@ impl Definition {
             if kind.contains_null() {
                 // field is optional, so don't coerce to an object, but still make sure it _can_ be an object
                 assert!(
-                    self.event_kind.as_object().is_some(),
+                    self.metadata_kind.as_object().is_some(),
                     "Setting a field on a value that cannot be an object"
                 );
             } else {
-                self.event_kind = self
-                    .event_kind
+                self.metadata_kind = self
+                    .metadata_kind
                     .into_object()
                     .expect("required field implies the type can be an object")
                     .into();
             }
         }
 
-        self.metadata_kind.insert(&path, kind);
+        self.metadata_kind.set_at_path(&path, kind);
         self
     }
 

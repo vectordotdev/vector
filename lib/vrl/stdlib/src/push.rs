@@ -79,10 +79,10 @@ impl Expression for PushFn {
         let array = typedef.as_array_mut().expect("must be an array");
 
         if let Some(exact_len) = array.exact_length() {
-            // the exact array length is known, so just add the item to the correct index
+            // The exact array length is known, so just add the item to the correct index.
             array.known_mut().insert(exact_len.into(), item);
         } else {
-            // we don't know where the item will be inserted, so just add it to the unknown
+            // We don't know where the item will be inserted, so just add it to the unknown.
             array.set_unknown(array.unknown_kind().union(item));
         }
 

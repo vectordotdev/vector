@@ -42,7 +42,7 @@ impl Kind {
         if let Some(segment) = iter.next() {
             match segment {
                 BorrowedSegment::Field(field) | BorrowedSegment::CoalesceEnd(field) => {
-                    // field insertion converts the value to an object, so remove all other types
+                    // Field insertion converts the value to an object, so remove all other types.
                     *self = Self::object(self.object.clone().unwrap_or_else(Collection::empty));
                     let collection = self.object.as_mut().expect("object was just inserted");
 
@@ -53,59 +53,59 @@ impl Kind {
                     .insert_recursive(iter, kind);
                 }
                 BorrowedSegment::Index(mut index) => {
-                    // array insertion converts the value to an array, so remove all other types
+                    // Array insertion converts the value to an array, so remove all other types.
                     *self = Self::array(self.array.clone().unwrap_or_else(Collection::empty));
                     let collection = self.array.as_mut().expect("array was just inserted");
 
                     if index < 0 {
                         let largest_known_index = collection.largest_known_index();
-                        // the minimum size of the resulting array
+                        // The minimum size of the resulting array.
                         let len_required = -index as usize;
 
                         let unknown_kind = collection.unknown_kind();
                         if unknown_kind.contains_any_defined() {
-                            // the array may be larger, but this is the largest we can prove the array is from the type information
+                            // The array may be larger, but this is the largest we can prove the array is from the type information.
                             let min_length = collection.min_length();
 
                             if len_required > min_length {
                                 // We can't prove the array is large enough, so "holes" may be created
                                 // which set the value to null.
                                 // Holes are inserted to the front, which shifts everything to the right.
-                                // We don't know the exact number of holes/shifts, but can determine an upper bound
+                                // We don't know the exact number of holes/shifts, but can determine an upper bound.
                                 let max_shifts = len_required - min_length;
 
                                 // The number of possible shifts is 0 ..= max_shifts.
                                 // Each shift will be calculated independently and merged into the collection.
-                                // A shift of 0 is the original collection, so that is skipped
+                                // A shift of 0 is the original collection, so that is skipped.
                                 let zero_shifts = collection.clone();
                                 for shift_count in 1..=max_shifts {
                                     let mut shifted_collection = zero_shifts.clone();
-                                    // clear all known values and replace with new ones. (in-place shift can overwrite)
+                                    // Clear all known values and replace with new ones. (in-place shift can overwrite).
                                     shifted_collection.known_mut().clear();
 
-                                    // add the "null" from holes.
+                                    // Add the "null" from holes.
                                     for i in 1..shift_count {
                                         shifted_collection
                                             .known_mut()
                                             .insert(i.into(), Self::null());
                                     }
 
-                                    // shift known values by the exact "shift_count"
+                                    // Shift known values by the exact "shift_count".
                                     for (i, i_kind) in zero_shifts.known() {
                                         shifted_collection
                                             .known_mut()
                                             .insert(*i + shift_count, i_kind.clone());
                                     }
 
-                                    // add this shift count as another possible type definition
+                                    // Add this shift count as another possible type definition.
                                     collection.merge(shifted_collection, false);
                                 }
                             }
 
-                            // We can prove the positive index won't be less than "min_index"
+                            // We can prove the positive index won't be less than "min_index".
                             let min_index = (min_length as isize + index).max(0) as usize;
 
-                            // sanity check: if holes are added to the type, min_index must be 0
+                            // Sanity check: if holes are added to the type, min_index must be 0.
                             debug_assert!(min_index == 0 || min_length >= len_required);
 
                             // Apply the current "unknown" to indices that don't have an explicit known
@@ -119,7 +119,7 @@ impl Kind {
                                     .remove_undefined();
                             }
                             for (i, i_kind) in collection.known_mut() {
-                                // This index might be set by the insertion, add the insertion type to the existing type
+                                // This index might be set by the insertion. Add the insertion type to the existing type.
                                 if i.to_usize() >= min_index {
                                     let mut kind_with_insertion = i_kind.clone();
                                     let remaining_path_segments = iter.clone().collect::<Vec<_>>();
@@ -143,14 +143,14 @@ impl Kind {
                             "all cases with an unknown have been handled"
                         );
 
-                        // If there is no unknown, the exact position of the negative index can be determined
+                        // If there is no unknown, the exact position of the negative index can be determined.
                         let exact_array_len =
                             largest_known_index.map_or(0, |max_index| max_index + 1);
 
                         if len_required > exact_array_len {
-                            // fill in holes from extending to fit a negative index
+                            // Fill in holes from extending to fit a negative index.
                             for i in exact_array_len..len_required {
-                                // there is no unknown, so the exact type "null" can be inserted
+                                // There is no unknown, so the exact type "null" can be inserted.
                                 collection.known_mut().insert(i.into(), Self::null());
                             }
                         }
@@ -162,8 +162,8 @@ impl Kind {
 
                     let index_exists = collection.known().contains_key(&index.into());
                     if !index_exists {
-                        // add "null" to all holes, adding it to the "unknown" if it exists
-                        // holes can never be undefined
+                        // Add "null" to all holes, adding it to the "unknown" if it exists.
+                        // Holes can never be undefined.
                         let hole_type = collection.unknown_kind().without_undefined().or_null();
 
                         for i in 0..index {
@@ -187,13 +187,13 @@ impl Kind {
                         return self.insert_recursive(iter, kind);
                     }
 
-                    // need to collect to prevent infinite recursive iterator type
+                    // Need to collect to prevent infinite recursive iterator type.
                     #[allow(clippy::needless_collect)]
-                    // the remaining segments if this match succeeded
+                    // The remaining segments if this match succeeded.
                     let match_iter = iter
                         .clone()
                         .skip_while(|segment| matches!(segment, BorrowedSegment::CoalesceField(_)))
-                        // skip the CoalesceEnd, which always exists after CoalesceFields
+                        // Skip the `CoalesceEnd`, which always exists after `CoalesceFields`.
                         .skip(1)
                         .collect::<Vec<_>>();
 
@@ -202,14 +202,14 @@ impl Kind {
                     if let Some(object) = match_type.as_object_mut() {
                         if let Some(field_kind) = object.known_mut().get_mut(&field.as_ref().into())
                         {
-                            // "match_type" is only valid if the match succeeded, which means this field wasn't undefined
+                            // "match_type" is only valid if the match succeeded, which means this field wasn't undefined.
                             field_kind.remove_undefined();
                             field_kind.insert_recursive(match_iter.into_iter(), kind.clone());
                         }
                     }
 
                     if !field_kind.contains_undefined() {
-                        // this coalesce field will always be defined, so skip the others.
+                        // This coalesce field will always be defined, so skip the others.
                         *self = match_type;
                         return;
                     }
@@ -218,7 +218,7 @@ impl Kind {
                     self.insert_recursive(iter, kind);
                     *self = self.clone().union(match_type);
                 }
-                BorrowedSegment::Invalid => { /* an invalid path does nothing */ }
+                BorrowedSegment::Invalid => { /* An invalid path does nothing. */ }
             };
         } else {
             *self = kind;
@@ -469,7 +469,7 @@ mod tests {
                 TestCase {
                     this: Kind::array(
                         Collection::from(BTreeMap::from([
-                            // this would be an invalid type without index 0 (it can't be undefined)
+                            // This would be an invalid type without index 0 (it can't be undefined).
                             (0.into(), Kind::integer()),
                             (1.into(), Kind::float()),
                         ]))
@@ -479,10 +479,10 @@ mod tests {
                     kind: Kind::bytes(),
                     expected: Kind::array(
                         Collection::from(BTreeMap::from([
-                            // either the unknown (integer) or the inserted value, depending on the actual length
+                            // Either the unknown (integer) or the inserted value, depending on the actual length.
                             (0.into(), Kind::integer().or_bytes()),
-                            // original float if it wasn't shifted, or bytes/integer if it was shifted
-                            // can't be a hole
+                            // The original float if it wasn't shifted, or bytes/integer if it was shifted.
+                            // Can't be a hole.
                             (1.into(), Kind::float().or_bytes().or_integer()),
                             (2.into(), Kind::float().or_bytes().or_integer()),
                         ]))

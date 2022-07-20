@@ -19,7 +19,7 @@ impl Index {
 }
 
 impl Collection<Index> {
-    /// Returns the largest known index, or None if no known indices exist
+    /// Returns the largest known index, or None if no known indices exist.
     #[must_use]
     pub fn largest_known_index(&self) -> Option<usize> {
         self.known().keys().map(|i| i.to_usize()).max()

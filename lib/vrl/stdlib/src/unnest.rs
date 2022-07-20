@@ -192,8 +192,8 @@ pub(crate) fn invert_array_at_path(typedef: &TypeDef, path: &LookupBuf) -> TypeD
     let mut array = if let Some(array) = kind.into_array() {
         array
     } else {
-        // guaranteed fallible
-        // this can't actually be set to "fallible", or it will cause problems due to
+        // Guaranteed fallible.
+        // This can't actually be set to "fallible", or it will cause problems due to
         // https://github.com/vectordotdev/vector/issues/13527
         return TypeDef::never();
     };
@@ -387,7 +387,7 @@ mod tests {
                     } },
                 ] },
             },
-            // Coalesce with known path first
+            // Coalesce with known path first.
             TestCase {
                 old: type_def! { object {
                     "nonk" => type_def! { object {

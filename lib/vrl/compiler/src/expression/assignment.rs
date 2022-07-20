@@ -351,9 +351,9 @@ impl Target {
             Self::Noop => {}
             Self::Internal(ident, path) => {
                 let type_def = match local.variable(ident) {
-                    None => TypeDef::null().with_type_set_at_path(path, new_type_def),
+                    None => TypeDef::null().with_type_inserted(path, new_type_def),
                     Some(&Details { ref type_def, .. }) => {
-                        type_def.clone().with_type_set_at_path(path, new_type_def)
+                        type_def.clone().with_type_inserted(path, new_type_def)
                     }
                 };
 
@@ -367,7 +367,7 @@ impl Target {
                         .target()
                         .type_def
                         .clone()
-                        .with_type_set_at_path(path, new_type_def),
+                        .with_type_inserted(path, new_type_def),
                     value,
                 });
             }
@@ -538,7 +538,7 @@ where
         match self {
             Single { expr, .. } => expr.type_def(state),
             Infallible { expr, .. } => {
-                // return type is either the "expr" type, or "bytes" (the error message)
+                // Return type is either the "expr" type, or "bytes" (the error message).
                 let mut type_def = expr.type_def(state);
                 type_def.kind_mut().add_bytes();
                 type_def.infallible()

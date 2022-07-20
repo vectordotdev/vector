@@ -205,7 +205,7 @@ impl Kind {
             && self.array.is_none()
     }
 
-    /// Returns `true` if at most one type is set
+    /// Returns `true` if at most one type is set.
     #[must_use]
     #[allow(clippy::many_single_char_names)]
     pub const fn is_exact(&self) -> bool {

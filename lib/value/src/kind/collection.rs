@@ -126,7 +126,7 @@ impl<T: Ord + Clone> Collection<T> {
         self.unknown = unknown.into().into();
     }
 
-    /// Returns a new collection with the unknown set
+    /// Returns a new collection with the unknown set.
     #[must_use]
     pub fn with_unknown(mut self, unknown: impl Into<Kind>) -> Self {
         self.set_unknown(unknown);
