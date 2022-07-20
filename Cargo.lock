@@ -4997,8 +4997,7 @@ checksum = "ff011a302c396a5197692431fc1948019154afc178baf7d8e37367442a4601cf"
 [[package]]
 name = "openssl-src"
 version = "111.22.0+1.1.1q"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f31f0d509d1c1ae9cada2f9539ff8f37933831fd5098879e482aa687d659853"
+source = "git+https://github.com/vectordotdev/openssl-src-rs.git?branch=enable_engine#52be5ec9f548ea825f602d514ebf322aa828c932"
 dependencies = [
  "cc",
 ]
@@ -8386,6 +8385,7 @@ dependencies = [
  "once_cell",
  "openssl",
  "openssl-probe",
+ "openssl-src",
  "ordered-float 3.0.0",
  "percent-encoding",
  "pin-project",
