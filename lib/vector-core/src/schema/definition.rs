@@ -151,19 +151,10 @@ impl Definition {
         let meaning = meaning.map(ToOwned::to_owned);
 
         if !path.is_root() {
-            if kind.contains_null() {
-                // field is optional, so don't coerce to an object, but still make sure it _can_ be an object
-                assert!(
-                    self.event_kind.as_object().is_some(),
-                    "Setting a field on a value that cannot be an object"
-                );
-            } else {
-                self.event_kind = self
-                    .event_kind
-                    .into_object()
-                    .expect("required field implies the type can be an object")
-                    .into();
-            }
+            assert!(
+                self.event_kind.as_object().is_some(),
+                "Setting a field on a value that cannot be an object"
+            );
         }
 
         self.event_kind.set_at_path(&path, kind);
@@ -187,19 +178,10 @@ impl Definition {
         let path = path.into();
 
         if !path.is_root() {
-            if kind.contains_null() {
-                // field is optional, so don't coerce to an object, but still make sure it _can_ be an object
-                assert!(
-                    self.metadata_kind.as_object().is_some(),
-                    "Setting a field on a value that cannot be an object"
-                );
-            } else {
-                self.metadata_kind = self
-                    .metadata_kind
-                    .into_object()
-                    .expect("required field implies the type can be an object")
-                    .into();
-            }
+            assert!(
+                self.metadata_kind.as_object().is_some(),
+                "Setting a field on a value that cannot be an object"
+            );
         }
 
         self.metadata_kind.set_at_path(&path, kind);
@@ -218,7 +200,7 @@ impl Definition {
         kind: Kind,
         meaning: Option<&str>,
     ) -> Self {
-        self.with_field(path, kind.or_null(), meaning)
+        self.with_field(path, kind.or_undefined(), meaning)
     }
 
     /// Register a semantic meaning for the definition.
