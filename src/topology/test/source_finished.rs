@@ -11,7 +11,7 @@ use crate::{
 #[tokio::test]
 async fn sources_finished() {
     let mut old_config = Config::builder();
-    let demo_logs = DemoLogsConfig::repeat(vec!["text".to_owned()], 1, 0.0);
+    let demo_logs = DemoLogsConfig::repeat(vec!["text".to_owned()], 1, 0.0, None);
     old_config.add_source("in", demo_logs);
     old_config.add_sink(
         "out",
