@@ -148,7 +148,7 @@ impl Histogram {
             .iter()
             .map(|(upper_limit, count)| Bucket {
                 upper_limit: *upper_limit,
-                count: count.load(Ordering::Relaxed) as u64,
+                count: u64::from(count.load(Ordering::Relaxed)),
             })
             .collect()
     }

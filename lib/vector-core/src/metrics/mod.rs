@@ -127,6 +127,7 @@ impl Controller {
 
     /// Take a snapshot of all gathered metrics and expose them as metric
     /// [`Event`](crate::event::Event)s.
+    #[allow(clippy::cast_precision_loss)]
     pub fn capture_metrics(&self) -> Vec<Metric> {
         let timestamp = Utc::now();
         let mut metrics = Vec::<Metric>::new();
@@ -139,7 +140,6 @@ impl Controller {
                 metrics.push(Metric::from_metric_kv(key, value, timestamp));
             });
             registry.visit_gauges(|key, gauge| {
-                // NOTE this will truncate if the value is greater than 2**52.
                 let value = gauge.load(Ordering::Relaxed);
                 let value = MetricValue::Gauge { value };
                 metrics.push(Metric::from_metric_kv(key, value, timestamp));
