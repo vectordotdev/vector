@@ -102,7 +102,7 @@ impl SourceSender {
         // events, so we have to add a map to the receiver to handle the
         // finalization.
         let recv = recv.into_stream().flat_map(move |mut events| {
-            events.for_each_event(|mut event| {
+            events.iter_events_mut().for_each(|mut event| {
                 let metadata = event.metadata_mut();
                 metadata.update_status(status);
                 metadata.update_sources();
@@ -126,7 +126,7 @@ impl SourceSender {
                 EventStatus::Delivered
             };
             count += 1;
-            events.for_each_event(|mut event| {
+            events.iter_events_mut().for_each(|mut event| {
                 let metadata = event.metadata_mut();
                 metadata.update_status(status);
                 metadata.update_sources();
@@ -144,7 +144,7 @@ impl SourceSender {
     ) -> impl Stream<Item = EventArray> + Unpin {
         let (inner, recv) = Inner::new_with_buffer(100, name.clone());
         let recv = recv.into_stream().map(move |mut events| {
-            events.for_each_event(|mut event| {
+            events.iter_events_mut().for_each(|mut event| {
                 let metadata = event.metadata_mut();
                 metadata.update_status(status);
                 metadata.update_sources();

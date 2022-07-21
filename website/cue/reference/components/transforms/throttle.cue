@@ -39,7 +39,7 @@ components: transforms: throttle: {
 				A [template string](/docs/reference/configuration/template-syntax/) that will be rendered to determine
 				if the event should be rate limited.
 
-				Each unique rendered template value will create a buckets of related events to be rate limited
+				Each unique rendered template value will create a bucket of related events to be rate limited
 				separately. If left unspecified, or if the event doesn’t have `key_field`, the event be will not be rate
 				limited separately. For example, to throttle events based on the `hostname` field use `{{ hostname }}`.
 				"""

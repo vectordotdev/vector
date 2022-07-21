@@ -1,11 +1,39 @@
 //! All types related to merging one [`Kind`] into another.
 
+use crate::kind::nest::CoalescedPath;
 use crate::kind::Field;
+use lookup::Lookup;
 use std::{collections::BTreeMap, ops::BitOr};
 
+use super::nest;
 use super::{Collection, Kind};
 
 impl Kind {
+    /// Returns a new kind with the type set at the specific path.
+    ///
+    /// # Errors
+    /// Because `nest_at_path` doesn't support coalescing or negative indices, an error will
+    /// be returned if a path is used that contains either of those. In the future those should
+    /// be supported so this functon can just return `Kind` instead of `Result`.
+    pub fn with_type_set_at_path(
+        mut self,
+        path: &Lookup<'_>,
+        other: Self,
+    ) -> Result<Self, nest::Error> {
+        if path.is_root() {
+            Ok(other)
+        } else {
+            let nested = other.nest_at_path(
+                path,
+                super::nest::Strategy {
+                    coalesced_path: CoalescedPath::Reject,
+                },
+            )?;
+            self.merge_keep(nested, true);
+            Ok(self)
+        }
+    }
+
     /// Merge `other` into `self`, using the provided `Strategy`.
     pub fn merge(&mut self, other: Self, strategy: Strategy) {
         match strategy.indices {

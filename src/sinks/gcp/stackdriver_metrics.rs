@@ -164,7 +164,7 @@ impl HttpSink for HttpEventSink {
             namespace, series.name.name
         );
 
-        let end_time = data.timestamp.unwrap_or_else(chrono::Utc::now);
+        let end_time = data.time.timestamp.unwrap_or_else(chrono::Utc::now);
 
         let (point_value, interval, metric_kind) = match &data.value {
             MetricValue::Counter { value } => {
