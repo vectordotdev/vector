@@ -134,8 +134,10 @@ impl RemapConfig {
         functions.append(&mut enrichment::vrl_functions());
         functions.append(&mut vector_vrl_functions::vrl_functions());
 
-        let mut state =
-            vrl::state::ExternalEnv::new_with_kind(merged_schema_definition.kind().clone());
+        let mut state = vrl::state::ExternalEnv::new_with_kind(
+            merged_schema_definition.event_kind().clone(),
+            merged_schema_definition.metadata_kind().clone(),
+        );
         state.set_external_context(enrichment_tables);
         state.set_external_context(MeaningList::default());
 
@@ -227,7 +229,6 @@ impl TransformConfig for RemapConfig {
         let mut dropped_definition =
             Definition::new(Kind::never(), input_definition.log_namespaces().clone());
 
-        // The vector namespace appends the dropped fields to the "event metadata", which doesn't yet have a schema
         if input_definition
             .log_namespaces()
             .contains(&LogNamespace::Legacy)
@@ -243,6 +244,21 @@ impl TransformConfig for RemapConfig {
                 ])),
                 Some("metadata"),
             ));
+        }
+
+        if input_definition
+            .log_namespaces()
+            .contains(&LogNamespace::Vector)
+        {
+            dropped_definition = dropped_definition.merge(
+                input_definition
+                    .clone()
+                    .with_metadata_field("reason", Kind::bytes())
+                    .with_metadata_field("message", Kind::bytes())
+                    .with_metadata_field("component_id", Kind::bytes())
+                    .with_metadata_field("component_type", Kind::bytes())
+                    .with_metadata_field("component_kind", Kind::bytes()),
+            );
         }
 
         let default_output =

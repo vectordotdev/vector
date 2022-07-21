@@ -3,13 +3,17 @@ use std::collections::btree_map;
 use ::value::Value;
 use vrl::prelude::*;
 
-fn flatten(value: Value) -> Resolved {
+static DEFAULT_SEPARATOR: &str = ".";
+
+fn flatten(value: Value, separator: Value) -> Resolved {
+    let separator = separator.try_bytes_utf8_lossy()?;
+
     match value {
         Value::Array(arr) => Ok(Value::Array(
             ArrayFlatten::new(arr.iter()).cloned().collect(),
         )),
         Value::Object(map) => Ok(Value::Object(
-            MapFlatten::new(map.iter())
+            MapFlatten::new(map.iter(), &separator)
                 .map(|(k, v)| (k, v.clone()))
                 .collect(),
         )),
@@ -30,11 +34,18 @@ impl Function for Flatten {
     }
 
     fn parameters(&self) -> &'static [Parameter] {
-        &[Parameter {
-            keyword: "value",
-            kind: kind::OBJECT | kind::ARRAY,
-            required: true,
-        }]
+        &[
+            Parameter {
+                keyword: "value",
+                kind: kind::OBJECT | kind::ARRAY,
+                required: true,
+            },
+            Parameter {
+                keyword: "separator",
+                kind: kind::BYTES,
+                required: false,
+            },
+        ]
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -43,6 +54,11 @@ impl Function for Flatten {
                 title: "object",
                 source: r#"flatten({ "foo": { "bar": true }})"#,
                 result: Ok(r#"{ "foo.bar": true }"#),
+            },
+            Example {
+                title: "object",
+                source: r#"flatten({ "foo": { "bar": true }}, "_")"#,
+                result: Ok(r#"{ "foo_bar": true }"#),
             },
             Example {
                 title: "array",
@@ -58,19 +74,26 @@ impl Function for Flatten {
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
+        let separator = arguments
+            .optional("separator")
+            .unwrap_or_else(|| expr!(DEFAULT_SEPARATOR));
         let value = arguments.required("value");
-        Ok(Box::new(FlattenFn { value }))
+        Ok(Box::new(FlattenFn { value, separator }))
     }
 }
 
 #[derive(Debug, Clone)]
 struct FlattenFn {
     value: Box<dyn Expression>,
+    separator: Box<dyn Expression>,
 }
 
 impl Expression for FlattenFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        flatten(self.value.resolve(ctx)?)
+        let value = self.value.resolve(ctx)?;
+        let separator = self.separator.resolve(ctx)?;
+
+        flatten(value, separator)
     }
 
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
@@ -87,22 +110,29 @@ impl Expression for FlattenFn {
 /// An iterator to walk over maps allowing us to flatten nested maps to a single level.
 struct MapFlatten<'a> {
     values: btree_map::Iter<'a, String, Value>,
+    separator: &'a str,
     inner: Option<Box<MapFlatten<'a>>>,
     parent: Option<String>,
 }
 
 impl<'a> MapFlatten<'a> {
-    fn new(values: btree_map::Iter<'a, String, Value>) -> Self {
+    fn new(values: btree_map::Iter<'a, String, Value>, separator: &'a str) -> Self {
         Self {
             values,
+            separator,
             inner: None,
             parent: None,
         }
     }
 
-    fn new_from_parent(parent: String, values: btree_map::Iter<'a, String, Value>) -> Self {
+    fn new_from_parent(
+        parent: String,
+        values: btree_map::Iter<'a, String, Value>,
+        separator: &'a str,
+    ) -> Self {
         Self {
             values,
+            separator,
             inner: None,
             parent: Some(parent),
         }
@@ -112,7 +142,7 @@ impl<'a> MapFlatten<'a> {
     fn new_key(&self, key: &str) -> String {
         match self.parent {
             None => key.to_string(),
-            Some(ref parent) => format!("{}.{}", parent, key),
+            Some(ref parent) => format!("{}{}{}", parent, self.separator, key),
         }
     }
 }
@@ -135,6 +165,7 @@ impl<'a> std::iter::Iterator for MapFlatten<'a> {
                 self.inner = Some(Box::new(MapFlatten::new_from_parent(
                     self.new_key(key),
                     value.iter(),
+                    self.separator,
                 )));
                 self.next()
             }
@@ -238,6 +269,12 @@ mod test {
             tdef: TypeDef::object(Collection::any()),
         }
 
+        nested_map_with_separator {
+            args: func_args![value: value!({parent: {child1: 1, child2: 2}, key: "val"}), separator: "_"],
+            want: Ok(value!({"parent_child1": 1, "parent_child2": 2, key: "val"})),
+            tdef: TypeDef::object(Collection::any()),
+        }
+
         double_nested_map {
             args: func_args![value: value!({
                 parent: {
@@ -267,6 +304,23 @@ mod test {
                 "parent.child1": [1, [2, 3]],
                 "parent.child2.grandchild1": 1,
                 "parent.child2.grandchild2": [1, [2, 3], 4],
+                key: "val",
+            })),
+            tdef: TypeDef::object(Collection::any()),
+        }
+
+        map_and_array_with_separator {
+            args: func_args![value: value!({
+                parent: {
+                    child1: [1, [2, 3]],
+                    child2: {grandchild1: 1, grandchild2: [1, [2, 3], 4]},
+                },
+                key: "val",
+            }), separator: "_"],
+            want: Ok(value!({
+                "parent_child1": [1, [2, 3]],
+                "parent_child2_grandchild1": 1,
+                "parent_child2_grandchild2": [1, [2, 3], 4],
                 key: "val",
             })),
             tdef: TypeDef::object(Collection::any()),

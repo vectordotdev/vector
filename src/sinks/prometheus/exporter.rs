@@ -298,7 +298,7 @@ impl MetricNormalize for PrometheusExporterMetricNormalizer {
             MetricValue::Distribution { .. } => {
                 // Convert the distribution as-is, and then let the normalizer absolute-ify it.
                 let (series, data, metadata) = metric.into_parts();
-                let (ts, kind, value) = data.into_parts();
+                let (time, kind, value) = data.into_parts();
 
                 let new_value = if self.distributions_as_summaries {
                     // We use a sketch when in summary mode because they're actually able to be
@@ -314,7 +314,7 @@ impl MetricNormalize for PrometheusExporterMetricNormalizer {
                         .expect("value should be distribution already")
                 };
 
-                let data = MetricData::from_parts(ts, kind, new_value);
+                let data = MetricData::from_parts(time, kind, new_value);
                 Metric::from_parts(series, data, metadata)
             }
             _ => metric,
