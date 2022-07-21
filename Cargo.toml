@@ -193,7 +193,7 @@ prost = { version = "0.10.4", default-features = false, features = ["std"] }
 prost-types = { version = "0.10.1", default-features = false, optional = true }
 
 # GCP
-goauth = { git = "https://github.com/StephenWakely/rust-goauth.git", branch = "malachite-ingestion", default-features = false, optional = true }
+goauth = { version = "0.13.1", optional = true }
 smpl_jwt = { version = "0.7.1", default-features = false, optional = true }
 
 # API
