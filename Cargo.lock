@@ -1679,7 +1679,7 @@ dependencies = [
  "tonic",
  "tracing 0.1.34",
  "tracing-core 0.1.28",
- "tracing-subscriber 0.3.14",
+ "tracing-subscriber 0.3.15",
 ]
 
 [[package]]
@@ -4229,7 +4229,7 @@ dependencies = [
  "once_cell",
  "tracing 0.1.34",
  "tracing-core 0.1.28",
- "tracing-subscriber 0.3.14",
+ "tracing-subscriber 0.3.15",
 ]
 
 [[package]]
@@ -7746,7 +7746,7 @@ checksum = "12de1a8c6bcfee614305e836308b596bbac831137a04c61f7e5b0b0bf2cfeaf6"
 dependencies = [
  "tracing 0.1.34",
  "tracing-core 0.1.28",
- "tracing-subscriber 0.3.14",
+ "tracing-subscriber 0.3.15",
 ]
 
 [[package]]
@@ -7779,7 +7779,7 @@ dependencies = [
  "mock_instant",
  "tracing 0.1.34",
  "tracing-core 0.1.28",
- "tracing-subscriber 0.3.14",
+ "tracing-subscriber 0.3.15",
 ]
 
 [[package]]
@@ -7827,9 +7827,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-subscriber"
-version = "0.3.14"
+version = "0.3.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a713421342a5a666b7577783721d3117f1b69a393df803ee17bb73b1e122a59"
+checksum = "60db860322da191b40952ad9affe65ea23e7dd6a5c442c2c42865810c6ab8e6b"
 dependencies = [
  "ansi_term",
  "matchers 0.1.0",
@@ -7866,7 +7866,7 @@ checksum = "3eb7bda2e93bbc9c5b247034acc6a4b3d04f033a3d4b8fc1cb87d4d1c7c7ebd7"
 dependencies = [
  "lazy_static",
  "tracing-core 0.1.28",
- "tracing-subscriber 0.3.14",
+ "tracing-subscriber 0.3.15",
  "tracing-test-macro 0.2.1",
 ]
 
@@ -8438,7 +8438,7 @@ dependencies = [
  "tracing-core 0.1.28",
  "tracing-futures 0.2.5",
  "tracing-limit",
- "tracing-subscriber 0.3.14",
+ "tracing-subscriber 0.3.15",
  "tracing-tower",
  "trust-dns-proto",
  "tui",
@@ -8531,7 +8531,7 @@ dependencies = [
  "tokio-util 0.7.1",
  "tracing 0.1.34",
  "tracing-fluent-assertions",
- "tracing-subscriber 0.3.14",
+ "tracing-subscriber 0.3.15",
  "vector_common",
 ]
 
@@ -8659,7 +8659,7 @@ dependencies = [
  "tracing 0.1.34",
  "tracing-core 0.1.28",
  "tracing-log",
- "tracing-subscriber 0.3.14",
+ "tracing-subscriber 0.3.15",
  "twox-hash",
  "typetag",
  "url",
@@ -8853,7 +8853,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tikv-jemallocator",
- "tracing-subscriber 0.3.14",
+ "tracing-subscriber 0.3.15",
  "value",
  "vector-vrl-functions",
  "vector_common",
