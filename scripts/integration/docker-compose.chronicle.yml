@@ -34,6 +34,7 @@ services:
       - cargogit:/usr/local/cargo/git
       - cargoregistry:/usr/local/cargo/registry
       - ${PWD}/scripts/integration/chronicleauth.json:/chronicleauth.json
+      - ${PWD}/scripts/integration/invalidchronicleauth.json:/invalidchronicleauth.json
 
 volumes:
   cargogit: {}

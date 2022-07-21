@@ -433,29 +433,29 @@ mod integration_tests {
 
     const ADDRESS_ENV_VAR: &str = "CHRONICLE_ADDRESS";
 
-    fn config(log_type: &str) -> ChronicleUnstructuredConfig {
+    fn config(log_type: &str, auth_path: &str) -> ChronicleUnstructuredConfig {
         let address = std::env::var(ADDRESS_ENV_VAR).unwrap();
         let config = format!(
             indoc! { r#"
              endpoint = "{}"
              customer_id = "customer id"
-             credentials_path = "/chronicleauth.json"
+             credentials_path = "{}"
              log_type = "{}"
              encoding.codec = "text"
         "# },
-            address, log_type
+            address, auth_path, log_type
         );
 
         let config: ChronicleUnstructuredConfig = toml::from_str(&config).unwrap();
         config
     }
 
-    async fn config_build(log_type: &str) -> (VectorSink, crate::sinks::Healthcheck) {
+    async fn config_build(
+        log_type: &str,
+        auth_path: &str,
+    ) -> crate::Result<(VectorSink, crate::sinks::Healthcheck)> {
         let cx = SinkContext::new_test();
-        config(log_type)
-            .build(cx)
-            .await
-            .expect("Building sink failed")
+        config(log_type, auth_path).build(cx).await
     }
 
     #[tokio::test]
@@ -463,7 +463,9 @@ mod integration_tests {
         trace_init();
 
         let log_type = random_string(10);
-        let (sink, healthcheck) = config_build(&log_type).await;
+        let (sink, healthcheck) = config_build(&log_type, "/chronicleauth.json")
+            .await
+            .expect("Building sink failed");
 
         healthcheck.await.expect("Health check failed");
 
@@ -483,6 +485,36 @@ mod integration_tests {
             let expected = serde_json::to_value(input[i].as_log().get("message").unwrap()).unwrap();
             assert_eq!(data, expected);
         }
+    }
+
+    #[tokio::test]
+    async fn invalid_credentials() {
+        trace_init();
+
+        let log_type = random_string(10);
+        // Test with an auth file that doesnt match the public key sent to the dummy chronicle server.
+        let sink = config_build(&log_type, "/invalidchronicleauth.json").await;
+
+        assert!(sink.is_err())
+    }
+
+    #[tokio::test]
+    async fn publish_invalid_events() {
+        trace_init();
+
+        // The chronicle-emulator we are testing against is setup so a `log_type` of "INVALID"
+        // will return a `400 BAD_REQUEST`.
+        let log_type = "INVALID";
+        let (sink, healthcheck) = config_build(&log_type, "/chronicleauth.json")
+            .await
+            .expect("Building sink failed");
+
+        healthcheck.await.expect("Health check failed");
+
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let (_input, events) = random_events_with_stream(100, 100, Some(batch));
+        let _ = sink.run(events).await;
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
     }
 
     #[derive(Clone, Debug, Deserialize, Serialize)]
