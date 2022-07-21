@@ -35,11 +35,7 @@ use crate::{
             metadata::{RequestMetadata, RequestMetadataBuilder},
             partitioner::KeyPartitioner,
             request_builder::EncodeResult,
-            BatchConfig,
-            BulkSizeBasedDefaultBatchSettings,
-            Compression,
-            //Compressor,
-            RequestBuilder,
+            BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression, RequestBuilder,
             TowerRequestConfig,
         },
         Healthcheck,
@@ -91,8 +87,6 @@ pub struct ChronicleUnstructuredConfig {
     pub encoding: EncodingConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
-    #[serde(default)]
-    compression: Compression,
     pub tls: Option<TlsConfig>,
     pub log_type: Template,
     #[serde(
@@ -299,9 +293,6 @@ impl Encoder<(String, Vec<Event>)> for ChronicleEncoder {
 #[derive(Clone, Debug)]
 struct RequestSettings {
     encoder: ChronicleEncoder,
-
-    // TODO Does chronicle handle compression?
-    compression: Compression,
 }
 
 struct ChronicleRequestPayload {
@@ -329,7 +320,7 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
     type Error = io::Error;
 
     fn compression(&self) -> Compression {
-        self.compression
+        Compression::None
     }
 
     fn encoder(&self) -> &Self::Encoder {
@@ -372,10 +363,7 @@ impl RequestSettings {
             encoder,
             transformer,
         };
-        Ok(Self {
-            compression: config.compression,
-            encoder,
-        })
+        Ok(Self { encoder })
     }
 }
 

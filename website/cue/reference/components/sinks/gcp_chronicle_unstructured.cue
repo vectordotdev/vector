@@ -22,12 +22,6 @@ components: sinks: chronicle_unstructured: {
 				max_bytes:    10_000_000
 				timeout_secs: 300.0
 			}
-			compression: {
-				enabled: true
-				default: "none"
-				algorithms: ["gzip"]
-				levels: ["none", "fast", "default", "best", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-			}
 			encoding: {
 				enabled: true
 				codec: {
