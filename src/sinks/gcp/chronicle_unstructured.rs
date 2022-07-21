@@ -505,7 +505,7 @@ mod integration_tests {
         // The chronicle-emulator we are testing against is setup so a `log_type` of "INVALID"
         // will return a `400 BAD_REQUEST`.
         let log_type = "INVALID";
-        let (sink, healthcheck) = config_build(&log_type, "/chronicleauth.json")
+        let (sink, healthcheck) = config_build(log_type, "/chronicleauth.json")
             .await
             .expect("Building sink failed");
 
