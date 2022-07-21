@@ -308,36 +308,6 @@ mod tests {
                     } },
                 ] },
             },
-            // Indexed any
-            TestCase {
-                old: type_def! { object {
-                    "nonk" => type_def! { array [
-                        type_def! { object {
-                            "noog" => type_def! { array [
-                                type_def! { bytes },
-                            ] },
-                            "nork" => type_def! { bytes },
-                        } },
-                    ] },
-                } },
-                path: ".nonk[0].noog",
-                new: type_def! { array [
-                    type_def! { object {
-                        "nonk" => type_def! { array {
-                            unknown => type_def! { object {
-                                "noog" => type_def! { array [
-                                    type_def! { bytes },
-                                ] },
-                                "nork" => type_def! { bytes },
-                            } },
-                            // The index is added on top of the "unknown" entry.
-                            0 => type_def! { object {
-                                "noog" => type_def! { bytes },
-                            } },
-                        } },
-                    } },
-                ] },
-            },
             // Indexed specific
             TestCase {
                 old: type_def! { object {
@@ -458,6 +428,10 @@ mod tests {
         for case in cases {
             let path = LookupBuf::from_str(case.path).unwrap();
             let new = invert_array_at_path(&case.old, &path);
+            if case.new != new {
+                println!("Actual  : {:#?}", new.debug_info());
+                println!("Expected: {:#?}", case.new.debug_info());
+            }
             assert_eq!(case.new, new, "{}", path);
         }
     }
