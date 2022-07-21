@@ -457,9 +457,7 @@ impl Kind {
 
 // `without_*` methods to narrow the state of a type (functional).
 impl Kind {
-    /// Remove the `undefined` state from the type.
-    ///
-    /// If the type previously included this state, true is returned.
+    /// Remove the `undefined` state from the type, and return it.
     #[must_use]
     pub fn without_undefined(mut self) -> Self {
         self.remove_undefined();
