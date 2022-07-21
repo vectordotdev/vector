@@ -9,6 +9,9 @@ pub struct Options {
     #[serde(default = "default_enabled")]
     pub enabled: bool,
 
+    #[serde(default = "default_sink_requirements_enabled")]
+    pub sink_requirements: bool,
+
     pub log_namespace: Option<bool>,
 }
 
@@ -26,11 +29,16 @@ impl Default for Options {
     fn default() -> Self {
         Self {
             enabled: default_enabled(),
+            sink_requirements: default_sink_requirements_enabled(),
             log_namespace: None,
         }
     }
 }
 
 const fn default_enabled() -> bool {
+    false
+}
+
+const fn default_sink_requirements_enabled() -> bool {
     false
 }
