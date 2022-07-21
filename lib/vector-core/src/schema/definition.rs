@@ -137,6 +137,16 @@ impl Definition {
         &self.log_namespaces
     }
 
+    pub fn try_with_field(
+        mut self,
+        path: impl Into<LookupBuf>,
+        kind: Kind,
+        meaning: Option<&str>,
+    ) -> Self {
+        let path = path.into();
+        if kind.find_at_path()
+    }
+
     /// Add type information for an event field.
     /// A non-root required field means the root type must be an object, so the type will be automatically
     /// restricted to an object.
