@@ -428,10 +428,6 @@ mod tests {
         for case in cases {
             let path = LookupBuf::from_str(case.path).unwrap();
             let new = invert_array_at_path(&case.old, &path);
-            if case.new != new {
-                println!("Actual  : {:#?}", new.debug_info());
-                println!("Expected: {:#?}", case.new.debug_info());
-            }
             assert_eq!(case.new, new, "{}", path);
         }
     }
