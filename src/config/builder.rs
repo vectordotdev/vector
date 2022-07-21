@@ -287,8 +287,6 @@ impl ConfigBuilder {
             errors.push(error);
         }
 
-        self.schema = with.schema;
-
         #[cfg(feature = "enterprise")]
         {
             match (self.enterprise.as_ref(), with.enterprise) {
@@ -320,15 +318,7 @@ impl ConfigBuilder {
 
         self.global.proxy = self.global.proxy.merge(&with.global.proxy);
 
-        if self.schema.log_namespace.is_some()
-            && with.schema.log_namespace.is_some()
-            && self.schema.log_namespace != with.schema.log_namespace
-        {
-            errors.push(
-                format!("conflicting values for 'log_namespace' found. Both {:?} and {:?} used in the same component",
-                                self.schema.log_namespace(), with.schema.log_namespace())
-            );
-        }
+        self.schema.append(with.schema, &mut errors);
 
         self.schema.log_namespace = self.schema.log_namespace.or(with.schema.log_namespace);
 

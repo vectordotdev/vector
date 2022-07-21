@@ -23,6 +23,26 @@ impl Options {
                 use_vector_namespace.into()
             })
     }
+
+    /// Merges two schema options together.
+    pub fn append(&mut self, with: Self, errors: &mut Vec<String>) {
+        if self.log_namespace.is_some()
+            && with.log_namespace.is_some()
+            && self.log_namespace != with.log_namespace
+        {
+            errors.push(
+                format!("conflicting values for 'log_namespace' found. Both {:?} and {:?} used in the same component",
+                        self.log_namespace(), with.log_namespace())
+            );
+        }
+        if let Some(log_namespace) = with.log_namespace {
+            self.log_namespace = Some(log_namespace);
+        }
+
+        // If either config enables these flags, it is enabled.
+        self.enabled |= with.enabled;
+        self.sink_requirements |= with.sink_requirements;
+    }
 }
 
 impl Default for Options {
@@ -41,4 +61,96 @@ const fn default_enabled() -> bool {
 
 const fn default_sink_requirements_enabled() -> bool {
     false
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_append() {
+        for (test, mut a, b, expected) in [
+            (
+                "enable log namespacing",
+                Options {
+                    enabled: false,
+                    sink_requirements: false,
+                    log_namespace: None,
+                },
+                Options {
+                    enabled: false,
+                    sink_requirements: false,
+                    log_namespace: Some(true),
+                },
+                Some(Options {
+                    enabled: false,
+                    sink_requirements: false,
+                    log_namespace: Some(true),
+                }),
+            ),
+            (
+                "log namespace conflict",
+                Options {
+                    enabled: false,
+                    sink_requirements: false,
+                    log_namespace: Some(false),
+                },
+                Options {
+                    enabled: false,
+                    sink_requirements: false,
+                    log_namespace: Some(true),
+                },
+                None,
+            ),
+            (
+                "enable schemas",
+                Options {
+                    enabled: false,
+                    sink_requirements: false,
+                    log_namespace: None,
+                },
+                Options {
+                    enabled: true,
+                    sink_requirements: false,
+                    log_namespace: None,
+                },
+                Some(Options {
+                    enabled: true,
+                    sink_requirements: false,
+                    log_namespace: None,
+                }),
+            ),
+            (
+                "enable sink requirements",
+                Options {
+                    enabled: false,
+                    sink_requirements: false,
+                    log_namespace: None,
+                },
+                Options {
+                    enabled: false,
+                    sink_requirements: true,
+                    log_namespace: None,
+                },
+                Some(Options {
+                    enabled: false,
+                    sink_requirements: true,
+                    log_namespace: None,
+                }),
+            ),
+        ] {
+            let mut errors = vec![];
+            a.append(b, &mut errors);
+            if errors.is_empty() {
+                assert_eq!(Some(a), expected, "result mismatch: {}", test);
+            } else {
+                assert_eq!(
+                    errors.is_empty(),
+                    expected.is_some(),
+                    "error mismatch: {}",
+                    test
+                );
+            }
+        }
+    }
 }
