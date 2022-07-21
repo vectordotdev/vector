@@ -16,7 +16,6 @@ use vrl_lib::prelude::VrlValueConvert;
 
 use crate::{
     event::{BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable},
-    metrics::Handle,
     ByteSizeOf,
 };
 
@@ -269,33 +268,11 @@ impl Metric {
 
     /// Creates a new metric from components specific to a metric emitted by `metrics`.
     #[allow(clippy::cast_precision_loss)]
-    pub fn from_metric_kv(key: &metrics::Key, handle: &Handle) -> Self {
-        let value = match handle {
-            Handle::Counter(counter) => MetricValue::Counter {
-                // NOTE this will truncate if `counter.count()` is a value
-                // greater than 2**52.
-                value: counter.count() as f64,
-            },
-            Handle::Gauge(gauge) => MetricValue::Gauge {
-                value: gauge.gauge(),
-            },
-            Handle::Histogram(histogram) => {
-                let buckets: Vec<Bucket> = histogram
-                    .buckets()
-                    .map(|(upper_limit, count)| Bucket {
-                        upper_limit,
-                        count: count.into(),
-                    })
-                    .collect();
-
-                MetricValue::AggregatedHistogram {
-                    buckets,
-                    sum: histogram.sum() as f64,
-                    count: histogram.count(),
-                }
-            }
-        };
-
+    pub(crate) fn from_metric_kv(
+        key: &metrics::Key,
+        value: MetricValue,
+        timestamp: DateTime<Utc>,
+    ) -> Self {
         let labels = key
             .labels()
             .map(|label| (String::from(label.key()), String::from(label.value())))
@@ -303,12 +280,8 @@ impl Metric {
 
         Self::new(key.name().to_string(), MetricKind::Absolute, value)
             .with_namespace(Some("vector"))
-            .with_timestamp(Some(Utc::now()))
-            .with_tags(if labels.is_empty() {
-                None
-            } else {
-                Some(labels)
-            })
+            .with_timestamp(Some(timestamp))
+            .with_tags((!labels.is_empty()).then(|| labels))
     }
 
     /// Removes a tag from this metric, returning the value of the tag if the tag was previously in the metric.
