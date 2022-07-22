@@ -355,6 +355,8 @@ chrono = { git = "https://github.com/vectordotdev/chrono.git", branch = "no-defa
 # Adds `Status::is_reset` test, remove after the next version is released.
 h2 = { git = "https://github.com/hyperium/h2.git", rev = "f6aa3be6719270cd7b4094ee1940751b5f4ec88e" }
 # Enables OpenSSL ENGINE support during cross compilation to musl
+# TODO remove this branch and instead use the openssl-src feature flag once it is available
+#    (see https://github.com/vectordotdev/vector/issues/13695)
 openssl-src = { git = "https://github.com/vectordotdev/openssl-src-rs.git", branch  = "enable_engine" }
 
 [features]
