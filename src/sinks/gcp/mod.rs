@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+pub mod chronicle_unstructured;
 pub mod cloud_storage;
 pub mod pubsub;
 pub mod stackdriver_logs;
