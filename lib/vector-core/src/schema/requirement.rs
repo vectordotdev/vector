@@ -104,7 +104,7 @@ impl Requirement {
                     // If no kind is found, we set the kind to "any", since we
                     // lack any further information.
                     let definition_kind = definition
-                        .kind()
+                        .event_kind()
                         .find_at_path(&path.to_lookup())
                         .ok()
                         .flatten()

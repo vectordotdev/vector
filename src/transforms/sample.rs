@@ -34,6 +34,7 @@ pub struct SampleConfig {
     pub exclude: Option<AnyCondition>,
 }
 
+// TODO: Deprecate the name `sampler`
 inventory::submit! {
     TransformDescription::new::<SampleConfig>("sampler")
 }
@@ -68,11 +69,11 @@ impl TransformConfig for SampleConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        Input::new(DataType::Log | DataType::Trace)
     }
 
     fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+        vec![Output::default(DataType::Log | DataType::Trace)]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -142,7 +143,11 @@ impl FunctionTransform for Sample {
         let value = self
             .key_field
             .as_ref()
-            .and_then(|key_field| event.as_log().get(key_field.as_str()))
+            .and_then(|key_field| match &event {
+                Event::Log(event) => event.get(key_field.as_str()),
+                Event::Trace(event) => event.get(key_field.as_str()),
+                Event::Metric(_) => panic!("component can never receive metric events"),
+            })
             .map(|v| v.to_string_lossy());
 
         let num = if let Some(value) = value {
@@ -154,9 +159,11 @@ impl FunctionTransform for Sample {
         self.count = (self.count + 1) % self.rate;
 
         if num % self.rate == 0 {
-            event
-                .as_mut_log()
-                .insert("sample_rate", self.rate.to_string());
+            match event {
+                Event::Log(ref mut event) => event.insert("sample_rate", self.rate.to_string()),
+                Event::Trace(ref mut event) => event.insert("sample_rate", self.rate.to_string()),
+                Event::Metric(_) => panic!("component can never receive metric events"),
+            };
             output.push(event);
         } else {
             emit!(SampleEventDiscarded);
@@ -172,7 +179,7 @@ mod tests {
     use crate::{
         conditions::{Condition, ConditionalConfig, VrlConfig},
         config::log_schema,
-        event::{Event, LogEvent},
+        event::{Event, LogEvent, TraceEvent},
         test_util::random_lines,
         transforms::test::transform_one,
     };
@@ -353,6 +360,18 @@ mod tests {
             let passing = transform_one(&mut sampler, event).unwrap();
             assert!(passing.as_log().get("sample_rate").is_none());
         }
+    }
+
+    #[test]
+    fn handles_trace_event() {
+        let event: TraceEvent = LogEvent::from("trace").into();
+        let trace = Event::Trace(event);
+        let mut sampler = Sample::new(2, None, None);
+        let iterations = 0..2;
+        let total_passed = iterations
+            .filter_map(|_| transform_one(&mut sampler, trace.clone()))
+            .count();
+        assert_eq!(total_passed, 1);
     }
 
     fn random_events(n: usize) -> Vec<Event> {

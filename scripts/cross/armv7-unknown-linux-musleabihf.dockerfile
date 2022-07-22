@@ -1,4 +1,4 @@
-FROM ghcr.io/cross-rs/armv7-unknown-linux-musleabihf:main
+FROM ghcr.io/cross-rs/armv7-unknown-linux-musleabihf:0.2.4
 
 COPY bootstrap-ubuntu.sh .
 RUN ./bootstrap-ubuntu.sh

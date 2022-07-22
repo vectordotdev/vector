@@ -782,7 +782,7 @@ mod integration_tests {
     async fn source(
         address: String,
         tls: Option<TlsEnableableConfig>,
-    ) -> impl Stream<Item = Event> {
+    ) -> impl Stream<Item = Event> + Unpin {
         let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
         let address: std::net::SocketAddr = address.parse().unwrap();
         let tls_options = match tls {

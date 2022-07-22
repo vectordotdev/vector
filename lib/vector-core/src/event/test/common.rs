@@ -8,7 +8,10 @@ use quickcheck::{empty_shrinker, Arbitrary, Gen};
 
 use crate::{
     event::{
-        metric::{Bucket, MetricData, MetricName, MetricSeries, MetricSketch, Quantile, Sample},
+        metric::{
+            Bucket, MetricData, MetricName, MetricSeries, MetricSketch, MetricTime, Quantile,
+            Sample,
+        },
         Event, EventMetadata, LogEvent, Metric, MetricKind, MetricValue, StatisticKind, TraceEvent,
         Value,
     },
@@ -560,8 +563,15 @@ impl Arbitrary for MetricData {
             None
         };
 
+        let interval_ms = bool::arbitrary(g)
+            .then(|| u32::arbitrary(g))
+            .and_then(std::num::NonZeroU32::new);
+
         MetricData {
-            timestamp: dt,
+            time: MetricTime {
+                timestamp: dt,
+                interval_ms,
+            },
             kind: MetricKind::arbitrary(g),
             value: MetricValue::arbitrary(g),
         }

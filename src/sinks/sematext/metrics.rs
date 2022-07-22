@@ -250,7 +250,7 @@ fn encode_events(
             .namespace
             .unwrap_or_else(|| default_namespace.into());
         let label = series.name.name;
-        let ts = encode_timestamp(data.timestamp);
+        let ts = encode_timestamp(data.time.timestamp);
 
         // Authentication in Sematext is by inserting the token as a tag.
         let mut tags = series.tags.unwrap_or_default();

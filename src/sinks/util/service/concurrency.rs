@@ -1,16 +1,28 @@
 use serde::Serializer;
 use std::fmt;
+use vector_config::configurable_component;
 
 use serde::{
     de::{self, Unexpected, Visitor},
     Deserialize, Deserializer, Serialize,
 };
 
+/// Configuration for outbound request concurrency.
+#[configurable_component(no_ser, no_deser)]
 #[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
 pub enum Concurrency {
+    /// A fixed concurrency of 1.
+    ///
+    /// In other words, only one request can be outstanding at any given time.
     None,
+
+    /// Concurrency will be managed by Vector's [adaptive concurrency][arc] feature.
+    ///
+    /// [arc]: https://vector.dev/docs/about/under-the-hood/networking/arc/
     Adaptive,
-    Fixed(usize),
+
+    /// A fixed amount of concurrency will be allowed.
+    Fixed(#[configurable(transparent)] usize),
 }
 
 impl Serialize for Concurrency {

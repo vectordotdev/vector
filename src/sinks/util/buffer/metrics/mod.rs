@@ -45,7 +45,7 @@ impl Batch for MetricsBuffer {
     type Input = Metric;
     type Output = Vec<Metric>;
 
-    fn get_settings_defaults<D: SinkBatchSettings>(
+    fn get_settings_defaults<D: SinkBatchSettings + Clone>(
         config: BatchConfig<D, Merged>,
     ) -> Result<BatchConfig<D, Merged>, BatchError> {
         config.disallow_max_bytes()

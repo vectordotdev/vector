@@ -220,7 +220,7 @@ async fn api_key_in_metadata_inner(api_status: ApiStatus) {
     let api_key = "0xDECAFBAD";
     let events = events.map(|mut e| {
         println!("EVENT: {:?}", e);
-        e.for_each_log(|log| {
+        e.iter_logs_mut().for_each(|log| {
             log.metadata_mut().set_datadog_api_key(Arc::from(api_key));
         });
         e
@@ -360,7 +360,7 @@ async fn enterprise_headers_inner(api_status: ApiStatus) {
     let api_key = "0xDECAFBAD";
     let events = events.map(|mut e| {
         println!("EVENT: {:?}", e);
-        e.for_each_log(|log| {
+        e.iter_logs_mut().for_each(|log| {
             log.metadata_mut().set_datadog_api_key(Arc::from(api_key));
         });
         e
@@ -423,7 +423,7 @@ async fn no_enterprise_headers_inner(api_status: ApiStatus) {
     let api_key = "0xDECAFBAD";
     let events = events.map(|mut e| {
         println!("EVENT: {:?}", e);
-        e.for_each_log(|log| {
+        e.iter_logs_mut().for_each(|log| {
             log.metadata_mut().set_datadog_api_key(Arc::from(api_key));
         });
         e
