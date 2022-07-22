@@ -208,8 +208,8 @@ Examples:
 
 ### Upfront configuration
 
-Vector should never require manual intervention of Vector to remedy normal
-processing failures during; instead Vector should require any necessary
+Vector should never require manual intervention to remedy normal
+processing failures at runtime. Instead, Vector should require any necessary
 configuration to handle these failures a priori.
 
 For example, rather than requiring users to intervene to unblock processing
