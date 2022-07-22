@@ -34,18 +34,19 @@ impl HostMetrics {
                                 self.counter(
                                     name,
                                     timestamp,
-                                    times.nice().get::<second>(),
-                                    BTreeMap::from([
-                                        (String::from("mode"), String::from("nice")),
-                                        (String::from("cpu"), index.to_string()),
-                                    ]),
-                                ),
-                                self.counter(
-                                    name,
-                                    timestamp,
                                     times.system().get::<second>(),
                                     BTreeMap::from([
                                         (String::from("mode"), String::from("system")),
+                                        (String::from("cpu"), index.to_string()),
+                                    ]),
+                                ),
+                                #[cfg(target_os = "linux")]
+                                self.counter(
+                                    name,
+                                    timestamp,
+                                    times.io_wait().get::<second>(),
+                                    BTreeMap::from([
+                                        (String::from("mode"), String::from("io_wait")),
                                         (String::from("cpu"), index.to_string()),
                                     ]),
                                 ),
