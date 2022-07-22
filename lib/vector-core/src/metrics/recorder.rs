@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use metrics::{Counter, Gauge, Histogram, Key, KeyName, Recorder, Unit};
+use metrics::{Counter, Gauge, Histogram, Key, KeyName, Recorder, SharedString, Unit};
 use once_cell::unsync::OnceCell;
 
 use super::storage::VectorStorage;
@@ -53,9 +53,9 @@ impl Recorder for VectorRecorder {
         self.with_registry(|r| r.get_or_create_histogram(key, |h| h.clone().into()))
     }
 
-    fn describe_counter(&self, _: KeyName, _: Option<Unit>, _: &'static str) {}
+    fn describe_counter(&self, _: KeyName, _: Option<Unit>, _: SharedString) {}
 
-    fn describe_gauge(&self, _: KeyName, _: Option<Unit>, _: &'static str) {}
+    fn describe_gauge(&self, _: KeyName, _: Option<Unit>, _: SharedString) {}
 
-    fn describe_histogram(&self, _: KeyName, _: Option<Unit>, _: &'static str) {}
+    fn describe_histogram(&self, _: KeyName, _: Option<Unit>, _: SharedString) {}
 }

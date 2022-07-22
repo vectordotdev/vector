@@ -229,7 +229,7 @@ mod tests {
         access_key: Option<String>,
         record_compression: Option<Compression>,
         delivered: bool,
-    ) -> (impl Stream<Item = Event>, SocketAddr) {
+    ) -> (impl Stream<Item = Event> + Unpin, SocketAddr) {
         use EventStatus::*;
         let status = if delivered { Delivered } else { Rejected };
         let (sender, recv) = SourceSender::new_test_finalize(status);

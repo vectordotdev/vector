@@ -228,7 +228,7 @@ mod tests {
         }
     }
 
-    async fn start_source() -> impl Stream<Item = Event> {
+    async fn start_source() -> impl Stream<Item = Event> + Unpin {
         let (tx, rx) = SourceSender::new_test();
 
         let source = InternalLogsConfig::default()

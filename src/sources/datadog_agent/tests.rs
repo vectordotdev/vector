@@ -130,7 +130,7 @@ async fn source(
     store_api_key: bool,
     multiple_outputs: bool,
 ) -> (
-    impl Stream<Item = Event>,
+    impl Stream<Item = Event> + Unpin,
     Option<impl Stream<Item = Event>>,
     Option<impl Stream<Item = Event>>,
     SocketAddr,
