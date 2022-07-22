@@ -294,7 +294,7 @@ impl Inner {
         for events in array::events_into_arrays(events, Some(CHUNK_SIZE)) {
             events
                 .iter_events()
-                .for_each(|event| self.emit_lag_time(EventRef::from(event), reference));
+                .for_each(|event| self.emit_lag_time(event, reference));
             let this_count = events.len();
             let this_size = events.size_of();
             match self.inner.send(events).await {
