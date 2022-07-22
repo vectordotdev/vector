@@ -192,7 +192,7 @@ impl HostMetricsConfig {
 pub struct HostMetrics {
     config: HostMetricsConfig,
     #[cfg(target_os = "linux")]
-    root_cgroup: Option<cgroups::CGroup>,
+    root_cgroup: Option<cgroups::CGroupRoot>,
 }
 
 impl HostMetrics {
@@ -203,7 +203,7 @@ impl HostMetrics {
 
     #[cfg(target_os = "linux")]
     pub fn new(config: HostMetricsConfig) -> Self {
-        let root_cgroup = cgroups::CGroup::root(config.cgroups.base.as_deref());
+        let root_cgroup = cgroups::CGroupRoot::new(&config.cgroups);
         Self {
             config,
             root_cgroup,
