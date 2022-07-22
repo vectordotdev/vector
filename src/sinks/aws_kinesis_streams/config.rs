@@ -83,7 +83,6 @@ pub struct KinesisSinkConfig {
     /// If not specified, a unique partition key will be generated for each Kinesis record.
     pub partition_key_field: Option<String>,
 
-    #[configurable(derived)]
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
 

@@ -35,6 +35,7 @@ pub(super) enum BuildError {
 /// Configuration for the `aws_sqs` sink.
 #[configurable_component(sink)]
 #[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct SqsSinkConfig {
     /// The URL of the Amazon SQS queue to which messages are sent.
     #[configurable(validation(format = "uri"))]

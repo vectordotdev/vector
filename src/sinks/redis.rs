@@ -113,7 +113,7 @@ impl SinkBatchSettings for RedisDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 1.0;
 }
 
-/// Configuration for the `redis`gsink.
+/// Configuration for the `redis` sink.
 #[configurable_component(sink)]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]

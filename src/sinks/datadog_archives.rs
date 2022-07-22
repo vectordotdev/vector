@@ -143,6 +143,7 @@ pub struct DatadogArchivesSinkConfig {
 /// S3-specific configuration options.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
+#[serde(deny_unknown_fields)]
 pub struct S3Config {
     #[serde(flatten)]
     pub options: S3Options,
@@ -232,6 +233,7 @@ pub struct AzureBlobConfig {
 /// GCS-specific configuration options.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
+#[serde(deny_unknown_fields)]
 pub struct GcsConfig {
     #[configurable(derived)]
     acl: Option<GcsPredefinedAcl>,

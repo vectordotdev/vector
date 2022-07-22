@@ -40,6 +40,7 @@ impl SinkBatchSettings for InfluxDbLogsDefaultBatchSettings {
 /// Configuration for the `influxdb_logs` sink.
 #[configurable_component(sink)]
 #[derive(Clone, Debug, Default)]
+#[serde(deny_unknown_fields)]
 pub struct InfluxDbLogsConfig {
     /// The namespace of the measurement name to use.
     ///

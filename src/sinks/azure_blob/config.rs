@@ -25,6 +25,7 @@ use crate::{
 /// Configuration for the `azure_blob` sink.
 #[configurable_component(sink)]
 #[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct AzureBlobSinkConfig {
     /// The Azure Blob Storage Account connection string.
     ///

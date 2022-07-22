@@ -48,6 +48,7 @@ enum BuildError {
 /// Configuration for the `http` sink.
 #[configurable_component(sink)]
 #[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct HttpSinkConfig {
     /// The full URI to make HTTP requests to.
     ///
@@ -68,7 +69,6 @@ pub struct HttpSinkConfig {
     #[serde(default)]
     pub compression: Compression,
 
-    #[configurable(derived)]
     #[serde(flatten)]
     pub encoding: EncodingConfigWithFraming,
 

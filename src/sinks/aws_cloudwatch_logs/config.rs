@@ -49,6 +49,7 @@ impl ClientBuilder for CloudwatchLogsClientBuilder {
 /// Configuration for the `aws_cloudwatch_logs` sink.
 #[configurable_component(sink)]
 #[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct CloudwatchLogsSinkConfig {
     /// The [group name][group_name] of the target CloudWatch Logs stream.
     ///

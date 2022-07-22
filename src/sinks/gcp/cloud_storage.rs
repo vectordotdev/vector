@@ -56,6 +56,7 @@ const NAME: &str = "gcp_cloud_storage";
 /// Configuration for the `gcp_cloud_storage` sink.
 #[configurable_component(sink)]
 #[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct GcsSinkConfig {
     /// The GCS bucket name.
     bucket: String,
@@ -135,7 +136,6 @@ pub struct GcsSinkConfig {
     #[serde(default)]
     request: TowerRequestConfig,
 
-    #[configurable(derived)]
     #[serde(flatten)]
     auth: GcpAuthConfig,
 

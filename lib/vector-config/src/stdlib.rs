@@ -127,7 +127,7 @@ where
 
     fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<Self>) -> SchemaObject {
         // We explicitly do not pass anything from the override metadata, because there's nothing to
-        // reasonably pass: if `V` is referencable, using the description for `BTreeMap<String, V>`
+        // reasonably pass: if `V` is referenceable, using the description for `BTreeMap<String, V>`
         // likely makes no sense, nor would a default make sense, and so on.
         //
         // We do, however, set `V` to be "transparent", which means that during schema finalization,
@@ -156,7 +156,7 @@ where
 
     fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<Self>) -> SchemaObject {
         // We explicitly do not pass anything from the override metadata, because there's nothing to
-        // reasonably pass: if `V` is referencable, using the description for `HashMap<String, V>`
+        // reasonably pass: if `V` is referenceable, using the description for `HashMap<String, V>`
         // likely makes no sense, nor would a default make sense, and so on.
         //
         // We do, however, set `V` to be "transparent", which means that during schema finalization,
@@ -179,7 +179,7 @@ where
 {
     fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<Self>) -> SchemaObject {
         // We explicitly do not pass anything from the override metadata, because there's nothing to reasonably pass: if
-        // `V` is referencable, using the description for `HashSet<V>` likely makes no sense, nor would a default make
+        // `V` is referenceable, using the description for `HashSet<V>` likely makes no sense, nor would a default make
         // sense, and so on.
         //
         // We do, however, set `V` to be "transparent", which means that during schema finalization, we will relax the
@@ -197,7 +197,7 @@ where
 
 // Additional types that do not map directly to scalars.
 impl Configurable for SocketAddr {
-    fn referencable_name() -> Option<&'static str> {
+    fn referenceable_name() -> Option<&'static str> {
         Some("stdlib::SocketAddr")
     }
 
@@ -216,7 +216,7 @@ impl Configurable for SocketAddr {
 }
 
 impl Configurable for PathBuf {
-    fn referencable_name() -> Option<&'static str> {
+    fn referenceable_name() -> Option<&'static str> {
         Some("stdlib::PathBuf")
     }
 

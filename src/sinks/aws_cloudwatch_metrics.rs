@@ -51,6 +51,7 @@ impl SinkBatchSettings for CloudWatchMetricsDefaultBatchSettings {
 /// Configuration for the `aws_cloudwatch_metrics` sink.
 #[configurable_component(sink)]
 #[derive(Clone, Debug, Default)]
+#[serde(deny_unknown_fields)]
 pub struct CloudWatchMetricsSinkConfig {
     /// The default namespace to use for metrics that do not have one.
     ///

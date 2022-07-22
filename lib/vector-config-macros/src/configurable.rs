@@ -61,7 +61,7 @@ pub fn derive_configurable_impl(input: TokenStream) -> TokenStream {
             #[automatically_derived]
             #[allow(unused_qualifications)]
             impl #impl_generics ::vector_config::Configurable for #name #ty_generics #where_clause {
-                fn referencable_name() -> Option<&'static str> {
+                fn referenceable_name() -> Option<&'static str> {
                     Some(std::concat!(std::module_path!(), "::", #ref_name))
                 }
 
@@ -366,12 +366,12 @@ fn generate_variant_metadata(
     let maybe_deprecated = get_metadata_deprecated(meta_ident, variant.deprecated());
     let maybe_custom_attributes = get_metadata_custom_attributes(meta_ident, variant.metadata());
 
-    // We ase a unit tuple here because we don't have access to the actual type of the variant's enum container,
-    // at least not without parsing it specifically as a type token from an amalgamated version of the enum ident... but
-    // it doesn't actually matter because enums don't support default values, which is the only spot in `Metadata<T>`
-    // where the `T` gets used, so we can carry all the other pertinent details with `()`... it's still a littlw wonky, though.
+    // We specifically use `()` as the type here because we need to generate the metadata for this
+    // variant, but there's no unique concrete type for a variant, only the type of the enum
+    // container it exists within. We also don't want to use the metadata of the enum container, as
+    // it might have values that would conflict with the metadata of this specific variant.
     quote! {
-        let mut #meta_ident =  <() as ::vector_config::Configurable>::metadata();
+        let mut #meta_ident = ::vector_config::Metadata::<()>::default();
         #maybe_title
         #description
         #maybe_deprecated

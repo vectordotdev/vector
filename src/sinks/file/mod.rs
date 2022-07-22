@@ -40,6 +40,7 @@ use bytes_path::BytesPath;
 /// Configuration for the `file` sink.
 #[configurable_component(sink)]
 #[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct FileSinkConfig {
     /// File name to write events to.
     #[configurable(metadata(templateable))]

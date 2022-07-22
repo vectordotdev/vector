@@ -33,8 +33,8 @@ use crate::{
 // [1]: https://github.com/serde-rs/serde/issues/1504
 #[configurable_component(sink)]
 #[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct HumioMetricsConfig {
-    #[configurable(derived)]
     #[serde(flatten)]
     transform: MetricToLogConfig,
 

@@ -38,6 +38,7 @@ const DEFAULT_FILENAME_APPEND_UUID: bool = true;
 /// Configuration for the `aws_s3` sink.
 #[configurable_component(sink)]
 #[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct S3SinkConfig {
     /// The S3 bucket name.
     ///
