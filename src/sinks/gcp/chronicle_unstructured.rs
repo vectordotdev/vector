@@ -31,7 +31,7 @@ use crate::{
             sink::GcsSink,
         },
         util::{
-            encoding::Encoder,
+            encoding::{as_tracked_write, Encoder},
             metadata::{RequestMetadata, RequestMetadataBuilder},
             partitioner::KeyPartitioner,
             request_builder::EncodeResult,
@@ -281,9 +281,12 @@ impl Encoder<(String, Vec<Event>)> for ChronicleEncoder {
             "entries": events,
         });
 
-        let body = crate::serde::json::to_bytes(&json)?.freeze();
-        writer.write_all(&body)?;
-        Ok(body.len())
+        let size = as_tracked_write::<_, _, io::Error>(writer, &json, |writer, json| {
+            serde_json::to_writer(writer, json)?;
+            Ok(())
+        })?;
+
+        Ok(size)
     }
 }
 
