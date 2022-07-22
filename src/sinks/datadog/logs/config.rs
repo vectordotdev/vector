@@ -54,6 +54,8 @@ pub struct DatadogLogsConfig {
     pub(crate) endpoint: Option<String>,
 
     /// The Datadog region to send logs to.
+    ///
+    /// This option is deprecated, and the `site` field should be used instead.
     #[configurable(deprecated)]
     pub region: Option<Region>,
 
@@ -62,9 +64,9 @@ pub struct DatadogLogsConfig {
     /// [dd_site]: https://docs.datadoghq.com/getting_started/site
     pub site: Option<String>,
 
-    /// The default Datadog [API key][api_key] to send events with.
+    /// The default Datadog [API key][api_key] to send logs with.
     ///
-    /// If an event has a Datadog [API key][api_key] set explicitly in its metadata, it will take
+    /// If a log has a Datadog [API key][api_key] set explicitly in its metadata, it will take
     /// precedence over the default.
     ///
     /// [api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication

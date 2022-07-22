@@ -30,6 +30,8 @@ pub struct DatadogEventsConfig {
     pub endpoint: Option<String>,
 
     /// The Datadog region to send events to.
+    ///
+    /// This option is deprecated, and the `site` field should be used instead.
     #[configurable(deprecated)]
     pub region: Option<Region>,
 

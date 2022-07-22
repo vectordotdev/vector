@@ -67,7 +67,7 @@ pub struct DatadogTracesConfig {
 
     /// The default Datadog [API key][api_key] to send traces with.
     ///
-    /// If an event has a Datadog [API key][api_key] set explicitly in its metadata, it will take
+    /// If a trace has a Datadog [API key][api_key] set explicitly in its metadata, it will take
     /// precedence over the default.
     ///
     /// [api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication

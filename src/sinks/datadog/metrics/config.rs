@@ -107,21 +107,23 @@ pub struct DatadogMetricsConfig {
     /// present, it is used as a prefix to the metric name, and separated with a period (`.`).
     pub default_namespace: Option<String>,
 
-    /// The endpoint to send logs to.
+    /// The endpoint to send metrics to.
     pub(crate) endpoint: Option<String>,
 
-    /// The Datadog region to send logs to.
+    /// The Datadog region to send metrics to.
+    ///
+    /// This option is deprecated, and the `site` field should be used instead.
     #[configurable(deprecated)]
     pub region: Option<Region>,
 
-    /// The Datadog [site][dd_site] to send logs to.
+    /// The Datadog [site][dd_site] to send metrics to.
     ///
     /// [dd_site]: https://docs.datadoghq.com/getting_started/site
     pub site: Option<String>,
 
-    /// The default Datadog [API key][api_key] to send events with.
+    /// The default Datadog [API key][api_key] to send metrics with.
     ///
-    /// If an event has a Datadog [API key][api_key] set explicitly in its metadata, it will take
+    /// If a metric has a Datadog [API key][api_key] set explicitly in its metadata, it will take
     /// precedence over the default.
     ///
     /// [api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
