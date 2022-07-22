@@ -179,7 +179,7 @@ mod tests {
     use crate::{
         conditions::{Condition, ConditionalConfig, VrlConfig},
         config::log_schema,
-        event::{Event, LogEvent},
+        event::{Event, LogEvent, TraceEvent},
         test_util::random_lines,
         transforms::test::transform_one,
     };
@@ -360,6 +360,18 @@ mod tests {
             let passing = transform_one(&mut sampler, event).unwrap();
             assert!(passing.as_log().get("sample_rate").is_none());
         }
+    }
+
+    #[test]
+    fn handles_trace_event() {
+        let event: TraceEvent = LogEvent::from("trace").into();
+        let trace = Event::Trace(event);
+        let mut sampler = Sample::new(2, None, None);
+        let iterations = 0..2;
+        let total_passed = iterations
+            .filter_map(|_| transform_one(&mut sampler, trace.clone()))
+            .count();
+        assert_eq!(total_passed, 1);
     }
 
     fn random_events(n: usize) -> Vec<Event> {
