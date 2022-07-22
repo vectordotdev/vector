@@ -143,8 +143,7 @@ impl Definition {
         kind: Kind,
         meaning: Option<&str>,
     ) -> Self {
-        let path = path.into();
-        if kind.find_at_path()
+        unimplemented!()
     }
 
     /// Add type information for an event field.
