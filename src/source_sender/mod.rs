@@ -416,7 +416,7 @@ mod tests {
             .expect("There must be a controller")
             .capture_metrics()
             .into_iter()
-            .filter(|metric| metric.name() == "lag_time_seconds")
+            .filter(|metric| metric.name() == "source_lag_time_seconds")
             .collect::<Vec<_>>();
         assert_eq!(lag_times.len(), 1);
 
@@ -439,7 +439,7 @@ mod tests {
                 assert_eq!(*count, 1);
                 assert!((*sum - expected).abs() <= 0.001);
             }
-            _ => panic!("lag_time_seconds has invalid type"),
+            _ => panic!("source_lag_time_seconds has invalid type"),
         }
     }
 }
