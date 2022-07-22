@@ -161,7 +161,7 @@ aws-sdk-cloudwatchlogs = { version = "0.15.0", default-features = false, feature
 aws-sdk-elasticsearch = {version = "0.15.0", default-features = false, features = ["rustls"], optional = true }
 aws-sdk-firehose = { version = "0.15.0", default-features = false, features = ["rustls"], optional = true }
 aws-sdk-kinesis = { version = "0.15.0", default-features = false, features = ["rustls"], optional = true }
-aws-sigv4 = { version = "0.15.0", default-features = false, optional = true }
+aws-sigv4 = { version = "0.46.0", default-features = false, optional = true }
 aws-smithy-async = { version = "0.45.0", default-features = false, optional = true }
 aws-smithy-client = { version = "0.45.0", default-features = false, features = ["client-hyper"], optional = true}
 aws-smithy-http = { version = "0.45.0", default-features = false, features = ["event-stream"], optional = true }
