@@ -204,7 +204,7 @@ impl SinkConfig for HttpSinkConfig {
 
         let sink = HttpSink {
             uri: self.uri.with_default_parts(),
-            method: self.method.clone(),
+            method: self.method,
             auth: self.auth.choose_one(&self.uri.auth)?,
             compression: self.compression,
             transformer: self.encoding.transformer(),
@@ -276,7 +276,7 @@ impl util::http::HttpSink for HttpSink {
     }
 
     async fn build_request(&self, mut body: Self::Output) -> crate::Result<http::Request<Bytes>> {
-        let method = match &self.method.clone().unwrap_or(HttpMethod::Post) {
+        let method = match &self.method.unwrap_or(HttpMethod::Post) {
             HttpMethod::Get => Method::GET,
             HttpMethod::Head => Method::HEAD,
             HttpMethod::Post => Method::POST,

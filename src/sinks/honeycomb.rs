@@ -21,7 +21,7 @@ use crate::{
 /// Configuration for the `honeycomb` sink.
 #[configurable_component(sink)]
 #[derive(Clone, Debug)]
-pub(super) struct HoneycombConfig {
+pub struct HoneycombConfig {
     #[serde(skip, default = "default_endpoint")]
     endpoint: String,
 

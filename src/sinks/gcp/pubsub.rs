@@ -265,6 +265,7 @@ mod tests {
 mod integration_tests {
     use codecs::JsonSerializerConfig;
     use reqwest::{Client, Method, Response};
+    use serde::{Deserialize, Serialize};
     use serde_json::{json, Value};
     use vector_core::event::{BatchNotifier, BatchStatus};
 

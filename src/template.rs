@@ -1,4 +1,4 @@
-use std::{borrow::Cow, convert::TryFrom, hash::Hash, path::PathBuf};
+use std::{borrow::Cow, convert::TryFrom, fmt, hash::Hash, path::PathBuf};
 
 use bytes::Bytes;
 use chrono::{
@@ -107,6 +107,12 @@ impl TryFrom<Cow<'_, str>> for Template {
 impl From<Template> for String {
     fn from(template: Template) -> String {
         template.src
+    }
+}
+
+impl fmt::Display for Template {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.src)
     }
 }
 

@@ -232,6 +232,7 @@ pub enum Sinks {
     #[cfg(any(feature = "sinks-influxdb", feature = "prometheus-integration-tests"))]
     InfluxdbLogs(#[configurable(derived)] influxdb::logs::InfluxDbLogsConfig),
 
+    /*
     /// InfluxDB Metrics.
     #[cfg(any(feature = "sinks-influxdb", feature = "prometheus-integration-tests"))]
     InfluxdbMetrics(#[configurable(derived)] influxdb::metrics::InfluxDbConfig),
@@ -250,7 +251,7 @@ pub enum Sinks {
 
     /// NATS.
     #[cfg(feature = "sinks-nats")]
-    Nats(#[configurable(derived)] nats::NatsSinkConfig),
+    Nats(#[configurable(derived)] self::nats::NatsSinkConfig),
 
     /// New Relic.
     #[cfg(feature = "sinks-new_relic")]
@@ -259,11 +260,12 @@ pub enum Sinks {
     /// New Relic Logs.
     #[cfg(feature = "sinks-new_relic_logs")]
     NewrelicLogs(#[configurable(derived)] new_relic_logs::NewRelicLogsConfig),
-
+    */
     /// Papertrail.
     #[cfg(feature = "sinks-papertrail")]
     Papertrail(#[configurable(derived)] papertrail::PapertrailConfig),
 
+    /*
     /// Prometheus Exporter.
     #[cfg(feature = "sinks-prometheus")]
     PrometheusExporter(#[configurable(derived)] prometheus::exporter::PrometheusExporterConfig),
@@ -271,7 +273,7 @@ pub enum Sinks {
     /// Prometheus Remote Write.
     #[cfg(feature = "sinks-prometheus")]
     PrometheusRemoteWrite(#[configurable(derived)] prometheus::remote_write::RemoteWriteConfig),
-
+    */
     /// Apache Pulsar.
     #[cfg(feature = "sinks-pulsar")]
     Pulsar(#[configurable(derived)] pulsar::PulsarSinkConfig),
@@ -279,7 +281,7 @@ pub enum Sinks {
     /// Redis.
     #[cfg(feature = "sinks-redis")]
     Redis(#[configurable(derived)] redis::RedisSinkConfig),
-
+    /*
     /// Sematext Logs.
     #[cfg(feature = "sinks-sematext")]
     SematextLogs(#[configurable(derived)] sematext::logs::SematextLogsConfig),
@@ -311,4 +313,5 @@ pub enum Sinks {
     /// Websocket.
     #[cfg(feature = "sinks-websocket")]
     Websocket(#[configurable(derived)] websocket::WebSocketSinkConfig),
+    */
 }

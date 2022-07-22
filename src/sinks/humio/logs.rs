@@ -218,6 +218,7 @@ mod integration_tests {
     use chrono::{TimeZone, Utc};
     use futures::{future::ready, stream};
     use indoc::indoc;
+    use serde::Deserialize;
     use serde_json::{json, Value as JsonValue};
     use tokio::time::Duration;
 

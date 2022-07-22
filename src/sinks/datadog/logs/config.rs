@@ -49,7 +49,7 @@ impl SinkBatchSettings for DatadogLogsDefaultBatchSettings {
 #[configurable_component(sink)]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct DatadogLogsConfig {
+pub struct DatadogLogsConfig {
     /// The endpoint to send logs to.
     pub(crate) endpoint: Option<String>,
 
