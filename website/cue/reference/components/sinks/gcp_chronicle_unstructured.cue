@@ -22,6 +22,7 @@ components: sinks: chronicle_unstructured: {
 				max_bytes:    10_000_000
 				timeout_secs: 300.0
 			}
+			compression: enabled: false
 			encoding: {
 				enabled: true
 				codec: {
