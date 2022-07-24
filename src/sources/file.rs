@@ -545,16 +545,17 @@ pub fn file_source(
         let span2 = span.clone();
         let mut messages = messages.map(move |line| {
             let _enter = span2.enter();
-            let mut event = create_event(
-                line.text,
-                &line.filename,
-                line.offset,
-                line_delimiter_len,
-                &host_key,
-                &hostname,
-                &file_key,
-                &offset_key,
-            );
+            let meta = LogEventMetadata {
+                file: &line.filename,
+                line_end_offset: line.offset,
+                line_delimiter_len: line_delimiter_len,
+                host_key: &host_key,
+                hostname: &hostname,
+                file_key: &file_key,
+                offset_key: &offset_key,
+            };
+            let mut event = create_event(line.text, meta);
+
             if let Some(finalizer) = &finalizer {
                 let (batch, receiver) = BatchNotifier::new_with_receiver();
                 event = event.with_batch_notifier(&batch);
@@ -632,22 +633,22 @@ fn wrap_with_line_agg(
     )
 }
 
-
-fn create_event(
-    line: Bytes,
-    file: &str,
+struct LogEventMetadata<'a> {
+    file: &'a str,
     line_end_offset: u64,
     line_delimiter_len: usize,
-    host_key: &str,
-    hostname: &Option<String>,
-    file_key: &Option<String>,
-    offset_key: &Option<String>,
-) -> LogEvent {
+    host_key: &'a str,
+    hostname: &'a Option<String>,
+    file_key: &'a Option<String>,
+    offset_key: &'a Option<String>,
+}
+
+fn create_event(line: Bytes, meta: LogEventMetadata) -> LogEvent {
     let line_len = line.len();
 
     emit!(FileEventsReceived {
         count: 1,
-        file,
+        file: meta.file,
         byte_size: line_len,
     });
 
@@ -656,17 +657,18 @@ fn create_event(
     // Add source type
     event.insert(log_schema().source_type_key(), Bytes::from("file"));
 
-    if let Some(offset_key) = &offset_key {
-        let line_start_offset: u64 = line_end_offset - line_len as u64 - line_delimiter_len as u64;
+    if let Some(offset_key) = &meta.offset_key {
+        let line_start_offset: u64 =
+            meta.line_end_offset - line_len as u64 - meta.line_delimiter_len as u64;
         event.insert(offset_key.as_str(), line_start_offset.to_string());
     }
 
-    if let Some(file_key) = &file_key {
-        event.insert(file_key.as_str(), file);
+    if let Some(file_key) = &meta.file_key {
+        event.insert(file_key.as_str(), meta.file);
     }
 
-    if let Some(hostname) = &hostname {
-        event.insert(host_key, hostname.clone());
+    if let Some(hostname) = &meta.hostname {
+        event.insert(meta.host_key, hostname.clone());
     }
 
     event
@@ -826,16 +828,16 @@ mod tests {
         let offset_key = Some("offset".to_string());
         let line_delimiter_len: usize = 1;
 
-        let log = create_event(
-            line,
-            file,
-            line_end_offset,
-            line_delimiter_len,
-            &host_key,
-            &hostname,
-            &file_key,
-            &offset_key,
-        );
+        let meta = LogEventMetadata {
+            file: file,
+            line_end_offset: line_end_offset,
+            line_delimiter_len: line_delimiter_len,
+            host_key: &host_key,
+            hostname: &hostname,
+            file_key: &file_key,
+            offset_key: &offset_key,
+        };
+        let log = create_event(line, meta);
 
         assert_eq!(log["file"], file.into());
         assert_eq!(log["host"], "Some.Machine".into());
