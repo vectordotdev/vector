@@ -824,11 +824,13 @@ mod tests {
         let hostname = Some("Some.Machine".to_string());
         let file_key = Some("file".to_string());
         let offset_key = Some("offset".to_string());
+        let line_delimiter_len: usize = 1;
 
         let log = create_event(
             line,
             file,
             line_end_offset,
+            line_delimiter_len,
             &host_key,
             &hostname,
             &file_key,
