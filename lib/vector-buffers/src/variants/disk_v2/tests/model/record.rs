@@ -34,7 +34,7 @@ impl fmt::Display for DecodeError {
 
 impl error::Error for DecodeError {}
 
-#[derive(Clone, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Record {
     id: u32,
     size: u32,
@@ -81,18 +81,6 @@ impl fmt::Debug for Record {
             .field("encoded_len", &self.encoded_len())
             .field("archived_len", &self.archived_len())
             .finish()
-    }
-}
-
-impl PartialEq for Record {
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id && self.size == other.size && self.event_count == other.event_count
-    }
-}
-
-impl AddBatchNotifier for Record {
-    fn add_batch_notifier(&mut self, batch: BatchNotifier) {
-        self.finalizers.add(EventFinalizer::new(batch));
     }
 }
 

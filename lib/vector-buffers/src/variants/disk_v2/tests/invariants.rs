@@ -132,7 +132,7 @@ async fn file_id_wraps_around_when_max_file_id_hit() {
 
         async move {
             let record_size = 100;
-            let record = SizedRecord::new(record_size);
+            let record = SizedRecord(record_size);
             let max_data_file_size = get_minimum_data_file_size_for_record_payload(&record);
 
             // Create our buffer with an arbitrarily low max data file size, which will let us
@@ -156,7 +156,7 @@ async fn file_id_wraps_around_when_max_file_id_hit() {
             let mut writer_file_id = 0;
             while id < target_id {
                 let bytes_written = writer
-                    .write_record(record.clone())
+                    .write_record(record)
                     .await
                     .expect("write should not fail");
                 assert_enough_bytes_written!(bytes_written, SizedRecord, record_size);
@@ -210,7 +210,7 @@ async fn writer_stops_when_hitting_file_that_reader_is_still_on() {
 
         async move {
             let record_size = 100;
-            let record = SizedRecord::new(record_size);
+            let record = SizedRecord(record_size);
             let max_data_file_size = get_minimum_data_file_size_for_record_payload(&record);
 
             // Create our buffer with an arbitrarily low max data file size, which will let us
@@ -623,7 +623,7 @@ async fn writer_waits_for_reader_after_validate_last_write_fails_and_data_file_s
 
         async move {
             let record_size = 42;
-            let record = SizedRecord::new(record_size);
+            let record = SizedRecord(record_size);
             let corrected_record_size = get_corrected_max_record_size(&record);
             let max_data_file_size = (corrected_record_size * 2)
                 .try_into()
@@ -649,7 +649,7 @@ async fn writer_waits_for_reader_after_validate_last_write_fails_and_data_file_s
             while writer_file_id != target_writer_file_id {
                 for _ in 0..2 {
                     bytes_written = writer
-                        .write_record(record.clone())
+                        .write_record(record)
                         .await
                         .expect("write should not fail");
                     assert_enough_bytes_written!(bytes_written, SizedRecord, record_size);

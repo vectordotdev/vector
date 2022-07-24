@@ -24,7 +24,8 @@ use vector_core::{buffers::Acker, internal_event::EventsSent, ByteSizeOf};
 use crate::{
     codecs::Encoder,
     config::{
-        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
+        SinkDescription,
     },
     event::{Event, EventStatus, Finalizable},
     expiring_hash_map::ExpiringHashMap,
@@ -174,7 +175,7 @@ impl SinkConfig for FileSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::new(self.encoding.config().1.input_type())
+        Input::new(self.encoding.config().1.input_type() & DataType::Log)
     }
 
     fn sink_type(&self) -> &'static str {

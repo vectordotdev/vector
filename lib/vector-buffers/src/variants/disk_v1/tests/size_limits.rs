@@ -35,8 +35,8 @@ async fn ensure_write_offset_valid_after_reload_with_multievent() {
             // This write should return immediately because will have exceeded our 100 byte total
             // buffer size limit handily with the first write we did, but since it's a fallible
             // write attempt, it can already tell that the write will not fit anyways:
-            let record = SizedRecord::new(second_write_size);
-            let second_write_result = writer.try_send(record.clone());
+            let record = SizedRecord(second_write_size);
+            let second_write_result = writer.try_send(record);
 
             assert_eq!(second_write_result, Some(record));
         }

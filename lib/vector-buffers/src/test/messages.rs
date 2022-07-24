@@ -93,29 +93,8 @@ impl FixedEncodable for Message {
     }
 }
 
-#[derive(Clone, Debug, Eq)]
-pub(crate) struct SizedRecord(pub u32, EventFinalizers);
-
-impl SizedRecord {
-    pub(crate) const fn new(n: u32) -> Self {
-        Self(n, EventFinalizers::DEFAULT)
-    }
-
-    fn encoded_len(&self) -> usize {
-        let payload_len: usize = self
-            .0
-            .try_into()
-            .expect("`SizedRecord` should never have a payload length greater than `usize`.");
-
-        payload_len + mem::size_of_val(&self.0)
-    }
-}
-
-impl AddBatchNotifier for SizedRecord {
-    fn add_batch_notifier(&mut self, batch: BatchNotifier) {
-        self.1.add(EventFinalizer::new(batch));
-    }
-}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct SizedRecord(pub u32);
 
 impl ByteSizeOf for SizedRecord {
     fn allocated_bytes(&self) -> usize {
@@ -149,7 +128,7 @@ impl FixedEncodable for SizedRecord {
                 io::ErrorKind::Other,
                 format!(
                     "not enough capacity to encode record: need {}, only have {}",
-                    minimum_len,
+                    self.0 + 4,
                     buffer.remaining_mut()
                 ),
             ));
@@ -171,6 +150,10 @@ impl FixedEncodable for SizedRecord {
 
     fn encoded_size(&self) -> Option<usize> {
         Some(self.encoded_len())
+    }
+
+    fn encoded_size(&self) -> Option<usize> {
+        Some(self.0 as usize + 4)
     }
 }
 

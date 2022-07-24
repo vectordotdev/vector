@@ -91,7 +91,7 @@ components: sinks: [Name=string]: {
 						required:      true
 						relevant_when: "type = \"disk\""
 						type: uint: {
-							examples: [104900000]
+							examples: [268435456]
 							unit: "bytes"
 						}
 					}
@@ -287,7 +287,7 @@ components: sinks: [Name=string]: {
 										enum: {
 											bytes:               "Byte frames are concatenated."
 											character_delimited: "Byte frames are delimited by a chosen character."
-											length_delimited:    "Byte frames are encoded by adding a length header."
+											length_delimited:    "Byte frames are prefixed by an unsized big-endian 32-bit integer indicating the length."
 											newline_delimited:   "Byte frames are delimited by a newline character."
 										}
 									}

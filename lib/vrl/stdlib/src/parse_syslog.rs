@@ -150,7 +150,7 @@ fn message_to_value(message: Message<&str>) -> Value {
         result.insert("procid".to_string(), value);
     }
 
-    for element in message.structured_data {
+    for element in message.structured_data.into_iter() {
         let mut sdata = BTreeMap::new();
         for (name, value) in element.params() {
             sdata.insert(name.to_string(), value.into());

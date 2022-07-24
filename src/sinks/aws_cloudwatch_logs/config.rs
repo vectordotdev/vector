@@ -11,8 +11,8 @@ use crate::{
     },
     codecs::Encoder,
     config::{
-        log_schema, AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig,
-        SinkContext,
+        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig,
+        SinkConfig, SinkContext,
     },
     sinks::{
         aws_cloudwatch_logs::{
@@ -146,7 +146,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::new(self.encoding.config().input_type())
+        Input::new(self.encoding.config().input_type() & DataType::Log)
     }
 
     fn sink_type(&self) -> &'static str {
