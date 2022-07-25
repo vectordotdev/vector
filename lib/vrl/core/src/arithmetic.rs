@@ -18,6 +18,9 @@ pub trait VrlValueArithmetic: Sized {
     /// Similar to [`std::ops::Sub`], but fallible (e.g. `TrySub`).
     fn try_sub(self, rhs: Self) -> Result<Self, Error>;
 
+    /// Test if value is interpreted as false when used in "OR" (`||`).
+    fn is_falsy(&self) -> bool;
+
     /// Try to "OR" (`||`) two values types.
     ///
     /// If the lhs value is `null` or `false`, the rhs is evaluated and
@@ -142,18 +145,21 @@ impl VrlValueArithmetic for Value {
         Ok(value)
     }
 
+    /// Test if value is interpreted as false when used in "OR" (`||`).
+    fn is_falsy(&self) -> bool {
+        matches!(self, Value::Null | Value::Boolean(false))
+    }
+
     /// Try to "OR" (`||`) two values types.
     ///
     /// If the lhs value is `null` or `false`, the rhs is evaluated and
     /// returned. The rhs is a closure that can return an error, and thus this
     /// method can return an error as well.
     fn try_or(self, mut rhs: impl FnMut() -> Result<Self, ExpressionError>) -> Result<Self, Error> {
-        let err = Error::Or;
-
-        match self {
-            Value::Null => rhs().map_err(err),
-            Value::Boolean(false) => rhs().map_err(err),
-            value => Ok(value),
+        if self.is_falsy() {
+            rhs().map_err(Error::Or)
+        } else {
+            Ok(self)
         }
     }
 
