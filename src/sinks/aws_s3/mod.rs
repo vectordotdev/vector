@@ -6,7 +6,7 @@ mod sink;
 #[cfg(test)]
 mod tests;
 
-use self::config::S3SinkConfig;
+pub use self::config::S3SinkConfig;
 
 inventory::submit! {
     SinkDescription::new::<S3SinkConfig>("aws_s3")

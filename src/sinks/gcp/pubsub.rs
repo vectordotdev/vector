@@ -3,10 +3,10 @@ use futures::{FutureExt, SinkExt};
 use http::{Request, Uri};
 use hyper::Body;
 use indoc::indoc;
-use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
+use vector_config::configurable_component;
 
 use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
@@ -46,24 +46,39 @@ impl SinkBatchSettings for PubsubDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 1.0;
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the `gcp_pubsub` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug)]
 pub struct PubsubConfig {
+    /// The project name to which to publish events.
     pub project: String,
+
+    /// The topic within the project to which to publish events.
     pub topic: String,
+
+    /// The endpoint to which to publish events.
     #[serde(default)]
     pub endpoint: Option<String>,
+
     #[serde(default, flatten)]
     pub auth: GcpAuthConfig,
 
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<PubsubDefaultBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    #[configurable(derived)]
     encoding: EncodingConfig,
 
+    #[configurable(derived)]
     #[serde(default)]
     pub tls: Option<TlsConfig>,
 
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -250,6 +265,7 @@ mod tests {
 mod integration_tests {
     use codecs::JsonSerializerConfig;
     use reqwest::{Client, Method, Response};
+    use serde::{Deserialize, Serialize};
     use serde_json::{json, Value};
     use vector_core::event::{BatchNotifier, BatchStatus};
 

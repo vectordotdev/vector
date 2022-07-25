@@ -53,7 +53,7 @@
 // then multiline parsing is disabled". Including that description on `MultilineConfig` itself is kind of weird because
 // it forces that on everyone else using it, where, in some cases, it may not be optional at all.
 //
-// TODO: Right now, we're manually generating a referencable name where it makes sense by appending the module path to
+// TODO: Right now, we're manually generating a referenceable name where it makes sense by appending the module path to
 // the ident for structs/enums, and by crafting the name by hand for anything like stdlib impls, or impls on external
 // types.
 //
@@ -61,7 +61,7 @@
 // fully-qualified path of a type, which we would need (in general, regardless of whether or not we used that function)
 // because we don't want definition types totally changing name between compiler versions, etc.
 //
-// This is obviously also tricky from a re-export standpoint i.e. what is the referencable name of a type that uses the
+// This is obviously also tricky from a re-export standpoint i.e. what is the referenceable name of a type that uses the
 // derive macros for `Configurable` but is exporter somewhere entirely different? The path would refer to the source nol
 // matter what, as it's based on how `std::module_path!()` works. Technically speaking, that's still correct from a "we
 // shouldn't create duplicate schemas for T" standpoint, but could manifest as a non-obvious divergence.
@@ -81,6 +81,32 @@
 // can essentially define flags i.e. `docs:templateable` as a metadata value for marking a field as working with
 // Vector's template syntax, since doing `templateable = true` is weird given that we never otherwise specifically
 // disable it. In other words, we want a way to define feature flags in metadata.
+//
+// TODO: Should we add a way, and/or make it the default, that if you only supply a description of a
+// field, it concats the description of the type of the field? for example, you have:
+//
+// /// Predefined ACLs.
+// ///
+// /// For more information, see this link.
+// pub enum PredefinedAcl { ... }
+//
+// and then somewhere else, you use it like this:
+//
+// /// The Predefined ACL to apply to newly created objects.
+// field: PredefinedAcl,
+//
+// the resulting docs for `field` should look as if we wrote this:
+//
+// /// The Predefined ACL to apply to newly created objects.
+// ///
+// /// For more information, see this link.
+//
+// basically, we're always documenting these shared types fully, but sometimes their title is
+// written in an intentionally generic way, and we may want to spice up the wording so it's
+// context-specific i.e. we're using predefined ACLs for new objects, or using it for new firewall
+// rules, or ... so on and so forth. and by concating the existing description on the shared type,
+// we can continue to include high-quality doc comments with contextual links, examples, etc and
+// avoid duplication.
 
 #![deny(warnings)]
 
@@ -355,11 +381,11 @@ pub trait Configurable
 where
     Self: Sized,
 {
-    /// Gets the referencable name of this value, if any.
+    /// Gets the referenceable name of this value, if any.
     ///
     /// When specified, this implies the value is both complex and standardized, and should be
     /// reused within any generated schema it is present in.
-    fn referencable_name() -> Option<&'static str> {
+    fn referenceable_name() -> Option<&'static str> {
         None
     }
 

@@ -47,8 +47,8 @@ impl SinkBatchSettings for SematextMetricsDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 1.0;
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
-struct SematextMetricsConfig {
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct SematextMetricsConfig {
     pub default_namespace: String,
     pub region: Option<Region>,
     pub endpoint: Option<String>,
