@@ -46,8 +46,9 @@ pub fn parse_path(path: &str) -> OwnedPath {
 /// A path is simply the data describing how to look up a value.
 /// This should only be implemented for types that are very cheap to clone, such as references.
 pub trait Path<'a>: Clone {
-    type Iter: Iterator<Item = BorrowedSegment<'a>>;
+    type Iter: Iterator<Item = BorrowedSegment<'a>> + Clone;
 
+    /// Iterates over the raw "Borrowed" segments.
     fn segment_iter(&self) -> Self::Iter;
 
     fn concat<T: Path<'a>>(&self, path: T) -> PathConcat<Self, T> {

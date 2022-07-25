@@ -10,9 +10,9 @@ use http::{
 };
 use hyper::Body;
 use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
+use vector_config::configurable_component;
 
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
@@ -45,23 +45,45 @@ enum BuildError {
     },
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+/// Configuration for the `http` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct HttpSinkConfig {
+    /// The full URI to make HTTP requests to.
+    ///
+    /// This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.
     pub uri: UriSerde,
+
+    /// The HTTP method to use when making the request.
     pub method: Option<HttpMethod>,
+
+    #[configurable(derived)]
     pub auth: Option<Auth>,
-    // Deprecated, moved to request.
+
+    /// A list of custom headers to add to each request.
+    #[configurable(deprecated)]
     pub headers: Option<IndexMap<String, String>>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub compression: Compression,
+
     #[serde(flatten)]
     pub encoding: EncodingConfigWithFraming,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: RequestConfig,
+
+    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -70,18 +92,41 @@ pub struct HttpSinkConfig {
     pub acknowledgements: AcknowledgementsConfig,
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
+/// HTTP method.
+///
+/// A subset of the HTTP methods described in [RFC 9110, section 9.1][rfc9110] are supported.
+///
+/// [rfc9110]: https://datatracker.ietf.org/doc/html/rfc9110#section-9.1
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 #[derivative(Default)]
 pub enum HttpMethod {
+    /// GET.
+    ///
+    /// This is the default.
     #[derivative(Default)]
     Get,
+
+    /// HEAD.
     Head,
+
+    /// POST.
     Post,
+
+    /// PUT.
     Put,
+
+    /// DELETE.
     Delete,
+
+    /// OPTIONS.
     Options,
+
+    /// TRACE.
     Trace,
+
+    /// PATCH.
     Patch,
 }
 
@@ -159,7 +204,7 @@ impl SinkConfig for HttpSinkConfig {
 
         let sink = HttpSink {
             uri: self.uri.with_default_parts(),
-            method: self.method.clone(),
+            method: self.method,
             auth: self.auth.choose_one(&self.uri.auth)?,
             compression: self.compression,
             transformer: self.encoding.transformer(),
@@ -231,7 +276,7 @@ impl util::http::HttpSink for HttpSink {
     }
 
     async fn build_request(&self, mut body: Self::Output) -> crate::Result<http::Request<Bytes>> {
-        let method = match &self.method.clone().unwrap_or(HttpMethod::Post) {
+        let method = match &self.method.unwrap_or(HttpMethod::Post) {
             HttpMethod::Get => Method::GET,
             HttpMethod::Head => Method::HEAD,
             HttpMethod::Post => Method::POST,

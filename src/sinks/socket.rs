@@ -15,15 +15,13 @@ use crate::{
     sinks::util::{tcp::TcpSinkConfig, udp::UdpSinkConfig},
 };
 
-#[derive(Deserialize, Serialize, Debug)]
-// `#[serde(deny_unknown_fields)]` doesn't work when flattening internally tagged enums, see
-// https://github.com/serde-rs/serde/issues/1358.
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SocketSinkConfig {
     #[serde(flatten)]
     pub mode: Mode,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum Mode {
     Tcp(TcpMode),

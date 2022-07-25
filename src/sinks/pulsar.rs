@@ -13,10 +13,10 @@ use pulsar::{
     message::proto, producer::SendFuture, proto::CommandSendReceipt, Authentication,
     Error as PulsarError, Producer, Pulsar, TokioExecutor,
 };
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
 use vector_common::internal_event::{BytesSent, EventsSent};
+use vector_config::configurable_component;
 use vector_core::config::log_schema;
 
 use crate::{
@@ -34,28 +34,60 @@ enum BuildError {
     CreatePulsarSink { source: PulsarError },
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+/// Configuration for the `pulsar` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug)]
 pub struct PulsarSinkConfig {
-    // Deprecated name
+    /// The endpoint to which the Pulsar client should connect to.
     #[serde(alias = "address")]
     endpoint: String,
+
+    /// The Pulsar topic name to write events to.
     topic: String,
+
+    #[configurable(derived)]
     pub encoding: EncodingConfig,
+
+    #[configurable(derived)]
     auth: Option<AuthConfig>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+/// Authentication configuration.
+#[configurable_component]
+#[derive(Clone, Debug)]
 struct AuthConfig {
-    name: Option<String>,  // "token"
-    token: Option<String>, // <jwt token>
+    /// Basic authentication name/username.
+    ///
+    /// This can be used either for basic authentication (username/password) or JWT authentication.
+    /// When used for JWT, the value should be `token`.
+    name: Option<String>,
+
+    /// Basic authentication password/token.
+    ///
+    /// This can be used either for basic authentication (username/password) or JWT authentication.
+    /// When used for JWT, the value should be the signed JWT, in the compact representation.
+    token: Option<String>,
+
+    #[configurable(derived)]
     oauth2: Option<OAuth2Config>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+/// OAuth2-specific authenticatgion configuration.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct OAuth2Config {
+    /// The issuer URL.
     issuer_url: String,
+
+    /// The credentials URL.
+    ///
+    /// A data URL is also supported.
     credentials_url: String,
+
+    /// The OAuth2 audience.
     audience: Option<String>,
+
+    /// The OAuth2 scope.
     scope: Option<String>,
 }
 

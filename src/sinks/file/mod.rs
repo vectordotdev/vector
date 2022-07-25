@@ -12,12 +12,12 @@ use futures::{
     stream::{BoxStream, StreamExt},
     FutureExt,
 };
-use serde::{Deserialize, Serialize};
 use tokio::{
     fs::{self, File},
     io::AsyncWriteExt,
 };
 use tokio_util::codec::Encoder as _;
+use vector_config::configurable_component;
 use vector_core::{internal_event::EventsSent, ByteSizeOf};
 
 use crate::{
@@ -37,18 +37,31 @@ use std::convert::TryFrom;
 
 use bytes_path::BytesPath;
 
-#[derive(Deserialize, Serialize, Debug)]
+/// Configuration for the `file` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct FileSinkConfig {
+    /// File name to write events to.
+    #[configurable(metadata(templateable))]
     pub path: Template,
+
+    /// The amount of time, in seconds, that a file can be idle and stay open.
+    ///
+    /// After not receiving any events in this amount of time, the file will be flushed and closed.
     pub idle_timeout_secs: Option<u64>,
+
     #[serde(flatten)]
     pub encoding: EncodingConfigWithFraming,
+
+    #[configurable(derived)]
     #[serde(
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub compression: Compression,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -74,10 +87,16 @@ impl GenerateConfig for FileSinkConfig {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Copy)]
+/// Compression algorithm.
+// TODO: Why doesn't this already use `crate::sinks::util::Compression`? :thinkies:
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum Compression {
+    /// Gzip compression.
     Gzip,
+
+    /// No compression.
     None,
 }
 
