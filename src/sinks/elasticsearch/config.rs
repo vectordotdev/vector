@@ -5,9 +5,9 @@ use std::{
 };
 
 use futures::{stream, FutureExt};
-use vector_config::configurable_component;
 use snafu::ResultExt;
 use tower::{discover::Change, ServiceBuilder};
+use vector_config::configurable_component;
 
 use crate::{
     aws::RegionOrEndpoint,
@@ -111,6 +111,8 @@ pub struct ElasticsearchConfig {
 
     #[configurable(derived)]
     pub tls: Option<TlsConfig>,
+
+    #[configurable(derived)]
     pub distribution: Option<DistributionConfig>,
 
     #[configurable(derived)]
@@ -187,9 +189,15 @@ impl BulkConfig {
     }
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default)]
+/// Distribution configuration.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
+#[serde(rename_all = "snake_case")]
 pub struct DistributionConfig {
+    /// Endpoints to which to distribute data.
     pub endpoints: Vec<String>,
+
+    /// Time between reactivation attempts.
     pub reactivate_delay_secs: Option<u64>,
 }
 
