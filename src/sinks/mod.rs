@@ -265,7 +265,6 @@ pub enum Sinks {
     #[cfg(feature = "sinks-papertrail")]
     Papertrail(#[configurable(derived)] papertrail::PapertrailConfig),
 
-    /*
     /// Prometheus Exporter.
     #[cfg(feature = "sinks-prometheus")]
     PrometheusExporter(#[configurable(derived)] prometheus::exporter::PrometheusExporterConfig),
