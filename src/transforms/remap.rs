@@ -1014,11 +1014,11 @@ mod tests {
         let context = TransformContext {
             key: Some(ComponentKey::from("remapper")),
             schema_definitions,
-            merged_schema_definition: schema::Definition::empty_legacy_namespace().with_field(
-                "hello",
-                Kind::bytes(),
-                None,
-            ),
+            merged_schema_definition: schema::Definition::new(
+                Kind::any_object(),
+                [LogNamespace::Legacy],
+            )
+            .with_field("hello", Kind::bytes(), None),
             ..Default::default()
         };
         let mut tform = Remap::new_ast(conf, &context).unwrap().0;
@@ -1263,16 +1263,15 @@ mod tests {
             ..Default::default()
         };
 
-        let schema_definition = schema::Definition::empty_legacy_namespace()
-            .with_field("foo", Kind::bytes().or_null(), None)
-            .with_field(
-                "tags",
-                Kind::object(BTreeMap::from([("foo".into(), Kind::bytes())])).or_null(),
-                None,
-            );
+        let schema_definition = schema::Definition::new(Kind::any_object(), [LogNamespace::Legacy])
+            .with_field("foo", Kind::any(), None)
+            .with_field("tags", Kind::any(), None);
 
         assert_eq!(
-            conf.outputs(&schema::Definition::empty_legacy_namespace()),
+            conf.outputs(&schema::Definition::new(
+                Kind::any_object(),
+                [LogNamespace::Legacy]
+            )),
             vec![Output::default(DataType::all()).with_schema_definition(schema_definition)]
         );
 

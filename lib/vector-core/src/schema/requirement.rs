@@ -1,7 +1,4 @@
-use std::{
-    borrow::Cow,
-    collections::{BTreeMap, BTreeSet},
-};
+use std::collections::{BTreeMap, BTreeSet};
 
 use lookup::LookupBuf;
 use value::Kind;
@@ -101,18 +98,10 @@ impl Requirement {
             match maybe_meaning_path {
                 Some(path) => {
                     // Get the kind at the path for the given semantic meaning.
-                    // If no kind is found, we set the kind to "any", since we
-                    // lack any further information.
-                    let definition_kind = definition
-                        .event_kind()
-                        .find_at_path(&path.to_lookup())
-                        .ok()
-                        .flatten()
-                        .map_or_else(Kind::any, Cow::into_owned);
+                    let definition_kind = definition.event_kind().at_path(path);
 
                     if !req_meaning.kind.is_superset(&definition_kind) {
-                        // We found a field matching the defined semantic
-                        // meaning, but its kind does not match the expected
+                        // The semantic meaning kind does not match the expected
                         // kind, so we can't use it in the sink.
                         errors.push(ValidationError::MeaningKind {
                             identifier,

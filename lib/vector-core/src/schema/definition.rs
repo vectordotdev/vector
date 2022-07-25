@@ -2,11 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::config::LogNamespace;
 use lookup::LookupBuf;
-use value::kind::insert;
-use value::{
-    kind::{merge, Collection},
-    Kind,
-};
+use value::{kind::Collection, Kind};
 
 /// The definition of a schema.
 ///
@@ -155,31 +151,13 @@ impl Definition {
         let meaning = meaning.map(ToOwned::to_owned);
 
         if !path.is_root() {
-            if kind.contains_null() {
-                // field is optional, so don't coerce to an object, but still make sure it _can_ be an object
-                assert!(
-                    self.event_kind.as_object().is_some(),
-                    "Setting a field on a value that cannot be an object"
-                );
-            } else {
-                self.event_kind = self
-                    .event_kind
-                    .into_object()
-                    .expect("required field implies the type can be an object")
-                    .into();
-            }
+            assert!(
+                self.event_kind.as_object().is_some(),
+                "Setting a field on a value that cannot be an object"
+            );
         }
-        self.event_kind
-            .insert_at_path(
-                &path.to_lookup(),
-                kind,
-                insert::Strategy {
-                    inner_conflict: insert::InnerConflict::Replace,
-                    leaf_conflict: insert::LeafConflict::Replace,
-                    coalesced_path: insert::CoalescedPath::Reject,
-                },
-            )
-            .expect("Field definition not valid");
+
+        self.event_kind.set_at_path(&path, kind);
 
         if let Some(meaning) = meaning {
             self.meaning.insert(meaning, MeaningPointer::Valid(path));
@@ -200,33 +178,13 @@ impl Definition {
         let path = path.into();
 
         if !path.is_root() {
-            if kind.contains_null() {
-                // field is optional, so don't coerce to an object, but still make sure it _can_ be an object
-                assert!(
-                    self.event_kind.as_object().is_some(),
-                    "Setting a field on a value that cannot be an object"
-                );
-            } else {
-                self.event_kind = self
-                    .event_kind
-                    .into_object()
-                    .expect("required field implies the type can be an object")
-                    .into();
-            }
+            assert!(
+                self.metadata_kind.as_object().is_some(),
+                "Setting a field on a value that cannot be an object"
+            );
         }
 
-        if let Err(err) = self.metadata_kind.insert_at_path(
-            &path.to_lookup(),
-            kind,
-            insert::Strategy {
-                inner_conflict: insert::InnerConflict::Replace,
-                leaf_conflict: insert::LeafConflict::Replace,
-                coalesced_path: insert::CoalescedPath::Reject,
-            },
-        ) {
-            panic!("Field definition not valid: {:?}", err);
-        }
-
+        self.metadata_kind.set_at_path(&path, kind);
         self
     }
 
@@ -242,7 +200,7 @@ impl Definition {
         kind: Kind,
         meaning: Option<&str>,
     ) -> Self {
-        self.with_field(path, kind.or_null(), meaning)
+        self.with_field(path, kind.or_undefined(), meaning)
     }
 
     /// Register a semantic meaning for the definition.
@@ -256,11 +214,7 @@ impl Definition {
 
         // Ensure the path exists in the collection.
         assert!(
-            self.event_kind
-                .find_at_path(&path.to_lookup())
-                .ok()
-                .flatten()
-                .is_some(),
+            self.event_kind.at_path(&path).contains_any_defined(),
             "meaning must point to a valid path"
         );
 
@@ -271,7 +225,7 @@ impl Definition {
 
     /// Set the kind for all unknown fields.
     #[must_use]
-    pub fn unknown_fields(mut self, unknown: impl Into<Option<Kind>>) -> Self {
+    pub fn unknown_fields(mut self, unknown: impl Into<Kind>) -> Self {
         let unknown = unknown.into();
         if let Some(object) = self.event_kind.as_object_mut() {
             object.set_unknown(unknown.clone());
@@ -296,14 +250,8 @@ impl Definition {
             self.meaning.insert(other_id, meaning);
         }
 
-        self.event_kind.merge(
-            other.event_kind,
-            merge::Strategy {
-                collisions: merge::CollisionStrategy::Union,
-                indices: merge::Indices::Keep,
-            },
-        );
-
+        self.event_kind = self.event_kind.union(other.event_kind);
+        self.metadata_kind = self.metadata_kind.union(other.metadata_kind);
         self.log_namespaces.append(&mut other.log_namespaces);
         self
     }
@@ -437,7 +385,7 @@ mod tests {
                 meaning,
                 want,
             },
-        ) in HashMap::from([
+        ) in [
             (
                 "simple",
                 TestCase {
@@ -447,7 +395,7 @@ mod tests {
                     want: Definition {
                         event_kind: Kind::object(BTreeMap::from([(
                             "foo".into(),
-                            Kind::boolean().or_null(),
+                            Kind::boolean().or_undefined(),
                         )])),
                         metadata_kind: Kind::object(Collection::empty()),
                         meaning: [("foo_meaning".to_owned(), "foo".into())].into(),
@@ -464,7 +412,10 @@ mod tests {
                     want: Definition {
                         event_kind: Kind::object(BTreeMap::from([(
                             "foo".into(),
-                            Kind::object(BTreeMap::from([("bar".into(), Kind::regex().or_null())])),
+                            Kind::object(BTreeMap::from([(
+                                "bar".into(),
+                                Kind::regex().or_null().or_undefined(),
+                            )])),
                         )])),
                         metadata_kind: Kind::object(Collection::empty()),
                         meaning: [(
@@ -485,7 +436,7 @@ mod tests {
                     want: Definition {
                         event_kind: Kind::object(BTreeMap::from([(
                             "foo".into(),
-                            Kind::boolean().or_null(),
+                            Kind::boolean().or_undefined(),
                         )])),
                         metadata_kind: Kind::object(Collection::empty()),
                         meaning: BTreeMap::default(),
@@ -493,7 +444,7 @@ mod tests {
                     },
                 },
             ),
-        ]) {
+        ] {
             let mut got = Definition::new(Kind::object(BTreeMap::new()), []);
             got = got.optional_field(path, kind, meaning);
 
