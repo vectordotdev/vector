@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use futures::stream::{BoxStream, StreamExt};
 use indoc::indoc;
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 use super::Region;
 use crate::{
@@ -20,26 +20,36 @@ use crate::{
     },
 };
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+/// Configuration for the `sematext_logs` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug)]
 pub struct SematextLogsConfig {
+    #[configurable(derived)]
     region: Option<Region>,
-    // Deprecated name
+
+    /// The endpoint to send data to.
     #[serde(alias = "host")]
     endpoint: Option<String>,
+
+    /// The token that will be used to write to Sematext.
     token: String,
 
+    #[configurable(derived)]
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
     )]
     pub encoding: Transformer,
 
+    #[configurable(derived)]
     #[serde(default)]
     request: TowerRequestConfig,
 
+    #[configurable(derived)]
     #[serde(default)]
     batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",

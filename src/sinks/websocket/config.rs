@@ -1,6 +1,6 @@
 use codecs::JsonSerializerConfig;
-use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
+use vector_config::configurable_component;
 
 use crate::{
     codecs::EncodingConfig,
@@ -12,13 +12,30 @@ use crate::{
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+/// Configuration for the `websocket` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug)]
 pub struct WebSocketSinkConfig {
+    /// The WebSocket URI to connect to.
+    ///
+    /// This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.
     pub uri: String,
+
+    #[configurable(derived)]
     pub tls: Option<TlsEnableableConfig>,
+
+    #[configurable(derived)]
     pub encoding: EncodingConfig,
+
+    /// The interval, in seconds, between sending PINGs to the remote peer.
     pub ping_interval: Option<u64>,
+
+    /// The timeout, in seconds, while waiting for a PONG response from the remote peer.
+    ///
+    /// If a response is not received in this time, the connection is reestablished.
     pub ping_timeout: Option<u64>,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
