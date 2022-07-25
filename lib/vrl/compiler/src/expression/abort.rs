@@ -71,6 +71,15 @@ impl Expression for Abort {
     fn type_def(&self, _: (&LocalEnv, &ExternalEnv)) -> TypeDef {
         TypeDef::never().infallible().abortable()
     }
+
+    #[cfg(feature = "llvm")]
+    fn emit_llvm<'ctx>(
+        &self,
+        _: (&mut LocalEnv, &mut ExternalEnv),
+        _: &mut crate::llvm::Context<'ctx>,
+    ) -> Result<(), String> {
+        todo!()
+    }
 }
 
 impl fmt::Display for Abort {

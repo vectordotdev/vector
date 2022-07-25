@@ -130,6 +130,15 @@ impl Expression for Query {
             Container(container) => container.type_def(state).at_path(&self.path.to_lookup()),
         }
     }
+
+    #[cfg(feature = "llvm")]
+    fn emit_llvm<'ctx>(
+        &self,
+        _: (&mut LocalEnv, &mut ExternalEnv),
+        _: &mut crate::llvm::Context<'ctx>,
+    ) -> Result<(), String> {
+        todo!()
+    }
 }
 
 impl fmt::Display for Query {

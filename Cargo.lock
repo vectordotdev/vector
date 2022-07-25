@@ -3475,6 +3475,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "inkwell"
+version = "0.1.0"
+source = "git+https://github.com/pablosichert/inkwell?branch=pablosichert/orc2#26c370cba215a466ea6edebb987262a5c981139c"
+dependencies = [
+ "either",
+ "inkwell_internals",
+ "libc",
+ "llvm-sys",
+ "once_cell",
+ "parking_lot 0.12.1",
+]
+
+[[package]]
+name = "inkwell_internals"
+version = "0.5.0"
+source = "git+https://github.com/pablosichert/inkwell?branch=pablosichert/orc2#26c370cba215a466ea6edebb987262a5c981139c"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "inotify"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3983,6 +4006,19 @@ dependencies = [
  "libc",
  "uuid 1.1.2",
  "winapi 0.3.9",
+]
+
+[[package]]
+name = "llvm-sys"
+version = "140.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5a4ad24a72823cb06764e04a008d4aedc1be56d2be87aa4212b12a3e9f77bb10"
+dependencies = [
+ "cc",
+ "lazy_static",
+ "libc",
+ "regex",
+ "semver 1.0.10",
 ]
 
 [[package]]
@@ -8716,6 +8752,7 @@ dependencies = [
  "criterion",
  "dyn-clone",
  "indoc",
+ "inkwell",
  "lalrpop-util",
  "lookup",
  "ordered-float 3.0.0",

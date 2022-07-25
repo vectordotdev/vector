@@ -786,6 +786,15 @@ impl Expression for FunctionCall {
 
         type_def
     }
+
+    #[cfg(feature = "llvm")]
+    fn emit_llvm<'ctx>(
+        &self,
+        _: (&mut LocalEnv, &mut ExternalEnv),
+        _: &mut crate::llvm::Context<'ctx>,
+    ) -> Result<(), String> {
+        todo!()
+    }
 }
 
 impl fmt::Display for FunctionCall {

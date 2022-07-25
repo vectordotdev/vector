@@ -37,6 +37,15 @@ impl Expression for IfStatement {
             Some(alternative) => type_def.merge_deep(alternative.type_def(state)),
         }
     }
+
+    #[cfg(feature = "llvm")]
+    fn emit_llvm<'ctx>(
+        &self,
+        _: (&mut LocalEnv, &mut ExternalEnv),
+        _: &mut crate::llvm::Context<'ctx>,
+    ) -> Result<(), String> {
+        todo!()
+    }
 }
 
 impl fmt::Display for IfStatement {

@@ -79,6 +79,16 @@ pub trait Expression: Send + Sync + fmt::Debug + DynClone {
     /// An expression is allowed to fail, which aborts the running program.
     fn resolve(&self, ctx: &mut Context) -> Resolved;
 
+    /// Emit LLVM IR that computes the `Value` for this expression.
+    #[cfg(feature = "llvm")]
+    fn emit_llvm<'ctx>(
+        &self,
+        _: (&mut LocalEnv, &mut ExternalEnv),
+        _: &mut crate::llvm::Context<'ctx>,
+    ) -> Result<(), String> {
+        Err("Called `emit_llvm` on an expression which is not supposed to emit LLVM IR".into())
+    }
+
     /// Resolve an expression to a value without any context, if possible.
     ///
     /// This returns `Some` for static expressions, or `None` for dynamic expressions.
@@ -315,6 +325,15 @@ impl Expression for Expr {
             #[cfg(feature = "expr-abort")]
             Abort(v) => v.type_def(state),
         }
+    }
+
+    #[cfg(feature = "llvm")]
+    fn emit_llvm<'ctx>(
+        &self,
+        _: (&mut LocalEnv, &mut ExternalEnv),
+        _: &mut crate::llvm::Context<'ctx>,
+    ) -> Result<(), String> {
+        todo!()
     }
 }
 

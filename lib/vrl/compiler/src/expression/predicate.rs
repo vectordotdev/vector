@@ -11,8 +11,6 @@ use crate::{
     Context, Expression, Span, TypeDef,
 };
 
-pub(crate) type Result = std::result::Result<Predicate, Error>;
-
 #[derive(Clone, PartialEq)]
 pub struct Predicate {
     inner: Vec<Expr>,
@@ -23,7 +21,7 @@ impl Predicate {
         node: Node<Vec<Expr>>,
         state: (&LocalEnv, &ExternalEnv),
         fallible_predicate: Option<&dyn DiagnosticMessage>,
-    ) -> Result {
+    ) -> Result<Predicate, Error> {
         let (span, exprs) = node.take();
         let type_def = exprs
             .last()
@@ -81,6 +79,15 @@ impl Expression for Predicate {
         type_def
             .with_fallibility(fallible)
             .with_abortability(abortable)
+    }
+
+    #[cfg(feature = "llvm")]
+    fn emit_llvm<'ctx>(
+        &self,
+        _: (&mut LocalEnv, &mut ExternalEnv),
+        _: &mut crate::llvm::Context<'ctx>,
+    ) -> Result<(), String> {
+        todo!()
     }
 }
 

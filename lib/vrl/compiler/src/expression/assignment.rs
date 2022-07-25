@@ -186,6 +186,15 @@ impl Expression for Assignment {
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
         self.variant.type_def(state)
     }
+
+    #[cfg(feature = "llvm")]
+    fn emit_llvm<'ctx>(
+        &self,
+        _: (&mut LocalEnv, &mut ExternalEnv),
+        _: &mut crate::llvm::Context<'ctx>,
+    ) -> Result<(), String> {
+        todo!()
+    }
 }
 
 impl fmt::Display for Assignment {
@@ -419,6 +428,15 @@ where
             Single { expr, .. } => expr.type_def(state),
             Infallible { expr, .. } => expr.type_def(state).infallible(),
         }
+    }
+
+    #[cfg(feature = "llvm")]
+    fn emit_llvm<'ctx>(
+        &self,
+        _: (&mut LocalEnv, &mut ExternalEnv),
+        _: &mut crate::llvm::Context<'ctx>,
+    ) -> Result<(), String> {
+        todo!()
     }
 }
 

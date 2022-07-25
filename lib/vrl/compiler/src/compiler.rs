@@ -407,7 +407,7 @@ impl<'a> Compiler<'a> {
         &mut self,
         node: Node<ast::Predicate>,
         external: &mut ExternalEnv,
-    ) -> Option<predicate::Result> {
+    ) -> Option<Result<Predicate, predicate::Error>> {
         use ast::Predicate::{Many, One};
 
         let (span, predicate) = node.take();
