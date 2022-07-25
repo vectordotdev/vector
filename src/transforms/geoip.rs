@@ -1,4 +1,4 @@
-use std::{str::FromStr, sync::Arc};
+use std::sync::Arc;
 
 use serde::Serialize;
 use vector_config::configurable_component;
@@ -55,6 +55,7 @@ pub struct Geoip {
     #[derivative(Debug = "ignore")]
     pub dbreader: Arc<maxminddb::Reader<Vec<u8>>>,
     pub database: String,
+    pub database_kind: DatabaseKind,
     pub source: String,
     pub target: String,
     pub locale: String,
@@ -117,8 +118,24 @@ impl TransformConfig for GeoipConfig {
 // MaxMind GeoIP database files have a type field we can use to recognize specific
 // products. If we encounter one of these two types, we look for ASN/ISP information;
 // otherwise we expect to be working with a City database.
-const ASN_DATABASE_TYPE: &str = "GeoLite2-ASN";
-const ISP_DATABASE_TYPE: &str = "GeoIP2-ISP";
+#[derive(Copy, Clone, Debug)]
+pub enum DatabaseKind {
+    Asn,
+    Isp,
+    ConnectionType,
+    City,
+}
+
+impl From<&str> for DatabaseKind {
+    fn from(v: &str) -> Self {
+        match v {
+            "GeoLite2-ASN" => Self::Asn,
+            "GeoIP2-ISP" => Self::Isp,
+            "GeoIP2-Connection-Type" => Self::ConnectionType,
+            _ => Self::City,
+        }
+    }
+}
 
 impl Geoip {
     pub fn new(
@@ -127,19 +144,25 @@ impl Geoip {
         target: String,
         locale: String,
     ) -> crate::Result<Self> {
+        let dbreader = Arc::new(maxminddb::Reader::open_readfile(database.clone())?);
+
         Ok(Geoip {
-            dbreader: Arc::new(maxminddb::Reader::open_readfile(database.clone())?),
+            database_kind: DatabaseKind::from(dbreader.metadata.database_type.as_str()),
+            dbreader,
             database,
             source,
             target,
             locale,
         })
     }
+}
 
-    fn has_isp_db(&self) -> bool {
-        self.dbreader.metadata.database_type == ASN_DATABASE_TYPE
-            || self.dbreader.metadata.database_type == ISP_DATABASE_TYPE
-    }
+#[derive(Serialize)]
+#[serde(untagged)]
+enum Value<'a> {
+    Isp(Isp<'a>),
+    City(City<'a>),
+    ConnectionType(ConnectionType<'a>),
 }
 
 #[derive(Default, Serialize)]
@@ -165,113 +188,141 @@ struct City<'a> {
     metro_code: String, // converted from u16 for consistency
 }
 
+#[derive(Default, Serialize)]
+struct ConnectionType<'a> {
+    connection_type: &'a str,
+}
+
 impl FunctionTransform for Geoip {
     fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
-        let mut isp: Isp = Default::default();
-        let mut city: City = Default::default();
         let target_field = self.target.clone();
         let ipaddress = event
             .as_log()
             .get(self.source.as_str())
             .map(|s| s.to_string_lossy());
-        if let Some(ipaddress) = &ipaddress {
-            match FromStr::from_str(ipaddress) {
-                Ok(ip) => {
-                    if self.has_isp_db() {
-                        if let Ok(data) = self.dbreader.lookup::<maxminddb::geoip2::Isp>(ip) {
-                            if let Some(as_number) = data.autonomous_system_number {
-                                isp.autonomous_system_number = as_number as i64;
-                            }
-                            if let Some(as_organization) = data.autonomous_system_organization {
-                                isp.autonomous_system_organization = as_organization;
-                            }
-                            if let Some(isp_name) = data.isp {
-                                isp.isp = isp_name;
-                            }
-                            if let Some(organization) = data.organization {
-                                isp.organization = organization;
-                            }
-                        }
-                    } else if let Ok(data) = self.dbreader.lookup::<maxminddb::geoip2::City>(ip) {
-                        if let Some(city_names) = data.city.and_then(|c| c.names) {
-                            if let Some(city_name) = city_names.get("en") {
-                                city.city_name = city_name;
-                            }
-                        }
+        let parsed_ip = ipaddress
+            .as_deref()
+            .map(|ip| ip.parse().map_err(|err| (err, ip)));
 
-                        if let Some(continent_code) = data.continent.and_then(|c| c.code) {
-                            city.continent_code = continent_code;
-                        }
+        let value = match (self.database_kind, parsed_ip) {
+            (DatabaseKind::Isp | DatabaseKind::Asn, Some(Ok(ip))) => {
+                let mut isp = Isp::default();
 
-                        if let Some(country) = data.country {
-                            if let Some(country_code) = country.iso_code {
-                                city.country_code = country_code;
-                            }
-                            if let Some(country_name) = country
-                                .names
-                                .as_ref()
-                                .and_then(|names| names.get(&*self.locale))
-                            {
-                                city.country_name = country_name;
-                            }
-                        }
-
-                        if let Some(location) = data.location {
-                            if let Some(time_zone) = location.time_zone {
-                                city.timezone = time_zone;
-                            }
-                            if let Some(latitude) = location.latitude {
-                                city.latitude = latitude.to_string();
-                            }
-
-                            if let Some(longitude) = location.longitude {
-                                city.longitude = longitude.to_string();
-                            }
-
-                            if let Some(metro_code) = location.metro_code {
-                                city.metro_code = metro_code.to_string();
-                            }
-                        }
-
-                        // last subdivision is most specific per https://github.com/maxmind/GeoIP2-java/blob/39385c6ce645374039450f57208b886cf87ade47/src/main/java/com/maxmind/geoip2/model/AbstractCityResponse.java#L96-L107
-                        if let Some(subdivision) = data.subdivisions.as_ref().and_then(|s| s.last())
-                        {
-                            if let Some(name) = subdivision
-                                .names
-                                .as_ref()
-                                .and_then(|names| names.get(&*self.locale))
-                            {
-                                city.region_name = name;
-                            }
-
-                            if let Some(iso_code) = subdivision.iso_code {
-                                city.region_code = iso_code
-                            }
-                        }
-
-                        if let Some(postal_code) = data.postal.and_then(|p| p.code) {
-                            city.postal_code = postal_code;
-                        }
+                if let Ok(data) = self.dbreader.lookup::<maxminddb::geoip2::Isp>(ip) {
+                    if let Some(as_number) = data.autonomous_system_number {
+                        isp.autonomous_system_number = as_number as i64;
+                    }
+                    if let Some(as_organization) = data.autonomous_system_organization {
+                        isp.autonomous_system_organization = as_organization;
+                    }
+                    if let Some(isp_name) = data.isp {
+                        isp.isp = isp_name;
+                    }
+                    if let Some(organization) = data.organization {
+                        isp.organization = organization;
                     }
                 }
-                Err(error) => {
-                    emit!(GeoipIpAddressParseError {
-                        error,
-                        address: ipaddress
-                    });
-                }
+
+                Some(Value::Isp(isp))
             }
-        } else {
-            emit!(ParserMissingFieldError {
-                field: &self.source
-            });
+            (DatabaseKind::ConnectionType, Some(Ok(ip))) => {
+                let mut connection_type = ConnectionType::default();
+
+                if let Ok(data) = self
+                    .dbreader
+                    .lookup::<maxminddb::geoip2::ConnectionType>(ip)
+                {
+                    if let Some(value) = data.connection_type {
+                        connection_type.connection_type = value;
+                    }
+                }
+
+                Some(Value::ConnectionType(connection_type))
+            }
+            (DatabaseKind::City, Some(Ok(ip))) => {
+                let mut city = City::default();
+
+                if let Ok(data) = self.dbreader.lookup::<maxminddb::geoip2::City>(ip) {
+                    if let Some(city_names) = data.city.and_then(|c| c.names) {
+                        if let Some(city_name) = city_names.get("en") {
+                            city.city_name = city_name;
+                        }
+                    }
+
+                    if let Some(continent_code) = data.continent.and_then(|c| c.code) {
+                        city.continent_code = continent_code;
+                    }
+
+                    if let Some(country) = data.country {
+                        if let Some(country_code) = country.iso_code {
+                            city.country_code = country_code;
+                        }
+                        if let Some(country_name) = country
+                            .names
+                            .as_ref()
+                            .and_then(|names| names.get(&*self.locale))
+                        {
+                            city.country_name = country_name;
+                        }
+                    }
+
+                    if let Some(location) = data.location {
+                        if let Some(time_zone) = location.time_zone {
+                            city.timezone = time_zone;
+                        }
+                        if let Some(latitude) = location.latitude {
+                            city.latitude = latitude.to_string();
+                        }
+
+                        if let Some(longitude) = location.longitude {
+                            city.longitude = longitude.to_string();
+                        }
+
+                        if let Some(metro_code) = location.metro_code {
+                            city.metro_code = metro_code.to_string();
+                        }
+                    }
+
+                    // last subdivision is most specific per https://github.com/maxmind/GeoIP2-java/blob/39385c6ce645374039450f57208b886cf87ade47/src/main/java/com/maxmind/geoip2/model/AbstractCityResponse.java#L96-L107
+                    if let Some(subdivision) = data.subdivisions.as_ref().and_then(|s| s.last()) {
+                        if let Some(name) = subdivision
+                            .names
+                            .as_ref()
+                            .and_then(|names| names.get(&*self.locale))
+                        {
+                            city.region_name = name;
+                        }
+
+                        if let Some(iso_code) = subdivision.iso_code {
+                            city.region_code = iso_code
+                        }
+                    }
+
+                    if let Some(postal_code) = data.postal.and_then(|p| p.code) {
+                        city.postal_code = postal_code;
+                    }
+                }
+
+                Some(Value::City(city))
+            }
+            (_, Some(Err((error, ipaddress)))) => {
+                emit!(GeoipIpAddressParseError {
+                    error,
+                    address: ipaddress
+                });
+
+                None
+            }
+            (_, None) => {
+                emit!(ParserMissingFieldError {
+                    field: &self.source
+                });
+
+                None
+            }
         };
 
-        let json_value = if self.has_isp_db() {
-            serde_json::to_value(isp)
-        } else {
-            serde_json::to_value(city)
-        };
+        let json_value = serde_json::to_value(value);
         if let Ok(json_value) = json_value {
             event.as_mut_log().insert(target_field.as_str(), json_value);
         }
@@ -456,6 +507,50 @@ mod tests {
         exp_geoip_attr.insert("autonomous_system_organization", "");
         exp_geoip_attr.insert("isp", "");
         exp_geoip_attr.insert("organization", "");
+
+        for field in exp_geoip_attr.keys() {
+            let k = format!("geo.{}", field).to_string();
+            let geodata = new_event
+                .as_log()
+                .get(k.as_str())
+                .unwrap()
+                .to_string_lossy();
+            assert_eq!(&geodata, exp_geoip_attr.get(field).expect("fields exists"));
+        }
+    }
+
+    #[test]
+    fn geoip_connection_type_lookup_success() {
+        let mut log = LogEvent::default();
+        let _ = log.insert("remote_addr", "201.243.200.1");
+        let _ = log.insert("request_path", "foo/bar");
+
+        let new_event = parse_one(log.into(), "tests/data/GeoIP2-Connection-Type-Test.mmdb");
+
+        let mut exp_geoip_attr = HashMap::new();
+        exp_geoip_attr.insert("connection_type", "Corporate");
+
+        for field in exp_geoip_attr.keys() {
+            let k = format!("geo.{}", field).to_string();
+            let geodata = new_event
+                .as_log()
+                .get(k.as_str())
+                .unwrap()
+                .to_string_lossy();
+            assert_eq!(&geodata, exp_geoip_attr.get(field).expect("field exists"));
+        }
+    }
+
+    #[test]
+    fn geoip_connection_type_lookup_no_results() {
+        let mut log = LogEvent::default();
+        let _ = log.insert("remote_addr", "10.1.12.1");
+        let _ = log.insert("request_path", "foo/bar");
+
+        let new_event = parse_one(log.into(), "tests/data/GeoIP2-Connection-Type-Test.mmdb");
+
+        let mut exp_geoip_attr = HashMap::new();
+        exp_geoip_attr.insert("connection_type", "");
 
         for field in exp_geoip_attr.keys() {
             let k = format!("geo.{}", field).to_string();
