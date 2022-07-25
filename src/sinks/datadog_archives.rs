@@ -21,10 +21,10 @@ use goauth::scopes::Scope;
 use http::header::{HeaderName, HeaderValue};
 use lookup::path;
 use rand::{thread_rng, Rng};
-use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tower::ServiceBuilder;
 use uuid::Uuid;
+use vector_config::configurable_component;
 use vector_core::{
     config::{log_schema, AcknowledgementsConfig, LogSchema},
     event::{Event, EventFinalizers, Finalizable},
@@ -86,27 +86,52 @@ impl SinkBatchSettings for DatadogArchivesDefaultBatchSettings {
     const MAX_BYTES: Option<usize> = Some(100_000_000);
     const TIMEOUT_SECS: f64 = 900.0;
 }
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the `datadog_archives` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogArchivesSinkConfig {
+    /// The name of the object storage service to use.
+    // TODO: This should really be an enum.
     pub service: String,
+
+    /// The name of the bucket to store the archives in.
     pub bucket: String,
+
+    /// A prefix to apply to all object keys.
+    ///
+    /// Prefixes are useful for partitioning objects, such as by creating an object key that
+    /// stores objects under a particular "directory". If using a prefix for this purpose, it must end
+    /// in `/` in order to act as a directory path: Vector will **not** add a trailing `/` automatically.
     pub key_prefix: Option<String>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub aws_s3: Option<S3Config>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub azure_blob: Option<AzureBlobConfig>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub gcp_cloud_storage: Option<GcsConfig>,
+
+    #[configurable(derived)]
     tls: Option<TlsConfig>,
+
+    #[configurable(derived)]
     #[serde(
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub encoding: Transformer,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -115,43 +140,114 @@ pub struct DatadogArchivesSinkConfig {
     acknowledgements: AcknowledgementsConfig,
 }
 
-#[derive(Deserialize, Serialize, Default, Debug, Clone)]
+/// S3-specific configuration options.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct S3Config {
     #[serde(flatten)]
     pub options: S3Options,
+
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub auth: AwsAuthentication,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+/// S3-specific bucket/object options.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct S3Options {
-    acl: Option<S3CannedAcl>,
-    grant_full_control: Option<String>,
-    grant_read: Option<String>,
-    grant_read_acp: Option<String>,
-    grant_write_acp: Option<String>,
-    server_side_encryption: Option<S3ServerSideEncryption>,
-    ssekms_key_id: Option<String>,
-    storage_class: Option<S3StorageClass>,
-    tags: Option<BTreeMap<String, String>>,
+    /// Canned ACL to apply to the created objects.
+    ///
+    /// For more information, see [Canned ACL][canned_acl].
+    ///
+    /// [canned_acl]: https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#canned-acl
+    pub acl: Option<S3CannedAcl>,
+
+    /// Grants `READ`, `READ_ACP`, and `WRITE_ACP` permissions on the created objects to the named [grantee].
+    ///
+    /// This allows the grantee to read the created objects and their metadata, as well as read and
+    /// modify the ACL on the created objects.
+    ///
+    /// [grantee]: https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#specifying-grantee
+    pub grant_full_control: Option<String>,
+
+    /// Grants `READ` permissions on the created objects to the named [grantee].
+    ///
+    /// This allows the grantee to read the created objects and their metadata.
+    ///
+    /// [grantee]: https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#specifying-grantee
+    pub grant_read: Option<String>,
+
+    /// Grants `READ_ACP` permissions on the created objects to the named [grantee].
+    ///
+    /// This allows the grantee to read the ACL on the created objects.
+    ///
+    /// [grantee]: https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#specifying-grantee
+    pub grant_read_acp: Option<String>,
+
+    /// Grants `WRITE_ACP` permissions on the created objects to the named [grantee].
+    ///
+    /// This allows the grantee to modify the ACL on the created objects.
+    ///
+    /// [grantee]: https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#specifying-grantee
+    pub grant_write_acp: Option<String>,
+
+    /// The Server-side Encryption algorithm used when storing these objects.
+    pub server_side_encryption: Option<S3ServerSideEncryption>,
+
+    /// Specifies the ID of the AWS Key Management Service (AWS KMS) symmetrical customer managed
+    /// customer master key (CMK) that will used for the created objects.
+    ///
+    /// Only applies when `server_side_encryption` is configured to use KMS.
+    ///
+    /// If not specified, Amazon S3 uses the AWS managed CMK in AWS to protect the data.
+    pub ssekms_key_id: Option<String>,
+
+    /// The storage class for the created objects.
+    ///
+    /// For more information, see [Using Amazon S3 storage classes][storage_classes].
+    ///
+    /// [storage_classes]: https://docs.aws.amazon.com/AmazonS3/latest/dev/storage-class-intro.html
+    pub storage_class: Option<S3StorageClass>,
+
+    /// The tag-set for the object.
+    pub tags: Option<BTreeMap<String, String>>,
 }
 
-#[derive(Deserialize, Serialize, Default, Debug, Clone)]
+/// ABS-specific configuration options.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct AzureBlobConfig {
+    /// The Azure Blob Storage Account connection string.
+    ///
+    /// Authentication with access key is the only supported authentication method.
     pub connection_string: String,
 }
 
-#[derive(Deserialize, Serialize, Default, Debug, Clone)]
+/// GCS-specific configuration options.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct GcsConfig {
+    #[configurable(derived)]
     acl: Option<GcsPredefinedAcl>,
+
+    #[configurable(derived)]
     storage_class: Option<GcsStorageClass>,
+
+    /// The set of metadata `key:value` pairs for the created objects.
+    ///
+    /// For more information, see [Custom metadata][custom_metadata].
+    ///
+    /// [custom_metadata]: https://cloud.google.com/storage/docs/metadata#custom-metadata
     metadata: Option<HashMap<String, String>>,
+
     #[serde(flatten)]
     auth: GcpAuthConfig,
 }

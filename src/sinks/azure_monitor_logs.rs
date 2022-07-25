@@ -11,6 +11,7 @@ use openssl::{base64, hash, pkey, sign};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
+use vector_config::configurable_component;
 
 use crate::{
     codecs::Transformer,
@@ -32,25 +33,59 @@ fn default_host() -> String {
     "ods.opinsights.azure.com".into()
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+/// Configuration for the `azure_monitor_logs` sink.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct AzureMonitorLogsConfig {
+    /// The [unique identifier][uniq_id] for the Log Analytics workspace.
+    ///
+    /// [uniq_id]: https://docs.microsoft.com/en-us/azure/azure-monitor/platform/data-collector-api#request-uri-parameters
     pub customer_id: String,
+
+    /// The [primary or the secondary key][shared_key] for the Log Analytics workspace.
+    ///
+    /// [shared_key]: https://docs.microsoft.com/en-us/azure/azure-monitor/platform/data-collector-api#authorization
     pub shared_key: String,
+
+    /// The [record type][record_type] of the data that is being submitted.
+    ///
+    /// Can only contain letters, numbers, and underscores (_), and may not exceed 100 characters.
+    ///
+    /// [record_type]: https://docs.microsoft.com/en-us/azure/azure-monitor/platform/data-collector-api#request-headers
+    #[configurable(validation(pattern = "[a-zA-Z0-9_]{1,100}"))]
     pub log_type: String,
+
+    /// The [Resource ID][resource_id] of the Azure resource the data should be associated with.
+    ///
+    /// [resource_id]: https://docs.microsoft.com/en-us/azure/azure-monitor/platform/data-collector-api#request-headers
     pub azure_resource_id: Option<String>,
+
+    /// [Alternative host][alt_host] for dedicated Azure regions.
+    ///
+    /// [alt_host]: https://docs.azure.cn/en-us/articles/guidance/developerdifferences#check-endpoints-in-azure
     #[serde(default = "default_host")]
     pub(super) host: String,
+
+    #[configurable(derived)]
     #[serde(
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub encoding: Transformer,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",

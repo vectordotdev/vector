@@ -1,7 +1,6 @@
 use darling::error::Accumulator;
-use quote::spanned::Spanned;
 use serde_derive_internals::{attr as serde_attr, Ctxt};
-use syn::{Attribute, ExprPath, Lit, Meta, MetaNameValue};
+use syn::{spanned::Spanned, Attribute, ExprPath, Lit, Meta, MetaNameValue};
 
 const ERR_FIELD_MISSING_DESCRIPTION: &str = "field must have a description -- i.e. `/// This is a widget...` or `#[configurable(description = \"...\")] -- or derive it from the underlying type of the field by specifying `#[configurable(derived)]`";
 

@@ -5,11 +5,11 @@ use chrono::Utc;
 use codecs::encoding::Framer;
 use http::header::{HeaderName, HeaderValue};
 use indoc::indoc;
-use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use snafu::Snafu;
 use tower::ServiceBuilder;
 use uuid::Uuid;
+use vector_config::configurable_component;
 use vector_core::event::{EventFinalizers, Finalizable};
 
 use crate::{
@@ -53,28 +53,96 @@ pub enum GcsHealthcheckError {
 
 const NAME: &str = "gcp_cloud_storage";
 
-#[derive(Deserialize, Serialize, Debug)]
+/// Configuration for the `gcp_cloud_storage` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct GcsSinkConfig {
+    /// The GCS bucket name.
     bucket: String,
+
+    /// The Predefined ACL to apply to created objects.
+    ///
+    /// For more information, see [Predefined ACLs][predefined_acls].
+    ///
+    /// [predefined_acls]: https://cloud.google.com/storage/docs/access-control/lists#predefined-acl
     acl: Option<GcsPredefinedAcl>,
+
+    /// The storage class for created objects.
+    ///
+    /// For more information, see [Storage classes][storage_classes].
+    ///
+    /// [storage_classes]: https://cloud.google.com/storage/docs/storage-classes
     storage_class: Option<GcsStorageClass>,
+
+    /// The set of metadata `key:value` pairs for the created objects.
+    ///
+    /// For more information, see [Custom metadata][custom_metadata].
+    ///
+    /// [custom_metadata]: https://cloud.google.com/storage/docs/metadata#custom-metadata
     metadata: Option<HashMap<String, String>>,
+
+    /// A prefix to apply to all object keys.
+    ///
+    /// Prefixes are useful for partitioning objects, such as by creating an object key that
+    /// stores objects under a particular "directory". If using a prefix for this purpose, it must end
+    /// in `/` in order to act as a directory path: Vector will **not** add a trailing `/` automatically.
+    #[configurable(metadata(templateable))]
     key_prefix: Option<String>,
+
+    /// The timestamp format for the time component of the object key.
+    ///
+    /// By default, object keys are appended with a timestamp that reflects when the objects are
+    /// sent to S3, such that the resulting object key is functionally equivalent to joining the key
+    /// prefix with the formatted timestamp, such as `date=2022-07-18/1658176486`.
+    ///
+    /// This would represent a `key_prefix` set to `date=%F/` and the timestamp of Mon Jul 18 2022
+    /// 20:34:44 GMT+0000, with the `filename_time_format` being set to `%s`, which renders
+    /// timestamps in seconds since the Unix epoch.
+    ///
+    /// Supports the common [`strftime`][chrono_strftime_specifiers] specifiers found in most
+    /// languages.
+    ///
+    /// When set to an empty string, no timestamp will be appended to the key prefix.
+    ///
+    /// [chrono_strftime_specifiers]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
     filename_time_format: Option<String>,
+
+    /// Whether or not to append a UUID v4 token to the end of the object key.
+    ///
+    /// The UUID is appended to the timestamp portion of the object key, such that if the object key
+    /// being generated was `date=2022-07-18/1658176486`, setting this field to `true` would result
+    /// in an object key that looked like `date=2022-07-18/1658176486-30f6652c-71da-4f9f-800d-a1189c47c547`.
+    ///
+    /// This ensures there are no name collisions, and can be useful in high-volume workloads where
+    /// object keys must be unique.
     filename_append_uuid: Option<bool>,
+
+    /// The filename extension to use in the object key.
     filename_extension: Option<String>,
+
     #[serde(flatten)]
     encoding: EncodingConfigWithFraming,
+
+    #[configurable(derived)]
     #[serde(default)]
     compression: Compression,
+
+    #[configurable(derived)]
     #[serde(default)]
     batch: BatchConfig<BulkSizeBasedDefaultBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     request: TowerRequestConfig,
+
     #[serde(flatten)]
     auth: GcpAuthConfig,
+
+    #[configurable(derived)]
     tls: Option<TlsConfig>,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",

@@ -3,9 +3,9 @@ use std::sync::Arc;
 use futures::FutureExt;
 use http::Uri;
 use indoc::indoc;
-use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use tower::ServiceBuilder;
+use vector_config::configurable_component;
 use vector_core::config::{proxy::ProxyConfig, AcknowledgementsConfig};
 
 use super::service::TraceApiRetry;
@@ -52,30 +52,49 @@ impl SinkBatchSettings for DatadogTracesDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = BATCH_DEFAULT_TIMEOUT_SECS;
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the `datadog_traces` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogTracesConfig {
+    /// The endpoint to send traces to.
     pub(crate) endpoint: Option<String>,
-    site: Option<String>,
-    default_api_key: String,
 
-    tls: Option<TlsEnableableConfig>,
+    /// The Datadog [site][dd_site] to send traces to.
+    ///
+    /// [dd_site]: https://docs.datadoghq.com/getting_started/site
+    pub site: Option<String>,
 
+    /// The default Datadog [API key][api_key] to send traces with.
+    ///
+    /// If a trace has a Datadog [API key][api_key] set explicitly in its metadata, it will take
+    /// precedence over the default.
+    ///
+    /// [api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
+    pub default_api_key: String,
+
+    #[configurable(derived)]
+    pub tls: Option<TlsEnableableConfig>,
+
+    #[configurable(derived)]
     #[serde(default)]
-    compression: Option<Compression>,
+    pub compression: Option<Compression>,
 
+    #[configurable(derived)]
     #[serde(default)]
-    batch: BatchConfig<DatadogTracesDefaultBatchSettings>,
+    pub batch: BatchConfig<DatadogTracesDefaultBatchSettings>,
 
+    #[configurable(derived)]
     #[serde(default)]
-    request: TowerRequestConfig,
+    pub request: TowerRequestConfig,
 
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    acknowledgements: AcknowledgementsConfig,
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 impl GenerateConfig for DatadogTracesConfig {

@@ -7,7 +7,7 @@ mod integration_tests;
 #[cfg(test)]
 mod test;
 
-use config::AzureBlobSinkConfig;
+pub use self::config::AzureBlobSinkConfig;
 
 use crate::config::SinkDescription;
 

@@ -4,9 +4,9 @@ use std::{
 };
 
 use futures::FutureExt;
-use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use tower::ServiceBuilder;
+use vector_config::configurable_component;
 
 use crate::{
     aws::RegionOrEndpoint,
@@ -38,41 +38,89 @@ use lookup::path;
 /// The field name for the timestamp required by data stream mode
 pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+/// Configuration for the `elasticsearch` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ElasticsearchConfig {
+    /// The Elasticsearch endpoint to send logs to.
+    ///
+    /// This should be the full URL as shown in the example.
     pub endpoint: String,
 
+    /// The `doc_type` for your index data.
+    ///
+    /// This is only relevant for Elasticsearch <= 6.X. If you are using >= 7.0 you do not need to
+    /// set this option since Elasticsearch has removed it.
     pub doc_type: Option<String>,
+
+    /// Whether or not to send the `type` field to Elasticsearch.
+    ///
+    /// `type` field was deprecated in Elasticsearch 7.x and removed in Elasticsearch 8.x.
+    ///
+    /// If enabled, the `doc_type` option will be ignored.
     #[serde(default)]
     pub suppress_type_name: bool,
+
+    /// The name of the event key that should map to Elasticsearch’s [`_id` field][es_id].
+    ///
+    /// By default, Vector does not set the `_id` field, which allows Elasticsearch to set this
+    /// automatically. You should think carefully about setting your own Elasticsearch IDs, since
+    /// this can [hinder performance][perf_doc].
+    ///
+    /// [es_id]: https://www.elastic.co/guide/en/elasticsearch/reference/current/mapping-id-field.html
+    /// [perf_doc]: https://www.elastic.co/guide/en/elasticsearch/reference/master/tune-for-indexing-speed.html#_use_auto_generated_ids
     pub id_key: Option<String>,
+
+    /// The name of the pipeline to apply.
     pub pipeline: Option<String>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub mode: ElasticsearchMode,
 
+    #[configurable(derived)]
     #[serde(default)]
     pub compression: Compression,
+
+    #[configurable(derived)]
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
     )]
     pub encoding: Transformer,
 
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: RequestConfig,
+
+    #[configurable(derived)]
     pub auth: Option<ElasticsearchAuth>,
+
+    #[configurable(derived)]
     pub query: Option<HashMap<String, String>>,
+
+    #[configurable(derived)]
     pub aws: Option<RegionOrEndpoint>,
+
+    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
+    #[configurable(derived)]
     #[serde(alias = "normal")]
     pub bulk: Option<BulkConfig>,
+
+    #[configurable(derived)]
     pub data_stream: Option<DataStreamConfig>,
+
+    #[configurable(derived)]
     pub metrics: Option<MetricToLogConfig>,
 
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -118,10 +166,15 @@ impl ElasticsearchConfig {
     }
 }
 
-#[derive(Deserialize, Serialize, Clone, Default, Debug)]
+/// Bulk mode configuration.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
 #[serde(rename_all = "snake_case")]
 pub struct BulkConfig {
+    /// The bulk action to use.
     pub action: Option<String>,
+
+    /// The name of the index to use.
     pub index: Option<String>,
 }
 
@@ -131,17 +184,40 @@ impl BulkConfig {
     }
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+/// Data stream mode configuration.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(rename_all = "snake_case")]
 pub struct DataStreamConfig {
+    /// The data stream type used to construct the data stream at index time.
+    #[configurable(metadata(templateable))]
     #[serde(rename = "type", default = "DataStreamConfig::default_type")]
     pub dtype: Template,
+
+    /// The data stream dataset used to construct the data stream at index time.
+    #[configurable(metadata(templateable))]
     #[serde(default = "DataStreamConfig::default_dataset")]
     pub dataset: Template,
+
+    /// The data stream namespace used to construct the data stream at index time.
+    #[configurable(metadata(templateable))]
     #[serde(default = "DataStreamConfig::default_namespace")]
     pub namespace: Template,
+
+    /// Automatically routes events by deriving the data stream name using specific event fields.
+    ///
+    /// The format of the data stream name is `<type>-<dataset>-<namespace>`, where each value comes
+    /// from the `data_stream` configuration field of the same name.
+    ///
+    /// If enabled, the value of the `data_stream.type`, `data_stream.dataset`, and
+    /// `data_stream.namespace` event fields will be used if they are present. Otherwise, the values
+    /// set here in the configuration will be used.
     #[serde(default = "DataStreamConfig::default_auto_routing")]
     pub auto_routing: bool,
+
+    /// Automatically adds and syncs the `data_stream.*` event fields if they are missing from the event.
+    ///
+    /// This ensures that fields match the name of the data stream that is receiving events.
     #[serde(default = "DataStreamConfig::default_sync_fields")]
     pub sync_fields: bool,
 }

@@ -1,8 +1,8 @@
 use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
-use serde::{Deserialize, Serialize};
 use serde_json::json;
+use vector_config::configurable_component;
 
 use crate::{
     codecs::Transformer,
@@ -18,29 +18,37 @@ use crate::{
     },
 };
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub(super) struct HoneycombConfig {
+/// Configuration for the `honeycomb` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug)]
+pub struct HoneycombConfig {
     #[serde(skip, default = "default_endpoint")]
     endpoint: String,
 
+    /// The team key that will be used to authenticate against Honeycomb.
     api_key: String,
 
+    /// The dataset that Vector will send logs to.
     // TODO: we probably want to make this a template
     // but this limits us in how we can do our healthcheck.
     dataset: String,
 
+    #[configurable(derived)]
     #[serde(default)]
     batch: BatchConfig<HoneycombDefaultBatchSettings>,
 
+    #[configurable(derived)]
     #[serde(default)]
     request: TowerRequestConfig,
 
+    #[configurable(derived)]
     #[serde(
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     encoding: Transformer,
 
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",

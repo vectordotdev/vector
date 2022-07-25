@@ -11,7 +11,7 @@ impl Configurable for &'static encoding_rs::Encoding {
     // valid character set encodings... but that would be a very large array of strings, and technically the Encoding
     // Standard standard is a living standard, so... :thinkies:
 
-    fn referencable_name() -> Option<&'static str> {
+    fn referenceable_name() -> Option<&'static str> {
         Some("encoding_rs::Encoding")
     }
 
@@ -40,7 +40,7 @@ where
 
     fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<Self>) -> SchemaObject {
         // We explicitly do not pass anything from the override metadata, because there's nothing to
-        // reasonably pass: if `V` is referencable, using the description for `IndexMap<String, V>`
+        // reasonably pass: if `V` is referenceable, using the description for `IndexMap<String, V>`
         // likely makes no sense, nor would a default make sense, and so on.
         //
         // We do, however, set `V` to be "transparent", which means that during schema finalization,

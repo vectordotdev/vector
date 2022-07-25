@@ -1,5 +1,5 @@
 use futures::{future, FutureExt};
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 use crate::{
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
@@ -10,14 +10,25 @@ const fn default_print_interval_secs() -> u64 {
     1
 }
 
-#[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
+/// Configuration for the `blackhole` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug, Derivative)]
 #[serde(deny_unknown_fields, default)]
 #[derivative(Default)]
 pub struct BlackholeConfig {
+    /// The number of seconds between reporting a summary of activity.
+    ///
+    /// Set to `0` to disable reporting.
     #[derivative(Default(value = "1"))]
     #[serde(default = "default_print_interval_secs")]
     pub print_interval_secs: u64,
+
+    /// The number of events, per second, that the sink is allowed to consume.
+    ///
+    /// By default, there is no limit.
     pub rate: Option<usize>,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",

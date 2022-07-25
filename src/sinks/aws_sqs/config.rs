@@ -4,6 +4,7 @@ use aws_sdk_sqs::Client as SqsClient;
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use vector_config::configurable_component;
 
 use crate::{
     aws::create_client,
@@ -31,22 +32,52 @@ pub(super) enum BuildError {
     MessageDeduplicationIdTemplate { source: TemplateParseError },
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the `aws_sqs` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct SqsSinkConfig {
+    /// The URL of the Amazon SQS queue to which messages are sent.
+    #[configurable(validation(format = "uri"))]
     pub queue_url: String,
+
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
+
+    #[configurable(derived)]
     pub encoding: EncodingConfig,
+
+    /// The tag that specifies that a message belongs to a specific message group.
+    ///
+    /// Can be applied only to FIFO queues.
     pub message_group_id: Option<String>,
+
+    /// The message deduplication ID value to allow AWS to identify duplicate messages.
+    ///
+    /// This value is a template which should result in a unique string for each event. See the [AWS
+    /// documentation][deduplication_id_docs] for more about how AWS does message deduplication.
+    ///
+    /// [deduplication_id_docs]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/using-messagededuplicationid-property.html
     pub message_deduplication_id: Option<String>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
-    // Deprecated name. Moved to auth.
-    pub(super) assume_role: Option<String>,
+
+    /// The ARN of an [IAM role][iam_role] to assume at startup.
+    ///
+    /// [iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
+    #[configurable(deprecated)]
+    pub assume_role: Option<String>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub auth: AwsAuthentication,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
