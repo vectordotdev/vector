@@ -182,9 +182,9 @@ impl Expression for DelFn {
         // supported.
         if self.query.is_external() {
             match self.query.delete_type_def(external) {
-                Err(value::kind::remove::Error::RootPath)
-                | Err(value::kind::remove::Error::CoalescedPath)
-                | Err(value::kind::remove::Error::NegativeIndexPath) => {
+                Err(vrl::kind::remove::Error::RootPath)
+                | Err(vrl::kind::remove::Error::CoalescedPath)
+                | Err(vrl::kind::remove::Error::NegativeIndexPath) => {
                     // This function is (currently) infallible, so we ignore any errors here.
                     //
                     // see: https://github.com/vectordotdev/vector/issues/11264

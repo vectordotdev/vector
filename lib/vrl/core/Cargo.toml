@@ -6,9 +6,12 @@ edition = "2021"
 publish = false
 
 [dependencies]
-lookup = { path = "../../lookup" }
-value = { path = "../../value" }
+bytes = { version = "1.1.0", default-features = false }
+chrono = { version = "0.4", default-features = false }
 diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
+lookup = { path = "../../lookup" }
+thiserror = { version = "1", default-features = false }
+value = { path = "../../value" }
 
 [features]
 default = ["expressions"]

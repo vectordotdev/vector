@@ -42,7 +42,7 @@ ordered-float = { version = "3", default-features = false }
 paste = { version = "1", default-features = false }
 regex = { version = "1", default-features = false }
 serde = { version = "1", default-features = false, features = ["derive"] }
-thiserror ={ version =  "1", default-features = false }
+thiserror = { version = "1", default-features = false }
 anymap = { version = "0.12.1", default-features = false }
 
 [dev-dependencies]

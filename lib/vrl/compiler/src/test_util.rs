@@ -5,7 +5,7 @@
 macro_rules! expr {
     ($($v:tt)*) => {{
         let value = $crate::value!($($v)*);
-        $crate::value::VrlValueConvert::into_expression(value)
+        $crate::value::value_into_expression(value)
     }};
 }
 
@@ -151,26 +151,26 @@ macro_rules! type_def {
     };
 
     (object {$(unknown => $unknown:expr,)? $($key:literal => $value:expr,)+ }) => {{
-        let mut v = value::kind::Collection::from(::std::collections::BTreeMap::from([$(($key.into(), $value.into()),)+]));
+        let mut v = kind::Collection::from(::std::collections::BTreeMap::from([$(($key.into(), $value.into()),)+]));
         $(v.set_unknown(value::Kind::from($unknown)))?;
 
         TypeDef::object(v)
     }};
 
     (array [ $($value:expr,)+ ]) => {{
-        $(let v = value::kind::Collection::from_unknown(value::Kind::from($value));)+
+        $(let v = kind::Collection::from_unknown(value::Kind::from($value));)+
 
         TypeDef::array(v)
     }};
 
     (array { $(unknown => $unknown:expr,)? $($idx:literal => $value:expr,)+ }) => {{
-        let mut v = value::kind::Collection::from(::std::collections::BTreeMap::from([$(($idx.into(), $value.into()),)+]));
+        let mut v = kind::Collection::from(::std::collections::BTreeMap::from([$(($idx.into(), $value.into()),)+]));
         $(v.set_unknown(value::Kind::from($unknown)))?;
 
         TypeDef::array(v)
     }};
 
     (array) => {
-        TypeDef::array(value::kind::Collection::any())
+        TypeDef::array(kind::Collection::any())
     };
 }

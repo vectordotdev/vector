@@ -47,7 +47,7 @@ pub(crate) fn capture_regex_to_map(
 #[cfg(any(feature = "parse_regex", feature = "parse_regex_all"))]
 pub(crate) fn regex_kind(
     regex: &regex::Regex,
-) -> std::collections::BTreeMap<vrl::value::kind::Field, vrl::value::Kind> {
+) -> std::collections::BTreeMap<vrl::kind::Field, vrl::value::Kind> {
     let mut inner_type = std::collections::BTreeMap::new();
 
     // Add typedefs for each capture by numerical index.

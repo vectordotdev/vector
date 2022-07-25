@@ -1140,7 +1140,7 @@ impl DiagnosticMessage for Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{state::ExternalEnv, value::kind};
+    use crate::{kind, state::ExternalEnv};
 
     #[derive(Clone, Debug)]
     struct Fn;

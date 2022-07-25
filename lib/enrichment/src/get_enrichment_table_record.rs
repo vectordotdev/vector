@@ -5,12 +5,11 @@ use vrl::{
     function::{
         ArgumentList, Compiled, CompiledArgument, Example, FunctionCompileContext, Parameter,
     },
+    kind,
     prelude::{
         expression, DiagnosticMessage, FunctionArgument, Resolved, Result, TypeDef, VrlValueConvert,
     },
-    state,
-    value::kind,
-    Context, Expression, Function,
+    state, Context, Expression, Function,
 };
 
 use crate::{

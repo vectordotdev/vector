@@ -12,9 +12,10 @@ use value::{kind::Collection, Value};
 
 use crate::{
     expression::{container::Variant, Block, Container, Expr, Expression, FunctionArgument},
+    kind,
     parser::Node,
     state::{ExternalEnv, LocalEnv},
-    value::{kind, Kind},
+    value::Kind,
     Span,
 };
 

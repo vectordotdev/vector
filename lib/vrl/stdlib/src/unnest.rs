@@ -1,6 +1,6 @@
 use ::value::Value;
 use lookup_lib::LookupBuf;
-use vrl::{prelude::*, value::kind::merge};
+use vrl::{kind::merge, prelude::*};
 
 fn unnest(path: &expression::Query, root_lookup: &LookupBuf, ctx: &mut Context) -> Resolved {
     let lookup_buf = path.path();
@@ -187,7 +187,7 @@ impl Expression for UnnestFn {
 ///  ]`
 ///
 pub(crate) fn invert_array_at_path(typedef: &TypeDef, path: &LookupBuf) -> TypeDef {
-    use self::value::kind::insert;
+    use kind::insert;
 
     let type_def = typedef.at_path(&path.to_lookup());
 

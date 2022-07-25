@@ -417,6 +417,7 @@ fn trim_xml(xml: &str) -> Cow<str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use vrl::value::value_into_expression;
 
     test_function![
         parse_xml => ParseXml;
@@ -685,7 +686,7 @@ mod tests {
         let external = state::ExternalEnv::default();
 
         let func = ParseXmlFn {
-            value: value!(true).into_expression(),
+            value: value_into_expression(value!(true)),
             trim: None,
             include_attr: None,
             attr_prefix: None,

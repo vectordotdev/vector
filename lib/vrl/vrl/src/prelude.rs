@@ -1,5 +1,5 @@
 // commonly used modules
-pub use compiler::{expression, state, value::kind};
+pub use compiler::{expression, kind, state};
 // pub use crate::{expression, function, state, value};
 
 // commonly used top-level crate types

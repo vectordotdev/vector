@@ -1,7 +1,7 @@
 use std::fmt;
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use vrl_compiler::value::kind;
+use vrl_compiler::kind;
 
 struct Parameters {
     basis: u16,
@@ -21,7 +21,7 @@ impl fmt::Display for Parameters {
 }
 
 fn benchmark_kind_display(c: &mut Criterion) {
-    let mut group = c.benchmark_group("vrl_compiler/value::kind::display");
+    let mut group = c.benchmark_group("vrl_compiler/kind::display");
     for param in &PARAMETERS {
         let parameter = vrl_compiler::Parameter {
             keyword: "",

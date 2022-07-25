@@ -6,13 +6,13 @@ use value::Value;
 
 use crate::{
     expression::{Expr, Resolved},
+    kind::DefaultValue,
     parser::{
         ast::{self, Ident},
         Node,
     },
     state::{ExternalEnv, LocalEnv},
     type_def::Details,
-    value::kind::DefaultValue,
     Context, Expression, Span, TypeDef,
 };
 

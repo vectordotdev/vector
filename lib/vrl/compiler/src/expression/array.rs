@@ -86,7 +86,7 @@ impl From<Vec<Expr>> for Array {
 
 #[cfg(test)]
 mod tests {
-    use value::kind::Collection;
+    use crate::kind::Collection;
 
     use super::*;
     use crate::{expr, test_type_def, value::Kind, TypeDef};

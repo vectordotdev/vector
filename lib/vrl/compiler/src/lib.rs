@@ -35,12 +35,13 @@ mod test_util;
 
 pub mod expression;
 pub mod function;
+pub mod kind;
 pub mod state;
 pub mod type_def;
 pub mod value;
 
 pub use core::{
-    value, ExpressionError, MetadataTarget, Resolved, SecretTarget, Target, TargetValue,
+    value, Error, ExpressionError, MetadataTarget, Resolved, SecretTarget, Target, TargetValue,
     TargetValueRef,
 };
 use std::{fmt::Display, str::FromStr};
