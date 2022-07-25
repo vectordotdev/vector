@@ -207,7 +207,7 @@ impl TransformConfig for RemapConfig {
                     .expect("context exists")
                     .0;
 
-                let mut new_type_def = Definition::new(
+                let mut new_type_def = Definition::new_with_default_metadata(
                     state.target_kind().clone(),
                     input_definition.log_namespaces().clone(),
                 );
@@ -217,7 +217,7 @@ impl TransformConfig for RemapConfig {
                 new_type_def
             })
             .unwrap_or_else(|_| {
-                Definition::new(
+                Definition::new_with_default_metadata(
                     // The program failed to compile, so it can "never" return a value
                     Kind::never(),
                     input_definition.log_namespaces().clone(),
@@ -226,8 +226,10 @@ impl TransformConfig for RemapConfig {
 
         // When a message is dropped and re-routed, we keep the original event, but also annotate
         // it with additional metadata.
-        let mut dropped_definition =
-            Definition::new(Kind::never(), input_definition.log_namespaces().clone());
+        let mut dropped_definition = Definition::new_with_default_metadata(
+            Kind::never(),
+            input_definition.log_namespaces().clone(),
+        );
 
         if input_definition
             .log_namespaces()
@@ -1014,7 +1016,7 @@ mod tests {
         let context = TransformContext {
             key: Some(ComponentKey::from("remapper")),
             schema_definitions,
-            merged_schema_definition: schema::Definition::new(
+            merged_schema_definition: schema::Definition::new_with_default_metadata(
                 Kind::any_object(),
                 [LogNamespace::Legacy],
             )
@@ -1263,12 +1265,15 @@ mod tests {
             ..Default::default()
         };
 
-        let schema_definition = schema::Definition::new(Kind::any_object(), [LogNamespace::Legacy])
-            .with_field("foo", Kind::any(), None)
-            .with_field("tags", Kind::any(), None);
+        let schema_definition = schema::Definition::new_with_default_metadata(
+            Kind::any_object(),
+            [LogNamespace::Legacy],
+        )
+        .with_field("foo", Kind::any(), None)
+        .with_field("tags", Kind::any(), None);
 
         assert_eq!(
-            conf.outputs(&schema::Definition::new(
+            conf.outputs(&schema::Definition::new_with_default_metadata(
                 Kind::any_object(),
                 [LogNamespace::Legacy]
             )),

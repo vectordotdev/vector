@@ -188,53 +188,24 @@ impl SourceConfig for DatadogAgentConfig {
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
-        let log_namespace = global_log_namespace.merge(self.log_namespace);
+        let source_name = "datadog_agent";
 
-        let definition = match log_namespace {
-            LogNamespace::Legacy => {
-                match self.decoding {
-                    // See: `LogMsg` struct.
-                    DeserializerConfig::Bytes => self
-                        .decoding
-                        .schema_definition(log_namespace)
-                        .with_field("message", Kind::bytes(), Some("message"))
-                        .with_field("status", Kind::bytes(), Some("severity"))
-                        .with_field("timestamp", Kind::timestamp(), Some("timestamp"))
-                        .with_field("hostname", Kind::bytes(), Some("host"))
-                        .with_field("service", Kind::bytes(), Some("service"))
-                        .with_field("ddsource", Kind::bytes(), Some("source"))
-                        .with_field("ddtags", Kind::bytes(), Some("tags")),
-
-                    // JSON deserializer can overwrite existing fields at runtime, so we have to treat
-                    // those events as if there is no known type details we can provide, other than the
-                    // details provided by the generic JSON schema definition.
-                    DeserializerConfig::Json => self.decoding.schema_definition(log_namespace),
-
-                    // Syslog deserializer allows for arbritrary "structured data" that can overwrite
-                    // existing fields, similar to the JSON deserializer.
-                    //
-                    // See also: https://datatracker.ietf.org/doc/html/rfc5424#section-6.3
-                    #[cfg(feature = "sources-syslog")]
-                    DeserializerConfig::Syslog => self.decoding.schema_definition(log_namespace),
-
-                    DeserializerConfig::Native => self.decoding.schema_definition(log_namespace),
-                    DeserializerConfig::NativeJson => {
-                        self.decoding.schema_definition(log_namespace)
-                    }
-                    DeserializerConfig::Gelf => self.decoding.schema_definition(log_namespace),
-                }
-            }
-            LogNamespace::Vector => self
-                .decoding
-                .schema_definition(log_namespace)
-                .with_metadata_field("message", Kind::bytes())
-                .with_metadata_field("status", Kind::bytes())
-                .with_metadata_field("timestamp", Kind::timestamp())
-                .with_metadata_field("hostname", Kind::bytes())
-                .with_metadata_field("service", Kind::bytes())
-                .with_metadata_field("ddsource", Kind::bytes())
-                .with_metadata_field("ddtags", Kind::bytes()),
-        };
+        let definition = self
+            .decoding
+            .schema_definition(global_log_namespace.merge(self.log_namespace))
+            .with_source_metadata(source_name, "message", Kind::bytes(), Some("message"))
+            .with_source_metadata(source_name, "status", Kind::bytes(), Some("severity"))
+            .with_source_metadata(
+                source_name,
+                "timestamp",
+                Kind::timestamp(),
+                Some("timestamp"),
+            )
+            .with_source_metadata(source_name, "hostname", Kind::bytes(), Some("host"))
+            .with_source_metadata(source_name, "service", Kind::bytes(), Some("service"))
+            .with_source_metadata(source_name, "ddsource", Kind::bytes(), Some("source"))
+            .with_source_metadata(source_name, "ddtags", Kind::bytes(), Some("tags"))
+            .with_standard_vector_source_metadata();
 
         if self.multiple_outputs {
             vec![
