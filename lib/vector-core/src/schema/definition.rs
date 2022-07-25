@@ -205,7 +205,7 @@ impl Definition {
     /// - If the path is not root, and the definition does not allow the type to be an object
     /// - Provided path has one or more coalesced segments (e.g. `.(foo | bar)`).
     #[must_use]
-    pub fn with_metadata_field(mut self, path: impl Into<LookupBuf>, kind: Kind) -> Self {
+    pub fn with_vector_metadata(mut self, path: impl Into<LookupBuf>, kind: Kind) -> Self {
         let path = path.into();
 
         if !path.is_root() {
