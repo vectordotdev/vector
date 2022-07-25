@@ -31,7 +31,7 @@ use crate::{
     },
     schema,
     serde::{default_decoding, default_framing_message_based},
-    sources::datadog::agent::{
+    sources::datadog_agent::{
         ddmetric_proto, ddtrace_proto, logs::decode_log_body, metrics::DatadogSeriesRequest,
         DatadogAgentConfig, DatadogAgentSource, LogMsg, LOGS, METRICS, TRACES,
     },
