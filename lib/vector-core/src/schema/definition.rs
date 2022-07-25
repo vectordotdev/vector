@@ -385,7 +385,7 @@ mod tests {
                 meaning,
                 want,
             },
-        ) in HashMap::from([
+        ) in [
             (
                 "simple",
                 TestCase {
@@ -395,7 +395,7 @@ mod tests {
                     want: Definition {
                         event_kind: Kind::object(BTreeMap::from([(
                             "foo".into(),
-                            Kind::boolean().or_null(),
+                            Kind::boolean().or_undefined(),
                         )])),
                         metadata_kind: Kind::object(Collection::empty()),
                         meaning: [("foo_meaning".to_owned(), "foo".into())].into(),
@@ -412,7 +412,10 @@ mod tests {
                     want: Definition {
                         event_kind: Kind::object(BTreeMap::from([(
                             "foo".into(),
-                            Kind::object(BTreeMap::from([("bar".into(), Kind::regex().or_null())])),
+                            Kind::object(BTreeMap::from([(
+                                "bar".into(),
+                                Kind::regex().or_null().or_undefined(),
+                            )])),
                         )])),
                         metadata_kind: Kind::object(Collection::empty()),
                         meaning: [(
@@ -433,7 +436,7 @@ mod tests {
                     want: Definition {
                         event_kind: Kind::object(BTreeMap::from([(
                             "foo".into(),
-                            Kind::boolean().or_null(),
+                            Kind::boolean().or_undefined(),
                         )])),
                         metadata_kind: Kind::object(Collection::empty()),
                         meaning: BTreeMap::default(),
@@ -441,7 +444,7 @@ mod tests {
                     },
                 },
             ),
-        ]) {
+        ] {
             let mut got = Definition::new(Kind::object(BTreeMap::new()), []);
             got = got.optional_field(path, kind, meaning);
 
