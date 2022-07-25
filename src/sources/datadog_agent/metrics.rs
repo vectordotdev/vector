@@ -18,8 +18,7 @@ use crate::{
     internal_events::EventsReceived,
     schema,
     sources::{
-        datadog::agent::{
-            self,
+        datadog_agent::{
             ddmetric_proto::{metric_payload, MetricPayload, SketchPayload},
             handle_request, ApiKeyQueryParams, DatadogAgentSource,
         },
@@ -93,7 +92,7 @@ fn sketches_service(
                         )
                     });
                 if multiple_outputs {
-                    handle_request(events, acknowledgements, out.clone(), Some(agent::METRICS))
+                    handle_request(events, acknowledgements, out.clone(), Some(super::METRICS))
                 } else {
                     handle_request(events, acknowledgements, out.clone(), None)
                 }
@@ -135,7 +134,7 @@ fn series_v1_service(
                         )
                     });
                 if multiple_outputs {
-                    handle_request(events, acknowledgements, out.clone(), Some(agent::METRICS))
+                    handle_request(events, acknowledgements, out.clone(), Some(super::METRICS))
                 } else {
                     handle_request(events, acknowledgements, out.clone(), None)
                 }
@@ -177,7 +176,7 @@ fn series_v2_service(
                         )
                     });
                 if multiple_outputs {
-                    handle_request(events, acknowledgements, out.clone(), Some(agent::METRICS))
+                    handle_request(events, acknowledgements, out.clone(), Some(super::METRICS))
                 } else {
                     handle_request(events, acknowledgements, out.clone(), None)
                 }
