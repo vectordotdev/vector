@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::config::LogNamespace;
-use lookup::LookupBuf;
+use lookup::{LookupBuf, SegmentBuf};
 use value::{kind::Collection, Kind};
 
 /// The definition of a schema.
@@ -133,6 +133,66 @@ impl Definition {
         &self.log_namespaces
     }
 
+    /// This should be used wherever `LogNamespace::insert_source_metadata' is used to insert metadata.
+    /// This automatically detects which log namespaces are used, and also automatically
+    /// determines if there are possible conflicts for field names from the selected decoder.
+    pub fn with_source_metadata<'a>(
+        self,
+        source_name: &'a str,
+        path: impl Into<LookupBuf>,
+        kind: Kind,
+        meaning: Option<&str>,
+    ) -> Self {
+        let path = path.into();
+        self.with_namespaced_metadata(source_name, path.clone(), path, kind, meaning)
+    }
+
+    /// This should be used wherever `LogNamespace::insert_vector_metadata' is used to insert metadata.
+    /// This automatically detects which log namespaces are used, and also automatically
+    /// determines if there are possible conflicts for field names from the selected decoder.
+    pub fn with_vector_metadata<'a>(
+        self,
+        path: impl Into<LookupBuf>,
+        kind: Kind,
+        meaning: Option<&str>,
+    ) -> Self {
+        let path = path.into();
+        self.with_namespaced_metadata("vector", path.clone(), path, kind, meaning)
+    }
+
+    fn with_namespaced_metadata<'a>(
+        self,
+        prefix: &'a str,
+        legacy_path: impl Into<LookupBuf>,
+        vector_path: impl Into<LookupBuf>,
+        kind: Kind,
+        meaning: Option<&str>,
+    ) -> Self {
+        let legacy_definition = if self.log_namespaces.contains(&LogNamespace::Legacy) {
+            Some(
+                self.clone()
+                    .try_with_field(legacy_path, kind.clone(), meaning),
+            )
+        } else {
+            None
+        };
+
+        let vector_definition = if self.log_namespaces.contains(&LogNamespace::Vector) {
+            let mut path_with_prefix = vector_path.into();
+            path_with_prefix.push_front(SegmentBuf::from(prefix));
+
+            Some(self.clone().with_metadata_field(path_with_prefix, kind))
+        } else {
+            None
+        };
+
+        match (legacy_definition, vector_definition) {
+            (Some(a), Some(b)) => a.merge(b),
+            (Some(x), _) | (_, Some(x)) => x,
+            (None, None) => self,
+        }
+    }
+
     /// Add type information for an event field.
     /// A non-root required field means the root type must be an object, so the type will be automatically
     /// restricted to an object.
@@ -164,6 +224,36 @@ impl Definition {
         }
 
         self
+    }
+
+    /// Add type information for an event field.
+    /// This inserts type information similar to `LogEvent::try_insert`.
+    ///
+    /// # Panics
+    /// - If the path is not root, and the definition does not allow the type to be an object.
+    #[must_use]
+    pub fn try_with_field(
+        self,
+        path: impl Into<LookupBuf>,
+        kind: Kind,
+        meaning: Option<&str>,
+    ) -> Self {
+        let path = path.into();
+
+        let existing_type = self.event_kind.at_path(&path);
+
+        if existing_type.is_undefined() {
+            // Guaranteed to never be set, so the insertion will always succeed.
+            self.with_field(path, kind, meaning)
+        } else if !existing_type.contains_undefined() {
+            // Guaranteed to always be set (or is never), so the insertion will always fail.
+            self
+        } else {
+            // Not sure if the insertion will be successful. The type definition should contain both
+            // possibilities. The meaning is not set, since it can't be relied on.
+            let success_definition = self.clone().with_field(path, kind, None);
+            self.merge(success_definition)
+        }
     }
 
     /// Add type information for an event field.
