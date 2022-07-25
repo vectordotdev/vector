@@ -3,8 +3,8 @@ use codecs::{
     JsonSerializerConfig,
 };
 use futures::{future, FutureExt};
-use serde::{Deserialize, Serialize};
 use tokio::io;
+use vector_config::configurable_component;
 
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType},
@@ -12,22 +12,33 @@ use crate::{
     sinks::{console::sink::WriterSink, Healthcheck, VectorSink},
 };
 
-#[derive(Debug, Derivative, Deserialize, Serialize)]
+/// Output target.
+#[configurable_component]
+#[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Target {
+    /// Standard output.
     #[derivative(Default)]
     Stdout,
+
+    /// Standard error.
     Stderr,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+/// Configuration for the `console` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct ConsoleSinkConfig {
+    #[configurable(derived)]
     #[serde(default)]
     pub target: Target,
+
     #[serde(flatten)]
     pub encoding: EncodingConfigWithFraming,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",

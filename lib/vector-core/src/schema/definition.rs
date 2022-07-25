@@ -2,11 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::config::LogNamespace;
 use lookup::LookupBuf;
-use value::kind::insert;
-use value::{
-    kind::{merge, Collection},
-    Kind,
-};
+use value::{kind::Collection, Kind};
 
 /// The definition of a schema.
 ///
@@ -15,11 +11,15 @@ use value::{
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct Definition {
     /// The type of the event
-    kind: Kind,
+    event_kind: Kind,
+
+    /// The type of the metadata.
+    metadata_kind: Kind,
 
     /// Semantic meaning assigned to fields within the collection.
     ///
-    /// The value within this map points to a path inside the `collection`.
+    /// The value within this map points to a path inside the `event_kind`.
+    /// Meanings currently can't point to metadata.
     meaning: BTreeMap<String, MeaningPointer>,
 
     /// Type definitions of components can change depending on the log namespace chosen.
@@ -83,15 +83,21 @@ impl From<LookupBuf> for MeaningPointer {
 impl Definition {
     /// The most general possible definition. The `Kind` is `any`, and all `log_namespaces` are enabled.
     pub fn any() -> Self {
-        Self::new(Kind::any(), [LogNamespace::Legacy, LogNamespace::Vector])
+        Self {
+            event_kind: Kind::any(),
+            metadata_kind: Kind::any(),
+            meaning: BTreeMap::default(),
+            log_namespaces: [LogNamespace::Legacy, LogNamespace::Vector].into(),
+        }
     }
 
     /// Creates a new definition that is of the kind specified.
     /// There are no meanings.
     /// The `log_namespaces` are used to list the possible namespaces the schema is for.
-    pub fn new(kind: Kind, log_namespaces: impl Into<BTreeSet<LogNamespace>>) -> Self {
+    pub fn new(event_kind: Kind, log_namespaces: impl Into<BTreeSet<LogNamespace>>) -> Self {
         Self {
-            kind,
+            event_kind,
+            metadata_kind: Kind::object(Collection::empty()),
             meaning: BTreeMap::default(),
             log_namespaces: log_namespaces.into(),
         }
@@ -145,37 +151,40 @@ impl Definition {
         let meaning = meaning.map(ToOwned::to_owned);
 
         if !path.is_root() {
-            if kind.contains_null() {
-                // field is optional, so don't coerce to an object, but still make sure it _can_ be an object
-                assert!(
-                    self.kind.as_object().is_some(),
-                    "Setting a field on a value that cannot be an object"
-                );
-            } else {
-                self.kind = self
-                    .kind
-                    .into_object()
-                    .expect("required field implies the type can be an object")
-                    .into();
-            }
+            assert!(
+                self.event_kind.as_object().is_some(),
+                "Setting a field on a value that cannot be an object"
+            );
         }
 
-        self.kind
-            .insert_at_path(
-                &path.to_lookup(),
-                kind,
-                insert::Strategy {
-                    inner_conflict: insert::InnerConflict::Replace,
-                    leaf_conflict: insert::LeafConflict::Replace,
-                    coalesced_path: insert::CoalescedPath::Reject,
-                },
-            )
-            .expect("Field definition not valid");
+        self.event_kind.set_at_path(&path, kind);
 
         if let Some(meaning) = meaning {
             self.meaning.insert(meaning, MeaningPointer::Valid(path));
         }
 
+        self
+    }
+
+    /// Add type information for an event field.
+    /// A non-root required field means the root type must be an object, so the type will be automatically
+    /// restricted to an object.
+    ///
+    /// # Panics
+    /// - If the path is not root, and the definition does not allow the type to be an object
+    /// - Provided path has one or more coalesced segments (e.g. `.(foo | bar)`).
+    #[must_use]
+    pub fn with_metadata_field(mut self, path: impl Into<LookupBuf>, kind: Kind) -> Self {
+        let path = path.into();
+
+        if !path.is_root() {
+            assert!(
+                self.metadata_kind.as_object().is_some(),
+                "Setting a field on a value that cannot be an object"
+            );
+        }
+
+        self.metadata_kind.set_at_path(&path, kind);
         self
     }
 
@@ -191,7 +200,7 @@ impl Definition {
         kind: Kind,
         meaning: Option<&str>,
     ) -> Self {
-        self.with_field(path, kind.or_null(), meaning)
+        self.with_field(path, kind.or_undefined(), meaning)
     }
 
     /// Register a semantic meaning for the definition.
@@ -205,11 +214,7 @@ impl Definition {
 
         // Ensure the path exists in the collection.
         assert!(
-            self.kind
-                .find_at_path(&path.to_lookup())
-                .ok()
-                .flatten()
-                .is_some(),
+            self.event_kind.at_path(&path).contains_any_defined(),
             "meaning must point to a valid path"
         );
 
@@ -220,12 +225,12 @@ impl Definition {
 
     /// Set the kind for all unknown fields.
     #[must_use]
-    pub fn unknown_fields(mut self, unknown: impl Into<Option<Kind>>) -> Self {
+    pub fn unknown_fields(mut self, unknown: impl Into<Kind>) -> Self {
         let unknown = unknown.into();
-        if let Some(object) = self.kind.as_object_mut() {
+        if let Some(object) = self.event_kind.as_object_mut() {
             object.set_unknown(unknown.clone());
         }
-        if let Some(array) = self.kind.as_array_mut() {
+        if let Some(array) = self.event_kind.as_array_mut() {
             array.set_unknown(unknown);
         }
         self
@@ -245,14 +250,8 @@ impl Definition {
             self.meaning.insert(other_id, meaning);
         }
 
-        self.kind.merge(
-            other.kind,
-            merge::Strategy {
-                collisions: merge::CollisionStrategy::Union,
-                indices: merge::Indices::Keep,
-            },
-        );
-
+        self.event_kind = self.event_kind.union(other.event_kind);
+        self.metadata_kind = self.metadata_kind.union(other.metadata_kind);
         self.log_namespaces.append(&mut other.log_namespaces);
         self
     }
@@ -281,8 +280,12 @@ impl Definition {
             })
     }
 
-    pub fn kind(&self) -> &Kind {
-        &self.kind
+    pub fn event_kind(&self) -> &Kind {
+        &self.event_kind
+    }
+
+    pub fn metadata_kind(&self) -> &Kind {
+        &self.metadata_kind
     }
 }
 
@@ -317,7 +320,8 @@ mod tests {
                     kind: Kind::boolean(),
                     meaning: Some("foo_meaning"),
                     want: Definition {
-                        kind: Kind::object(BTreeMap::from([("foo".into(), Kind::boolean())])),
+                        event_kind: Kind::object(BTreeMap::from([("foo".into(), Kind::boolean())])),
+                        metadata_kind: Kind::object(Collection::empty()),
                         meaning: [("foo_meaning".to_owned(), "foo".into())].into(),
                         log_namespaces: BTreeSet::new(),
                     },
@@ -330,10 +334,11 @@ mod tests {
                     kind: Kind::regex().or_null(),
                     meaning: Some("foobar"),
                     want: Definition {
-                        kind: Kind::object(BTreeMap::from([(
+                        event_kind: Kind::object(BTreeMap::from([(
                             "foo".into(),
                             Kind::object(BTreeMap::from([("bar".into(), Kind::regex().or_null())])),
                         )])),
+                        metadata_kind: Kind::object(Collection::empty()),
                         meaning: [(
                             "foobar".to_owned(),
                             LookupBuf::from_str(".foo.bar").unwrap().into(),
@@ -350,7 +355,8 @@ mod tests {
                     kind: Kind::boolean(),
                     meaning: None,
                     want: Definition {
-                        kind: Kind::object(BTreeMap::from([("foo".into(), Kind::boolean())])),
+                        event_kind: Kind::object(BTreeMap::from([("foo".into(), Kind::boolean())])),
+                        metadata_kind: Kind::object(Collection::empty()),
                         meaning: BTreeMap::default(),
                         log_namespaces: BTreeSet::new(),
                     },
@@ -358,7 +364,7 @@ mod tests {
             ),
         ]) {
             let got = Definition::empty_legacy_namespace().with_field(path, kind, meaning);
-            assert_eq!(got.kind(), want.kind(), "{}", title);
+            assert_eq!(got.event_kind(), want.event_kind(), "{}", title);
         }
     }
 
@@ -379,7 +385,7 @@ mod tests {
                 meaning,
                 want,
             },
-        ) in HashMap::from([
+        ) in [
             (
                 "simple",
                 TestCase {
@@ -387,10 +393,11 @@ mod tests {
                     kind: Kind::boolean(),
                     meaning: Some("foo_meaning"),
                     want: Definition {
-                        kind: Kind::object(BTreeMap::from([(
+                        event_kind: Kind::object(BTreeMap::from([(
                             "foo".into(),
-                            Kind::boolean().or_null(),
+                            Kind::boolean().or_undefined(),
                         )])),
+                        metadata_kind: Kind::object(Collection::empty()),
                         meaning: [("foo_meaning".to_owned(), "foo".into())].into(),
                         log_namespaces: BTreeSet::new(),
                     },
@@ -403,10 +410,14 @@ mod tests {
                     kind: Kind::regex().or_null(),
                     meaning: Some("foobar"),
                     want: Definition {
-                        kind: Kind::object(BTreeMap::from([(
+                        event_kind: Kind::object(BTreeMap::from([(
                             "foo".into(),
-                            Kind::object(BTreeMap::from([("bar".into(), Kind::regex().or_null())])),
+                            Kind::object(BTreeMap::from([(
+                                "bar".into(),
+                                Kind::regex().or_null().or_undefined(),
+                            )])),
                         )])),
+                        metadata_kind: Kind::object(Collection::empty()),
                         meaning: [(
                             "foobar".to_owned(),
                             LookupBuf::from_str(".foo.bar").unwrap().into(),
@@ -423,16 +434,17 @@ mod tests {
                     kind: Kind::boolean(),
                     meaning: None,
                     want: Definition {
-                        kind: Kind::object(BTreeMap::from([(
+                        event_kind: Kind::object(BTreeMap::from([(
                             "foo".into(),
-                            Kind::boolean().or_null(),
+                            Kind::boolean().or_undefined(),
                         )])),
+                        metadata_kind: Kind::object(Collection::empty()),
                         meaning: BTreeMap::default(),
                         log_namespaces: BTreeSet::new(),
                     },
                 },
             ),
-        ]) {
+        ] {
             let mut got = Definition::new(Kind::object(BTreeMap::new()), []);
             got = got.optional_field(path, kind, meaning);
 
@@ -443,7 +455,8 @@ mod tests {
     #[test]
     fn test_unknown_fields() {
         let want = Definition {
-            kind: Kind::object(Collection::from_unknown(Kind::bytes().or_integer())),
+            event_kind: Kind::object(Collection::from_unknown(Kind::bytes().or_integer())),
+            metadata_kind: Kind::object(Collection::empty()),
             meaning: BTreeMap::default(),
             log_namespaces: BTreeSet::new(),
         };
@@ -469,26 +482,29 @@ mod tests {
                 "equal definitions",
                 TestCase {
                     this: Definition {
-                        kind: Kind::object(Collection::from(BTreeMap::from([(
+                        event_kind: Kind::object(Collection::from(BTreeMap::from([(
                             "foo".into(),
                             Kind::boolean().or_null(),
                         )]))),
+                        metadata_kind: Kind::object(Collection::empty()),
                         meaning: BTreeMap::from([("foo_meaning".to_owned(), "foo".into())]),
                         log_namespaces: BTreeSet::new(),
                     },
                     other: Definition {
-                        kind: Kind::object(Collection::from(BTreeMap::from([(
+                        event_kind: Kind::object(Collection::from(BTreeMap::from([(
                             "foo".into(),
                             Kind::boolean().or_null(),
                         )]))),
+                        metadata_kind: Kind::object(Collection::empty()),
                         meaning: BTreeMap::from([("foo_meaning".to_owned(), "foo".into())]),
                         log_namespaces: BTreeSet::new(),
                     },
                     want: Definition {
-                        kind: Kind::object(Collection::from(BTreeMap::from([(
+                        event_kind: Kind::object(Collection::from(BTreeMap::from([(
                             "foo".into(),
                             Kind::boolean().or_null(),
                         )]))),
+                        metadata_kind: Kind::object(Collection::empty()),
                         meaning: BTreeMap::from([("foo_meaning".to_owned(), "foo".into())]),
                         log_namespaces: BTreeSet::new(),
                     },
@@ -498,26 +514,29 @@ mod tests {
                 "this optional, other required",
                 TestCase {
                     this: Definition {
-                        kind: Kind::object(Collection::from(BTreeMap::from([(
+                        event_kind: Kind::object(Collection::from(BTreeMap::from([(
                             "foo".into(),
                             Kind::boolean().or_null(),
                         )]))),
+                        metadata_kind: Kind::object(Collection::empty()),
                         meaning: BTreeMap::default(),
                         log_namespaces: BTreeSet::new(),
                     },
                     other: Definition {
-                        kind: Kind::object(Collection::from(BTreeMap::from([(
+                        event_kind: Kind::object(Collection::from(BTreeMap::from([(
                             "foo".into(),
                             Kind::boolean(),
                         )]))),
+                        metadata_kind: Kind::object(Collection::empty()),
                         meaning: BTreeMap::default(),
                         log_namespaces: BTreeSet::new(),
                     },
                     want: Definition {
-                        kind: Kind::object(Collection::from(BTreeMap::from([(
+                        event_kind: Kind::object(Collection::from(BTreeMap::from([(
                             "foo".into(),
                             Kind::boolean().or_null(),
                         )]))),
+                        metadata_kind: Kind::object(Collection::empty()),
                         meaning: BTreeMap::default(),
                         log_namespaces: BTreeSet::new(),
                     },
@@ -527,26 +546,29 @@ mod tests {
                 "this required, other optional",
                 TestCase {
                     this: Definition {
-                        kind: Kind::object(Collection::from(BTreeMap::from([(
+                        event_kind: Kind::object(Collection::from(BTreeMap::from([(
                             "foo".into(),
                             Kind::boolean(),
                         )]))),
+                        metadata_kind: Kind::object(Collection::empty()),
                         meaning: BTreeMap::default(),
                         log_namespaces: BTreeSet::new(),
                     },
                     other: Definition {
-                        kind: Kind::object(Collection::from(BTreeMap::from([(
+                        event_kind: Kind::object(Collection::from(BTreeMap::from([(
                             "foo".into(),
                             Kind::boolean().or_null(),
                         )]))),
+                        metadata_kind: Kind::object(Collection::empty()),
                         meaning: BTreeMap::default(),
                         log_namespaces: BTreeSet::new(),
                     },
                     want: Definition {
-                        kind: Kind::object(Collection::from(BTreeMap::from([(
+                        event_kind: Kind::object(Collection::from(BTreeMap::from([(
                             "foo".into(),
                             Kind::boolean().or_null(),
                         )]))),
+                        metadata_kind: Kind::object(Collection::empty()),
                         meaning: BTreeMap::default(),
                         log_namespaces: BTreeSet::new(),
                     },
@@ -556,26 +578,29 @@ mod tests {
                 "this required, other required",
                 TestCase {
                     this: Definition {
-                        kind: Kind::object(Collection::from(BTreeMap::from([(
+                        event_kind: Kind::object(Collection::from(BTreeMap::from([(
                             "foo".into(),
                             Kind::boolean(),
                         )]))),
+                        metadata_kind: Kind::object(Collection::empty()),
                         meaning: BTreeMap::default(),
                         log_namespaces: BTreeSet::new(),
                     },
                     other: Definition {
-                        kind: Kind::object(Collection::from(BTreeMap::from([(
+                        event_kind: Kind::object(Collection::from(BTreeMap::from([(
                             "foo".into(),
                             Kind::boolean(),
                         )]))),
+                        metadata_kind: Kind::object(Collection::empty()),
                         meaning: BTreeMap::default(),
                         log_namespaces: BTreeSet::new(),
                     },
                     want: Definition {
-                        kind: Kind::object(Collection::from(BTreeMap::from([(
+                        event_kind: Kind::object(Collection::from(BTreeMap::from([(
                             "foo".into(),
                             Kind::boolean(),
                         )]))),
+                        metadata_kind: Kind::object(Collection::empty()),
                         meaning: BTreeMap::default(),
                         log_namespaces: BTreeSet::new(),
                     },
@@ -585,10 +610,11 @@ mod tests {
                 "same meaning, pointing to different paths",
                 TestCase {
                     this: Definition {
-                        kind: Kind::object(Collection::from(BTreeMap::from([(
+                        event_kind: Kind::object(Collection::from(BTreeMap::from([(
                             "foo".into(),
                             Kind::boolean(),
                         )]))),
+                        metadata_kind: Kind::object(Collection::empty()),
                         meaning: BTreeMap::from([(
                             "foo".into(),
                             MeaningPointer::Valid("foo".into()),
@@ -596,10 +622,11 @@ mod tests {
                         log_namespaces: BTreeSet::new(),
                     },
                     other: Definition {
-                        kind: Kind::object(Collection::from(BTreeMap::from([(
+                        event_kind: Kind::object(Collection::from(BTreeMap::from([(
                             "foo".into(),
                             Kind::boolean(),
                         )]))),
+                        metadata_kind: Kind::object(Collection::empty()),
                         meaning: BTreeMap::from([(
                             "foo".into(),
                             MeaningPointer::Valid("bar".into()),
@@ -607,10 +634,11 @@ mod tests {
                         log_namespaces: BTreeSet::new(),
                     },
                     want: Definition {
-                        kind: Kind::object(Collection::from(BTreeMap::from([(
+                        event_kind: Kind::object(Collection::from(BTreeMap::from([(
                             "foo".into(),
                             Kind::boolean(),
                         )]))),
+                        metadata_kind: Kind::object(Collection::empty()),
                         meaning: BTreeMap::from([(
                             "foo".into(),
                             MeaningPointer::Invalid(BTreeSet::from(["foo".into(), "bar".into()])),
@@ -623,10 +651,11 @@ mod tests {
                 "same meaning, pointing to same path",
                 TestCase {
                     this: Definition {
-                        kind: Kind::object(Collection::from(BTreeMap::from([(
+                        event_kind: Kind::object(Collection::from(BTreeMap::from([(
                             "foo".into(),
                             Kind::boolean(),
                         )]))),
+                        metadata_kind: Kind::object(Collection::empty()),
                         meaning: BTreeMap::from([(
                             "foo".into(),
                             MeaningPointer::Valid("foo".into()),
@@ -634,10 +663,11 @@ mod tests {
                         log_namespaces: BTreeSet::new(),
                     },
                     other: Definition {
-                        kind: Kind::object(Collection::from(BTreeMap::from([(
+                        event_kind: Kind::object(Collection::from(BTreeMap::from([(
                             "foo".into(),
                             Kind::boolean(),
                         )]))),
+                        metadata_kind: Kind::object(Collection::empty()),
                         meaning: BTreeMap::from([(
                             "foo".into(),
                             MeaningPointer::Valid("foo".into()),
@@ -645,10 +675,11 @@ mod tests {
                         log_namespaces: BTreeSet::new(),
                     },
                     want: Definition {
-                        kind: Kind::object(Collection::from(BTreeMap::from([(
+                        event_kind: Kind::object(Collection::from(BTreeMap::from([(
                             "foo".into(),
                             Kind::boolean(),
                         )]))),
+                        metadata_kind: Kind::object(Collection::empty()),
                         meaning: BTreeMap::from([(
                             "foo".into(),
                             MeaningPointer::Valid("foo".into()),

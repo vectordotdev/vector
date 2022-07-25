@@ -16,6 +16,7 @@ impl Kind {
             timestamp: Some(()),
             regex: Some(()),
             null: Some(()),
+            undefined: Some(()),
             array: Some(Collection::any()),
             object: Some(Collection::any()),
         }
@@ -35,27 +36,9 @@ impl Kind {
             timestamp: None,
             regex: None,
             null: Some(()),
+            undefined: Some(()),
             array: Some(Collection::json()),
             object: Some(Collection::json()),
-        }
-    }
-
-    /// The "primitive" type state.
-    ///
-    /// This state represents all types, _except_ ones that contain collection of types (e.g.
-    /// objects and arrays).
-    #[must_use]
-    pub const fn primitive() -> Self {
-        Self {
-            bytes: Some(()),
-            integer: Some(()),
-            float: Some(()),
-            boolean: Some(()),
-            timestamp: Some(()),
-            regex: Some(()),
-            null: Some(()),
-            array: None,
-            object: None,
         }
     }
 
@@ -70,6 +53,7 @@ impl Kind {
             timestamp: None,
             regex: None,
             null: None,
+            undefined: None,
             array: None,
             object: None,
         }
@@ -86,6 +70,7 @@ impl Kind {
             timestamp: None,
             regex: None,
             null: None,
+            undefined: None,
             array: None,
             object: None,
         }
@@ -102,6 +87,7 @@ impl Kind {
             timestamp: None,
             regex: None,
             null: None,
+            undefined: None,
             array: None,
             object: None,
         }
@@ -118,6 +104,7 @@ impl Kind {
             timestamp: None,
             regex: None,
             null: None,
+            undefined: None,
             array: None,
             object: None,
         }
@@ -134,6 +121,7 @@ impl Kind {
             timestamp: Some(()),
             regex: None,
             null: None,
+            undefined: None,
             array: None,
             object: None,
         }
@@ -150,6 +138,7 @@ impl Kind {
             timestamp: None,
             regex: Some(()),
             null: None,
+            undefined: None,
             array: None,
             object: None,
         }
@@ -166,6 +155,24 @@ impl Kind {
             timestamp: None,
             regex: None,
             null: Some(()),
+            undefined: None,
+            array: None,
+            object: None,
+        }
+    }
+
+    /// The "undefined" type state.
+    #[must_use]
+    pub const fn undefined() -> Self {
+        Self {
+            bytes: None,
+            integer: None,
+            float: None,
+            boolean: None,
+            timestamp: None,
+            regex: None,
+            null: None,
+            undefined: Some(()),
             array: None,
             object: None,
         }
@@ -182,6 +189,7 @@ impl Kind {
             timestamp: None,
             regex: None,
             null: None,
+            undefined: None,
             array: None,
             object: None,
         }
@@ -198,6 +206,7 @@ impl Kind {
             timestamp: None,
             regex: None,
             null: None,
+            undefined: None,
             array: Some(collection.into()),
             object: None,
         }
@@ -214,6 +223,7 @@ impl Kind {
             timestamp: None,
             regex: None,
             null: None,
+            undefined: None,
             array: None,
             object: Some(collection.into()),
         }
@@ -274,6 +284,13 @@ impl Kind {
     #[must_use]
     pub const fn or_null(mut self) -> Self {
         self.null = Some(());
+        self
+    }
+
+    /// Add the `undefined` state to the type.
+    #[must_use]
+    pub const fn or_undefined(mut self) -> Self {
+        self.undefined = Some(());
         self
     }
 
@@ -343,6 +360,13 @@ impl Kind {
         self.null.replace(()).is_none()
     }
 
+    /// Add the `null` state to the type.
+    ///
+    /// If the type already included this state, the function returns `false`.
+    pub fn add_undefined(&mut self) -> bool {
+        self.undefined.replace(()).is_none()
+    }
+
     /// Add the `array` state to the type.
     ///
     /// If the type already included this state, the function returns `false`.
@@ -409,6 +433,13 @@ impl Kind {
         self.null.take().is_some()
     }
 
+    /// Remove the `undefined` state from the type.
+    ///
+    /// If the type previously included this state, true is returned.
+    pub fn remove_undefined(&mut self) -> bool {
+        self.undefined.take().is_some()
+    }
+
     /// Remove the `array` state from the type.
     ///
     /// If the type previously included this state, true is returned.
@@ -421,5 +452,15 @@ impl Kind {
     /// If the type previously included this state, true is returned.
     pub fn remove_object(&mut self) -> bool {
         self.object.take().is_some()
+    }
+}
+
+// `without_*` methods to narrow the state of a type (functional).
+impl Kind {
+    /// Remove the `undefined` state from the type, and return it.
+    #[must_use]
+    pub fn without_undefined(mut self) -> Self {
+        self.remove_undefined();
+        self
     }
 }
