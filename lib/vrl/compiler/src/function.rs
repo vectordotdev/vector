@@ -23,6 +23,12 @@ pub type Compiled = Result<Box<dyn Expression>, Box<dyn DiagnosticMessage>>;
 pub type CompiledArgument =
     Result<Option<Box<dyn std::any::Any + Send + Sync>>, Box<dyn DiagnosticMessage>>;
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct ResolvedArgument {
+    pub argument: Parameter,
+    pub expression: Expr,
+}
+
 pub trait Function: Send + Sync + fmt::Debug {
     /// The identifier by which the function can be called.
     fn identifier(&self) -> &'static str;
@@ -68,7 +74,7 @@ pub trait Function: Send + Sync + fmt::Debug {
     /// at compile time.
     fn compile_argument(
         &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
+        _args: &[(&'static str, Option<ResolvedArgument>)],
         _ctx: &mut FunctionCompileContext,
         _name: &str,
         _expr: Option<&Expr>,

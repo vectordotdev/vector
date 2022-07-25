@@ -99,14 +99,14 @@ impl Function for ParseGroks {
 
     fn compile_argument(
         &self,
-        args: &[(&'static str, Option<FunctionArgument>)],
+        args: &[(&'static str, Option<ResolvedArgument>)],
         _ctx: &mut FunctionCompileContext,
         name: &str,
         expr: Option<&expression::Expr>,
     ) -> CompiledArgument {
         match (name, expr) {
             ("patterns", Some(expr)) => {
-                let aliases: Option<&FunctionArgument> = args.iter().find_map(|(name, arg)| {
+                let aliases: Option<&ResolvedArgument> = args.iter().find_map(|(name, arg)| {
                     if *name == "aliases" {
                         arg.as_ref()
                     } else {
@@ -139,6 +139,7 @@ impl Function for ParseGroks {
                 let aliases = aliases
                 .map(|aliases| {
                     aliases
+                        .expression
                         .as_value()
                         .unwrap()
                         .try_object()

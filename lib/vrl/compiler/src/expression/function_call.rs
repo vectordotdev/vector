@@ -1,4 +1,4 @@
-use std::{fmt, sync::Arc};
+use std::{any::Any, fmt, sync::Arc};
 
 use anymap::AnyMap;
 use diagnostic::{DiagnosticMessage, Label, Note, Urls};
@@ -9,6 +9,7 @@ use crate::{
     function::{
         closure::{self, VariableKind},
         ArgumentList, Example, FunctionClosure, FunctionCompileContext, Parameter,
+        ResolvedArgument,
     },
     parser::{Ident, Node},
     state::{ExternalEnv, LocalEnv},
@@ -516,55 +517,116 @@ pub struct FunctionCall {
 
 #[allow(unused)] // will be used by LLVM runtime
 impl FunctionCall {
+    fn compile_arguments(
+        &self,
+        function: &dyn Function,
+        external_env: &mut ExternalEnv,
+    ) -> Result<Vec<(&'static str, Option<CompiledArgument>)>, String> {
+        let function_arguments = self
+            .arguments
+            .iter()
+            .map(|argument| argument.clone().into_inner())
+            .collect::<Vec<_>>();
+
+        // Resolve the arguments so they are in the order defined in the function.
+        let arguments = Self::resolve_arguments(function, function_arguments);
+
+        // We take the external context, and pass it to the function compile context, this allows
+        // functions mutable access to external state, but keeps the internal compiler state behind
+        // an immutable reference, to ensure compiler state correctness.
+        let external_context = external_env.swap_external_context(AnyMap::new());
+
+        let mut compile_ctx =
+            FunctionCompileContext::new(self.span).with_external_context(external_context);
+
+        let compiled_arguments = arguments
+            .iter()
+            .map(|(keyword, argument)| -> Result<_, String> {
+                let expression = argument.as_ref().map(|argument| &argument.expression);
+
+                // Call `compile_argument` for functions that need to perform any compile time processing
+                // on the argument.
+                let compiled_argument = function
+                    .compile_argument(&arguments, &mut compile_ctx, keyword, expression)
+                    .map_err(|error| error.to_string())?;
+
+                let argument = match compiled_argument {
+                    Some(argument) => Some(CompiledArgument::Static(argument)),
+                    None => argument
+                        .as_ref()
+                        .map(|argument| CompiledArgument::Dynamic(argument.clone())),
+                };
+
+                Ok((*keyword, argument))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        // Re-insert the external context into the compiler state.
+        let _ = external_env.swap_external_context(compile_ctx.into_external_context());
+
+        Ok(compiled_arguments)
+    }
+
     /// Takes the arguments passed and resolves them into the order they are defined
-    /// in the function
+    /// in the function.
     /// The error path in this function should never really be hit as the compiler should
     /// catch these whilst creating the AST.
     fn resolve_arguments(
-        &self,
-        function: &(dyn Function),
-    ) -> Result<Vec<(&'static str, Option<FunctionArgument>)>, String> {
-        let params = function.parameters().to_vec();
-        let mut result = params
+        function: &dyn Function,
+        function_arguments: Vec<FunctionArgument>,
+    ) -> Vec<(&'static str, Option<ResolvedArgument>)> {
+        let mut parameters = function.parameters().to_vec();
+        let mut arguments = parameters
             .iter()
-            .map(|param| (param.keyword, None))
+            .map(|parameter| (parameter.keyword, None))
             .collect::<Vec<_>>();
 
         let mut unnamed = Vec::new();
 
         // Position all the named parameters, keeping track of all the unnamed for later.
-        for param in self.arguments.iter() {
-            match param.keyword() {
-                None => unnamed.push(param.clone().take().1),
+        for parameter in function_arguments {
+            match parameter.keyword() {
+                None => unnamed.push(parameter.into_inner()),
                 Some(keyword) => {
-                    match params.iter().position(|param| param.keyword == keyword) {
-                        None => {
-                            // The parameter was not found in the list.
-                            return Err(format!("parameter {} not found.", keyword));
-                        }
-                        Some(pos) => {
-                            result[pos].1 = Some(param.clone().take().1);
-                        }
-                    }
+                    let position_parameters = parameters
+                        .iter()
+                        .position(|parameter| parameter.keyword == keyword)
+                        .unwrap_or_else(|| panic!("parameter {} not found.", keyword));
+                    let position_arguments = arguments
+                        .iter()
+                        .position(|argument| argument.0 == keyword)
+                        .unwrap_or_else(|| panic!("argument {} not found.", keyword));
+
+                    let argument = parameters.remove(position_parameters);
+                    arguments[position_arguments].1 = Some(ResolvedArgument {
+                        argument,
+                        expression: parameter.into_inner(),
+                    });
                 }
             }
         }
 
         // Position all the remaining unnamed parameters
-        let mut pos = 0;
-        for param in unnamed {
-            while result[pos].1.is_some() {
-                pos += 1;
+        let mut position = 0;
+        for expression in unnamed {
+            while arguments[position].1.is_some() {
+                position += 1;
             }
 
-            if pos > result.len() {
-                return Err("Too many parameters".to_string());
-            }
+            assert!(
+                !(position > arguments.len() || parameters.is_empty()),
+                "Too many parameters"
+            );
 
-            result[pos].1 = Some(param);
+            let argument = parameters.remove(0);
+
+            arguments[position].1 = Some(ResolvedArgument {
+                argument,
+                expression,
+            });
         }
 
-        Ok(result)
+        arguments
     }
 
     #[must_use]
@@ -582,6 +644,13 @@ impl FunctionCall {
             .map(|arg| format!("{:?}", arg.inner()))
             .collect::<Vec<_>>()
     }
+}
+
+#[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
+enum CompiledArgument {
+    Static(Box<dyn Any + Send + Sync>),
+    Dynamic(ResolvedArgument),
 }
 
 impl Expression for FunctionCall {
@@ -1213,6 +1282,18 @@ mod tests {
     }
 
     #[cfg(feature = "expr-literal")]
+    fn create_resolved_argument(parameter: Parameter, value: i64) -> ResolvedArgument {
+        use crate::expression::{Expr, Literal};
+
+        let expression = Expr::Literal(Literal::Integer(value));
+
+        ResolvedArgument {
+            argument: parameter,
+            expression,
+        }
+    }
+
+    #[cfg(feature = "expr-literal")]
     fn create_function_call(arguments: Vec<Node<FunctionArgument>>) -> FunctionCall {
         let mut local = LocalEnv::default();
         let mut external = ExternalEnv::default();
@@ -1247,14 +1328,21 @@ mod tests {
             create_node(create_argument(None, 3)),
         ]);
 
-        let params = call.resolve_arguments(&TestFn);
-        let expected: Vec<(&'static str, Option<FunctionArgument>)> = vec![
-            ("one", Some(create_argument(None, 1))),
-            ("two", Some(create_argument(None, 2))),
-            ("three", Some(create_argument(None, 3))),
+        let arguments = call
+            .arguments
+            .iter()
+            .map(|argument| argument.clone().into_inner())
+            .collect::<Vec<_>>();
+
+        let resolved_arguments = FunctionCall::resolve_arguments(&TestFn, arguments);
+        let parameters = TestFn.parameters();
+        let expected: Vec<(&'static str, Option<ResolvedArgument>)> = vec![
+            ("one", Some(create_resolved_argument(parameters[0], 1))),
+            ("two", Some(create_resolved_argument(parameters[1], 2))),
+            ("three", Some(create_resolved_argument(parameters[2], 3))),
         ];
 
-        assert_eq!(Ok(expected), params);
+        assert_eq!(resolved_arguments, expected);
     }
 
     #[test]
@@ -1266,14 +1354,21 @@ mod tests {
             create_node(create_argument(Some("three"), 3)),
         ]);
 
-        let params = call.resolve_arguments(&TestFn);
-        let expected: Vec<(&'static str, Option<FunctionArgument>)> = vec![
-            ("one", Some(create_argument(Some("one"), 1))),
-            ("two", Some(create_argument(Some("two"), 2))),
-            ("three", Some(create_argument(Some("three"), 3))),
+        let arguments = call
+            .arguments
+            .iter()
+            .map(|argument| argument.clone().into_inner())
+            .collect::<Vec<_>>();
+
+        let resolved_arguments = FunctionCall::resolve_arguments(&TestFn, arguments);
+        let parameters = TestFn.parameters();
+        let expected: Vec<(&'static str, Option<ResolvedArgument>)> = vec![
+            ("one", Some(create_resolved_argument(parameters[0], 1))),
+            ("two", Some(create_resolved_argument(parameters[1], 2))),
+            ("three", Some(create_resolved_argument(parameters[2], 3))),
         ];
 
-        assert_eq!(Ok(expected), params);
+        assert_eq!(resolved_arguments, expected);
     }
 
     #[test]
@@ -1285,14 +1380,21 @@ mod tests {
             create_node(create_argument(Some("one"), 1)),
         ]);
 
-        let params = call.resolve_arguments(&TestFn);
-        let expected: Vec<(&'static str, Option<FunctionArgument>)> = vec![
-            ("one", Some(create_argument(Some("one"), 1))),
-            ("two", Some(create_argument(Some("two"), 2))),
-            ("three", Some(create_argument(Some("three"), 3))),
+        let arguments = call
+            .arguments
+            .iter()
+            .map(|argument| argument.clone().into_inner())
+            .collect::<Vec<_>>();
+
+        let resolved_arguments = FunctionCall::resolve_arguments(&TestFn, arguments);
+        let parameters = TestFn.parameters();
+        let expected: Vec<(&'static str, Option<ResolvedArgument>)> = vec![
+            ("one", Some(create_resolved_argument(parameters[0], 1))),
+            ("two", Some(create_resolved_argument(parameters[1], 2))),
+            ("three", Some(create_resolved_argument(parameters[2], 3))),
         ];
 
-        assert_eq!(Ok(expected), params);
+        assert_eq!(resolved_arguments, expected);
     }
 
     #[test]
@@ -1304,14 +1406,21 @@ mod tests {
             create_node(create_argument(Some("one"), 1)),
         ]);
 
-        let params = call.resolve_arguments(&TestFn);
-        let expected: Vec<(&'static str, Option<FunctionArgument>)> = vec![
-            ("one", Some(create_argument(Some("one"), 1))),
-            ("two", Some(create_argument(None, 2))),
-            ("three", Some(create_argument(Some("three"), 3))),
+        let arguments = call
+            .arguments
+            .iter()
+            .map(|argument| argument.clone().into_inner())
+            .collect::<Vec<_>>();
+
+        let resolved_arguments = FunctionCall::resolve_arguments(&TestFn, arguments);
+        let parameters = TestFn.parameters();
+        let expected: Vec<(&'static str, Option<ResolvedArgument>)> = vec![
+            ("one", Some(create_resolved_argument(parameters[0], 1))),
+            ("two", Some(create_resolved_argument(parameters[1], 2))),
+            ("three", Some(create_resolved_argument(parameters[2], 3))),
         ];
 
-        assert_eq!(Ok(expected), params);
+        assert_eq!(resolved_arguments, expected);
     }
 
     #[test]
@@ -1323,13 +1432,20 @@ mod tests {
             create_node(create_argument(None, 2)),
         ]);
 
-        let params = call.resolve_arguments(&TestFn);
-        let expected: Vec<(&'static str, Option<FunctionArgument>)> = vec![
-            ("one", Some(create_argument(None, 1))),
-            ("two", Some(create_argument(None, 2))),
-            ("three", Some(create_argument(Some("three"), 3))),
+        let arguments = call
+            .arguments
+            .iter()
+            .map(|argument| argument.clone().into_inner())
+            .collect::<Vec<_>>();
+
+        let resolved_arguments = FunctionCall::resolve_arguments(&TestFn, arguments);
+        let parameters = TestFn.parameters();
+        let expected: Vec<(&'static str, Option<ResolvedArgument>)> = vec![
+            ("one", Some(create_resolved_argument(parameters[0], 1))),
+            ("two", Some(create_resolved_argument(parameters[1], 2))),
+            ("three", Some(create_resolved_argument(parameters[2], 3))),
         ];
 
-        assert_eq!(Ok(expected), params);
+        assert_eq!(resolved_arguments, expected);
     }
 }

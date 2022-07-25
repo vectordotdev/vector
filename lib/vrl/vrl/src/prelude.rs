@@ -4,7 +4,7 @@ pub use compiler::{expression, kind, state};
 
 // commonly used top-level crate types
 pub use compiler::{
-    function::{closure, FunctionClosure},
+    function::{closure, FunctionClosure, ResolvedArgument},
     value::{Collection, Field, Index, IterItem, Kind},
     Context, Expression, ExpressionError, Function, Resolved, Target, TypeDef,
 };
