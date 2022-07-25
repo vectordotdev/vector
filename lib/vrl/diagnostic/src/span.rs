@@ -5,6 +5,12 @@ pub struct Span {
     end: usize,
 }
 
+impl std::fmt::Display for Span {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(formatter, "({}:{})", self.start, self.end)
+    }
+}
+
 impl Span {
     pub fn new(start: usize, end: usize) -> Self {
         Self { start, end }
