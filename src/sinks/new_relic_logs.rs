@@ -56,8 +56,8 @@ impl SinkBatchSettings for NewRelicLogsDefaultBatchSettings {
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 pub struct NewRelicLogsConfig {
-    /// A valid New Relic license key.
-    pub license_key: String,
+    /// A valid New Relic license key (if applicable).
+    pub license_key: Option<String>,
 
     /// A valid New Relic insert key (if applicable).
     pub insert_key: Option<String>,
