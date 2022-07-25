@@ -159,6 +159,7 @@ struct PipelinesAuth<'a> {
 struct PipelinesStrFields<'a> {
     configuration_version_hash: &'a str,
     vector_version: &'a str,
+    hostname: &'a str,
 }
 
 /// Top-level struct representing the field structure for reporting a config to Datadog OP.
@@ -177,6 +178,7 @@ struct PipelinesData<'a> {
 struct PipelinesAttributes<'a> {
     config_hash: &'a str,
     vector_version: &'a str,
+    hostname: &'a str,
     config: &'a toml::value::Table,
 }
 
@@ -261,6 +263,7 @@ impl<'a> PipelinesVersionPayload<'a> {
                 attributes: PipelinesAttributes {
                     config_hash: fields.configuration_version_hash,
                     vector_version: fields.vector_version,
+                    hostname: fields.hostname,
                     config,
                 },
                 r#type: "pipelines_configuration_version",
@@ -622,6 +625,10 @@ pub(crate) fn report_configuration(
             opts,
         } = metadata;
 
+        // Get the machine hostname to avoid reporting the same configuration several time
+        // for a given instance of vector.
+        let hostname = crate::get_hostname().expect("Couldn't read the current hostname.");
+
         // Get the Vector version. This is reported to Pipelines along with a config hash.
         let vector_version = crate::get_version();
 
@@ -636,6 +643,7 @@ pub(crate) fn report_configuration(
         let fields = PipelinesStrFields {
             configuration_version_hash: &configuration_version_hash,
             vector_version: &vector_version,
+            hostname: &hostname,
         };
 
         // Set the Datadog authorization fields. There's an API and app key, to allow read/write
@@ -821,6 +829,7 @@ mod test {
     const fn get_pipelines_fields() -> PipelinesStrFields<'static> {
         PipelinesStrFields {
             configuration_version_hash: "configuration_version_hash",
+            hostname: "hostname",
             vector_version: "vector_version",
         }
     }
