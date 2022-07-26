@@ -34,6 +34,8 @@ pub mod heroku_logs;
 pub mod host_metrics;
 #[cfg(feature = "sources-http")]
 pub mod http;
+#[cfg(feature = "sources-http_scrape")]
+pub mod http_scrape;
 #[cfg(feature = "sources-internal_logs")]
 pub mod internal_logs;
 #[cfg(feature = "sources-internal_metrics")]
@@ -161,6 +163,10 @@ pub enum Sources {
     /// HTTP.
     #[cfg(feature = "sources-http")]
     Http(#[configurable(derived)] http::SimpleHttpConfig),
+
+    /// HTTP Scrape.
+    #[cfg(feature = "sources-http_scrape")]
+    HttpScrape(#[configurable(derived)] http_scrape::HttpScrapeConfig),
 
     /// Internal Logs.
     #[cfg(feature = "sources-internal_logs")]

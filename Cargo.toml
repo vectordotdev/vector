@@ -449,6 +449,7 @@ sources-logs = [
   "sources-gcp_pubsub",
   "sources-heroku_logs",
   "sources-http",
+  "sources-http_scrape",
   "sources-internal_logs",
   "sources-journald",
   "sources-kafka",
@@ -494,6 +495,7 @@ sources-gcp_pubsub = ["gcp", "dep:h2", "dep:prost-types", "protobuf-build", "dep
 sources-heroku_logs = ["sources-utils-http", "sources-utils-http-query", "sources-http"]
 sources-host_metrics = ["dep:heim"]
 sources-http = ["sources-utils-http", "sources-utils-http-query"]
+sources-http_scrape = ["sources-utils-http", "sources-utils-http-query"]
 sources-internal_logs = []
 sources-internal_metrics = []
 sources-journald = []
