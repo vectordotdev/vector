@@ -289,7 +289,6 @@ mod test {
                               patterns: vec!["(%{TIMESTAMP_ISO8601:timestamp}|%{LOGLEVEL:level})"]],
             want: Ok(Value::from(btreemap! {
                 "timestamp" => "2020-10-02T23:22:12.223222Z",
-                "level" => "",
             })),
             tdef: TypeDef::object(Collection::any()).fallible(),
         }
