@@ -278,20 +278,14 @@ impl SourceConfig for DemoLogsConfig {
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        // There is a global and per-source `log_namespace` config. The source config overrides the global setting,
+        // and is merged here.
         let log_namespace = global_log_namespace.merge(self.log_namespace);
 
-        let schema_definition = match log_namespace {
-            LogNamespace::Legacy => self
-                .decoding
-                .schema_definition(log_namespace)
-                .try_with_field(log_schema().source_type_key(), Kind::bytes(), None)
-                .try_with_field(log_schema().timestamp_key(), Kind::timestamp(), None),
-            LogNamespace::Vector => self
-                .decoding
-                .schema_definition(log_namespace)
-                .with_metadata_field("vector.source_type", Kind::bytes())
-                .with_metadata_field("vector.ingest_timestamp", Kind::timestamp()),
-        };
+        let schema_definition = self
+            .decoding
+            .schema_definition(log_namespace)
+            .with_standard_vector_source_metadata();
 
         vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
     }
