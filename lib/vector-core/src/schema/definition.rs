@@ -160,7 +160,7 @@ impl Definition {
 
     /// This should be used wherever `LogNamespace::insert_source_metadata' is used to insert metadata.
     /// This automatically detects which log namespaces are used, and also automatically
-    /// determines if there are possible conflicts for field names from the selected decoder.
+    /// determines if there are possible conflicts from existing field names (usually from the selected decoder).
     pub fn with_source_metadata<'a>(
         self,
         source_name: &'a str,
@@ -174,7 +174,7 @@ impl Definition {
 
     /// This should be used wherever `LogNamespace::insert_vector_metadata' is used to insert metadata.
     /// This automatically detects which log namespaces are used, and also automatically
-    /// determines if there are possible conflicts for field names from the selected decoder.
+    /// determines if there are possible conflicts from existing field names (usually from the selected decoder).
     pub fn with_vector_metadata<'a>(
         self,
         path: impl Into<LookupBuf>,
@@ -254,9 +254,6 @@ impl Definition {
 
     /// Add type information for an event field.
     /// This inserts type information similar to `LogEvent::try_insert`.
-    ///
-    /// # Panics
-    /// - If the path is not root, and the definition does not allow the type to be an object.
     #[must_use]
     pub fn try_with_field(
         self,
