@@ -17,7 +17,7 @@ enum KafkaError {
 #[derive(Clone, Copy, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(rename_all = "lowercase")]
-pub(crate) enum KafkaCompression {
+pub enum KafkaCompression {
     /// No compression.
     #[derivative(Default)]
     None,
@@ -38,7 +38,7 @@ pub(crate) enum KafkaCompression {
 /// Kafka authentication configuration.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
-pub(crate) struct KafkaAuthConfig {
+pub struct KafkaAuthConfig {
     #[configurable(derived)]
     pub(crate) sasl: Option<KafkaSaslConfig>,
 
@@ -49,7 +49,7 @@ pub(crate) struct KafkaAuthConfig {
 /// Configuration for SASL authentication when interacting with Kafka.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
-pub(crate) struct KafkaSaslConfig {
+pub struct KafkaSaslConfig {
     /// Enables SASL authentication.
     ///
     /// Only `PLAIN` and `SCRAM`-based mechanisms are supported when configuring SASL authentication via `sasl.*`. For

@@ -8,11 +8,11 @@ use std::{
 use async_trait::async_trait;
 use bytes::BytesMut;
 use futures::{future::BoxFuture, ready, stream::BoxStream, FutureExt, StreamExt};
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::{net::UdpSocket, sync::oneshot, time::sleep};
 use tokio_util::codec::Encoder;
 use vector_common::internal_event::BytesSent;
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use super::SinkBuildError;
@@ -47,9 +47,18 @@ pub enum UdpError {
     ServiceChannelRecvError { source: oneshot::error::RecvError },
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+/// A UDP sink.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct UdpSinkConfig {
+    /// The address to connect to.
+    ///
+    /// The address _must_ include a port.
     address: String,
+
+    /// The size, in bytes, of the socket's send buffer.
+    ///
+    /// If set, the value of the setting is passed via the `SO_SNDBUF` option.
     send_buffer_bytes: Option<usize>,
 }
 

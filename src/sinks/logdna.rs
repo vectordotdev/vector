@@ -29,7 +29,7 @@ const PATH: &str = "/logs/ingest";
 /// Configuration for the `logdna` sink.
 #[configurable_component(sink)]
 #[derive(Clone, Debug)]
-pub(super) struct LogdnaConfig {
+pub struct LogdnaConfig {
     /// The Ingestion API key.
     api_key: String,
 

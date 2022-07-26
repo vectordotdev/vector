@@ -23,7 +23,7 @@ pub(crate) const QUEUED_MIN_MESSAGES: u64 = 100000;
 #[configurable_component(sink)]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct KafkaSinkConfig {
+pub struct KafkaSinkConfig {
     /// A comma-separated list of the initial Kafka brokers to connect to.
     ///
     /// Each value must be in the form of `<host>` or `<host>:<port>`, and separated by a comma.

@@ -244,10 +244,11 @@ pub enum Sinks {
     #[cfg(feature = "sinks-logdna")]
     Logdna(#[configurable(derived)] logdna::LogdnaConfig),
 
+    /*
     /// Loki.
     #[cfg(feature = "sinks-loki")]
     Loki(#[configurable(derived)] loki::LokiConfig),
-
+    */
     /// NATS.
     #[cfg(feature = "sinks-nats")]
     Nats(#[configurable(derived)] self::nats::NatsSinkConfig),
@@ -264,10 +265,11 @@ pub enum Sinks {
     #[cfg(feature = "sinks-papertrail")]
     Papertrail(#[configurable(derived)] papertrail::PapertrailConfig),
 
+    /*
     /// Prometheus Exporter.
     #[cfg(feature = "sinks-prometheus")]
     PrometheusExporter(#[configurable(derived)] prometheus::exporter::PrometheusExporterConfig),
-
+    */
     /// Prometheus Remote Write.
     #[cfg(feature = "sinks-prometheus")]
     PrometheusRemoteWrite(#[configurable(derived)] prometheus::remote_write::RemoteWriteConfig),
