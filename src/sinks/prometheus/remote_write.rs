@@ -54,7 +54,7 @@ pub struct RemoteWriteConfig {
     /// The default namespace for any metrics sent.
     ///
     /// This namespace is only used if a metric has no existing namespace. When a namespace is
-    /// present, it is used as a prefix to the metric name, and separated with a period (`.`).
+    /// present, it is used as a prefix to the metric name, and separated with an underscore (`_`).
     ///
     /// It should follow the Prometheus [naming conventions][prom_naming_docs].
     ///

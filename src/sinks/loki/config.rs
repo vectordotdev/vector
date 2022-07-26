@@ -114,8 +114,9 @@ pub enum OutOfOrderAction {
 
     /// Accept the event.
     ///
-    /// This sends the event to Loki normally, and requires Loki 2.4.0 or newer. Older versions do
-    /// not support out-of-order events and will throw an error when
+    /// The event is not dropped and is sent without modification.
+    ///
+    /// Requires Loki 2.4.0 or newer.
     Accept,
 }
 
