@@ -10,7 +10,6 @@ use snafu::Snafu;
 use std::task::Poll;
 use tokio::time::{self, Duration};
 use tokio_util::codec::FramedRead;
-use value::Kind;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
@@ -55,9 +54,9 @@ pub struct DemoLogsConfig {
     #[derivative(Default(value = "default_decoding()"))]
     pub decoding: DeserializerConfig,
 
-    /// The namespace to use for logs. This overrides the global settings
+    /// The namespace to use for logs. This overrides the global setting
     #[serde(default)]
-    log_namespace: Option<bool>,
+    pub log_namespace: Option<bool>,
 }
 
 const fn default_interval() -> f64 {
