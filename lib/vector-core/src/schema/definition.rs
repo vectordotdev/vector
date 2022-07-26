@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::config::LogNamespace;
+use crate::config::{log_schema, LogNamespace};
 use lookup::{LookupBuf, SegmentBuf};
 use value::{kind::Collection, Kind};
 
@@ -152,43 +152,56 @@ impl Definition {
         &self.log_namespaces
     }
 
-    /// Adds the "source_type" and "ingest_timestamp" metadata fields, which are added to every Vector source.
+    /// Adds the `source_type` and `ingest_timestamp` metadata fields, which are added to every Vector source.
+    #[must_use]
     pub fn with_standard_vector_source_metadata(self) -> Self {
-        self.with_vector_metadata("source_type", Kind::bytes(), None)
-            .with_vector_metadata("ingest_timestamp", Kind::timestamp(), None)
+        self.with_vector_metadata(
+            LookupBuf::from_str(log_schema().source_type_key()).expect("valid source_type key"),
+            "source_type",
+            Kind::bytes(),
+            None,
+        )
+        .with_vector_metadata(
+            LookupBuf::from_str(log_schema().timestamp_key()).expect("valid timestamp key"),
+            "ingest_timestamp",
+            Kind::timestamp(),
+            None,
+        )
     }
 
-    /// This should be used wherever `LogNamespace::insert_source_metadata' is used to insert metadata.
+    /// This should be used wherever `LogNamespace::insert_source_metadata` is used to insert metadata.
     /// This automatically detects which log namespaces are used, and also automatically
     /// determines if there are possible conflicts from existing field names (usually from the selected decoder).
-    pub fn with_source_metadata<'a>(
+    #[must_use]
+    pub fn with_source_metadata(
         self,
-        source_name: &'a str,
-        path: impl Into<LookupBuf>,
+        source_name: &str,
+        legacy_path: impl Into<LookupBuf>,
+        vector_path: impl Into<LookupBuf>,
         kind: Kind,
         meaning: Option<&str>,
     ) -> Self {
-        let path = path.into();
-        self.with_namespaced_metadata(source_name, path.clone(), path, kind, meaning)
+        self.with_namespaced_metadata(source_name, legacy_path, vector_path, kind, meaning)
     }
 
-    /// This should be used wherever `LogNamespace::insert_vector_metadata' is used to insert metadata.
+    /// This should be used wherever `LogNamespace::insert_vector_metadata` is used to insert metadata.
     /// This automatically detects which log namespaces are used, and also automatically
     /// determines if there are possible conflicts from existing field names (usually from the selected decoder).
-    pub fn with_vector_metadata<'a>(
+    #[must_use]
+    pub fn with_vector_metadata(
         self,
-        path: impl Into<LookupBuf>,
+        legacy_path: impl Into<LookupBuf>,
+        vector_path: impl Into<LookupBuf>,
         kind: Kind,
         meaning: Option<&str>,
     ) -> Self {
-        let path = path.into();
-        self.with_namespaced_metadata("vector", path.clone(), path, kind, meaning)
+        self.with_namespaced_metadata("vector", legacy_path, vector_path, kind, meaning)
     }
 
     /// This generalizes the `LogNamespace::insert_*` methods for type definitions.
-    fn with_namespaced_metadata<'a>(
+    fn with_namespaced_metadata(
         self,
-        prefix: &'a str,
+        prefix: &str,
         legacy_path: impl Into<LookupBuf>,
         vector_path: impl Into<LookupBuf>,
         kind: Kind,
@@ -256,7 +269,7 @@ impl Definition {
     /// This inserts type information similar to `LogEvent::try_insert`.
     #[must_use]
     pub fn try_with_field(
-        self,
+        mut self,
         path: impl Into<LookupBuf>,
         kind: Kind,
         meaning: Option<&str>,
@@ -267,14 +280,18 @@ impl Definition {
 
         if existing_type.is_undefined() {
             // Guaranteed to never be set, so the insertion will always succeed.
-            self.with_field(path, kind, meaning)
+            self.with_field(path.clone(), kind, meaning)
         } else if !existing_type.contains_undefined() {
             // Guaranteed to always be set (or is never), so the insertion will always fail.
             self
         } else {
             // Not sure if the insertion will be successful. The type definition should contain both
             // possibilities. The meaning is not set, since it can't be relied on.
-            let success_definition = self.clone().with_field(path, kind, None);
+
+            let success_definition = self.clone().with_field(path.clone(), kind, None);
+            // If the existing type contains `undefined`, the new type will always be used, so remove it.
+            self.event_kind
+                .set_at_path(&path, existing_type.without_undefined());
             self.merge(success_definition)
         }
     }

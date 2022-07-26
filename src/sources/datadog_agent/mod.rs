@@ -140,6 +140,7 @@ impl SourceConfig for DatadogAgentConfig {
             .or_else(|| cx.schema_definitions.get(&None))
             .expect("registered log schema required")
             .clone();
+
         let metrics_schema_definition = cx
             .schema_definitions
             .get(&Some(METRICS.to_owned()))
@@ -193,18 +194,49 @@ impl SourceConfig for DatadogAgentConfig {
         let definition = self
             .decoding
             .schema_definition(global_log_namespace.merge(self.log_namespace))
-            .with_source_metadata(source_name, "message", Kind::bytes(), Some("message"))
-            .with_source_metadata(source_name, "status", Kind::bytes(), Some("severity"))
             .with_source_metadata(
                 source_name,
+                "message",
+                "message",
+                Kind::bytes(),
+                Some("message"),
+            )
+            .with_source_metadata(
+                source_name,
+                "status",
+                "status",
+                Kind::bytes(),
+                Some("severity"),
+            )
+            .with_source_metadata(
+                source_name,
+                "timestamp",
                 "timestamp",
                 Kind::timestamp(),
                 Some("timestamp"),
             )
-            .with_source_metadata(source_name, "hostname", Kind::bytes(), Some("host"))
-            .with_source_metadata(source_name, "service", Kind::bytes(), Some("service"))
-            .with_source_metadata(source_name, "ddsource", Kind::bytes(), Some("source"))
-            .with_source_metadata(source_name, "ddtags", Kind::bytes(), Some("tags"))
+            .with_source_metadata(
+                source_name,
+                "hostname",
+                "hostname",
+                Kind::bytes(),
+                Some("host"),
+            )
+            .with_source_metadata(
+                source_name,
+                "service",
+                "service",
+                Kind::bytes(),
+                Some("service"),
+            )
+            .with_source_metadata(
+                source_name,
+                "ddsource",
+                "ddsource",
+                Kind::bytes(),
+                Some("source"),
+            )
+            .with_source_metadata(source_name, "ddtags", "ddtags", Kind::bytes(), Some("tags"))
             .with_standard_vector_source_metadata();
 
         if self.multiple_outputs {

@@ -31,16 +31,15 @@ impl JsonDeserializerConfig {
     /// The schema produced by the deserializer.
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
         match log_namespace {
-            LogNamespace::Legacy => {
-                schema::Definition::new_with_default_metadata(Kind::json(), [log_namespace])
-                    .try_with_field(
-                        log_schema().timestamp_key(),
-                        // The JSON decoder will try to insert a new `timestamp`-type value into the
-                        // "timestamp_key" field, but only if that field doesn't already exist.
-                        Kind::json().or_timestamp(),
-                        Some("timestamp"),
-                    )
-            }
+            LogNamespace::Legacy => schema::Definition::empty_legacy_namespace()
+                .unknown_fields(Kind::json())
+                .try_with_field(
+                    log_schema().timestamp_key(),
+                    // The JSON decoder will try to insert a new `timestamp`-type value into the
+                    // "timestamp_key" field, but only if that field doesn't already exist.
+                    Kind::json().or_timestamp(),
+                    Some("timestamp"),
+                ),
             LogNamespace::Vector => {
                 schema::Definition::new_with_default_metadata(Kind::json(), [log_namespace])
             }

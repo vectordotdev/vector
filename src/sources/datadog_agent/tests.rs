@@ -1302,7 +1302,7 @@ fn test_config_outputs() {
             multiple_outputs,
             want,
         },
-    ) in HashMap::from([
+    ) in [
         (
             "default decoding",
             TestCase {
@@ -1318,7 +1318,8 @@ fn test_config_outputs() {
                             .with_field("hostname", Kind::bytes(), Some("host"))
                             .with_field("service", Kind::bytes(), Some("service"))
                             .with_field("ddsource", Kind::bytes(), Some("source"))
-                            .with_field("ddtags", Kind::bytes(), Some("tags")),
+                            .with_field("ddtags", Kind::bytes(), Some("tags"))
+                            .with_field("source_type", Kind::bytes(), None),
                     ),
                 )]),
             },
@@ -1338,7 +1339,8 @@ fn test_config_outputs() {
                             .with_field("hostname", Kind::bytes(), Some("host"))
                             .with_field("service", Kind::bytes(), Some("service"))
                             .with_field("ddsource", Kind::bytes(), Some("source"))
-                            .with_field("ddtags", Kind::bytes(), Some("tags")),
+                            .with_field("ddtags", Kind::bytes(), Some("tags"))
+                            .with_field("source_type", Kind::bytes(), None),
                     ),
                 )]),
             },
@@ -1359,7 +1361,8 @@ fn test_config_outputs() {
                                 .with_field("hostname", Kind::bytes(), Some("host"))
                                 .with_field("service", Kind::bytes(), Some("service"))
                                 .with_field("ddsource", Kind::bytes(), Some("source"))
-                                .with_field("ddtags", Kind::bytes(), Some("tags")),
+                                .with_field("ddtags", Kind::bytes(), Some("tags"))
+                                .with_field("source_type", Kind::bytes(), None),
                         ),
                     ),
                     (Some(METRICS), None),
@@ -1376,7 +1379,14 @@ fn test_config_outputs() {
                     None,
                     Some(
                         schema::Definition::empty_legacy_namespace()
-                            .with_field("timestamp", Kind::json().or_timestamp(), Some("timestamp"))
+                            .with_field("timestamp", Kind::json().or_timestamp(), None)
+                            .with_field("source_type", Kind::json(), None)
+                            .with_field("ddsource", Kind::json(), None)
+                            .with_field("ddtags", Kind::json(), None)
+                            .with_field("hostname", Kind::json(), None)
+                            .with_field("message", Kind::json(), None)
+                            .with_field("service", Kind::json(), None)
+                            .with_field("status", Kind::json(), None)
                             .unknown_fields(Kind::json()),
                     ),
                 )]),
@@ -1392,11 +1402,14 @@ fn test_config_outputs() {
                         Some(LOGS),
                         Some(
                             schema::Definition::empty_legacy_namespace()
-                                .with_field(
-                                    "timestamp",
-                                    Kind::json().or_timestamp(),
-                                    Some("timestamp"),
-                                )
+                                .with_field("timestamp", Kind::json().or_timestamp(), None)
+                                .with_field("source_type", Kind::json(), None)
+                                .with_field("ddsource", Kind::json(), None)
+                                .with_field("ddtags", Kind::json(), None)
+                                .with_field("hostname", Kind::json(), None)
+                                .with_field("message", Kind::json(), None)
+                                .with_field("service", Kind::json(), None)
+                                .with_field("status", Kind::json(), None)
                                 .unknown_fields(Kind::json()),
                         ),
                     ),
@@ -1416,14 +1429,39 @@ fn test_config_outputs() {
                     Some(
                         schema::Definition::empty_legacy_namespace()
                             .with_field("message", Kind::bytes(), Some("message"))
-                            .optional_field("timestamp", Kind::timestamp(), Some("timestamp"))
-                            .optional_field("hostname", Kind::bytes(), None)
+                            .with_field("timestamp", Kind::timestamp(), Some("timestamp"))
+                            .with_field("hostname", Kind::bytes(), None)
                             .optional_field("severity", Kind::bytes(), Some("severity"))
                             .optional_field("facility", Kind::bytes(), None)
                             .optional_field("version", Kind::integer(), None)
                             .optional_field("appname", Kind::bytes(), None)
                             .optional_field("msgid", Kind::bytes(), None)
                             .optional_field("procid", Kind::integer().or_bytes(), None)
+                            .with_field(
+                                "source_type",
+                                Kind::bytes().or_object(Collection::from_unknown(Kind::bytes())),
+                                None,
+                            )
+                            .with_field(
+                                "ddsource",
+                                Kind::bytes().or_object(Collection::from_unknown(Kind::bytes())),
+                                None,
+                            )
+                            .with_field(
+                                "ddtags",
+                                Kind::bytes().or_object(Collection::from_unknown(Kind::bytes())),
+                                None,
+                            )
+                            .with_field(
+                                "service",
+                                Kind::bytes().or_object(Collection::from_unknown(Kind::bytes())),
+                                None,
+                            )
+                            .with_field(
+                                "status",
+                                Kind::bytes().or_object(Collection::from_unknown(Kind::bytes())),
+                                None,
+                            )
                             .unknown_fields(Kind::object(value::kind::Collection::from_unknown(
                                 Kind::bytes(),
                             ))),
@@ -1443,14 +1481,44 @@ fn test_config_outputs() {
                         Some(
                             schema::Definition::empty_legacy_namespace()
                                 .with_field("message", Kind::bytes(), Some("message"))
-                                .optional_field("timestamp", Kind::timestamp(), Some("timestamp"))
-                                .optional_field("hostname", Kind::bytes(), None)
+                                .with_field("timestamp", Kind::timestamp(), Some("timestamp"))
+                                .with_field("hostname", Kind::bytes(), None)
                                 .optional_field("severity", Kind::bytes(), Some("severity"))
                                 .optional_field("facility", Kind::bytes(), None)
                                 .optional_field("version", Kind::integer(), None)
                                 .optional_field("appname", Kind::bytes(), None)
                                 .optional_field("msgid", Kind::bytes(), None)
                                 .optional_field("procid", Kind::integer().or_bytes(), None)
+                                .with_field(
+                                    "source_type",
+                                    Kind::bytes()
+                                        .or_object(Collection::from_unknown(Kind::bytes())),
+                                    None,
+                                )
+                                .with_field(
+                                    "ddsource",
+                                    Kind::bytes()
+                                        .or_object(Collection::from_unknown(Kind::bytes())),
+                                    None,
+                                )
+                                .with_field(
+                                    "ddtags",
+                                    Kind::bytes()
+                                        .or_object(Collection::from_unknown(Kind::bytes())),
+                                    None,
+                                )
+                                .with_field(
+                                    "service",
+                                    Kind::bytes()
+                                        .or_object(Collection::from_unknown(Kind::bytes())),
+                                    None,
+                                )
+                                .with_field(
+                                    "status",
+                                    Kind::bytes()
+                                        .or_object(Collection::from_unknown(Kind::bytes())),
+                                    None,
+                                )
                                 .unknown_fields(Kind::object(
                                     value::kind::Collection::from_unknown(Kind::bytes()),
                                 )),
@@ -1461,7 +1529,7 @@ fn test_config_outputs() {
                 ]),
             },
         ),
-    ]) {
+    ] {
         let config = DatadogAgentConfig {
             address: "0.0.0.0:8080".parse().unwrap(),
             tls: None,
@@ -1694,7 +1762,7 @@ async fn decode_series_endpoint_v2() {
 
 #[test]
 fn test_output_schema_definition_json_vector_namespace() {
-    let definition = toml::from_str::<DatadogAgentConfig>(&indoc! { r#"
+    let definition = toml::from_str::<DatadogAgentConfig>(indoc! { r#"
             address = "0.0.0.0:8012"
             decoding.codec = "json"
         "#})
@@ -1748,7 +1816,7 @@ fn test_output_schema_definition_json_vector_namespace() {
 
 #[test]
 fn test_output_schema_definition_bytes_vector_namespace() {
-    let definition = toml::from_str::<DatadogAgentConfig>(&indoc! { r#"
+    let definition = toml::from_str::<DatadogAgentConfig>(indoc! { r#"
             address = "0.0.0.0:8012"
             decoding.codec = "bytes"
         "#})
@@ -1803,7 +1871,7 @@ fn test_output_schema_definition_bytes_vector_namespace() {
 
 #[test]
 fn test_output_schema_definition_json_legacy_namespace() {
-    let definition = toml::from_str::<DatadogAgentConfig>(&indoc! { r#"
+    let definition = toml::from_str::<DatadogAgentConfig>(indoc! { r#"
             address = "0.0.0.0:8012"
             decoding.codec = "json"
         "#})
@@ -1817,13 +1885,19 @@ fn test_output_schema_definition_json_legacy_namespace() {
         definition,
         Definition::new_with_default_metadata(Kind::json(), [LogNamespace::Legacy])
             .with_field("timestamp", Kind::json().or_timestamp(), None)
-            .with_field("ingest_timestamp", Kind::json().or_timestamp(), None)
+            .with_field("ddsource", Kind::json(), None)
+            .with_field("ddtags", Kind::json(), None)
+            .with_field("hostname", Kind::json(), None)
+            .with_field("message", Kind::json(), None)
+            .with_field("service", Kind::json(), None)
+            .with_field("source_type", Kind::json(), None)
+            .with_field("status", Kind::json(), None)
     )
 }
 
 #[test]
 fn test_output_schema_definition_bytes_legacy_namespace() {
-    let definition = toml::from_str::<DatadogAgentConfig>(&indoc! { r#"
+    let definition = toml::from_str::<DatadogAgentConfig>(indoc! { r#"
             address = "0.0.0.0:8012"
             decoding.codec = "bytes"
         "#})
@@ -1842,7 +1916,6 @@ fn test_output_schema_definition_bytes_legacy_namespace() {
         .with_field("ddsource", Kind::bytes(), Some("source"))
         .with_field("ddtags", Kind::bytes(), Some("tags"))
         .with_field("hostname", Kind::bytes(), Some("host"))
-        .with_field("ingest_timestamp", Kind::timestamp(), None)
         .with_field("message", Kind::bytes(), Some("message"))
         .with_field("service", Kind::bytes(), Some("service"))
         .with_field("source_type", Kind::bytes(), None)
