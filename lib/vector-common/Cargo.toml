@@ -45,7 +45,7 @@ tokenize = [
 [dependencies]
 async-stream = "0.3.3"
 bytes = { version = "1.2.0", default-features = false, optional = true }
-chrono-tz = "0.6.1"
+chrono-tz = "0.6.2"
 chrono = { version = "0.4", default-features = false, optional = true, features = ["clock"] }
 crossbeam-utils = { version = "0.8.10", default-features = false }
 derivative = "2.1.3"
