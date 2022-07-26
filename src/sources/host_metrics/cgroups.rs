@@ -139,7 +139,7 @@ impl<'a> CGroupRecurser<'a> {
         self.recurse(cgroup, 1).await;
     }
 
-    fn recurse<'b>(&'b mut self, cgroup: CGroup, level: usize) -> BoxFuture<'b, ()> {
+    fn recurse(&mut self, cgroup: CGroup, level: usize) -> BoxFuture<'_, ()> {
         Box::pin(async move {
             let tags = cgroup.tags();
 
@@ -274,7 +274,6 @@ impl CGroupRoot {
             let hybrid_test_file = join_path(&hybrid_root, CGROUP_CONTROLLERS);
             let modern_test_file = join_path(&base_dir, CGROUP_CONTROLLERS);
             let cpu_dir = join_path(&base_dir, "cpu");
-            let base_dir = base_dir.clone();
             if is_file(&hybrid_test_file) {
                 debug!(
                     message = "Detected hybrid cgroup base directory.",
@@ -352,7 +351,7 @@ impl CGroup {
                 Ok(Some(filename))
             }
             Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
-            Err(source) => Err(CGroupsError::Opening { source, filename }.into()),
+            Err(source) => Err(CGroupsError::Opening { source, filename }),
         }
     }
 
@@ -598,7 +597,7 @@ mod tests {
         "user.slice/user-1000.slice/session-40.scope",
     ];
 
-    const GROUPS: [&str; 5] = ["/", &SUBDIRS[1], &SUBDIRS[2], &SUBDIRS[3], &SUBDIRS[4]];
+    const GROUPS: [&str; 5] = ["/", SUBDIRS[1], SUBDIRS[2], SUBDIRS[3], SUBDIRS[4]];
 
     struct Setup(TempDir, ThreadRng);
 
@@ -698,7 +697,7 @@ mod tests {
                 .truncate(true)
                 .open(path)
                 .unwrap();
-            file.write(contents.as_bytes()).unwrap();
+            file.write_all(contents.as_bytes()).unwrap();
         }
     }
 
