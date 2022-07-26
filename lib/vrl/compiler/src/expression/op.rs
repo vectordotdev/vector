@@ -130,10 +130,10 @@ impl Expression for Op {
 
         match self.opcode {
             // ok/err ?? ok
-            Err if rhs_def.is_infallible() => lhs_def.merge_deep(rhs_def).infallible(),
+            Err if rhs_def.is_infallible() => lhs_def.union(rhs_def).infallible(),
 
             // ... ?? ...
-            Err => lhs_def.merge_deep(rhs_def),
+            Err => lhs_def.union(rhs_def),
 
             // null || ...
             Or if lhs_def.is_null() => rhs_def,
@@ -149,10 +149,10 @@ impl Expression for Op {
                 // we will be taking the rhs and only the rhs type_def will then be relevant.
                 lhs_def.remove_null();
 
-                lhs_def.merge_deep(rhs_def)
+                lhs_def.union(rhs_def)
             }
 
-            Or => lhs_def.merge_deep(rhs_def),
+            Or => lhs_def.union(rhs_def),
 
             // ... | ...
             Merge => lhs_def.merge_overwrite(rhs_def),
@@ -165,19 +165,19 @@ impl Expression for Op {
             // ... && ...
             And => lhs_def
                 .fallible_unless(K::null().or_boolean())
-                .merge_deep(rhs_def.fallible_unless(K::null().or_boolean()))
+                .union(rhs_def.fallible_unless(K::null().or_boolean()))
                 .with_kind(K::boolean()),
 
             // ... == ...
             // ... != ...
-            Eq | Ne => lhs_def.merge_deep(rhs_def).with_kind(K::boolean()),
+            Eq | Ne => lhs_def.union(rhs_def).with_kind(K::boolean()),
 
             // "b" >  "a"
             // "a" >= "a"
             // "a" <  "b"
             // "b" <= "b"
             Gt | Ge | Lt | Le if lhs_def.is_bytes() && rhs_def.is_bytes() => {
-                lhs_def.merge_deep(rhs_def).with_kind(K::boolean())
+                lhs_def.union(rhs_def).with_kind(K::boolean())
             }
 
             // ... >  ...
@@ -186,7 +186,7 @@ impl Expression for Op {
             // ... <= ...
             Gt | Ge | Lt | Le => lhs_def
                 .fallible_unless(K::integer().or_float())
-                .merge_deep(rhs_def.fallible_unless(K::integer().or_float()))
+                .union(rhs_def.fallible_unless(K::integer().or_float()))
                 .with_kind(K::boolean()),
 
             // ... / ...
@@ -223,7 +223,7 @@ impl Expression for Op {
             // ... + "bar"
             Add if lhs_def.is_bytes() || rhs_def.is_bytes() => lhs_def
                 .fallible_unless(K::bytes().or_null())
-                .merge_deep(rhs_def.fallible_unless(K::bytes().or_null()))
+                .union(rhs_def.fallible_unless(K::bytes().or_null()))
                 .with_kind(K::bytes()),
 
             // ... + 1.0
@@ -236,7 +236,7 @@ impl Expression for Op {
             // 1.0 % ...
             Add | Sub | Mul if lhs_def.is_float() || rhs_def.is_float() => lhs_def
                 .fallible_unless(K::integer().or_float())
-                .merge_deep(rhs_def.fallible_unless(K::integer().or_float()))
+                .union(rhs_def.fallible_unless(K::integer().or_float()))
                 .with_kind(K::float()),
 
             // 1 + 1
@@ -244,29 +244,29 @@ impl Expression for Op {
             // 1 * 1
             // 1 % 1
             Add | Sub | Mul if lhs_def.is_integer() && rhs_def.is_integer() => {
-                lhs_def.merge_deep(rhs_def).with_kind(K::integer())
+                lhs_def.union(rhs_def).with_kind(K::integer())
             }
 
             // "bar" * 1
             Mul if lhs_def.is_bytes() && rhs_def.is_integer() => {
-                lhs_def.merge_deep(rhs_def).with_kind(K::bytes())
+                lhs_def.union(rhs_def).with_kind(K::bytes())
             }
 
             // 1 * "bar"
             Mul if lhs_def.is_integer() && rhs_def.is_bytes() => {
-                lhs_def.merge_deep(rhs_def).with_kind(K::bytes())
+                lhs_def.union(rhs_def).with_kind(K::bytes())
             }
 
             // ... + ...
             // ... * ...
             Add | Mul => lhs_def
-                .merge_deep(rhs_def)
+                .union(rhs_def)
                 .fallible()
                 .with_kind(K::bytes().or_integer().or_float()),
 
             // ... - ...
             Sub => lhs_def
-                .merge_deep(rhs_def)
+                .union(rhs_def)
                 .fallible()
                 .with_kind(K::integer().or_float()),
         }

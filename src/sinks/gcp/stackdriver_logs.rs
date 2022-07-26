@@ -4,9 +4,9 @@ use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{Request, Uri};
 use hyper::Body;
-use serde::{Deserialize, Serialize};
 use serde_json::{json, map};
 use snafu::Snafu;
+use vector_config::configurable_component;
 
 use crate::{
     codecs::Transformer,
@@ -33,7 +33,9 @@ enum HealthcheckError {
     NotFound,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+/// Configuration for the `gcp_stackdriver_logs` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct StackdriverConfig {
     #[serde(skip, default = "default_endpoint")]
@@ -41,26 +43,53 @@ pub struct StackdriverConfig {
 
     #[serde(flatten)]
     pub log_name: StackdriverLogName,
+
+    /// The log ID to which to publish logs.
+    ///
+    /// This is a name you create to identify this log stream.
+    #[configurable(metadata(templateable))]
     pub log_id: Template,
 
+    /// The monitored resource to associate the logs with.
     pub resource: StackdriverResource,
+
+    /// The field of the log event from which to take the outgoing log’s `severity` field.
+    ///
+    /// The named field is removed from the log event if present, and must be either an integer
+    /// between 0 and 800 or a string containing one of the [severity level names][sev_names] (case
+    /// is ignored) or a common prefix such as `err`.
+    ///
+    /// If no severity key is specified, the severity of outgoing records is set to 0 (`DEFAULT`).
+    ///
+    /// See the [GCP Stackdriver Logging LogSeverity description][logsev_docs] for more details on
+    /// the value of the `severity` field.
+    ///
+    /// [sev_names]: https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#logseverity
+    /// [logsev_docs]: https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#logseverity
     pub severity_key: Option<String>,
 
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
+
+    #[configurable(derived)]
     #[serde(
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub encoding: Transformer,
 
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
+    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -84,24 +113,61 @@ struct StackdriverSink {
 // 10MB limit for entries.write: https://cloud.google.com/logging/quotas#api-limits
 const MAX_BATCH_PAYLOAD_SIZE: usize = 10_000_000;
 
-#[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
+/// Logging locations.
+#[configurable_component]
+#[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 pub enum StackdriverLogName {
+    /// The billing account ID to which to publish logs.
     #[serde(rename = "billing_account_id")]
-    BillingAccount(String),
+    BillingAccount(#[configurable(transparent)] String),
+
+    /// The folder ID to which to publish logs.
+    ///
+    /// See the [Google Cloud Platform folder documentation][folder_docs] for more details.
+    ///
+    /// [folder_docs]: https://cloud.google.com/resource-manager/docs/creating-managing-folders
     #[serde(rename = "folder_id")]
-    Folder(String),
+    Folder(#[configurable(transparent)] String),
+
+    /// The organization ID to which to publish logs.
+    ///
+    /// This would be the identifier assigned to your organization on Google Cloud Platform.
     #[serde(rename = "organization_id")]
-    Organization(String),
+    Organization(#[configurable(transparent)] String),
+
+    /// The project ID to which to publish logs.
+    ///
+    /// See the [Google Cloud Platform project management documentation][project_docs] for more details.
+    ///
+    /// [project_docs]: https://cloud.google.com/resource-manager/docs/creating-managing-projects
     #[derivative(Default)]
     #[serde(rename = "project_id")]
-    Project(String),
+    Project(#[configurable(transparent)] String),
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+/// A monitored resource.
+///
+/// Monitored resources in GCP allow associating logs and metrics specifically with native resources
+/// within Google Cloud Platform. This takes the form of a "type" field which identifies the
+/// resource, and a set of type-specific labels to uniquely identify a resource of that type.
+///
+/// See [Monitored resource types][mon_docs] for more information.
+///
+/// [mon_docs]: https://cloud.google.com/monitoring/api/resources
+// TODO: this type is specific to the stackdrivers log sink because it allows for template-able
+// label values, but we should consider replacing `sinks::gcp::GcpTypedResource` with this so both
+// the stackdriver metrics _and_ logs sink can have template-able label values, and less duplication
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
 pub struct StackdriverResource {
+    /// The monitored resource type.
+    ///
+    /// For example, the type of a Compute Engine VM instance is `gce_instance`.
     #[serde(rename = "type")]
     pub type_: String,
+
+    /// Type-specific labels.
     #[serde(flatten)]
     pub labels: HashMap<String, Template>,
 }

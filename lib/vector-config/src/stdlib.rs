@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     net::SocketAddr,
     num::{
         NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI8, NonZeroU16, NonZeroU32, NonZeroU64,
@@ -115,19 +115,48 @@ where
     }
 }
 
-impl<V> Configurable for HashMap<String, V>
+impl<V> Configurable for BTreeMap<String, V>
 where
     V: Configurable + Serialize,
 {
     fn is_optional() -> bool {
-        // A hashmap with required fields would be... an object.  So if you want that, make a struct
+        // A map with required fields would be... an object.  So if you want that, make a struct
         // instead, not a hashmap.
         true
     }
 
     fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<Self>) -> SchemaObject {
         // We explicitly do not pass anything from the override metadata, because there's nothing to
-        // reasonably pass: if `V` is referencable, using the description for `HashMap<String, V>`
+        // reasonably pass: if `V` is referenceable, using the description for `BTreeMap<String, V>`
+        // likely makes no sense, nor would a default make sense, and so on.
+        //
+        // We do, however, set `V` to be "transparent", which means that during schema finalization,
+        // we will relax the rules we enforce, such as needing a description, knowing that they'll
+        // be enforced on the field using `BTreeMap<String, V>` itself, where carrying that
+        // description forward to `V` might literally make no sense, such as when `V` is a primitive
+        // type like an integer or string.
+        let mut value_metadata = V::metadata();
+        value_metadata.set_transparent();
+
+        let mut schema = generate_map_schema(gen, value_metadata);
+        finalize_schema(gen, &mut schema, overrides);
+        schema
+    }
+}
+
+impl<V> Configurable for HashMap<String, V>
+where
+    V: Configurable + Serialize,
+{
+    fn is_optional() -> bool {
+        // A map with required fields would be... an object.  So if you want that, make a struct
+        // instead, not a hashmap.
+        true
+    }
+
+    fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<Self>) -> SchemaObject {
+        // We explicitly do not pass anything from the override metadata, because there's nothing to
+        // reasonably pass: if `V` is referenceable, using the description for `HashMap<String, V>`
         // likely makes no sense, nor would a default make sense, and so on.
         //
         // We do, however, set `V` to be "transparent", which means that during schema finalization,
@@ -150,7 +179,7 @@ where
 {
     fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<Self>) -> SchemaObject {
         // We explicitly do not pass anything from the override metadata, because there's nothing to reasonably pass: if
-        // `V` is referencable, using the description for `HashSet<V>` likely makes no sense, nor would a default make
+        // `V` is referenceable, using the description for `HashSet<V>` likely makes no sense, nor would a default make
         // sense, and so on.
         //
         // We do, however, set `V` to be "transparent", which means that during schema finalization, we will relax the
@@ -168,7 +197,7 @@ where
 
 // Additional types that do not map directly to scalars.
 impl Configurable for SocketAddr {
-    fn referencable_name() -> Option<&'static str> {
+    fn referenceable_name() -> Option<&'static str> {
         Some("stdlib::SocketAddr")
     }
 
@@ -187,7 +216,7 @@ impl Configurable for SocketAddr {
 }
 
 impl Configurable for PathBuf {
-    fn referencable_name() -> Option<&'static str> {
+    fn referenceable_name() -> Option<&'static str> {
         Some("stdlib::PathBuf")
     }
 

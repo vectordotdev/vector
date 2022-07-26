@@ -260,6 +260,113 @@ fn default_advanced_sink_endpoint() -> String {
     String::from("https://zalgohtml5.io")
 }
 
+pub mod vector_v1 {
+    use vector_config::configurable_component;
+
+    use crate::SocketListenAddr;
+
+    /// Configuration for version one of the `vector` source.
+    #[configurable_component]
+    #[derive(Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub(crate) struct VectorConfig {
+        /// The address to listen for connections on.
+        ///
+        /// It _must_ include a port.
+        address: SocketListenAddr,
+
+        /// The timeout, in seconds, before a connection is forcefully closed during shutdown.
+        #[serde(default = "default_shutdown_timeout_secs")]
+        shutdown_timeout_secs: u64,
+
+        /// The size, in bytes, of the receive buffer used for each connection.
+        ///
+        /// This should not typically needed to be changed.
+        receive_buffer_bytes: Option<usize>,
+    }
+
+    const fn default_shutdown_timeout_secs() -> u64 {
+        30
+    }
+}
+
+pub mod vector_v2 {
+    use std::net::SocketAddr;
+
+    use vector_config::configurable_component;
+
+    /// Configuration for version two of the `vector` source.
+    #[configurable_component]
+    #[derive(Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct VectorConfig {
+        /// The address to listen for connections on.
+        ///
+        /// It _must_ include a port.
+        pub address: SocketAddr,
+
+        /// The timeout, in seconds, before a connection is forcefully closed during shutdown.
+        #[serde(default = "default_shutdown_timeout_secs")]
+        pub shutdown_timeout_secs: u64,
+    }
+
+    const fn default_shutdown_timeout_secs() -> u64 {
+        30
+    }
+}
+
+/// Marker type for the version one of the configuration for the `vector` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
+enum V1 {
+    /// Marker value for version one.
+    #[serde(rename = "1")]
+    V1,
+}
+
+/// Configuration for version two of the `vector` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
+pub struct VectorConfigV1 {
+    /// Version of the configuration.
+    version: V1,
+
+    #[serde(flatten)]
+    config: self::vector_v1::VectorConfig,
+}
+
+/// Marker type for the version two of the configuration for the `vector` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
+enum V2 {
+    /// Marker value for version two.
+    #[serde(rename = "2")]
+    V2,
+}
+
+/// Configuration for version two of the `vector` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
+pub struct VectorConfigV2 {
+    /// Version of the configuration.
+    version: Option<V2>,
+
+    #[serde(flatten)]
+    config: self::vector_v2::VectorConfig,
+}
+
+/// Configurable for the `vector` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
+#[serde(untagged)]
+pub enum VectorSourceConfig {
+    /// Configuration for version one.
+    V1(#[configurable(derived)] VectorConfigV1),
+
+    /// Configuration for version two.
+    V2(#[configurable(derived)] VectorConfigV2),
+}
+
 /// Collection of various sources available in Vector.
 #[derive(Clone)]
 #[configurable_component]
@@ -267,6 +374,9 @@ fn default_advanced_sink_endpoint() -> String {
 pub enum SourceConfig {
     /// Simple source.
     Simple(#[configurable(derived)] SimpleSourceConfig),
+
+    /// Vector source.
+    Vector(#[configurable(derived)] VectorSourceConfig),
 }
 
 /// Collection of various sinks available in Vector.

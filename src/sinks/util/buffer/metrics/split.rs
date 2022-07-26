@@ -124,7 +124,7 @@ impl MetricSplit for AggregatedSummarySplitter {
             }
             MetricValue::AggregatedSummary { .. } => {
                 // Further extract the aggregated summary components so we can generate our multiple metrics.
-                let (ts, kind, value) = data.into_parts();
+                let (time, kind, value) = data.into_parts();
                 let (quantiles, count, sum) = match value {
                     MetricValue::AggregatedSummary {
                         quantiles,
@@ -141,7 +141,7 @@ impl MetricSplit for AggregatedSummarySplitter {
                 let mut count_series = series.clone();
                 count_series.name_mut().name_mut().push_str("_count");
                 let count_data = MetricData::from_parts(
-                    ts,
+                    time,
                     kind,
                     MetricValue::Counter {
                         value: count as f64,
@@ -156,7 +156,7 @@ impl MetricSplit for AggregatedSummarySplitter {
                     quantile_series
                         .insert_tag(String::from("quantile"), quantile.to_quantile_string());
                     let quantile_data = MetricData::from_parts(
-                        ts,
+                        time,
                         kind,
                         MetricValue::Gauge {
                             value: quantile.value,
@@ -174,7 +174,7 @@ impl MetricSplit for AggregatedSummarySplitter {
                 let mut sum_series = series;
                 sum_series.name_mut().name_mut().push_str("_sum");
                 let sum_data =
-                    MetricData::from_parts(ts, kind, MetricValue::Counter { value: sum });
+                    MetricData::from_parts(time, kind, MetricValue::Counter { value: sum });
                 let sum_metadata = metadata;
 
                 metrics.push_back(Metric::from_parts(sum_series, sum_data, sum_metadata));

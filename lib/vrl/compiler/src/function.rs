@@ -206,6 +206,10 @@ impl Parameter {
             kind.add_null();
         }
 
+        if (n & kind::UNDEFINED) == kind::UNDEFINED {
+            kind.add_undefined();
+        }
+
         kind
     }
 }

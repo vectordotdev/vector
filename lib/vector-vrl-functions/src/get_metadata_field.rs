@@ -48,13 +48,7 @@ impl Function for GetMetadataField {
         let key = get_metadata_key(&mut arguments)?;
         let kind = match &key {
             MetadataKey::Legacy(_) => Kind::bytes().or_null(),
-            MetadataKey::Query(query) => external
-                .metadata_kind()
-                .find_at_path(&query.path().to_lookup())
-                .ok()
-                .flatten()
-                .map(|x| x.into_owned())
-                .unwrap_or_else(Kind::any),
+            MetadataKey::Query(query) => external.metadata_kind().at_path(query.path()),
         };
         Ok(Box::new(GetMetadataFieldFn { key, kind }))
     }

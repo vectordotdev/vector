@@ -261,7 +261,7 @@ impl ToTokens for Validation {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let validation_tokens = match self {
             Validation::KnownFormat(format) => {
-                quote! { ::vector_config::validation::Validation::Format(#format) }
+                quote! { ::vector_config::validation::Validation::KnownFormat(#format) }
             }
             Validation::Length { minimum, maximum } => {
                 let min_tokens = option_as_token(*minimum);

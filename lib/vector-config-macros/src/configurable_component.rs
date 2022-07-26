@@ -2,7 +2,7 @@ use darling::{util::Flag, FromMeta};
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{
-    parse_macro_input, parse_quote, punctuated::Punctuated, token::Comma, AttributeArgs,
+    parse_macro_input, parse_quote_spanned, punctuated::Punctuated, token::Comma, AttributeArgs,
     DeriveInput, Path,
 };
 
@@ -64,6 +64,8 @@ impl Options {
 
 pub fn configurable_component_impl(args: TokenStream, item: TokenStream) -> TokenStream {
     let args = parse_macro_input!(args as AttributeArgs);
+    let input = parse_macro_input!(item as DeriveInput);
+
     let options = match Options::from_list(&args) {
         Ok(v) => v,
         Err(e) => {
@@ -77,17 +79,22 @@ pub fn configurable_component_impl(args: TokenStream, item: TokenStream) -> Toke
         .map(|s| quote! { #[configurable(metadata(component_type = #s))] });
 
     let mut derives = Punctuated::<Path, Comma>::new();
-    derives.push(parse_quote! { ::vector_config_macros::Configurable });
+    derives.push(parse_quote_spanned! {input.ident.span()=>
+        ::vector_config_macros::Configurable
+    });
 
     if options.should_derive_ser() {
-        derives.push(parse_quote! { ::serde::Serialize });
+        derives.push(parse_quote_spanned! {input.ident.span()=>
+            ::serde::Serialize
+        });
     }
 
     if options.should_derive_deser() {
-        derives.push(parse_quote! { ::serde::Deserialize });
+        derives.push(parse_quote_spanned! {input.ident.span()=>
+            ::serde::Deserialize
+        });
     }
 
-    let input = parse_macro_input!(item as DeriveInput);
     let derived = quote! {
         #[derive(#derives)]
         #component_type
