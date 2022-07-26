@@ -14,7 +14,7 @@ use vector_core::ByteSizeOf;
 
 use crate::{
     config::{DataType, Output, SourceConfig, SourceContext, SourceDescription},
-    event::metric::{Metric, MetricKind, MetricValue},
+    event::metric::{Metric, MetricKind, MetricTags, MetricValue},
     internal_events::{BytesReceived, EventsReceived, StreamClosedError},
     shutdown::ShutdownSignal,
     SourceSender,
@@ -210,41 +210,41 @@ impl HostMetrics {
         }
     }
 
-    async fn capture_metrics(&self) -> Vec<Metric> {
-        let hostname = crate::get_hostname();
+    pub fn buffer(&self) -> MetricsBuffer {
+        MetricsBuffer::new(self.config.namespace.clone())
+    }
 
-        let mut metrics = Vec::new();
+    async fn capture_metrics(&self) -> Vec<Metric> {
+        let mut buffer = self.buffer();
+
         #[cfg(target_os = "linux")]
         if self.config.has_collector(Collector::CGroups) {
-            metrics.extend(add_collector("cgroups", self.cgroups_metrics().await));
+            self.cgroups_metrics(&mut buffer).await;
         }
         if self.config.has_collector(Collector::Cpu) {
-            metrics.extend(add_collector("cpu", self.cpu_metrics().await));
+            self.cpu_metrics(&mut buffer).await;
         }
         if self.config.has_collector(Collector::Disk) {
-            metrics.extend(add_collector("disk", self.disk_metrics().await));
+            self.disk_metrics(&mut buffer).await;
         }
         if self.config.has_collector(Collector::Filesystem) {
-            metrics.extend(add_collector("filesystem", self.filesystem_metrics().await));
+            self.filesystem_metrics(&mut buffer).await;
         }
         if self.config.has_collector(Collector::Load) {
-            metrics.extend(add_collector("load", self.loadavg_metrics().await));
+            self.loadavg_metrics(&mut buffer).await;
         }
         if self.config.has_collector(Collector::Host) {
-            metrics.extend(add_collector("host", self.host_metrics().await));
+            self.host_metrics(&mut buffer).await;
         }
         if self.config.has_collector(Collector::Memory) {
-            metrics.extend(add_collector("memory", self.memory_metrics().await));
-            metrics.extend(add_collector("memory", self.swap_metrics().await));
+            self.memory_metrics(&mut buffer).await;
+            self.swap_metrics(&mut buffer).await;
         }
         if self.config.has_collector(Collector::Network) {
-            metrics.extend(add_collector("network", self.network_metrics().await));
+            self.network_metrics(&mut buffer).await;
         }
-        if let Ok(hostname) = &hostname {
-            for metric in &mut metrics {
-                metric.insert_tag("host".into(), hostname.into());
-            }
-        }
+
+        let metrics = buffer.metrics;
         emit!(EventsReceived {
             count: metrics.len(),
             byte_size: metrics.size_of(),
@@ -252,102 +252,87 @@ impl HostMetrics {
         metrics
     }
 
-    pub async fn loadavg_metrics(&self) -> Vec<Metric> {
+    pub async fn loadavg_metrics(&self, output: &mut MetricsBuffer) {
+        output.name = "load";
         #[cfg(unix)]
-        let result = match heim::cpu::os::unix::loadavg().await {
+        match heim::cpu::os::unix::loadavg().await {
             Ok(loadavg) => {
-                let timestamp = Utc::now();
-                vec![
-                    self.gauge(
-                        "load1",
-                        timestamp,
-                        loadavg.0.get::<ratio>() as f64,
-                        BTreeMap::new(),
-                    ),
-                    self.gauge(
-                        "load5",
-                        timestamp,
-                        loadavg.1.get::<ratio>() as f64,
-                        BTreeMap::new(),
-                    ),
-                    self.gauge(
-                        "load15",
-                        timestamp,
-                        loadavg.2.get::<ratio>() as f64,
-                        BTreeMap::new(),
-                    ),
-                ]
+                output.gauge("load1", loadavg.0.get::<ratio>() as f64, BTreeMap::new());
+                output.gauge("load5", loadavg.1.get::<ratio>() as f64, BTreeMap::new());
+                output.gauge("load15", loadavg.2.get::<ratio>() as f64, BTreeMap::new());
             }
             Err(error) => {
                 error!(message = "Failed to load load average info.", %error, internal_log_rate_secs = 60);
-                vec![]
             }
-        };
-        #[cfg(not(unix))]
-        let result = vec![];
-
-        result
+        }
     }
 
-    pub async fn host_metrics(&self) -> Vec<Metric> {
-        let mut metrics = Vec::new();
+    pub async fn host_metrics(&self, output: &mut MetricsBuffer) {
+        output.name = "host";
         match heim::host::uptime().await {
-            Ok(time) => {
-                let timestamp = Utc::now();
-                metrics.push(self.gauge(
-                    "uptime",
-                    timestamp,
-                    time.get::<second>() as f64,
-                    BTreeMap::default(),
-                ));
-            }
+            Ok(time) => output.gauge("uptime", time.get::<second>() as f64, BTreeMap::default()),
             Err(error) => {
                 error!(message = "Failed to load host uptime info.", %error, internal_log_rate_secs = 60);
             }
         }
 
         match heim::host::boot_time().await {
-            Ok(time) => {
-                let timestamp = Utc::now();
-                metrics.push(self.gauge(
-                    "boot_time",
-                    timestamp,
-                    time.get::<second>() as f64,
-                    BTreeMap::default(),
-                ));
-            }
+            Ok(time) => output.gauge(
+                "boot_time",
+                time.get::<second>() as f64,
+                BTreeMap::default(),
+            ),
             Err(error) => {
                 error!(message = "Failed to load host boot time info.", %error, internal_log_rate_secs = 60);
             }
         }
+    }
+}
 
-        metrics
+#[derive(Default)]
+pub struct MetricsBuffer {
+    pub metrics: Vec<Metric>,
+    name: &'static str,
+    host: Option<String>,
+    timestamp: DateTime<Utc>,
+    namespace: Option<String>,
+}
+
+impl MetricsBuffer {
+    fn new(namespace: Option<String>) -> Self {
+        Self {
+            metrics: Vec::new(),
+            name: "",
+            host: crate::get_hostname().ok(),
+            timestamp: Utc::now(),
+            namespace,
+        }
     }
 
-    fn counter(
-        &self,
-        name: &str,
-        timestamp: DateTime<Utc>,
-        value: f64,
-        tags: BTreeMap<String, String>,
-    ) -> Metric {
-        Metric::new(name, MetricKind::Absolute, MetricValue::Counter { value })
-            .with_namespace(self.config.namespace.clone())
-            .with_tags(Some(tags))
-            .with_timestamp(Some(timestamp))
+    fn tags(&self, mut tags: MetricTags) -> MetricTags {
+        tags.insert("collector".into(), self.name.into());
+        if let Some(host) = &self.host {
+            tags.insert("host".into(), host.clone());
+        }
+        tags
     }
 
-    fn gauge(
-        &self,
-        name: &str,
-        timestamp: DateTime<Utc>,
-        value: f64,
-        tags: BTreeMap<String, String>,
-    ) -> Metric {
-        Metric::new(name, MetricKind::Absolute, MetricValue::Gauge { value })
-            .with_namespace(self.config.namespace.clone())
-            .with_tags(Some(tags))
-            .with_timestamp(Some(timestamp))
+    fn counter(&mut self, name: &str, value: f64, tags: MetricTags) {
+        self.metrics.push(
+            Metric::new(name, MetricKind::Absolute, MetricValue::Counter { value })
+                .with_namespace(self.namespace.clone())
+                .with_tags(Some(self.tags(tags)))
+                .with_timestamp(Some(self.timestamp)),
+        )
+    }
+
+    fn gauge(&mut self, name: &str, value: f64, tags: MetricTags) {
+        self.metrics.push(
+            Metric::new(name, MetricKind::Absolute, MetricValue::Gauge { value })
+                .with_namespace(self.namespace.clone())
+                .with_tags(Some(self.tags(tags)))
+                .with_timestamp(Some(self.timestamp)),
+        )
     }
 }
 
@@ -365,13 +350,6 @@ where
     E: std::error::Error,
 {
     filter_result_sync(result, message)
-}
-
-fn add_collector(collector: &str, mut metrics: Vec<Metric>) -> Vec<Metric> {
-    for metric in &mut metrics {
-        metric.insert_tag("collector".into(), collector.into());
-    }
-    metrics
 }
 
 #[allow(clippy::missing_const_for_fn)]
@@ -639,9 +617,11 @@ pub(self) mod tests {
     #[cfg(not(target_os = "windows"))]
     #[tokio::test]
     async fn generates_loadavg_metrics() {
-        let metrics = HostMetrics::new(HostMetricsConfig::default())
-            .loadavg_metrics()
+        let mut buffer = MetricsBuffer::new(None);
+        HostMetrics::new(HostMetricsConfig::default())
+            .loadavg_metrics(&mut buffer)
             .await;
+        let metrics = buffer.metrics;
         assert_eq!(metrics.len(), 3);
         assert!(all_gauges(&metrics));
 
@@ -653,9 +633,11 @@ pub(self) mod tests {
 
     #[tokio::test]
     async fn generates_host_metrics() {
-        let metrics = HostMetrics::new(HostMetricsConfig::default())
-            .host_metrics()
+        let mut buffer = MetricsBuffer::new(None);
+        HostMetrics::new(HostMetricsConfig::default())
+            .host_metrics(&mut buffer)
             .await;
+        let metrics = buffer.metrics;
         assert_eq!(metrics.len(), 2);
         assert!(all_gauges(&metrics));
     }
@@ -710,12 +692,13 @@ pub(self) mod tests {
     }
 
     // Run a series of tests using filters to ensure they are obeyed
-    pub(super) async fn assert_filtered_metrics<'a, Get, Fut>(tag: &str, get_metrics: Get)
+    pub(super) async fn assert_filtered_metrics<Get, Fut>(tag: &str, get_metrics: Get)
     where
         Get: Fn(FilterList) -> Fut,
         Fut: Future<Output = Vec<Metric>>,
     {
         let all_metrics = get_metrics(FilterList::default()).await;
+
         let keys = collect_tag_values(&all_metrics, tag);
         // Pick an arbitrary key value
         if let Some(key) = keys.into_iter().next() {
@@ -723,41 +706,41 @@ pub(self) mod tests {
             let key_prefix_pattern = PatternWrapper::try_from(format!("{}*", key_prefix)).unwrap();
             let key_pattern = PatternWrapper::try_from(key.clone()).unwrap();
 
-            let filtered_metrics_with = get_metrics(FilterList {
+            let filter = FilterList {
                 includes: Some(vec![key_pattern.clone()]),
                 excludes: None,
-            })
-            .await;
+            };
+            let filtered_metrics_with = get_metrics(filter).await;
 
             assert!(filtered_metrics_with.len() <= all_metrics.len());
             assert!(!filtered_metrics_with.is_empty());
             assert!(all_tags_match(&filtered_metrics_with, tag, |s| s == key));
 
-            let filtered_metrics_with_match = get_metrics(FilterList {
+            let filter = FilterList {
                 includes: Some(vec![key_prefix_pattern.clone()]),
                 excludes: None,
-            })
-            .await;
+            };
+            let filtered_metrics_with_match = get_metrics(filter).await;
 
             assert!(filtered_metrics_with_match.len() >= filtered_metrics_with.len());
             assert!(all_tags_match(&filtered_metrics_with_match, tag, |s| {
                 s.starts_with(key_prefix)
             }));
 
-            let filtered_metrics_without = get_metrics(FilterList {
+            let filter = FilterList {
                 includes: None,
                 excludes: Some(vec![key_pattern]),
-            })
-            .await;
+            };
+            let filtered_metrics_without = get_metrics(filter).await;
 
             assert!(filtered_metrics_without.len() <= all_metrics.len());
             assert!(all_tags_match(&filtered_metrics_without, tag, |s| s != key));
 
-            let filtered_metrics_without_match = get_metrics(FilterList {
+            let filter = FilterList {
                 includes: None,
                 excludes: Some(vec![key_prefix_pattern]),
-            })
-            .await;
+            };
+            let filtered_metrics_without_match = get_metrics(filter).await;
 
             assert!(filtered_metrics_without_match.len() <= filtered_metrics_without.len());
             assert!(all_tags_match(&filtered_metrics_without_match, tag, |s| {
