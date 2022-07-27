@@ -20,16 +20,12 @@ use crate::{
     },
     opentelemetry::LogService::logs_service_server::LogsServiceServer,
     serde::bool_or_struct,
-    sources::{
-        http::HttpMethod,
-        util::{grpc::run_grpc_server, HttpSource},
-        Source,
-    },
+    sources::{util::grpc::run_grpc_server, Source},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
-use self::grpc::Service;
-use self::http::OpentelemetryHttpServer;
+use self::http::run_http_server;
+use self::{grpc::Service, http::build_warp_filter};
 
 pub const LOGS: &str = "logs";
 
@@ -122,17 +118,10 @@ impl SourceConfig for OpentelemetryConfig {
             error!(message = "Source future failed.", %error);
         });
 
-        let http_source = HttpSource::run(
-            OpentelemetryHttpServer {},
-            self.http.address,
-            "/v1/logs",
-            HttpMethod::Post,
-            true,
-            &self.http.tls,
-            &None,
-            cx,
-            self.acknowledgements,
-        )?;
+        let http_tls_settings = MaybeTlsSettings::from_config(&self.http.tls, true)?;
+        let filters = build_warp_filter(acknowledgements, cx.out);
+        let http_source =
+            run_http_server(self.http.address, http_tls_settings, filters, cx.shutdown);
 
         Ok(join(grpc_source, http_source).map(|_| Ok(())).boxed())
     }
