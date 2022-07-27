@@ -4,8 +4,8 @@ use bytes::{Bytes, BytesMut};
 use futures::{future::BoxFuture, stream, FutureExt, SinkExt};
 use http::Uri;
 use prost::Message;
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use super::collector::{self, MetricCollector as _};
@@ -43,28 +43,57 @@ enum Errors {
     SetMetricInvalid,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+/// Configuration for the `prometheus_remote_write` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct RemoteWriteConfig {
+    /// The endpoint to send data to.
     pub endpoint: String,
 
+    /// The default namespace for any metrics sent.
+    ///
+    /// This namespace is only used if a metric has no existing namespace. When a namespace is
+    /// present, it is used as a prefix to the metric name, and separated with an underscore (`_`).
+    ///
+    /// It should follow the Prometheus [naming conventions][prom_naming_docs].
+    ///
+    /// [prom_naming_docs]: https://prometheus.io/docs/practices/naming/#metric-names
     pub default_namespace: Option<String>,
 
+    /// Default buckets to use for aggregating [distribution][dist_metric_docs] metrics into histograms.
+    ///
+    /// [dist_metric_docs]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/metric/#distribution
     #[serde(default = "super::default_histogram_buckets")]
     pub buckets: Vec<f64>,
+
+    /// Quantiles to use for aggregating [distribution][dist_metric_docs] metrics into a summary.
+    ///
+    /// [dist_metric_docs]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/metric/#distribution
     #[serde(default = "super::default_summary_quantiles")]
     pub quantiles: Vec<f64>,
 
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<PrometheusRemoteWriteDefaultBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
+    /// The tenant ID to send.
+    ///
+    /// If set, a header named `X-Scope-OrgID` will be added to outgoing requests with the value of this setting.
+    ///
+    /// This may be used by Cortex or other remote services to identify the tenant making the request.
+    #[configurable(metadata(templateable))]
     #[serde(default)]
     pub tenant_id: Option<Template>,
 
+    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
+    #[configurable(derived)]
     pub auth: Option<Auth>,
 }
 

@@ -10,7 +10,6 @@ use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use futures::{stream::BoxStream, task::noop_waker_ref, SinkExt, StreamExt};
 use futures_util::{future::ready, stream};
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::{
     io::{AsyncRead, ReadBuf},
@@ -19,6 +18,7 @@ use tokio::{
 };
 use tokio_util::codec::Encoder;
 use vector_common::internal_event::{BytesSent, EventsSent};
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -53,11 +53,24 @@ enum TcpError {
     SendError { source: tokio::io::Error },
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// A TCP sink.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct TcpSinkConfig {
+    /// The address to connect to.
+    ///
+    /// The address _must_ include a port.
     address: String,
+
+    #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
+
+    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
+
+    /// The size, in bytes, of the socket's send buffer.
+    ///
+    /// If set, the value of the setting is passed via the `SO_SNDBUF` option.
     send_buffer_bytes: Option<usize>,
 }
 

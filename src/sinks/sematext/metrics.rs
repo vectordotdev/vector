@@ -5,8 +5,8 @@ use futures::{future::BoxFuture, stream, FutureExt, SinkExt};
 use http::{StatusCode, Uri};
 use hyper::{Body, Request};
 use indoc::indoc;
-use serde::{Deserialize, Serialize};
 use tower::Service;
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use super::Region;
@@ -47,16 +47,34 @@ impl SinkBatchSettings for SematextMetricsDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 1.0;
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+/// Configuration for the `sematext_metrics` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug, Default)]
 pub struct SematextMetricsConfig {
+    /// Sets the default namespace for any metrics sent.
+    ///
+    /// This namespace is only used if a metric has no existing namespace. When a namespace is
+    /// present, it is used as a prefix to the metric name, and separated with a period (`.`).
     pub default_namespace: String,
+
+    #[configurable(derived)]
     pub region: Option<Region>,
+
+    /// The endpoint to send data to.
     pub endpoint: Option<String>,
+
+    /// The token that will be used to write to Sematext.
     pub token: String,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub(self) batch: BatchConfig<SematextMetricsDefaultBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",

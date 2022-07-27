@@ -1,8 +1,8 @@
 use codecs::{CharacterDelimitedEncoderConfig, JsonSerializerConfig};
 use http::Uri;
 use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use vector_config::configurable_component;
 
 use crate::{
     codecs::{EncodingConfigWithFraming, Transformer},
@@ -28,12 +28,17 @@ enum BuildError {
     MissingAuthParam,
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
+/// New Relic region.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 #[derivative(Default)]
 pub enum NewRelicLogsRegion {
+    /// US region.
     #[derivative(Default)]
     Us,
+
+    /// EU region.
     Eu,
 }
 
@@ -46,24 +51,40 @@ impl SinkBatchSettings for NewRelicLogsDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 1.0;
 }
 
-#[derive(Deserialize, Serialize, Debug, Derivative, Clone)]
+/// Configuration for the `new_relic_logs` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 pub struct NewRelicLogsConfig {
+    /// A valid New Relic license key (if applicable).
     pub license_key: Option<String>,
+
+    /// A valid New Relic insert key (if applicable).
     pub insert_key: Option<String>,
+
+    #[configurable(derived)]
     pub region: Option<NewRelicLogsRegion>,
+
+    #[configurable(derived)]
     #[serde(
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub encoding: Transformer,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub compression: Compression,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<NewRelicLogsDefaultBatchSettings>,
 
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",

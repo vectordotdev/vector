@@ -3,10 +3,10 @@ use std::{path::PathBuf, pin::Pin, time::Duration};
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use futures::{stream::BoxStream, SinkExt, StreamExt};
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::{net::UnixStream, time::sleep};
 use tokio_util::codec::Encoder;
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -33,8 +33,13 @@ pub enum UnixError {
     ConnectError { source: tokio::io::Error },
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// A Unix Domain Socket sink.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct UnixSinkConfig {
+    /// The Unix socket path.
+    ///
+    /// This should be an absolute path.
     pub path: PathBuf,
 }
 
