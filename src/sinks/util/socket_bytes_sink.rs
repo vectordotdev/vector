@@ -13,7 +13,7 @@ use tokio_util::codec::{BytesCodec, FramedWrite};
 use vector_common::finalization::EventFinalizers;
 
 use super::EncodedEvent;
-use crate::internal_events::{SocketEventsSent, SocketMode};
+use crate::internal_events::{SocketBytesSent, SocketEventsSent, SocketMode};
 
 const MAX_PENDING_ITEMS: usize = 1_000;
 
@@ -40,6 +40,7 @@ where
     shutdown_check: Box<dyn Fn(&mut T) -> ShutdownCheck + Send>,
     socket_mode: SocketMode,
     events_total: usize,
+    event_bytes: usize,
     bytes_total: usize,
     finalizers: Vec<EventFinalizers>,
 }
@@ -57,6 +58,7 @@ where
             inner: FramedWrite::new(inner, BytesCodec::new()),
             shutdown_check: Box::new(shutdown_check),
             events_total: 0,
+            event_bytes: 0,
             bytes_total: 0,
             socket_mode,
             finalizers: Vec::new(),
@@ -70,10 +72,15 @@ where
             emit!(SocketEventsSent {
                 mode: self.socket_mode,
                 count: self.events_total as u64,
+                byte_size: self.event_bytes,
+            });
+            emit!(SocketBytesSent {
+                mode: self.socket_mode,
                 byte_size: self.bytes_total,
             });
 
             self.events_total = 0;
+            self.event_bytes = 0;
             self.bytes_total = 0;
         }
     }
@@ -110,7 +117,8 @@ where
         let pinned = self.project();
         pinned.finalizers.push(item.finalizers);
         *pinned.events_total += 1;
-        *pinned.bytes_total += item.byte_size;
+        *pinned.event_bytes += item.byte_size;
+        *pinned.bytes_total += item.item.len();
         pinned.inner.start_send(item.item)
     }
 

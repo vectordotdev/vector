@@ -17,7 +17,6 @@ use tokio::{
     time::sleep,
 };
 use tokio_util::codec::Encoder;
-use vector_common::internal_event::{BytesSent, EventsSent};
 use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
@@ -289,20 +288,7 @@ where
             let mut sink = self.connect().await;
             let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
 
-            let mut mapped_input = stream::once(ready(item)).chain(&mut input).map(|event| {
-                emit!(EventsSent {
-                    count: 1,
-                    byte_size: event.byte_size,
-                    output: None,
-                });
-
-                emit!(BytesSent {
-                    byte_size: event.item.len(),
-                    protocol: "tcp",
-                });
-
-                Ok(event)
-            });
+            let mut mapped_input = stream::once(ready(item)).chain(&mut input).map(Ok);
 
             let result = match sink.send_all(&mut mapped_input).await {
                 Ok(()) => sink.close().await,
