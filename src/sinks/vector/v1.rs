@@ -1,23 +1,36 @@
 use bytes::{BufMut, BytesMut};
 use prost::Message;
-use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tokio_util::codec::Encoder;
+use vector_config::configurable_component;
 use vector_core::event::{proto, Event};
 
 use crate::{
-    config::{GenerateConfig, SinkContext},
+    config::GenerateConfig,
     sinks::{util::tcp::TcpSinkConfig, Healthcheck, VectorSink},
     tcp::TcpKeepaliveConfig,
     tls::TlsEnableableConfig,
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for version one of the `vector` sink.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct VectorConfig {
+    /// The downstream Vector address to connect to.
+    ///
+    /// The address _must_ include a port.
     address: String,
+
+    #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
+
+    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
+
+    /// The size, in bytes, of the socket's send buffer.
+    ///
+    /// If set, the value of the setting is passed via the `SO_SNDBUF` option.
     send_buffer_bytes: Option<usize>,
 }
 
@@ -60,14 +73,14 @@ impl GenerateConfig for VectorConfig {
 }
 
 impl VectorConfig {
-    pub(crate) async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    pub(crate) async fn build(&self) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink_config = TcpSinkConfig::new(
             self.address.clone(),
             self.keepalive,
             self.tls.clone(),
             self.send_buffer_bytes,
         );
-        sink_config.build(cx, Default::default(), VectorEncoder)
+        sink_config.build(Default::default(), VectorEncoder)
     }
 }
 
@@ -105,7 +118,7 @@ mod test {
     use vector_core::event::{Event, LogEvent};
 
     use crate::{
-        config::{GenerateConfig, SinkContext},
+        config::GenerateConfig,
         test_util::{
             components::{run_and_assert_sink_compliance, SINK_TAGS},
             next_addr, wait_for_tcp, CountReceiver,
@@ -132,8 +145,7 @@ mod test {
         config.address = mock_endpoint_addr.to_string();
         config.tls = Some(TlsEnableableConfig::default());
 
-        let context = SinkContext::new_test();
-        let (sink, _healthcheck) = config.build(context).await.unwrap();
+        let (sink, _healthcheck) = config.build().await.unwrap();
 
         let event = Event::Log(LogEvent::from("simple message"));
         run_and_assert_sink_compliance(sink, stream::once(ready(event)), &SINK_TAGS).await;

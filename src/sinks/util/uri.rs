@@ -2,17 +2,17 @@ use std::{fmt, str::FromStr};
 
 use http::uri::{Authority, PathAndQuery, Scheme, Uri};
 use percent_encoding::percent_decode_str;
-use serde::{
-    de::{Error, Visitor},
-    Deserialize, Deserializer, Serialize, Serializer,
-};
+use vector_config::configurable_component;
 
 use crate::http::Auth;
 
-/// A wrapper for `http::Uri` that implements the serde traits.
-/// Authorization credentials, if exist, will be removed from the URI and stored in `auth`.
-/// For example: `http://user:password@example.com`.
+/// A wrapper for `http::Uri` that implements `Deserialize` and `Serialize`.
+///
+/// Authorization credentials, if they exist, will be removed from the URI and stored separately in `auth`.
+#[configurable_component]
+#[configurable(title = "The URI component of a request.", description = "")]
 #[derive(Default, Debug, Clone)]
+#[serde(try_from = "String", into = "String")]
 pub struct UriSerde {
     pub uri: Uri,
     pub(crate) auth: Option<Auth>,
@@ -62,18 +62,17 @@ impl UriSerde {
     }
 }
 
-impl Serialize for UriSerde {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(&self.to_string())
+impl TryFrom<String> for UriSerde {
+    type Error = <Uri as FromStr>::Err;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        value.as_str().parse()
     }
 }
 
-impl<'a> Deserialize<'a> for UriSerde {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'a>,
-    {
-        deserializer.deserialize_str(UriVisitor)
+impl From<UriSerde> for String {
+    fn from(uri: UriSerde) -> Self {
+        uri.to_string()
     }
 }
 
@@ -90,23 +89,6 @@ impl fmt::Display for UriSerde {
             }
             _ => self.uri.fmt(f),
         }
-    }
-}
-
-struct UriVisitor;
-
-impl<'a> Visitor<'a> for UriVisitor {
-    type Value = UriSerde;
-
-    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "a string containing a valid HTTP Uri")
-    }
-
-    fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>
-    where
-        E: Error,
-    {
-        s.parse().map_err(Error::custom)
     }
 }
 

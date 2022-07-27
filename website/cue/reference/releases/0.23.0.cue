@@ -127,7 +127,7 @@ releases: "0.23.0": {
 				* `region_name`
 				* `metro_code`
 
-				This brings the transform up to parity with the fields encriched by Logstash's geoip filter (though the
+				This brings the transform up to parity with the fields enriched by Logstash's geoip filter (though the
 				field names are not the same).
 				"""
 			pr_numbers: [12803]
@@ -490,6 +490,28 @@ releases: "0.23.0": {
 				details.
 				"""
 			pr_numbers: [12433]
+		},
+		{
+			type:     "chore"
+			breaking: true
+			scopes: ["releasing"]
+			breaking: true
+			description: """
+				Due to changes to the [tool we use for cross-compiling Vector](https://github.com/cross-rs/cross),
+				support for operating systems with old versions of `libc` and `libstdc++` were dropped for the
+				`x86-uknown_linux-gnu` target. Vector now requires that the host system has `libc` >= 2.18 and
+				`libstdc++` >= 3.4.21 with support for ABI version 1.3.8.
+
+				Known OSes that this affects:
+
+				- Amazon Linux 1
+				- Ubuntu 14.04
+				- CentOS 7
+
+				We will be looking at options to [re-add support for these
+				OSes](http://github.com/vectordotdev/vector/issues/13183) in the future.
+				"""
+			pr_numbers: []
 		},
 	]
 

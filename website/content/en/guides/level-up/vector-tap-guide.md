@@ -186,7 +186,7 @@ source = '''
 type = "console"
 inputs = ["picky"]
 target = "stdout"
-encoding = "json"
+encoding.codec = "json"
 
 [sinks.trash]
 type = "blackhole"

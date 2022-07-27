@@ -4,6 +4,7 @@ use once_cell::sync::Lazy;
 use temp_dir::TempDir;
 use tracing_fluent_assertions::{AssertionRegistry, AssertionsLayer};
 use tracing_subscriber::{filter::LevelFilter, layer::SubscriberExt, Layer, Registry};
+use vector_common::finalization::{EventStatus, Finalizable};
 
 #[macro_export]
 macro_rules! assert_file_does_not_exist_async {
@@ -90,4 +91,12 @@ pub fn install_tracing_helpers() -> AssertionRegistry {
     });
 
     ASSERTION_REGISTRY.clone()
+}
+
+pub(crate) async fn acknowledge(mut event: impl Finalizable) {
+    event
+        .take_finalizers()
+        .update_status(EventStatus::Delivered);
+    // Finalizers are implicitly dropped here, sending the status update.
+    tokio::task::yield_now().await;
 }

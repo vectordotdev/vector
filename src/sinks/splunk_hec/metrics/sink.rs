@@ -73,7 +73,7 @@ where
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(self.service, self.context.acker());
+            .into_driver(self.service);
 
         sink.run().await
     }

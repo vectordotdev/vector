@@ -76,7 +76,7 @@ pub(self) async fn load_enrichment_tables<'a>(
     'tables: for (name, table) in config.enrichment_tables.iter() {
         let table_name = name.to_string();
         if ENRICHMENT_TABLES.needs_reload(&table_name) {
-            let indexes = if !diff.enrichment_tables.contains_new(name) {
+            let indexes = if !diff.enrichment_tables.is_added(name) {
                 // If this is an existing enrichment table, we need to store the indexes to reapply
                 // them again post load.
                 Some(ENRICHMENT_TABLES.index_fields(&table_name))
@@ -341,7 +341,7 @@ pub async fn build_pieces(
             };
         }
 
-        let (tx, rx, acker) = if let Some(buffer) = buffers.remove(key) {
+        let (tx, rx) = if let Some(buffer) = buffers.remove(key) {
             buffer
         } else {
             let buffer_type = match sink.buffer.stages().first().expect("cant ever be empty") {
@@ -365,12 +365,11 @@ pub async fn build_pieces(
                     errors.push(format!("Sink \"{}\": {}", key, error));
                     continue;
                 }
-                Ok((tx, rx, acker)) => (tx, Arc::new(Mutex::new(Some(rx.into_stream()))), acker),
+                Ok((tx, rx)) => (tx, Arc::new(Mutex::new(Some(rx.into_stream())))),
             }
         };
 
         let cx = SinkContext {
-            acker: acker.clone(),
             healthcheck,
             globals: config.global.clone(),
             proxy: ProxyConfig::merge_with_env(&config.global.proxy, sink.proxy()),
@@ -416,7 +415,7 @@ pub async fn build_pieces(
             .await
             .map(|_| {
                 debug!("Finished.");
-                TaskOutput::Sink(rx, acker)
+                TaskOutput::Sink(rx)
             })
         };
 

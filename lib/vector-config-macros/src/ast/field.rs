@@ -1,6 +1,6 @@
 use darling::{util::Flag, FromAttributes};
 use serde_derive_internals::ast as serde_ast;
-use syn::{ExprPath, Ident};
+use syn::{spanned::Spanned, ExprPath, Ident};
 use vector_config_common::{attributes::CustomAttribute, validation::Validation};
 
 use super::{
@@ -23,6 +23,7 @@ impl<'a> Field<'a> {
         is_virtual_newtype: bool,
     ) -> darling::Result<Field<'a>> {
         let original = serde.original;
+
         let name = serde.attrs.name().deserialize_name();
         let default_value = get_serde_default_value(serde.attrs.default());
 
@@ -86,6 +87,15 @@ impl<'a> Field<'a> {
             .clone()
             .into_iter()
             .flat_map(|metadata| metadata.attributes())
+    }
+}
+
+impl<'a> Spanned for Field<'a> {
+    fn span(&self) -> proc_macro2::Span {
+        match self.original.ident.as_ref() {
+            Some(ident) => ident.span(),
+            None => self.original.ty.span(),
+        }
     }
 }
 

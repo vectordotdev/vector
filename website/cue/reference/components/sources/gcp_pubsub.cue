@@ -195,6 +195,13 @@ components: sources: gcp_pubsub: {
 					syntax: "literal"
 				}
 			}
+			source_type: {
+				description: "The name of the source type."
+				required:    true
+				type: string: {
+					examples: ["gcp_pubsub"]
+				}
+			}
 			timestamp: fields._current_timestamp & {
 				description: "The time this message was published in the topic."
 			}

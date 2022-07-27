@@ -1,26 +1,41 @@
-use serde::{Deserialize, Serialize};
+use codecs::JsonSerializerConfig;
 use snafu::ResultExt;
+use vector_config::configurable_component;
 
 use crate::{
+    codecs::EncodingConfig,
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     sinks::{
-        util::encoding::{
-            EncodingConfig, EncodingConfigAdapter, StandardEncodings, StandardEncodingsMigrator,
-        },
         websocket::sink::{ConnectSnafu, WebSocketConnector, WebSocketError, WebSocketSink},
         Healthcheck, VectorSink,
     },
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+/// Configuration for the `websocket` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug)]
 pub struct WebSocketSinkConfig {
+    /// The WebSocket URI to connect to.
+    ///
+    /// This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.
     pub uri: String,
+
+    #[configurable(derived)]
     pub tls: Option<TlsEnableableConfig>,
-    pub encoding:
-        EncodingConfigAdapter<EncodingConfig<StandardEncodings>, StandardEncodingsMigrator>,
+
+    #[configurable(derived)]
+    pub encoding: EncodingConfig,
+
+    /// The interval, in seconds, between sending PINGs to the remote peer.
     pub ping_interval: Option<u64>,
+
+    /// The timeout, in seconds, while waiting for a PONG response from the remote peer.
+    ///
+    /// If a response is not received in this time, the connection is reestablished.
     pub ping_timeout: Option<u64>,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -34,7 +49,7 @@ impl GenerateConfig for WebSocketSinkConfig {
         toml::Value::try_from(Self {
             uri: "ws://127.0.0.1:9000/endpoint".into(),
             tls: None,
-            encoding: EncodingConfig::from(StandardEncodings::Json).into(),
+            encoding: JsonSerializerConfig::new().into(),
             ping_interval: None,
             ping_timeout: None,
             acknowledgements: Default::default(),
@@ -46,9 +61,9 @@ impl GenerateConfig for WebSocketSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "websocket")]
 impl SinkConfig for WebSocketSinkConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let connector = self.build_connector()?;
-        let ws_sink = WebSocketSink::new(self, connector.clone(), cx.acker())?;
+        let ws_sink = WebSocketSink::new(self, connector.clone())?;
 
         Ok((
             VectorSink::from_event_streamsink(ws_sink),

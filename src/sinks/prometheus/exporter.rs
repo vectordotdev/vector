@@ -21,7 +21,6 @@ use snafu::Snafu;
 use stream_cancel::{Trigger, Tripwire};
 use tracing::{Instrument, Span};
 use vector_core::{
-    buffers::Acker,
     event::metric::MetricSeries,
     internal_event::{BytesSent, EventsSent},
     ByteSizeOf,
@@ -57,24 +56,69 @@ enum BuildError {
     FlushPeriodTooShort { min: u64 },
 }
 
+/// Configuration for the `prometheus_exporter` sink.
 #[serde_as]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct PrometheusExporterConfig {
+    /// The default namespace for any metrics sent.
+    ///
+    /// This namespace is only used if a metric has no existing namespace. When a namespace is
+    /// present, it is used as a prefix to the metric name, and separated with an underscore (`_`).
+    ///
+    /// It should follow the Prometheus [naming conventions][prom_naming_docs].
+    ///
+    /// [prom_naming_docs]: https://prometheus.io/docs/practices/naming/#metric-names
     #[serde(alias = "namespace")]
     pub default_namespace: Option<String>,
+
+    /// The address to expose for scraping.
+    ///
+    /// The metrics are exposed at the typical Prometheus exporter path, `/metrics`.
     #[serde(default = "default_address")]
     pub address: SocketAddr,
+
     pub tls: Option<TlsEnableableConfig>,
+
+    /// Default buckets to use for aggregating [distribution][dist_metric_docs] metrics into histograms.
+    ///
+    /// [dist_metric_docs]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/metric/#distribution
     #[serde(default = "super::default_histogram_buckets")]
     pub buckets: Vec<f64>,
+
+    /// Quantiles to use for aggregating [distribution][dist_metric_docs] metrics into a summary.
+    ///
+    /// [dist_metric_docs]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/metric/#distribution
     #[serde(default = "super::default_summary_quantiles")]
     pub quantiles: Vec<f64>,
+
+    /// Whether or not to render [distributions][dist_metric_docs] as an [aggregated histogram][prom_agg_hist_docs] or  [aggregated summary][prom_agg_summ_docs].
+    ///
+    /// While Vector supports distributions as a lossless way to represent a set of samples for a
+    /// metric, Prometheus clients (the application being scraped, which is this sink) must
+    /// aggregate locally into either an aggregated histogram or aggregated summary.
+    ///
+    /// [dist_metric_docs]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/metric/#distribution
+    /// [prom_agg_hist_docs]: https://prometheus.io/docs/concepts/metric_types/#histogram
+    /// [prom_agg_summ_docs]: https://prometheus.io/docs/concepts/metric_types/#summary
     #[serde(default = "default_distributions_as_summaries")]
     pub distributions_as_summaries: bool,
+
+    /// The interval, in seconds, on which metrics are flushed.
+    ///
+    /// On the flush interval, if a metric has not been seen since the last flush interval, it is
+    /// considered expired and is removed.
+    ///
+    /// Be sure to configure this value higher than your client’s scrape interval.
     #[serde(default = "default_flush_period_secs")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     pub flush_period_secs: Duration,
+
+    /// Suppresses timestamps on the Prometheus output.
+    ///
+    /// This can sometimes be useful when the source of metrics leads to their timestamps being too
+    /// far in the past for Prometheus to allow them, such as when aggregating metrics over long
+    /// time periods, or when replaying old metrics from a disk buffer.
     #[serde(default)]
     pub suppress_timestamp: bool,
 }
@@ -129,7 +173,7 @@ impl GenerateConfig for PrometheusExporterConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "prometheus_exporter")]
 impl SinkConfig for PrometheusExporterConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         if self.flush_period_secs.as_secs() < MIN_FLUSH_PERIOD_SECS {
             return Err(Box::new(BuildError::FlushPeriodTooShort {
                 min: MIN_FLUSH_PERIOD_SECS,
@@ -138,7 +182,7 @@ impl SinkConfig for PrometheusExporterConfig {
 
         validate_quantiles(&self.quantiles)?;
 
-        let sink = PrometheusExporter::new(self.clone(), cx.acker());
+        let sink = PrometheusExporter::new(self.clone());
         let healthcheck = future::ok(()).boxed();
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
@@ -197,7 +241,6 @@ struct PrometheusExporter {
     server_shutdown_trigger: Option<Trigger>,
     config: PrometheusExporterConfig,
     metrics: Arc<RwLock<IndexMap<MetricRef, (Metric, MetricMetadata)>>>,
-    acker: Acker,
 }
 
 /// Expiration metadata for a metric.
@@ -300,7 +343,7 @@ impl MetricNormalize for PrometheusExporterMetricNormalizer {
             MetricValue::Distribution { .. } => {
                 // Convert the distribution as-is, and then let the normalizer absolute-ify it.
                 let (series, data, metadata) = metric.into_parts();
-                let (ts, kind, value) = data.into_parts();
+                let (time, kind, value) = data.into_parts();
 
                 let new_value = if self.distributions_as_summaries {
                     // We use a sketch when in summary mode because they're actually able to be
@@ -316,7 +359,7 @@ impl MetricNormalize for PrometheusExporterMetricNormalizer {
                         .expect("value should be distribution already")
                 };
 
-                let data = MetricData::from_parts(ts, kind, new_value);
+                let data = MetricData::from_parts(time, kind, new_value);
                 Metric::from_parts(series, data, metadata)
             }
             _ => metric,
@@ -367,12 +410,11 @@ fn handle(
 }
 
 impl PrometheusExporter {
-    fn new(config: PrometheusExporterConfig, acker: Acker) -> Self {
+    fn new(config: PrometheusExporterConfig) -> Self {
         Self {
             server_shutdown_trigger: None,
             config,
             metrics: Arc::new(RwLock::new(IndexMap::new())),
-            acker,
         }
     }
 
@@ -524,7 +566,6 @@ impl StreamSink<Event> for PrometheusExporter {
             }
 
             drop(finalizers);
-            self.acker.ack(1);
         }
 
         Ok(())
@@ -726,9 +767,8 @@ mod tests {
             tls: None,
             ..Default::default()
         };
-        let cx = SinkContext::new_test();
 
-        let sink = PrometheusExporter::new(config, cx.acker());
+        let sink = PrometheusExporter::new(config);
 
         let m1 = Metric::new(
             "absolute",
@@ -789,9 +829,8 @@ mod tests {
             ..Default::default()
         };
         let buckets = config.buckets.clone();
-        let cx = SinkContext::new_test();
 
-        let sink = PrometheusExporter::new(config, cx.acker());
+        let sink = PrometheusExporter::new(config);
 
         // Define a series of incremental distribution updates.
         let base_summary_metric = Metric::new(
@@ -909,9 +948,8 @@ mod tests {
             distributions_as_summaries: true,
             ..Default::default()
         };
-        let cx = SinkContext::new_test();
 
-        let sink = PrometheusExporter::new(config, cx.acker());
+        let sink = PrometheusExporter::new(config);
 
         // Define a series of incremental distribution updates.
         let base_summary_metric = Metric::new(

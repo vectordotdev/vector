@@ -1,12 +1,12 @@
 use tokio_test::{assert_pending, task::spawn};
 use tracing::Instrument;
 
-use super::create_default_buffer_v1;
+use super::{create_default_buffer_v1, read_next};
 use crate::{
     assert_reader_v1_delete_position, assert_reader_writer_v1_positions,
     test::{
-        install_tracing_helpers, with_temp_dir, MultiEventRecord, PoisonPillMultiEventRecord,
-        SizedRecord,
+        acknowledge, install_tracing_helpers, with_temp_dir, MultiEventRecord,
+        PoisonPillMultiEventRecord, SizedRecord,
     },
     variants::disk_v1::{reader::FLUSH_INTERVAL, tests::drive_reader_to_flush},
     EventCount,
@@ -20,26 +20,22 @@ async fn acking_single_event_advances_delete_offset() {
 
         async move {
             // Create a regular buffer, no customizations required.
-            let (mut writer, mut reader, acker) = create_default_buffer_v1(data_dir);
+            let (mut writer, mut reader) = create_default_buffer_v1(data_dir);
             assert_reader_writer_v1_positions!(reader, writer, 0, 0);
 
             // Write a simple single-event record and make writer offset moves forward by the
             // expected amount, since the entry key should be increment by event count:
             let record = SizedRecord::new(360);
-            assert_eq!(record.event_count(), 1);
+            let event_count = record.event_count();
+            assert_eq!(event_count, 1);
             writer.send(record.clone()).await;
             writer.flush();
             assert_reader_writer_v1_positions!(reader, writer, 0, record.event_count());
 
             // And now read it out which should give us a matching record, while our delete offset
             // is still lagging behind the read offset since we haven't yet acknowledged the record:
-            let read_record = reader.next().await.expect("read should not fail");
-            assert_reader_writer_v1_positions!(
-                reader,
-                writer,
-                record.event_count(),
-                record.event_count()
-            );
+            let read_record = read_next(&mut reader).await;
+            assert_reader_writer_v1_positions!(reader, writer, event_count, record.event_count());
 
             assert_eq!(record, read_record);
 
@@ -56,7 +52,7 @@ async fn acking_single_event_advances_delete_offset() {
             // deletes to the database:
             assert_reader_v1_delete_position!(reader, 0);
             assert_eq!(read_record.event_count(), 1);
-            acker.ack(record.event_count());
+            acknowledge(read_record).await;
 
             tokio::time::pause();
 
@@ -72,7 +68,7 @@ async fn acking_single_event_advances_delete_offset() {
             assert_pending!(staged_read.poll());
             drop(staged_read);
 
-            assert_reader_v1_delete_position!(reader, record.event_count());
+            assert_reader_v1_delete_position!(reader, event_count);
         }
     })
     .await;
@@ -86,20 +82,20 @@ async fn acking_multi_event_advances_delete_offset() {
 
         async move {
             // Create a regular buffer, no customizations required.
-            let (mut writer, mut reader, acker) = create_default_buffer_v1(data_dir);
+            let (mut writer, mut reader) = create_default_buffer_v1(data_dir);
             assert_reader_writer_v1_positions!(reader, writer, 0, 0);
 
             // Write a simple multi-event record and make writer offset moves forward by the
             // expected amount, since the entry key should be increment by event count:
-            let record = MultiEventRecord(14);
+            let record = MultiEventRecord::new(14);
             assert_eq!(record.event_count(), 14);
-            writer.send(record).await;
+            writer.send(record.clone()).await;
             writer.flush();
             assert_reader_writer_v1_positions!(reader, writer, 0, record.event_count());
 
             // And now read it out which should give us a matching record, while our delete offset
             // is still lagging behind the read offset since we haven't yet acknowledged the record:
-            let read_record = reader.next().await.expect("read should not fail");
+            let read_record = read_next(&mut reader).await;
             assert_reader_writer_v1_positions!(
                 reader,
                 writer,
@@ -120,7 +116,7 @@ async fn acking_multi_event_advances_delete_offset() {
             // deletes to the database:
             assert_reader_v1_delete_position!(reader, 0);
             assert_eq!(read_record.event_count(), 14);
-            acker.ack(record.event_count());
+            acknowledge(read_record).await;
 
             tokio::time::pause();
 
@@ -155,7 +151,7 @@ async fn acking_when_undecodable_records_present() {
     // detection, etc.
     let poisoned_record = PoisonPillMultiEventRecord::poisoned();
     let poisoned_event_count = poisoned_record.event_count();
-    let valid_record = PoisonPillMultiEventRecord(13);
+    let valid_record = PoisonPillMultiEventRecord::new(13);
     let valid_event_count = valid_record.event_count();
     let cases = vec![
         // A single poisoned record cannot be read, and without a follow up record, its event count
@@ -188,7 +184,7 @@ async fn acking_when_undecodable_records_present() {
 
             async move {
                 // Create a regular buffer, no customizations required.
-                let (mut writer, mut reader, acker) = create_default_buffer_v1(data_dir);
+                let (mut writer, mut reader) = create_default_buffer_v1(data_dir);
                 assert_reader_writer_v1_positions!(reader, writer, 0, 0);
 
                 // Write all of our input records to the buffer, and make sure the sum of their
@@ -218,8 +214,8 @@ async fn acking_when_undecodable_records_present() {
                 // expect these to come through, and thus wait for them:
                 let mut remaining_reads = expected_reads;
                 while remaining_reads > 0 {
-                    let record = reader.next().await.expect("read should not fail");
-                    acker.ack(record.event_count());
+                    let record = read_next(&mut reader).await;
+                    acknowledge(record).await;
 
                     remaining_reads -= 1;
                 }

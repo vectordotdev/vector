@@ -1,4 +1,6 @@
-use std::{io, num::NonZeroU64, path::Path};
+use std::{io, mem::ManuallyDrop, num::NonZeroU64, path::Path};
+
+use vector_common::finalization::{EventStatus, Finalizable};
 
 use crate::{
     buffer_usage_data::BufferUsageHandle,
@@ -7,12 +9,12 @@ use crate::{
         disk_v2::{build_disk_v2_buffer, get_disk_v2_data_dir_path},
         DiskV1Buffer,
     },
-    Acker, Bufferable,
+    Bufferable,
 };
 
 pub async fn try_disk_v1_migration<T>(base_data_dir: &Path, id: &str) -> Result<(), String>
 where
-    T: Bufferable + Clone,
+    T: Bufferable + Clone + Finalizable,
 {
     // Set both buffers to an essentially unlimited size so we can ensure that whatever is in the
     // source buffer can be written to the destination buffer.
@@ -49,19 +51,16 @@ where
     }
 
     let src_buffer = Box::new(src_buffer);
-    let (mut src_reader, src_acker): (ReceiverAdapter<T>, Acker) =
+    let mut src_reader: ReceiverAdapter<T> =
         match src_buffer.into_buffer_parts(usage_handle.clone()).await {
-            Ok((_, src_reader, src_acker)) => (
-                src_reader,
-                src_acker.expect("disk v1 buffer acker must exist"),
-            ),
+            Ok((_, src_reader)) => src_reader,
             // If the disk v1 buffer doesn't exist, then that's OK, just return early.
             Err(_) => return Ok(()),
         };
 
     let dst_buffer_dir = get_disk_v2_data_dir_path(base_data_dir, id);
 
-    let (mut dst_writer, _, _) =
+    let (mut dst_writer, _) =
         build_disk_v2_buffer(usage_handle, base_data_dir, id, buffer_max_size)
             .await
             .map_err(|e| format!("Failed to build `disk_v2` buffer: {}", e))?;
@@ -73,10 +72,12 @@ where
     info!("Detected old `disk_v1`-based buffer for the `{}` sink. Automatically migrating to `disk_v2`.", id);
 
     let mut migrated_records = 0;
-    while let Some(old_record) = src_reader.next().await {
+    while let Some(mut old_record) = src_reader.next().await {
         let old_record_event_count = old_record.event_count();
+        let finalizers = ManuallyDrop::new(old_record.take_finalizers());
 
         dst_writer.write_record(old_record).await.map_err(|e| {
+            finalizers.update_status(EventStatus::Errored);
             format!(
                 "failed writing record {} to the new disk v2 buffer: {}",
                 migrated_records, e,
@@ -84,20 +85,21 @@ where
         })?;
 
         dst_writer.flush().await.map_err(|e| {
+            finalizers.update_status(EventStatus::Errored);
             format!(
                 "failed flushing record {} to the new disk v2 buffer: {}",
                 migrated_records, e,
             )
         })?;
 
-        src_acker.ack(old_record_event_count);
+        finalizers.update_status(EventStatus::Delivered);
+        drop(ManuallyDrop::into_inner(finalizers));
         migrated_records += old_record_event_count;
     }
 
     // We've successfully migrated all of the records from the disk v1 buffer to the disk v2 buffer.
     // Yippee!  Now, let's remove the old disk v1 data directory to finalize the migration.
     drop(src_reader);
-    drop(src_acker);
 
     if std::fs::remove_dir_all(&src_buffer_dir).is_err() {
         error!(

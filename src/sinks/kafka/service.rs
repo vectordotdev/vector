@@ -10,7 +10,6 @@ use rdkafka::{
 };
 use tower::Service;
 use vector_core::{
-    buffers::Ackable,
     internal_event::{BytesSent, EventsSent},
     stream::DriverResponse,
 };
@@ -49,13 +48,6 @@ impl DriverResponse for KafkaResponse {
             byte_size: self.event_byte_size,
             output: None,
         }
-    }
-}
-
-impl Ackable for KafkaRequest {
-    fn ack_size(&self) -> usize {
-        // rdkafka takes care of batching internally, so a request here is always 1 event
-        1
     }
 }
 

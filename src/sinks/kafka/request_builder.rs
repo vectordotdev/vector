@@ -4,13 +4,10 @@ use tokio_util::codec::Encoder as _;
 use vector_core::{config::LogSchema, ByteSizeOf};
 
 use crate::{
-    codecs::Encoder,
+    codecs::{Encoder, Transformer},
     event::{Event, Finalizable, Value},
     internal_events::KafkaHeaderExtractionError,
-    sinks::{
-        kafka::service::{KafkaRequest, KafkaRequestMetadata},
-        util::encoding::Transformer,
-    },
+    sinks::kafka::service::{KafkaRequest, KafkaRequestMetadata},
     template::Template,
 };
 

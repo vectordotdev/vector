@@ -1,11 +1,7 @@
 use std::io::Write;
 
 use bytes::{BufMut, Bytes, BytesMut};
-use codecs::encoding::{
-    CharacterDelimitedEncoder, CharacterDelimitedEncoderConfig, Framer, FramingConfig,
-    JsonSerializerConfig, NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig, Serializer,
-    SerializerConfig, TextSerializerConfig,
-};
+use codecs::encoding::{CharacterDelimitedEncoder, Framer, Serializer};
 use flate2::write::{GzEncoder, ZlibEncoder};
 use futures::{future, FutureExt, SinkExt};
 use http::{
@@ -14,12 +10,12 @@ use http::{
 };
 use hyper::Body;
 use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
+use vector_config::configurable_component;
 
 use crate::{
-    codecs::Encoder,
+    codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
     config::{
         AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
         SinkDescription,
@@ -28,10 +24,6 @@ use crate::{
     http::{Auth, HttpClient, MaybeAuth},
     sinks::util::{
         self,
-        encoding::{
-            EncodingConfig, EncodingConfigWithFramingAdapter, EncodingConfigWithFramingMigrator,
-            Transformer,
-        },
         http::{BatchedHttpSink, HttpEventEncoder, RequestConfig},
         BatchConfig, Buffer, Compression, RealtimeSizeBasedDefaultBatchSettings,
         TowerRequestConfig, UriSerde,
@@ -53,44 +45,45 @@ enum BuildError {
     },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Migrator;
-
-impl EncodingConfigWithFramingMigrator for Migrator {
-    type Codec = Encoding;
-
-    fn migrate(codec: &Self::Codec) -> (Option<FramingConfig>, SerializerConfig) {
-        match codec {
-            Encoding::Text => (None, TextSerializerConfig::new().into()),
-            Encoding::Ndjson => (
-                Some(NewlineDelimitedEncoderConfig::new().into()),
-                JsonSerializerConfig::new().into(),
-            ),
-            Encoding::Json => (
-                Some(CharacterDelimitedEncoderConfig::new(b',').into()),
-                JsonSerializerConfig::new().into(),
-            ),
-        }
-    }
-}
-
-#[derive(Deserialize, Serialize, Clone, Debug)]
+/// Configuration for the `http` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct HttpSinkConfig {
+    /// The full URI to make HTTP requests to.
+    ///
+    /// This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.
     pub uri: UriSerde,
+
+    /// The HTTP method to use when making the request.
     pub method: Option<HttpMethod>,
+
+    #[configurable(derived)]
     pub auth: Option<Auth>,
-    // Deprecated, moved to request.
+
+    /// A list of custom headers to add to each request.
+    #[configurable(deprecated)]
     pub headers: Option<IndexMap<String, String>>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub compression: Compression,
+
     #[serde(flatten)]
-    pub encoding: EncodingConfigWithFramingAdapter<EncodingConfig<Encoding>, Migrator>,
+    pub encoding: EncodingConfigWithFraming,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: RequestConfig,
+
+    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -99,27 +92,42 @@ pub struct HttpSinkConfig {
     pub acknowledgements: AcknowledgementsConfig,
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
+/// HTTP method.
+///
+/// A subset of the HTTP methods described in [RFC 9110, section 9.1][rfc9110] are supported.
+///
+/// [rfc9110]: https://datatracker.ietf.org/doc/html/rfc9110#section-9.1
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 #[derivative(Default)]
 pub enum HttpMethod {
+    /// GET.
+    ///
+    /// This is the default.
     #[derivative(Default)]
     Get,
-    Head,
-    Post,
-    Put,
-    Delete,
-    Options,
-    Trace,
-    Patch,
-}
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
-#[serde(rename_all = "snake_case")]
-pub enum Encoding {
-    Text,
-    Ndjson,
-    Json,
+    /// HEAD.
+    Head,
+
+    /// POST.
+    Post,
+
+    /// PUT.
+    Put,
+
+    /// DELETE.
+    Delete,
+
+    /// OPTIONS.
+    Options,
+
+    /// TRACE.
+    Trace,
+
+    /// PATCH.
+    Patch,
 }
 
 inventory::submit! {
@@ -155,16 +163,8 @@ struct HttpSink {
 }
 
 #[cfg(test)]
-fn default_sink(encoding: Encoding) -> HttpSink {
-    let encoding = EncodingConfigWithFramingAdapter::<EncodingConfig<Encoding>, Migrator>::legacy(
-        encoding.into(),
-    )
-    .encoding()
-    .unwrap();
-    let framing = encoding
-        .0
-        .unwrap_or_else(|| NewlineDelimitedEncoder::new().into());
-    let serializer = encoding.1;
+fn default_sink(encoding: EncodingConfigWithFraming) -> HttpSink {
+    let (framing, serializer) = encoding.build(SinkType::MessageBased).unwrap();
     let encoder = Encoder::<Framer>::new(framing, serializer);
 
     HttpSink {
@@ -188,7 +188,7 @@ impl SinkConfig for HttpSinkConfig {
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let client = self.build_http_client(&cx)?;
 
-        let healthcheck = match cx.healthcheck.uri.clone() {
+        let healthcheck = match cx.healthcheck.uri {
             Some(healthcheck_uri) => {
                 healthcheck(healthcheck_uri, self.auth.clone(), client.clone()).boxed()
             }
@@ -199,16 +199,12 @@ impl SinkConfig for HttpSinkConfig {
         request.add_old_option(self.headers.clone());
         validate_headers(&request.headers, &self.auth)?;
 
-        let encoding = self.encoding.encoding()?;
-        let framing = encoding
-            .0
-            .unwrap_or_else(|| NewlineDelimitedEncoder::new().into());
-        let serializer = encoding.1;
-        let encoder = Encoder::<Framer>::new(framing, serializer);
+        let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
+        let encoder = Encoder::<Framer>::new(framer, serializer);
 
         let sink = HttpSink {
             uri: self.uri.with_default_parts(),
-            method: self.method.clone(),
+            method: self.method,
             auth: self.auth.choose_one(&self.uri.auth)?,
             compression: self.compression,
             transformer: self.encoding.transformer(),
@@ -229,7 +225,6 @@ impl SinkConfig for HttpSinkConfig {
             request,
             batch.timeout,
             client,
-            cx.acker(),
         )
         .sink_map_err(|error| error!(message = "Fatal HTTP sink error.", %error));
 
@@ -281,7 +276,7 @@ impl util::http::HttpSink for HttpSink {
     }
 
     async fn build_request(&self, mut body: Self::Output) -> crate::Result<http::Request<Bytes>> {
-        let method = match &self.method.clone().unwrap_or(HttpMethod::Post) {
+        let method = match &self.method.unwrap_or(HttpMethod::Post) {
             HttpMethod::Get => Method::GET,
             HttpMethod::Head => Method::HEAD,
             HttpMethod::Post => Method::POST,
@@ -336,7 +331,7 @@ impl util::http::HttpSink for HttpSink {
                 builder = builder.header("Content-Encoding", "gzip");
 
                 let buffer = BytesMut::new();
-                let mut w = GzEncoder::new(buffer.writer(), level);
+                let mut w = GzEncoder::new(buffer.writer(), level.as_flate2());
                 w.write_all(&body).expect("Writing to Vec can't fail");
                 body = w.finish().expect("Writing to Vec can't fail").into_inner();
             }
@@ -344,7 +339,7 @@ impl util::http::HttpSink for HttpSink {
                 builder = builder.header("Content-Encoding", "deflate");
 
                 let buffer = BytesMut::new();
-                let mut w = ZlibEncoder::new(buffer.writer(), level);
+                let mut w = ZlibEncoder::new(buffer.writer(), level.as_flate2());
                 w.write_all(&body).expect("Writing to Vec can't fail");
                 body = w.finish().expect("Writing to Vec can't fail").into_inner();
             }
@@ -405,6 +400,10 @@ mod tests {
     };
 
     use bytes::{Buf, Bytes};
+    use codecs::{
+        encoding::FramingConfig, JsonSerializerConfig, NewlineDelimitedEncoderConfig,
+        TextSerializerConfig,
+    };
     use flate2::read::MultiGzDecoder;
     use futures::{channel::mpsc, stream, StreamExt};
     use headers::{Authorization, HeaderMapExt};
@@ -433,7 +432,7 @@ mod tests {
     fn http_encode_event_text() {
         let event = Event::Log(LogEvent::from("hello world"));
 
-        let sink = default_sink(Encoding::Text);
+        let sink = default_sink((None::<FramingConfig>, TextSerializerConfig::new()).into());
         let mut encoder = sink.build_encoder();
         let bytes = encoder.encode_event(event).unwrap();
 
@@ -444,7 +443,13 @@ mod tests {
     fn http_encode_event_ndjson() {
         let event = Event::Log(LogEvent::from("hello world"));
 
-        let sink = default_sink(Encoding::Ndjson);
+        let sink = default_sink(
+            (
+                Some(NewlineDelimitedEncoderConfig::new()),
+                JsonSerializerConfig::new(),
+            )
+                .into(),
+        );
         let mut encoder = sink.build_encoder();
         let bytes = encoder.encode_event(event).unwrap();
 
@@ -465,7 +470,7 @@ mod tests {
     fn http_validates_normal_headers() {
         let config = r#"
         uri = "http://$IN_ADDR/frames"
-        encoding = "text"
+        encoding.codec = "text"
         [request.headers]
         Auth = "token:thing_and-stuff"
         X-Custom-Nonsense = "_%_{}_-_&_._`_|_~_!_#_&_$_"
@@ -479,7 +484,7 @@ mod tests {
     fn http_catches_bad_header_names() {
         let config = r#"
         uri = "http://$IN_ADDR/frames"
-        encoding = "text"
+        encoding.codec = "text"
         [request.headers]
         "\u0001" = "bad"
         "#;
@@ -499,7 +504,7 @@ mod tests {
     async fn http_headers_auth_conflict() {
         let config = r#"
         uri = "http://$IN_ADDR/"
-        encoding = "text"
+        encoding.codec = "text"
         [request.headers]
         Authorization = "Basic base64encodedstring"
         [auth]
@@ -692,7 +697,7 @@ mod tests {
         let config = r#"
         uri = "http://$IN_ADDR/frames"
         compression = "gzip"
-        encoding = "json"
+        encoding.codec = "json"
 
         [auth]
         strategy = "basic"
@@ -783,7 +788,8 @@ mod tests {
             r#"
                 uri = "http://{addr}/frames"
                 compression = "gzip"
-                encoding = "ndjson"
+                framing.method = "newline_delimited"
+                encoding.codec = "json"
                 {extras}
             "#,
             addr = in_addr,

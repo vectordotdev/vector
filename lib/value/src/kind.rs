@@ -4,12 +4,13 @@ mod builder;
 mod collection;
 mod comparison;
 mod conversion;
+mod crud;
 mod debug;
-pub mod find;
-pub mod insert;
+
 pub mod merge;
-pub mod nest;
 pub mod remove;
+
+pub use crud::*;
 
 use std::collections::BTreeMap;
 
@@ -21,7 +22,7 @@ use crate::Value;
 ///
 /// This struct tracks the known states a type can have. By allowing one type to have multiple
 /// states, the type definition can be progressively refined.
-#[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, Eq, PartialOrd)]
 pub struct Kind {
     // NOTE: The internal API uses `Option` over `bool` for primitive types, as it makes internal
     // usage of the API easier to work with. There is no impact on the memory size of the type.
@@ -32,6 +33,7 @@ pub struct Kind {
     timestamp: Option<()>,
     regex: Option<()>,
     null: Option<()>,
+    undefined: Option<()>,
     array: Option<Collection<Index>>,
     object: Option<Collection<Field>>,
 }
@@ -75,12 +77,16 @@ impl std::fmt::Display for Kind {
         if self.contains_null() {
             kinds.push("null");
         }
+        if self.contains_undefined() {
+            kinds.push("undefined");
+        }
         if self.contains_array() {
             kinds.push("array");
         }
         if self.contains_object() {
             kinds.push("object");
         }
+
         if kinds.is_empty() {
             return f.write_str("never");
         }
@@ -98,6 +104,61 @@ impl std::fmt::Display for Kind {
         }
 
         Ok(())
+    }
+}
+
+impl PartialEq for Kind {
+    fn eq(&self, other: &Self) -> bool {
+        let a = self.canonicalize();
+        let b = other.canonicalize();
+
+        if a.bytes != b.bytes {
+            return false;
+        }
+        if a.integer != b.integer {
+            return false;
+        }
+        if a.float != b.float {
+            return false;
+        }
+        if a.boolean != b.boolean {
+            return false;
+        }
+        if a.timestamp != b.timestamp {
+            return false;
+        }
+        if a.regex != b.regex {
+            return false;
+        }
+        if a.null != b.null {
+            return false;
+        }
+        if a.undefined != b.undefined {
+            return false;
+        }
+        if a.array != b.array {
+            return false;
+        }
+        if a.object != b.object {
+            return false;
+        }
+        true
+    }
+}
+
+impl Kind {
+    /// Returns a Kind type in a standard / simple representation.
+    #[must_use]
+    pub fn canonicalize(&self) -> Self {
+        let mut output = self.clone();
+
+        if let Some(object) = &mut output.object {
+            *object = object.canonicalize();
+        }
+        if let Some(array) = &mut output.array {
+            *array = array.canonicalize();
+        }
+        output
     }
 }
 

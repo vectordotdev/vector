@@ -1,20 +1,52 @@
 use std::fmt;
 
 use serde::{de, ser};
-use serde_json::Value;
+use vector_config::{
+    configurable_component,
+    schema::{
+        finalize_schema, generate_composite_schema, generate_number_schema, generate_string_schema,
+    },
+    schemars::{gen::SchemaGenerator, schema::SchemaObject},
+    validation::Validation,
+    Configurable, Metadata,
+};
 
-pub const GZIP_NONE: u32 = 0;
-pub const GZIP_FAST: u32 = 1;
-pub const GZIP_DEFAULT: u32 = 6;
-pub const GZIP_BEST: u32 = 9;
+// NOTE: The resulting schema for `Compression` is not going to look right, because of how we do the customized "string
+// or map" stuff. We've done a bunch of work here to get us half-way towards generating a valid schema for it, including
+// add in the `CompressionLevel` type and doing a custom `Configurable` implementation for it... but the real meat of
+// the change would be doing so for `Compression` because of it being an enum and all the boilerplate involved there.
+//
+// It'd be nice to find a succinct way to allow the expression of these constraints, possibly through a declarative
+// macro that helps build the manual `Configurable` implementation such that, while still leaving the developer
+// responsible for generating a correct schema, it would be far closer to a human-readable description of the schema
+// i.e. "this schema can be X or Y, and if X, it can only be these values, or if Y, the value must fall within this
+// specific range" and so on, with methods for describing enum variants, etc.
+//
+// Another complication is that we can _almost_ sort of get there with the existing primitives but `serde` itself has no
+// way to express an enum that functions like what we're doing here i.e. the variant name is parsed from the value,
+// without needing to be a tag field, with the ability to fallback to a newtype variant, etc.
+//
+// Long story short, these custom (de)serialization strategies are hard to encode in a procedural way because they are
+// in fact not themselves declared procedurally.
 
-#[derive(Debug, Derivative, Copy, Clone, Eq, PartialEq)]
+/// Compression configuration.
+#[configurable_component(no_ser, no_deser)]
+#[derive(Copy, Clone, Debug, Derivative, Eq, PartialEq)]
 #[derivative(Default)]
 pub enum Compression {
+    /// No compression.
     #[derivative(Default)]
     None,
-    Gzip(flate2::Compression),
-    Zlib(flate2::Compression),
+
+    /// [Gzip][gzip] compression.
+    ///
+    /// [gzip]: https://en.wikipedia.org/wiki/Gzip
+    Gzip(#[configurable(derived)] CompressionLevel),
+
+    /// [Zlib][zlib] compression.
+    ///
+    /// [zlib]: https://en.wikipedia.org/wiki/Zlib
+    Zlib(#[configurable(derived)] CompressionLevel),
 }
 
 impl Compression {
@@ -31,17 +63,11 @@ impl Compression {
     }
 
     pub const fn gzip_default() -> Compression {
-        // flate2 doesn't have a const `default` fn, since it actually implements the `Default`
-        // trait, and it doesn't have a constant for what the "default" level should be, so we
-        // hard-code it here.
-        Compression::Gzip(flate2::Compression::new(6))
+        Compression::Gzip(CompressionLevel::const_default())
     }
 
     pub const fn zlib_default() -> Compression {
-        // flate2 doesn't have a const `default` fn, since it actually implements the `Default`
-        // trait, and it doesn't have a constant for what the "default" level should be, so we
-        // hard-code it here.
-        Compression::Zlib(flate2::Compression::new(6))
+        Compression::Zlib(CompressionLevel::const_default())
     }
 
     pub const fn content_encoding(self) -> Option<&'static str> {
@@ -59,13 +85,21 @@ impl Compression {
             Self::Zlib(_) => "log.zz",
         }
     }
+
+    pub const fn level(self) -> flate2::Compression {
+        match self {
+            Self::None => flate2::Compression::none(),
+            Self::Gzip(level) | Self::Zlib(level) => level.as_flate2(),
+        }
+    }
 }
+
 impl fmt::Display for Compression {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             Compression::None => write!(f, "none"),
-            Compression::Gzip(ref level) => write!(f, "gzip({})", level.level()),
-            Compression::Zlib(ref level) => write!(f, "zlib({})", level.level()),
+            Compression::Gzip(ref level) => write!(f, "gzip({})", level.as_flate2().level()),
+            Compression::Zlib(ref level) => write!(f, "zlib({})", level.as_flate2().level()),
         }
     }
 }
@@ -118,37 +152,7 @@ impl<'de> de::Deserialize<'de> for Compression {
                             if level.is_some() {
                                 return Err(de::Error::duplicate_field("level"));
                             }
-                            level = Some(match map.next_value::<Value>()? {
-                                Value::Number(level) => match level.as_u64() {
-                                    Some(value) if value <= 9 => {
-                                        flate2::Compression::new(value as u32)
-                                    }
-                                    Some(_) | None => {
-                                        return Err(de::Error::invalid_value(
-                                            de::Unexpected::Other(&level.to_string()),
-                                            &"0, 1, 2, 3, 4, 5, 6, 7, 8 or 9",
-                                        ))
-                                    }
-                                },
-                                Value::String(level) => match level.as_str() {
-                                    "none" => flate2::Compression::none(),
-                                    "fast" => flate2::Compression::fast(),
-                                    "default" => flate2::Compression::default(),
-                                    "best" => flate2::Compression::best(),
-                                    level => {
-                                        return Err(de::Error::invalid_value(
-                                            de::Unexpected::Str(level),
-                                            &r#""none", "fast", "best" or "default""#,
-                                        ))
-                                    }
-                                },
-                                value => {
-                                    return Err(de::Error::invalid_type(
-                                        de::Unexpected::Other(&value.to_string()),
-                                        &"integer or string",
-                                    ));
-                                }
-                            });
+                            level = Some(map.next_value::<CompressionLevel>()?);
                         }
                         _ => return Err(de::Error::unknown_field(&key, &["algorithm", "level"])),
                     };
@@ -197,33 +201,169 @@ impl ser::Serialize for Compression {
             }
         }
 
+        // If there's a level present, and it's _not_ the default compression level, then serialize it. We already
+        // handle deserializing as the default level when the level isn't explicitly specified (but `algorithm` is) so
+        // serializing the default would just clutter the serialized output.
         if let Some(level) = level {
-            const NONE: flate2::Compression = flate2::Compression::none();
-            const FAST: flate2::Compression = flate2::Compression::fast();
-            const BEST: flate2::Compression = flate2::Compression::best();
-            let default = flate2::Compression::default();
-
-            match level {
-                NONE => map.serialize_entry("level", "none")?,
-                FAST => map.serialize_entry("level", "fast")?,
-                BEST => map.serialize_entry("level", "best")?,
-                // Don't serialize if at default level, we already utilize that when
-                // deserializing and it just clutters the resulting JSON.
-                level => {
-                    if level != default {
-                        map.serialize_entry("level", &level.level())?
-                    }
-                }
-            };
+            let default = CompressionLevel::const_default();
+            if level != default {
+                map.serialize_entry("level", &level)?
+            }
         }
 
         map.end()
     }
 }
 
+/// Compression level.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct CompressionLevel(flate2::Compression);
+
+impl CompressionLevel {
+    #[cfg(test)]
+    const fn new(level: u32) -> Self {
+        Self(flate2::Compression::new(level))
+    }
+
+    const fn const_default() -> Self {
+        Self(flate2::Compression::new(6))
+    }
+
+    const fn none() -> Self {
+        Self(flate2::Compression::none())
+    }
+
+    const fn best() -> Self {
+        Self(flate2::Compression::best())
+    }
+
+    const fn fast() -> Self {
+        Self(flate2::Compression::fast())
+    }
+
+    pub const fn as_flate2(self) -> flate2::Compression {
+        self.0
+    }
+}
+
+impl<'de> de::Deserialize<'de> for CompressionLevel {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        struct NumberOrString;
+
+        impl<'de> de::Visitor<'de> for NumberOrString {
+            type Value = CompressionLevel;
+
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.write_str("number or string")
+            }
+
+            fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                match s {
+                    "none" => Ok(CompressionLevel::none()),
+                    "fast" => Ok(CompressionLevel::fast()),
+                    "default" => Ok(CompressionLevel::const_default()),
+                    "best" => Ok(CompressionLevel::best()),
+                    level => {
+                        return Err(de::Error::invalid_value(
+                            de::Unexpected::Str(level),
+                            &r#""none", "fast", "best" or "default""#,
+                        ))
+                    }
+                }
+            }
+
+            fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Err(de::Error::invalid_value(
+                    de::Unexpected::Other(&v.to_string()),
+                    &"0, 1, 2, 3, 4, 5, 6, 7, 8 or 9",
+                ))
+            }
+
+            fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                if v <= 9 {
+                    Ok(CompressionLevel(flate2::Compression::new(v as u32)))
+                } else {
+                    return Err(de::Error::invalid_value(
+                        de::Unexpected::Unsigned(v),
+                        &"0, 1, 2, 3, 4, 5, 6, 7, 8 or 9",
+                    ));
+                }
+            }
+        }
+
+        deserializer.deserialize_any(NumberOrString)
+    }
+}
+
+impl ser::Serialize for CompressionLevel {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
+        const NONE: CompressionLevel = CompressionLevel::none();
+        const FAST: CompressionLevel = CompressionLevel::fast();
+        const BEST: CompressionLevel = CompressionLevel::best();
+
+        match *self {
+            NONE => serializer.serialize_str("none"),
+            FAST => serializer.serialize_str("fast"),
+            BEST => serializer.serialize_str("best"),
+            level => serializer.serialize_u64(u64::from(level.0.level())),
+        }
+    }
+}
+
+impl Configurable for CompressionLevel {
+    fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<Self>) -> SchemaObject {
+        let as_number = generate_number_schema::<u32>();
+        let as_string = generate_string_schema();
+
+        let mut schema = generate_composite_schema(&[as_number, as_string]);
+        finalize_schema(gen, &mut schema, overrides);
+        schema
+    }
+
+    fn description() -> Option<&'static str> {
+        Some("Compression level.")
+    }
+
+    fn metadata() -> vector_config::Metadata<Self> {
+        let mut metadata = vector_config::Metadata::default();
+        if let Some(description) = Self::description() {
+            metadata.set_description(description);
+        }
+
+        // Allows the user to specify any number from 0 to 9, or the constants "none", "fast", or "best".
+        //
+        // TODO: Technically, we can define `integer` or `number` for a schema's instance type, which would make the
+        // validation do the right thing, since as-is, while our implicit casting, everything in the schema ends up
+        // looking like it can be a floating-point number. We should add support for generating `integer` schemas, and
+        // then add validator support to do ranges specifically for integers vs numbers (floating-point).
+        metadata.add_validation(Validation::Range {
+            minimum: Some(0.0),
+            maximum: Some(9.0),
+        });
+        metadata.add_validation(Validation::Pattern(String::from("none|fast|best|default")));
+
+        metadata
+    }
+}
+
 #[cfg(test)]
 mod test {
-    use super::Compression;
+    use super::{Compression, CompressionLevel};
 
     #[test]
     fn deserialization() {
@@ -231,36 +371,36 @@ mod test {
             (r#""none""#, Compression::None),
             (
                 r#""gzip""#,
-                Compression::Gzip(flate2::Compression::default()),
+                Compression::Gzip(CompressionLevel::const_default()),
             ),
             (
                 r#""zlib""#,
-                Compression::Zlib(flate2::Compression::default()),
+                Compression::Zlib(CompressionLevel::const_default()),
             ),
             (r#"{"algorithm": "none"}"#, Compression::None),
             (
                 r#"{"algorithm": "gzip"}"#,
-                Compression::Gzip(flate2::Compression::default()),
+                Compression::Gzip(CompressionLevel::const_default()),
             ),
             (
                 r#"{"algorithm": "gzip", "level": "best"}"#,
-                Compression::Gzip(flate2::Compression::best()),
+                Compression::Gzip(CompressionLevel::best()),
             ),
             (
                 r#"{"algorithm": "gzip", "level": 8}"#,
-                Compression::Gzip(flate2::Compression::new(8)),
+                Compression::Gzip(CompressionLevel::new(8)),
             ),
             (
                 r#"{"algorithm": "zlib"}"#,
-                Compression::Zlib(flate2::Compression::default()),
+                Compression::Zlib(CompressionLevel::const_default()),
             ),
             (
                 r#"{"algorithm": "zlib", "level": "best"}"#,
-                Compression::Zlib(flate2::Compression::best()),
+                Compression::Zlib(CompressionLevel::best()),
             ),
             (
                 r#"{"algorithm": "zlib", "level": 8}"#,
-                Compression::Zlib(flate2::Compression::new(8)),
+                Compression::Zlib(CompressionLevel::new(8)),
             ),
         ];
         for (sources, result) in fixtures_valid.iter() {
@@ -287,15 +427,15 @@ mod test {
             ),
             (
                 r#"{"algorithm": "gzip", "level": -1}"#,
-                r#"invalid value: -1, expected 0, 1, 2, 3, 4, 5, 6, 7, 8 or 9 at line 1 column 34"#,
+                r#"invalid value: -1, expected 0, 1, 2, 3, 4, 5, 6, 7, 8 or 9 at line 1 column 33"#,
             ),
             (
                 r#"{"algorithm": "gzip", "level": "good"}"#,
-                r#"invalid value: string "good", expected "none", "fast", "best" or "default" at line 1 column 38"#,
+                r#"invalid value: string "good", expected "none", "fast", "best" or "default" at line 1 column 37"#,
             ),
             (
                 r#"{"algorithm": "gzip", "level": {}}"#,
-                r#"invalid type: {}, expected integer or string at line 1 column 34"#,
+                r#"invalid type: map, expected number or string at line 1 column 33"#,
             ),
             (
                 r#"{"algorithm": "gzip", "level": "default", "key": 42}"#,
@@ -313,10 +453,10 @@ mod test {
     fn from_and_to_value() {
         let fixtures_valid = [
             Compression::None,
-            Compression::Gzip(flate2::Compression::default()),
-            Compression::Gzip(flate2::Compression::new(7)),
-            Compression::Zlib(flate2::Compression::best()),
-            Compression::Zlib(flate2::Compression::new(7)),
+            Compression::Gzip(CompressionLevel::const_default()),
+            Compression::Gzip(CompressionLevel::new(7)),
+            Compression::Zlib(CompressionLevel::best()),
+            Compression::Zlib(CompressionLevel::new(7)),
         ];
 
         for v in fixtures_valid {
