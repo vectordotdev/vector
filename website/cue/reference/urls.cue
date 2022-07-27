@@ -2,6 +2,8 @@ package metadata
 
 urls: {
 	azure_blob_storage:                         "https://azure.microsoft.com/en-us/services/storage/blobs/"
+	azure_event_hubs_kafka_ecosystem:           "https://docs.microsoft.com/en-gb/azure/event-hubs/event-hubs-for-kafka-ecosystem-overview"
+	azure_event_hubs_connection:                "https://docs.microsoft.com/en-gb/azure/event-hubs/event-hubs-get-connection-string"
 	affine_type_system:                         "\(wikipedia)/wiki/Substructural_type_system#Affine_type_systems"
 	adaptive_request_concurrency_post:          "/blog/adaptive-request-concurrency/"
 	amazon_linux:                               "https://aws.amazon.com/amazon-linux-ami/"
