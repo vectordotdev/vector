@@ -1,14 +1,15 @@
+#[cfg(all(test, feature = "opentelemetry-integration-tests"))]
+mod integration_tests;
 #[cfg(test)]
 mod tests;
 
-mod log;
+mod grpc;
+mod http;
 
-use std::{collections::HashMap, net::SocketAddr};
+use std::net::SocketAddr;
 
-use bytes::Bytes;
 use futures::{future::join, FutureExt, TryFutureExt};
 
-use http::HeaderMap;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
@@ -17,18 +18,18 @@ use crate::{
         AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource, SourceConfig,
         SourceContext, SourceDescription,
     },
-    event::Event,
     opentelemetry::LogService::logs_service_server::LogsServiceServer,
     serde::bool_or_struct,
     sources::{
         http::HttpMethod,
-        util::{grpc::run_grpc_server, ErrorMessage, HttpSource},
+        util::{grpc::run_grpc_server, HttpSource},
         Source,
     },
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
-use self::log::Service;
+use self::grpc::Service;
+use self::http::OpentelemetryHttpServer;
 
 pub const LOGS: &str = "logs";
 
@@ -153,27 +154,5 @@ impl SourceConfig for OpentelemetryConfig {
 
     fn can_acknowledge(&self) -> bool {
         true
-    }
-}
-
-#[derive(Clone)]
-struct OpentelemetryHttpServer;
-
-impl OpentelemetryHttpServer {
-    fn decode_body(&self, _body: Bytes) -> Result<Vec<Event>, ErrorMessage> {
-        todo!()
-    }
-}
-
-impl HttpSource for OpentelemetryHttpServer {
-    fn build_events(
-        &self,
-        body: Bytes,
-        _header_map: HeaderMap,
-        _query_parameters: HashMap<String, String>,
-        _path: &str,
-    ) -> Result<Vec<Event>, ErrorMessage> {
-        let events = self.decode_body(body)?;
-        Ok(events)
     }
 }
