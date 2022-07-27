@@ -10,7 +10,7 @@ use futures::{ready, Sink};
 use pin_project::{pin_project, pinned_drop};
 use tokio::io::AsyncWrite;
 use tokio_util::codec::{BytesCodec, FramedWrite};
-use vector_common::finalization::EventFinalizers;
+use vector_common::finalization::{EventFinalizers, EventStatus};
 
 use super::EncodedEvent;
 use crate::internal_events::{SocketBytesSent, SocketEventsSent, SocketMode};
@@ -38,11 +38,7 @@ where
     #[pin]
     inner: FramedWrite<T, BytesCodec>,
     shutdown_check: Box<dyn Fn(&mut T) -> ShutdownCheck + Send>,
-    socket_mode: SocketMode,
-    events_total: usize,
-    event_bytes: usize,
-    bytes_total: usize,
-    finalizers: Vec<EventFinalizers>,
+    state: State,
 }
 
 impl<T> BytesSink<T>
@@ -57,27 +53,43 @@ where
         Self {
             inner: FramedWrite::new(inner, BytesCodec::new()),
             shutdown_check: Box::new(shutdown_check),
-            events_total: 0,
-            event_bytes: 0,
-            bytes_total: 0,
-            socket_mode,
-            finalizers: Vec::new(),
+            state: State {
+                events_total: 0,
+                event_bytes: 0,
+                bytes_total: 0,
+                socket_mode,
+                finalizers: Vec::new(),
+            },
         }
     }
+}
 
-    fn ack(&mut self) {
+struct State {
+    socket_mode: SocketMode,
+    events_total: usize,
+    event_bytes: usize,
+    bytes_total: usize,
+    finalizers: Vec<EventFinalizers>,
+}
+
+impl State {
+    fn ack(&mut self, status: EventStatus) {
         if self.events_total > 0 {
-            drop(std::mem::take(&mut self.finalizers));
+            for finalizer in std::mem::take(&mut self.finalizers) {
+                finalizer.update_status(status);
+            }
 
-            emit!(SocketEventsSent {
-                mode: self.socket_mode,
-                count: self.events_total as u64,
-                byte_size: self.event_bytes,
-            });
-            emit!(SocketBytesSent {
-                mode: self.socket_mode,
-                byte_size: self.bytes_total,
-            });
+            if status == EventStatus::Delivered {
+                emit!(SocketEventsSent {
+                    mode: self.socket_mode,
+                    count: self.events_total as u64,
+                    byte_size: self.event_bytes,
+                });
+                emit!(SocketBytesSent {
+                    mode: self.socket_mode,
+                    byte_size: self.bytes_total,
+                });
+            }
 
             self.events_total = 0;
             self.event_bytes = 0;
@@ -92,7 +104,7 @@ where
     T: AsyncWrite + Unpin,
 {
     fn drop(self: Pin<&mut Self>) {
-        self.get_mut().ack()
+        self.get_mut().state.ack(EventStatus::Dropped)
     }
 }
 
@@ -103,7 +115,7 @@ where
     type Error = <FramedWrite<T, BytesCodec> as Sink<Bytes>>::Error;
 
     fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        if *self.as_mut().project().events_total >= MAX_PENDING_ITEMS {
+        if self.as_mut().project().state.events_total >= MAX_PENDING_ITEMS {
             if let Err(error) = ready!(self.as_mut().poll_flush(cx)) {
                 return Poll::Ready(Err(error));
             }
@@ -115,11 +127,16 @@ where
 
     fn start_send(self: Pin<&mut Self>, item: EncodedEvent<Bytes>) -> Result<(), Self::Error> {
         let pinned = self.project();
-        pinned.finalizers.push(item.finalizers);
-        *pinned.events_total += 1;
-        *pinned.event_bytes += item.byte_size;
-        *pinned.bytes_total += item.item.len();
-        pinned.inner.start_send(item.item)
+        pinned.state.finalizers.push(item.finalizers);
+        pinned.state.events_total += 1;
+        pinned.state.event_bytes += item.byte_size;
+        pinned.state.bytes_total += item.item.len();
+
+        let result = pinned.inner.start_send(item.item);
+        if result.is_err() {
+            pinned.state.ack(EventStatus::Errored);
+        }
+        result
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -140,7 +157,10 @@ where
         let result = ready!(<FramedWrite<T, BytesCodec> as Sink<Bytes>>::poll_flush(
             inner, cx
         ));
-        self.as_mut().get_mut().ack();
+        self.as_mut().get_mut().state.ack(match result {
+            Ok(_) => EventStatus::Delivered,
+            Err(_) => EventStatus::Errored,
+        });
         Poll::Ready(result)
     }
 
@@ -149,7 +169,7 @@ where
         let result = ready!(<FramedWrite<T, BytesCodec> as Sink<Bytes>>::poll_close(
             inner, cx
         ));
-        self.as_mut().get_mut().ack();
+        self.as_mut().get_mut().state.ack(EventStatus::Dropped);
         Poll::Ready(result)
     }
 }

@@ -50,6 +50,14 @@ pub struct StatsdSinkConfig {
 
     #[serde(flatten)]
     pub mode: Mode,
+
+    #[configurable(derived)]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 /// Socket mode.
@@ -105,6 +113,7 @@ impl GenerateConfig for StatsdSinkConfig {
                 batch: Default::default(),
                 udp: UdpSinkConfig::from_address(default_address().to_string()),
             }),
+            acknowledgements: Default::default(),
         })
         .unwrap()
     }
@@ -162,7 +171,7 @@ impl SinkConfig for StatsdSinkConfig {
     }
 
     fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        None
+        Some(&self.acknowledgements)
     }
 }
 
@@ -497,6 +506,7 @@ mod test {
                 batch,
                 udp: UdpSinkConfig::from_address(addr.to_string()),
             }),
+            acknowledgements: Default::default(),
         };
 
         let context = SinkContext::new_test();
