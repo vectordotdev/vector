@@ -189,54 +189,58 @@ impl SourceConfig for DatadogAgentConfig {
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
-        let source_name = "datadog_agent";
-
         let definition = self
             .decoding
             .schema_definition(global_log_namespace.merge(self.log_namespace))
             .with_source_metadata(
-                source_name,
+                self.source_type(),
                 "message",
                 "message",
                 Kind::bytes(),
                 Some("message"),
             )
             .with_source_metadata(
-                source_name,
+                self.source_type(),
                 "status",
                 "status",
                 Kind::bytes(),
                 Some("severity"),
             )
             .with_source_metadata(
-                source_name,
+                self.source_type(),
                 "timestamp",
                 "timestamp",
                 Kind::timestamp(),
                 Some("timestamp"),
             )
             .with_source_metadata(
-                source_name,
+                self.source_type(),
                 "hostname",
                 "hostname",
                 Kind::bytes(),
                 Some("host"),
             )
             .with_source_metadata(
-                source_name,
+                self.source_type(),
                 "service",
                 "service",
                 Kind::bytes(),
                 Some("service"),
             )
             .with_source_metadata(
-                source_name,
+                self.source_type(),
                 "ddsource",
                 "ddsource",
                 Kind::bytes(),
                 Some("source"),
             )
-            .with_source_metadata(source_name, "ddtags", "ddtags", Kind::bytes(), Some("tags"))
+            .with_source_metadata(
+                self.source_type(),
+                "ddtags",
+                "ddtags",
+                Kind::bytes(),
+                Some("tags"),
+            )
             .with_standard_vector_source_metadata();
 
         if self.multiple_outputs {
