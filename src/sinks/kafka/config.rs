@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use codecs::JsonSerializerConfig;
 use futures::FutureExt;
 use rdkafka::ClientConfig;
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 use crate::{
     codecs::EncodingConfig,
@@ -19,28 +19,66 @@ use crate::{
 
 pub(crate) const QUEUED_MIN_MESSAGES: u64 = 100000;
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+/// Configuration for the `kafka` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct KafkaSinkConfig {
+pub struct KafkaSinkConfig {
+    /// A comma-separated list of the initial Kafka brokers to connect to.
+    ///
+    /// Each value must be in the form of `<host>` or `<host>:<port>`, and separated by a comma.
     pub bootstrap_servers: String,
+
+    /// The Kafka topic name to write events to.
+    #[configurable(metadata(templateable))]
     pub topic: String,
+
+    /// The log field name or tags key to use for the topic key.
+    ///
+    /// If the field does not exist in the log or in tags, a blank value will be used. If unspecified, the key is not sent.
+    ///
+    /// Kafka uses a hash of the key to choose the partition or uses round-robin if the record has no key.
     pub key_field: Option<String>,
+
+    #[configurable(derived)]
     pub encoding: EncodingConfig,
-    /// These batching options will **not** override librdkafka_options values.
+
+    // These batching options will **not** override librdkafka_options values.
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<NoDefaultsBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub compression: KafkaCompression,
+
+    #[configurable(derived)]
     #[serde(flatten)]
     pub auth: KafkaAuthConfig,
+
+    /// Default timeout, in milliseconds, for network requests.
     #[serde(default = "default_socket_timeout_ms")]
     pub socket_timeout_ms: u64,
+
+    /// Local message timeout, in milliseconds.
     #[serde(default = "default_message_timeout_ms")]
     pub message_timeout_ms: u64,
+
+    /// A map of advanced options to pass directly to the underlying `librdkafka` client.
+    ///
+    /// For more information on configuration options, see [Configuration properties][config_props_docs].
+    ///
+    /// [config_props_docs]: https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
     #[serde(default)]
     pub librdkafka_options: HashMap<String, String>,
+
+    /// The log field name to use for the Kafka headers.
+    ///
+    /// If omitted, no headers will be written.
     #[serde(alias = "headers_field")] // accidentally released as `headers_field` in 0.18
     pub headers_key: Option<String>,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",

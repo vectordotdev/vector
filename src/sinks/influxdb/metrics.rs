@@ -6,8 +6,9 @@ use std::{
 
 use bytes::{Bytes, BytesMut};
 use futures::{future::BoxFuture, stream, SinkExt};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use tower::Service;
+use vector_config::configurable_component;
 use vector_core::{
     event::metric::{MetricSketch, Quantile},
     ByteSizeOf,
@@ -53,24 +54,46 @@ impl SinkBatchSettings for InfluxDbDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 1.0;
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+/// Configuration for the `influxdb_metrics` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct InfluxDbConfig {
+    /// Sets the default namespace for any metrics sent.
+    ///
+    /// This namespace is only used if a metric has no existing namespace. When a namespace is
+    /// present, it is used as a prefix to the metric name, and separated with a period (`.`).
     #[serde(alias = "namespace")]
     pub default_namespace: Option<String>,
+
+    /// The endpoint to send data to.
     pub endpoint: String,
+
     #[serde(flatten)]
     pub influxdb1_settings: Option<InfluxDb1Settings>,
+
     #[serde(flatten)]
     pub influxdb2_settings: Option<InfluxDb2Settings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<InfluxDbDefaultBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    /// A map of additional tags, in the form of key/value pairs, to add to each measurement.
     pub tags: Option<HashMap<String, String>>,
+
+    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
+
+    /// The list of quantiles to calculate when sending distribution metrics.
     #[serde(default = "default_summary_quantiles")]
     pub quantiles: Vec<f64>,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",

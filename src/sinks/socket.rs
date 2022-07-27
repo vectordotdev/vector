@@ -2,7 +2,7 @@ use codecs::{
     encoding::{Framer, FramingConfig},
     TextSerializerConfig,
 };
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 #[cfg(unix)]
 use crate::sinks::util::unix::UnixSinkConfig;
@@ -15,41 +15,60 @@ use crate::{
     sinks::util::{tcp::TcpSinkConfig, udp::UdpSinkConfig},
 };
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+/// Configuration for the `socket` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug)]
 pub struct SocketSinkConfig {
     #[serde(flatten)]
     pub mode: Mode,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+/// Socket mode.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum Mode {
-    Tcp(TcpMode),
-    Udp(UdpMode),
+    /// TCP.
+    Tcp(#[configurable(transparent)] TcpMode),
+
+    /// UDP.
+    Udp(#[configurable(transparent)] UdpMode),
+
+    /// Unix Domain Socket.
     #[cfg(unix)]
-    Unix(UnixMode),
+    Unix(#[configurable(transparent)] UnixMode),
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// TCP configuration.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct TcpMode {
     #[serde(flatten)]
     config: TcpSinkConfig,
+
     #[serde(flatten)]
     encoding: EncodingConfigWithFraming,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// UDP configuration.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct UdpMode {
     #[serde(flatten)]
     config: UdpSinkConfig,
+
+    #[configurable(derived)]
     encoding: EncodingConfig,
 }
 
+/// Unix Domain Socket configuration.
 #[cfg(unix)]
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct UnixMode {
     #[serde(flatten)]
     config: UnixSinkConfig,
+
     #[serde(flatten)]
     encoding: EncodingConfigWithFraming,
 }

@@ -1,9 +1,4 @@
-use std::{
-    io::{self, Read},
-    num::ParseIntError,
-    path::{Path, PathBuf},
-    str::FromStr,
-};
+use std::{io, num::ParseIntError, path::Path, path::PathBuf, str::FromStr};
 
 use chrono::{DateTime, Utc};
 use futures::future::BoxFuture;
@@ -16,7 +11,7 @@ use vector_common::btreemap;
 use vector_config::configurable_component;
 
 use super::{filter_result_sync, FilterList, HostMetrics};
-use crate::event::metric::Metric;
+use crate::event::metric::{Metric, MetricTags};
 
 const MICROSECONDS: f64 = 1.0 / 1_000_000.0;
 
@@ -39,6 +34,10 @@ pub(crate) struct CGroupsConfig {
 
     /// Lists of group name patterns to include or exclude.
     groups: FilterList,
+
+    /// Base cgroup directory, for testing use only
+    #[serde(skip_serializing)]
+    base_dir: Option<PathBuf>,
 }
 
 #[derive(Debug, Snafu)]
@@ -63,113 +62,188 @@ enum CGroupsError {
 type CGroupsResult<T> = Result<T, CGroupsError>;
 
 impl HostMetrics {
-    pub async fn cgroups_metrics(&self) -> Vec<Metric> {
-        let now = Utc::now();
-        let mut buffer = String::new();
-        let mut output = Vec::new();
-        if let Some(root) = self.root_cgroup.clone() {
-            self.recurse_cgroup(&mut output, now, root, 1, &mut buffer)
-                .await;
+    pub(super) async fn cgroups_metrics(&self) -> Vec<Metric> {
+        match &self.root_cgroup {
+            Some(root) => {
+                let mut recurser = CGroupRecurser::new(self);
+                match &root.mode {
+                    Mode::Modern(base) => recurser.scan_modern(root, base).await,
+                    Mode::Legacy(base) => recurser.scan_legacy(root, base).await,
+                    Mode::Hybrid(v1base, v2base) => {
+                        // Hybrid cgroups contain both legacy and modern cgroups, so scan them both
+                        // for the data files. The `cpu` controller is usually found in the modern
+                        // groups, but the top-level stats are found under the legacy controller in
+                        // some setups. Similarly, the `memory` controller can be found in either
+                        // location. As such, detecting exactly where to scan for the controllers
+                        // doesn't work, so opportunistically scan for any controller files in all
+                        // subdirectories of the given root.
+                        recurser.scan_legacy(root, v1base).await;
+                        recurser.scan_modern(root, v2base).await;
+                    }
+                }
+                recurser.output
+            }
+            None => Vec::default(),
         }
-        output
+    }
+}
+
+struct CGroupRecurser<'a> {
+    host: &'a HostMetrics,
+    now: DateTime<Utc>,
+    output: Vec<Metric>,
+    buffer: String,
+    load_cpu: bool,
+    load_memory: bool,
+}
+
+impl<'a> CGroupRecurser<'a> {
+    fn new(host: &'a HostMetrics) -> Self {
+        Self {
+            host,
+            now: Utc::now(),
+            output: Vec::new(),
+            buffer: String::new(),
+            load_cpu: true,
+            load_memory: true,
+        }
     }
 
-    fn recurse_cgroup<'a>(
-        &'a self,
-        result: &'a mut Vec<Metric>,
-        now: DateTime<Utc>,
-        cgroup: CGroup,
-        level: usize,
-        buffer: &'a mut String,
-    ) -> BoxFuture<'a, ()> {
+    async fn scan_modern(&mut self, root: &CGroupRoot, base: &Path) {
+        let cgroup = CGroup {
+            path: join_path(base, &root.path),
+            name: root.name.clone(),
+        };
+        self.load_cpu = true;
+        self.load_memory = true;
+        self.recurse(cgroup, 1).await;
+    }
+
+    async fn scan_legacy(&mut self, root: &CGroupRoot, base: &Path) {
+        let memory_base = join_path(base, "memory");
+        let cgroup = CGroup {
+            path: join_path(memory_base, &root.path),
+            name: root.name.clone(),
+        };
+        self.load_cpu = false;
+        self.load_memory = true;
+        self.recurse(cgroup, 1).await;
+
+        let cpu_base = join_path(base, "cpu");
+        let cgroup = CGroup {
+            path: join_path(cpu_base, &root.path),
+            name: root.name.clone(),
+        };
+        self.load_cpu = true;
+        self.load_memory = false;
+        self.recurse(cgroup, 1).await;
+    }
+
+    fn recurse(&mut self, cgroup: CGroup, level: usize) -> BoxFuture<'_, ()> {
         Box::pin(async move {
-            let tags = btreemap! {
-                "cgroup" => cgroup.name.to_string_lossy(),
-                "collector" => "cgroups",
-            };
-            if let Some(cpu) = filter_result_sync(
-                cgroup.load_cpu(buffer).await,
-                "Failed to load cgroups CPU statistics.",
-            ) {
-                result.push(self.counter(
-                    "cgroup_cpu_usage_seconds_total",
-                    now,
-                    cpu.usage_usec as f64 * MICROSECONDS,
-                    tags.clone(),
-                ));
-                result.push(self.counter(
-                    "cgroup_cpu_user_seconds_total",
-                    now,
-                    cpu.user_usec as f64 * MICROSECONDS,
-                    tags.clone(),
-                ));
-                result.push(self.counter(
-                    "cgroup_cpu_system_seconds_total",
-                    now,
-                    cpu.system_usec as f64 * MICROSECONDS,
-                    tags.clone(),
-                ));
+            let tags = cgroup.tags();
+
+            if self.load_cpu {
+                self.load_cpu(&cgroup, &tags).await;
+            }
+            if self.load_memory && !cgroup.is_root() {
+                self.load_memory(&cgroup, &tags).await;
             }
 
-            if cgroup.has_memory_controller && !cgroup.is_root() {
-                if let Some(current) = filter_result_sync(
-                    cgroup.load_memory_current(buffer).await,
-                    "Failed to load cgroups current memory.",
-                ) {
-                    result.push(self.gauge(
-                        "cgroup_memory_current_bytes",
-                        now,
-                        current as f64,
-                        tags.clone(),
-                    ));
-                }
-
-                if let Some(stat) = filter_result_sync(
-                    cgroup.load_memory_stat(buffer).await,
-                    "Failed to load cgroups memory statistics.",
-                ) {
-                    result.push(self.gauge(
-                        "cgroup_memory_anon_bytes",
-                        now,
-                        stat.anon as f64,
-                        tags.clone(),
-                    ));
-                    result.push(self.gauge(
-                        "cgroup_memory_file_bytes",
-                        now,
-                        stat.file as f64,
-                        tags,
-                    ));
-                }
-            }
-
-            if level < self.config.cgroups.levels {
+            if level < self.host.config.cgroups.levels {
+                let groups = &self.host.config.cgroups.groups;
                 if let Some(children) =
                     filter_result_sync(cgroup.children().await, "Failed to load cgroups children.")
                 {
                     for child in children {
-                        if self.config.cgroups.groups.contains_path(Some(&child.name)) {
-                            self.recurse_cgroup(result, now, child, level + 1, buffer)
-                                .await;
+                        if groups.contains_path(Some(&child.name)) {
+                            self.recurse(child, level + 1).await;
                         }
                     }
                 }
             }
         })
     }
+
+    /// Try to load the `cpu` controller data file and emit metrics if it is found.
+    async fn load_cpu(&mut self, cgroup: &CGroup, tags: &MetricTags) {
+        if let Some(Some(cpu)) = filter_result_sync(
+            cgroup.load_cpu(&mut self.buffer).await,
+            "Failed to load cgroups CPU statistics.",
+        ) {
+            self.output.push(self.host.counter(
+                "cgroup_cpu_usage_seconds_total",
+                self.now,
+                cpu.usage_usec as f64 * MICROSECONDS,
+                tags.clone(),
+            ));
+            self.output.push(self.host.counter(
+                "cgroup_cpu_user_seconds_total",
+                self.now,
+                cpu.user_usec as f64 * MICROSECONDS,
+                tags.clone(),
+            ));
+            self.output.push(self.host.counter(
+                "cgroup_cpu_system_seconds_total",
+                self.now,
+                cpu.system_usec as f64 * MICROSECONDS,
+                tags.clone(),
+            ));
+        }
+    }
+
+    /// Try to load the `memory` controller data files and emit metrics if they are found.
+    async fn load_memory(&mut self, cgroup: &CGroup, tags: &MetricTags) {
+        if let Some(Some(current)) = filter_result_sync(
+            cgroup.load_memory_current(&mut self.buffer).await,
+            "Failed to load cgroups current memory.",
+        ) {
+            self.output.push(self.host.gauge(
+                "cgroup_memory_current_bytes",
+                self.now,
+                current as f64,
+                tags.clone(),
+            ));
+        }
+
+        if let Some(Some(stat)) = filter_result_sync(
+            cgroup.load_memory_stat(&mut self.buffer).await,
+            "Failed to load cgroups memory statistics.",
+        ) {
+            self.output.push(self.host.gauge(
+                "cgroup_memory_anon_bytes",
+                self.now,
+                stat.anon as f64,
+                tags.clone(),
+            ));
+            self.output.push(self.host.gauge(
+                "cgroup_memory_file_bytes",
+                self.now,
+                stat.file as f64,
+                tags.clone(),
+            ));
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
-pub(super) struct CGroup {
-    root: PathBuf,
+pub(super) struct CGroupRoot {
     name: PathBuf,
-    has_memory_controller: bool,
+    path: PathBuf,
+    mode: Mode,
+}
+
+#[derive(Clone, Debug)]
+enum Mode {
+    Legacy(PathBuf),
+    Hybrid(PathBuf, PathBuf),
+    Modern(PathBuf),
 }
 
 const CGROUP_CONTROLLERS: &str = "cgroup.controllers";
 
-impl CGroup {
-    pub(super) fn root<P: AsRef<Path>>(base_group: Option<P>) -> Option<CGroup> {
+impl CGroupRoot {
+    pub(super) fn new(config: &CGroupsConfig) -> Option<Self> {
         // There are three standard possibilities for cgroups setups
         // (`BASE` below is normally `/sys/fs/cgroup`, but containers
         // sometimes have `/sys` mounted elsewhere):
@@ -190,136 +264,139 @@ impl CGroup {
         // root, contains a set of files representing the controllers
         // for that group.
 
-        let base_dir = join_path(heim::os::linux::sysfs_root(), "fs/cgroup");
+        let base_dir = config
+            .base_dir
+            .clone()
+            .unwrap_or_else(|| join_path(heim::os::linux::sysfs_root(), "fs/cgroup"));
 
-        let (base_dir, controllers_file) = {
+        let mode = {
             let hybrid_root = join_path(&base_dir, "unified");
-            let test_file = join_path(&hybrid_root, CGROUP_CONTROLLERS);
-            if is_file(&test_file) {
-                (hybrid_root, test_file)
+            let hybrid_test_file = join_path(&hybrid_root, CGROUP_CONTROLLERS);
+            let modern_test_file = join_path(&base_dir, CGROUP_CONTROLLERS);
+            let cpu_dir = join_path(&base_dir, "cpu");
+            if is_file(&hybrid_test_file) {
+                debug!(
+                    message = "Detected hybrid cgroup base directory.",
+                    ?base_dir
+                );
+                Mode::Hybrid(base_dir, hybrid_root)
+            } else if is_file(&modern_test_file) {
+                debug!(
+                    message = "Detected modern cgroup base directory.",
+                    ?base_dir
+                );
+                Mode::Modern(base_dir)
+            } else if is_dir(&cpu_dir) {
+                debug!(
+                    message = "Detected legacy cgroup base directory.",
+                    ?base_dir
+                );
+                Mode::Legacy(base_dir)
             } else {
-                let test_file = join_path(&base_dir, CGROUP_CONTROLLERS);
-                if is_file(&test_file) {
-                    (base_dir, test_file)
-                } else {
-                    return None;
-                }
+                warn!(
+                    message = "Could not detect cgroup base directory.",
+                    ?base_dir
+                );
+                return None;
             }
         };
 
-        debug!(message = "Detected cgroup base directory.", ?base_dir);
-
-        let controllers = load_controllers(&controllers_file)
-            .map_err(
-                |error| error!(message = "Could not load root cgroup controllers list.", %error, ?controllers_file),
-            )
-            .ok()?;
-        let has_memory_controller = controllers.iter().any(|name| name == "memory");
-        if !has_memory_controller {
-            warn!(
-                message =
-                    "CGroups memory controller is not active, there will be no memory metrics."
-            );
-        }
-
-        match base_group {
-            Some(group) => {
-                let group = group.as_ref();
-                let root = join_path(base_dir, group);
-                is_dir(&root).then(|| CGroup {
-                    root,
-                    name: group.into(),
-                    has_memory_controller,
-                })
-            }
-            None => Some(CGroup {
-                root: base_dir,
-                name: "/".into(),
-                has_memory_controller,
-            }),
-        }
+        let (path, name) = match &config.base {
+            Some(base) => (base.to_path_buf(), base.to_path_buf()),
+            None => ("/".into(), "/".into()),
+        };
+        Some(Self { name, path, mode })
     }
+}
 
+#[derive(Clone, Debug)]
+struct CGroup {
+    path: PathBuf,
+    name: PathBuf,
+}
+
+impl CGroup {
     fn is_root(&self) -> bool {
         self.name == Path::new("/")
     }
 
-    async fn load_cpu(&self, buffer: &mut String) -> CGroupsResult<CpuStat> {
-        self.open_read_parse("cpu.stat", buffer).await
+    fn tags(&self) -> MetricTags {
+        btreemap! {
+            "cgroup" => self.name.to_string_lossy(),
+            "collector" => "cgroups",
+        }
     }
 
     fn make_path(&self, filename: impl AsRef<Path>) -> PathBuf {
-        join_path(&self.root, filename)
+        join_path(&self.path, filename)
     }
 
+    /// Open the file and read its contents. Returns `Ok(Some(filename))` if the file was read
+    /// successfully, `Ok(None)` if it didn't exist, and `Err(…)` if an error happend during the
+    /// process.
     async fn open_read(
         &self,
         filename: impl AsRef<Path>,
         buffer: &mut String,
-    ) -> CGroupsResult<PathBuf> {
+    ) -> CGroupsResult<Option<PathBuf>> {
         buffer.clear();
         let filename = self.make_path(filename);
-        File::open(&filename)
-            .await
-            .with_context(|_| OpeningSnafu {
-                filename: filename.clone(),
-            })?
-            .read_to_string(buffer)
-            .await
-            .with_context(|_| ReadingSnafu {
-                filename: filename.clone(),
-            })?;
-        Ok(filename)
+        match File::open(&filename).await {
+            Ok(mut file) => {
+                file.read_to_string(buffer)
+                    .await
+                    .with_context(|_| ReadingSnafu {
+                        filename: filename.clone(),
+                    })?;
+                Ok(Some(filename))
+            }
+            Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+            Err(source) => Err(CGroupsError::Opening { source, filename }),
+        }
     }
 
+    /// Open the file, read its contents, and parse the contents using the `FromStr` trait on the
+    /// desired type. Returns `Ok(Some(parsed_data))` on success, otherwise see `CGroup::open_read`.
     async fn open_read_parse<T: FromStr<Err = ParseIntError>>(
         &self,
         filename: impl AsRef<Path>,
         buffer: &mut String,
-    ) -> CGroupsResult<T> {
-        let filename = self.open_read(filename, buffer).await?;
-        buffer
-            .trim()
-            .parse()
-            .with_context(|_| ParsingSnafu { filename })
+    ) -> CGroupsResult<Option<T>> {
+        self.open_read(filename, buffer)
+            .await?
+            .map(|filename| {
+                buffer
+                    .trim()
+                    .parse()
+                    .with_context(|_| ParsingSnafu { filename })
+            })
+            .transpose()
     }
 
-    async fn load_memory_current(&self, buffer: &mut String) -> CGroupsResult<u64> {
+    async fn load_cpu(&self, buffer: &mut String) -> CGroupsResult<Option<CpuStat>> {
+        self.open_read_parse("cpu.stat", buffer).await
+    }
+
+    async fn load_memory_current(&self, buffer: &mut String) -> CGroupsResult<Option<u64>> {
         self.open_read_parse("memory.current", buffer).await
     }
 
-    async fn load_memory_stat(&self, buffer: &mut String) -> CGroupsResult<MemoryStat> {
+    async fn load_memory_stat(&self, buffer: &mut String) -> CGroupsResult<Option<MemoryStat>> {
         self.open_read_parse("memory.stat", buffer).await
     }
 
     async fn children(&self) -> io::Result<Vec<CGroup>> {
         let mut result = Vec::new();
-        let mut dir = fs::read_dir(&self.root).await?;
+        let mut dir = fs::read_dir(&self.path).await?;
         while let Some(entry) = dir.next_entry().await? {
-            let root = entry.path();
-            if is_dir(&root) {
-                result.push(CGroup {
-                    root,
-                    name: join_name(&self.name, entry.file_name()),
-                    has_memory_controller: self.has_memory_controller,
-                });
+            let path = entry.path();
+            if is_dir(&path) {
+                let name = join_name(&self.name, entry.file_name());
+                result.push(CGroup { path, name });
             }
         }
         Ok(result)
     }
-}
-
-fn load_controllers(filename: &Path) -> CGroupsResult<Vec<String>> {
-    let mut buffer = String::new();
-    std::fs::File::open(&filename)
-        .with_context(|_| OpeningSnafu {
-            filename: filename.to_path_buf(),
-        })?
-        .read_to_string(&mut buffer)
-        .with_context(|_| ReadingSnafu {
-            filename: filename.to_path_buf(),
-        })?;
-    Ok(buffer.trim().split(' ').map(Into::into).collect())
 }
 
 macro_rules! define_stat_struct {
@@ -354,7 +431,7 @@ define_stat_struct! { CpuStat(
 )}
 
 define_stat_struct! { MemoryStat(
-    // This file contains *way* more fields than defined here, these are
+    // This file contains *many* more fields than defined here, these are
     // just the ones used to provide the metrics here. See the
     // documentation on `memory.stat` at
     // https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html#memory
@@ -364,15 +441,11 @@ define_stat_struct! { MemoryStat(
 )}
 
 fn is_dir(path: impl AsRef<Path>) -> bool {
-    std::fs::metadata(path.as_ref())
-        .map(|metadata| metadata.is_dir())
-        .unwrap_or(false)
+    std::fs::metadata(path.as_ref()).map_or(false, |metadata| metadata.is_dir())
 }
 
 fn is_file(path: impl AsRef<Path>) -> bool {
-    std::fs::metadata(path.as_ref())
-        .map(|metadata| metadata.is_file())
-        .unwrap_or(false)
+    std::fs::metadata(path.as_ref()).map_or(false, |metadata| metadata.is_file())
 }
 
 /// Join a base directory path with a cgroup name.
@@ -387,6 +460,7 @@ fn join_path(base_path: impl AsRef<Path>, filename: impl AsRef<Path>) -> PathBuf
     }
 }
 
+/// Join a base cgroup name with another cgroup name.
 fn join_name(base_name: &Path, filename: impl AsRef<Path>) -> PathBuf {
     let filename = filename.as_ref();
     // Joining cgroups names works a little differently than path
@@ -401,9 +475,15 @@ fn join_name(base_name: &Path, filename: impl AsRef<Path>) -> PathBuf {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
+    use std::fs::{self, File};
+    use std::io::Write;
     use std::path::{Path, PathBuf};
 
-    use pretty_assertions::assert_eq;
+    use pretty_assertions::{assert_eq, assert_ne};
+    use rand::{rngs::ThreadRng, Rng};
+    use tempfile::TempDir;
+    use vector_core::event::Metric;
 
     use super::{
         super::{
@@ -430,8 +510,210 @@ mod tests {
 
         assert!(!metrics.is_empty());
         assert_eq!(count_tag(&metrics, "cgroup"), metrics.len());
-        assert!(count_name(&metrics, "cgroup_cpu_usage_seconds_total") > 0);
-        assert!(count_name(&metrics, "cgroup_cpu_user_seconds_total") > 0);
-        assert!(count_name(&metrics, "cgroup_cpu_system_seconds_total") > 0);
+        assert_eq!(count_tag(&metrics, "collector"), metrics.len());
+        assert_ne!(count_name(&metrics, "cgroup_cpu_usage_seconds_total"), 0);
+        assert_ne!(count_name(&metrics, "cgroup_cpu_user_seconds_total"), 0);
+        assert_ne!(count_name(&metrics, "cgroup_cpu_system_seconds_total"), 0);
+        assert_ne!(count_name(&metrics, "cgroup_memory_anon_bytes"), 0);
+        assert_ne!(count_name(&metrics, "cgroup_memory_file_bytes"), 0);
+    }
+
+    #[tokio::test]
+    async fn parses_modern_cgroups() {
+        // Fully v2 cgroups:
+        // - The groups start at the root.
+        // - All group contains a controller file and all controllers.
+        let mut base = Setup::new();
+        for subdir in SUBDIRS {
+            base.group(
+                subdir,
+                CPU_STAT | MEMORY_STAT,
+                Some(if subdir == "." {
+                    "cpuset cpu memory pids\n"
+                } else {
+                    "memory pids\n"
+                }),
+            );
+        }
+        base.test().await;
+    }
+
+    #[tokio::test]
+    async fn parses_hybrid_cgroups_1() {
+        // As found on Gentoo, hybrid v1/v2 cgroups:
+        // - v1 controllers (memory) are at the root.
+        // - v2 groups (cpu) are under `unified`.
+        // - controller list files are under `unified` but are empty.
+        let mut base = Setup::new();
+        base.d("memory");
+        base.d("unified");
+        for subdir in SUBDIRS {
+            base.group(&format!("unified/{}", subdir), CPU_STAT, Some(""));
+            base.group(&format!("memory/{}", subdir), MEMORY_STAT, None);
+        }
+        base.test().await;
+    }
+
+    #[tokio::test]
+    async fn parses_hybrid_cgroups_2() {
+        // As found on Ubuntu, hybrid v1/v2 cgroups:
+        // - v1 controllers (memory) are at the root.
+        // - v2 groups (cpu) are under `unified`.
+        // - controller list files are under `unified` but are empty.
+        // - the top-level `cpu.stat` file is under the v1 controller.
+        let mut base = Setup::new();
+        base.group("cpu", CPU_STAT, None); // oddball cpu.stat file here, but only that one
+        base.d("memory");
+        base.d("unified");
+        for subdir in SUBDIRS {
+            base.group(
+                &format!("unified/{}", subdir),
+                if subdir == "." { NONE } else { CPU_STAT },
+                Some(""),
+            );
+            base.group(&format!("memory/{}", subdir), MEMORY_STAT, None);
+        }
+        base.test().await;
+    }
+
+    #[tokio::test]
+    async fn parses_legacy_cgroups() {
+        // Fully v1 (legacy) cgroups:
+        // - The controllers are at the root with groups underneath each.
+        let mut base = Setup::new();
+        base.d("cpu");
+        base.d("memory");
+        for subdir in SUBDIRS {
+            base.group(&format!("cpu/{}", subdir), CPU_STAT, None);
+            base.group(&format!("memory/{}", subdir), MEMORY_STAT, None);
+        }
+    }
+
+    const SUBDIRS: [&str; 5] = [
+        ".",
+        "system.slice",
+        "user.slice",
+        "user.slice/user-1000.slice",
+        "user.slice/user-1000.slice/session-40.scope",
+    ];
+
+    const GROUPS: [&str; 5] = ["/", SUBDIRS[1], SUBDIRS[2], SUBDIRS[3], SUBDIRS[4]];
+
+    struct Setup(TempDir, ThreadRng);
+
+    const NONE: usize = 0;
+    const CPU_STAT: usize = 1 << 1;
+    const MEMORY_STAT: usize = 1 << 2;
+
+    impl Setup {
+        fn new() -> Self {
+            Self(tempfile::tempdir().unwrap(), rand::thread_rng())
+        }
+
+        async fn test(&self) {
+            let path = self.0.path();
+            let config: HostMetricsConfig = toml::from_str(&format!(
+                r#"
+                collectors = ["cgroups"]
+                cgroups.base_dir = {path:?}
+                "#
+            ))
+            .unwrap();
+            let metrics = HostMetrics::new(config).cgroups_metrics().await;
+
+            assert_ne!(metrics.len(), 0);
+
+            assert_eq!(&all_tags(&metrics, "collector"), &["cgroups"]);
+            assert_eq!(&all_tags(&metrics, "cgroup"), &GROUPS);
+
+            assert_eq!(
+                count_name(&metrics, "cgroup_cpu_usage_seconds_total"),
+                SUBDIRS.len()
+            );
+            assert_eq!(
+                count_name(&metrics, "cgroup_cpu_user_seconds_total"),
+                SUBDIRS.len()
+            );
+            assert_eq!(
+                count_name(&metrics, "cgroup_cpu_system_seconds_total"),
+                SUBDIRS.len()
+            );
+            assert_eq!(
+                count_name(&metrics, "cgroup_memory_anon_bytes"),
+                SUBDIRS.len() - 1
+            );
+            assert_eq!(
+                count_name(&metrics, "cgroup_memory_file_bytes"),
+                SUBDIRS.len() - 1
+            );
+        }
+
+        fn group(&mut self, subdir: &str, flags: usize, controllers: Option<&str>) {
+            self.d(subdir);
+            if let Some(controllers) = controllers {
+                self.f(subdir, "cgroup.controllers", controllers);
+            }
+            if (flags & CPU_STAT) != 0 {
+                self.cpu_stat(subdir);
+            }
+            if (flags & MEMORY_STAT) != 0 {
+                self.memory_stat(subdir);
+            }
+        }
+
+        fn cpu_stat(&mut self, subdir: &str) {
+            let a = self.1.gen_range(1000000..1000000000);
+            let b = self.1.gen_range(1000000..1000000000);
+            let c = self.1.gen_range(1000000..1000000000);
+            self.f(
+                subdir,
+                "cpu.stat",
+                &format!("usage_usec {a}\nuser_usec {b}\nsystem_usec {c}\nnr_periods 0\nnr_throttled 0\nthrottled_usec 0\n"),
+            );
+        }
+
+        fn memory_stat(&mut self, subdir: &str) {
+            let anon = self.1.gen_range(1000000..1000000000);
+            let file = self.1.gen_range(1000000..1000000000);
+            self.f(
+                subdir,
+                "memory.stat",
+                &format!("anon {anon}\nfile {file}\n",),
+            );
+        }
+
+        fn d(&self, subdir: &str) {
+            let path: PathBuf = [self.0.path(), subdir.as_ref()].iter().collect();
+            fs::create_dir_all(path).unwrap();
+        }
+
+        fn f(&self, subdir: &str, filename: &str, contents: &str) {
+            let path: PathBuf = [self.0.path(), subdir.as_ref(), filename.as_ref()]
+                .iter()
+                .collect();
+            let mut file = File::options()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .open(path)
+                .unwrap();
+            file.write_all(contents.as_bytes()).unwrap();
+        }
+    }
+
+    fn all_tags(metrics: &[Metric], tag: &str) -> Vec<String> {
+        metrics
+            .iter()
+            .map(|metric| {
+                metric
+                    .tags()
+                    .expect("The metrics should have tags")
+                    .get(tag)
+                    .expect("The metric is missing the specified tag")
+                    .to_string()
+            })
+            .collect::<BTreeSet<String>>()
+            .into_iter()
+            .collect()
     }
 }

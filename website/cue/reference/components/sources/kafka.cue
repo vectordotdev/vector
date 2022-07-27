@@ -214,6 +214,13 @@ components: sources: kafka: {
 					examples: ["partition"]
 				}
 			}
+			source_type: {
+				description: "The name of the source type."
+				required:    true
+				type: string: {
+					examples: ["kafka"]
+				}
+			}
 			timestamp: fields._current_timestamp & {
 				description: "The timestamp encoded in the Kafka message or the current time if it cannot be fetched."
 			}

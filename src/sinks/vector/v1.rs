@@ -1,8 +1,8 @@
 use bytes::{BufMut, BytesMut};
 use prost::Message;
-use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tokio_util::codec::Encoder;
+use vector_config::configurable_component;
 use vector_core::event::{proto, Event};
 
 use crate::{
@@ -12,12 +12,25 @@ use crate::{
     tls::TlsEnableableConfig,
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for version one of the `vector` sink.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct VectorConfig {
+    /// The downstream Vector address to connect to.
+    ///
+    /// The address _must_ include a port.
     address: String,
+
+    #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
+
+    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
+
+    /// The size, in bytes, of the socket's send buffer.
+    ///
+    /// If set, the value of the setting is passed via the `SO_SNDBUF` option.
     send_buffer_bytes: Option<usize>,
 }
 

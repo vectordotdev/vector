@@ -27,6 +27,9 @@ env:
   VERBOSE: true
   CI: true
   PROFILE: debug
+  # observing issues fetching boringssl via HTTPS in the OSX build, seeing if this helps
+  # can be removed when we switch back to the upstream openssl-sys crate
+  CARGO_NET_GIT_FETCH_WITH_CLI: true
 
 jobs:
   changes:

@@ -134,7 +134,7 @@ vrl-cli = { path = "lib/vrl/cli", optional = true }
 async-stream = { version = "0.3.3", default-features = false }
 async-trait = { version = "0.1.56", default-features = false }
 futures = { version = "0.3.21", default-features = false, features = ["compat", "io-compat"], package = "futures" }
-tokio = { version = "1.20.0", default-features = false, features = ["full"] }
+tokio = { version = "1.20.1", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1.9", default-features = false, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.7", default-features = false, features = ["io", "time"] }
@@ -152,21 +152,21 @@ metrics = "0.20.1"
 metrics-tracing-context = { version = "0.12.0", default-features = false }
 
 # AWS - Official SDK
-aws-config = { version = "0.15.0", default-features = false, features = ["rustls"], optional = true }
-aws-types = { version = "0.15.0", default-features = false, features = ["hardcoded-credentials"], optional = true }
-aws-sdk-s3 = { version = "0.15.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-sqs = { version = "0.15.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-cloudwatch = { version = "0.15.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-cloudwatchlogs = { version = "0.15.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-elasticsearch = {version = "0.15.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-firehose = { version = "0.15.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-kinesis = { version = "0.15.0", default-features = false, features = ["rustls"], optional = true }
-aws-sigv4 = { version = "0.15.0", default-features = false, optional = true }
-aws-smithy-async = { version = "0.45.0", default-features = false, optional = true }
-aws-smithy-client = { version = "0.45.0", default-features = false, features = ["client-hyper"], optional = true}
-aws-smithy-http = { version = "0.45.0", default-features = false, features = ["event-stream"], optional = true }
-aws-smithy-http-tower = { version = "0.45.0", default-features = false, optional = true }
-aws-smithy-types = { version = "0.45.0", default-features = false, optional = true }
+aws-sdk-s3 = { version = "0.16.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-sqs = { version = "0.16.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-cloudwatch = { version = "0.16.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-cloudwatchlogs = { version = "0.16.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-elasticsearch = {version = "0.16.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-firehose = { version = "0.16.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-kinesis = { version = "0.16.0", default-features = false, features = ["rustls"], optional = true }
+aws-types = { version = "0.46.0", default-features = false, features = ["hardcoded-credentials"], optional = true }
+aws-sigv4 = { version = "0.46.0", default-features = false, optional = true }
+aws-config = { version = "0.46.0", default-features = false, features = ["rustls"], optional = true }
+aws-smithy-async = { version = "0.46.0", default-features = false, optional = true }
+aws-smithy-client = { version = "0.46.0", default-features = false, features = ["client-hyper"], optional = true}
+aws-smithy-http = { version = "0.46.0", default-features = false, features = ["event-stream"], optional = true }
+aws-smithy-http-tower = { version = "0.46.0", default-features = false, optional = true }
+aws-smithy-types = { version = "0.46.0", default-features = false, optional = true }
 
 # Azure
 azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b7171eb40909f7f2805f4622e076f8a6dbbe2d98", default-features = false, features = ["enable_reqwest"], optional = true }
@@ -221,7 +221,7 @@ vrl-stdlib = { path = "lib/vrl/stdlib" }
 arc-swap = { version = "1.5", default-features = false, optional = true }
 async-compression = { version = "0.3.12", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
 avro-rs = { version = "0.13.0", default-features = false, optional = true }
-axum = { version = "0.5.13", default-features = false }
+axum = { version = "0.5.14", default-features = false }
 base64 = { version = "0.13.0", default-features = false, optional = true }
 bloom = { version = "0.3.2", default-features = false, optional = true }
 bollard = { version = "0.13.0", default-features = false, features = ["ssl"] }
@@ -229,7 +229,7 @@ bytes = { version = "1.2.0", default-features = false, features = ["serde"] }
 bytesize = { version = "1.1.0", default-features = false }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
 cidr-utils = { version = "0.5.7", default-features = false }
-clap = { version = "3.2.14", default-features = false, features = ["derive", "env", "std"] }
+clap = { version = "3.2.15", default-features = false, features = ["derive", "env", "std"] }
 colored = { version = "2.0.0", default-features = false }
 csv = { version = "1.1", default-features = false, optional = true }
 derivative = { version = "2.2.0", default-features = false }
@@ -307,7 +307,7 @@ warp = { version = "0.3.1", default-features = false }
 heim = { git = "https://github.com/vectordotdev/heim.git", branch="update-nix", default-features = false, features = ["cpu", "disk", "host", "memory", "net"], optional = true }
 
 # make sure to update the external docs when the Lua version changes
-mlua = { version = "0.8.1", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
+mlua = { version = "0.8.2", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 
 [target.'cfg(windows)'.dependencies]
 schannel = "0.1.20"
@@ -339,7 +339,7 @@ proptest = "1.0"
 quickcheck = "1.0.3"
 reqwest = { version = "0.11", features = ["json"] }
 tempfile = "3.3.0"
-tokio = { version = "1.20.0", features = ["test-util"] }
+tokio = { version = "1.20.1", features = ["test-util"] }
 tokio-test = "0.4.2"
 tower-test = "0.4.0"
 value = { path = "lib/value", features = ["test"] }
