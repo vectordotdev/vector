@@ -17,8 +17,8 @@ use tokio_stream::wrappers::IntervalStream;
 use crate::{
     http::{Auth, HttpClient},
     internal_events::{
-        EndpointBytesReceived, PrometheusEventsReceived, PrometheusHttpError,
-        PrometheusHttpResponseError, RequestCompleted, StreamClosedError,
+        EndpointBytesReceived, HttpScrapeEventsReceived, HttpScrapeHttpError,
+        HttpScrapeHttpResponseError, RequestCompleted, StreamClosedError,
     },
     tls::TlsSettings,
     Error, SourceSender,
@@ -153,8 +153,7 @@ pub(crate) async fn http_scrape<H: HttpScraper + std::marker::Send + Clone>(
                         });
                         match context.on_response(&url, &header, &body) {
                             Some(events) => {
-                                // TODO emit EventsReceived (PrometheusEventsReceived)
-                                emit!(PrometheusEventsReceived {
+                                emit!(HttpScrapeEventsReceived {
                                     byte_size: events.size_of(),
                                     count: events.len(),
                                     uri: url.clone()
@@ -166,14 +165,14 @@ pub(crate) async fn http_scrape<H: HttpScraper + std::marker::Send + Clone>(
                     }
                     Ok((header, _)) => {
                         context.on_http_response_error(&url, &header);
-                        emit!(PrometheusHttpResponseError {
+                        emit!(HttpScrapeHttpResponseError {
                             code: header.status,
                             url: url.clone(),
                         });
                         None
                     }
                     Err(error) => {
-                        emit!(PrometheusHttpError {
+                        emit!(HttpScrapeHttpError {
                             error,
                             url: url.clone(),
                         });
