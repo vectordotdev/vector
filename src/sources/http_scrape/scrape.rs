@@ -1,5 +1,5 @@
-//!
-//!
+//! Generalized HTTP scrape source.
+//! Scrapes an endpoint at an interval, decoding the HTTP responses into events.
 
 use bytes::{Bytes, BytesMut};
 use futures_util::FutureExt;
@@ -27,13 +27,18 @@ use vector_core::{
     event::Event,
 };
 
+/// The name of this source
 const NAME: &str = "http_scrape";
+
+// TODO:
+//   - request headers
+//   - framing for the decoding?
 
 /// Configuration for the `http_scrape` source.
 #[configurable_component(source)]
 #[derive(Clone, Debug)]
 pub struct HttpScrapeConfig {
-    /// Endpoints to scrape metrics from.
+    /// Endpoint to scrape events from.
     endpoint: String,
 
     /// Custom parameters for the scrape request query string.
@@ -46,24 +51,24 @@ pub struct HttpScrapeConfig {
     #[serde(default = "super::default_scrape_interval_secs")]
     scrape_interval_secs: u64,
 
-    /// TODO
+    /// Decoder to use on the HTTP responses.
     #[configurable(derived)]
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
 
-    /// TODO
+    /// Framing to use in the decoding.
     #[configurable(derived)]
     framing: Option<FramingConfig>,
 
-    /// TODO
+    /// Headers to apply to the HTTP requests.
     #[serde(default)]
     headers: Option<Vec<String>>,
 
-    /// TODO
+    /// TLS configuration.
     #[configurable(derived)]
     tls: Option<TlsConfig>,
 
-    /// TODO
+    /// HTTP Authentication.
     #[configurable(derived)]
     auth: Option<Auth>,
 }
@@ -75,7 +80,7 @@ inventory::submit! {
 impl GenerateConfig for HttpScrapeConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            endpoint: "http://localhost:9090/metrics".to_string(),
+            endpoint: "http://localhost:9898/logs".to_string(),
             query: None,
             scrape_interval_secs: super::default_scrape_interval_secs(),
             decoding: default_decoding(),
@@ -92,6 +97,7 @@ impl GenerateConfig for HttpScrapeConfig {
 #[typetag::serde(name = "http_scrape")]
 impl SourceConfig for HttpScrapeConfig {
     async fn build(&self, cx: SourceContext) -> Result<sources::Source> {
+        // build the url
         let endpoints = vec![self.endpoint.clone()];
         let urls = endpoints
             .iter()
@@ -101,6 +107,7 @@ impl SourceConfig for HttpScrapeConfig {
 
         let tls = TlsSettings::from_options(&self.tls)?;
 
+        // build the decoder
         let decoder = DecodingConfig::new(
             self.framing
                 .clone()
@@ -110,6 +117,7 @@ impl SourceConfig for HttpScrapeConfig {
         )
         .build();
 
+        // the only specific context needed is the ability to decode
         let context = HttpScrapeContext { decoder };
 
         let inputs = super::GenericHttpScrapeInputs::new(
@@ -143,7 +151,7 @@ struct HttpScrapeContext {
 }
 
 impl super::HttpScraper for HttpScrapeContext {
-    ///
+    /// Decodes the HTTP response body into events per the decoder configured.
     fn on_response(
         &mut self,
         _url: &http::Uri,

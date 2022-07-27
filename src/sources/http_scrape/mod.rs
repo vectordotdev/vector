@@ -1,5 +1,12 @@
+//! Common logic for sources that are HTTP scrapers.
 //!
-//!
+//! Specific HTTP scraping sources will:
+//!   - Call get_url() to build the URL(s) to scrape.
+//!   - Implmement a specific context struct which:
+//!       - Contains the data that source needs in order to process the HTTP responses into internal_events
+//!       - Implements the HttpScraper trait
+//!   - Call http_scrape() supplying the generic inputs for scraping and the source-specific
+//!     context.
 
 #[cfg(all(unix, feature = "sources-http_scrape"))]
 pub mod scrape;
@@ -26,7 +33,7 @@ use crate::{
 use vector_common::shutdown::ShutdownSignal;
 use vector_core::{config::proxy::ProxyConfig, event::Event, ByteSizeOf};
 
-/// TODO
+/// Contains the inputs generic to any http scrape.
 pub(crate) struct GenericHttpScrapeInputs {
     urls: Vec<Uri>,
     interval_secs: u64,
@@ -56,24 +63,24 @@ impl GenericHttpScrapeInputs {
     }
 }
 
-/// TODO
+/// The default interval to scrape the http endpoint if none is configured.
 pub(crate) const fn default_scrape_interval_secs() -> u64 {
     15
 }
 
-///
+/// Methods that allow context-specific behavior during the scraping procedure.
 pub(crate) trait HttpScraper {
-    ///
+    /// (Optional) Called before the HTTP request is made, allows building context.
     fn build(&mut self, _url: &Uri) {}
 
-    ///
+    /// Called after the HTTP request succeeds and returns the decoded/parsed Event array.
     fn on_response(&mut self, url: &Uri, header: &Parts, body: &Bytes) -> Option<Vec<Event>>;
 
-    ///
+    /// (Optional) Called if the HTTP response is not 200 ('OK').
     fn on_http_response_error(&self, _uri: &Uri, _header: &Parts) {}
 }
 
-///
+/// Builds a url for the HTTP requests.
 pub(crate) fn get_url(uri: &Uri, query: &Option<HashMap<String, Vec<String>>>) -> Uri {
     let mut serializer = url::form_urlencoded::Serializer::new(String::new());
     if let Some(query) = uri.query() {
@@ -100,7 +107,10 @@ pub(crate) fn get_url(uri: &Uri, query: &Option<HashMap<String, Vec<String>>>) -
     builder.build().expect("error building URI")
 }
 
-///
+/// Scrapes one or more urls at an interval.
+///   - The HTTP request is built per the options in provided generic inputs.
+///   - The HTTP response is decoded/parsed into events by the specific context.
+///   - The events are then sent to the output stream.
 pub(crate) async fn http_scrape<H: HttpScraper + std::marker::Send + Clone>(
     inputs: GenericHttpScrapeInputs,
     context: H,

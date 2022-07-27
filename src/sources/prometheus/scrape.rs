@@ -237,7 +237,7 @@ struct PrometheusScrapeContext {
 }
 
 impl HttpScraper for PrometheusScrapeContext {
-    ///
+    /// Builds the instance info and endpoint info for the current request
     fn build(&mut self, url: &Uri) {
         self.instance_info = self.instance_tag.as_ref().map(|tag| {
             let instance = format!(
@@ -263,7 +263,7 @@ impl HttpScraper for PrometheusScrapeContext {
         });
     }
 
-    ///
+    /// Parses the Prometheus HTTP response into metric events
     fn on_response(&mut self, url: &Uri, _header: &Parts, body: &Bytes) -> Option<Vec<Event>> {
         let body = String::from_utf8_lossy(body);
 
@@ -331,7 +331,6 @@ impl HttpScraper for PrometheusScrapeContext {
         }
     }
 
-    ///
     fn on_http_response_error(&self, url: &Uri, header: &Parts) {
         if header.status == hyper::StatusCode::NOT_FOUND && url.path() == "/" {
             // https://github.com/vectordotdev/vector/pull/3801#issuecomment-700723178
