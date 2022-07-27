@@ -47,7 +47,7 @@ impl Function for TypeDef {
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
-        let type_def = value.type_def((&*state.local, &*state.external));
+        let type_def = value.type_def(state);
 
         Ok(Box::new(TypeDefFn { type_def }))
     }
@@ -63,7 +63,7 @@ impl Expression for TypeDefFn {
         Ok(type_def(&self.type_def.clone()))
     }
 
-    fn type_def(&self, _state: (&state::LocalEnv, &state::ExternalEnv)) -> VrlTypeDef {
+    fn type_def(&self, _state: &state::TypeState) -> VrlTypeDef {
         VrlTypeDef::any().infallible()
     }
 }

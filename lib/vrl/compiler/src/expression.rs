@@ -42,7 +42,7 @@ pub mod query;
 
 pub use core::{ExpressionError, Resolved};
 
-use crate::state::TypeState;
+use crate::state::{TypeInfo, TypeState};
 #[cfg(feature = "expr-abort")]
 pub use abort::Abort;
 pub use array::Array;
@@ -89,16 +89,24 @@ pub trait Expression: Send + Sync + fmt::Debug + DynClone {
 
     /// Resolve an expression to its [`TypeDef`] type definition.
     /// This must be called with the _initial_ TypeState.
-    fn type_def(&self, state: &TypeState) -> TypeDef;
+    fn type_def(&self, state: &TypeState) -> TypeDef {
+        panic!("deprecated type_def called for {:?}", self);
+    }
 
     /// Updates the state if necessary.
     /// By default it does nothing.
+    // deprecated
     fn update_state(
         &mut self,
         _local: &mut LocalEnv,
         _external: &mut ExternalEnv,
     ) -> Result<(), ExpressionError> {
         Ok(())
+    }
+
+    fn type_info(&self, state: &TypeState) -> TypeInfo {
+        // TODO: remove this
+        unimplemented!("type_info not implemented for {:?}", self)
     }
 
     /// Format the expression into a consistent style.
@@ -288,7 +296,7 @@ impl Expression for Expr {
         }
     }
 
-    fn type_def(&self, state: &TypeState) -> TypeDef {
+    fn type_info(&self, state: &TypeState) -> TypeInfo {
         use Expr::{
             Abort, Assignment, Container, FunctionCall, IfStatement, Literal, Noop, Op, Query,
             Unary, Variable,
@@ -296,24 +304,24 @@ impl Expression for Expr {
 
         match self {
             #[cfg(feature = "expr-literal")]
-            Literal(v) => v.type_def(state),
-            Container(v) => v.type_def(state),
+            Literal(v) => v.type_info(state),
+            Container(v) => v.type_info(state),
             #[cfg(feature = "expr-if_statement")]
-            IfStatement(v) => v.type_def(state),
+            IfStatement(v) => v.type_info(state),
             #[cfg(feature = "expr-op")]
-            Op(v) => v.type_def(state),
+            Op(v) => v.type_info(state),
             #[cfg(feature = "expr-assignment")]
-            Assignment(v) => v.type_def(state),
+            Assignment(v) => v.type_info(state),
             #[cfg(feature = "expr-query")]
-            Query(v) => v.type_def(state),
+            Query(v) => v.type_info(state),
             #[cfg(feature = "expr-function_call")]
-            FunctionCall(v) => v.type_def(state),
-            Variable(v) => v.type_def(state),
-            Noop(v) => v.type_def(state),
+            FunctionCall(v) => v.type_info(state),
+            Variable(v) => v.type_info(state),
+            Noop(v) => v.type_info(state),
             #[cfg(feature = "expr-unary")]
-            Unary(v) => v.type_def(state),
+            Unary(v) => v.type_info(state),
             #[cfg(feature = "expr-abort")]
-            Abort(v) => v.type_def(state),
+            Abort(v) => v.type_info(state),
         }
     }
 }

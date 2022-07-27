@@ -1,6 +1,7 @@
+use core::{ExpressionError, Value};
 use std::fmt;
 
-use crate::state::TypeState;
+use crate::state::{TypeInfo, TypeState};
 use crate::{
     expression::{Expr, Resolved},
     state::{ExternalEnv, LocalEnv},
@@ -29,7 +30,7 @@ impl Expression for Block {
         // NOTE:
         //
         // Technically, this invalidates the scoping invariant of variables
-        // defined in child scopes to not be accessible in parrent scopes.
+        // defined in child scopes to not be accessible in parent scopes.
         //
         // However, because we guard against this (using the "undefined
         // variable" check) at compile-time, we can omit any (costly) run-time
@@ -46,34 +47,24 @@ impl Expression for Block {
         last.resolve(ctx)
     }
 
-    /// If an expression has a "never" type, it is considered a "terminating" expression.
-    /// Type information of future expressions in this block should not be considered after
-    /// a terminating expression.
-    ///
-    /// Since type definitions due to assignments are calculated outside of the "`type_def`" function,
-    /// assignments that can never execute might still have adjusted the type definition.
-    /// Therefore, expressions after a terminating expression must not be included in a block.
-    /// It is considered an internal compiler error if this situation occurs, which is checked here
-    /// and will result in a panic.
-    ///
-    /// VRL is allowed to have expressions after a terminating expression, but the compiler
-    /// MUST not include them in a block expression when compiled.
-    fn type_def(&self, state: &TypeState) -> TypeDef {
-        let mut last = TypeDef::null();
+    fn type_info(&self, state: &TypeState) -> TypeInfo {
+        let mut state = state.clone();
+        let mut result = TypeDef::undefined();
         let mut fallible = false;
-        let mut has_terminated = false;
+
         for expr in &self.inner {
-            assert!(!has_terminated, "VRL block contains an expression after a terminating expression. This is an internal compiler error. Please submit a bug report.");
-            last = expr.type_def(state);
-            if last.is_never() {
-                has_terminated = true;
-            }
-            if last.is_fallible() {
+            let info = expr.type_info(&state);
+            result = info.result;
+
+            if result.is_fallible() {
                 fallible = true;
+            }
+            if result.is_never() {
+                break;
             }
         }
 
-        last.with_fallibility(fallible)
+        TypeInfo::new(state, result.with_fallibility(fallible))
     }
 }
 

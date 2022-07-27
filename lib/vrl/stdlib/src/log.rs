@@ -85,7 +85,7 @@ impl Function for Log {
 
     fn compile(
         &self,
-        _state: &TypeState,
+        _state: &state::TypeState,
         ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -175,7 +175,7 @@ impl Expression for LogFn {
         log(rate_limit_secs, &self.level, value, span)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::null().infallible()
     }
 }

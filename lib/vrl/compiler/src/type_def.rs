@@ -191,6 +191,12 @@ impl TypeDef {
 
     #[inline]
     #[must_use]
+    pub fn undefined() -> Self {
+        Kind::undefined().into()
+    }
+
+    #[inline]
+    #[must_use]
     pub fn never() -> Self {
         Kind::never().into()
     }

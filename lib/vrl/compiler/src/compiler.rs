@@ -44,7 +44,7 @@ impl<'a> Compiler<'a> {
     pub fn compile(
         fns: &'a [Box<dyn Function>],
         ast: parser::Program,
-        type_state: &TypeState,
+        state: &TypeState,
     ) -> Result<(Program, DiagnosticList), DiagnosticList> {
         let mut compiler = Self {
             fns,
@@ -56,7 +56,7 @@ impl<'a> Compiler<'a> {
             skip_missing_query_target: vec![],
             fallible_expression_error: None,
         };
-        let expressions = compiler.compile_root_exprs(ast, &type_state);
+        let expressions = compiler.compile_root_exprs(ast, &state);
 
         let (errors, warnings): (Vec<_>, Vec<_>) =
             compiler.diagnostics.into_iter().partition(|diagnostic| {
@@ -64,7 +64,6 @@ impl<'a> Compiler<'a> {
             });
 
         if !errors.is_empty() {
-            println!("Err while compiling!");
             return Err(errors.into());
         }
 
@@ -77,7 +76,14 @@ impl<'a> Compiler<'a> {
 
         let expressions = Block::new(expressions);
 
-        Ok((Program { expressions, info }, warnings.into()))
+        Ok((
+            Program {
+                expressions,
+                info,
+                initial_state: state.clone(),
+            },
+            warnings.into(),
+        ))
     }
 
     fn compile_exprs(

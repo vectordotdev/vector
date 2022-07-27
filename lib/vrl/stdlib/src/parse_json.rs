@@ -174,7 +174,7 @@ impl Function for ParseJson {
 
     fn compile(
         &self,
-        _state: &TypeState,
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -199,7 +199,7 @@ impl Expression for ParseJsonFn {
         parse_json(value)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         type_def()
     }
 }
@@ -217,7 +217,7 @@ impl Expression for ParseJsonMaxDepthFn {
         parse_json_with_depth(value, max_depth)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         type_def()
     }
 }

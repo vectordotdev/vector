@@ -58,7 +58,7 @@ impl Function for ParseNginxLog {
 
     fn compile(
         &self,
-        _state: &TypeState,
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -161,7 +161,7 @@ impl Expression for ParseNginxLogFn {
         parse_nginx_log(bytes, timestamp_format, format, ctx)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::object(match self.format.as_ref() {
             b"combined" => kind_combined(),
             b"error" => kind_error(),

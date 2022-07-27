@@ -67,7 +67,7 @@ impl Function for ParseApacheLog {
 
     fn compile(
         &self,
-        _state: &TypeState,
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -151,7 +151,7 @@ impl Expression for ParseApacheLogFn {
         parse_apache_log(bytes, timestamp_format, &self.format, ctx)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::object(match self.format.as_ref() {
             b"common" => kind_common(),
             b"combined" => kind_combined(),

@@ -38,7 +38,7 @@ impl Function for IsRegex {
 
     fn compile(
         &self,
-        _state: &TypeState,
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -58,7 +58,7 @@ impl Expression for IsRegexFn {
         self.value.resolve(ctx).map(|v| value!(v.is_regex()))
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::boolean().infallible()
     }
 }

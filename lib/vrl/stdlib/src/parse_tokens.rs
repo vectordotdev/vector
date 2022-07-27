@@ -35,7 +35,7 @@ impl Function for ParseTokens {
 
     fn compile(
         &self,
-        _state: &TypeState,
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -64,7 +64,7 @@ impl Expression for ParseTokensFn {
         parse_tokens(value)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::array(Collection::from_unknown(Kind::bytes()))
     }
 }

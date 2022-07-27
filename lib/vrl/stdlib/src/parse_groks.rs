@@ -227,7 +227,7 @@ impl Function for ParseGroks {
 
     fn compile(
         &self,
-        _state: &TypeState,
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -256,7 +256,7 @@ impl Expression for ParseGroksFn {
         Ok(v)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::object(Collection::any()).fallible()
     }
 }

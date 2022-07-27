@@ -41,7 +41,7 @@ impl Function for RandomBytes {
 
     fn compile(
         &self,
-        _state: &TypeState,
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -84,7 +84,7 @@ impl Expression for RandomBytesFn {
         random_bytes(length)
     }
 
-    fn type_def(&self, _state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _state: &state::TypeState) -> TypeDef {
         match self.length.as_value() {
             None => TypeDef::bytes().fallible(),
             Some(value) => {

@@ -47,7 +47,7 @@ impl Function for MatchAny {
 
     fn compile(
         &self,
-        _state: &TypeState,
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -118,7 +118,7 @@ impl Expression for MatchAnyFn {
         match_any(value, &self.regex_set)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::boolean().infallible()
     }
 }

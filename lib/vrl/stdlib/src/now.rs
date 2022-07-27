@@ -19,7 +19,7 @@ impl Function for Now {
 
     fn compile(
         &self,
-        _state: &TypeState,
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         _: ArgumentList,
     ) -> Compiled {
@@ -35,7 +35,7 @@ impl Expression for NowFn {
         Ok(Utc::now().into())
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::timestamp()
     }
 }

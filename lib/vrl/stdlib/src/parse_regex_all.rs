@@ -44,7 +44,7 @@ impl Function for ParseRegexAll {
 
     fn compile(
         &self,
-        _state: &TypeState,
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -133,7 +133,7 @@ impl Expression for ParseRegexAllFn {
         parse_regex_all(value, numeric_groups.try_boolean()?, pattern)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::array(Collection::from_unknown(
             Kind::object(util::regex_kind(&self.pattern)).or_null(),
         ))

@@ -58,7 +58,7 @@ impl Function for ToUnixTimestamp {
 
     fn compile(
         &self,
-        _state: &TypeState,
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -166,7 +166,7 @@ impl Expression for ToUnixTimestampFn {
         to_unix_timestamp(value, unit)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::integer().infallible()
     }
 }

@@ -4,8 +4,30 @@ use anymap::AnyMap;
 use lookup::LookupBuf;
 use value::{Kind, Value};
 
-use crate::{parser::ast::Ident, type_def::Details, value::Collection};
+use crate::{parser::ast::Ident, type_def::Details, value::Collection, TypeDef};
 
+#[derive(Debug, Clone)]
+pub struct TypeInfo {
+    pub state: TypeState,
+    pub result: TypeDef,
+}
+
+impl TypeInfo {
+    pub fn new(state: impl Into<TypeState>, result: TypeDef) -> Self {
+        Self {
+            state: state.into(),
+            result,
+        }
+    }
+}
+
+impl From<&TypeState> for TypeState {
+    fn from(state: &TypeState) -> Self {
+        state.clone()
+    }
+}
+
+#[derive(Debug, Clone, Default)]
 pub struct TypeState {
     pub local: LocalEnv,
     pub external: ExternalEnv,

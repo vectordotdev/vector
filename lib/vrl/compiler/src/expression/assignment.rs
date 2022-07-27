@@ -1,10 +1,11 @@
+use core::ExpressionError;
 use std::{convert::TryFrom, fmt};
 
 use diagnostic::{DiagnosticMessage, Label, Note};
 use lookup::{LookupBuf, SegmentBuf};
 use value::{Kind, Value};
 
-use crate::state::TypeState;
+use crate::state::{TypeInfo, TypeState};
 use crate::{
     expression::{assignment::ErrorVariant::InvalidParentPathSegment, Expr, Resolved},
     parser::{
@@ -300,6 +301,29 @@ impl Expression for Assignment {
     fn type_def(&self, state: &TypeState) -> TypeDef {
         self.variant.type_def(state)
     }
+
+    fn type_info(&self, state: &TypeState) -> TypeInfo {
+        let mut final_state = state.clone();
+
+        match &self.variant {
+            Variant::Single { target, expr } => {
+                target.insert_type_def(
+                    &mut final_state,
+                    expr.type_info(state).result,
+                    expr.as_value(),
+                );
+            }
+            Variant::Infallible {
+                ok,
+                err,
+                expr,
+                default,
+            } => {
+                unimplemented!()
+            }
+        }
+        TypeInfo::new(final_state, self.variant.type_def(state))
+    }
 }
 
 impl fmt::Display for Assignment {
@@ -336,17 +360,11 @@ pub(crate) enum Target {
 }
 
 impl Target {
-    fn insert_type_def(
-        &self,
-        local: &mut LocalEnv,
-        external: &mut ExternalEnv,
-        new_type_def: TypeDef,
-        value: Option<Value>,
-    ) {
+    fn insert_type_def(&self, state: &mut TypeState, new_type_def: TypeDef, value: Option<Value>) {
         match self {
             Self::Noop => {}
             Self::Internal(ident, path) => {
-                let type_def = match local.variable(ident) {
+                let type_def = match state.local.variable(ident) {
                     None => TypeDef::null().with_type_inserted(path, new_type_def),
                     Some(&Details { ref type_def, .. }) => {
                         type_def.clone().with_type_inserted(path, new_type_def)
@@ -354,12 +372,13 @@ impl Target {
                 };
 
                 let details = Details { type_def, value };
-                local.insert_variable(ident.clone(), details);
+                state.local.insert_variable(ident.clone(), details);
             }
 
             Self::External(path) => {
-                external.update_target(Details {
-                    type_def: external
+                state.external.update_target(Details {
+                    type_def: state
+                        .external
                         .target()
                         .type_def
                         .clone()

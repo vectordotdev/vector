@@ -33,7 +33,7 @@ impl Function for Strlen {
 
     fn compile(
         &self,
-        _state: &TypeState,
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -55,7 +55,7 @@ impl Expression for StrlenFn {
         strlen(value)
     }
 
-    fn type_def(&self, _state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _state: &state::TypeState) -> TypeDef {
         TypeDef::integer().infallible()
     }
 }

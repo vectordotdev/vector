@@ -1,5 +1,6 @@
 use ::value::Value;
 use vrl::prelude::*;
+use vrl::state::TypeState;
 
 fn get_secret(ctx: &mut Context, key: Value) -> std::result::Result<Value, ExpressionError> {
     let key_bytes = key.as_bytes().expect("argument must be a string");
@@ -37,7 +38,7 @@ impl Function for GetSecret {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -57,7 +58,7 @@ impl Expression for GetSecretFn {
         get_secret(ctx, key)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &TypeState) -> TypeDef {
         TypeDef::bytes().add_null().infallible()
     }
 }

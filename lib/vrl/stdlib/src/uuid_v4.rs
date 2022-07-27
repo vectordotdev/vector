@@ -27,7 +27,7 @@ impl Function for UuidV4 {
 
     fn compile(
         &self,
-        _state: &TypeState,
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         _: ArgumentList,
     ) -> Compiled {
@@ -43,7 +43,7 @@ impl Expression for UuidV4Fn {
         Ok(uuid_v4())
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &TypeState) -> TypeDef {
         TypeDef::bytes().infallible()
     }
 }

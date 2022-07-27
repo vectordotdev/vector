@@ -89,7 +89,7 @@ impl Function for Del {
     ) -> Compiled {
         let query = arguments.required_query("target")?;
 
-        if external.is_read_only_event_path(query.path()) {
+        if state.external.is_read_only_event_path(query.path()) {
             return Err(vrl::function::Error::ReadOnlyMutation {
                 context: format!("{} is read-only, and cannot be deleted", query),
             }
@@ -168,7 +168,7 @@ impl Expression for DelFn {
         del(&self.query, ctx)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         // The return type can't be queried from the state since it was deleted in "update_state"
         self.return_type.clone()
     }

@@ -93,7 +93,7 @@ impl Function for IsJson {
 
     fn compile(
         &self,
-        _state: &TypeState,
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -143,7 +143,7 @@ impl Expression for IsJsonFn {
         is_json(value)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::boolean().infallible()
     }
 }
@@ -162,7 +162,7 @@ impl Expression for IsJsonVariantsFn {
         is_json_with_variant(value, variant)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::boolean().infallible()
     }
 }

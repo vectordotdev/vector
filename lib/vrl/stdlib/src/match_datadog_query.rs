@@ -47,7 +47,7 @@ impl Function for MatchDatadogQuery {
 
     fn compile(
         &self,
-        _state: &TypeState,
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -142,7 +142,7 @@ impl Expression for MatchDatadogQueryFn {
         Ok(self.filter.run(&value).into())
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         type_def()
     }
 }
