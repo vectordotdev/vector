@@ -2,11 +2,9 @@
 //!
 
 #[cfg(all(unix, feature = "sources-http_scrape"))]
-pub mod config;
-#[cfg(all(unix, feature = "sources-http_scrape"))]
-pub mod source;
+pub mod scrape;
 
-pub use config::HttpScrapeConfig;
+pub use scrape::HttpScrapeConfig;
 
 use bytes::Bytes;
 use futures_util::{stream, FutureExt, StreamExt, TryFutureExt};
