@@ -15,7 +15,10 @@ use crate::{
     internal_events::{PrometheusEventsReceived, PrometheusParseError},
     sources::{
         self,
-        http_scrape::{get_url, http_scrape, HttpScraper},
+        http_scrape::{
+            default_scrape_interval_secs, get_url, http_scrape, GenericHttpScrapeInputs,
+            HttpScraper,
+        },
     },
     tls::{TlsConfig, TlsSettings},
     Result,
@@ -84,10 +87,6 @@ pub struct PrometheusScrapeConfig {
     auth: Option<Auth>,
 }
 
-pub(crate) const fn default_scrape_interval_secs() -> u64 {
-    15
-}
-
 inventory::submit! {
     SourceDescription::new::<PrometheusScrapeConfig>("prometheus")
 }
@@ -124,7 +123,7 @@ impl SourceConfig for PrometheusScrapeConfig {
             .collect::<std::result::Result<Vec<Uri>, sources::BuildError>>()?;
         let tls = TlsSettings::from_options(&self.tls)?;
 
-        let context = HttpScrapeContext {
+        let context = PrometheusScrapeContext {
             honor_labels: self.honor_labels,
             instance_tag: self.instance_tag.clone(),
             endpoint_tag: self.endpoint_tag.clone(),
@@ -132,17 +131,16 @@ impl SourceConfig for PrometheusScrapeConfig {
             endpoint_info: None,
         };
 
-        Ok(http_scrape(
-            context,
+        let inputs = GenericHttpScrapeInputs::new(
             urls,
             self.scrape_interval_secs,
             self.auth.clone(),
             tls,
             cx.proxy.clone(),
             cx.shutdown,
-            cx.out,
-        )
-        .boxed())
+        );
+
+        Ok(http_scrape(inputs, context, cx.out).boxed())
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
@@ -230,7 +228,7 @@ struct EndpointInfo {
 }
 
 #[derive(Clone)]
-struct HttpScrapeContext {
+struct PrometheusScrapeContext {
     honor_labels: bool,
     instance_tag: Option<String>,
     endpoint_tag: Option<String>,
@@ -238,7 +236,7 @@ struct HttpScrapeContext {
     endpoint_info: Option<EndpointInfo>,
 }
 
-impl HttpScraper for HttpScrapeContext {
+impl HttpScraper for PrometheusScrapeContext {
     ///
     fn build(&mut self, url: &Uri) {
         self.instance_info = self.instance_tag.as_ref().map(|tag| {
@@ -267,7 +265,7 @@ impl HttpScraper for HttpScrapeContext {
 
     ///
     fn on_response(&mut self, url: &Uri, _header: &Parts, body: &Bytes) -> Option<Vec<Event>> {
-        let body = String::from_utf8_lossy(&body);
+        let body = String::from_utf8_lossy(body);
 
         match parser::parse_text(&body) {
             Ok(mut events) => {

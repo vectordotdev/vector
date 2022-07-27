@@ -43,7 +43,7 @@ pub struct HttpScrapeConfig {
     query: Option<HashMap<String, Vec<String>>>,
 
     /// The interval between scrapes, in seconds.
-    #[serde(default = "default_scrape_interval_secs")]
+    #[serde(default = "super::default_scrape_interval_secs")]
     scrape_interval_secs: u64,
 
     /// TODO
@@ -68,10 +68,6 @@ pub struct HttpScrapeConfig {
     auth: Option<Auth>,
 }
 
-pub(crate) const fn default_scrape_interval_secs() -> u64 {
-    15
-}
-
 inventory::submit! {
     SourceDescription::new::<HttpScrapeConfig>(NAME)
 }
@@ -81,7 +77,7 @@ impl GenerateConfig for HttpScrapeConfig {
         toml::Value::try_from(Self {
             endpoint: "http://localhost:9090/metrics".to_string(),
             query: None,
-            scrape_interval_secs: default_scrape_interval_secs(),
+            scrape_interval_secs: super::default_scrape_interval_secs(),
             decoding: default_decoding(),
             framing: None,
             headers: None,
@@ -116,17 +112,16 @@ impl SourceConfig for HttpScrapeConfig {
 
         let context = HttpScrapeContext { decoder };
 
-        Ok(super::http_scrape(
-            context,
+        let inputs = super::GenericHttpScrapeInputs::new(
             urls,
             self.scrape_interval_secs,
             self.auth.clone(),
             tls,
             cx.proxy.clone(),
             cx.shutdown,
-            cx.out,
-        )
-        .boxed())
+        );
+
+        Ok(super::http_scrape(inputs, context, cx.out).boxed())
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
@@ -155,13 +150,11 @@ impl super::HttpScraper for HttpScrapeContext {
         _header: &Parts,
         body: &Bytes,
     ) -> Option<Vec<Event>> {
-        let body = String::from_utf8_lossy(&body);
-        dbg!(&body);
-
-        let mut events = Vec::new();
         let mut bytes = BytesMut::new();
+        let body = String::from_utf8_lossy(body);
         bytes.extend_from_slice(body.as_bytes());
 
+        let mut events = Vec::new();
         loop {
             match self.decoder.decode_eof(&mut bytes) {
                 Ok(Some((next, _))) => {
@@ -177,9 +170,6 @@ impl super::HttpScraper for HttpScrapeContext {
                     break;
                 }
             }
-        }
-        for event in &events {
-            dbg!(event);
         }
         Some(events)
     }
@@ -197,22 +187,22 @@ mod test {
     };
 
     #[test]
-    fn generate_config() {
+    fn test_http_scrape_generate_config() {
         test_generate_config::<HttpScrapeConfig>();
     }
 
     #[tokio::test]
-    async fn test_() {
+    async fn test_http_scrape_bytes_decoding() {
         let in_addr = next_addr();
 
-        let dummy_endpoint = warp::path!("metrics")
+        let dummy_endpoint = warp::path!("endpoint")
             .and(warp::header::exact("Accept", "text/plain"))
             .map(|| r#"A plain text event"#);
 
         tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
 
         let config = HttpScrapeConfig {
-            endpoint: format!("http://{}/metrics", in_addr),
+            endpoint: format!("http://{}/endpoint", in_addr),
             scrape_interval_secs: 1,
             query: None,
             decoding: default_decoding(),
@@ -229,5 +219,100 @@ mod test {
         )
         .await;
         assert!(!events.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_http_scrape_json_decoding() {
+        let in_addr = next_addr();
+
+        let dummy_endpoint = warp::path!("endpoint")
+            .and(warp::header::exact("Accept", "text/plain"))
+            .map(|| r#"{"data" : "foo"}"#);
+
+        tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+
+        let config = HttpScrapeConfig {
+            endpoint: format!("http://{}/endpoint", in_addr),
+            scrape_interval_secs: 1,
+            query: None,
+            decoding: DeserializerConfig::Json,
+            framing: None,
+            headers: None,
+            auth: None,
+            tls: None,
+        };
+
+        let events = run_and_assert_source_compliance(
+            config,
+            Duration::from_secs(1),
+            &HTTP_PULL_SOURCE_TAGS,
+        )
+        .await;
+        assert!(!events.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_http_scrape_request_query() {
+        let in_addr = next_addr();
+
+        let dummy_endpoint = warp::path!("endpoint")
+            .and(warp::query::raw())
+            .map(|query| format!(r#"{{"data" : "{}"}}"#, query));
+
+        tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+
+        let config = HttpScrapeConfig {
+            endpoint: format!("http://{}/endpoint?key1=val1", in_addr),
+            scrape_interval_secs: 1,
+            query: Some(HashMap::from([
+                ("key1".to_string(), vec!["val2".to_string()]),
+                (
+                    "key2".to_string(),
+                    vec!["val1".to_string(), "val2".to_string()],
+                ),
+            ])),
+            decoding: DeserializerConfig::Json,
+            framing: None,
+            headers: None,
+            auth: None,
+            tls: None,
+        };
+
+        let events = run_and_assert_source_compliance(
+            config,
+            Duration::from_secs(1),
+            &HTTP_PULL_SOURCE_TAGS,
+        )
+        .await;
+        assert!(!events.is_empty());
+
+        let logs: Vec<_> = events.into_iter().map(|event| event.into_log()).collect();
+
+        let expected = HashMap::from([
+            (
+                "key1".to_string(),
+                vec!["val1".to_string(), "val2".to_string()],
+            ),
+            (
+                "key2".to_string(),
+                vec!["val1".to_string(), "val2".to_string()],
+            ),
+        ]);
+
+        for log in logs {
+            let query = log.get("data").expect("data must be available");
+            let mut got: HashMap<String, Vec<String>> = HashMap::new();
+            for (k, v) in url::form_urlencoded::parse(
+                query.as_bytes().expect("byte conversion should succeed"),
+            ) {
+                got.entry(k.to_string())
+                    .or_insert_with(Vec::new)
+                    .push(v.to_string());
+            }
+            for v in got.values_mut() {
+                v.sort();
+            }
+            assert_eq!(got, expected);
+        }
     }
 }

@@ -26,8 +26,43 @@ use crate::{
 use vector_common::shutdown::ShutdownSignal;
 use vector_core::{config::proxy::ProxyConfig, event::Event, ByteSizeOf};
 
+/// TODO
+pub(crate) struct GenericHttpScrapeInputs {
+    urls: Vec<Uri>,
+    interval_secs: u64,
+    auth: Option<Auth>,
+    tls: TlsSettings,
+    proxy: ProxyConfig,
+    shutdown: ShutdownSignal,
+}
+
+impl GenericHttpScrapeInputs {
+    pub fn new(
+        urls: Vec<Uri>,
+        interval_secs: u64,
+        auth: Option<Auth>,
+        tls: TlsSettings,
+        proxy: ProxyConfig,
+        shutdown: ShutdownSignal,
+    ) -> Self {
+        Self {
+            urls,
+            interval_secs,
+            auth,
+            tls,
+            proxy,
+            shutdown,
+        }
+    }
+}
+
+/// TODO
+pub(crate) const fn default_scrape_interval_secs() -> u64 {
+    15
+}
+
 ///
-pub trait HttpScraper {
+pub(crate) trait HttpScraper {
     ///
     fn build(&mut self, _url: &Uri) {}
 
@@ -67,91 +102,89 @@ pub(crate) fn get_url(uri: &Uri, query: &Option<HashMap<String, Vec<String>>>) -
 
 ///
 pub(crate) async fn http_scrape<H: HttpScraper + std::marker::Send + Clone>(
+    inputs: GenericHttpScrapeInputs,
     context: H,
-    urls: Vec<Uri>,
-    interval_secs: u64,
-    auth: Option<Auth>,
-    tls: TlsSettings,
-    proxy: ProxyConfig,
-    shutdown: ShutdownSignal,
     mut out: SourceSender,
 ) -> Result<(), ()> {
-    let mut stream = IntervalStream::new(tokio::time::interval(Duration::from_secs(interval_secs)))
-        .take_until(shutdown)
-        .map(move |_| stream::iter(urls.clone()))
-        .flatten()
-        .map(move |url| {
-            let client = HttpClient::new(tls.clone(), &proxy).expect("Building HTTP client failed");
-            let endpoint = url.to_string();
+    let mut stream = IntervalStream::new(tokio::time::interval(Duration::from_secs(
+        inputs.interval_secs,
+    )))
+    .take_until(inputs.shutdown)
+    .map(move |_| stream::iter(inputs.urls.clone()))
+    .flatten()
+    .map(move |url| {
+        let client = HttpClient::new(inputs.tls.clone(), &inputs.proxy)
+            .expect("Building HTTP client failed");
+        let endpoint = url.to_string();
 
-            let mut context = context.clone();
-            context.build(&url);
+        let mut context = context.clone();
+        context.build(&url);
 
-            let mut request = Request::get(&url)
-                .header(http::header::ACCEPT, "text/plain")
-                .body(Body::empty())
-                .expect("error creating request");
+        let mut request = Request::get(&url)
+            .header(http::header::ACCEPT, "text/plain")
+            .body(Body::empty())
+            .expect("error creating request");
 
-            if let Some(auth) = &auth {
-                auth.apply(&mut request);
-            }
+        if let Some(auth) = &inputs.auth {
+            auth.apply(&mut request);
+        }
 
-            let start = Instant::now();
-            client
-                .send(request)
-                .map_err(Error::from)
-                .and_then(|response| async move {
-                    let (header, body) = response.into_parts();
-                    let body = hyper::body::to_bytes(body).await?;
-                    emit!(EndpointBytesReceived {
-                        byte_size: body.len(),
-                        protocol: "http",
-                        endpoint: endpoint.as_str(),
-                    });
-                    Ok((header, body))
-                })
-                .into_stream()
-                .filter_map(move |response| {
-                    ready(match response {
-                        Ok((header, body)) if header.status == hyper::StatusCode::OK => {
-                            emit!(RequestCompleted {
-                                start,
-                                end: Instant::now()
-                            });
-                            match context.on_response(&url, &header, &body) {
-                                Some(events) => {
-                                    // TODO emit EventsReceived (PrometheusEventsReceived)
-                                    emit!(PrometheusEventsReceived {
-                                        byte_size: events.size_of(),
-                                        count: events.len(),
-                                        uri: url.clone()
-                                    });
-                                    Some(stream::iter(events))
-                                }
-                                None => None,
+        let start = Instant::now();
+        client
+            .send(request)
+            .map_err(Error::from)
+            .and_then(|response| async move {
+                let (header, body) = response.into_parts();
+                let body = hyper::body::to_bytes(body).await?;
+                emit!(EndpointBytesReceived {
+                    byte_size: body.len(),
+                    protocol: "http",
+                    endpoint: endpoint.as_str(),
+                });
+                Ok((header, body))
+            })
+            .into_stream()
+            .filter_map(move |response| {
+                ready(match response {
+                    Ok((header, body)) if header.status == hyper::StatusCode::OK => {
+                        emit!(RequestCompleted {
+                            start,
+                            end: Instant::now()
+                        });
+                        match context.on_response(&url, &header, &body) {
+                            Some(events) => {
+                                // TODO emit EventsReceived (PrometheusEventsReceived)
+                                emit!(PrometheusEventsReceived {
+                                    byte_size: events.size_of(),
+                                    count: events.len(),
+                                    uri: url.clone()
+                                });
+                                Some(stream::iter(events))
                             }
+                            None => None,
                         }
-                        Ok((header, _)) => {
-                            context.on_http_response_error(&url, &header);
-                            emit!(PrometheusHttpResponseError {
-                                code: header.status,
-                                url: url.clone(),
-                            });
-                            None
-                        }
-                        Err(error) => {
-                            emit!(PrometheusHttpError {
-                                error,
-                                url: url.clone(),
-                            });
-                            None
-                        }
-                    })
+                    }
+                    Ok((header, _)) => {
+                        context.on_http_response_error(&url, &header);
+                        emit!(PrometheusHttpResponseError {
+                            code: header.status,
+                            url: url.clone(),
+                        });
+                        None
+                    }
+                    Err(error) => {
+                        emit!(PrometheusHttpError {
+                            error,
+                            url: url.clone(),
+                        });
+                        None
+                    }
                 })
-                .flatten()
-        })
-        .flatten()
-        .boxed();
+            })
+            .flatten()
+    })
+    .flatten()
+    .boxed();
 
     match out.send_event_stream(&mut stream).await {
         Ok(()) => {
