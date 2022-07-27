@@ -43,7 +43,7 @@ async fn sets_create_action_when_configured() {
         .request_builder
         .encoder
         .encode_input(
-            vec![process_log(log, &es.mode, &None).unwrap()],
+            vec![process_log(log, &es.mode, &None, &config.encoding).unwrap()],
             &mut encoded,
         )
         .unwrap();
@@ -91,7 +91,7 @@ async fn encode_datastream_mode() {
         .request_builder
         .encoder
         .encode_input(
-            vec![process_log(log, &es.mode, &None).unwrap()],
+            vec![process_log(log, &es.mode, &None, &config.encoding).unwrap()],
             &mut encoded,
         )
         .unwrap();
@@ -136,7 +136,7 @@ async fn encode_datastream_mode_no_routing() {
         .request_builder
         .encoder
         .encode_input(
-            vec![process_log(log, &es.mode, &None).unwrap()],
+            vec![process_log(log, &es.mode, &None, &config.encoding).unwrap()],
             &mut encoded,
         )
         .unwrap();
@@ -171,7 +171,7 @@ async fn handle_metrics() {
     es.request_builder
         .encoder
         .encode_input(
-            vec![process_log(log, &es.mode, &None).unwrap()],
+            vec![process_log(log, &es.mode, &None, &config.encoding).unwrap()],
             &mut encoded,
         )
         .unwrap();
@@ -260,7 +260,7 @@ async fn encode_datastream_mode_no_sync() {
         .request_builder
         .encoder
         .encode_input(
-            vec![process_log(log, &es.mode, &None).unwrap()],
+            vec![process_log(log, &es.mode, &None, &config.encoding).unwrap()],
             &mut encoded,
         )
         .unwrap();
@@ -273,7 +273,7 @@ async fn encode_datastream_mode_no_sync() {
 }
 
 #[tokio::test]
-async fn allows_using_excepted_fields() {
+async fn allows_using_except_fields() {
     let config = ElasticsearchConfig {
         bulk: Some(BulkConfig {
             action: None,
@@ -299,13 +299,48 @@ async fn allows_using_excepted_fields() {
         .request_builder
         .encoder
         .encode_input(
-            vec![process_log(log, &es.mode, &None).unwrap()],
+            vec![process_log(log, &es.mode, &None, &config.encoding).unwrap()],
             &mut encoded,
         )
         .unwrap();
 
     let expected = r#"{"index":{"_index":"purple","_type":"_doc"}}
 {"foo":"bar","message":"hello there"}
+"#;
+    assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
+    assert_eq!(encoded.len(), encoded_size);
+}
+
+#[tokio::test]
+async fn allows_using_only_fields() {
+    let config = ElasticsearchConfig {
+        bulk: Some(BulkConfig {
+            action: None,
+            index: Some(String::from("{{ idx }}")),
+        }),
+        encoding: Transformer::new(Some(vec![lookup::lookup_v2::parse_path("foo")]), None, None)
+            .unwrap(),
+        endpoint: String::from("https://example.com"),
+        ..Default::default()
+    };
+    let es = ElasticsearchCommon::parse_config(&config).await.unwrap();
+
+    let mut log = LogEvent::from("hello there");
+    log.insert("foo", "bar");
+    log.insert("idx", "purple");
+
+    let mut encoded = vec![];
+    let encoded_size = es
+        .request_builder
+        .encoder
+        .encode_input(
+            vec![process_log(log, &es.mode, &None, &config.encoding).unwrap()],
+            &mut encoded,
+        )
+        .unwrap();
+
+    let expected = r#"{"index":{"_index":"purple","_type":"_doc"}}
+{"foo":"bar"}
 "#;
     assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
     assert_eq!(encoded.len(), encoded_size);
