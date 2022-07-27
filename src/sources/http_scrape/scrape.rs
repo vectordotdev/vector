@@ -33,6 +33,7 @@ const NAME: &str = "http_scrape";
 // TODO:
 //   - request headers
 //   - framing for the decoding?
+//   - cue files
 
 /// Configuration for the `http_scrape` source.
 #[configurable_component(source)]
