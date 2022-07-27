@@ -36,6 +36,7 @@ pub struct AzureEventHubsConfig {
     pub queue_name: String,
 
     /// The name of the consumer group.
+    #[serde(default = "default_group_id")]
     pub group_id: String,
 
     #[configurable(derived)]
@@ -57,6 +58,10 @@ pub struct AzureEventHubsConfig {
 }
 
 impl_generate_config_from_default!(AzureEventHubsConfig);
+
+fn default_group_id() -> String {
+    "$DEFAULT".to_string()
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "azure_event_hubs")]
