@@ -67,7 +67,6 @@ impl InternalEvent for SocketEventsReceived {
 pub struct SocketBytesSent {
     pub mode: SocketMode,
     pub byte_size: usize,
-    //pub endpoint: &'a str,
 }
 
 impl InternalEvent for SocketBytesSent {
@@ -77,12 +76,10 @@ impl InternalEvent for SocketBytesSent {
             message = "Bytes sent.",
             byte_size = %self.byte_size,
             protocol = %protocol,
-            //endpoint = %self.endpoint,
         );
         counter!(
             "component_sent_bytes_total", self.byte_size as u64,
             "protocol" => protocol,
-            //"endpoint" => self.endpoint.to_string(),
         );
     }
 }
