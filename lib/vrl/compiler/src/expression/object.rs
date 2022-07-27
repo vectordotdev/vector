@@ -2,6 +2,7 @@ use std::{collections::BTreeMap, fmt, ops::Deref};
 
 use value::Value;
 
+use crate::state::TypeState;
 use crate::{
     expression::{Expr, Resolved},
     state::{ExternalEnv, LocalEnv},
@@ -45,7 +46,7 @@ impl Expression for Object {
             .map(Value::Object)
     }
 
-    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &TypeState) -> TypeDef {
         let type_defs = self
             .inner
             .iter()

@@ -41,7 +41,7 @@ impl Function for Append {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -66,7 +66,7 @@ impl Expression for AppendFn {
         append(value, items)
     }
 
-    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &state::TypeState) -> TypeDef {
         let mut self_value = self.value.type_def(state).restrict_array();
         let items = self.items.type_def(state).restrict_array();
 

@@ -1,5 +1,6 @@
 use std::fmt;
 
+use crate::state::TypeState;
 use crate::{
     expression::{Expr, Resolved},
     state::{ExternalEnv, LocalEnv},
@@ -9,19 +10,12 @@ use crate::{
 #[derive(Debug, Clone, PartialEq)]
 pub struct Block {
     inner: Vec<Expr>,
-
-    /// The local environment of the block.
-    ///
-    /// This allows any expressions within the block to mutate the local
-    /// environment, but once the block ends, the environment is reset to the
-    /// state of the parent expression of the block.
-    pub(crate) local_env: LocalEnv,
 }
 
 impl Block {
     #[must_use]
-    pub fn new(inner: Vec<Expr>, local_env: LocalEnv) -> Self {
-        Self { inner, local_env }
+    pub fn new(inner: Vec<Expr>) -> Self {
+        Self { inner }
     }
 
     #[must_use]
@@ -64,13 +58,13 @@ impl Expression for Block {
     ///
     /// VRL is allowed to have expressions after a terminating expression, but the compiler
     /// MUST not include them in a block expression when compiled.
-    fn type_def(&self, (_, external): (&LocalEnv, &ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &TypeState) -> TypeDef {
         let mut last = TypeDef::null();
         let mut fallible = false;
         let mut has_terminated = false;
         for expr in &self.inner {
             assert!(!has_terminated, "VRL block contains an expression after a terminating expression. This is an internal compiler error. Please submit a bug report.");
-            last = expr.type_def((&self.local_env, external));
+            last = expr.type_def(state);
             if last.is_never() {
                 has_terminated = true;
             }

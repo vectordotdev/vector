@@ -19,6 +19,7 @@ pub use diagnostic;
 pub use runtime::{Runtime, RuntimeResult, Terminate};
 pub use vector_common::TimeZone;
 
+use crate::state::TypeState;
 pub use compiler::expression::query;
 
 /// Compile a given source into the final [`Program`].
@@ -31,18 +32,23 @@ pub fn compile(source: &str, fns: &[Box<dyn Function>]) -> compiler::Result {
 pub fn compile_with_external(
     source: &str,
     fns: &[Box<dyn Function>],
-    external: &mut state::ExternalEnv,
+    external: &state::ExternalEnv,
 ) -> compiler::Result {
-    compile_with_state(source, fns, external, state::LocalEnv::default())
+    let state = TypeState {
+        local: state::LocalEnv::default(),
+        external: external.clone(),
+    };
+
+    compile_with_state(source, fns, &state)
 }
 
 pub fn compile_with_state(
     source: &str,
     fns: &[Box<dyn Function>],
-    external: &mut state::ExternalEnv,
-    local: state::LocalEnv,
+    state: &TypeState,
 ) -> compiler::Result {
     let ast = parser::parse(source)
         .map_err(|err| diagnostic::DiagnosticList::from(vec![Box::new(err) as Box<_>]))?;
-    Compiler::compile(fns, ast, external, local)
+
+    Compiler::compile(fns, ast, state)
 }

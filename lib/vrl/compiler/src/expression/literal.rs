@@ -7,6 +7,7 @@ use ordered_float::NotNan;
 use regex::Regex;
 use value::{Value, ValueRegex};
 
+use crate::state::TypeState;
 use crate::{
     expression::Resolved,
     state::{ExternalEnv, LocalEnv},
@@ -55,7 +56,7 @@ impl Expression for Literal {
         Some(self.to_value())
     }
 
-    fn type_def(&self, _: (&LocalEnv, &ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &TypeState) -> TypeDef {
         use Literal::{Boolean, Float, Integer, Null, Regex, String, Timestamp};
 
         let type_def = match self {

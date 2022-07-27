@@ -1,6 +1,7 @@
 use ::value::Value;
 use bytes::Bytes;
 use vrl::prelude::*;
+use vrl::state::TypeState;
 
 fn uuid_v4() -> Value {
     let mut buf = [0; 36];
@@ -26,7 +27,7 @@ impl Function for UuidV4 {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &TypeState,
         _ctx: &mut FunctionCompileContext,
         _: ArgumentList,
     ) -> Compiled {

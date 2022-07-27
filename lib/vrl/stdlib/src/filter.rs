@@ -72,7 +72,7 @@ impl Function for Filter {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -124,7 +124,7 @@ impl Expression for FilterFn {
         filter(value, ctx, runner)
     }
 
-    fn type_def(&self, ctx: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, ctx: &state::TypeState) -> TypeDef {
         let mut type_def = self.value.type_def(ctx);
 
         // Erase any type information from the array or object, as we can't know

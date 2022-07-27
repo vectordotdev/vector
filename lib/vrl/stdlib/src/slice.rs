@@ -90,7 +90,7 @@ impl Function for Slice {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -121,7 +121,7 @@ impl Expression for SliceFn {
         slice(start, end, value)
     }
 
-    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &state::TypeState) -> TypeDef {
         let td = TypeDef::from(Kind::never()).fallible();
 
         match self.value.type_def(state) {

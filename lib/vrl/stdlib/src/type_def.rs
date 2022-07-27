@@ -1,5 +1,6 @@
 use ::value::Value;
 use vrl::prelude::{TypeDef as VrlTypeDef, *};
+use vrl::state::TypeState;
 
 fn type_def(type_def: &VrlTypeDef) -> Value {
     let mut tree = type_def.kind().canonicalize().debug_info();
@@ -41,12 +42,12 @@ impl Function for TypeDef {
 
     fn compile(
         &self,
-        state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        state: &TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
-        let type_def = value.type_def((&*state.0, &*state.1));
+        let type_def = value.type_def((&*state.local, &*state.external));
 
         Ok(Box::new(TypeDefFn { type_def }))
     }

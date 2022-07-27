@@ -43,7 +43,7 @@ impl Function for Integer {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -63,7 +63,7 @@ impl Expression for IntegerFn {
         int(self.value.resolve(ctx)?)
     }
 
-    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &state::TypeState) -> TypeDef {
         let non_integer = !self.value.type_def(state).is_integer();
 
         TypeDef::integer().with_fallibility(non_integer)

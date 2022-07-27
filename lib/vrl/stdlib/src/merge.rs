@@ -41,7 +41,7 @@ impl Function for Merge {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -71,7 +71,7 @@ impl Expression for MergeFn {
         Ok(to_value.into())
     }
 
-    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &state::TypeState) -> TypeDef {
         // TODO: this has a known bug when deep is true
         // see: https://github.com/vectordotdev/vector/issues/13597
         self.to

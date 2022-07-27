@@ -3,6 +3,7 @@ use std::fmt;
 use diagnostic::{DiagnosticMessage, Label, Note, Span, Urls};
 use value::Value;
 
+use crate::state::TypeState;
 use crate::{
     expression::{self, Expr, Resolved},
     parser::{ast, Node},
@@ -23,7 +24,7 @@ impl Op {
         lhs: Node<Expr>,
         opcode: Node<ast::Opcode>,
         rhs: Node<Expr>,
-        state: (&LocalEnv, &ExternalEnv),
+        state: &TypeState,
     ) -> Result<Self, Error> {
         use ast::Opcode::{Eq, Ge, Gt, Le, Lt, Ne};
 
@@ -121,7 +122,7 @@ impl Expression for Op {
         .map_err(Into::into)
     }
 
-    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &TypeState) -> TypeDef {
         use ast::Opcode::{Add, And, Div, Eq, Err, Ge, Gt, Le, Lt, Merge, Mul, Ne, Or, Rem, Sub};
         use value::Kind as K;
 

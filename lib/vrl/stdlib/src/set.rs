@@ -122,7 +122,7 @@ impl Function for Set {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -150,7 +150,7 @@ impl Expression for SetFn {
         set(path, value, data)
     }
 
-    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &state::TypeState) -> TypeDef {
         let value_td = self.value.type_def(state);
 
         let mut td = TypeDef::from(Kind::never()).fallible();

@@ -47,7 +47,7 @@ impl Function for TagTypesExternally {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -78,7 +78,7 @@ impl Expression for TagTypesExternallyFn {
         Ok(tagged_externally)
     }
 
-    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &state::TypeState) -> TypeDef {
         match self.value.type_def(state) {
             td if td.is_array() => TypeDef::array(Collection::any()),
             td if td.is_null() => TypeDef::null(),

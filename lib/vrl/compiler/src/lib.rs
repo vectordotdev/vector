@@ -1,5 +1,5 @@
 #![deny(
-    warnings,
+    // warnings,
     clippy::all,
     clippy::pedantic,
     unreachable_pub,

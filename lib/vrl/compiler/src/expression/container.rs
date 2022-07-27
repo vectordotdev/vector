@@ -1,5 +1,6 @@
 use std::fmt;
 
+use crate::state::TypeState;
 use crate::{
     expression::{Array, Block, Group, Object, Resolved, Value},
     state::{ExternalEnv, LocalEnv},
@@ -49,7 +50,7 @@ impl Expression for Container {
         }
     }
 
-    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &TypeState) -> TypeDef {
         use Variant::{Array, Block, Group, Object};
 
         match &self.variant {

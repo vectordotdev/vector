@@ -4,6 +4,7 @@ use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 use parser::ast::Node;
 
 use super::Expr;
+use crate::state::TypeState;
 use crate::{
     expression::{ExpressionError, Resolved},
     state::{ExternalEnv, LocalEnv},
@@ -22,11 +23,7 @@ impl Abort {
     ///
     /// * The optional message is fallible.
     /// * The optional message does not resolve to a string.
-    pub fn new(
-        span: Span,
-        message: Option<Node<Expr>>,
-        state: (&LocalEnv, &ExternalEnv),
-    ) -> Result<Self, Error> {
+    pub fn new(span: Span, message: Option<Node<Expr>>, state: &TypeState) -> Result<Self, Error> {
         let message = message
             .map(|node| {
                 let (expr_span, expr) = node.take();
@@ -68,7 +65,7 @@ impl Expression for Abort {
         })
     }
 
-    fn type_def(&self, _: (&LocalEnv, &ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &TypeState) -> TypeDef {
         TypeDef::never().infallible()
     }
 }

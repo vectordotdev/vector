@@ -42,6 +42,7 @@ pub mod query;
 
 pub use core::{ExpressionError, Resolved};
 
+use crate::state::TypeState;
 #[cfg(feature = "expr-abort")]
 pub use abort::Abort;
 pub use array::Array;
@@ -87,9 +88,8 @@ pub trait Expression: Send + Sync + fmt::Debug + DynClone {
     }
 
     /// Resolve an expression to its [`TypeDef`] type definition.
-    ///
-    /// This method is executed at compile-time.
-    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef;
+    /// This must be called with the _initial_ TypeState.
+    fn type_def(&self, state: &TypeState) -> TypeDef;
 
     /// Updates the state if necessary.
     /// By default it does nothing.
@@ -288,7 +288,7 @@ impl Expression for Expr {
         }
     }
 
-    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &TypeState) -> TypeDef {
         use Expr::{
             Abort, Assignment, Container, FunctionCall, IfStatement, Literal, Noop, Op, Query,
             Unary, Variable,

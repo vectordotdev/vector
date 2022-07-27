@@ -49,7 +49,7 @@ impl Function for ForEach {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -101,7 +101,7 @@ impl Expression for ForEachFn {
         for_each(value, ctx, runner)
     }
 
-    fn type_def(&self, ctx: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, ctx: &state::TypeState) -> TypeDef {
         let fallible = self.closure.block.type_def(ctx).is_fallible();
 
         TypeDef::null().with_fallibility(fallible)

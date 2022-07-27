@@ -66,7 +66,7 @@ impl Function for MapKeys {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -124,7 +124,7 @@ impl Expression for MapKeysFn {
         map_keys(value, recursive, ctx, runner)
     }
 
-    fn type_def(&self, ctx: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, ctx: &state::TypeState) -> TypeDef {
         self.value
             .type_def(ctx)
             .with_fallibility(self.closure.block.type_def(ctx).is_fallible())

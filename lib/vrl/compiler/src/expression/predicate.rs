@@ -2,6 +2,7 @@ use std::fmt;
 
 use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 
+use crate::state::TypeState;
 use crate::{
     expression::{Expr, Resolved},
     parser::Node,
@@ -20,7 +21,7 @@ pub struct Predicate {
 impl Predicate {
     pub(crate) fn new(
         node: Node<Vec<Expr>>,
-        state: (&LocalEnv, &ExternalEnv),
+        state: &TypeState,
         fallible_predicate: Option<&dyn DiagnosticMessage>,
     ) -> Result {
         let (span, exprs) = node.take();
@@ -63,7 +64,7 @@ impl Expression for Predicate {
         last.resolve(ctx)
     }
 
-    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &TypeState) -> TypeDef {
         let mut type_defs = self
             .inner
             .iter()

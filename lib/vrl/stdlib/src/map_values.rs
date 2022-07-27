@@ -65,7 +65,7 @@ impl Function for MapValues {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -123,7 +123,7 @@ impl Expression for MapValuesFn {
         map_values(value, recursive, ctx, runner)
     }
 
-    fn type_def(&self, ctx: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, ctx: &state::TypeState) -> TypeDef {
         let mut value = self.value.type_def(ctx);
         let closure = self.closure.block.type_def(ctx);
 

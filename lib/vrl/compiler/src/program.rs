@@ -23,7 +23,8 @@ impl Program {
     /// a program as each line is compiled.
     #[must_use]
     pub fn local_env(&self) -> &LocalEnv {
-        &self.expressions.local_env
+        unimplemented!()
+        // &self.expressions.local_env
     }
 
     /// Get detailed information about the program, as collected by the VRL

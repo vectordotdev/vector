@@ -47,7 +47,7 @@ impl Function for Push {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -72,7 +72,7 @@ impl Expression for PushFn {
         push(list, item)
     }
 
-    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &state::TypeState) -> TypeDef {
         let item = self.item.type_def(state).kind().clone().upgrade_undefined();
         let mut typedef = self.value.type_def(state).restrict_array();
 

@@ -83,7 +83,7 @@ impl Function for Del {
 
     fn compile(
         &self,
-        (local, external): (&mut state::LocalEnv, &mut state::ExternalEnv),
+        state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -96,7 +96,7 @@ impl Function for Del {
             .into());
         }
 
-        let return_type = query.type_def((local, external));
+        let return_type = query.type_def(state);
 
         Ok(Box::new(DelFn { query, return_type }))
     }
@@ -173,28 +173,28 @@ impl Expression for DelFn {
         self.return_type.clone()
     }
 
-    fn update_state(
-        &mut self,
-        _local: &mut state::LocalEnv,
-        external: &mut state::ExternalEnv,
-    ) -> std::result::Result<(), ExpressionError> {
-        // FIXME(Jean): This should also delete non-external queries, as `del(foo.bar)` is
-        // supported.
-        if self.query.is_external() {
-            if let Err(
-                value::kind::remove::Error::RootPath
-                | value::kind::remove::Error::CoalescedPath
-                | value::kind::remove::Error::NegativeIndexPath,
-            ) = self.query.delete_type_def(external)
-            {
-                // This function is (currently) infallible, so we ignore any errors here.
-                //
-                // see: https://github.com/vectordotdev/vector/issues/11264
-            }
-        }
-
-        Ok(())
-    }
+    // fn update_state(
+    //     &mut self,
+    //     _local: &mut state::LocalEnv,
+    //     external: &mut state::ExternalEnv,
+    // ) -> std::result::Result<(), ExpressionError> {
+    //     // FIXME(Jean): This should also delete non-external queries, as `del(foo.bar)` is
+    //     // supported.
+    //     if self.query.is_external() {
+    //         if let Err(
+    //             value::kind::remove::Error::RootPath
+    //             | value::kind::remove::Error::CoalescedPath
+    //             | value::kind::remove::Error::NegativeIndexPath,
+    //         ) = self.query.delete_type_def(external)
+    //         {
+    //             // This function is (currently) infallible, so we ignore any errors here.
+    //             //
+    //             // see: https://github.com/vectordotdev/vector/issues/11264
+    //         }
+    //     }
+    //
+    //     Ok(())
+    // }
 }
 
 impl fmt::Display for DelFn {

@@ -2,6 +2,7 @@ use std::fmt;
 
 use value::Value;
 
+use crate::state::TypeState;
 use crate::{
     expression::{Block, Predicate, Resolved},
     state::{ExternalEnv, LocalEnv},
@@ -29,7 +30,7 @@ impl Expression for IfStatement {
         }
     }
 
-    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &TypeState) -> TypeDef {
         let type_def = self.consequent.type_def(state);
 
         match &self.alternative {

@@ -6,6 +6,11 @@ use value::{Kind, Value};
 
 use crate::{parser::ast::Ident, type_def::Details, value::Collection};
 
+pub struct TypeState {
+    pub local: LocalEnv,
+    pub external: ExternalEnv,
+}
+
 /// Local environment, limited to a given scope.
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct LocalEnv {
@@ -56,7 +61,7 @@ impl LocalEnv {
 }
 
 /// A lexical scope within the program.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ExternalEnv {
     /// The external target of the program.
     target: Details,
@@ -65,19 +70,18 @@ pub struct ExternalEnv {
     metadata: Kind,
 
     read_only_paths: BTreeSet<ReadOnlyPath>,
-
-    /// Custom context injected by the external environment
-    custom: AnyMap,
+    // /// Custom context injected by the external environment
+    // custom: AnyMap,
 }
 
 // temporary until paths can point to metadata
-#[derive(Debug, Ord, Eq, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, Ord, Eq, PartialEq, PartialOrd)]
 pub enum PathRoot {
     Event,
     Metadata,
 }
 
-#[derive(Debug, Ord, Eq, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, Ord, Eq, PartialEq, PartialOrd)]
 pub struct ReadOnlyPath {
     path: LookupBuf,
     recursive: bool,
@@ -104,7 +108,7 @@ impl ExternalEnv {
                 value: None,
             },
             metadata,
-            custom: AnyMap::new(),
+            // custom: AnyMap::new(),
             read_only_paths: BTreeSet::new(),
         }
     }
@@ -182,10 +186,10 @@ impl ExternalEnv {
         self.metadata = kind;
     }
 
-    /// Sets the external context data for VRL functions to use.
-    pub fn set_external_context<T: 'static>(&mut self, data: T) {
-        self.custom.insert::<T>(data);
-    }
+    // /// Sets the external context data for VRL functions to use.
+    // pub fn set_external_context<T: 'static>(&mut self, data: T) {
+    //     self.custom.insert::<T>(data);
+    // }
 
     /// Marks everything as read only. Any mutations on read-only values will result in a
     /// compile time error.
@@ -195,17 +199,17 @@ impl ExternalEnv {
         self
     }
 
-    /// Get external context data from the external environment.
-    pub fn get_external_context<T: 'static>(&self) -> Option<&T> {
-        self.custom.get::<T>()
-    }
+    // /// Get external context data from the external environment.
+    // pub fn get_external_context<T: 'static>(&self) -> Option<&T> {
+    //     self.custom.get::<T>()
+    // }
 
-    /// Swap the existing external contexts with new ones, returning the old ones.
-    #[must_use]
-    #[cfg(feature = "expr-function_call")]
-    pub(crate) fn swap_external_context(&mut self, ctx: AnyMap) -> AnyMap {
-        std::mem::replace(&mut self.custom, ctx)
-    }
+    // /// Swap the existing external contexts with new ones, returning the old ones.
+    // #[must_use]
+    // #[cfg(feature = "expr-function_call")]
+    // pub(crate) fn swap_external_context(&mut self, ctx: AnyMap) -> AnyMap {
+    //     std::mem::replace(&mut self.custom, ctx)
+    // }
 }
 
 /// The state used at runtime to track changes as they happen.

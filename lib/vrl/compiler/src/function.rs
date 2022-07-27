@@ -10,6 +10,7 @@ use diagnostic::{DiagnosticMessage, Label, Note};
 use parser::ast::Ident;
 use value::{kind::Collection, Value};
 
+use crate::state::TypeState;
 use crate::{
     expression::{container::Variant, Block, Container, Expr, Expression, FunctionArgument},
     parser::Node,
@@ -50,7 +51,7 @@ pub trait Function: Send + Sync + fmt::Debug {
     /// resolved to its final [`Value`].
     fn compile(
         &self,
-        state: (&mut LocalEnv, &mut ExternalEnv),
+        state: &TypeState,
         ctx: &mut FunctionCompileContext,
         arguments: ArgumentList,
     ) -> Compiled;

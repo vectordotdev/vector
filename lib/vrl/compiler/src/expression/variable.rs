@@ -3,6 +3,7 @@ use std::fmt;
 use diagnostic::{DiagnosticMessage, Label};
 use value::Value;
 
+use crate::state::TypeState;
 use crate::{
     expression::{levenstein, Resolved},
     parser::ast::Ident,
@@ -51,8 +52,9 @@ impl Expression for Variable {
             .unwrap_or(Value::Null))
     }
 
-    fn type_def(&self, (local, _): (&LocalEnv, &ExternalEnv)) -> TypeDef {
-        local
+    fn type_def(&self, state: &TypeState) -> TypeDef {
+        state
+            .local
             .variable(&self.ident)
             .cloned()
             .map_or_else(|| TypeDef::null().infallible(), |d| d.type_def)

@@ -19,7 +19,7 @@ impl Function for Now {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &TypeState,
         _ctx: &mut FunctionCompileContext,
         _: ArgumentList,
     ) -> Compiled {

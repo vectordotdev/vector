@@ -1,5 +1,6 @@
 use std::fmt;
 
+use crate::state::TypeState;
 use crate::{
     expression::{Not, Resolved},
     state::{ExternalEnv, LocalEnv},
@@ -32,7 +33,7 @@ impl Expression for Unary {
         }
     }
 
-    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &TypeState) -> TypeDef {
         use Variant::Not;
 
         match &self.variant {

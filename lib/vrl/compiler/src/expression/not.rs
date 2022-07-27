@@ -2,6 +2,7 @@ use std::fmt;
 
 use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 
+use crate::state::TypeState;
 use crate::{
     expression::{Expr, Resolved},
     parser::Node,
@@ -18,7 +19,7 @@ pub struct Not {
 }
 
 impl Not {
-    pub fn new(node: Node<Expr>, not_span: Span, state: (&LocalEnv, &ExternalEnv)) -> Result {
+    pub fn new(node: Node<Expr>, not_span: Span, state: &TypeState) -> Result {
         let (expr_span, expr) = node.take();
         let type_def = expr.type_def(state);
 
@@ -41,7 +42,7 @@ impl Expression for Not {
         Ok((!self.inner.resolve(ctx)?.try_boolean()?).into())
     }
 
-    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &TypeState) -> TypeDef {
         let fallible = self.inner.type_def(state).is_fallible();
 
         TypeDef::boolean().with_fallibility(fallible)

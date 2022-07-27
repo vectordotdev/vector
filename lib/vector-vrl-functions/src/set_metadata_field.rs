@@ -2,7 +2,7 @@ use crate::{get_metadata_key, MetadataKey};
 use ::value::Value;
 use vrl::prelude::*;
 use vrl::query::Target as QueryTarget;
-use vrl::state::{ExternalEnv, LocalEnv};
+use vrl::state::{ExternalEnv, LocalEnv, TypeState};
 
 fn set_metadata_field(
     ctx: &mut Context,
@@ -55,7 +55,7 @@ impl Function for SetMetadataField {
 
     fn compile(
         &self,
-        (local, external): (&mut state::LocalEnv, &mut state::ExternalEnv),
+        state: &TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {

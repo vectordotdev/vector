@@ -1,6 +1,7 @@
 use ::value::Value;
 use indexmap::IndexSet;
 use vrl::prelude::*;
+use vrl::state::TypeState;
 
 fn unique(value: Value) -> Resolved {
     let value = value.try_array()?;
@@ -26,7 +27,7 @@ impl Function for Unique {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {

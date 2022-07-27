@@ -97,7 +97,7 @@ impl Function for Unnest {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -160,12 +160,12 @@ impl Expression for UnnestFn {
         unnest(&self.path, &self.root, ctx)
     }
 
-    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &state::TypeState) -> TypeDef {
         use expression::Target;
 
         match self.path.target() {
             Target::External => invert_array_at_path(
-                &TypeDef::from(state.1.target_kind().clone()),
+                &TypeDef::from(state.external.target_kind().clone()),
                 self.path.path(),
             ),
             Target::Internal(v) => invert_array_at_path(&v.type_def(state), self.path.path()),
