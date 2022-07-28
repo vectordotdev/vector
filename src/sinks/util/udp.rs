@@ -19,7 +19,7 @@ use super::SinkBuildError;
 use crate::{
     codecs::Transformer,
     dns,
-    event::{Event, Finalizable},
+    event::{Event, EventStatus, Finalizable},
     internal_events::{
         SocketEventsSent, SocketMode, UdpSendIncompleteError, UdpSocketConnectionError,
         UdpSocketConnectionEstablished, UdpSocketError,
@@ -307,14 +307,14 @@ where
                             byte_size: bytes.len(),
                             protocol: "udp",
                         });
+                        finalizers.update_status(EventStatus::Delivered);
                     }
                     Err(error) => {
                         emit!(UdpSocketError { error });
+                        finalizers.update_status(EventStatus::Errored);
                         break;
                     }
-                };
-
-                drop(finalizers); // Ensure we don't acknowledge until after the send
+                }
             }
         }
 
