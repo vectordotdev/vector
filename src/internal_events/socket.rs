@@ -28,15 +28,15 @@ pub struct SocketBytesReceived {
 
 impl InternalEvent for SocketBytesReceived {
     fn emit(self) {
-        let mode = self.mode.as_str();
+        let protocol = self.mode.as_str();
         trace!(
             message = "Bytes received.",
             byte_size = %self.byte_size,
-            mode,
+            protocol,
         );
         counter!(
             "component_received_bytes_total", self.byte_size as u64,
-            "mode" => mode,
+            "protocol" => protocol,
         );
     }
 }
@@ -72,15 +72,15 @@ pub struct SocketBytesSent {
 
 impl InternalEvent for SocketBytesSent {
     fn emit(self) {
-        let mode = self.mode.as_str();
+        let protocol = self.mode.as_str();
         trace!(
             message = "Bytes sent.",
             byte_size = %self.byte_size,
-            mode,
+            protocol,
         );
         counter!(
             "component_sent_bytes_total", self.byte_size as u64,
-            "mode" => mode,
+            "protocol" => protocol,
         );
     }
 }
