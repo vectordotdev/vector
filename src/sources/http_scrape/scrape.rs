@@ -2,6 +2,7 @@
 //! Scrapes an endpoint at an interval, decoding the HTTP responses into events.
 
 use bytes::{Bytes, BytesMut};
+use chrono::Utc;
 use futures_util::FutureExt;
 use http::{response::Parts, Uri};
 use snafu::ResultExt;
@@ -23,7 +24,7 @@ use codecs::{
 };
 use vector_config::configurable_component;
 use vector_core::{
-    config::{LogNamespace, Output},
+    config::{log_schema, LogNamespace, Output},
     event::Event,
 };
 
@@ -153,21 +154,12 @@ struct HttpScrapeContext {
     decoder: Decoder,
 }
 
-impl super::HttpScraper for HttpScrapeContext {
-    /// Decodes the HTTP response body into events per the decoder configured.
-    fn on_response(
-        &mut self,
-        _url: &http::Uri,
-        _header: &Parts,
-        body: &Bytes,
-    ) -> Option<Vec<Event>> {
-        let mut bytes = BytesMut::new();
-        let body = String::from_utf8_lossy(body);
-        bytes.extend_from_slice(body.as_bytes());
-
+impl HttpScrapeContext {
+    /// Decode the events from the byte buffer
+    fn decode_events(&mut self, buf: &mut BytesMut) -> Vec<Event> {
         let mut events = Vec::new();
         loop {
-            match self.decoder.decode_eof(&mut bytes) {
+            match self.decoder.decode_eof(buf) {
                 Ok(Some((next, _))) => {
                     events.extend(next.into_iter());
                 }
@@ -181,6 +173,44 @@ impl super::HttpScraper for HttpScrapeContext {
                     break;
                 }
             }
+        }
+        events
+    }
+
+    /// Enriches log events
+    fn enrich_events(&self, events: &mut Vec<Event>) {
+        for event in events {
+            if let Event::Log(ref mut log) = event {
+                log.try_insert(log_schema().source_type_key(), Bytes::from(NAME));
+                log.try_insert(log_schema().timestamp_key(), Utc::now());
+            }
+        }
+    }
+}
+
+impl super::HttpScraper for HttpScrapeContext {
+    /// Decodes the HTTP response body into events per the decoder configured.
+    fn on_response(
+        &mut self,
+        _url: &http::Uri,
+        _header: &Parts,
+        body: &Bytes,
+    ) -> Option<Vec<Event>> {
+        // get the body into a byte array
+        let mut buf = BytesMut::new();
+        let body = String::from_utf8_lossy(body);
+        buf.extend_from_slice(body.as_bytes());
+
+        //TODO delete
+        dbg!(body);
+
+        // decode and enrich
+        let mut events = self.decode_events(&mut buf);
+        self.enrich_events(&mut events);
+
+        // TODO delete
+        for event in &events {
+            dbg!(event);
         }
         Some(events)
     }
@@ -198,12 +228,12 @@ mod test {
     };
 
     #[test]
-    fn test_http_scrape_generate_config() {
+    fn http_scrape_generate_config() {
         test_generate_config::<HttpScrapeConfig>();
     }
 
     #[tokio::test]
-    async fn test_http_scrape_bytes_decoding() {
+    async fn http_scrape_bytes_decoding() {
         let in_addr = next_addr();
 
         let dummy_endpoint = warp::path!("endpoint")
@@ -233,7 +263,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_http_scrape_json_decoding() {
+    async fn http_scrape_json_decoding() {
         let in_addr = next_addr();
 
         let dummy_endpoint = warp::path!("endpoint")
@@ -263,7 +293,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_http_scrape_request_query() {
+    async fn http_scrape_request_query() {
         let in_addr = next_addr();
 
         let dummy_endpoint = warp::path!("endpoint")
@@ -325,5 +355,35 @@ mod test {
             }
             assert_eq!(got, expected);
         }
+    }
+}
+
+#[cfg(all(test, feature = "http-scrape-integration-tests"))]
+mod integration_tests {
+    use tokio::time::Duration;
+
+    use super::*;
+    use crate::test_util::components::{run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS};
+
+    #[tokio::test]
+    async fn http_scrape_logs_json() {
+        let config = HttpScrapeConfig {
+            endpoint: format!("http://localhost:5000/logs/foo.json"),
+            scrape_interval_secs: 1,
+            query: None,
+            decoding: DeserializerConfig::Json,
+            framing: None,
+            headers: None,
+            auth: None,
+            tls: None,
+        };
+
+        let events = run_and_assert_source_compliance(
+            config,
+            Duration::from_secs(1),
+            &HTTP_PULL_SOURCE_TAGS,
+        )
+        .await;
+        assert!(!events.is_empty());
     }
 }

@@ -1,6 +1,17 @@
 version: "3"
 
 services:
+  dufs:
+    image: docker.io/sigoden/dufs:latest
+      #network_mode: host
+      #    networks:
+      #- backend
+    ports:
+      - 5000:5000
+    command:
+      - "/data"
+    volumes:
+      - ${PWD}/tests/data/http-scrape/:/data
   runner:
     build:
       context: ${PWD}
@@ -8,6 +19,9 @@ services:
       args:
         - RUST_VERSION=${RUST_VERSION}
     working_dir: /code
+      #network_mode: host
+      #networks:
+      #- backend
     command:
       - "cargo"
       - "nextest"
@@ -16,21 +30,27 @@ services:
       - "--no-default-features"
       - "--features"
       - "http-scrape-integration-tests"
-        #    depends_on:
+      - "--lib"
+      - "sources::http_scrape::scrape::integration_tests::"
+    depends_on:
+      - dufs
         #    environment:
-    networks:
-      - public
+        #networks:
+        #- public
     volumes:
       - ${PWD}:/code
-      - target:/code/target
+        #- target:/code/target
       - cargogit:/usr/local/cargo/git
       - cargoregistry:/usr/local/cargo/registry
 
-networks:
-  public: {}
-  proxy: {}
+        #networks:
+        #backend: {}
+
+        #networks:
+        #  public: {}
+        #  proxy: {}
 
 volumes:
-  target: {}
+  #  target: {}
   cargogit: {}
   cargoregistry: {}
