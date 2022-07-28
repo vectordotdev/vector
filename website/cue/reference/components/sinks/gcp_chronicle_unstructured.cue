@@ -1,6 +1,6 @@
 package metadata
 
-components: sinks: chronicle_unstructured: {
+components: sinks: gcp_chronicle_unstructured: {
 	title: "GCP Chronicle Unstructured"
 
 	classes: {
