@@ -164,6 +164,9 @@ impl SourceConfig for DatadogAgentConfig {
         let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
         let filters = source.build_warp_filters(cx.out, acknowledgements, self)?;
         let shutdown = cx.shutdown;
+
+        info!(message = "Building HTTP server.", address = %self.address);
+
         Ok(Box::pin(async move {
             let span = Span::current();
             let routes = filters
@@ -177,6 +180,7 @@ impl SourceConfig for DatadogAgentConfig {
                         Err(r)
                     }
                 });
+
             warp::serve(routes)
                 .serve_incoming_with_graceful_shutdown(
                     listener.accept_stream(),
