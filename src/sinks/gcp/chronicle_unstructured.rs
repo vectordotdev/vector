@@ -7,12 +7,12 @@ use goauth::scopes::Scope;
 use http::{header::HeaderValue, Request, Uri};
 use hyper::Body;
 use indoc::indoc;
-use serde::{Deserialize, Serialize};
 use serde_json::json;
 use snafu::Snafu;
 use std::io;
 use tokio_util::codec::Encoder as _;
 use tower::{Service, ServiceBuilder};
+use vector_config::configurable_component;
 use vector_core::{
     config::{AcknowledgementsConfig, Input},
     event::{Event, EventFinalizers, Finalizable},
@@ -35,8 +35,7 @@ use crate::{
             metadata::{RequestMetadata, RequestMetadataBuilder},
             partitioner::KeyPartitioner,
             request_builder::EncodeResult,
-            BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression, RequestBuilder,
-            TowerRequestConfig,
+            BatchConfig, Compression, RequestBuilder, SinkBatchSettings, TowerRequestConfig,
         },
         Healthcheck,
     },
@@ -56,11 +55,18 @@ pub enum GcsHealthcheckError {
     NotFound,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+/// Google Chronicle regions.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum Region {
+    /// EU region.
     Eu,
+
+    /// US region.
     Us,
+
+    /// APAC region.
     Asia,
 }
 
@@ -75,20 +81,61 @@ impl Region {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct ChronicleUnstructuredDefaultBatchSettings;
+
+// Chronicle Ingestion API has a 1MB limit[1] for unstructured log entries. We're also using a
+// conservatively low batch timeout to ensure events make it to Chronicle in a timely fashion, but
+// high enough that it allows for reasonable batching.
+//
+// [1]: https://cloud.google.com/chronicle/docs/reference/ingestion-api#unstructuredlogentries
+impl SinkBatchSettings for ChronicleUnstructuredDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = None;
+    const MAX_BYTES: Option<usize> = Some(1_000_000);
+    const TIMEOUT_SECS: f64 = 15.0;
+}
+
+/// Configuration for the `gcp_chronicle_unstructured` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug)]
 pub struct ChronicleUnstructuredConfig {
+    /// The endpoint to send data to.
     pub endpoint: Option<String>,
+
+    #[configurable(derived)]
     pub region: Option<Region>,
+
+    /// The Unique identifier (UUID) corresponding to the Chronicle instance.
+    #[configurable(validation(format = "uuid"))]
     pub customer_id: String,
+
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
+
+    #[configurable(derived)]
     #[serde(default)]
-    pub batch: BatchConfig<BulkSizeBasedDefaultBatchSettings>,
+    pub batch: BatchConfig<ChronicleUnstructuredDefaultBatchSettings>,
+
+    #[configurable(derived)]
     pub encoding: EncodingConfig,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
+
+    /// The type of log entries in a request.
+    ///
+    /// This must be one of the [supported log types][unstructured_log_types_doc], otherwise
+    /// Chronicle will reject the entry with an error.
+    ///
+    /// [unstructured_log_types_doc]: https://cloud.google.com/chronicle/docs/ingestion/parser-list/supported-default-parsers
+    #[configurable(metadata(templateable))]
     pub log_type: Template,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -426,6 +473,7 @@ impl Service<ChronicleRequest> for ChronicleService {
 #[cfg(all(test, feature = "chronicle-integration-tests"))]
 mod integration_tests {
     use reqwest::{Client, Method, Response};
+    use serde::{Deserialize, Serialize};
     use vector_core::event::{BatchNotifier, BatchStatus};
 
     use super::*;

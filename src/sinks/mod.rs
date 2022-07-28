@@ -196,6 +196,12 @@ pub enum Sinks {
     #[cfg(feature = "sinks-file")]
     File(#[configurable(derived)] file::FileSinkConfig),
 
+    /// Google Chronicle (unstructured).
+    #[cfg(feature = "sinks-gcp")]
+    GcpChronicleUnstructured(
+        #[configurable(derived)] gcp::chronicle_unstructured::ChronicleUnstructuredConfig,
+    ),
+
     /// GCP Stackdriver Logs.
     #[cfg(feature = "sinks-gcp")]
     GcpStackdriverLogs(#[configurable(derived)] gcp::stackdriver_logs::StackdriverConfig),
