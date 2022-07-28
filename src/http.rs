@@ -139,8 +139,12 @@ pub fn build_proxy_connector(
     tls_settings: MaybeTlsSettings,
     proxy_config: &ProxyConfig,
 ) -> Result<ProxyConnector<HttpsConnector<HttpConnector>>, HttpError> {
+    let tls = tls_connector_builder(&tls_settings.clone())
+        .context(BuildTlsConnectorSnafu)?
+        .build();
     let https = build_tls_connector(tls_settings)?;
     let mut proxy = ProxyConnector::new(https).unwrap();
+    proxy.set_tls(Some(tls));
     proxy_config
         .configure(&mut proxy)
         .context(MakeProxyConnectorSnafu)?;
