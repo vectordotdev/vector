@@ -17,8 +17,8 @@ use crate::{
 ///
 /// Concretely, in the codegen, if a value has no mitigating configuration, we treat it as if it is
 /// already `Serialize`, and use it directly. Otherwise, if specific attributes are in place that
-/// indicate the use of an optional helper type, we construct `DelegatedSerialize<I, H>` where `H`
-/// is the value passed to `#[serde(with = "...")]`.
+/// indicate the use of an optional helper type, we construct `Delegated<I, H>` where `H` is the
+/// value passed to `#[serde(with = "...")]`.
 ///
 /// Astute readers may realize: "but isn't the value of `with` supposed to be a module path where a
 /// custom `serialize` and/or `deserialize` function exist?", and they would be correct insofar as

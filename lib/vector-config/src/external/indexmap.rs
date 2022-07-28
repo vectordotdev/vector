@@ -3,11 +3,13 @@ use serde::Serialize;
 use crate::{
     schema::{finalize_schema, generate_map_schema},
     schemars::{gen::SchemaGenerator, schema::SchemaObject},
+    str::ConfigurableString,
     Configurable, Metadata,
 };
 
-impl<V> Configurable for indexmap::IndexMap<String, V>
+impl<K, V> Configurable for indexmap::IndexMap<K, V>
 where
+    K: ConfigurableString + Serialize + std::hash::Hash + Eq,
     V: Configurable + Serialize,
 {
     fn is_optional() -> bool {

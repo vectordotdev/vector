@@ -18,6 +18,7 @@ use crate::{
         generate_number_schema, generate_optional_schema, generate_set_schema,
         generate_string_schema,
     },
+    str::ConfigurableString,
     Configurable, Metadata,
 };
 
@@ -115,8 +116,9 @@ where
     }
 }
 
-impl<V> Configurable for BTreeMap<String, V>
+impl<K, V> Configurable for BTreeMap<K, V>
 where
+    K: ConfigurableString + Serialize + Ord,
     V: Configurable + Serialize,
 {
     fn is_optional() -> bool {
@@ -144,8 +146,9 @@ where
     }
 }
 
-impl<V> Configurable for HashMap<String, V>
+impl<K, V> Configurable for HashMap<K, V>
 where
+    K: ConfigurableString + Serialize + std::hash::Hash + Eq,
     V: Configurable + Serialize,
 {
     fn is_optional() -> bool {

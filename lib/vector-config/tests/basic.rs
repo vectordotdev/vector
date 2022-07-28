@@ -14,7 +14,7 @@ use std::{
 
 use serde::{de, Deserialize, Deserializer};
 use serde_with::serde_as;
-use vector_config::{configurable_component, schema::generate_root_schema};
+use vector_config::{configurable_component, schema::generate_root_schema, ConfigurableString};
 
 /// A templated string.
 #[configurable_component]
@@ -30,6 +30,8 @@ pub struct Template {
     #[serde(skip)]
     has_fields: bool,
 }
+
+impl ConfigurableString for Template {}
 
 impl TryFrom<String> for Template {
     type Error = String;
@@ -57,16 +59,6 @@ impl From<Template> for String {
 #[derive(Clone)]
 #[configurable_component]
 pub struct SpecialDuration(#[configurable(transparent)] u64);
-
-/// Duration, but in seconds.
-#[serde_as]
-#[configurable_component]
-#[derive(Clone)]
-struct DurationSecondsTest {
-    /// The timeout.
-    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
-    timeout: Duration,
-}
 
 /// Controls the batching behavior of events.
 #[derive(Clone)]
@@ -165,18 +157,23 @@ where
 }
 
 /// A source for collecting events over TCP.
-#[derive(Clone)]
+#[serde_as]
 #[configurable_component(source)]
+#[derive(Clone)]
 #[configurable(metadata(status = "beta"))]
 pub struct SimpleSourceConfig {
     /// The address to listen on for events.
     #[serde(default = "default_simple_source_listen_addr")]
     listen_addr: SocketListenAddr,
-    /*
+
     /// The timeout for waiting for events from the source before closing the source.
-    #[serde(with = "DurationSeconds")]
+    #[serde(default = "default_simple_source_timeout")]
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     timeout: Duration,
-    */
+}
+
+const fn default_simple_source_timeout() -> Duration {
+    Duration::from_secs(42)
 }
 
 fn default_simple_source_listen_addr() -> SocketListenAddr {
@@ -254,7 +251,9 @@ pub struct AdvancedSinkConfig {
     #[serde(default = "default_partition_key")]
     partition_key: String,
     /// The tags to apply to each event.
-    tags: HashMap<String, String>,
+    ///
+    /// Both the keys and values are templateable.
+    tags: HashMap<Template, Template>,
 }
 
 fn default_advanced_sink_batch() -> BatchConfig {

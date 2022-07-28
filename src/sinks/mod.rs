@@ -244,11 +244,10 @@ pub enum Sinks {
     #[cfg(feature = "sinks-logdna")]
     Logdna(#[configurable(derived)] logdna::LogdnaConfig),
 
-    /*
     /// Loki.
     #[cfg(feature = "sinks-loki")]
     Loki(#[configurable(derived)] loki::LokiConfig),
-    */
+
     /// NATS.
     #[cfg(feature = "sinks-nats")]
     Nats(#[configurable(derived)] self::nats::NatsSinkConfig),
