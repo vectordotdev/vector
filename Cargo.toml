@@ -81,6 +81,8 @@ members = [
   "lib/vector-config",
   "lib/vector-config-common",
   "lib/vector-config-macros",
+  "lib/vector-console-sink",
+  "lib/vector-sdk",
   "lib/vector-core",
   "lib/dnsmsg-parser",
   "lib/fakedata",
@@ -129,6 +131,9 @@ vector_core = { path = "lib/vector-core", default-features = false, features = [
 vector-api-client = { path = "lib/vector-api-client", optional = true }
 vector-vrl-functions = { path = "lib/vector-vrl-functions" }
 vrl-cli = { path = "lib/vrl/cli", optional = true }
+
+# Test source
+vector_console_sink = { path = "lib/vector-console-sink" }
 
 # Tokio / Futures
 async-stream = { version = "0.3.3", default-features = false }

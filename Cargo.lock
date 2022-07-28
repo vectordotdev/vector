@@ -8464,6 +8464,7 @@ dependencies = [
  "vector_config",
  "vector_config_common",
  "vector_config_macros",
+ "vector_console_sink",
  "vector_core",
  "vrl",
  "vrl-cli",
@@ -8614,6 +8615,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "vector_console_sink"
+version = "0.1.0"
+dependencies = [
+ "async-graphql",
+ "async-trait",
+ "bytes 1.2.0",
+ "chrono",
+ "derivative",
+ "futures 0.3.21",
+ "indoc",
+ "lookup",
+ "mlua",
+ "ordered-float 3.0.0",
+ "quickcheck",
+ "regex",
+ "serde",
+ "serde_json",
+ "snafu",
+ "tokio",
+ "tokio-util 0.7.1",
+ "toml",
+ "tracing 0.1.34",
+ "typetag",
+ "vector_common",
+ "vector_sdk",
+]
+
+[[package]]
 name = "vector_core"
 version = "0.1.0"
 dependencies = [
@@ -8680,6 +8709,33 @@ dependencies = [
  "vector_config",
  "vector_config_macros",
  "vrl",
+]
+
+[[package]]
+name = "vector_sdk"
+version = "0.1.0"
+dependencies = [
+ "async-graphql",
+ "async-trait",
+ "bytes 1.2.0",
+ "codecs",
+ "futures 0.3.21",
+ "lookup",
+ "metrics",
+ "mlua",
+ "serde",
+ "smallvec",
+ "tokio",
+ "tokio-util 0.7.1",
+ "toml",
+ "tracing 0.1.34",
+ "typetag",
+ "value",
+ "vector_buffers",
+ "vector_common",
+ "vector_config",
+ "vector_config_macros",
+ "vector_core",
 ]
 
 [[package]]

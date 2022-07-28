@@ -1,0 +1,44 @@
+[package]
+name = "vector_sdk"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@timber.io>"]
+edition = "2021"
+license = "MPL-2.0"
+readme = "README.md"
+publish = false
+
+[dependencies]
+codecs = { path = "../codecs", default-features = false }
+vector_buffers = { path = "../vector-buffers", default-features = false }
+vector_common = { path = "../vector-common", default-features = false }
+vector_config = { path = "../vector-config", default-features = false }
+vector_config_macros = { path = "../vector-config-macros", default-features = false }
+vector_core = { path = "../vector-core", default-features = false }
+lookup = { path = "../lookup", default-features = false }
+value = { path = "../value", default-features = false, features = ["lua", "toml", "json", "api"] }
+# Optional
+async-graphql = { version = "4.0.5", default-features = false, optional = true }
+mlua = { version = "0.8.1", default-features = false, features = ["lua54", "send", "vendored"], optional = true}
+
+async-trait = { version = "0.1", default-features = false }
+bytes = { version = "1.2.0", default-features = false, features = ["serde"] }
+futures = { version = "0.3.21", default-features = false, features = ["compat", "io-compat"], package = "futures" }
+metrics = "0.20.1"
+serde = { version = "1.0.140", default-features = false, features = ["derive"] }
+smallvec = { version = "1", default-features = false, features = ["union"] }
+tracing = { version = "0.1.34", default-features = false }
+tokio = { version = "1.20.0", default-features = false, features = ["full"] }
+tokio-util = { version = "0.7", default-features = false, features = ["io", "time"] }
+toml = { version = "0.5.9", default-features = false }
+typetag = { version = "0.2.1", default-features = false }
+
+[features]
+api = ["dep:async-graphql", "value/api"]
+default = []
+lua = ["dep:mlua"]
+test = []
+
+[dev-dependencies]
+value = { path = "../value", default-features = false, features = ["lua", "toml", "json", "api", "arbitrary", "test"] }
+mlua = { version = "0.8.1", default-features = false, features = ["lua54", "send", "vendored"]}
+
