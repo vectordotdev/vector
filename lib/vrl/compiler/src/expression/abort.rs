@@ -4,7 +4,7 @@ use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 use parser::ast::Node;
 
 use super::Expr;
-use crate::state::TypeState;
+use crate::state::{TypeInfo, TypeState};
 use crate::{
     expression::{ExpressionError, Resolved},
     state::{ExternalEnv, LocalEnv},
@@ -65,8 +65,8 @@ impl Expression for Abort {
         })
     }
 
-    fn type_def(&self, _: &TypeState) -> TypeDef {
-        TypeDef::never().infallible()
+    fn type_info(&self, state: &TypeState) -> TypeInfo {
+        TypeInfo::new(state, TypeDef::never())
     }
 }
 

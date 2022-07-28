@@ -4,7 +4,7 @@ use anymap::AnyMap;
 use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 
 use super::Block;
-use crate::state::TypeState;
+use crate::state::{TypeInfo, TypeState};
 use crate::{
     expression::{levenstein, ExpressionError, FunctionArgument},
     function::{
@@ -38,135 +38,151 @@ impl<'a> Builder<'a> {
         abort_on_error: bool,
         arguments: Vec<Node<FunctionArgument>>,
         funcs: &'a [Box<dyn Function>],
-        type_state: &TypeState,
+        state: &TypeState,
         closure_variables: Option<Node<Vec<Node<Ident>>>>,
     ) -> Result<Self, Error> {
-        unimplemented!()
-        // let (ident_span, ident) = ident.take();
+        let (ident_span, ident) = ident.take();
+
+        // Check if function exists.
+        let (function_id, function) = match funcs
+            .iter()
+            .enumerate()
+            .find(|(_pos, f)| f.identifier() == ident.as_ref())
+        {
+            Some(function) => function,
+            None => {
+                let idents = funcs
+                    .iter()
+                    .map(|func| func.identifier())
+                    .collect::<Vec<_>>();
+
+                return Err(Error::Undefined {
+                    ident_span,
+                    ident: ident.clone(),
+                    idents,
+                });
+            }
+        };
+
+        // Check function arity.
+        if arguments.len() > function.parameters().len() {
+            let arguments_span = {
+                let start = arguments.first().unwrap().span().start();
+                let end = arguments.last().unwrap().span().end();
+
+                Span::new(start, end)
+            };
+
+            return Err(Error::WrongNumberOfArgs {
+                arguments_span,
+                max: function.parameters().len(),
+            });
+        }
+
+        // Keeps track of positional argument indices.
         //
-        // // Check if function exists.
-        // let (function_id, function) = match funcs
-        //     .iter()
-        //     .enumerate()
-        //     .find(|(_pos, f)| f.identifier() == ident.as_ref())
-        // {
-        //     Some(function) => function,
-        //     None => {
-        //         let idents = funcs
-        //             .iter()
-        //             .map(|func| func.identifier())
-        //             .collect::<Vec<_>>();
-        //
-        //         return Err(Error::Undefined {
-        //             ident_span,
-        //             ident: ident.clone(),
-        //             idents,
-        //         });
-        //     }
-        // };
-        //
-        // // Check function arity.
-        // if arguments.len() > function.parameters().len() {
-        //     let arguments_span = {
-        //         let start = arguments.first().unwrap().span().start();
-        //         let end = arguments.last().unwrap().span().end();
-        //
-        //         Span::new(start, end)
-        //     };
-        //
-        //     return Err(Error::WrongNumberOfArgs {
-        //         arguments_span,
-        //         max: function.parameters().len(),
-        //     });
-        // }
-        //
-        // // Keeps track of positional argument indices.
-        // //
-        // // Used to map a positional argument to its keyword. Keyword arguments
-        // // can be used in any order, and don't count towards the index of
-        // // positional arguments.
-        // let mut index = 0;
-        // let mut list = ArgumentList::default();
-        //
-        // let mut arguments_with_unknown_type_validity = vec![];
-        // for node in &arguments {
-        //     let (argument_span, argument) = node.clone().take();
-        //
-        //     let parameter = match argument.keyword() {
-        //         // positional argument
-        //         None => {
-        //             index += 1;
-        //             function.parameters().get(index - 1)
-        //         }
-        //
-        //         // keyword argument
-        //         Some(k) => function
-        //             .parameters()
-        //             .iter()
-        //             .enumerate()
-        //             .find(|(_, param)| param.keyword == k)
-        //             .map(|(pos, param)| {
-        //                 if pos == index {
-        //                     index += 1;
-        //                 }
-        //
-        //                 param
-        //             }),
-        //     }
-        //     .ok_or_else(|| Error::UnknownKeyword {
-        //         keyword_span: argument.keyword_span().expect("exists"),
-        //         ident_span,
-        //         keywords: function.parameters().iter().map(|p| p.keyword).collect(),
-        //     })?;
-        //
-        //     // Check if the argument is of the expected type.
-        //     let argument_type_def = argument.type_def((local, external));
-        //     let expr_kind = argument_type_def.kind();
-        //     let param_kind = parameter.kind();
-        //
-        //     if !param_kind.intersects(expr_kind) {
-        //         return Err(Error::InvalidArgumentKind {
-        //             function_ident: function.identifier(),
-        //             abort_on_error,
-        //             arguments_fmt: arguments
-        //                 .iter()
-        //                 .map(|arg| arg.inner().to_string())
-        //                 .collect::<Vec<_>>(),
-        //             parameter: *parameter,
-        //             got: expr_kind.clone(),
-        //             argument,
-        //             argument_span,
-        //         });
-        //     } else if !param_kind.is_superset(expr_kind) {
-        //         arguments_with_unknown_type_validity.push((*parameter, node.clone()));
-        //     }
-        //
-        //     // Check if the argument is infallible.
-        //     if argument_type_def.is_fallible() {
-        //         return Err(Error::FallibleArgument {
-        //             expr_span: argument.span(),
-        //         });
-        //     }
-        //
-        //     list.insert(parameter.keyword, argument.into_inner());
-        // }
-        //
-        // // Check missing required arguments.
-        // function
-        //     .parameters()
-        //     .iter()
-        //     .enumerate()
-        //     .filter(|(_, p)| p.required)
-        //     .filter(|(_, p)| !list.keywords().contains(&p.keyword))
-        //     .try_for_each(|(i, p)| -> Result<_, _> {
-        //         Err(Error::MissingArgument {
-        //             call_span,
-        //             keyword: p.keyword,
-        //             position: i,
-        //         })
-        //     })?;
+        // Used to map a positional argument to its keyword. Keyword arguments
+        // can be used in any order, and don't count towards the index of
+        // positional arguments.
+        let mut index = 0;
+        let mut list = ArgumentList::default();
+
+        let mut arguments_with_unknown_type_validity = vec![];
+        for node in &arguments {
+            let (argument_span, argument) = node.clone().take();
+
+            let parameter = match argument.keyword() {
+                // positional argument
+                None => {
+                    index += 1;
+                    function.parameters().get(index - 1)
+                }
+
+                // keyword argument
+                Some(k) => function
+                    .parameters()
+                    .iter()
+                    .enumerate()
+                    .find(|(_, param)| param.keyword == k)
+                    .map(|(pos, param)| {
+                        if pos == index {
+                            index += 1;
+                        }
+
+                        param
+                    }),
+            }
+            .ok_or_else(|| Error::UnknownKeyword {
+                keyword_span: argument.keyword_span().expect("exists"),
+                ident_span,
+                keywords: function.parameters().iter().map(|p| p.keyword).collect(),
+            })?;
+
+            // Check if the argument is of the expected type.
+            let argument_type_def = argument.type_info(state).result;
+            let expr_kind = argument_type_def.kind();
+            let param_kind = parameter.kind();
+
+            if !param_kind.intersects(expr_kind) {
+                return Err(Error::InvalidArgumentKind {
+                    function_ident: function.identifier(),
+                    abort_on_error,
+                    arguments_fmt: arguments
+                        .iter()
+                        .map(|arg| arg.inner().to_string())
+                        .collect::<Vec<_>>(),
+                    parameter: *parameter,
+                    got: expr_kind.clone(),
+                    argument,
+                    argument_span,
+                });
+            } else if !param_kind.is_superset(expr_kind) {
+                arguments_with_unknown_type_validity.push((*parameter, node.clone()));
+            }
+
+            // Check if the argument is infallible.
+            if argument_type_def.is_fallible() {
+                return Err(Error::FallibleArgument {
+                    expr_span: argument.span(),
+                });
+            }
+
+            list.insert(parameter.keyword, argument.into_inner());
+        }
+
+        // Check missing required arguments.
+        function
+            .parameters()
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| p.required)
+            .filter(|(_, p)| !list.keywords().contains(&p.keyword))
+            .try_for_each(|(i, p)| -> Result<_, _> {
+                Err(Error::MissingArgument {
+                    call_span,
+                    keyword: p.keyword,
+                    position: i,
+                })
+            })?;
+
         //
         // // Check function closure validity.
+        // let closure = Self::check_closure();
+
+        Ok(Self {
+            abort_on_error,
+            arguments_with_unknown_type_validity,
+            call_span,
+            ident_span,
+            function_id,
+            arguments: Arc::new(arguments),
+            closure: None,
+            list,
+            function: function.as_ref(),
+        })
+    }
+
+    fn check_closure() {
         // let closure = match (function.closure(), closure_variables) {
         //     // Error if closure is provided for function that doesn't support
         //     // any.
@@ -348,18 +364,6 @@ impl<'a> Builder<'a> {
         //
         //     _ => None,
         // };
-        //
-        // Ok(Self {
-        //     abort_on_error,
-        //     arguments_with_unknown_type_validity,
-        //     call_span,
-        //     ident_span,
-        //     function_id,
-        //     arguments: Arc::new(arguments),
-        //     closure,
-        //     list,
-        //     function: function.as_ref(),
-        // })
     }
 
     pub(crate) fn compile(
@@ -369,9 +373,8 @@ impl<'a> Builder<'a> {
         mut local_snapshot: LocalEnv,
         fallible_expression_error: &mut Option<Box<dyn DiagnosticMessage>>,
     ) -> Result<FunctionCall, Error> {
-        unimplemented!()
-        // let mut closure_fallible = false;
-        // let mut closure = None;
+        let mut closure_fallible = false;
+        let mut closure = None;
         //
         // // Check if we have a closure we need to compile.
         // if let Some((variables, input)) = self.closure.clone() {
@@ -409,9 +412,9 @@ impl<'a> Builder<'a> {
         //
         //     closure = Some(fnclosure);
         // };
-        //
-        // let call_span = self.call_span;
-        // let ident_span = self.ident_span;
+
+        let call_span = self.call_span;
+        let ident_span = self.ident_span;
 
         // We take the external context, and pass it to the function compile context, this allows
         // functions mutable access to external state, but keeps the internal compiler state behind
@@ -419,59 +422,57 @@ impl<'a> Builder<'a> {
         // TODO: fix
         // let external_context = external.swap_external_context(AnyMap::new());
 
-        // unimplemented!()
+        let mut compile_ctx = FunctionCompileContext::new(self.call_span); //.with_external_context(external_context);
 
-        // // let mut compile_ctx =
-        // //     FunctionCompileContext::new(self.call_span).with_external_context(external_context);
-        // //
-        // // let mut expr = self
-        // //     .function
-        // //     .compile(state, &mut compile_ctx, self.list.clone())
-        // //     .map_err(|error| Error::Compilation { call_span, error })?;
-        //
+        let mut expr = self
+            .function
+            .compile(state, &mut compile_ctx, self.list.clone())
+            .map_err(|error| Error::Compilation { call_span, error })?;
+
         // // Re-insert the external context into the compiler state.
         // // TODO: fix
         // // let _ = external.swap_external_context(compile_ctx.into_external_context());
         //
-        // // Asking for an infallible function to abort on error makes no sense.
-        // // We consider this an error at compile-time, because it makes the
-        // // resulting program incorrectly convey this function call might fail.
-        // if self.abort_on_error
-        //     && self.arguments_with_unknown_type_validity.is_empty()
-        //     && !expr.type_def(state).is_fallible()
-        // {
-        //     return Err(Error::AbortInfallible {
-        //         ident_span,
-        //         abort_span: Span::new(ident_span.end(), ident_span.end() + 1),
-        //     });
-        // }
-        //
-        // // The function is expected to abort at boot-time if any error occurred,
-        // // and one or more arguments are of an invalid type, so we'll return the
-        // // appropriate error.
-        // if let Some((parameter, argument)) =
-        //     self.arguments_with_unknown_type_validity.first().cloned()
-        // {
-        //     if !self.abort_on_error {
-        //         let error = Error::InvalidArgumentKind {
-        //             function_ident: self.function.identifier(),
-        //             abort_on_error: self.abort_on_error,
-        //             arguments_fmt: self
-        //                 .arguments
-        //                 .iter()
-        //                 .map(|arg| arg.inner().to_string())
-        //                 .collect::<Vec<_>>(),
-        //             parameter,
-        //             got: argument.expr().type_def(state).into(),
-        //             argument: argument.clone().into_inner(),
-        //             argument_span: argument
-        //                 .keyword_span()
-        //                 .unwrap_or_else(|| argument.expr_span()),
-        //         };
-        //
-        //         *fallible_expression_error = Some(Box::new(error) as _);
-        //     }
-        // }
+
+        // Asking for an infallible function to abort on error makes no sense.
+        // We consider this an error at compile-time, because it makes the
+        // resulting program incorrectly convey this function call might fail.
+        if self.abort_on_error
+            && self.arguments_with_unknown_type_validity.is_empty()
+            && !expr.type_def(state).is_fallible()
+        {
+            return Err(Error::AbortInfallible {
+                ident_span,
+                abort_span: Span::new(ident_span.end(), ident_span.end() + 1),
+            });
+        }
+
+        // The function is expected to abort at boot-time if any error occurred,
+        // and one or more arguments are of an invalid type, so we'll return the
+        // appropriate error.
+        if let Some((parameter, argument)) =
+            self.arguments_with_unknown_type_validity.first().cloned()
+        {
+            if !self.abort_on_error {
+                let error = Error::InvalidArgumentKind {
+                    function_ident: self.function.identifier(),
+                    abort_on_error: self.abort_on_error,
+                    arguments_fmt: self
+                        .arguments
+                        .iter()
+                        .map(|arg| arg.inner().to_string())
+                        .collect::<Vec<_>>(),
+                    parameter,
+                    got: argument.expr().type_def(state).into(),
+                    argument: argument.clone().into_inner(),
+                    argument_span: argument
+                        .keyword_span()
+                        .unwrap_or_else(|| argument.expr_span()),
+                };
+
+                *fallible_expression_error = Some(Box::new(error) as _);
+            }
+        }
         //
         // // Update the state if necessary.
         // //TODO: fix
@@ -481,17 +482,17 @@ impl<'a> Builder<'a> {
         // //         error: err.to_string(),
         // //     })?;
         //
-        // Ok(FunctionCall {
-        //     abort_on_error: self.abort_on_error,
-        //     expr,
-        //     arguments_with_unknown_type_validity: self.arguments_with_unknown_type_validity,
-        //     closure_fallible,
-        //     closure,
-        //     span: call_span,
-        //     ident: self.function.identifier(),
-        //     function_id: self.function_id,
-        //     arguments: self.arguments.clone(),
-        // })
+        Ok(FunctionCall {
+            abort_on_error: self.abort_on_error,
+            expr,
+            arguments_with_unknown_type_validity: self.arguments_with_unknown_type_validity,
+            closure_fallible,
+            closure,
+            span: call_span,
+            ident: self.function.identifier(),
+            function_id: self.function_id,
+            arguments: self.arguments.clone(),
+        })
     }
 }
 
@@ -617,8 +618,8 @@ impl Expression for FunctionCall {
         })
     }
 
-    fn type_def(&self, state: &TypeState) -> TypeDef {
-        let mut type_def = self.expr.type_def(state);
+    fn type_info(&self, state: &TypeState) -> TypeInfo {
+        let mut info = self.expr.type_info(state);
 
         // If one of the arguments only partially matches the function type
         // definition, then we mark the entire function as fallible.
@@ -677,7 +678,7 @@ impl Expression for FunctionCall {
         // For the third event, both functions fail.
         //
         if !self.arguments_with_unknown_type_validity.is_empty() {
-            type_def = type_def.with_fallibility(true);
+            info.result = info.result.with_fallibility(true);
         }
 
         // If the function has a closure attached, and that closure is fallible,
@@ -693,14 +694,14 @@ impl Expression for FunctionCall {
         // possible to silence potential closure errors using the "abort on
         // error" function-call feature (see below).
         if self.closure_fallible {
-            type_def = type_def.with_fallibility(true);
+            info.result = info.result.with_fallibility(true);
         }
 
         if self.abort_on_error {
-            type_def = type_def.with_fallibility(false);
+            info.result = info.result.with_fallibility(false);
         }
 
-        type_def
+        info
     }
 }
 

@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, fmt, ops::Deref};
 
 use value::Value;
 
-use crate::state::TypeState;
+use crate::state::{TypeInfo, TypeState};
 use crate::{
     expression::{Expr, Resolved},
     state::{ExternalEnv, LocalEnv},
@@ -45,11 +45,17 @@ impl Expression for Array {
             .map(Value::Array)
     }
 
-    fn type_def(&self, state: &TypeState) -> TypeDef {
+    fn type_info(&self, state: &TypeState) -> TypeInfo {
+        let mut state = state.clone();
+
         let type_defs = self
             .inner
             .iter()
-            .map(|expr| expr.type_def(state))
+            .map(|expr| {
+                let info = expr.type_info(&state);
+                state = info.state;
+                info.result
+            })
             .collect::<Vec<_>>();
 
         // If any of the stored expressions is fallible, the entire array is
@@ -62,7 +68,7 @@ impl Expression for Array {
             .map(|(index, type_def)| (index.into(), type_def.into()))
             .collect::<BTreeMap<_, _>>();
 
-        TypeDef::array(collection).with_fallibility(fallible)
+        TypeInfo::new(state, TypeDef::array(collection).with_fallibility(fallible))
     }
 }
 

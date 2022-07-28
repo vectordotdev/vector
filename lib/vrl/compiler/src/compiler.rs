@@ -132,7 +132,7 @@ impl<'a> Compiler<'a> {
         // currently not tracking any existing fallible expression in the chain
         // of expressions, then this is the first expression within that chain
         // that can cause the entire chain to be fallible.
-        if expr.type_def(state).is_fallible() && self.fallible_expression_error.is_none() {
+        if expr.type_info(state).result.is_fallible() && self.fallible_expression_error.is_none() {
             let error = crate::expression::Error::Fallible { span };
             self.fallible_expression_error = Some(Box::new(error) as _);
         }
@@ -234,7 +234,7 @@ impl<'a> Compiler<'a> {
                         }
 
                         // if terminated_state.is_none() {
-                        let type_def = expr.type_def(state);
+                        // let type_def = expr.type_def(state);
                         node_exprs.push(expr);
                         // an expression that has the "never" type is a terminating expression
                         // if type_def.is_never() {

@@ -32,6 +32,8 @@ mod variable;
 pub(crate) mod assignment;
 pub(crate) mod container;
 #[cfg(feature = "expr-function_call")]
+pub(crate) mod function;
+#[cfg(feature = "expr-function_call")]
 pub(crate) mod function_call;
 #[cfg(feature = "expr-literal")]
 pub(crate) mod literal;
@@ -50,6 +52,8 @@ pub use array::Array;
 pub use assignment::Assignment;
 pub use block::Block;
 pub use container::{Container, Variant};
+#[cfg(feature = "expr-function_call")]
+pub use function::FunctionExpression;
 pub use function_argument::FunctionArgument;
 #[cfg(feature = "expr-function_call")]
 pub use function_call::FunctionCall;

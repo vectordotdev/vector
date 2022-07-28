@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 
 use ::value::Value;
 use vrl::prelude::*;
+use vrl::state::TypeState;
 
 use crate::{
     vrl_util::{self, add_index, evaluate_condition, index_from_args},
@@ -89,7 +90,7 @@ impl Function for FindEnrichmentTableRecords {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &TypeState,
         ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -219,7 +220,7 @@ impl Expression for FindEnrichmentTableRecordsFn {
         )
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &TypeState) -> TypeDef {
         TypeDef::array(Collection::from_unknown(Kind::object(Collection::any()))).fallible()
     }
 }

@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use value::{kind::Collection, Kind, Value};
+use vrl::state::TypeState;
 use vrl::{
     function::{
         ArgumentList, Compiled, CompiledArgument, Example, FunctionCompileContext, Parameter,
@@ -8,7 +9,6 @@ use vrl::{
     prelude::{
         expression, DiagnosticMessage, FunctionArgument, Resolved, Result, TypeDef, VrlValueConvert,
     },
-    state,
     value::kind,
     Context, Expression, Function,
 };
@@ -91,7 +91,7 @@ impl Function for GetEnrichmentTableRecord {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &TypeState,
         ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -221,7 +221,7 @@ impl Expression for GetEnrichmentTableRecordFn {
         )
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &TypeState) -> TypeDef {
         TypeDef::object(Collection::any()).fallible()
     }
 }

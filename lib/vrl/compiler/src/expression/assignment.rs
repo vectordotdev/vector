@@ -36,7 +36,7 @@ impl Assignment {
                 let target_span = target.span();
                 let expr_span = expr.span();
                 let assignment_span = Span::new(target_span.start(), expr_span.start() - 1);
-                let type_def = expr.type_def(state);
+                // let type_def = expr.type_def(state);
 
                 // Fallible expressions require infallible assignment.
                 if fallible_rhs.is_some() {
@@ -298,31 +298,8 @@ impl Expression for Assignment {
         self.variant.resolve(ctx)
     }
 
-    fn type_def(&self, state: &TypeState) -> TypeDef {
-        self.variant.type_def(state)
-    }
-
     fn type_info(&self, state: &TypeState) -> TypeInfo {
-        let mut final_state = state.clone();
-
-        match &self.variant {
-            Variant::Single { target, expr } => {
-                target.insert_type_def(
-                    &mut final_state,
-                    expr.type_info(state).result,
-                    expr.as_value(),
-                );
-            }
-            Variant::Infallible {
-                ok,
-                err,
-                expr,
-                default,
-            } => {
-                unimplemented!()
-            }
-        }
-        TypeInfo::new(final_state, self.variant.type_def(state))
+        self.variant.type_info(state)
     }
 }
 
@@ -547,18 +524,40 @@ where
         Ok(value)
     }
 
-    fn type_def(&self, state: &TypeState) -> TypeDef {
-        use Variant::{Infallible, Single};
+    // fn type_def(&self, state: &TypeState) -> TypeDef {
+    //     use Variant::{Infallible, Single};
+    //
+    //     match self {
+    //         Single { expr, .. } => expr.type_def(state),
+    //         Infallible { expr, .. } => {
+    //             // Return type is either the "expr" type, or "bytes" (the error message).
+    //             let mut type_def = expr.type_def(state);
+    //             type_def.kind_mut().add_bytes();
+    //             type_def.infallible()
+    //         }
+    //     }
+    // }
 
-        match self {
-            Single { expr, .. } => expr.type_def(state),
-            Infallible { expr, .. } => {
-                // Return type is either the "expr" type, or "bytes" (the error message).
-                let mut type_def = expr.type_def(state);
-                type_def.kind_mut().add_bytes();
-                type_def.infallible()
+    fn type_info(&self, state: &TypeState) -> TypeInfo {
+        match &self {
+            Variant::Single { target, expr } => {
+                let expr_info = expr.type_info(state);
+
+                let expr_result = expr_info.result;
+                let mut final_state = expr_info.state;
+                target.insert_type_def(&mut final_state, expr_result.clone(), expr.as_value());
+                TypeInfo::new(final_state, expr_result)
+            }
+            Variant::Infallible {
+                ok,
+                err,
+                expr,
+                default,
+            } => {
+                unimplemented!()
             }
         }
+        // TypeInfo::new(final_state, self.variant.type_def(state))
     }
 }
 

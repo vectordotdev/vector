@@ -54,6 +54,7 @@ impl Expression for Block {
 
         for expr in &self.inner {
             let info = expr.type_info(&state);
+            state = info.state;
             result = info.result;
 
             if result.is_fallible() {

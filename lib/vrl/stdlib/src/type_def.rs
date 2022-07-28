@@ -1,4 +1,5 @@
 use ::value::Value;
+use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::{TypeDef as VrlTypeDef, *};
 use vrl::state::TypeState;
 
@@ -47,9 +48,9 @@ impl Function for TypeDef {
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
-        let type_def = value.type_def(state);
+        let type_def = value.type_info(state).result;
 
-        Ok(Box::new(TypeDefFn { type_def }))
+        Ok(TypeDefFn { type_def }.as_expr())
     }
 }
 
@@ -58,12 +59,12 @@ struct TypeDefFn {
     type_def: VrlTypeDef,
 }
 
-impl Expression for TypeDefFn {
-    fn resolve(&self, _ctx: &mut Context) -> Resolved {
+impl FunctionExpression for TypeDefFn {
+    fn resolve(&self, _ctx: &Context) -> Resolved {
         Ok(type_def(&self.type_def.clone()))
     }
 
     fn type_def(&self, _state: &state::TypeState) -> VrlTypeDef {
-        VrlTypeDef::any().infallible()
+        VrlTypeDef::any()
     }
 }
