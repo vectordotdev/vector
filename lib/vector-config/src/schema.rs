@@ -13,7 +13,9 @@ use serde_json::{Map, Value};
 
 use crate::{num::ConfigurableNumber, Configurable, CustomAttribute, Metadata};
 
-/// Finalizes the schema by ensuring all metadata is applied and registering it in the generator.
+/// Finalizes the schema.
+///
+/// This ensures all metadata is applied and registers `T` in the generator if possible.
 ///
 /// As many configuration types are reused often, such as nearly all sinks allowing configuration of batching
 /// behavior via `BatchConfig`, we utilize JSONSchema's ability to define a named schema and then

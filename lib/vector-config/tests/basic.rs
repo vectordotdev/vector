@@ -9,9 +9,11 @@ use std::{
     net::{Ipv4Addr, SocketAddr, SocketAddrV4},
     num::NonZeroU64,
     path::PathBuf,
+    time::Duration,
 };
 
 use serde::{de, Deserialize, Deserializer};
+use serde_with::serde_as;
 use vector_config::{configurable_component, schema::generate_root_schema};
 
 /// A templated string.
@@ -55,6 +57,16 @@ impl From<Template> for String {
 #[derive(Clone)]
 #[configurable_component]
 pub struct SpecialDuration(#[configurable(transparent)] u64);
+
+/// Duration, but in seconds.
+#[serde_as]
+#[configurable_component]
+#[derive(Clone)]
+struct DurationSecondsTest {
+    /// The timeout.
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    timeout: Duration,
+}
 
 /// Controls the batching behavior of events.
 #[derive(Clone)]
@@ -160,6 +172,11 @@ pub struct SimpleSourceConfig {
     /// The address to listen on for events.
     #[serde(default = "default_simple_source_listen_addr")]
     listen_addr: SocketListenAddr,
+    /*
+    /// The timeout for waiting for events from the source before closing the source.
+    #[serde(with = "DurationSeconds")]
+    timeout: Duration,
+    */
 }
 
 fn default_simple_source_listen_addr() -> SocketListenAddr {

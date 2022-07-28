@@ -20,6 +20,7 @@ use serde_with::serde_as;
 use snafu::Snafu;
 use stream_cancel::{Trigger, Tripwire};
 use tracing::{Instrument, Span};
+use vector_config::configurable_component;
 use vector_core::{
     event::metric::MetricSeries,
     internal_event::{BytesSent, EventsSent},
@@ -58,7 +59,8 @@ enum BuildError {
 
 /// Configuration for the `prometheus_exporter` sink.
 #[serde_as]
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[configurable_component(sink)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct PrometheusExporterConfig {
     /// The default namespace for any metrics sent.
@@ -78,6 +80,7 @@ pub struct PrometheusExporterConfig {
     #[serde(default = "default_address")]
     pub address: SocketAddr,
 
+    #[configurable(derived)]
     pub tls: Option<TlsEnableableConfig>,
 
     /// Default buckets to use for aggregating [distribution][dist_metric_docs] metrics into histograms.

@@ -265,11 +265,10 @@ pub enum Sinks {
     #[cfg(feature = "sinks-papertrail")]
     Papertrail(#[configurable(derived)] papertrail::PapertrailConfig),
 
-    /*
     /// Prometheus Exporter.
     #[cfg(feature = "sinks-prometheus")]
     PrometheusExporter(#[configurable(derived)] prometheus::exporter::PrometheusExporterConfig),
-    */
+
     /// Prometheus Remote Write.
     #[cfg(feature = "sinks-prometheus")]
     PrometheusRemoteWrite(#[configurable(derived)] prometheus::remote_write::RemoteWriteConfig),
