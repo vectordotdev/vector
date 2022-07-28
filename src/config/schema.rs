@@ -9,8 +9,8 @@ pub struct Options {
     #[serde(default = "default_enabled")]
     pub enabled: bool,
 
-    #[serde(default = "default_sink_requirements_enabled")]
-    pub sink_requirements: bool,
+    #[serde(default = "default_validation")]
+    pub validation: bool,
 
     pub log_namespace: Option<bool>,
 }
@@ -41,7 +41,7 @@ impl Options {
 
         // If either config enables these flags, it is enabled.
         self.enabled |= with.enabled;
-        self.sink_requirements |= with.sink_requirements;
+        self.validation |= with.validation;
     }
 }
 
@@ -49,7 +49,7 @@ impl Default for Options {
     fn default() -> Self {
         Self {
             enabled: default_enabled(),
-            sink_requirements: default_sink_requirements_enabled(),
+            validation: default_validation(),
             log_namespace: None,
         }
     }
@@ -59,7 +59,7 @@ const fn default_enabled() -> bool {
     false
 }
 
-const fn default_sink_requirements_enabled() -> bool {
+const fn default_validation() -> bool {
     false
 }
 
@@ -74,17 +74,17 @@ mod test {
                 "enable log namespacing",
                 Options {
                     enabled: false,
-                    sink_requirements: false,
+                    validation: false,
                     log_namespace: None,
                 },
                 Options {
                     enabled: false,
-                    sink_requirements: false,
+                    validation: false,
                     log_namespace: Some(true),
                 },
                 Some(Options {
                     enabled: false,
-                    sink_requirements: false,
+                    validation: false,
                     log_namespace: Some(true),
                 }),
             ),
@@ -92,12 +92,12 @@ mod test {
                 "log namespace conflict",
                 Options {
                     enabled: false,
-                    sink_requirements: false,
+                    validation: false,
                     log_namespace: Some(false),
                 },
                 Options {
                     enabled: false,
-                    sink_requirements: false,
+                    validation: false,
                     log_namespace: Some(true),
                 },
                 None,
@@ -106,17 +106,17 @@ mod test {
                 "enable schemas",
                 Options {
                     enabled: false,
-                    sink_requirements: false,
+                    validation: false,
                     log_namespace: None,
                 },
                 Options {
                     enabled: true,
-                    sink_requirements: false,
+                    validation: false,
                     log_namespace: None,
                 },
                 Some(Options {
                     enabled: true,
-                    sink_requirements: false,
+                    validation: false,
                     log_namespace: None,
                 }),
             ),
@@ -124,17 +124,17 @@ mod test {
                 "enable sink requirements",
                 Options {
                     enabled: false,
-                    sink_requirements: false,
+                    validation: false,
                     log_namespace: None,
                 },
                 Options {
                     enabled: false,
-                    sink_requirements: true,
+                    validation: true,
                     log_namespace: None,
                 },
                 Some(Options {
                     enabled: false,
-                    sink_requirements: true,
+                    validation: true,
                     log_namespace: None,
                 }),
             ),
