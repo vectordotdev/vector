@@ -32,7 +32,7 @@ impl InternalEvent for SocketBytesReceived {
         trace!(
             message = "Bytes received.",
             byte_size = %self.byte_size,
-            protocol,
+            %protocol,
         );
         counter!(
             "component_received_bytes_total", self.byte_size as u64,
@@ -55,7 +55,7 @@ impl InternalEvent for SocketEventsReceived {
             message = "Events received.",
             count = self.count,
             byte_size = self.byte_size,
-            mode,
+            %mode,
         );
         counter!("component_received_events_total", self.count as u64, "mode" => mode);
         counter!("component_received_event_bytes_total", self.byte_size as u64, "mode" => mode);
@@ -76,7 +76,7 @@ impl InternalEvent for SocketBytesSent {
         trace!(
             message = "Bytes sent.",
             byte_size = %self.byte_size,
-            protocol,
+            %protocol,
         );
         counter!(
             "component_sent_bytes_total", self.byte_size as u64,
@@ -115,7 +115,7 @@ impl<'a> InternalEvent for SocketReceiveError<'a> {
             error_code = "receiving_data",
             error_type = error_type::CONNECTION_FAILED,
             stage = error_stage::RECEIVING,
-            mode,
+            %mode,
         );
         counter!(
             "component_errors_total", 1,
