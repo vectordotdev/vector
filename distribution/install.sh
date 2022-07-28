@@ -48,6 +48,7 @@ USAGE:
 FLAGS:
     -y                      Disable confirmation prompt.
         --prefix            The directory where the files should be placed, default: "$HOME/.vector"
+                            Note: This option automatically assumes the \`--no-modify-path\` flag
         --no-modify-path    Don't configure the PATH environment variable
     -h, --help              Prints help information
 EOF
@@ -60,6 +61,7 @@ main() {
     local prompt=yes
     local modify_path=yes
     local prefix="$HOME/.vector"
+    local use_new_directory_structure=no
     for arg in "$@"; do
         case "$arg" in
             -h|--help)
@@ -68,6 +70,8 @@ main() {
                 ;;
             --prefix)
                 prefix="$2"
+                use_new_directory_structure=yes
+                modify_path=no
                 shift 2
                 ;;
             --no-modify-path)
@@ -110,10 +114,13 @@ main() {
         echo ""
     fi
 
-    install_from_archive $modify_path $prefix
+    install_from_archive "$modify_path" "$prefix" "$use_new_directory_structure"
 }
 
 install_from_archive() {
+    need_cmd dirname
+    need_cmd pwd
+    need_cmd basename
     need_cmd cp
     need_cmd mktemp
     need_cmd mkdir
@@ -127,10 +134,11 @@ install_from_archive() {
     get_architecture || return 1
     local modify_path="$1"
     local prefix="$2"
+    local use_new_directory_structure="$3"
     local _arch="$RETVAL"
     assert_nz "$_arch" "arch"
 
-    # this path could be a relative, get the absolute path, ref: https://stackoverflow.com/a/21188136/11667450
+    # this path could be a relative, change it to absolute path, ref: https://stackoverflow.com/a/21188136/11667450
     prefix="$(cd "$(dirname "$prefix")" && pwd)/$(basename "$prefix")"
 
     local _archive_arch=""
@@ -171,9 +179,28 @@ install_from_archive() {
     ensure downloader "$_url" "$_file"
     printf " ✓\n"
 
-    printf "%s Unpacking archive to $prefix ..." "$_prompt"
     ensure mkdir -p "$prefix"
-    ensure tar -xzf "$_file" --directory="$prefix" --strip-components=2
+
+    if [ "$use_new_directory_structure" = "no" ]; then
+        printf "%s Unpacking archive to $prefix ..." "$_prompt"
+        ensure tar -xzf "$_file" --directory="$prefix" --strip-components=2
+    else
+        # https://github.com/vectordotdev/vector/pull/13613#pullrequestreview-1045524132.
+        # We will unpack the archive to a temporary directory and then copy the files to
+        # their corresponding locations according to the new directory structure.
+        printf "%s Using new directory structure since --prefix was specified...\n" "$_prompt"
+        local _unpack_dir
+        _unpack_dir="$(mktemp -d 2>/dev/null || ensure mktemp -d -t vector-install)"
+        ensure tar -xzf "$_file" --directory="$_unpack_dir" --strip-components=2
+        # copy all files (including hidden), ref: https://askubuntu.com/a/86891
+        ensure cp -r "$_unpack_dir/bin/." "$prefix/bin"
+        ensure cp -r "$_unpack_dir/etc/." "$prefix/etc"
+        ensure mkdir -p "$prefix/share/vector/config"
+        ensure cp -r "$_unpack_dir/config/." "$prefix/share/vector/config"
+        ensure cp "$_unpack_dir"/{LICENSE,README.md} "$prefix/share/vector/"
+        # all files have been moved, we can safely remove the unpack directory
+        ignore rm -rf "$_unpack_dir"
+    fi
 
     printf " ✓\n"
 
