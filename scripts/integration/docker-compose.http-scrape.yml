@@ -1,0 +1,36 @@
+version: "3"
+
+services:
+  runner:
+    build:
+      context: ${PWD}
+      dockerfile: scripts/integration/Dockerfile
+      args:
+        - RUST_VERSION=${RUST_VERSION}
+    working_dir: /code
+    command:
+      - "cargo"
+      - "nextest"
+      - "run"
+      - "--no-fail-fast"
+      - "--no-default-features"
+      - "--features"
+      - "http-scrape-integration-tests"
+        #    depends_on:
+        #    environment:
+    networks:
+      - public
+    volumes:
+      - ${PWD}:/code
+      - target:/code/target
+      - cargogit:/usr/local/cargo/git
+      - cargoregistry:/usr/local/cargo/registry
+
+networks:
+  public: {}
+  proxy: {}
+
+volumes:
+  target: {}
+  cargogit: {}
+  cargoregistry: {}

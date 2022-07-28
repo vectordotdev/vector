@@ -10,7 +10,7 @@ use tokio_util::codec::Decoder as _;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{self, GenerateConfig, SourceConfig, SourceContext, SourceDescription},
+    config::{self, SourceConfig, SourceContext, SourceDescription},
     http::Auth,
     serde::default_decoding,
     sources,
@@ -31,7 +31,7 @@ use vector_core::{
 const NAME: &str = "http_scrape";
 
 // TODO:
-//   - request headers
+//   - integration tests
 //   - framing for the decoding?
 //   - cue files
 
@@ -63,7 +63,7 @@ pub struct HttpScrapeConfig {
 
     /// Headers to apply to the HTTP requests.
     #[serde(default)]
-    headers: Option<Vec<String>>,
+    headers: Option<HashMap<String, String>>,
 
     /// TLS configuration.
     #[configurable(derived)]
@@ -74,13 +74,9 @@ pub struct HttpScrapeConfig {
     auth: Option<Auth>,
 }
 
-inventory::submit! {
-    SourceDescription::new::<HttpScrapeConfig>(NAME)
-}
-
-impl GenerateConfig for HttpScrapeConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+impl Default for HttpScrapeConfig {
+    fn default() -> Self {
+        Self {
             endpoint: "http://localhost:9898/logs".to_string(),
             query: None,
             scrape_interval_secs: super::default_scrape_interval_secs(),
@@ -89,10 +85,15 @@ impl GenerateConfig for HttpScrapeConfig {
             headers: None,
             tls: None,
             auth: None,
-        })
-        .unwrap()
+        }
     }
 }
+
+inventory::submit! {
+    SourceDescription::new::<HttpScrapeConfig>(NAME)
+}
+
+impl_generate_config_from_default!(HttpScrapeConfig);
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "http_scrape")]
@@ -124,6 +125,7 @@ impl SourceConfig for HttpScrapeConfig {
         let inputs = super::GenericHttpScrapeInputs::new(
             urls,
             self.scrape_interval_secs,
+            self.headers.clone(),
             self.auth.clone(),
             tls,
             cx.proxy.clone(),

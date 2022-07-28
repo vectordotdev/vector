@@ -134,6 +134,7 @@ impl SourceConfig for PrometheusScrapeConfig {
         let inputs = GenericHttpScrapeInputs::new(
             urls,
             self.scrape_interval_secs,
+            None,
             self.auth.clone(),
             tls,
             cx.proxy.clone(),

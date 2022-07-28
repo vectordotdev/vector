@@ -37,6 +37,7 @@ use vector_core::{config::proxy::ProxyConfig, event::Event, ByteSizeOf};
 pub(crate) struct GenericHttpScrapeInputs {
     urls: Vec<Uri>,
     interval_secs: u64,
+    headers: Option<HashMap<String, String>>,
     auth: Option<Auth>,
     tls: TlsSettings,
     proxy: ProxyConfig,
@@ -47,6 +48,7 @@ impl GenericHttpScrapeInputs {
     pub fn new(
         urls: Vec<Uri>,
         interval_secs: u64,
+        headers: Option<HashMap<String, String>>,
         auth: Option<Auth>,
         tls: TlsSettings,
         proxy: ProxyConfig,
@@ -55,6 +57,7 @@ impl GenericHttpScrapeInputs {
         Self {
             urls,
             interval_secs,
+            headers,
             auth,
             tls,
             proxy,
@@ -130,10 +133,15 @@ pub(crate) async fn http_scrape<H: HttpScraper + std::marker::Send + Clone>(
         let mut context = context.clone();
         context.build(&url);
 
-        let mut request = Request::get(&url)
-            .header(http::header::ACCEPT, "text/plain")
-            .body(Body::empty())
-            .expect("error creating request");
+        let mut builder = Request::get(&url).header(http::header::ACCEPT, "text/plain");
+
+        // add user supplied headers
+        if let Some(headers) = &inputs.headers {
+            for header in headers {
+                builder = builder.header(header.0, header.1);
+            }
+        }
+        let mut request = builder.body(Body::empty()).expect("error creating request");
 
         if let Some(auth) = &inputs.auth {
             auth.apply(&mut request);
