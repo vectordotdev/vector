@@ -1,6 +1,5 @@
 use std::{io, num::ParseIntError, path::Path, path::PathBuf, str::FromStr};
 
-use chrono::{DateTime, Utc};
 use futures::future::BoxFuture;
 use snafu::{ResultExt, Snafu};
 use tokio::{
@@ -10,8 +9,8 @@ use tokio::{
 use vector_common::btreemap;
 use vector_config::configurable_component;
 
-use super::{filter_result_sync, FilterList, HostMetrics};
-use crate::event::metric::{Metric, MetricTags};
+use super::{filter_result_sync, FilterList, HostMetrics, MetricsBuffer};
+use crate::event::metric::MetricTags;
 
 const MICROSECONDS: f64 = 1.0 / 1_000_000.0;
 
@@ -62,50 +61,45 @@ enum CGroupsError {
 type CGroupsResult<T> = Result<T, CGroupsError>;
 
 impl HostMetrics {
-    pub(super) async fn cgroups_metrics(&self) -> Vec<Metric> {
-        match &self.root_cgroup {
-            Some(root) => {
-                let mut recurser = CGroupRecurser::new(self);
-                match &root.mode {
-                    Mode::Modern(base) => recurser.scan_modern(root, base).await,
-                    Mode::Legacy(base) => recurser.scan_legacy(root, base).await,
-                    Mode::Hybrid(v1base, v2base) => {
-                        // Hybrid cgroups contain both legacy and modern cgroups, so scan them both
-                        // for the data files. The `cpu` controller is usually found in the modern
-                        // groups, but the top-level stats are found under the legacy controller in
-                        // some setups. Similarly, the `memory` controller can be found in either
-                        // location. As such, detecting exactly where to scan for the controllers
-                        // doesn't work, so opportunistically scan for any controller files in all
-                        // subdirectories of the given root.
-                        recurser.scan_legacy(root, v1base).await;
-                        recurser.scan_modern(root, v2base).await;
-                    }
+    pub(super) async fn cgroups_metrics(&self, output: &mut MetricsBuffer) {
+        if let Some(root) = &self.root_cgroup {
+            output.name = "cgroups";
+            let mut recurser = CGroupRecurser::new(self, output);
+            match &root.mode {
+                Mode::Modern(base) => recurser.scan_modern(root, base).await,
+                Mode::Legacy(base) => recurser.scan_legacy(root, base).await,
+                Mode::Hybrid(v1base, v2base) => {
+                    // Hybrid cgroups contain both legacy and modern cgroups, so scan them both
+                    // for the data files. The `cpu` controller is usually found in the modern
+                    // groups, but the top-level stats are found under the legacy controller in
+                    // some setups. Similarly, the `memory` controller can be found in either
+                    // location. As such, detecting exactly where to scan for the controllers
+                    // doesn't work, so opportunistically scan for any controller files in all
+                    // subdirectories of the given root.
+                    recurser.scan_legacy(root, v1base).await;
+                    recurser.scan_modern(root, v2base).await;
                 }
-                recurser.output
             }
-            None => Vec::default(),
         }
     }
 }
 
 struct CGroupRecurser<'a> {
-    host: &'a HostMetrics,
-    now: DateTime<Utc>,
-    output: Vec<Metric>,
+    output: &'a mut MetricsBuffer,
     buffer: String,
     load_cpu: bool,
     load_memory: bool,
+    config: &'a CGroupsConfig,
 }
 
 impl<'a> CGroupRecurser<'a> {
-    fn new(host: &'a HostMetrics) -> Self {
+    fn new(host: &'a HostMetrics, output: &'a mut MetricsBuffer) -> Self {
         Self {
-            host,
-            now: Utc::now(),
-            output: Vec::new(),
+            output,
             buffer: String::new(),
             load_cpu: true,
             load_memory: true,
+            config: &host.config.cgroups,
         }
     }
 
@@ -150,8 +144,8 @@ impl<'a> CGroupRecurser<'a> {
                 self.load_memory(&cgroup, &tags).await;
             }
 
-            if level < self.host.config.cgroups.levels {
-                let groups = &self.host.config.cgroups.groups;
+            if level < self.config.levels {
+                let groups = &self.config.groups;
                 if let Some(children) =
                     filter_result_sync(cgroup.children().await, "Failed to load cgroups children.")
                 {
@@ -171,24 +165,21 @@ impl<'a> CGroupRecurser<'a> {
             cgroup.load_cpu(&mut self.buffer).await,
             "Failed to load cgroups CPU statistics.",
         ) {
-            self.output.push(self.host.counter(
+            self.output.counter(
                 "cgroup_cpu_usage_seconds_total",
-                self.now,
                 cpu.usage_usec as f64 * MICROSECONDS,
                 tags.clone(),
-            ));
-            self.output.push(self.host.counter(
+            );
+            self.output.counter(
                 "cgroup_cpu_user_seconds_total",
-                self.now,
                 cpu.user_usec as f64 * MICROSECONDS,
                 tags.clone(),
-            ));
-            self.output.push(self.host.counter(
+            );
+            self.output.counter(
                 "cgroup_cpu_system_seconds_total",
-                self.now,
                 cpu.system_usec as f64 * MICROSECONDS,
                 tags.clone(),
-            ));
+            );
         }
     }
 
@@ -198,30 +189,18 @@ impl<'a> CGroupRecurser<'a> {
             cgroup.load_memory_current(&mut self.buffer).await,
             "Failed to load cgroups current memory.",
         ) {
-            self.output.push(self.host.gauge(
-                "cgroup_memory_current_bytes",
-                self.now,
-                current as f64,
-                tags.clone(),
-            ));
+            self.output
+                .gauge("cgroup_memory_current_bytes", current as f64, tags.clone());
         }
 
         if let Some(Some(stat)) = filter_result_sync(
             cgroup.load_memory_stat(&mut self.buffer).await,
             "Failed to load cgroups memory statistics.",
         ) {
-            self.output.push(self.host.gauge(
-                "cgroup_memory_anon_bytes",
-                self.now,
-                stat.anon as f64,
-                tags.clone(),
-            ));
-            self.output.push(self.host.gauge(
-                "cgroup_memory_file_bytes",
-                self.now,
-                stat.file as f64,
-                tags.clone(),
-            ));
+            self.output
+                .gauge("cgroup_memory_anon_bytes", stat.anon as f64, tags.clone());
+            self.output
+                .gauge("cgroup_memory_file_bytes", stat.file as f64, tags.clone());
         }
     }
 }
@@ -490,7 +469,7 @@ mod tests {
             tests::{count_name, count_tag},
             HostMetrics, HostMetricsConfig,
         },
-        join_name, join_path,
+        join_name, join_path, MetricsBuffer,
     };
 
     #[test]
@@ -506,7 +485,9 @@ mod tests {
     #[tokio::test]
     async fn generates_cgroups_metrics() {
         let config: HostMetricsConfig = toml::from_str(r#"collectors = ["cgroups"]"#).unwrap();
-        let metrics = HostMetrics::new(config).cgroups_metrics().await;
+        let mut buffer = MetricsBuffer::new(None);
+        HostMetrics::new(config).cgroups_metrics(&mut buffer).await;
+        let metrics = buffer.metrics;
 
         assert!(!metrics.is_empty());
         assert_eq!(count_tag(&metrics, "cgroup"), metrics.len());
@@ -619,7 +600,9 @@ mod tests {
                 "#
             ))
             .unwrap();
-            let metrics = HostMetrics::new(config).cgroups_metrics().await;
+            let mut buffer = MetricsBuffer::new(None);
+            HostMetrics::new(config).cgroups_metrics(&mut buffer).await;
+            let metrics = buffer.metrics;
 
             assert_ne!(metrics.len(), 0);
 
