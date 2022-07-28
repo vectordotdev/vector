@@ -28,11 +28,11 @@ pub struct SocketBytesReceived {
 
 impl InternalEvent for SocketBytesReceived {
     fn emit(self) {
-        let protocol = self.mode.as_str().to_string();
+        let protocol = self.mode.as_str();
         trace!(
             message = "Bytes received.",
             byte_size = %self.byte_size,
-            protocol = protocol.as_str(),
+            %protocol,
         );
         counter!(
             "component_received_bytes_total", self.byte_size as u64,
@@ -50,16 +50,17 @@ pub struct SocketEventsReceived {
 
 impl InternalEvent for SocketEventsReceived {
     fn emit(self) {
+        let mode = self.mode.as_str();
         trace!(
             message = "Events received.",
             count = self.count,
             byte_size = self.byte_size,
-            mode = self.mode.as_str()
+            %mode,
         );
-        counter!("component_received_events_total", self.count as u64, "mode" => self.mode.as_str());
-        counter!("component_received_event_bytes_total", self.byte_size as u64, "mode" => self.mode.as_str());
+        counter!("component_received_events_total", self.count as u64, "mode" => mode);
+        counter!("component_received_event_bytes_total", self.byte_size as u64, "mode" => mode);
         // deprecated
-        counter!("events_in_total", self.count as u64, "mode" => self.mode.as_str());
+        counter!("events_in_total", self.count as u64, "mode" => mode);
     }
 }
 
@@ -71,11 +72,11 @@ pub struct SocketBytesSent {
 
 impl InternalEvent for SocketBytesSent {
     fn emit(self) {
-        let protocol = self.mode.as_str().to_string();
+        let protocol = self.mode.as_str();
         trace!(
             message = "Bytes sent.",
             byte_size = %self.byte_size,
-            protocol = %protocol,
+            %protocol,
         );
         counter!(
             "component_sent_bytes_total", self.byte_size as u64,
@@ -107,22 +108,23 @@ pub struct SocketReceiveError<'a> {
 
 impl<'a> InternalEvent for SocketReceiveError<'a> {
     fn emit(self) {
+        let mode = self.mode.as_str();
         error!(
             message = "Error receiving data.",
             error = %self.error,
             error_code = "receiving_data",
             error_type = error_type::CONNECTION_FAILED,
             stage = error_stage::RECEIVING,
-            mode = %self.mode.as_str(),
+            %mode,
         );
         counter!(
             "component_errors_total", 1,
             "error_code" => "receiving_data",
             "error_type" => error_type::CONNECTION_FAILED,
             "stage" => error_stage::RECEIVING,
-            "mode" => self.mode.as_str(),
+            "mode" => mode,
         );
         // deprecated
-        counter!("connection_errors_total", 1, "mode" => self.mode.as_str());
+        counter!("connection_errors_total", 1, "mode" => mode);
     }
 }
