@@ -31,13 +31,13 @@ use crate::{
 /// This means we do some extra work up front to avoid misclassifying usages of `#[serde(with =
 /// "...")]` that are using module paths, and as such, this also means that those usages are not
 /// supported.
-pub struct DelegatedSerialize<I, H> {
+pub struct Delegated<I, H> {
     input: I,
     _helper: PhantomData<fn(H)>,
 }
 
 // Adapter implementation for `serde_with` where the helper `H` is able to serialize `I`.
-impl<I, H> Serialize for DelegatedSerialize<I, serde_with::As<H>>
+impl<I, H> Serialize for Delegated<I, serde_with::As<H>>
 where
     H: serde_with::SerializeAs<I>,
 {
@@ -49,7 +49,7 @@ where
     }
 }
 
-impl<I, H> From<I> for DelegatedSerialize<I, serde_with::As<H>>
+impl<I, H> From<I> for Delegated<I, serde_with::As<H>>
 where
     H: serde_with::SerializeAs<I>,
 {
@@ -62,7 +62,7 @@ where
 }
 
 // Passthrough implementation for any `H` which is `Configurable`.
-impl<I, H> Configurable for DelegatedSerialize<I, H>
+impl<I, H> Configurable for Delegated<I, H>
 where
     H: Configurable,
 {

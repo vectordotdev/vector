@@ -304,7 +304,7 @@ impl Attributes {
             // serialize wrapper, since we know we'll have to do that in a few different places
             // during codegen, so it's cleaner to do it here.
             let field_ty = field.ty;
-            parse_quote! { ::vector_config::ser::DelegatedSerialize<#field_ty, #virtual_ty> }
+            parse_quote! { ::vector_config::ser::Delegated<#field_ty, #virtual_ty> }
         });
 
         Ok(self)
