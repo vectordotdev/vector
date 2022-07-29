@@ -168,8 +168,8 @@ impl SinkConfig for HecLogsSinkConfig {
         "splunk_hec_logs"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements.inner)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements.inner
     }
 }
 
@@ -262,7 +262,7 @@ impl SinkConfig for HecSinkCompatConfig {
         "splunk_hec"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
         self.config.acknowledgements()
     }
 }

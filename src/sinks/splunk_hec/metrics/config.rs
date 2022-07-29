@@ -136,8 +136,8 @@ impl SinkConfig for HecMetricsSinkConfig {
         "splunk_hec_metrics"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements.inner)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements.inner
     }
 }
 

@@ -197,8 +197,8 @@ impl SinkConfig for TestConfig {
         unimplemented!("not intended for use in real configs")
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        None
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &AcknowledgementsConfig::DEFAULT
     }
 }
 
