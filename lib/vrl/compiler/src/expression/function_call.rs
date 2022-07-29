@@ -790,10 +790,173 @@ impl Expression for FunctionCall {
     #[cfg(feature = "llvm")]
     fn emit_llvm<'ctx>(
         &self,
-        _: (&mut LocalEnv, &mut ExternalEnv),
-        _: &mut crate::llvm::Context<'ctx>,
+        state: (&mut LocalEnv, &mut ExternalEnv),
+        ctx: &mut crate::llvm::Context<'ctx>,
     ) -> Result<(), String> {
-        todo!()
+        let begin_block = ctx.append_basic_block(&format!("function_call_{}_begin", self.ident));
+
+        ctx.build_unconditional_branch(begin_block);
+        ctx.position_at_end(begin_block);
+
+        if ["del", "exists"].contains(&self.ident) {
+            return self.expr.emit_llvm(state, ctx);
+        }
+
+        let abort_block = ctx.append_basic_block(&format!("function_call_{}_abort", self.ident));
+        let end_block = ctx.append_basic_block(&format!("function_call_{}_end", self.ident));
+
+        let stdlib_function = ctx.stdlib(self.function_id);
+        let uses_context = stdlib_function
+            .symbol()
+            .map_or(false, |symbol| symbol.uses_context);
+        let compiled_arguments = self.compile_arguments(stdlib_function, (state.0, state.1))?;
+
+        let function_name = format!("vrl_fn_{}", self.ident);
+        let function = ctx
+            .module()
+            .get_function(&function_name)
+            .unwrap_or_else(|| {
+                let mut argument_types = Vec::new();
+
+                if uses_context {
+                    argument_types.push(ctx.context_mut_type().into());
+                }
+
+                for (_, argument) in &compiled_arguments {
+                    let argument_type = match argument {
+                        Some(CompiledArgument::Static(_)) => ctx.static_argument_ref_type(),
+                        Some(CompiledArgument::Dynamic(argument)) if argument.argument.required => {
+                            ctx.value_mut_type()
+                        }
+                        Some(CompiledArgument::Dynamic(_)) | None => ctx.optional_value_mut_type(),
+                    };
+
+                    argument_types.push(argument_type.into());
+                }
+
+                argument_types.push(ctx.resolved_mut_type().into());
+
+                let function_type = ctx.context().void_type().fn_type(&argument_types, false);
+
+                ctx.module()
+                    .add_function(&function_name, function_type, None)
+            });
+
+        let result_ref = ctx.result_ref();
+
+        let mut argument_refs = Vec::new();
+        let mut drop_on_abort_refs = Vec::new();
+
+        if uses_context {
+            argument_refs.push(ctx.context_ref().into());
+        }
+
+        for (keyword, argument) in compiled_arguments {
+            let argument_name = format!("argument_{}", keyword);
+            match argument {
+                Some(CompiledArgument::Static(argument)) => {
+                    let static_ref = ctx
+                        .cast_static_argument_ref_type(
+                            ctx.into_const(argument, &argument_name).as_pointer_value(),
+                        )
+                        .into();
+
+                    argument_refs.push(static_ref);
+                }
+                Some(CompiledArgument::Dynamic(argument)) if argument.argument.required => {
+                    let argument_ref = ctx.build_alloca_resolved_initialized(&argument_name);
+                    drop_on_abort_refs.push((argument_ref.into(), ctx.fns().vrl_resolved_drop));
+
+                    ctx.emit_llvm(
+                        &argument.expression,
+                        argument_ref,
+                        (state.0, state.1),
+                        abort_block,
+                        drop_on_abort_refs.clone(),
+                    )?;
+
+                    let value_ref = ctx
+                        .fns()
+                        .vrl_resolved_as_value
+                        .build_call(ctx.builder(), argument_ref)
+                        .try_as_basic_value()
+                        .left()
+                        .expect("result is not a basic value");
+
+                    argument_refs.push(value_ref.into());
+                }
+                Some(CompiledArgument::Dynamic(argument)) => {
+                    let argument_ref = ctx.build_alloca_resolved_initialized(&argument_name);
+                    drop_on_abort_refs.push((argument_ref.into(), ctx.fns().vrl_resolved_drop));
+
+                    ctx.emit_llvm(
+                        &argument.expression,
+                        argument_ref,
+                        (state.0, state.1),
+                        abort_block,
+                        drop_on_abort_refs.clone(),
+                    )?;
+
+                    let optional_value_ref =
+                        ctx.build_alloca_optional_value_initialized(&argument_name);
+                    ctx.fns()
+                        .vrl_resolved_as_value_to_optional_value
+                        .build_call(ctx.builder(), argument_ref, optional_value_ref);
+
+                    argument_refs.push(optional_value_ref.into());
+                }
+                None => {
+                    let optional_value_ref =
+                        ctx.build_alloca_optional_value_initialized(&argument_name);
+                    drop_on_abort_refs
+                        .push((optional_value_ref.into(), ctx.fns().vrl_optional_value_drop));
+
+                    argument_refs.push(optional_value_ref.into());
+                }
+            }
+        }
+
+        argument_refs.push(result_ref.into());
+
+        ctx.builder()
+            .build_call(function, &argument_refs, self.ident);
+
+        let ident_ref = ctx
+            .into_const(self.ident.to_owned(), self.ident)
+            .as_pointer_value();
+        let span_ref = ctx
+            .into_const(self.span, &self.span.to_string())
+            .as_pointer_value();
+        let type_def = self.type_def((state.0, state.1));
+
+        if type_def.is_fallible() && !ctx.discard_error() || self.abort_on_error {
+            let is_error = ctx
+                .fns()
+                .vrl_resolved_is_err
+                .build_call(ctx.builder(), result_ref)
+                .try_as_basic_value()
+                .left()
+                .expect("result is not a basic value")
+                .try_into()
+                .expect("result is not an int value");
+
+            ctx.build_conditional_branch(is_error, abort_block, end_block);
+        } else {
+            ctx.build_unconditional_branch(end_block);
+        }
+
+        ctx.position_at_end(abort_block);
+        ctx.fns().vrl_expression_function_call_abort.build_call(
+            ctx.builder(),
+            ctx.cast_string_ref_type(ident_ref),
+            ctx.cast_span_ref_type(span_ref),
+            result_ref,
+        );
+        ctx.build_unconditional_branch(end_block);
+
+        ctx.position_at_end(end_block);
+
+        Ok(())
     }
 }
 
