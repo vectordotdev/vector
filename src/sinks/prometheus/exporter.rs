@@ -207,8 +207,8 @@ impl SinkConfig for PrometheusExporterConfig {
         vec![Resource::tcp(self.address)]
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
@@ -239,7 +239,7 @@ impl SinkConfig for PrometheusCompatConfig {
         self.config.resources()
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
         self.config.acknowledgements()
     }
 }

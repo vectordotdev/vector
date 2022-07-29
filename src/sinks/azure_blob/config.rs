@@ -157,8 +157,8 @@ impl SinkConfig for AzureBlobSinkConfig {
         "azure_blob"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 

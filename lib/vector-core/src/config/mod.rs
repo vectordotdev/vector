@@ -154,6 +154,8 @@ pub struct AcknowledgementsConfig {
 }
 
 impl AcknowledgementsConfig {
+    pub const DEFAULT: Self = Self { enabled: None };
+
     #[must_use]
     pub fn merge_default(&self, other: &Self) -> Self {
         let enabled = self.enabled.or(other.enabled);

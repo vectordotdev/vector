@@ -424,8 +424,8 @@ impl SinkConfig for MockSinkConfig {
         unimplemented!("not intended for use in real configs")
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        None
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &AcknowledgementsConfig::DEFAULT
     }
 }
 
