@@ -1,4 +1,10 @@
+use ::value::Value;
+use primitive_calling_convention::primitive_calling_convention;
 use vrl::prelude::*;
+
+fn is_string(value: Value) -> Resolved {
+    Ok(value.is_bytes().into())
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct IsString;
@@ -46,6 +52,14 @@ impl Function for IsString {
 
         Ok(Box::new(IsStringFn { value }))
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_is_string",
+            address: vrl_fn_is_string as _,
+            uses_context: false,
+        })
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -55,12 +69,20 @@ struct IsStringFn {
 
 impl Expression for IsStringFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        self.value.resolve(ctx).map(|v| value!(v.is_bytes()))
+        let value = self.value.resolve(ctx)?;
+
+        is_string(value)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::boolean().infallible()
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_is_string(value: Value) -> Resolved {
+    is_string(value)
 }
 
 #[cfg(test)]

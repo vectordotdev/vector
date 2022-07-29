@@ -1,4 +1,10 @@
+use ::value::Value;
+use primitive_calling_convention::primitive_calling_convention;
 use vrl::prelude::*;
+
+fn is_timestamp(value: Value) -> Resolved {
+    Ok(value.is_timestamp().into())
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct IsTimestamp;
@@ -46,6 +52,14 @@ impl Function for IsTimestamp {
 
         Ok(Box::new(IsTimestampFn { value }))
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_is_timestamp",
+            address: vrl_fn_is_timestamp as _,
+            uses_context: false,
+        })
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -55,12 +69,20 @@ struct IsTimestampFn {
 
 impl Expression for IsTimestampFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        self.value.resolve(ctx).map(|v| value!(v.is_timestamp()))
+        let value = self.value.resolve(ctx)?;
+
+        is_timestamp(value)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::boolean().infallible()
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_is_timestamp(value: Value) -> Resolved {
+    is_timestamp(value)
 }
 
 #[cfg(test)]

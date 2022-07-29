@@ -1,4 +1,5 @@
 use ::value::Value;
+use primitive_calling_convention::primitive_calling_convention;
 use vrl::prelude::*;
 
 fn int(value: Value) -> Resolved {
@@ -51,6 +52,14 @@ impl Function for Integer {
 
         Ok(Box::new(IntegerFn { value }))
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_int",
+            address: vrl_fn_int as _,
+            uses_context: false,
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -68,4 +77,10 @@ impl Expression for IntegerFn {
 
         TypeDef::integer().with_fallibility(non_integer)
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_int(value: Value) -> Resolved {
+    int(value)
 }

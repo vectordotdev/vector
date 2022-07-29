@@ -1,4 +1,4 @@
-use std::{iter::FromIterator, str::FromStr};
+use std::{any::Any, iter::FromIterator, str::FromStr};
 
 use ::value::Value;
 use nom::{
@@ -12,6 +12,7 @@ use nom::{
     sequence::{delimited, preceded, terminated, tuple},
     IResult,
 };
+use primitive_calling_convention::primitive_calling_convention;
 use vrl::prelude::*;
 
 pub(crate) fn parse_key_value(
@@ -146,22 +147,35 @@ impl Function for ParseKeyValue {
         expr: Option<&expression::Expr>,
     ) -> CompiledArgument {
         match (name, expr) {
-            ("whitespace", Some(expr)) => match expr.as_value() {
-                None => Ok(None),
-                Some(value) => Ok(Some(
-                    Whitespace::from_str(
-                        &value.try_bytes_utf8_lossy().expect("whitespace not bytes"),
-                    )
-                    .map(|whitespace| Box::new(whitespace) as Box<dyn std::any::Any + Send + Sync>)
-                    .map_err(|_| vrl::function::Error::InvalidEnumVariant {
-                        keyword: "whitespace",
-                        value,
-                        variants: Whitespace::all_value().to_vec(),
-                    })?,
-                )),
+            ("whitespace", expr) => match expr {
+                Some(expr) => match expr.as_value() {
+                    None => Ok(Some(Box::new(Whitespace::default()) as _)),
+                    Some(value) => Ok(Some(
+                        Whitespace::from_str(
+                            &value.try_bytes_utf8_lossy().expect("whitespace not bytes"),
+                        )
+                        .map(|whitespace| Box::new(whitespace) as _)
+                        .map_err(|_| {
+                            vrl::function::Error::InvalidEnumVariant {
+                                keyword: "whitespace",
+                                value,
+                                variants: Whitespace::all_value().to_vec(),
+                            }
+                        })?,
+                    )),
+                },
+                _ => Ok(Some(Box::new(Whitespace::default()) as _)),
             },
             _ => Ok(None),
         }
+    }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_parse_key_value",
+            address: vrl_fn_parse_key_value as _,
+            uses_context: false,
+        })
     }
 }
 
@@ -240,6 +254,29 @@ impl Expression for ParseKeyValueFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::object(Collection::any()).fallible()
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_parse_key_value(
+    value: Value,
+    key_value_delimiter: Option<Value>,
+    field_delimiter: Option<Value>,
+    whitespace: &Box<dyn Any + Send + Sync>,
+    accept_standalone_key: Option<Value>,
+) -> Resolved {
+    let key_value_delimiter = key_value_delimiter.unwrap_or_else(|| "=".into());
+    let field_delimiter = field_delimiter.unwrap_or_else(|| " ".into());
+    let accept_standalone_key = accept_standalone_key.unwrap_or_else(|| true.into());
+    let whitespace = *whitespace.downcast_ref::<Whitespace>().unwrap();
+
+    parse_key_value(
+        value,
+        key_value_delimiter,
+        field_delimiter,
+        accept_standalone_key,
+        whitespace,
+    )
 }
 
 fn parse<'a>(

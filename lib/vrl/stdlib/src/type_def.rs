@@ -1,3 +1,5 @@
+use primitive_calling_convention::primitive_calling_convention;
+use std::any::Any;
 use vrl::prelude::{TypeDef as VrlTypeDef, *};
 
 fn type_def(type_def: &VrlTypeDef) -> Resolved {
@@ -68,6 +70,14 @@ impl Function for TypeDef {
             _ => Ok(None),
         }
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_type_def",
+            address: vrl_fn_type_def as _,
+            uses_context: false,
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -83,4 +93,12 @@ impl Expression for TypeDefFn {
     fn type_def(&self, _state: (&state::LocalEnv, &state::ExternalEnv)) -> VrlTypeDef {
         VrlTypeDef::any().infallible()
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_type_def(def: &Box<dyn Any + Send + Sync>) -> Resolved {
+    let def = def.downcast_ref::<VrlTypeDef>().unwrap();
+
+    type_def(def)
 }

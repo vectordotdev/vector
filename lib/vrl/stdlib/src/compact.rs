@@ -1,18 +1,19 @@
 use std::collections::BTreeMap;
 
 use ::value::Value;
+use primitive_calling_convention::primitive_calling_convention;
 use vrl::prelude::*;
 
 use crate::util;
 
 fn compact(
+    value: Value,
     recursive: Option<Value>,
     null: Option<Value>,
     string: Option<Value>,
     object: Option<Value>,
     array: Option<Value>,
     nullish: Option<Value>,
-    value: Value,
 ) -> Resolved {
     let options = CompactOptions {
         recursive: match recursive {
@@ -144,6 +145,14 @@ impl Function for Compact {
             nullish,
         }))
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_compact",
+            address: vrl_fn_compact as _,
+            uses_context: false,
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -199,6 +208,7 @@ impl CompactOptions {
 
 impl Expression for CompactFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
+        let value = self.value.resolve(ctx)?;
         let recursive = self
             .recursive
             .as_ref()
@@ -229,9 +239,8 @@ impl Expression for CompactFn {
             .as_ref()
             .map(|expr| expr.resolve(ctx))
             .transpose()?;
-        let value = self.value.resolve(ctx)?;
 
-        compact(recursive, null, string, object, array, nullish, value)
+        compact(value, recursive, null, string, object, array, nullish)
     }
 
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
@@ -241,6 +250,20 @@ impl Expression for CompactFn {
             TypeDef::object(Collection::any())
         }
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_compact(
+    value: Value,
+    recursive: Option<Value>,
+    null: Option<Value>,
+    string: Option<Value>,
+    object: Option<Value>,
+    array: Option<Value>,
+    nullish: Option<Value>,
+) -> Resolved {
+    compact(value, recursive, null, string, object, array, nullish)
 }
 
 /// Compact the value if we are recursing - otherwise, just return the value untouched.

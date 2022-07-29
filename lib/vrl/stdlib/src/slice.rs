@@ -1,9 +1,13 @@
 use std::ops::Range;
 
 use ::value::Value;
+use primitive_calling_convention::primitive_calling_convention;
 use vrl::prelude::*;
 
-fn slice(start: i64, end: Option<i64>, value: Value) -> Resolved {
+fn slice(value: Value, start: Value, end: Option<Value>) -> Resolved {
+    let start = start.try_integer()?;
+    let end = end.map(|end| end.try_integer()).transpose()?;
+
     let range = |len: i64| -> Result<Range<usize>> {
         let start = match start {
             start if start < 0 => start + len,
@@ -100,6 +104,14 @@ impl Function for Slice {
 
         Ok(Box::new(SliceFn { value, start, end }))
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_slice",
+            address: vrl_fn_slice as _,
+            uses_context: false,
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -111,14 +123,11 @@ struct SliceFn {
 
 impl Expression for SliceFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let start = self.start.resolve(ctx)?.try_integer()?;
-        let end = match &self.end {
-            Some(expr) => Some(expr.resolve(ctx)?.try_integer()?),
-            None => None,
-        };
+        let start = self.start.resolve(ctx)?;
+        let end = self.end.as_ref().map(|end| end.resolve(ctx)).transpose()?;
         let value = self.value.resolve(ctx)?;
 
-        slice(start, end, value)
+        slice(value, start, end)
     }
 
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
@@ -130,6 +139,12 @@ impl Expression for SliceFn {
             _ => td.add_bytes().add_array(Collection::any()),
         }
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_slice(value: Value, start: Value, end: Option<Value>) -> Resolved {
+    slice(value, start, end)
 }
 
 #[cfg(test)]

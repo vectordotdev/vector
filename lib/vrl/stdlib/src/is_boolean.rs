@@ -1,4 +1,10 @@
+use ::value::Value;
+use primitive_calling_convention::primitive_calling_convention;
 use vrl::prelude::*;
+
+fn is_boolean(value: Value) -> Resolved {
+    Ok(value.is_boolean().into())
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct IsBoolean;
@@ -46,6 +52,14 @@ impl Function for IsBoolean {
 
         Ok(Box::new(IsBooleanFn { value }))
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_is_boolean",
+            address: vrl_fn_is_boolean as _,
+            uses_context: false,
+        })
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -55,12 +69,20 @@ struct IsBooleanFn {
 
 impl Expression for IsBooleanFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        self.value.resolve(ctx).map(|v| value!(v.is_boolean()))
+        let value = self.value.resolve(ctx)?;
+
+        is_boolean(value)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::boolean().infallible()
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_is_boolean(value: Value) -> Resolved {
+    is_boolean(value)
 }
 
 #[cfg(test)]

@@ -1,4 +1,5 @@
 use ::value::Value;
+use primitive_calling_convention::primitive_calling_convention;
 use vector_common::conversion::Conversion;
 use vrl::prelude::*;
 
@@ -158,6 +159,14 @@ impl Function for ToBool {
 
         Ok(Box::new(ToBoolFn { value }))
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_to_bool",
+            address: vrl_fn_to_bool as _,
+            uses_context: false,
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -183,6 +192,12 @@ impl Expression for ToBoolFn {
                 || td.contains_regex(),
         )
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_to_bool(value: Value) -> Resolved {
+    to_bool(value)
 }
 
 #[cfg(test)]

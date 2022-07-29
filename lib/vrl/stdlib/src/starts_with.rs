@@ -1,3 +1,5 @@
+use ::value::Value;
+use primitive_calling_convention::primitive_calling_convention;
 use vrl::prelude::*;
 
 struct Chars<'a> {
@@ -132,6 +134,14 @@ impl Function for StartsWith {
             case_sensitive,
         }))
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_starts_with",
+            address: vrl_fn_starts_with as _,
+            uses_context: false,
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -161,6 +171,28 @@ impl Expression for StartsWithFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::boolean().infallible()
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_starts_with(
+    value: Value,
+    substring: Value,
+    case_sensitive: Option<Value>,
+) -> Resolved {
+    let case_sensitive = if case_sensitive
+        .unwrap_or_else(|| true.into())
+        .try_boolean()?
+    {
+        Case::Sensitive
+    } else {
+        Case::Insensitive
+    };
+
+    let substring = substring.try_bytes()?;
+    let value = value.try_bytes()?;
+
+    Ok(starts_with(&value, &substring, case_sensitive).into())
 }
 
 #[cfg(test)]

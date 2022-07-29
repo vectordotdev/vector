@@ -1,4 +1,5 @@
 use ::value::Value;
+use primitive_calling_convention::primitive_calling_convention;
 use vrl::prelude::*;
 
 fn array(value: Value) -> Resolved {
@@ -51,6 +52,14 @@ impl Function for Array {
 
         Ok(Box::new(ArrayFn { value }))
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_array",
+            address: vrl_fn_array as _,
+            uses_context: false,
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -69,4 +78,10 @@ impl Expression for ArrayFn {
             .fallible_unless(Kind::array(Collection::any()))
             .restrict_array()
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_array(value: Value) -> Resolved {
+    array(value)
 }

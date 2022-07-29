@@ -1,4 +1,5 @@
 use ::value::Value;
+use primitive_calling_convention::primitive_calling_convention;
 use vrl::prelude::*;
 
 fn boolean(value: Value) -> Resolved {
@@ -51,6 +52,14 @@ impl Function for Boolean {
 
         Ok(Box::new(BooleanFn { value }))
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_bool",
+            address: vrl_fn_bool as _,
+            uses_context: false,
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -68,4 +77,10 @@ impl Expression for BooleanFn {
 
         TypeDef::boolean().with_fallibility(non_boolean)
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_bool(value: Value) -> Resolved {
+    boolean(value)
 }

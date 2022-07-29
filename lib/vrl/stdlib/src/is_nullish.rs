@@ -1,4 +1,5 @@
 use ::value::Value;
+use primitive_calling_convention::primitive_calling_convention;
 use vrl::prelude::*;
 
 use crate::util;
@@ -40,6 +41,14 @@ impl Function for IsNullish {
         let value = arguments.required("value");
         Ok(Box::new(IsNullishFn { value }))
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_is_nullish",
+            address: vrl_fn_is_nullish as _,
+            uses_context: false,
+        })
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -56,6 +65,12 @@ impl Expression for IsNullishFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::boolean().infallible()
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_is_nullish(value: Value) -> Resolved {
+    is_nullish(value)
 }
 
 #[cfg(test)]

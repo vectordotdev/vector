@@ -1,5 +1,7 @@
 use ::value::Value;
+use primitive_calling_convention::primitive_calling_convention;
 use sha_3::{Digest, Sha3_224, Sha3_256, Sha3_384, Sha3_512};
+use std::any::Any;
 use vrl::prelude::*;
 
 fn sha3(value: Value, variant: &Bytes) -> Resolved {
@@ -98,6 +100,14 @@ impl Function for Sha3 {
             _ => Ok(None),
         }
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_sha3",
+            address: vrl_fn_sha3 as _,
+            uses_context: false,
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -117,6 +127,13 @@ impl Expression for Sha3Fn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().infallible()
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_sha3(value: Value, bytes: &Box<dyn Any + Send + Sync>) -> Resolved {
+    let bytes = bytes.downcast_ref::<Bytes>().unwrap();
+    sha3(value, bytes)
 }
 
 #[inline]

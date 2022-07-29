@@ -1,4 +1,5 @@
 use ::value::Value;
+use primitive_calling_convention::primitive_calling_convention;
 use vrl::prelude::*;
 
 fn string(value: Value) -> Resolved {
@@ -51,6 +52,14 @@ impl Function for String {
 
         Ok(Box::new(StringFn { value }))
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_string",
+            address: vrl_fn_string as _,
+            uses_context: false,
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -68,4 +77,10 @@ impl Expression for StringFn {
 
         TypeDef::bytes().with_fallibility(non_bytes)
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+pub extern "C" fn vrl_fn_string(value: Value) -> Resolved {
+    string(value)
 }

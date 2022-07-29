@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use ::value::Value;
+use primitive_calling_convention::primitive_calling_convention;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -16,7 +17,7 @@ impl Function for Merge {
             Parameter {
                 keyword: "to",
                 kind: kind::OBJECT,
-                required: false,
+                required: true,
             },
             Parameter {
                 keyword: "from",
@@ -51,6 +52,14 @@ impl Function for Merge {
 
         Ok(Box::new(MergeFn { to, from, deep }))
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_merge",
+            address: vrl_fn_merge as _,
+            uses_context: false,
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -77,6 +86,18 @@ impl Expression for MergeFn {
             .restrict_object()
             .merge_overwrite(self.from.type_def(state).restrict_object())
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_merge(to: Value, from: Value, deep: Option<Value>) -> Resolved {
+    let mut to_value = to.try_object()?;
+    let from_value = from.try_object()?;
+    let deep = deep.unwrap_or_else(|| false.into()).try_boolean()?;
+
+    merge_maps(&mut to_value, &from_value, deep);
+
+    Ok(to_value.into())
 }
 
 /// Merges two BTreeMaps of Symbol’s value as variable is void: Values. The

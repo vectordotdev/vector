@@ -1,4 +1,5 @@
 use bytes::Bytes;
+use primitive_calling_convention::primitive_calling_convention;
 use vrl::prelude::*;
 
 fn uuid_v4() -> Resolved {
@@ -31,6 +32,14 @@ impl Function for UuidV4 {
     ) -> Compiled {
         Ok(Box::new(UuidV4Fn))
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_uuid_v4",
+            address: vrl_fn_uuid_v4 as _,
+            uses_context: false,
+        })
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -44,6 +53,12 @@ impl Expression for UuidV4Fn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().infallible()
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_uuid_v4() -> Resolved {
+    uuid_v4()
 }
 
 #[cfg(test)]

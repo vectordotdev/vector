@@ -1,4 +1,5 @@
 use ::value::Value;
+use primitive_calling_convention::primitive_calling_convention;
 use vrl::prelude::*;
 
 fn contains(value: Value, substring: Value, case_sensitive: bool) -> Resolved {
@@ -81,6 +82,14 @@ impl Function for Contains {
             },
         ]
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_contains",
+            address: vrl_fn_contains as _,
+            uses_context: false,
+        })
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -102,6 +111,20 @@ impl Expression for ContainsFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::boolean().infallible()
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_contains(
+    value: Value,
+    substring: Value,
+    case_sensitive: Option<Value>,
+) -> Resolved {
+    let case_sensitive = case_sensitive
+        .unwrap_or_else(|| true.into())
+        .try_boolean()?;
+
+    contains(value, substring, case_sensitive)
 }
 
 #[cfg(test)]

@@ -1,6 +1,7 @@
 use std::collections::btree_map;
 
 use ::value::Value;
+use primitive_calling_convention::primitive_calling_convention;
 use vrl::prelude::*;
 
 fn flatten(value: Value) -> Resolved {
@@ -61,6 +62,14 @@ impl Function for Flatten {
         let value = arguments.required("value");
         Ok(Box::new(FlattenFn { value }))
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_flatten",
+            address: vrl_fn_flatten as _,
+            uses_context: false,
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -82,6 +91,12 @@ impl Expression for FlattenFn {
             TypeDef::object(Collection::any())
         }
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_flatten(value: Value) -> Resolved {
+    flatten(value)
 }
 
 /// An iterator to walk over maps allowing us to flatten nested maps to a single level.

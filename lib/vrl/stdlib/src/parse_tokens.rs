@@ -1,4 +1,5 @@
 use ::value::Value;
+use primitive_calling_convention::primitive_calling_convention;
 use vector_common::tokenize;
 use vrl::prelude::*;
 
@@ -51,6 +52,14 @@ impl Function for ParseTokens {
             required: true,
         }]
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_parse_tokens",
+            address: vrl_fn_parse_tokens as _,
+            uses_context: false,
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -67,6 +76,12 @@ impl Expression for ParseTokensFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::array(Collection::from_unknown(Kind::bytes()))
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_parse_tokens(value: Value) -> Resolved {
+    parse_tokens(value)
 }
 
 #[cfg(test)]

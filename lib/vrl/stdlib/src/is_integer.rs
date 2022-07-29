@@ -1,4 +1,10 @@
+use ::value::Value;
+use primitive_calling_convention::primitive_calling_convention;
 use vrl::prelude::*;
+
+fn is_integer(value: Value) -> Resolved {
+    Ok(value.is_integer().into())
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct IsInteger;
@@ -46,6 +52,14 @@ impl Function for IsInteger {
 
         Ok(Box::new(IsIntegerFn { value }))
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_is_integer",
+            address: vrl_fn_is_integer as _,
+            uses_context: false,
+        })
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -55,12 +69,20 @@ struct IsIntegerFn {
 
 impl Expression for IsIntegerFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        self.value.resolve(ctx).map(|v| value!(v.is_integer()))
+        let value = self.value.resolve(ctx)?;
+
+        is_integer(value)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::boolean().infallible()
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_is_integer(value: Value) -> Resolved {
+    is_integer(value)
 }
 
 #[cfg(test)]

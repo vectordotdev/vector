@@ -1,5 +1,6 @@
 use ::sha1::Digest;
 use ::value::Value;
+use primitive_calling_convention::primitive_calling_convention;
 use vrl::prelude::*;
 
 fn sha1(value: Value) -> Resolved {
@@ -41,6 +42,14 @@ impl Function for Sha1 {
 
         Ok(Box::new(Sha1Fn { value }))
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_sha1",
+            address: vrl_fn_sha1 as _,
+            uses_context: false,
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -57,6 +66,12 @@ impl Expression for Sha1Fn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().infallible()
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_sha1(value: Value) -> Resolved {
+    sha1(value)
 }
 
 #[cfg(test)]

@@ -1,4 +1,5 @@
 use ::value::Value;
+use primitive_calling_convention::primitive_calling_convention;
 use vrl::prelude::*;
 
 fn append(value: Value, items: Value) -> Resolved {
@@ -50,6 +51,14 @@ impl Function for Append {
 
         Ok(Box::new(AppendFn { value, items }))
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_append",
+            address: vrl_fn_append as _,
+            uses_context: false,
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -72,6 +81,12 @@ impl Expression for AppendFn {
             .restrict_array()
             .merge_append(self.items.type_def(state).restrict_array())
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_append(value: Value, items: Value) -> Resolved {
+    append(value, items)
 }
 
 #[cfg(test)]

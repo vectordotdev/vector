@@ -1,4 +1,5 @@
 use ::value::Value;
+use primitive_calling_convention::primitive_calling_convention;
 use vector_common::conversion::Conversion;
 use vrl::prelude::*;
 
@@ -113,6 +114,14 @@ impl Function for ToFloat {
 
         Ok(Box::new(ToFloatFn { value }))
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_to_float",
+            address: vrl_fn_to_float as _,
+            uses_context: false,
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -137,6 +146,12 @@ impl Expression for ToFloatFn {
                 || td.contains_regex(),
         )
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_to_float(value: Value) -> Resolved {
+    to_float(value)
 }
 
 #[cfg(test)]
