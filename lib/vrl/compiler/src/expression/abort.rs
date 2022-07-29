@@ -3,9 +3,8 @@ use std::fmt;
 use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 use parser::ast::Node;
 
-use super::Expr;
 use crate::{
-    expression::{ExpressionError, Resolved},
+    expression::{Expr, ExpressionError, Resolved},
     state::{ExternalEnv, LocalEnv},
     value::{Kind, VrlValueConvert},
     Context, Expression, Span, TypeDef,
@@ -75,10 +74,41 @@ impl Expression for Abort {
     #[cfg(feature = "llvm")]
     fn emit_llvm<'ctx>(
         &self,
-        _: (&mut LocalEnv, &mut ExternalEnv),
-        _: &mut crate::llvm::Context<'ctx>,
+        state: (&mut LocalEnv, &mut ExternalEnv),
+        ctx: &mut crate::llvm::Context<'ctx>,
     ) -> Result<(), String> {
-        todo!()
+        let abort_begin_block = ctx.append_basic_block("abort_begin");
+        let abort_end_block = ctx.append_basic_block("abort_end");
+
+        ctx.build_unconditional_branch(abort_begin_block);
+        ctx.position_at_end(abort_begin_block);
+
+        let span_name = format!("{:?}", self.span);
+        let span_ref = ctx.into_const(self.span, &span_name).as_pointer_value();
+
+        let message_ref = ctx.build_alloca_resolved_initialized("message");
+
+        if let Some(message) = &self.message {
+            ctx.emit_llvm(
+                message.as_ref(),
+                message_ref,
+                state,
+                abort_end_block,
+                vec![(message_ref.into(), ctx.fns().vrl_resolved_drop)],
+            )?;
+        }
+
+        ctx.fns().vrl_expression_abort.build_call(
+            ctx.builder(),
+            ctx.cast_span_ref_type(span_ref),
+            message_ref,
+            ctx.result_ref(),
+        );
+
+        ctx.build_unconditional_branch(abort_end_block);
+        ctx.position_at_end(abort_end_block);
+
+        Ok(())
     }
 }
 
