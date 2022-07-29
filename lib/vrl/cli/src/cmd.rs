@@ -194,6 +194,7 @@ fn execute(
         VrlRuntime::Ast => runtime
             .resolve(object, program, timezone)
             .map_err(Error::Runtime),
+        VrlRuntime::Llvm => todo!(),
     }
 }
 

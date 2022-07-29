@@ -131,7 +131,7 @@ impl SecretTarget for TargetValueRef<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TargetValue {
     pub value: Value,
     pub metadata: Value,
