@@ -1,6 +1,9 @@
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use vector_core::transform::SyncTransform;
+use vector_core::{
+    event::{EventArray, EventContainer},
+    transform::SyncTransform,
+};
 
 use crate::{
     conditions::{AnyCondition, Condition},
@@ -50,6 +53,16 @@ impl SyncTransform for Route {
         }
         if check_failed == self.conditions.len() {
             output.push_named(UNMATCHED_ROUTE, event);
+        }
+    }
+
+    fn transform_all(
+        &mut self,
+        events: EventArray,
+        output: &mut vector_core::transform::TransformOutputsBuf,
+    ) {
+        for event in events.into_events() {
+            self.transform(event, output);
         }
     }
 }
@@ -196,7 +209,7 @@ mod test {
 
         assert_eq!(
             serde_json::to_string(&config).unwrap(),
-            r#"{"route":{"first":{"type":"vrl","source":".message == \"hello world\"","runtime":"ast"}}}"#
+            r#"{"route":{"first":{"type":"vrl","source":".message == \"hello world\"","runtime":"ast_batch"}}}"#
         );
     }
 

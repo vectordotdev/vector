@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::{AnyCondition, Condition, ConditionConfig, Conditional};
-use crate::event::Event;
+use crate::event::{Event, LogEvent, Metric, TraceEvent};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct NotConfig(AnyCondition);
@@ -25,13 +25,23 @@ impl ConditionConfig for NotConfig {
 pub struct Not(Box<Condition>);
 
 impl Conditional for Not {
-    fn check(&self, e: Event) -> (bool, Event) {
-        let (result, event) = self.0.check(e);
+    fn check_log(&self, log: LogEvent) -> (bool, LogEvent) {
+        let (result, event) = self.0.check_log(log);
         (!result, event)
     }
 
-    fn check_with_context(&self, e: Event) -> (Result<(), String>, Event) {
-        let (result, event) = self.0.check_with_context(e);
+    fn check_metric(&self, metric: Metric) -> (bool, Metric) {
+        let (result, event) = self.0.check_metric(metric);
+        (!result, event)
+    }
+
+    fn check_trace(&self, trace: TraceEvent) -> (bool, TraceEvent) {
+        let (result, event) = self.0.check_trace(trace);
+        (!result, event)
+    }
+
+    fn check_with_context(&self, event: Event) -> (Result<(), String>, Event) {
+        let (result, event) = self.0.check_with_context(event);
         match result {
             Ok(()) => (Err("event matches inner condition".to_string()), event),
             Err(_) => (Ok(()), event),

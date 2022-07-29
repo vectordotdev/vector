@@ -6,7 +6,7 @@ use crate::{
         DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
         TransformDescription,
     },
-    event::Event,
+    event::{Event, EventArray},
     internal_events::SampleEventDiscarded,
     schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
@@ -111,24 +111,25 @@ impl Sample {
 
 impl FunctionTransform for Sample {
     fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
-        let mut event = {
+        let mut log = {
             if let Some(condition) = self.exclude.as_ref() {
-                let (result, event) = condition.check(event);
+                let (result, log) = condition.check_log(event.into_log());
                 if result {
+                    let event = Event::from(log);
                     output.push(event);
                     return;
                 } else {
-                    event
+                    log
                 }
             } else {
-                event
+                event.into_log()
             }
         };
 
         let value = self
             .key_field
             .as_ref()
-            .and_then(|key_field| event.as_log().get(key_field.as_str()))
+            .and_then(|key_field| log.get(key_field.as_str()))
             .map(|v| v.to_string_lossy());
 
         let num = if let Some(value) = value {
@@ -140,12 +141,59 @@ impl FunctionTransform for Sample {
         self.count = (self.count + 1) % self.rate;
 
         if num % self.rate == 0 {
-            event
-                .as_mut_log()
-                .insert("sample_rate", self.rate.to_string());
+            log.insert("sample_rate", self.rate.to_string());
+            let event = Event::from(log);
             output.push(event);
         } else {
             emit!(SampleEventDiscarded);
+        }
+    }
+
+    fn transform_all(&mut self, output: &mut OutputBuffer, events: EventArray) {
+        let logs = {
+            if let Some(condition) = self.exclude.as_ref() {
+                condition
+                    .check_all(events)
+                    .into_iter()
+                    .filter_map(|(result, event)| {
+                        if result {
+                            output.push(event);
+                            None
+                        } else {
+                            Some(event.into_log())
+                        }
+                    })
+                    .collect()
+            } else {
+                match events {
+                    EventArray::Logs(logs) => logs,
+                    _ => panic!("samples must be logs"),
+                }
+            }
+        };
+
+        for mut log in logs {
+            let value = self
+                .key_field
+                .as_ref()
+                .and_then(|key_field| log.get(key_field.as_str()))
+                .map(|v| v.to_string_lossy());
+
+            let num = if let Some(value) = value {
+                seahash::hash(value.as_bytes())
+            } else {
+                self.count
+            };
+
+            self.count = (self.count + 1) % self.rate;
+
+            if num % self.rate == 0 {
+                log.insert("sample_rate", self.rate.to_string());
+                let event = Event::from(log);
+                output.push(event);
+            } else {
+                emit!(SampleEventDiscarded);
+            }
         }
     }
 }

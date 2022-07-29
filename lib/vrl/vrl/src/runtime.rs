@@ -1,10 +1,10 @@
 use std::{error::Error, fmt};
 
-use compiler::ExpressionError;
+use compiler::{ExpressionError, Resolved};
 use lookup::LookupBuf;
 use value::Value;
 
-use crate::{state, Context, Program, Target, TimeZone};
+use crate::{state, BatchContext, Context, Program, Target, TimeZone};
 
 pub type RuntimeResult = Result<Value, Terminate>;
 
@@ -43,6 +43,16 @@ impl Error for Terminate {
     }
 }
 
+impl From<ExpressionError> for Terminate {
+    fn from(error: ExpressionError) -> Self {
+        match error {
+            #[cfg(feature = "expr-abort")]
+            ExpressionError::Abort { .. } => Terminate::Abort(error),
+            error @ ExpressionError::Error { .. } => Terminate::Error(error),
+        }
+    }
+}
+
 impl Runtime {
     pub fn new(state: state::Runtime) -> Self {
         Self {
@@ -71,28 +81,91 @@ impl Runtime {
         target: &mut dyn Target,
         program: &Program,
         timezone: &TimeZone,
-    ) -> RuntimeResult {
+    ) -> Resolved {
         // Validate that the path is a value.
         match target.target_get(&self.root_lookup) {
             Ok(Some(_)) => {}
-            Ok(None) => {
-                return Err(Terminate::Error(
-                    "expected target object, got nothing".to_owned().into(),
-                ))
-            }
+            Ok(None) => return Err(ExpressionError::from("expected target object, got nothing")),
             Err(err) => {
-                return Err(Terminate::Error(
-                    format!("error querying target object: {}", err).into(),
-                ))
+                return Err(ExpressionError::from(format!(
+                    "error querying target object: {}",
+                    err
+                )))
             }
         };
 
         let mut ctx = Context::new(target, &mut self.state, timezone);
 
-        program.resolve(&mut ctx).map_err(|err| match err {
-            #[cfg(feature = "expr-abort")]
-            ExpressionError::Abort { .. } => Terminate::Abort(err),
-            err @ ExpressionError::Error { .. } => Terminate::Error(err),
-        })
+        program.resolve(&mut ctx)
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct BatchRuntime {
+    root_lookup: LookupBuf,
+    selection_vector: Vec<usize>,
+}
+
+impl BatchRuntime {
+    pub fn new() -> Self {
+        Self {
+            // `LookupBuf` uses a `VecDeque` internally, which always allocates, even
+            // when it's empty (for `LookupBuf::root()`), so we do the
+            // allocation on initialization of the runtime, instead of on every
+            // `resolve` run.
+            root_lookup: LookupBuf::root(),
+            selection_vector: vec![],
+        }
+    }
+
+    /// Given the provided [`Target`], resolve the provided [`Program`] to
+    /// completion.
+    pub fn resolve_batch<'a>(
+        &mut self,
+        resolved_values: &'a mut Vec<Resolved>,
+        targets: &'a mut [&'a mut dyn Target],
+        states: &'a mut [state::Runtime],
+        program: &mut Program,
+        timezone: TimeZone,
+    ) {
+        self.selection_vector.resize(targets.len(), 0);
+        for i in 0..self.selection_vector.len() {
+            self.selection_vector[i] = i;
+        }
+
+        let mut len = self.selection_vector.len();
+        let mut i = 0;
+        loop {
+            if i >= len {
+                break;
+            }
+
+            let index = self.selection_vector[i];
+
+            // Validate that the path is a value.
+            match targets[index].target_get(&self.root_lookup) {
+                Ok(Some(_)) => {
+                    i += 1;
+                }
+                Ok(None) => {
+                    resolved_values[index] =
+                        Err(ExpressionError::from("expected target object, got nothing"));
+                    len -= 1;
+                    self.selection_vector.swap(i, len);
+                }
+                Err(err) => {
+                    resolved_values[index] = Err(ExpressionError::from(format!(
+                        "error querying target object: {}",
+                        err
+                    )));
+                    len -= 1;
+                    self.selection_vector.swap(i, len);
+                }
+            };
+        }
+        self.selection_vector.truncate(len);
+
+        let mut ctx = BatchContext::new(resolved_values, targets, states, timezone);
+        program.resolve_batch(&mut ctx, &self.selection_vector);
     }
 }

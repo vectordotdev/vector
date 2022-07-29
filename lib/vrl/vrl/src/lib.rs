@@ -11,12 +11,13 @@ pub mod prelude;
 mod runtime;
 
 pub use compiler::{
-    function, kind, llvm, state, value, Context, Expression, Function, MetadataTarget, Program,
-    ProgramInfo, SecretTarget, Target, TargetValue, TargetValueRef, VrlRuntime,
+    function, kind, llvm, state, value, BatchContext, Context, Expression, Function,
+    MetadataTarget, Program, ProgramInfo, SecretTarget, Target, TargetValue, TargetValueRef,
+    VrlRuntime,
 };
 pub use core;
 pub use diagnostic;
-pub use runtime::{Runtime, RuntimeResult, Terminate};
+pub use runtime::{BatchRuntime, Runtime, RuntimeResult, Terminate};
 pub use vector_common::TimeZone;
 
 /// Compile a given source into the final [`Program`].

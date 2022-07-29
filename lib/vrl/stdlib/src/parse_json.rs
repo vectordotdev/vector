@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ptr::addr_of_mut};
 
 use ::value::Value;
 use primitive_calling_convention::primitive_calling_convention;
@@ -206,6 +206,16 @@ impl Expression for ParseJsonFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         parse_json(value)
+    }
+
+    fn resolve_batch(&mut self, ctx: &mut BatchContext, selection_vector: &[usize]) {
+        self.value.resolve_batch(ctx, selection_vector);
+
+        for index in selection_vector {
+            let index = *index;
+            let resolved = addr_of_mut!(ctx.resolved_values[index]);
+            unsafe { resolved.write(resolved.read().and_then(parse_json)) };
+        }
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

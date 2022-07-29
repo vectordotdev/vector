@@ -1,3 +1,4 @@
+use core::Resolved;
 use vector_common::TimeZone;
 
 use crate::{state::Runtime, Target};
@@ -44,5 +45,29 @@ impl<'a> Context<'a> {
     #[must_use]
     pub fn timezone(&self) -> &TimeZone {
         self.timezone
+    }
+}
+
+pub struct BatchContext<'a> {
+    pub resolved_values: &'a mut Vec<Resolved>,
+    pub targets: &'a mut [&'a mut dyn Target],
+    pub states: &'a mut [Runtime],
+    pub timezone: TimeZone,
+}
+
+impl<'a> BatchContext<'a> {
+    /// Create a new [`BatchContext`].
+    pub fn new(
+        resolved_values: &'a mut Vec<Resolved>,
+        targets: &'a mut [&'a mut dyn Target],
+        states: &'a mut [Runtime],
+        timezone: TimeZone,
+    ) -> Self {
+        Self {
+            resolved_values,
+            targets,
+            states,
+            timezone,
+        }
     }
 }

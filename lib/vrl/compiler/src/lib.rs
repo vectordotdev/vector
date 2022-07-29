@@ -49,7 +49,7 @@ pub use core::{
 use std::{fmt::Display, str::FromStr};
 
 use ::serde::{Deserialize, Serialize};
-pub use context::Context;
+pub use context::{BatchContext, Context};
 use diagnostic::DiagnosticList;
 pub(crate) use diagnostic::Span;
 pub use expression::Expression;
@@ -63,9 +63,10 @@ pub type Result<T = (Program, DiagnosticList)> = std::result::Result<T, Diagnost
 
 /// The choice of available runtimes.
 #[derive(Deserialize, Serialize, Debug, Copy, Clone, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "snake_case")]
 pub enum VrlRuntime {
     Ast,
+    AstBatch,
     Llvm,
 }
 
@@ -81,8 +82,9 @@ impl FromStr for VrlRuntime {
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
             "ast" => Ok(Self::Ast),
+            "ast_batch" => Ok(Self::AstBatch),
             "llvm" => Ok(Self::Llvm),
-            _ => Err("runtime must be ast or llvm."),
+            _ => Err("runtime must be ast or ast_batch or llvm."),
         }
     }
 }
@@ -94,6 +96,7 @@ impl Display for VrlRuntime {
             "{}",
             match self {
                 VrlRuntime::Ast => "ast",
+                VrlRuntime::AstBatch => "ast_batch",
                 VrlRuntime::Llvm => "llvm",
             }
         )

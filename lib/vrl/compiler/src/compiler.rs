@@ -373,22 +373,14 @@ impl<'a> Compiler<'a> {
 
                 external.update_target(consequent_external.merge(external.target().clone()));
 
-                Some(IfStatement {
-                    predicate,
-                    consequent,
-                    alternative: Some(else_block),
-                })
+                Some(IfStatement::new(predicate, consequent, Some(else_block)))
             }
             None => {
                 // assignments must be the result of either the if block or the original value
                 self.local = self.local.clone().merge(original_locals);
                 external.update_target(original_external.merge(external.target().clone()));
 
-                Some(IfStatement {
-                    predicate,
-                    consequent,
-                    alternative: None,
-                })
+                Some(IfStatement::new(predicate, consequent, None))
             }
         }
     }
@@ -507,11 +499,11 @@ impl<'a> Compiler<'a> {
                                 None
                             })?;
 
-                        Node::new(span, Variant::Single { target, expr })
+                        Node::new(span, Variant::single(target, expr))
                     }
                     AssignmentOp::Merge => {
                         let expr = self.rewrite_to_merge(span, &target, expr, external)?;
-                        Node::new(span, Variant::Single { target, expr })
+                        Node::new(span, Variant::single(target, expr))
                     }
                 }
             }
@@ -529,22 +521,12 @@ impl<'a> Compiler<'a> {
                                 None
                             })?;
 
-                        let node = Variant::Infallible {
-                            ok,
-                            err,
-                            expr,
-                            default: Value::Null,
-                        };
+                        let node = Variant::infallible(ok, err, expr, Value::Null);
                         Node::new(span, node)
                     }
                     AssignmentOp::Merge => {
                         let expr = self.rewrite_to_merge(span, &ok, expr, external)?;
-                        let node = Variant::Infallible {
-                            ok,
-                            err,
-                            expr,
-                            default: Value::Null,
-                        };
+                        let node = Variant::infallible(ok, err, expr, Value::Null);
 
                         Node::new(span, node)
                     }
