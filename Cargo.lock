@@ -7561,8 +7561,7 @@ dependencies = [
 [[package]]
 name = "tokio-util"
 version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0edfdeb067411dba2044da6d1cb2df793dd35add7888d73c16e3381ded401764"
+source = "git+https://github.com/vectordotdev/tokio?rev=3aa231cf6f33f74ca29077163879f0de9a207ad8#3aa231cf6f33f74ca29077163879f0de9a207ad8"
 dependencies = [
  "bytes 1.2.0",
  "futures-core",
