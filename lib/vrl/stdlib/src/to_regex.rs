@@ -1,4 +1,5 @@
 use ::value::Value;
+use primitive_calling_convention::primitive_calling_convention;
 use tracing::warn;
 use vrl::prelude::*;
 
@@ -44,6 +45,14 @@ impl Function for ToRegex {
         let value = arguments.required("value");
         Ok(Box::new(ToRegexFn { value }))
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_to_regex",
+            address: vrl_fn_to_regex as _,
+            uses_context: false,
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -60,6 +69,12 @@ impl Expression for ToRegexFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::regex().fallible()
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_to_regex(value: Value) -> Resolved {
+    to_regex(value)
 }
 
 #[cfg(test)]

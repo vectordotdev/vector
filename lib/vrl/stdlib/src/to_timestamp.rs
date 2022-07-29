@@ -1,7 +1,8 @@
-use std::str::FromStr;
+use std::{any::Any, str::FromStr};
 
 use ::value::Value;
 use chrono::{TimeZone as _, Utc};
+use primitive_calling_convention::primitive_calling_convention;
 use vector_common::{conversion::Conversion, TimeZone};
 use vrl::{function::Error, prelude::*};
 
@@ -208,23 +209,34 @@ impl Function for ToTimestamp {
         expr: Option<&expression::Expr>,
     ) -> CompiledArgument {
         match (name, expr) {
-            ("unit", Some(expr)) => match expr.as_value() {
-                None => Ok(None),
-                Some(value) => {
-                    let s = value.try_bytes_utf8_lossy().expect("unit not bytes");
-                    Ok(Some(
-                        Unit::from_str(&s)
-                            .map(|unit| Box::new(unit) as Box<dyn std::any::Any + Send + Sync>)
-                            .map_err(|_| Error::InvalidEnumVariant {
-                                keyword: "unit",
-                                value,
-                                variants: Unit::all_value(),
-                            })?,
-                    ))
-                }
+            ("unit", expr) => match expr {
+                Some(expr) => match expr.as_value() {
+                    None => Ok(Some(Box::new(Unit::default()) as _)),
+                    Some(value) => {
+                        let s = value.try_bytes_utf8_lossy().expect("unit not bytes");
+                        Ok(Some(
+                            Unit::from_str(&s)
+                                .map(|unit| Box::new(unit) as _)
+                                .map_err(|_| Error::InvalidEnumVariant {
+                                    keyword: "unit",
+                                    value,
+                                    variants: Unit::all_value(),
+                                })?,
+                        ))
+                    }
+                },
+                None => Ok(Some(Box::new(Unit::default()) as _)),
             },
             _ => Ok(None),
         }
+    }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_to_timestamp",
+            address: vrl_fn_to_timestamp as _,
+            uses_context: false,
+        })
     }
 }
 
@@ -297,6 +309,14 @@ impl Expression for ToTimestampFn {
             .fallible_unless(Kind::timestamp())
             .with_kind(Kind::timestamp())
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_to_timestamp(value: Value, unit: &Box<dyn Any + Send + Sync>) -> Resolved {
+    let unit = *unit.downcast_ref::<Unit>().unwrap();
+
+    to_timestamp(value, unit)
 }
 
 #[cfg(test)]

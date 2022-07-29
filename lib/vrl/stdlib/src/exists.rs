@@ -112,4 +112,50 @@ impl Expression for ExistsFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::boolean().infallible()
     }
+
+    fn emit_llvm<'ctx>(
+        &self,
+        state: (&mut vrl::state::LocalEnv, &mut vrl::state::ExternalEnv),
+        ctx: &mut vrl::llvm::Context<'ctx>,
+    ) -> std::result::Result<(), String> {
+        let query = &self.query;
+        let path = query.path();
+        let path_ref = ctx.into_lookup_buf_const_ref(path.clone());
+
+        let result_ref = ctx.result_ref();
+
+        if query.is_external() {
+            ctx.fns().vrl_exists_external.build_call(
+                ctx.builder(),
+                ctx.context_ref(),
+                ctx.cast_lookup_buf_ref_type(path_ref),
+                result_ref,
+            );
+        } else if let Some(ident) = query.variable_ident() {
+            let variable_ref = ctx.get_variable_ref(ident);
+            ctx.fns().vrl_exists_internal.build_call(
+                ctx.builder(),
+                variable_ref,
+                ctx.cast_lookup_buf_ref_type(path_ref),
+                result_ref,
+            );
+        } else if let Some(expr) = query.expression_target() {
+            let resolved_temp_ref = ctx.build_alloca_resolved_initialized("temp");
+            ctx.set_result_ref(resolved_temp_ref);
+            expr.emit_llvm(state, ctx)?;
+            ctx.fns().vrl_exists_expression.build_call(
+                ctx.builder(),
+                resolved_temp_ref,
+                ctx.cast_lookup_buf_ref_type(path_ref),
+                result_ref,
+            );
+            ctx.set_result_ref(result_ref);
+        } else {
+            ctx.fns()
+                .vrl_resolved_ok_false
+                .build_call(ctx.builder(), result_ref);
+        }
+
+        Ok(())
+    }
 }

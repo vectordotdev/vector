@@ -1,4 +1,10 @@
+use ::value::Value;
+use primitive_calling_convention::primitive_calling_convention;
 use vrl::prelude::*;
+
+fn is_float(value: Value) -> Resolved {
+    Ok(value.is_float().into())
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct IsFloat;
@@ -46,6 +52,14 @@ impl Function for IsFloat {
 
         Ok(Box::new(IsFloatFn { value }))
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_is_float",
+            address: vrl_fn_is_float as _,
+            uses_context: false,
+        })
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -55,12 +69,20 @@ struct IsFloatFn {
 
 impl Expression for IsFloatFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        self.value.resolve(ctx).map(|v| value!(v.is_float()))
+        let value = self.value.resolve(ctx)?;
+
+        is_float(value)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::boolean().infallible()
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_is_float(value: Value) -> Resolved {
+    is_float(value)
 }
 
 #[cfg(test)]

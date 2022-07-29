@@ -11,9 +11,10 @@ pub mod prelude;
 mod runtime;
 
 pub use compiler::{
-    function, kind, state, value, Context, Expression, Function, MetadataTarget, Program,
+    function, kind, llvm, state, value, Context, Expression, Function, MetadataTarget, Program,
     ProgramInfo, SecretTarget, Target, TargetValue, TargetValueRef, VrlRuntime,
 };
+pub use core;
 pub use diagnostic;
 pub use runtime::{Runtime, RuntimeResult, Terminate};
 pub use vector_common::TimeZone;

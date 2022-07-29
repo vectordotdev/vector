@@ -1,4 +1,5 @@
 use ::value::Value;
+use primitive_calling_convention::primitive_calling_convention;
 use vrl::prelude::*;
 
 fn to_string(value: Value) -> Resolved {
@@ -103,6 +104,14 @@ impl Function for ToString {
 
         Ok(Box::new(ToStringFn { value }))
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_to_string",
+            address: vrl_fn_to_string as _,
+            uses_context: false,
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -123,6 +132,12 @@ impl Expression for ToStringFn {
         TypeDef::bytes()
             .with_fallibility(td.contains_array() || td.contains_object() || td.contains_regex())
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_to_string(value: Value) -> Resolved {
+    to_string(value)
 }
 
 #[cfg(test)]

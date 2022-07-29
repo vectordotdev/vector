@@ -1,4 +1,5 @@
 use ::value::Value;
+use primitive_calling_convention::primitive_calling_convention;
 use vrl::{diagnostic::Note, prelude::*};
 
 fn assert_eq(left: Value, right: Value, message: Option<Value>) -> Resolved {
@@ -85,6 +86,14 @@ impl Function for AssertEq {
             message,
         }))
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_assert_eq",
+            address: vrl_fn_assert_eq as _,
+            uses_context: false,
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -106,6 +115,12 @@ impl Expression for AssertEqFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::boolean().fallible()
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_assert_eq(left: Value, right: Value, message: Option<Value>) -> Resolved {
+    assert_eq(left, right, message)
 }
 
 #[cfg(test)]

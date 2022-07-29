@@ -1,4 +1,5 @@
 use ::value::Value;
+use primitive_calling_convention::primitive_calling_convention;
 use vrl::prelude::*;
 
 fn push(list: Value, item: Value) -> Resolved {
@@ -56,12 +57,26 @@ impl Function for Push {
 
         Ok(Box::new(PushFn { value, item }))
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_push",
+            address: vrl_fn_push as _,
+            uses_context: false,
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
 struct PushFn {
     value: Box<dyn Expression>,
     item: Box<dyn Expression>,
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_push(value: Value, item: Value) -> Resolved {
+    push(value, item)
 }
 
 impl Expression for PushFn {

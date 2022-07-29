@@ -2,15 +2,16 @@ use std::collections::BTreeMap;
 
 use ::value::Value;
 use chrono::{DateTime, Datelike, Utc};
+use primitive_calling_convention::primitive_calling_convention;
 use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
 use vector_common::TimeZone;
 use vrl::prelude::*;
 
-pub(crate) fn parse_syslog(value: Value, ctx: &Context) -> Resolved {
+pub(crate) fn parse_syslog(timezone: TimeZone, value: Value) -> Resolved {
     let message = value.try_bytes_utf8_lossy()?;
-    let timezone = match ctx.timezone() {
+    let timezone = match timezone {
         TimeZone::Local => None,
-        TimeZone::Named(tz) => Some(*tz),
+        TimeZone::Named(tz) => Some(tz),
     };
     let parsed = syslog_loose::parse_message_with_year_exact_tz(&message, resolve_year, timezone)?;
     Ok(message_to_value(parsed))
@@ -65,6 +66,14 @@ impl Function for ParseSyslog {
 
         Ok(Box::new(ParseSyslogFn { value }))
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_parse_syslog",
+            address: vrl_fn_parse_syslog as _,
+            uses_context: true,
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -76,12 +85,18 @@ impl Expression for ParseSyslogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
 
-        parse_syslog(value, ctx)
+        parse_syslog(*ctx.timezone(), value)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::object(inner_kind()).fallible()
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_parse_syslog(ctx: &vrl::core::Context, value: Value) -> Resolved {
+    parse_syslog(*ctx.timezone, value)
 }
 
 /// Function used to resolve the year for syslog messages that don't include the

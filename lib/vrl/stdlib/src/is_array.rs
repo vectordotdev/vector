@@ -1,4 +1,10 @@
+use ::value::Value;
+use primitive_calling_convention::primitive_calling_convention;
 use vrl::prelude::*;
+
+fn is_array(value: Value) -> Resolved {
+    Ok(value.is_array().into())
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct IsArray;
@@ -46,6 +52,14 @@ impl Function for IsArray {
 
         Ok(Box::new(IsArrayFn { value }))
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_is_array",
+            address: vrl_fn_is_array as _,
+            uses_context: false,
+        })
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -55,12 +69,20 @@ struct IsArrayFn {
 
 impl Expression for IsArrayFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        self.value.resolve(ctx).map(|v| value!(v.is_array()))
+        let value = self.value.resolve(ctx)?;
+
+        is_array(value)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::boolean().infallible()
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_is_array(value: Value) -> Resolved {
+    is_array(value)
 }
 
 #[cfg(test)]

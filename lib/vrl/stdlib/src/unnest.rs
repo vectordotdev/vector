@@ -1,5 +1,7 @@
 use ::value::Value;
 use lookup_lib::LookupBuf;
+use primitive_calling_convention::primitive_calling_convention;
+use std::any::Any;
 use vrl::{kind::merge, prelude::*};
 
 fn unnest(path: &expression::Query, root_lookup: &LookupBuf, ctx: &mut Context) -> Resolved {
@@ -116,7 +118,8 @@ impl Function for Unnest {
         expr: Option<&expression::Expr>,
     ) -> CompiledArgument {
         match (name, expr) {
-            ("path", Some(expr)) => {
+            ("path", expr) => {
+                let expr = expr.expect("argument must be provided");
                 let query = match expr {
                     expression::Expr::Query(query) => query,
                     _ => {
@@ -128,7 +131,7 @@ impl Function for Unnest {
                     }
                 };
 
-                Ok(Some(Box::new(query.clone()) as _))
+                Ok(Some(Box::new((query.clone(), LookupBuf::root())) as _))
             }
             _ => Ok(None),
         }
@@ -174,6 +177,12 @@ impl Expression for UnnestFn {
             Target::Container(c) => invert_array_at_path(&c.type_def(state), self.path.path()),
         }
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_unnest(_: &Box<dyn Any + Send + Sync>) -> Resolved {
+    todo!()
 }
 
 /// Assuming path points at an Array, this will take the typedefs for that array,

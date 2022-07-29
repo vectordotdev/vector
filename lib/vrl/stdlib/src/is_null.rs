@@ -1,4 +1,10 @@
+use ::value::Value;
+use primitive_calling_convention::primitive_calling_convention;
 use vrl::prelude::*;
+
+fn is_null(value: Value) -> Resolved {
+    Ok(value.is_null().into())
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct IsNull;
@@ -46,6 +52,14 @@ impl Function for IsNull {
 
         Ok(Box::new(IsNullFn { value }))
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_is_null",
+            address: vrl_fn_is_null as _,
+            uses_context: false,
+        })
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -55,12 +69,20 @@ struct IsNullFn {
 
 impl Expression for IsNullFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        self.value.resolve(ctx).map(|v| value!(v.is_null()))
+        let value = self.value.resolve(ctx)?;
+
+        is_null(value)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::boolean().infallible()
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_is_null(value: Value) -> Resolved {
+    is_null(value)
 }
 
 #[cfg(test)]

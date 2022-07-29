@@ -1,4 +1,5 @@
 use ::value::Value;
+use primitive_calling_convention::primitive_calling_convention;
 use vrl::prelude::*;
 
 fn object(value: Value) -> Resolved {
@@ -51,6 +52,14 @@ impl Function for Object {
 
         Ok(Box::new(ObjectFn { value }))
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_object",
+            address: vrl_fn_object as _,
+            uses_context: false,
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -69,4 +78,10 @@ impl Expression for ObjectFn {
             .fallible_unless(Kind::object(Collection::any()))
             .restrict_object()
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_object(value: Value) -> Resolved {
+    object(value)
 }

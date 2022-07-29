@@ -1,8 +1,9 @@
 use ::value::Value;
 use cidr_utils::cidr::IpCidr;
+use primitive_calling_convention::primitive_calling_convention;
 use vrl::prelude::*;
 
-fn ip_cidr_contains(value: Value, cidr: Value) -> Resolved {
+fn ip_cidr_contains(cidr: Value, value: Value) -> Resolved {
     let value = value
         .try_bytes_utf8_lossy()?
         .parse()
@@ -78,6 +79,14 @@ impl Function for IpCidrContains {
 
         Ok(Box::new(IpCidrContainsFn { cidr, value }))
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_ip_cidr_contains",
+            address: vrl_fn_ip_cidr_contains as _,
+            uses_context: false,
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -88,15 +97,21 @@ struct IpCidrContainsFn {
 
 impl Expression for IpCidrContainsFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
         let cidr = self.cidr.resolve(ctx)?;
+        let value = self.value.resolve(ctx)?;
 
-        ip_cidr_contains(value, cidr)
+        ip_cidr_contains(cidr, value)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::boolean().fallible()
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_ip_cidr_contains(cidr: Value, value: Value) -> Resolved {
+    ip_cidr_contains(cidr, value)
 }
 
 #[cfg(test)]

@@ -1,9 +1,10 @@
 use ::value::Value;
+use primitive_calling_convention::primitive_calling_convention;
 use vrl::prelude::*;
 
 use crate::util::round_to_precision;
 
-fn floor(precision: Option<Value>, value: Value) -> Resolved {
+fn floor(value: Value, precision: Option<Value>) -> Resolved {
     let precision = match precision {
         Some(value) => value.try_integer()?,
         None => 0,
@@ -65,6 +66,14 @@ impl Function for Floor {
             result: Ok("9.0"),
         }]
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_floor",
+            address: vrl_fn_floor as _,
+            uses_context: false,
+        })
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -75,14 +84,14 @@ struct FloorFn {
 
 impl Expression for FloorFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
+        let value = self.value.resolve(ctx)?;
         let precision = self
             .precision
             .as_ref()
             .map(|expr| expr.resolve(ctx))
             .transpose()?;
-        let value = self.value.resolve(ctx)?;
 
-        floor(precision, value)
+        floor(value, precision)
     }
 
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
@@ -91,6 +100,12 @@ impl Expression for FloorFn {
             _ => Kind::integer().or_float().into(),
         }
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_floor(value: Value, precision: Option<Value>) -> Resolved {
+    floor(value, precision)
 }
 
 #[cfg(test)]

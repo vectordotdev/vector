@@ -1,4 +1,5 @@
 use ::value::Value;
+use primitive_calling_convention::primitive_calling_convention;
 use vector_common::conversion::Conversion;
 use vrl::prelude::*;
 
@@ -112,6 +113,14 @@ impl Function for ToInt {
 
         Ok(Box::new(ToIntFn { value }))
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_to_int",
+            address: vrl_fn_to_int as _,
+            uses_context: false,
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -136,6 +145,12 @@ impl Expression for ToIntFn {
                 || td.contains_regex(),
         )
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_to_int(value: Value) -> Resolved {
+    to_int(value)
 }
 
 #[cfg(test)]

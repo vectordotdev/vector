@@ -1,4 +1,10 @@
+use ::value::Value;
+use primitive_calling_convention::primitive_calling_convention;
 use vrl::prelude::*;
+
+fn strip_whitespace(value: Value) -> Resolved {
+    Ok(value.try_bytes_utf8_lossy()?.trim().into())
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct StripWhitespace;
@@ -46,6 +52,14 @@ impl Function for StripWhitespace {
 
         Ok(Box::new(StripWhitespaceFn { value }))
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_strip_whitespace",
+            address: vrl_fn_strip_whitespace as _,
+            uses_context: false,
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -57,12 +71,18 @@ impl Expression for StripWhitespaceFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
 
-        Ok(value.try_bytes_utf8_lossy()?.trim().into())
+        strip_whitespace(value)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().infallible()
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_strip_whitespace(value: Value) -> Resolved {
+    strip_whitespace(value)
 }
 
 #[cfg(test)]

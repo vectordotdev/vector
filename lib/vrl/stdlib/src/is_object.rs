@@ -1,4 +1,10 @@
+use ::value::Value;
+use primitive_calling_convention::primitive_calling_convention;
 use vrl::prelude::*;
+
+fn is_object(value: Value) -> Resolved {
+    Ok(value.is_object().into())
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct IsObject;
@@ -46,6 +52,14 @@ impl Function for IsObject {
 
         Ok(Box::new(IsObjectFn { value }))
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_is_object",
+            address: vrl_fn_is_object as _,
+            uses_context: false,
+        })
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -55,12 +69,20 @@ struct IsObjectFn {
 
 impl Expression for IsObjectFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        self.value.resolve(ctx).map(|v| value!(v.is_object()))
+        let value = self.value.resolve(ctx)?;
+
+        is_object(value)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::boolean().infallible()
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_is_object(value: Value) -> Resolved {
+    is_object(value)
 }
 
 #[cfg(test)]

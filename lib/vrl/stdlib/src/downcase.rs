@@ -1,4 +1,5 @@
 use ::value::Value;
+use primitive_calling_convention::primitive_calling_convention;
 use vrl::prelude::*;
 
 fn downcase(value: Value) -> Resolved {
@@ -39,6 +40,14 @@ impl Function for Downcase {
             result: Ok("foo 2 bar"),
         }]
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_downcase",
+            address: vrl_fn_downcase as _,
+            uses_context: false,
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -55,6 +64,12 @@ impl Expression for DowncaseFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().infallible()
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_downcase(value: Value) -> Resolved {
+    downcase(value)
 }
 
 #[cfg(test)]

@@ -1,11 +1,13 @@
 use std::collections::BTreeMap;
 
 use ::value::Value;
+use primitive_calling_convention::primitive_calling_convention;
+use vector_common::TimeZone;
 use vrl::prelude::*;
 
 use crate::log_util;
 
-fn parse_common_log(bytes: Value, timestamp_format: Option<Value>, ctx: &Context) -> Resolved {
+fn parse_common_log(bytes: Value, timestamp_format: Option<Value>, timezone: TimeZone) -> Resolved {
     let message = bytes.try_bytes_utf8_lossy()?;
     let timestamp_format = match timestamp_format {
         None => "%d/%b/%Y:%T %z".to_owned(),
@@ -18,7 +20,7 @@ fn parse_common_log(bytes: Value, timestamp_format: Option<Value>, ctx: &Context
         &log_util::REGEX_APACHE_COMMON_LOG,
         &captures,
         &timestamp_format,
-        ctx.timezone(),
+        &timezone,
     )
     .map_err(Into::into)
 }
@@ -81,6 +83,14 @@ impl Function for ParseCommonLog {
             }),
         }]
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_parse_common_log",
+            address: vrl_fn_parse_common_log as _,
+            uses_context: true,
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -98,12 +108,22 @@ impl Expression for ParseCommonLogFn {
             .map(|expr| expr.resolve(ctx))
             .transpose()?;
 
-        parse_common_log(bytes, timestamp_format, ctx)
+        parse_common_log(bytes, timestamp_format, *ctx.timezone())
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::object(inner_kind()).fallible()
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_parse_common_log(
+    ctx: &vrl::core::Context,
+    value: Value,
+    timestamp_format: Option<Value>,
+) -> Resolved {
+    parse_common_log(value, timestamp_format, *ctx.timezone)
 }
 
 fn inner_kind() -> BTreeMap<Field, Kind> {

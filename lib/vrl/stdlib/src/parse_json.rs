@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use ::value::Value;
+use primitive_calling_convention::primitive_calling_convention;
 use serde_json::{
     value::{RawValue, Value as JsonValue},
     Error, Map,
@@ -186,6 +187,14 @@ impl Function for ParseJson {
             None => Ok(Box::new(ParseJsonFn { value })),
         }
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_parse_json",
+            address: vrl_fn_parse_json as _,
+            uses_context: false,
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -220,6 +229,14 @@ impl Expression for ParseJsonMaxDepthFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         type_def()
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_parse_json(value: Value, _max_depth: Option<Value>) -> Resolved {
+    // TODO: make max_depth a compiled argument.
+
+    parse_json(value)
 }
 
 fn inner_kind() -> Kind {

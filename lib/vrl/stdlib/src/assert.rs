@@ -1,4 +1,5 @@
 use ::value::Value;
+use primitive_calling_convention::primitive_calling_convention;
 use vrl::{diagnostic::Note, prelude::*};
 
 fn assert(condition: Value, message: Option<Value>, format: Option<String>) -> Resolved {
@@ -77,6 +78,14 @@ impl Function for Assert {
 
         Ok(Box::new(AssertFn { condition, message }))
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_assert",
+            address: vrl_fn_assert as _,
+            uses_context: false,
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -88,8 +97,8 @@ struct AssertFn {
 impl Expression for AssertFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let condition = self.condition.resolve(ctx)?;
-        let format = self.condition.format();
         let message = self.message.as_ref().map(|m| m.resolve(ctx)).transpose()?;
+        let format = self.condition.format();
 
         assert(condition, message, format)
     }
@@ -103,4 +112,10 @@ impl fmt::Display for AssertFn {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("")
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_assert(condition: Value, message: Option<Value>) -> Resolved {
+    assert(condition, message, None)
 }

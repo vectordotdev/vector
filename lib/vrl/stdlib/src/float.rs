@@ -1,4 +1,5 @@
 use ::value::Value;
+use primitive_calling_convention::primitive_calling_convention;
 use vrl::prelude::*;
 
 fn float(value: Value) -> Resolved {
@@ -51,6 +52,14 @@ impl Function for Float {
 
         Ok(Box::new(FloatFn { value }))
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_float",
+            address: vrl_fn_float as _,
+            uses_context: false,
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -68,4 +77,10 @@ impl Expression for FloatFn {
 
         TypeDef::float().with_fallibility(non_float)
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_float(value: Value) -> Resolved {
+    float(value)
 }

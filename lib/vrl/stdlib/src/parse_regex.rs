@@ -1,10 +1,13 @@
+use std::any::Any;
+
 use ::value::Value;
+use primitive_calling_convention::primitive_calling_convention;
 use regex::Regex;
 use vrl::{function::Error, prelude::*};
 
 use crate::util;
 
-fn parse_regex(value: Value, numeric_groups: bool, pattern: &Regex) -> Resolved {
+fn parse_regex(value: Value, pattern: &Regex, numeric_groups: bool) -> Resolved {
     let bytes = value.try_bytes()?;
     let value = String::from_utf8_lossy(&bytes);
     let parsed = pattern
@@ -94,7 +97,8 @@ impl Function for ParseRegex {
         expr: Option<&expression::Expr>,
     ) -> CompiledArgument {
         match (name, expr) {
-            ("pattern", Some(expr)) => {
+            ("pattern", expr) => {
+                let expr = expr.expect("argument must be provided");
                 let regex: regex::Regex = match expr {
                     expression::Expr::Literal(expression::Literal::Regex(regex)) => {
                         Ok((**regex).clone())
@@ -111,6 +115,14 @@ impl Function for ParseRegex {
             _ => Ok(None),
         }
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_parse_regex",
+            address: vrl_fn_parse_regex as _,
+            uses_context: false,
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -123,15 +135,28 @@ pub(crate) struct ParseRegexFn {
 impl Expression for ParseRegexFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let numeric_groups = self.numeric_groups.resolve(ctx)?;
         let pattern = &self.pattern;
+        let numeric_groups = self.numeric_groups.resolve(ctx)?;
 
-        parse_regex(value, numeric_groups.try_boolean()?, pattern)
+        parse_regex(value, pattern, numeric_groups.try_boolean()?)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::object(util::regex_kind(&self.pattern)).fallible()
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_parse_regex(
+    value: Value,
+    pattern: &Box<dyn Any + Send + Sync>,
+    numeric_groups: Option<Value>,
+) -> Resolved {
+    let pattern = pattern.downcast_ref::<Regex>().unwrap();
+    let numeric_groups = numeric_groups.unwrap_or_else(|| false.into());
+
+    parse_regex(value, pattern, numeric_groups.try_boolean()?)
 }
 
 #[cfg(test)]

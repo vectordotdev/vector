@@ -1,15 +1,14 @@
+use std::any::Any;
+
 use ::value::Value;
+use primitive_calling_convention::primitive_calling_convention;
 use tracing::{debug, error, info, trace, warn};
 use vrl::prelude::*;
 
-fn log(
-    rate_limit_secs: Value,
-    level: &Bytes,
-    value: Value,
-    span: vrl::diagnostic::Span,
-) -> Resolved {
+fn log(value: Value, rate_limit_secs: Value, info: &LogInfo) -> Resolved {
     let rate_limit_secs = rate_limit_secs.try_integer()?;
     let res = value.to_string_lossy();
+    let LogInfo { level, span } = info;
     match level.as_ref() {
         b"trace" => {
             trace!(message = %res, internal_log_rate_secs = rate_limit_secs, vrl_position = span.start())
@@ -106,9 +105,11 @@ impl Function for Log {
         let rate_limit_secs = arguments.optional("rate_limit_secs");
 
         Ok(Box::new(LogFn {
-            span: ctx.span(),
+            info: LogInfo {
+                level,
+                span: ctx.span(),
+            },
             value,
-            level,
             rate_limit_secs,
         }))
     }
@@ -124,18 +125,21 @@ impl Function for Log {
         if name == "level" {
             let level = match expr {
                 Some(expr) => match expr.as_value() {
-                    Some(value) => levels()
-                        .into_iter()
-                        .find(|level| Some(level) == value.as_bytes())
-                        .ok_or_else(|| vrl::function::Error::InvalidEnumVariant {
-                            keyword: "level",
-                            value,
-                            variants: levels().into_iter().map(Value::from).collect::<Vec<_>>(),
-                        })?,
-                    None => return Ok(None),
+                    Some(value) => Some(
+                        levels()
+                            .into_iter()
+                            .find(|level| Some(level) == value.as_bytes())
+                            .ok_or_else(|| vrl::function::Error::InvalidEnumVariant {
+                                keyword: "level",
+                                value,
+                                variants: levels().into_iter().map(Value::from).collect::<Vec<_>>(),
+                            })?,
+                    ),
+                    None => None,
                 },
-                None => Bytes::from("info"),
-            };
+                None => None,
+            }
+            .unwrap_or_else(|| Bytes::from("info"));
 
             let level = LogInfo {
                 level,
@@ -146,10 +150,18 @@ impl Function for Log {
             Ok(None)
         }
     }
+
+    fn symbol(&self) -> Option<Symbol> {
+        Some(Symbol {
+            name: "vrl_fn_log",
+            address: vrl_fn_log as _,
+            uses_context: false,
+        })
+    }
 }
 
-#[allow(unused)] // will be used by LLVM runtime
-#[derive(Debug)]
+#[allow(unused)]
+#[derive(Debug, Clone)]
 struct LogInfo {
     level: Bytes,
     span: vrl::diagnostic::Span,
@@ -157,9 +169,8 @@ struct LogInfo {
 
 #[derive(Debug, Clone)]
 struct LogFn {
-    span: vrl::diagnostic::Span,
+    info: LogInfo,
     value: Box<dyn Expression>,
-    level: Bytes,
     rate_limit_secs: Option<Box<dyn Expression>>,
 }
 
@@ -171,14 +182,25 @@ impl Expression for LogFn {
             None => value!(1),
         };
 
-        let span = self.span;
-
-        log(rate_limit_secs, &self.level, value, span)
+        log(value, rate_limit_secs, &self.info)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::null().infallible()
     }
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
+extern "C" fn vrl_fn_log(
+    value: Value,
+    info: &Box<dyn Any + Send + Sync>,
+    rate_limit_secs: Option<Value>,
+) -> Resolved {
+    let info = info.downcast_ref::<LogInfo>().unwrap();
+    let rate_limit_secs = rate_limit_secs.unwrap_or_else(|| 1.into());
+
+    log(value, rate_limit_secs, info)
 }
 
 #[cfg(test)]
@@ -204,10 +226,12 @@ mod tests {
     fn output_quotes() {
         // Check that a message is logged without additional quotes
         log(
-            value!(1),
-            &Bytes::from("warn"),
             value!("simple test message"),
-            Default::default(),
+            value!(1),
+            &LogInfo {
+                level: Bytes::from("warn"),
+                span: Default::default(),
+            },
         )
         .unwrap();
 
