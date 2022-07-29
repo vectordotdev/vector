@@ -86,7 +86,8 @@ impl<'a> Field<'a> {
     /// This may be different than the name of the field itself depending on whether it has been
     /// altered with `serde` helper attributes i.e. `#[serde(rename = "...")]`.
     ///
-    /// TODO: Explain why this is non-optional when `ident` can be optional.
+    /// Additionally, for unnamed fields (tuple structs/variants), this will be the integer index of
+    /// the field, formatted as a string.
     pub fn name(&self) -> &str {
         self.name.as_str()
     }
