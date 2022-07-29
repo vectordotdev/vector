@@ -445,6 +445,11 @@ mod integration_tests {
     }
 
     #[tokio::test]
+    async fn scraped_trace_native_json() {
+        // TODO - add a trace
+    }
+
+    #[tokio::test]
     async fn unauthorized() {
         // TODO how to assert failure
 
@@ -485,7 +490,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn tls() {
-        // TODO - is this worthy of testing and how to verify
+        // TODO - use dufs with tls settings
     }
 
     #[tokio::test]
