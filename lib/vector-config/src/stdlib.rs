@@ -14,8 +14,8 @@ use vector_config_common::validation::Validation;
 
 use crate::{
     schema::{
-        finalize_schema, generate_array_schema, generate_bool_schema, generate_map_schema,
-        generate_number_schema, generate_optional_schema, generate_set_schema,
+        assert_string_schema_for_map, finalize_schema, generate_array_schema, generate_bool_schema,
+        generate_map_schema, generate_number_schema, generate_optional_schema, generate_set_schema,
         generate_string_schema,
     },
     str::ConfigurableString,
@@ -128,6 +128,9 @@ where
     }
 
     fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<Self>) -> SchemaObject {
+        // Make sure our key type is _truly_ a string schema.
+        assert_string_schema_for_map::<K, Self>(gen);
+
         // We explicitly do not pass anything from the override metadata, because there's nothing to
         // reasonably pass: if `V` is referenceable, using the description for `BTreeMap<String, V>`
         // likely makes no sense, nor would a default make sense, and so on.
@@ -158,6 +161,9 @@ where
     }
 
     fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<Self>) -> SchemaObject {
+        // Make sure our key type is _truly_ a string schema.
+        assert_string_schema_for_map::<K, Self>(gen);
+
         // We explicitly do not pass anything from the override metadata, because there's nothing to
         // reasonably pass: if `V` is referenceable, using the description for `HashMap<String, V>`
         // likely makes no sense, nor would a default make sense, and so on.
