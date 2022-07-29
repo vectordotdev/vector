@@ -41,10 +41,74 @@ impl Expression for IfStatement {
     #[cfg(feature = "llvm")]
     fn emit_llvm<'ctx>(
         &self,
-        _: (&mut LocalEnv, &mut ExternalEnv),
-        _: &mut crate::llvm::Context<'ctx>,
+        state: (&mut LocalEnv, &mut ExternalEnv),
+        ctx: &mut crate::llvm::Context<'ctx>,
     ) -> Result<(), String> {
-        todo!()
+        let if_statement_begin_block = ctx.append_basic_block("if_statement_begin");
+        let if_statement_end_block = ctx.append_basic_block("if_statement_end");
+        let if_branch_block = ctx.append_basic_block("if_statement_if_branch");
+        let else_branch_block = ctx.append_basic_block("if_statement_else_branch");
+
+        ctx.build_unconditional_branch(if_statement_begin_block);
+        ctx.position_at_end(if_statement_begin_block);
+
+        let result_ref = ctx.result_ref();
+
+        let predicate_ref = ctx.build_alloca_resolved_initialized("predicate");
+
+        ctx.emit_llvm(
+            &self.predicate,
+            predicate_ref,
+            (state.0, state.1),
+            if_statement_end_block,
+            vec![(predicate_ref.into(), ctx.fns().vrl_resolved_drop)],
+        )?;
+
+        let is_true = ctx
+            .fns()
+            .vrl_value_boolean_is_true
+            .build_call(ctx.builder(), predicate_ref)
+            .try_as_basic_value()
+            .left()
+            .expect("result is not a basic value")
+            .try_into()
+            .expect("result is not an int value");
+
+        ctx.fns()
+            .vrl_resolved_drop
+            .build_call(ctx.builder(), predicate_ref);
+
+        ctx.build_conditional_branch(is_true, if_branch_block, else_branch_block);
+
+        ctx.position_at_end(if_branch_block);
+        ctx.emit_llvm(
+            &self.consequent,
+            result_ref,
+            (state.0, state.1),
+            if_statement_end_block,
+            vec![],
+        )?;
+        ctx.build_unconditional_branch(if_statement_end_block);
+
+        ctx.position_at_end(else_branch_block);
+        if let Some(alternative) = &self.alternative {
+            ctx.emit_llvm(
+                alternative,
+                result_ref,
+                (state.0, state.1),
+                if_statement_end_block,
+                vec![],
+            )?;
+        } else {
+            ctx.fns()
+                .vrl_resolved_ok_null
+                .build_call(ctx.builder(), result_ref);
+        }
+        ctx.build_unconditional_branch(if_statement_end_block);
+
+        ctx.position_at_end(if_statement_end_block);
+
+        Ok(())
     }
 }
 
