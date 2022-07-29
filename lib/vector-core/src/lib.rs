@@ -41,10 +41,12 @@ pub mod stream;
 mod test_util;
 pub mod time;
 pub mod transform;
+#[cfg(feature = "vrl")]
 mod vrl;
 
 use std::path::PathBuf;
 
+#[cfg(feature = "vrl")]
 pub use vrl::compile_vrl;
 
 pub use vector_buffers as buffers;

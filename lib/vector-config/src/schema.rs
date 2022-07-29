@@ -22,7 +22,7 @@ use crate::{num::ConfigurableNumber, Configurable, CustomAttribute, Metadata};
 /// types such that they can be surfaced by tools using the schema.
 ///
 /// Since we don't utilize the typical flow of generating schemas via `schemars`, we're forced to
-/// manually determine when we should register a schema as a referencable schema within the schema
+/// manually determine when we should register a schema as a referenceable schema within the schema
 /// generator. As well, we need to handle applying metadata to these schemas such that we preserve
 /// the intended behavior.
 pub fn finalize_schema<T>(
@@ -32,9 +32,9 @@ pub fn finalize_schema<T>(
 ) where
     T: Configurable + Serialize,
 {
-    // If the type that this schema represents is referencable, check to see if it's been defined
+    // If the type that this schema represents is referenceable, check to see if it's been defined
     // before, and if not, then go ahead and define it.
-    if let Some(ref_name) = T::referencable_name() {
+    if let Some(ref_name) = T::referenceable_name() {
         if !gen.definitions().contains_key(ref_name) {
             // We specifically apply the metadata of `T` itself, and not the `metadata` we've been
             // given, as we do not want to apply field-level metadata e.g. field-specific default
@@ -274,7 +274,7 @@ where
         // If this schema has no instance type, see if it's a reference schema.  If so, then we'd simply switch to
         // generating a composite schema with this schema reference and a generic null schema.
         None => match schema.is_ref() {
-            false => panic!("tried to generate optional schema, but `T` had no instance type and was not a referencable schema"),
+            false => panic!("tried to generate optional schema, but `T` had no instance type and was not a referenceable schema"),
             true => {
                 let null = generate_null_schema();
 

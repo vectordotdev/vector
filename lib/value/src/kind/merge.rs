@@ -1,45 +1,14 @@
 //! All types related to merging one [`Kind`] into another.
 
-use crate::kind::nest::CoalescedPath;
 use crate::kind::Field;
-use lookup::Lookup;
-use std::{collections::BTreeMap, ops::BitOr};
+use std::ops::BitOr;
 
-use super::nest;
 use super::{Collection, Kind};
 
 impl Kind {
-    /// Returns a new kind with the type set at the specific path.
-    ///
-    /// # Errors
-    /// Because `nest_at_path` doesn't support coalescing or negative indices, an error will
-    /// be returned if a path is used that contains either of those. In the future those should
-    /// be supported so this functon can just return `Kind` instead of `Result`.
-    pub fn with_type_set_at_path(
-        mut self,
-        path: &Lookup<'_>,
-        other: Self,
-    ) -> Result<Self, nest::Error> {
-        if path.is_root() {
-            Ok(other)
-        } else {
-            let nested = other.nest_at_path(
-                path,
-                super::nest::Strategy {
-                    coalesced_path: CoalescedPath::Reject,
-                },
-            )?;
-            self.merge_keep(nested, true);
-            Ok(self)
-        }
-    }
-
     /// Merge `other` into `self`, using the provided `Strategy`.
     pub fn merge(&mut self, other: Self, strategy: Strategy) {
-        match strategy.indices {
-            Indices::Keep => self.merge_keep(other, strategy.collisions.is_shallow()),
-            Indices::Append => self.merge_append(other, strategy.collisions.is_shallow()),
-        }
+        self.merge_keep(other, strategy.collisions.is_shallow());
     }
 
     fn merge_primitives(&mut self, other: &Self) {
@@ -50,6 +19,7 @@ impl Kind {
         self.timestamp = self.timestamp.or(other.timestamp);
         self.regex = self.regex.or(other.regex);
         self.null = self.null.or(other.null);
+        self.undefined = self.undefined.or(other.undefined);
     }
 
     fn merge_objects(&mut self, other: Option<Collection<Field>>, overwrite: bool) {
@@ -60,7 +30,16 @@ impl Kind {
         };
     }
 
+    /// Returns the union of self and other.
+    #[must_use]
+    pub fn union(&self, other: Self) -> Self {
+        let mut kind = self.clone();
+        kind.merge_keep(other, false);
+        kind
+    }
+
     /// Merge `other` into `self`, optionally overwriting on conflicts.
+    // deprecated
     pub fn merge_keep(&mut self, other: Self, overwrite: bool) {
         self.merge_primitives(&other);
         self.merge_objects(other.object, overwrite);
@@ -68,36 +47,6 @@ impl Kind {
         match (self.array.as_mut(), other.array) {
             (None, Some(rhs)) => self.array = Some(rhs),
             (Some(lhs), Some(rhs)) => lhs.merge(rhs, overwrite),
-            _ => {}
-        }
-    }
-
-    /// Merge `other` into `self`, using the provided `Strategy`.
-    /// We take the higest index of the lhs
-    /// collection, and increase all known indices of the rhs collection by that value.
-    /// Then we merge them, similar to the non-append strategy.
-    fn merge_append(&mut self, other: Self, overwrite: bool) {
-        self.merge_primitives(&other);
-        self.merge_objects(other.object, overwrite);
-
-        match (self.array.as_mut(), other.array) {
-            (None, Some(rhs)) => self.array = Some(rhs),
-
-            (Some(lhs), Some(rhs)) => {
-                let last_index = lhs.known().keys().max().map(|i| *i + 1).unwrap_or_default();
-
-                let (rhs_known, rhs_unknown) = rhs.into_parts();
-
-                let mut known = BTreeMap::default();
-                for (index, kind) in rhs_known {
-                    let index = index + last_index;
-                    known.insert(index, kind);
-                }
-
-                // The indices cannot collide since they are being appended, so switch to overwrite mode.
-                // otherwise the union of the types will include "null"
-                lhs.merge(Collection::from_parts(known, rhs_unknown), true);
-            }
             _ => {}
         }
     }
@@ -109,18 +58,13 @@ pub struct Strategy {
     /// How to deal with types in a collection if both specify a type.
     /// This only applies to types in a collection (not the root type)
     pub collisions: CollisionStrategy,
-
-    /// The strategy used when merging array indices.
-    ///
-    /// This can either be "keep" or "append", meaning do not update array indices, or append them
-    /// to the end of the `self` array.
-    pub indices: Indices,
 }
 
 /// The choice of "depth" to apply when merging two [`Kind`]s.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum CollisionStrategy {
-    /// Use the 2nd value
+    /// Use the 2nd value. This should no longer be used, and will be removed in the future.
+    /// Try using `Kind::insert` or a custom function instead.
     Overwrite,
 
     /// Merge both together
@@ -141,53 +85,17 @@ impl CollisionStrategy {
     }
 }
 
-/// The action to take for arrays and their indices when merging two [`Kind`]s.
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub enum Indices {
-    /// When merging two arrays, keep their respective indices, potentially merging two `Kinds`
-    /// assigned to the same index.
-    Keep,
-
-    /// When merging two arrays, append the indices of the `other` array after the indices of the
-    /// `self` array.
-    ///
-    /// Meaning, if `self` has index `0` and `other has index `0`, then the index of `other` is
-    /// changed to `1`.
-    Append,
-}
-
-impl Indices {
-    /// Check if `keep` strategy is enabled.
-    #[must_use]
-    pub const fn is_keep(self) -> bool {
-        matches!(self, Self::Keep)
-    }
-
-    /// Check if `append` strategy is enabled.
-    #[must_use]
-    pub const fn is_append(self) -> bool {
-        matches!(self, Self::Append)
-    }
-}
-
 impl BitOr for Kind {
     type Output = Self;
 
-    fn bitor(mut self, rhs: Self) -> Self::Output {
-        self.merge(
-            rhs,
-            Strategy {
-                collisions: CollisionStrategy::Union,
-                indices: Indices::Keep,
-            },
-        );
-        self
+    fn bitor(self, rhs: Self) -> Self::Output {
+        self.union(rhs)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use std::collections::{BTreeMap, HashMap};
 
     use super::*;
     use crate::kind::Collection;
@@ -218,7 +126,6 @@ mod tests {
                     other: Kind::object(BTreeMap::from([("x".into(), Kind::integer())])),
                     strategy: Strategy {
                         collisions: CollisionStrategy::Union,
-                        indices: Indices::Keep,
                     },
                     merged: {
                         let mut collection =
@@ -235,7 +142,6 @@ mod tests {
                     other: Kind::integer(),
                     strategy: Strategy {
                         collisions: CollisionStrategy::Overwrite,
-                        indices: Indices::Keep,
                     },
                     merged: Kind::bytes().or_integer(),
                 },
@@ -247,8 +153,6 @@ mod tests {
                     other: Kind::integer(),
                     strategy: Strategy {
                         collisions: CollisionStrategy::Union,
-
-                        indices: Indices::Keep,
                     },
                     merged: Kind::bytes().or_integer(),
                 },
@@ -260,7 +164,6 @@ mod tests {
                     other: Kind::bytes().or_object(Collection::from_unknown(Kind::bytes())),
                     strategy: Strategy {
                         collisions: CollisionStrategy::Overwrite,
-                        indices: Indices::Keep,
                     },
                     merged: Kind::bytes()
                         .or_object(Collection::from_unknown(Kind::integer().or_bytes())),
@@ -273,7 +176,6 @@ mod tests {
                     other: Kind::bytes().or_object(Collection::from_unknown(Kind::bytes())),
                     strategy: Strategy {
                         collisions: CollisionStrategy::Union,
-                        indices: Indices::Keep,
                     },
                     merged: Kind::bytes()
                         .or_object(Collection::from_unknown(Kind::integer().or_bytes())),
@@ -306,7 +208,6 @@ mod tests {
                     ])),
                     strategy: Strategy {
                         collisions: CollisionStrategy::Overwrite,
-                        indices: Indices::Keep,
                     },
                     merged: Kind::bytes().or_integer().or_object(BTreeMap::from([
                         (
@@ -349,7 +250,6 @@ mod tests {
                     ])),
                     strategy: Strategy {
                         collisions: CollisionStrategy::Union,
-                        indices: Indices::Keep,
                     },
                     merged: Kind::bytes().or_integer().or_object(BTreeMap::from([
                         (
@@ -363,104 +263,6 @@ mod tests {
                         ),
                         ("bar".into(), Kind::integer().or_null()),
                         ("baz".into(), Kind::boolean().or_null()),
-                    ])),
-                },
-            ),
-            (
-                "append array shallow",
-                TestCase {
-                    this: Kind::array(BTreeMap::from([
-                        (0.into(), Kind::bytes()),
-                        (
-                            2.into(),
-                            Kind::array(BTreeMap::from([
-                                (0.into(), Kind::integer()),
-                                (1.into(), Kind::bytes()),
-                            ])),
-                        ),
-                    ])),
-                    other: Kind::array(BTreeMap::from([
-                        (0.into(), Kind::regex()),
-                        (
-                            2.into(),
-                            Kind::array(BTreeMap::from([
-                                (0.into(), Kind::integer()),
-                                (1.into(), Kind::bytes()),
-                            ])),
-                        ),
-                        (5.into(), Kind::timestamp()),
-                    ])),
-                    strategy: Strategy {
-                        collisions: CollisionStrategy::Overwrite,
-                        indices: Indices::Append,
-                    },
-                    merged: Kind::array(BTreeMap::from([
-                        (0.into(), Kind::bytes()),
-                        (
-                            2.into(),
-                            Kind::array(BTreeMap::from([
-                                (0.into(), Kind::integer()),
-                                (1.into(), Kind::bytes()),
-                            ])),
-                        ),
-                        (3.into(), Kind::regex()),
-                        (
-                            5.into(),
-                            Kind::array(BTreeMap::from([
-                                (0.into(), Kind::integer()),
-                                (1.into(), Kind::bytes()),
-                            ])),
-                        ),
-                        (8.into(), Kind::timestamp()),
-                    ])),
-                },
-            ),
-            (
-                "append array deep",
-                TestCase {
-                    this: Kind::array(BTreeMap::from([
-                        (0.into(), Kind::bytes()),
-                        (
-                            2.into(),
-                            Kind::array(BTreeMap::from([
-                                (0.into(), Kind::integer()),
-                                (1.into(), Kind::bytes()),
-                            ])),
-                        ),
-                    ])),
-                    other: Kind::array(BTreeMap::from([
-                        (0.into(), Kind::regex()),
-                        (
-                            2.into(),
-                            Kind::array(BTreeMap::from([
-                                (0.into(), Kind::integer()),
-                                (1.into(), Kind::bytes()),
-                            ])),
-                        ),
-                        (5.into(), Kind::timestamp()),
-                    ])),
-                    strategy: Strategy {
-                        collisions: CollisionStrategy::Union,
-                        indices: Indices::Append,
-                    },
-                    merged: Kind::array(BTreeMap::from([
-                        (0.into(), Kind::bytes()),
-                        (
-                            2.into(),
-                            Kind::array(BTreeMap::from([
-                                (0.into(), Kind::integer()),
-                                (1.into(), Kind::bytes()),
-                            ])),
-                        ),
-                        (3.into(), Kind::regex()),
-                        (
-                            5.into(),
-                            Kind::array(BTreeMap::from([
-                                (0.into(), Kind::integer()),
-                                (1.into(), Kind::bytes()),
-                            ])),
-                        ),
-                        (8.into(), Kind::timestamp()),
                     ])),
                 },
             ),

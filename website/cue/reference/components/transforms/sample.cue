@@ -64,7 +64,7 @@ components: transforms: sample: {
 	input: {
 		logs:    true
 		metrics: null
-		traces:  false
+		traces:  true
 	}
 
 	telemetry: metrics: {

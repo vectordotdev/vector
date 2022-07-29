@@ -76,7 +76,7 @@ pub(self) async fn load_enrichment_tables<'a>(
     'tables: for (name, table) in config.enrichment_tables.iter() {
         let table_name = name.to_string();
         if ENRICHMENT_TABLES.needs_reload(&table_name) {
-            let indexes = if !diff.enrichment_tables.contains_new(name) {
+            let indexes = if !diff.enrichment_tables.is_added(name) {
                 // If this is an existing enrichment table, we need to store the indexes to reapply
                 // them again post load.
                 Some(ENRICHMENT_TABLES.index_fields(&table_name))

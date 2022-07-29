@@ -93,12 +93,7 @@ impl Function for SetSemanticMeaning {
 
         let path = query.path().clone();
 
-        let exists = state
-            .target_kind()
-            .find_at_path(&path.to_lookup())
-            .ok()
-            .flatten()
-            .is_some();
+        let exists = state.target_kind().at_path(&path).contains_any_defined();
 
         // Reject assigning meaning to non-existing field.
         if !exists {

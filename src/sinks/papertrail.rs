@@ -1,6 +1,6 @@
 use bytes::{BufMut, BytesMut};
-use serde::{Deserialize, Serialize};
 use syslog::{Facility, Formatter3164, LogFormat, Severity};
+use vector_config::configurable_component;
 
 use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
@@ -16,15 +16,37 @@ use crate::{
     tls::TlsEnableableConfig,
 };
 
-#[derive(Deserialize, Serialize, Debug)]
+/// Configuration for the `papertrail` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-pub(self) struct PapertrailConfig {
+pub struct PapertrailConfig {
+    /// The endpoint to send logs to.
     endpoint: UriSerde,
+
+    #[configurable(derived)]
     encoding: EncodingConfig,
+
+    #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
+
+    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
+
+    /// Configures the send buffer size using the `SO_SNDBUF` option on the socket.
     send_buffer_bytes: Option<usize>,
+
+    /// The value to use as the `process` in Papertrail.
+    #[configurable(metadata(templateable))]
     process: Option<Template>,
+
+    #[configurable(derived)]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 inventory::submit! {
@@ -96,7 +118,7 @@ impl SinkConfig for PapertrailConfig {
     }
 
     fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        None
+        Some(&self.acknowledgements)
     }
 }
 

@@ -89,7 +89,7 @@ pub mod ser_de {
 }
 
 impl Configurable for TimeZone {
-    fn referencable_name() -> Option<&'static str> {
+    fn referenceable_name() -> Option<&'static str> {
         Some("vector_common::TimeZone")
     }
 
