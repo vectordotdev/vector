@@ -26,7 +26,7 @@ impl Expression for Noop {
         _: (&mut LocalEnv, &mut ExternalEnv),
         _: &mut crate::llvm::Context<'ctx>,
     ) -> Result<(), String> {
-        todo!()
+        Ok(())
     }
 }
 
