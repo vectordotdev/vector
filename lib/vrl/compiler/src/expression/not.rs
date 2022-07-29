@@ -56,10 +56,51 @@ impl Expression for Not {
     #[cfg(feature = "llvm")]
     fn emit_llvm<'ctx>(
         &self,
-        _: (&mut LocalEnv, &mut ExternalEnv),
-        _: &mut crate::llvm::Context<'ctx>,
-    ) -> Result<(), String> {
-        todo!()
+        state: (&mut LocalEnv, &mut ExternalEnv),
+        ctx: &mut crate::llvm::Context<'ctx>,
+    ) -> std::result::Result<(), String> {
+        let not_begin_block = ctx.append_basic_block("not_begin");
+        let not_end_block = ctx.append_basic_block("not_end");
+
+        ctx.build_unconditional_branch(not_begin_block);
+        ctx.position_at_end(not_begin_block);
+
+        ctx.emit_llvm(
+            self.inner.as_ref(),
+            ctx.result_ref(),
+            (state.0, state.1),
+            not_end_block,
+            vec![],
+        )?;
+
+        let type_def = self.inner.type_def((state.0, state.1));
+        if type_def.is_fallible() {
+            let not_is_ok_block = ctx.append_basic_block("not_is_ok");
+
+            let is_err = ctx
+                .fns()
+                .vrl_resolved_is_err
+                .build_call(ctx.builder(), ctx.result_ref())
+                .try_as_basic_value()
+                .left()
+                .expect("result is not a basic value")
+                .try_into()
+                .expect("result is not an int value");
+
+            ctx.build_conditional_branch(is_err, not_end_block, not_is_ok_block);
+
+            ctx.position_at_end(not_is_ok_block);
+        }
+
+        ctx.fns()
+            .vrl_expression_not
+            .build_call(ctx.builder(), ctx.result_ref());
+
+        ctx.build_unconditional_branch(not_end_block);
+
+        ctx.position_at_end(not_end_block);
+
+        Ok(())
     }
 }
 
