@@ -67,6 +67,7 @@ impl Expression for Block {
     fn type_def(&self, (_, external): (&LocalEnv, &ExternalEnv)) -> TypeDef {
         let mut last = TypeDef::null();
         let mut fallible = false;
+        let mut abortable = false;
         let mut has_terminated = false;
         for expr in &self.inner {
             assert!(!has_terminated, "VRL block contains an expression after a terminating expression. This is an internal compiler error. Please submit a bug report.");
@@ -77,9 +78,12 @@ impl Expression for Block {
             if last.is_fallible() {
                 fallible = true;
             }
+            if last.is_abortable() {
+                abortable = true;
+            }
         }
 
-        last.with_fallibility(fallible)
+        last.with_fallibility(fallible).with_abortability(abortable)
     }
 }
 

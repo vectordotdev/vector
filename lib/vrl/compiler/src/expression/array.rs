@@ -55,13 +55,17 @@ impl Expression for Array {
         // fallible.
         let fallible = type_defs.iter().any(TypeDef::is_fallible);
 
+        let abortable = type_defs.iter().any(TypeDef::is_abortable);
+
         let collection = type_defs
             .into_iter()
             .enumerate()
             .map(|(index, type_def)| (index.into(), type_def.into()))
             .collect::<BTreeMap<_, _>>();
 
-        TypeDef::array(collection).with_fallibility(fallible)
+        TypeDef::array(collection)
+            .with_fallibility(fallible)
+            .with_abortability(abortable)
     }
 }
 

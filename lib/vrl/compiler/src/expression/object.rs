@@ -56,12 +56,16 @@ impl Expression for Object {
         // fallible.
         let fallible = type_defs.values().any(TypeDef::is_fallible);
 
+        let abortable = type_defs.values().any(TypeDef::is_abortable);
+
         let collection = type_defs
             .into_iter()
             .map(|(field, type_def)| (field.into(), type_def.into()))
             .collect::<BTreeMap<_, _>>();
 
-        TypeDef::object(collection).with_fallibility(fallible)
+        TypeDef::object(collection)
+            .with_fallibility(fallible)
+            .with_abortability(abortable)
     }
 }
 

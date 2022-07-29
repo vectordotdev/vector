@@ -191,23 +191,26 @@ impl Expression for Op {
 
             // ... / ...
             Div => {
-                let td = TypeDef::float();
+                let type_def = TypeDef::float();
 
                 // Division is infallible if the rhs is a literal normal float or integer.
-                match self.rhs.as_value() {
+                let td = match self.rhs.as_value() {
                     Some(value) if lhs_def.is_float() || lhs_def.is_integer() => match value {
-                        Value::Float(v) if v.is_normal() => td.infallible(),
-                        Value::Integer(v) if v != 0 => td.infallible(),
-                        _ => td.fallible(),
+                        Value::Float(v) if v.is_normal() => type_def.infallible(),
+                        Value::Integer(v) if v != 0 => type_def.infallible(),
+                        _ => type_def.fallible(),
                     },
-                    _ => td.fallible(),
-                }
+                    _ => type_def.fallible(),
+                };
+
+                let abortable = lhs_def.is_abortable() | rhs_def.is_abortable();
+                td.with_abortability(abortable)
             }
 
             // ... % ...
             Rem => {
                 // Division is infallible if the rhs is a literal normal float or integer.
-                match self.rhs.as_value() {
+                let type_def = match self.rhs.as_value() {
                     Some(value) if lhs_def.is_float() || lhs_def.is_integer() => match value {
                         Value::Float(v) if v.is_normal() => TypeDef::float().infallible(),
                         Value::Float(_) => TypeDef::float().fallible(),
@@ -216,7 +219,10 @@ impl Expression for Op {
                         _ => TypeDef::float().add_integer().fallible(),
                     },
                     _ => TypeDef::float().add_integer().fallible(),
-                }
+                };
+
+                let abortable = lhs_def.is_abortable() | rhs_def.is_abortable();
+                type_def.with_abortability(abortable)
             }
 
             // "bar" + ...

@@ -21,6 +21,7 @@ use crate::{
 pub(crate) struct Builder<'a> {
     abort_on_error: bool,
     arguments_with_unknown_type_validity: Vec<(Parameter, Node<FunctionArgument>)>,
+    arguments_abortable: bool,
     call_span: Span,
     ident_span: Span,
     function_id: usize,
@@ -89,6 +90,7 @@ impl<'a> Builder<'a> {
         let mut list = ArgumentList::default();
 
         let mut arguments_with_unknown_type_validity = vec![];
+        let mut arguments_abortable = false;
         for node in &arguments {
             let (argument_span, argument) = node.clone().take();
 
@@ -140,6 +142,8 @@ impl<'a> Builder<'a> {
             } else if !param_kind.is_superset(expr_kind) {
                 arguments_with_unknown_type_validity.push((*parameter, node.clone()));
             }
+
+            arguments_abortable |= argument_type_def.is_abortable();
 
             // Check if the argument is infallible.
             if argument_type_def.is_fallible() {
@@ -354,6 +358,7 @@ impl<'a> Builder<'a> {
         Ok(Self {
             abort_on_error,
             arguments_with_unknown_type_validity,
+            arguments_abortable,
             call_span,
             ident_span,
             function_id,
@@ -482,6 +487,7 @@ impl<'a> Builder<'a> {
             abort_on_error: self.abort_on_error,
             expr,
             arguments_with_unknown_type_validity: self.arguments_with_unknown_type_validity,
+            arguments_abortable: self.arguments_abortable,
             closure_fallible,
             closure,
             span: call_span,
@@ -498,6 +504,7 @@ pub struct FunctionCall {
     abort_on_error: bool,
     expr: Box<dyn Expression>,
     arguments_with_unknown_type_validity: Vec<(Parameter, Node<FunctionArgument>)>,
+    arguments_abortable: bool,
     closure_fallible: bool,
     closure: Option<FunctionClosure>,
 
@@ -762,7 +769,11 @@ impl Expression for FunctionCall {
         }
 
         if self.abort_on_error {
-            type_def = type_def.with_fallibility(false);
+            type_def = type_def.with_fallibility(false).abortable();
+        }
+
+        if self.arguments_abortable {
+            type_def = type_def.abortable();
         }
 
         type_def

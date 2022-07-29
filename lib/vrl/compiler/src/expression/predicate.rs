@@ -73,10 +73,14 @@ impl Expression for Predicate {
         // fallible.
         let fallible = type_defs.iter().any(TypeDef::is_fallible);
 
+        let abortable = type_defs.iter().any(TypeDef::is_abortable);
+
         // The last expression determines the resulting value of the predicate.
         let type_def = type_defs.pop().unwrap_or_else(TypeDef::boolean);
 
-        type_def.with_fallibility(fallible)
+        type_def
+            .with_fallibility(fallible)
+            .with_abortability(abortable)
     }
 }
 

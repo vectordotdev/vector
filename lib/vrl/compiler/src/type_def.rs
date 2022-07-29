@@ -48,6 +48,12 @@ pub struct TypeDef {
     /// custom function designed to be infallible).
     fallible: bool,
 
+    /// True, if an expression can abort the execution of the program.
+    ///
+    /// Examples of this are fallible functions using the `!` operator (e.g. `string!(123)`) or
+    /// explicit abort statements (e.g. `abort "mayday!"`).
+    abortable: bool,
+
     /// The [`Kind`][value::Kind]s this definition represents.
     kind: Kind,
 }
@@ -74,6 +80,7 @@ impl TypeDef {
 
     pub fn at_path(&self, path: &Lookup<'_>) -> TypeDef {
         let fallible = self.fallible;
+        let abortable = self.abortable;
 
         let kind = self
             .kind
@@ -82,12 +89,17 @@ impl TypeDef {
             .flatten()
             .map_or_else(Kind::any, Cow::into_owned);
 
-        Self { fallible, kind }
+        Self {
+            fallible,
+            abortable,
+            kind,
+        }
     }
 
     #[must_use]
     pub fn for_path(self, path: &Lookup<'_>) -> TypeDef {
         let fallible = self.fallible;
+        let abortable = self.abortable;
         let kind = self
             .kind
             .clone()
@@ -99,7 +111,11 @@ impl TypeDef {
             )
             .unwrap_or(self.kind);
 
-        Self { fallible, kind }
+        Self {
+            fallible,
+            abortable,
+            kind,
+        }
     }
 
     #[inline]
@@ -120,6 +136,27 @@ impl TypeDef {
     #[must_use]
     pub fn with_fallibility(mut self, fallible: bool) -> Self {
         self.fallible = fallible;
+        self
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn abortable(mut self) -> Self {
+        self.abortable = true;
+        self
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn inabortable(mut self) -> Self {
+        self.abortable = false;
+        self
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn with_abortability(mut self, abortable: bool) -> Self {
+        self.abortable = abortable;
         self
     }
 
@@ -248,6 +285,7 @@ impl TypeDef {
     #[must_use]
     pub fn restrict_array(self) -> Self {
         let fallible = self.fallible;
+        let abortable = self.abortable;
         let collection = match self.kind.into_array() {
             Some(array) => array,
             None => Collection::any(),
@@ -255,6 +293,7 @@ impl TypeDef {
 
         Self {
             fallible,
+            abortable,
             kind: Kind::array(collection),
         }
     }
@@ -281,6 +320,7 @@ impl TypeDef {
     #[must_use]
     pub fn restrict_object(self) -> Self {
         let fallible = self.fallible;
+        let abortable = self.abortable;
         let collection = match self.kind.into_object() {
             Some(object) => object,
             None => Collection::any(),
@@ -288,6 +328,7 @@ impl TypeDef {
 
         Self {
             fallible,
+            abortable,
             kind: Kind::object(collection),
         }
     }
@@ -328,6 +369,16 @@ impl TypeDef {
     #[must_use]
     pub fn is_infallible(&self) -> bool {
         !self.is_fallible()
+    }
+
+    #[must_use]
+    pub fn is_abortable(&self) -> bool {
+        self.abortable
+    }
+
+    #[must_use]
+    pub fn is_inabortable(&self) -> bool {
+        !self.is_abortable()
     }
 
     /// Set the type definition to be fallible if its kind is not contained
@@ -372,6 +423,7 @@ impl TypeDef {
 
     pub fn merge(&mut self, other: Self, strategy: merge::Strategy) {
         self.fallible |= other.fallible;
+        self.abortable |= other.abortable;
         self.kind.merge(other.kind, strategy);
     }
 
@@ -401,6 +453,7 @@ impl From<Kind> for TypeDef {
     fn from(kind: Kind) -> Self {
         Self {
             fallible: false,
+            abortable: false,
             kind,
         }
     }

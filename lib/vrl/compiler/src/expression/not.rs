@@ -42,9 +42,13 @@ impl Expression for Not {
     }
 
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
-        let fallible = self.inner.type_def(state).is_fallible();
+        let type_def = self.inner.type_def(state);
+        let fallible = type_def.is_fallible();
+        let abortable = type_def.is_abortable();
 
-        TypeDef::boolean().with_fallibility(fallible)
+        TypeDef::boolean()
+            .with_fallibility(fallible)
+            .with_abortability(abortable)
     }
 }
 
