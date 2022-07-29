@@ -21,6 +21,14 @@ use crate::{
 pub struct SocketSinkConfig {
     #[serde(flatten)]
     pub mode: Mode,
+
+    #[configurable(derived)]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 /// Socket mode.
@@ -89,15 +97,24 @@ impl GenerateConfig for SocketSinkConfig {
 }
 
 impl SocketSinkConfig {
-    pub const fn new(mode: Mode) -> Self {
-        SocketSinkConfig { mode }
+    pub const fn new(mode: Mode, acknowledgements: AcknowledgementsConfig) -> Self {
+        SocketSinkConfig {
+            mode,
+            acknowledgements,
+        }
     }
 
-    pub fn make_basic_tcp_config(address: String) -> Self {
-        Self::new(Mode::Tcp(TcpMode {
-            config: TcpSinkConfig::from_address(address),
-            encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
-        }))
+    pub fn make_basic_tcp_config(
+        address: String,
+        acknowledgements: AcknowledgementsConfig,
+    ) -> Self {
+        Self::new(
+            Mode::Tcp(TcpMode {
+                config: TcpSinkConfig::from_address(address),
+                encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
+            }),
+            acknowledgements,
+        )
     }
 }
 
@@ -146,7 +163,7 @@ impl SinkConfig for SocketSinkConfig {
     }
 
     fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        None
+        Some(&self.acknowledgements)
     }
 }
 
@@ -191,6 +208,7 @@ mod test {
                 config: UdpSinkConfig::from_address(addr.to_string()),
                 encoding: JsonSerializerConfig::new().into(),
             }),
+            acknowledgements: Default::default(),
         };
         let context = SinkContext::new_test();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
@@ -235,6 +253,7 @@ mod test {
                 config: TcpSinkConfig::from_address(addr.to_string()),
                 encoding: (None::<FramingConfig>, JsonSerializerConfig::new()).into(),
             }),
+            acknowledgements: Default::default(),
         };
 
         let context = SinkContext::new_test();
@@ -313,6 +332,7 @@ mod test {
                 ),
                 encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
             }),
+            acknowledgements: Default::default(),
         };
         let context = SinkContext::new_test();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
@@ -431,6 +451,7 @@ mod test {
                 config: TcpSinkConfig::from_address(addr.to_string()),
                 encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
             }),
+            acknowledgements: Default::default(),
         };
 
         let context = SinkContext::new_test();

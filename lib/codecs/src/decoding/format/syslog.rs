@@ -55,18 +55,21 @@ impl SyslogDeserializerConfig {
                     .unknown_fields(Kind::object(Collection::from_unknown(Kind::bytes())))
             }
             LogNamespace::Vector => {
-                schema::Definition::new(Kind::object(Collection::empty()), [log_namespace])
-                    .with_field("message", Kind::bytes(), Some("message"))
-                    .optional_field("timestamp", Kind::timestamp(), Some("timestamp"))
-                    .optional_field("hostname", Kind::bytes(), None)
-                    .optional_field("severity", Kind::bytes(), Some("severity"))
-                    .optional_field("facility", Kind::bytes(), None)
-                    .optional_field("version", Kind::integer(), None)
-                    .optional_field("appname", Kind::bytes(), None)
-                    .optional_field("msgid", Kind::bytes(), None)
-                    .optional_field("procid", Kind::integer().or_bytes(), None)
-                    // "structured data" is placed at the root. It will always be a map strings
-                    .unknown_fields(Kind::object(Collection::from_unknown(Kind::bytes())))
+                schema::Definition::new_with_default_metadata(
+                    Kind::object(Collection::empty()),
+                    [log_namespace],
+                )
+                .with_field("message", Kind::bytes(), Some("message"))
+                .optional_field("timestamp", Kind::timestamp(), Some("timestamp"))
+                .optional_field("hostname", Kind::bytes(), None)
+                .optional_field("severity", Kind::bytes(), Some("severity"))
+                .optional_field("facility", Kind::bytes(), None)
+                .optional_field("version", Kind::integer(), None)
+                .optional_field("appname", Kind::bytes(), None)
+                .optional_field("msgid", Kind::bytes(), None)
+                .optional_field("procid", Kind::integer().or_bytes(), None)
+                // "structured data" is placed at the root. It will always be a map strings
+                .unknown_fields(Kind::object(Collection::from_unknown(Kind::bytes())))
             }
         }
     }

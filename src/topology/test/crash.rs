@@ -25,7 +25,7 @@ async fn test_source_error() {
     config.add_sink(
         "out",
         &["in", "error"],
-        SocketSinkConfig::make_basic_tcp_config(out_addr.to_string()),
+        SocketSinkConfig::make_basic_tcp_config(out_addr.to_string(), Default::default()),
     );
 
     let mut output_lines = CountReceiver::receive_lines(out_addr);
@@ -67,7 +67,7 @@ async fn test_source_panic() {
     config.add_sink(
         "out",
         &["in", "panic"],
-        SocketSinkConfig::make_basic_tcp_config(out_addr.to_string()),
+        SocketSinkConfig::make_basic_tcp_config(out_addr.to_string(), Default::default()),
     );
 
     let mut output_lines = CountReceiver::receive_lines(out_addr);
@@ -112,7 +112,7 @@ async fn test_sink_error() {
     config.add_sink(
         "out",
         &["in1"],
-        SocketSinkConfig::make_basic_tcp_config(out_addr.to_string()),
+        SocketSinkConfig::make_basic_tcp_config(out_addr.to_string(), Default::default()),
     );
     config.add_sink("error", &["in2"], error_sink());
 
@@ -158,7 +158,7 @@ async fn test_sink_panic() {
     config.add_sink(
         "out",
         &["in1"],
-        SocketSinkConfig::make_basic_tcp_config(out_addr.to_string()),
+        SocketSinkConfig::make_basic_tcp_config(out_addr.to_string(), Default::default()),
     );
     config.add_sink("panic", &["in2"], panic_sink());
 
