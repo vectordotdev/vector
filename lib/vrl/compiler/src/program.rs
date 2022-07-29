@@ -41,6 +41,16 @@ impl Program {
     pub fn resolve(&self, ctx: &mut Context) -> Resolved {
         self.expressions.resolve(ctx)
     }
+
+    /// Emit LLVM IR for the program.
+    #[cfg(feature = "llvm")]
+    pub fn emit_llvm<'ctx>(
+        &self,
+        state: (&mut crate::state::LocalEnv, &mut crate::state::ExternalEnv),
+        ctx: &mut crate::llvm::Context<'ctx>,
+    ) -> Result<(), String> {
+        self.expressions.emit_llvm(state, ctx)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
