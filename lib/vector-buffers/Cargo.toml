@@ -42,7 +42,7 @@ once_cell = "1.13"
 proptest = "1.0"
 quickcheck = "1.0"
 rand = "0.8.5"
-serde_yaml = { version = "0.8", default-features = false }
+serde_yaml = { version = "0.9", default-features = false }
 temp-dir = "0.1.11"
 tokio-test = "0.4.2"
 tracing-fluent-assertions = { version = "0.3" }
