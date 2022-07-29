@@ -21,6 +21,7 @@ use std::time::{Duration, Instant};
 use std::{collections::HashMap, future::ready};
 use tokio_stream::wrappers::IntervalStream;
 
+use crate::internal_events::HttpScrapeEventsSent;
 use crate::{
     http::{Auth, HttpClient},
     internal_events::{
@@ -144,6 +145,7 @@ pub(crate) async fn http_scrape<H: HttpScraper + std::marker::Send + Clone>(
         let mut request = builder.body(Body::empty()).expect("error creating request");
 
         if let Some(auth) = &inputs.auth {
+            dbg!(auth);
             auth.apply(&mut request);
         }
 
@@ -176,6 +178,21 @@ pub(crate) async fn http_scrape<H: HttpScraper + std::marker::Send + Clone>(
                                     count: events.len(),
                                     uri: url.clone()
                                 });
+
+                                // TODO the below seems wrong placement. It seems should happen
+                                // after the stream is written ? Yet I'm not seeing how to go about
+                                // that.
+                                // emit EventsSent if metrics
+                                if events.len() > 0 {
+                                    if let Event::Metric(ref _metric) =
+                                        events.first().expect("should have event")
+                                    {
+                                        emit!(HttpScrapeEventsSent {
+                                            count: events.len() as u64,
+                                            byte_size: events.size_of()
+                                        });
+                                    }
+                                }
                                 Some(stream::iter(events))
                             }
                             None => None,

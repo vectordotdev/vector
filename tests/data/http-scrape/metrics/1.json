@@ -1,9 +1,0 @@
-{
-  "histogram" : {
-    "name" : "login.time",
-    "val" : 22.0,
-    "lables" : {
-      "host" : "0.0.0.0"
-    }
-  }
-}

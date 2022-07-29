@@ -88,3 +88,17 @@ impl InternalEvent for HttpScrapeHttpError {
         counter!("http_request_errors_total", 1);
     }
 }
+
+#[derive(Debug)]
+pub struct HttpScrapeEventsSent {
+    pub count: u64,
+    pub byte_size: usize,
+}
+
+impl InternalEvent for HttpScrapeEventsSent {
+    fn emit(self) {
+        trace!(message = "Events sent.", count = %self.count, byte_size = %self.byte_size);
+        counter!("component_sent_events_total", self.count as u64);
+        counter!("component_sent_event_bytes_total", self.byte_size as u64);
+    }
+}

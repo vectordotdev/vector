@@ -14,6 +14,7 @@ use crate::{
     config::{SourceConfig, SourceContext, SourceDescription},
     http::Auth,
     serde::default_decoding,
+    serde::default_framing_message_based,
     sources,
     tls::{TlsConfig, TlsSettings},
     Result,
@@ -33,7 +34,6 @@ const NAME: &str = "http_scrape";
 
 // TODO:
 //   - integration tests
-//   - framing for the decoding?
 //   - cue files
 
 /// Configuration for the `http_scrape` source.
@@ -60,7 +60,8 @@ pub struct HttpScrapeConfig {
 
     /// Framing to use in the decoding.
     #[configurable(derived)]
-    framing: Option<FramingConfig>,
+    #[serde(default = "default_framing_message_based")]
+    framing: FramingConfig,
 
     /// Headers to apply to the HTTP requests.
     #[serde(default)]
@@ -82,7 +83,7 @@ impl Default for HttpScrapeConfig {
             query: None,
             scrape_interval_secs: super::default_scrape_interval_secs(),
             decoding: default_decoding(),
-            framing: None,
+            framing: default_framing_message_based(),
             headers: None,
             tls: None,
             auth: None,
@@ -112,9 +113,7 @@ impl SourceConfig for HttpScrapeConfig {
 
         // build the decoder
         let decoder = DecodingConfig::new(
-            self.framing
-                .clone()
-                .unwrap_or_else(|| self.decoding.default_stream_framing()),
+            self.framing.clone(),
             self.decoding.clone(),
             LogNamespace::Vector,
         )
@@ -218,13 +217,18 @@ impl super::HttpScraper for HttpScrapeContext {
 
 #[cfg(test)]
 mod test {
-    use tokio::time::Duration;
+    use tokio::time::{sleep, Duration};
     use warp::Filter;
 
     use super::*;
-    use crate::test_util::{
-        components::{run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS},
-        next_addr, test_generate_config,
+    use crate::{
+        test_util::{
+            //collect_ready,
+            components::{run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS},
+            next_addr,
+            test_generate_config,
+        },
+        SourceSender,
     };
 
     #[test]
@@ -233,7 +237,48 @@ mod test {
     }
 
     #[tokio::test]
-    async fn http_scrape_bytes_decoding() {
+    async fn invalid_endpoint() {
+        let (tx, _rx) = SourceSender::new_test();
+
+        let source = HttpScrapeConfig {
+            endpoint: "http://nope".to_string(),
+            scrape_interval_secs: 1,
+            query: None,
+            decoding: default_decoding(),
+            framing: default_framing_message_based(),
+            headers: None,
+            auth: None,
+            tls: None,
+        }
+        .build(SourceContext::new_test(tx, None))
+        .await
+        .unwrap();
+        tokio::spawn(source);
+
+        sleep(Duration::from_secs(1)).await;
+
+        // TODO how to verify there was an error
+
+        // let _ = collect_ready(rx)
+        //     .await
+        //     .into_iter()
+        //     .map(|e| e.into_metric())
+        //     .collect::<Vec<_>>();
+    }
+
+    async fn run_test(config: HttpScrapeConfig) -> Vec<Event> {
+        let events = run_and_assert_source_compliance(
+            config,
+            Duration::from_secs(1),
+            &HTTP_PULL_SOURCE_TAGS,
+        )
+        .await;
+        assert!(!events.is_empty());
+        events
+    }
+
+    #[tokio::test]
+    async fn bytes_decoding() {
         let in_addr = next_addr();
 
         let dummy_endpoint = warp::path!("endpoint")
@@ -242,28 +287,21 @@ mod test {
 
         tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
 
-        let config = HttpScrapeConfig {
+        run_test(HttpScrapeConfig {
             endpoint: format!("http://{}/endpoint", in_addr),
             scrape_interval_secs: 1,
             query: None,
             decoding: default_decoding(),
-            framing: None,
+            framing: default_framing_message_based(),
             headers: None,
             auth: None,
             tls: None,
-        };
-
-        let events = run_and_assert_source_compliance(
-            config,
-            Duration::from_secs(1),
-            &HTTP_PULL_SOURCE_TAGS,
-        )
+        })
         .await;
-        assert!(!events.is_empty());
     }
 
     #[tokio::test]
-    async fn http_scrape_json_decoding() {
+    async fn json_decoding() {
         let in_addr = next_addr();
 
         let dummy_endpoint = warp::path!("endpoint")
@@ -272,28 +310,21 @@ mod test {
 
         tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
 
-        let config = HttpScrapeConfig {
+        run_test(HttpScrapeConfig {
             endpoint: format!("http://{}/endpoint", in_addr),
             scrape_interval_secs: 1,
             query: None,
             decoding: DeserializerConfig::Json,
-            framing: None,
+            framing: default_framing_message_based(),
             headers: None,
             auth: None,
             tls: None,
-        };
-
-        let events = run_and_assert_source_compliance(
-            config,
-            Duration::from_secs(1),
-            &HTTP_PULL_SOURCE_TAGS,
-        )
+        })
         .await;
-        assert!(!events.is_empty());
     }
 
     #[tokio::test]
-    async fn http_scrape_request_query() {
+    async fn request_query_applied() {
         let in_addr = next_addr();
 
         let dummy_endpoint = warp::path!("endpoint")
@@ -302,7 +333,7 @@ mod test {
 
         tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
 
-        let config = HttpScrapeConfig {
+        let events = run_test(HttpScrapeConfig {
             endpoint: format!("http://{}/endpoint?key1=val1", in_addr),
             scrape_interval_secs: 1,
             query: Some(HashMap::from([
@@ -313,19 +344,12 @@ mod test {
                 ),
             ])),
             decoding: DeserializerConfig::Json,
-            framing: None,
+            framing: default_framing_message_based(),
             headers: None,
             auth: None,
             tls: None,
-        };
-
-        let events = run_and_assert_source_compliance(
-            config,
-            Duration::from_secs(1),
-            &HTTP_PULL_SOURCE_TAGS,
-        )
+        })
         .await;
-        assert!(!events.is_empty());
 
         let logs: Vec<_> = events.into_iter().map(|event| event.into_log()).collect();
 
@@ -360,25 +384,12 @@ mod test {
 
 #[cfg(all(test, feature = "http-scrape-integration-tests"))]
 mod integration_tests {
-    use codecs::decoding::NewlineDelimitedDecoderOptions;
     use tokio::time::Duration;
 
     use super::*;
     use crate::test_util::components::{run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS};
 
-    #[tokio::test]
-    async fn http_scrape_logs_json() {
-        let config = HttpScrapeConfig {
-            endpoint: format!("http://dufs:5000/logs/1.json"),
-            scrape_interval_secs: 1,
-            query: None,
-            decoding: DeserializerConfig::Json,
-            framing: None,
-            headers: None,
-            auth: None,
-            tls: None,
-        };
-
+    async fn run_test(config: HttpScrapeConfig) {
         let events = run_and_assert_source_compliance(
             config,
             Duration::from_secs(1),
@@ -389,48 +400,96 @@ mod integration_tests {
     }
 
     #[tokio::test]
-    async fn http_scrape_logs_text() {
-        let config = HttpScrapeConfig {
-            endpoint: format!("http://dufs:5000/logs/1"),
+    async fn scraped_logs_bytes() {
+        run_test(HttpScrapeConfig {
+            endpoint: format!("http://dufs:5000/logs/bytes"),
             scrape_interval_secs: 1,
             query: None,
             decoding: DeserializerConfig::Bytes,
-            framing: None,
+            framing: default_framing_message_based(),
             headers: None,
             auth: None,
             tls: None,
-        };
-
-        let events = run_and_assert_source_compliance(
-            config,
-            Duration::from_secs(1),
-            &HTTP_PULL_SOURCE_TAGS,
-        )
+        })
         .await;
-        assert!(!events.is_empty());
     }
 
     #[tokio::test]
-    async fn http_scrape_metrics_json() {
-        let config = HttpScrapeConfig {
-            endpoint: format!("http://dufs:5000/metrics/1.json"),
+    async fn scraped_logs_json() {
+        run_test(HttpScrapeConfig {
+            endpoint: format!("http://dufs:5000/logs/json.json"),
             scrape_interval_secs: 1,
             query: None,
             decoding: DeserializerConfig::Json,
-            framing: Some(FramingConfig::NewlineDelimited {
-                newline_delimited: NewlineDelimitedDecoderOptions::new_with_max_length(10),
-            }),
+            framing: default_framing_message_based(),
             headers: None,
             auth: None,
             tls: None,
-        };
-
-        let events = run_and_assert_source_compliance(
-            config,
-            Duration::from_secs(1),
-            &HTTP_PULL_SOURCE_TAGS,
-        )
+        })
         .await;
-        assert!(!events.is_empty());
+    }
+
+    #[tokio::test]
+    async fn scraped_metrics_native_json() {
+        run_test(HttpScrapeConfig {
+            endpoint: format!("http://dufs:5000/metrics/native.json"),
+            scrape_interval_secs: 1,
+            query: None,
+            decoding: DeserializerConfig::NativeJson,
+            framing: default_framing_message_based(),
+            headers: None,
+            auth: None,
+            tls: None,
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn unauthorized() {
+        // TODO how to assert failure
+
+        // let config = HttpScrapeConfig {
+        //     endpoint: format!("http://dufs:5000/auth/json.json"),
+        //     scrape_interval_secs: 1,
+        //     query: None,
+        //     decoding: DeserializerConfig::NativeJson,
+        //     framing: default_framing_message_based(),
+        //     headers: None,
+        //     auth: None,
+        //     tls: None,
+        // };
+    }
+
+    #[tokio::test]
+    async fn authorized() {
+        run_test(HttpScrapeConfig {
+            endpoint: format!("http://dufs-auth:5000/logs/json.json"),
+            scrape_interval_secs: 1,
+            query: None,
+            decoding: DeserializerConfig::Json,
+            framing: default_framing_message_based(),
+            headers: None,
+            auth: Some(Auth::Basic {
+                user: "user".to_string(),
+                password: "pass".to_string(),
+            }),
+            tls: None,
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn headers() {
+        // TODO - is this worthy of testing and how to verify
+    }
+
+    #[tokio::test]
+    async fn tls() {
+        // TODO - is this worthy of testing and how to verify
+    }
+
+    #[tokio::test]
+    async fn shutdown() {
+        // TODO - is this worthy of testing and how to verify
     }
 }
