@@ -62,9 +62,19 @@ impl Expression for Variable {
     fn emit_llvm<'ctx>(
         &self,
         _: (&mut LocalEnv, &mut ExternalEnv),
-        _: &mut crate::llvm::Context<'ctx>,
+        ctx: &mut crate::llvm::Context<'ctx>,
     ) -> Result<(), String> {
-        todo!()
+        let variable_begin_block = ctx.append_basic_block("variable_begin");
+
+        ctx.build_unconditional_branch(variable_begin_block);
+        ctx.position_at_end(variable_begin_block);
+
+        let variable_ref = ctx.get_variable_ref(&self.ident);
+        ctx.fns()
+            .vrl_resolved_clone
+            .build_call(ctx.builder(), variable_ref, ctx.result_ref());
+
+        Ok(())
     }
 }
 
