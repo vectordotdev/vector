@@ -250,7 +250,6 @@ impl<'a> Container<'a> {
     ///
     /// This may be different than the name of the container itself depending on whether it has been
     /// altered with `serde` helper attributes i.e. `#[serde(rename = "...")]`.
-    ///
     pub fn name(&self) -> &str {
         self.name.as_str()
     }

@@ -7,7 +7,7 @@ use crate::{
 impl Configurable for &'static encoding_rs::Encoding {
     // TODO: At some point, we might want to override the metadata to define a validation pattern that only matches
     // valid character set encodings... but that would be a very large array of strings, and technically the Encoding
-    // Standard standard is a living standard, so... :thinkies:
+    // Standard is a living standard, so... :thinkies:
 
     fn referenceable_name() -> Option<&'static str> {
         Some("encoding_rs::Encoding")
