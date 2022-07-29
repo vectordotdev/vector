@@ -124,6 +124,7 @@ pub struct PrometheusExporterConfig {
     #[serde(default)]
     pub suppress_timestamp: bool,
 
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
