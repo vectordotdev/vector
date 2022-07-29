@@ -71,10 +71,54 @@ impl Expression for Array {
     #[cfg(feature = "llvm")]
     fn emit_llvm<'ctx>(
         &self,
-        _: (&mut LocalEnv, &mut ExternalEnv),
-        _: &mut crate::llvm::Context<'ctx>,
+        state: (&mut LocalEnv, &mut ExternalEnv),
+        ctx: &mut crate::llvm::Context<'ctx>,
     ) -> Result<(), String> {
-        todo!()
+        let begin_block = ctx.append_basic_block("array_begin");
+        let end_block = ctx.append_basic_block("array_end");
+        let insert_block = ctx.append_basic_block("array_insert");
+        let set_result_block = ctx.append_basic_block("array_set_result");
+
+        ctx.build_unconditional_branch(begin_block);
+        ctx.position_at_end(begin_block);
+
+        let vec_ref = ctx.build_alloca_vec_initialized("vec_entries", self.inner.len());
+
+        ctx.build_unconditional_branch(insert_block);
+        ctx.position_at_end(insert_block);
+
+        for value in &self.inner {
+            let value_ref = ctx.build_alloca_resolved_initialized("value");
+
+            ctx.emit_llvm(
+                value,
+                value_ref,
+                (state.0, state.1),
+                end_block,
+                vec![
+                    (value_ref.into(), ctx.fns().vrl_resolved_drop),
+                    (vec_ref.into(), ctx.fns().vrl_vec_drop),
+                ],
+            )?;
+
+            ctx.fns()
+                .vrl_vec_push
+                .build_call(ctx.builder(), vec_ref, value_ref);
+        }
+
+        ctx.build_unconditional_branch(set_result_block);
+        ctx.position_at_end(set_result_block);
+
+        ctx.fns().vrl_expression_array_into_result.build_call(
+            ctx.builder(),
+            vec_ref,
+            ctx.result_ref(),
+        );
+
+        ctx.build_unconditional_branch(end_block);
+        ctx.position_at_end(end_block);
+
+        Ok(())
     }
 }
 
