@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use futures::future::FutureExt;
-use serde::{Deserialize, Serialize};
 use vector_config::configurable_component;
 
 use super::{healthcheck::healthcheck, sink::LokiSink};
@@ -18,7 +17,8 @@ use crate::{
 };
 
 /// Configuration for the `loki` sink.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[configurable_component(sink)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct LokiConfig {
     /// The base URL of the Loki instance.
@@ -26,6 +26,7 @@ pub struct LokiConfig {
     /// Vector will append `/loki/api/v1/push` to this.
     pub endpoint: UriSerde,
 
+    #[configurable(derived)]
     pub encoding: EncodingConfig,
 
     /// The tenant ID to send.
@@ -45,6 +46,7 @@ pub struct LokiConfig {
     /// Note: If the set of labels has high cardinality, this can cause drastic performance issues
     /// with Loki. To prevent this from happening, reduce the number of unique label keys and
     /// values.
+    #[configurable(metadata(templateable))]
     pub labels: HashMap<Template, Template>,
 
     /// Whether or not to delete fields from the event when they are used as labels.
@@ -57,22 +59,29 @@ pub struct LokiConfig {
     #[serde(default = "crate::serde::default_true")]
     pub remove_timestamp: bool,
 
+    #[configurable(derived)]
     #[serde(default)]
     pub compression: Compression,
 
+    #[configurable(derived)]
     #[serde(default)]
     pub out_of_order_action: OutOfOrderAction,
 
+    #[configurable(derived)]
     pub auth: Option<Auth>,
 
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<LokiDefaultBatchSettings>,
 
+    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",

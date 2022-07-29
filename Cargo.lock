@@ -8585,6 +8585,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "serde_with 2.0.0",
  "toml",
  "vector_config_common",
  "vector_config_macros",

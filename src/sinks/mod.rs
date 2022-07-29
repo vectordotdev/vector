@@ -196,6 +196,12 @@ pub enum Sinks {
     #[cfg(feature = "sinks-file")]
     File(#[configurable(derived)] file::FileSinkConfig),
 
+    /// Google Chronicle (unstructured).
+    #[cfg(feature = "sinks-gcp")]
+    GcpChronicleUnstructured(
+        #[configurable(derived)] gcp::chronicle_unstructured::ChronicleUnstructuredConfig,
+    ),
+
     /// GCP Stackdriver Logs.
     #[cfg(feature = "sinks-gcp")]
     GcpStackdriverLogs(#[configurable(derived)] gcp::stackdriver_logs::StackdriverConfig),
@@ -244,11 +250,10 @@ pub enum Sinks {
     #[cfg(feature = "sinks-logdna")]
     Logdna(#[configurable(derived)] logdna::LogdnaConfig),
 
-    /*
     /// Loki.
     #[cfg(feature = "sinks-loki")]
     Loki(#[configurable(derived)] loki::LokiConfig),
-    */
+
     /// NATS.
     #[cfg(feature = "sinks-nats")]
     Nats(#[configurable(derived)] self::nats::NatsSinkConfig),
@@ -265,11 +270,10 @@ pub enum Sinks {
     #[cfg(feature = "sinks-papertrail")]
     Papertrail(#[configurable(derived)] papertrail::PapertrailConfig),
 
-    /*
     /// Prometheus Exporter.
     #[cfg(feature = "sinks-prometheus")]
     PrometheusExporter(#[configurable(derived)] prometheus::exporter::PrometheusExporterConfig),
-    */
+
     /// Prometheus Remote Write.
     #[cfg(feature = "sinks-prometheus")]
     PrometheusRemoteWrite(#[configurable(derived)] prometheus::remote_write::RemoteWriteConfig),

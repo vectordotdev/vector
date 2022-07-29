@@ -9,10 +9,12 @@ use std::{
     net::{Ipv4Addr, SocketAddr, SocketAddrV4},
     num::NonZeroU64,
     path::PathBuf,
+    time::Duration,
 };
 
 use serde::{de, Deserialize, Deserializer};
-use vector_config::{configurable_component, schema::generate_root_schema};
+use serde_with::serde_as;
+use vector_config::{configurable_component, schema::generate_root_schema, ConfigurableString};
 
 /// A templated string.
 #[configurable_component]
@@ -28,6 +30,8 @@ pub struct Template {
     #[serde(skip)]
     has_fields: bool,
 }
+
+impl ConfigurableString for Template {}
 
 impl TryFrom<String> for Template {
     type Error = String;
@@ -64,8 +68,10 @@ pub struct BatchConfig {
     /// The maximum number of events in a batch before it is flushed.
     #[configurable(validation(range(max = 100000)))]
     max_events: Option<NonZeroU64>,
+
     /// The maximum number of bytes in a batch before it is flushed.
     max_bytes: Option<NonZeroU64>,
+
     /// The maximum amount of time a batch can exist before it is flushed.
     timeout: Option<SpecialDuration>,
 }
@@ -87,6 +93,7 @@ impl Default for BatchConfig {
 pub enum Encoding {
     /// Text encoding.
     Text,
+
     /// JSON encoding.
     Json {
         /// Whether or not to render the output in a "pretty" form.
@@ -96,6 +103,7 @@ pub enum Encoding {
         /// would be the standard output, which eschews whitespace for the most succient output.
         pretty: bool,
     },
+
     #[configurable(description = "MessagePack encoding.")]
     MessagePack(
         /// Starting offset for fields something something this is a fake description anyways.
@@ -109,6 +117,7 @@ pub enum Encoding {
 pub struct TlsEnablableConfig {
     /// Whether or not TLS is enabled.
     pub enabled: bool,
+
     #[serde(flatten)]
     pub options: TlsConfig,
 }
@@ -119,6 +128,7 @@ pub struct TlsEnablableConfig {
 pub struct TlsConfig {
     /// Certificate file.
     pub crt_file: Option<PathBuf>,
+
     /// Private key file.
     pub key_file: Option<PathBuf>,
 }
@@ -153,13 +163,23 @@ where
 }
 
 /// A source for collecting events over TCP.
-#[derive(Clone)]
+#[serde_as]
 #[configurable_component(source)]
+#[derive(Clone)]
 #[configurable(metadata(status = "beta"))]
 pub struct SimpleSourceConfig {
     /// The address to listen on for events.
     #[serde(default = "default_simple_source_listen_addr")]
     listen_addr: SocketListenAddr,
+
+    /// The timeout for waiting for events from the source before closing the source.
+    #[serde(default = "default_simple_source_timeout")]
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    timeout: Duration,
+}
+
+const fn default_simple_source_timeout() -> Duration {
+    Duration::from_secs(42)
 }
 
 fn default_simple_source_listen_addr() -> SocketListenAddr {
@@ -177,18 +197,23 @@ pub struct SimpleSinkConfig {
     /// The endpoint to send events to.
     #[serde(default = "default_simple_sink_endpoint")]
     endpoint: String,
+
     #[configurable(derived)]
     #[serde(default = "default_simple_sink_batch")]
     batch: BatchConfig,
+
     #[configurable(derived)]
     #[serde(default = "default_simple_sink_encoding")]
     encoding: Encoding,
+
     /// The filepath to write the events to.
     #[configurable(metadata(templateable))]
     output_path: Template,
+
     /// The tags to apply to each event.
     #[configurable(validation(length(max = 32)))]
     tags: HashMap<String, String>,
+
     #[serde(skip)]
     meaningless_field: String,
 }
@@ -218,26 +243,34 @@ pub struct AdvancedSinkConfig {
     /// The endpoint to send events to.
     #[serde(default = "default_advanced_sink_endpoint")]
     endpoint: String,
+
     /// The agent version to simulate when sending events to the downstream service.
     ///
     /// Must match the pattern of "v\d+\.\d+\.\d+", which allows for values such as `v1.23.0` or `v0.1.3`, and so on.
     #[configurable(validation(pattern = "foo"))]
     agent_version: String,
+
     #[configurable(derived)]
     #[serde(default = "default_advanced_sink_batch")]
     batch: BatchConfig,
+
     #[configurable(deprecated, derived)]
     #[serde(default = "default_advanced_sink_encoding")]
     encoding: Encoding,
+
     /// Overridden TLS description.
     #[configurable(derived)]
     tls: Option<TlsEnablableConfig>,
+
     /// The partition key to use for each event.
     #[configurable(metadata(templateable))]
     #[serde(default = "default_partition_key")]
     partition_key: String,
+
     /// The tags to apply to each event.
-    tags: HashMap<String, String>,
+    ///
+    /// Both the keys and values are templateable.
+    tags: HashMap<Template, Template>,
 }
 
 fn default_advanced_sink_batch() -> BatchConfig {
@@ -405,14 +438,16 @@ pub struct GlobalOptions {
 pub struct VectorConfig {
     #[configurable(derived)]
     global: GlobalOptions,
+
     /// Any configured sources.
     sources: Vec<SourceConfig>,
+
     /// Any configured sinks.
     sinks: Vec<SinkConfig>,
 }
 
 #[test]
-fn vector_config() {
+fn generate_semi_real_schema() {
     let root_schema = generate_root_schema::<VectorConfig>();
     let json = serde_json::to_string_pretty(&root_schema)
         .expect("rendering root schema to JSON should not fail");
