@@ -330,10 +330,35 @@ impl Expression for Expr {
     #[cfg(feature = "llvm")]
     fn emit_llvm<'ctx>(
         &self,
-        _: (&mut LocalEnv, &mut ExternalEnv),
-        _: &mut crate::llvm::Context<'ctx>,
+        state: (&mut LocalEnv, &mut ExternalEnv),
+        ctx: &mut crate::llvm::Context<'ctx>,
     ) -> Result<(), String> {
-        todo!()
+        use Expr::{
+            Abort, Assignment, Container, FunctionCall, IfStatement, Literal, Noop, Op, Query,
+            Unary, Variable,
+        };
+
+        match self {
+            #[cfg(feature = "expr-literal")]
+            Literal(v) => v.emit_llvm(state, ctx),
+            Container(v) => v.emit_llvm(state, ctx),
+            #[cfg(feature = "expr-if_statement")]
+            IfStatement(v) => v.emit_llvm(state, ctx),
+            #[cfg(feature = "expr-op")]
+            Op(v) => v.emit_llvm(state, ctx),
+            #[cfg(feature = "expr-assignment")]
+            Assignment(v) => v.emit_llvm(state, ctx),
+            #[cfg(feature = "expr-query")]
+            Query(v) => v.emit_llvm(state, ctx),
+            #[cfg(feature = "expr-function_call")]
+            FunctionCall(v) => v.emit_llvm(state, ctx),
+            Variable(v) => v.emit_llvm(state, ctx),
+            Noop(v) => v.emit_llvm(state, ctx),
+            #[cfg(feature = "expr-unary")]
+            Unary(v) => v.emit_llvm(state, ctx),
+            #[cfg(feature = "expr-abort")]
+            Abort(v) => v.emit_llvm(state, ctx),
+        }
     }
 }
 
