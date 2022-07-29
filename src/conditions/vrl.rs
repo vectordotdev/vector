@@ -64,6 +64,7 @@ impl ConditionConfig for VrlConfig {
                 program,
                 source: self.source.clone(),
             })),
+            VrlRuntime::Llvm => todo!(),
         }
     }
 }

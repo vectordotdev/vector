@@ -1,11 +1,12 @@
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 
 use ::value::Value;
 use compiler::state;
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use indoc::indoc;
+use value::Secrets;
 use vector_common::TimeZone;
-use vrl::Runtime;
+use vrl::{llvm::OptimizationLevel, Runtime, TargetValue};
 
 struct Source {
     name: &'static str,
@@ -97,19 +98,63 @@ fn benchmark_vrl_runtimes(c: &mut Criterion) {
     for source in SOURCES {
         let tz = TimeZone::default();
         let functions = vrl_stdlib::all();
-        let (program, _) = vrl::compile(source.program, &functions).unwrap();
+        let mut external_env = state::ExternalEnv::default();
+        let (program, _) =
+            vrl::compile_with_state(source.program, &functions, &mut external_env).unwrap();
+        let mut local_env = program.local_env().clone();
+
+        let llvm_builder = compiler::llvm::Compiler::new().unwrap();
+        let llvm_library = llvm_builder
+            .compile(
+                OptimizationLevel::Aggressive,
+                (&mut local_env, &mut external_env),
+                &program,
+                &functions,
+                HashMap::new(),
+            )
+            .unwrap();
+        let vrl_execute = llvm_library.get_function().unwrap();
+
+        group.bench_with_input(BenchmarkId::new(source.name, "llvm"), &(), |b, _| {
+            let value: Value = serde_json::from_str(source.target).expect("valid json");
+            let target = TargetValue {
+                value,
+                metadata: Value::Null,
+                secrets: Secrets::new(),
+            };
+
+            b.iter_with_setup(
+                || target.clone(),
+                |mut target| {
+                    {
+                        let mut context = core::Context {
+                            target: &mut target,
+                            timezone: &tz,
+                        };
+                        let mut result = Ok(Value::Null);
+                        unsafe { vrl_execute.call(&mut context, &mut result) };
+                    }
+                    target // Return the target so it doesn't get dropped.
+                },
+            )
+        });
 
         group.bench_with_input(BenchmarkId::new(source.name, "ast"), &(), |b, _| {
             let state = state::Runtime::default();
             let mut runtime = Runtime::new(state);
-            let target: Value = serde_json::from_str(source.target).expect("valid json");
+            let value: Value = serde_json::from_str(source.target).expect("valid json");
+            let target = TargetValue {
+                value,
+                metadata: Value::Null,
+                secrets: Secrets::new(),
+            };
 
             b.iter_with_setup(
                 || target.clone(),
-                |mut obj| {
-                    let _ = black_box(runtime.resolve(&mut obj, &program, &tz));
+                |mut target| {
+                    let _ = black_box(runtime.resolve(&mut target, &program, &tz));
                     runtime.clear();
-                    obj
+                    target
                 },
             )
         });

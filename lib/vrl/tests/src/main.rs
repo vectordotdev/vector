@@ -3,7 +3,7 @@
 
 mod test_enrichment;
 
-use std::{str::FromStr, time::Instant};
+use std::{collections::HashMap, str::FromStr, time::Instant};
 
 use ::value::Value;
 use ansi_term::Colour;
@@ -14,9 +14,11 @@ use glob::glob;
 use value::Secrets;
 use vector_common::TimeZone;
 use vrl::{
+    core::ExpressionError,
     diagnostic::Formatter,
     prelude::{BTreeMap, VrlValueConvert},
-    state, Runtime, SecretTarget, TargetValueRef, Terminate, VrlRuntime,
+    state::{self, ExternalEnv},
+    Runtime, SecretTarget, TargetValueRef, Terminate, VrlRuntime,
 };
 use vrl_tests::{docs, Test};
 
@@ -171,6 +173,7 @@ fn main() {
 
         if test.skip {
             println!("{}", Colour::Yellow.bold().paint("SKIPPED"));
+            continue;
         }
 
         let state = state::Runtime::default();
@@ -208,7 +211,9 @@ fn main() {
                 let run_start = Instant::now();
                 let result = run_vrl(
                     runtime,
+                    external_env,
                     program,
+                    &functions,
                     &mut test,
                     timezone,
                     cmd.runtime,
@@ -390,7 +395,9 @@ fn main() {
 #[allow(clippy::too_many_arguments)]
 fn run_vrl(
     mut runtime: Runtime,
+    mut external_env: ExternalEnv,
     program: vrl::Program,
+    functions: &[Box<dyn vrl::Function>],
     test: &mut Test,
     timezone: TimeZone,
     vrl_runtime: VrlRuntime,
@@ -411,6 +418,30 @@ fn run_vrl(
         VrlRuntime::Ast => {
             test_enrichment.finish_load();
             runtime.resolve(&mut target, &program, &timezone)
+        }
+        VrlRuntime::Llvm => {
+            let mut local_env = program.local_env().clone();
+            let llvm_builder = vrl::llvm::Compiler::new().unwrap();
+            let llvm_library = llvm_builder
+                .compile(
+                    vrl::llvm::OptimizationLevel::None,
+                    (&mut local_env, &mut external_env),
+                    &program,
+                    functions,
+                    HashMap::new(),
+                )
+                .unwrap();
+            let vrl_execute = llvm_library.get_function().unwrap();
+            let mut result = Ok(Value::Null);
+            let mut context = vrl::core::Context {
+                target: &mut target,
+                timezone: &timezone,
+            };
+            unsafe { vrl_execute.call(&mut context, &mut result) };
+            result.map_err(|err| match err {
+                ExpressionError::Abort { .. } => Terminate::Abort(err),
+                err @ ExpressionError::Error { .. } => Terminate::Error(err),
+            })
         }
     }
 }
