@@ -84,10 +84,29 @@ impl Expression for Predicate {
     #[cfg(feature = "llvm")]
     fn emit_llvm<'ctx>(
         &self,
-        _: (&mut LocalEnv, &mut ExternalEnv),
-        _: &mut crate::llvm::Context<'ctx>,
-    ) -> Result<(), String> {
-        todo!()
+        state: (&mut LocalEnv, &mut ExternalEnv),
+        ctx: &mut crate::llvm::Context<'ctx>,
+    ) -> std::result::Result<(), String> {
+        let predicate_begin_block = ctx.append_basic_block("predicate_begin");
+        let predicate_end_block = ctx.append_basic_block("predicate_end");
+
+        ctx.build_unconditional_branch(predicate_begin_block);
+        ctx.position_at_end(predicate_begin_block);
+
+        for inner in &self.inner {
+            ctx.emit_llvm(
+                inner,
+                ctx.result_ref(),
+                (state.0, state.1),
+                predicate_end_block,
+                vec![],
+            )?;
+        }
+        ctx.build_unconditional_branch(predicate_end_block);
+
+        ctx.position_at_end(predicate_end_block);
+
+        Ok(())
     }
 }
 
