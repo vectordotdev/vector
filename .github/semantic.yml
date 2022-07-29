@@ -193,6 +193,7 @@ scopes:
   - datadog_metrics sink # Anything `datadog_metrics` sink related
   - elasticsearch sink # Anything `elasticsearch` sink related
   - file sink # Anything `file` sink related
+  - gcp_chronicle sink # Anything `gcp_chronicle` sink related
   - gcp_cloud_storage sink # Anything `gcp_cloud_storage` sink related
   - gcp_pubsub sink # Anything `gcp_pubsub` sink related
   - gcp_stackdriver_logs sink # Anything `gcp_stackdriver_logs` sink related

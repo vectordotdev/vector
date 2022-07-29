@@ -21,7 +21,6 @@ use snafu::Snafu;
 use stream_cancel::{Trigger, Tripwire};
 use tracing::{Instrument, Span};
 use vector_core::{
-    event::metric::MetricSeries,
     internal_event::{BytesSent, EventsSent},
     ByteSizeOf,
 };
@@ -33,8 +32,8 @@ use crate::{
         SinkDescription,
     },
     event::{
-        metric::{Metric, MetricData, MetricKind, MetricValue},
-        {Event, Finalizable},
+        metric::{Metric, MetricData, MetricKind, MetricSeries, MetricValue},
+        Event, EventStatus, Finalizable,
     },
     internal_events::PrometheusServerRequestComplete,
     sinks::{
@@ -121,6 +120,13 @@ pub struct PrometheusExporterConfig {
     /// time periods, or when replaying old metrics from a disk buffer.
     #[serde(default)]
     pub suppress_timestamp: bool,
+
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 impl Default for PrometheusExporterConfig {
@@ -134,6 +140,7 @@ impl Default for PrometheusExporterConfig {
             distributions_as_summaries: default_distributions_as_summaries(),
             flush_period_secs: default_flush_period_secs(),
             suppress_timestamp: default_suppress_timestamp(),
+            acknowledgements: Default::default(),
         }
     }
 }
@@ -201,7 +208,7 @@ impl SinkConfig for PrometheusExporterConfig {
     }
 
     fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        None
+        Some(&self.acknowledgements)
     }
 }
 
@@ -233,7 +240,7 @@ impl SinkConfig for PrometheusCompatConfig {
     }
 
     fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        None
+        self.config.acknowledgements()
     }
 }
 
@@ -513,7 +520,7 @@ impl StreamSink<Event> for PrometheusExporter {
             buckets: self.config.buckets.clone(),
         });
 
-        while let Some(mut event) = input.next().await {
+        while let Some(event) = input.next().await {
             // If we've exceed our flush interval, go through all of the metrics we're currently
             // tracking and remove any which have exceeded the flush interval in terms of not
             // having been updated within that long of a time.
@@ -539,9 +546,10 @@ impl StreamSink<Event> for PrometheusExporter {
                 }
             }
 
-            let finalizers = event.take_finalizers();
             // Now process the metric we got.
-            let metric = event.into_metric();
+            let mut metric = event.into_metric();
+            let finalizers = metric.take_finalizers();
+
             if let Some(normalized) = normalizer.normalize(metric) {
                 let normalized = if self.config.suppress_timestamp {
                     normalized.with_timestamp(None)
@@ -565,7 +573,7 @@ impl StreamSink<Event> for PrometheusExporter {
                 }
             }
 
-            drop(finalizers);
+            finalizers.update_status(EventStatus::Delivered);
         }
 
         Ok(())
@@ -578,8 +586,9 @@ mod tests {
     use futures::stream;
     use indoc::indoc;
     use pretty_assertions::assert_eq;
-    use tokio::{sync::mpsc, time};
+    use tokio::{sync::mpsc, sync::oneshot::error::TryRecvError, time};
     use tokio_stream::wrappers::UnboundedReceiverStream;
+    use vector_common::finalization::{BatchNotifier, BatchStatus};
     use vector_core::{event::StatisticKind, samples};
 
     use super::*;
@@ -658,7 +667,7 @@ mod tests {
 
     async fn export_and_fetch(
         tls_config: Option<TlsEnableableConfig>,
-        events: Vec<Event>,
+        mut events: Vec<Event>,
         suppress_timestamp: bool,
     ) -> String {
         trace_init();
@@ -680,11 +689,19 @@ mod tests {
         let input_events = input_events.map(Into::into);
         let sink_handle = tokio::spawn(async move { sink.run(input_events).await.unwrap() });
 
+        // Set up acknowledgement notification
+        let mut receiver = BatchNotifier::apply_to(&mut events[..]);
+
+        assert_eq!(receiver.try_recv(), Err(TryRecvError::Empty));
+
         for event in events {
             tx.send(event).expect("Failed to send event.");
         }
 
         time::sleep(time::Duration::from_millis(100)).await;
+
+        // Events are marked as delivered as soon as they are aggregated.
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         let request = Request::get(format!("{}://{}/metrics", proto, address))
             .body(Body::empty())
