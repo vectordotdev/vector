@@ -1,0 +1,11 @@
+[package]
+name = "precompiled"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+inkwell = { git = "https://github.com/pablosichert/inkwell", branch = "pablosichert/orc2", features = ["llvm14-0"] }
+libc = "0.2"
+
+[build-dependencies]
+syn = { version = "1", features = ["full"] }

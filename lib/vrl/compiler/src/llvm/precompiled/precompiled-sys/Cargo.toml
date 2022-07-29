@@ -1,0 +1,12 @@
+[package]
+name = "precompiled-sys"
+version = "0.0.0"
+edition = "2021"
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+bytes = "1.1.0"
+primitive-calling-convention = { path = "../../primitive-calling-convention" }
+vrl-core = { path = "../../../../../core" }
