@@ -75,9 +75,23 @@ impl Expression for Literal {
     fn emit_llvm<'ctx>(
         &self,
         _: (&mut LocalEnv, &mut ExternalEnv),
-        _: &mut crate::llvm::Context<'ctx>,
+        ctx: &mut crate::llvm::Context<'ctx>,
     ) -> Result<(), String> {
-        todo!()
+        let literal_begin_block = ctx.append_basic_block("literal_begin");
+
+        ctx.build_unconditional_branch(literal_begin_block);
+        ctx.position_at_end(literal_begin_block);
+
+        let value = self.to_value();
+        let value_name = format!("{}", value);
+        let value_ref = ctx.into_const(value, &value_name).as_pointer_value();
+        ctx.fns().vrl_expression_literal.build_call(
+            ctx.builder(),
+            ctx.cast_value_ref_type(value_ref),
+            ctx.result_ref(),
+        );
+
+        Ok(())
     }
 }
 
