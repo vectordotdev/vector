@@ -464,7 +464,7 @@ mod tests {
     /// should ideally be able to fix so that the original hash passes!
     fn version_hash_match() {
         assert_eq!(
-            "73470319b3694010b510d311d9ddf1f7cfa38ec5b349d98c3769e23de54c560b",
+            "bc0825487e137ee1d1fc76c616795d041c4825b4ca5a7236455ea4515238885c",
             ConfigBuilder::default().sha256_hash()
         );
     }
