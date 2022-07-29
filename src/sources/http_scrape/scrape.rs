@@ -11,7 +11,7 @@ use tokio_util::codec::Decoder as _;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{self, SourceConfig, SourceContext, SourceDescription},
+    config::{SourceConfig, SourceContext, SourceDescription},
     http::Auth,
     serde::default_decoding,
     sources,
@@ -137,7 +137,7 @@ impl SourceConfig for HttpScrapeConfig {
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(config::DataType::Metric)]
+        vec![Output::default(self.decoding.output_type())]
     }
 
     fn source_type(&self) -> &'static str {
@@ -360,6 +360,7 @@ mod test {
 
 #[cfg(all(test, feature = "http-scrape-integration-tests"))]
 mod integration_tests {
+    use codecs::decoding::NewlineDelimitedDecoderOptions;
     use tokio::time::Duration;
 
     use super::*;
@@ -368,11 +369,57 @@ mod integration_tests {
     #[tokio::test]
     async fn http_scrape_logs_json() {
         let config = HttpScrapeConfig {
-            endpoint: format!("http://localhost:5000/logs/foo.json"),
+            endpoint: format!("http://dufs:5000/logs/1.json"),
             scrape_interval_secs: 1,
             query: None,
             decoding: DeserializerConfig::Json,
             framing: None,
+            headers: None,
+            auth: None,
+            tls: None,
+        };
+
+        let events = run_and_assert_source_compliance(
+            config,
+            Duration::from_secs(1),
+            &HTTP_PULL_SOURCE_TAGS,
+        )
+        .await;
+        assert!(!events.is_empty());
+    }
+
+    #[tokio::test]
+    async fn http_scrape_logs_text() {
+        let config = HttpScrapeConfig {
+            endpoint: format!("http://dufs:5000/logs/1"),
+            scrape_interval_secs: 1,
+            query: None,
+            decoding: DeserializerConfig::Bytes,
+            framing: None,
+            headers: None,
+            auth: None,
+            tls: None,
+        };
+
+        let events = run_and_assert_source_compliance(
+            config,
+            Duration::from_secs(1),
+            &HTTP_PULL_SOURCE_TAGS,
+        )
+        .await;
+        assert!(!events.is_empty());
+    }
+
+    #[tokio::test]
+    async fn http_scrape_metrics_json() {
+        let config = HttpScrapeConfig {
+            endpoint: format!("http://dufs:5000/metrics/1.json"),
+            scrape_interval_secs: 1,
+            query: None,
+            decoding: DeserializerConfig::Json,
+            framing: Some(FramingConfig::NewlineDelimited {
+                newline_delimited: NewlineDelimitedDecoderOptions::new_with_max_length(10),
+            }),
             headers: None,
             auth: None,
             tls: None,
