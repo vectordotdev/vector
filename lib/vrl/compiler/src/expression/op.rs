@@ -281,10 +281,472 @@ impl Expression for Op {
     #[cfg(feature = "llvm")]
     fn emit_llvm<'ctx>(
         &self,
-        _: (&mut LocalEnv, &mut ExternalEnv),
-        _: &mut crate::llvm::Context<'ctx>,
+        state: (&mut LocalEnv, &mut ExternalEnv),
+        ctx: &mut crate::llvm::Context<'ctx>,
     ) -> Result<(), String> {
-        todo!()
+        let op_identifier = match self.opcode {
+            ast::Opcode::Mul => "mul",
+            ast::Opcode::Div => "div",
+            ast::Opcode::Add => "add",
+            ast::Opcode::Sub => "sub",
+            ast::Opcode::Rem => "rem",
+            ast::Opcode::Or => "or",
+            ast::Opcode::And => "and",
+            ast::Opcode::Err => "err",
+            ast::Opcode::Ne => "ne",
+            ast::Opcode::Eq => "eq",
+            ast::Opcode::Ge => "ge",
+            ast::Opcode::Gt => "gt",
+            ast::Opcode::Le => "le",
+            ast::Opcode::Lt => "lt",
+            ast::Opcode::Merge => "merge",
+        };
+
+        let op_begin_block = ctx.append_basic_block(&format!("op_{}_begin", op_identifier));
+        let op_end_block = ctx.append_basic_block(&format!("op_{}_end", op_identifier));
+
+        let lhs_def = self.lhs.type_def((state.0, state.1));
+        let rhs_def = self.rhs.type_def((state.0, state.1));
+
+        ctx.build_unconditional_branch(op_begin_block);
+        ctx.position_at_end(op_begin_block);
+
+        match self.opcode {
+            ast::Opcode::Mul
+            | ast::Opcode::Div
+            | ast::Opcode::Add
+            | ast::Opcode::Sub
+            | ast::Opcode::Rem
+            | ast::Opcode::Ne
+            | ast::Opcode::Eq
+            | ast::Opcode::Ge
+            | ast::Opcode::Gt
+            | ast::Opcode::Le
+            | ast::Opcode::Lt
+            | ast::Opcode::Merge => {
+                let lhs_resolved_ref = ctx.build_alloca_resolved_initialized("lhs");
+
+                ctx.emit_llvm(
+                    self.lhs.as_ref(),
+                    lhs_resolved_ref,
+                    (state.0, state.1),
+                    op_end_block,
+                    vec![(lhs_resolved_ref.into(), ctx.fns().vrl_resolved_drop)],
+                )?;
+
+                if lhs_def.is_fallible() {
+                    let lhs_ok_block =
+                        ctx.append_basic_block(&format!("op_{}_lhs_ok", op_identifier));
+                    let lhs_err_block =
+                        ctx.append_basic_block(&format!("op_{}_lhs_err", op_identifier));
+
+                    let is_ok = ctx
+                        .fns()
+                        .vrl_resolved_is_ok
+                        .build_call(ctx.builder(), lhs_resolved_ref)
+                        .try_as_basic_value()
+                        .left()
+                        .expect("result is not a basic value")
+                        .try_into()
+                        .expect("result is not an int value");
+
+                    ctx.build_conditional_branch(is_ok, lhs_ok_block, lhs_err_block);
+
+                    ctx.position_at_end(lhs_err_block);
+                    ctx.fns().vrl_resolved_move.build_call(
+                        ctx.builder(),
+                        lhs_resolved_ref,
+                        ctx.result_ref(),
+                    );
+                    ctx.build_unconditional_branch(op_end_block);
+
+                    ctx.position_at_end(lhs_ok_block);
+                }
+
+                let lhs_value_ref = ctx
+                    .fns()
+                    .vrl_resolved_as_value
+                    .build_call(ctx.builder(), lhs_resolved_ref)
+                    .try_as_basic_value()
+                    .left()
+                    .expect("result is not a basic value");
+
+                let rhs_resolved_ref = ctx.build_alloca_resolved_initialized("rhs");
+
+                ctx.emit_llvm(
+                    self.rhs.as_ref(),
+                    rhs_resolved_ref,
+                    (state.0, state.1),
+                    op_end_block,
+                    vec![(rhs_resolved_ref.into(), ctx.fns().vrl_resolved_drop)],
+                )?;
+
+                if rhs_def.is_fallible() {
+                    let rhs_ok_block =
+                        ctx.append_basic_block(&format!("op_{}_rhs_ok", op_identifier));
+                    let rhs_err_block =
+                        ctx.append_basic_block(&format!("op_{}_rhs_err", op_identifier));
+
+                    let is_ok = ctx
+                        .fns()
+                        .vrl_resolved_is_ok
+                        .build_call(ctx.builder(), rhs_resolved_ref)
+                        .try_as_basic_value()
+                        .left()
+                        .expect("result is not a basic value")
+                        .try_into()
+                        .expect("result is not an int value");
+
+                    ctx.build_conditional_branch(is_ok, rhs_ok_block, rhs_err_block);
+
+                    ctx.position_at_end(rhs_err_block);
+                    ctx.fns()
+                        .vrl_resolved_drop
+                        .build_call(ctx.builder(), lhs_resolved_ref);
+                    ctx.fns().vrl_resolved_move.build_call(
+                        ctx.builder(),
+                        rhs_resolved_ref,
+                        ctx.result_ref(),
+                    );
+                    ctx.build_unconditional_branch(op_end_block);
+
+                    ctx.position_at_end(rhs_ok_block);
+                }
+
+                let rhs_value_ref = ctx
+                    .fns()
+                    .vrl_resolved_as_value
+                    .build_call(ctx.builder(), rhs_resolved_ref)
+                    .try_as_basic_value()
+                    .left()
+                    .expect("result is not a basic value");
+
+                {
+                    let function = match (self.opcode, lhs_def, rhs_def) {
+                        (ast::Opcode::Mul, lhs_def, rhs_def)
+                            if lhs_def.is_integer() && rhs_def.is_integer() =>
+                        {
+                            ctx.fns().vrl_expression_op_mul_integer
+                        }
+                        (ast::Opcode::Mul, lhs_def, rhs_def)
+                            if lhs_def.is_float() && rhs_def.is_float() =>
+                        {
+                            ctx.fns().vrl_expression_op_mul_float
+                        }
+                        (ast::Opcode::Mul, _, _) => ctx.fns().vrl_expression_op_mul,
+                        (ast::Opcode::Div, lhs_def, rhs_def)
+                            if lhs_def.is_integer() && rhs_def.is_integer() =>
+                        {
+                            ctx.fns().vrl_expression_op_div_integer
+                        }
+                        (ast::Opcode::Div, lhs_def, rhs_def)
+                            if lhs_def.is_float() && rhs_def.is_float() =>
+                        {
+                            ctx.fns().vrl_expression_op_div_float
+                        }
+                        (ast::Opcode::Div, _, _) => ctx.fns().vrl_expression_op_div,
+                        (ast::Opcode::Add, lhs_def, rhs_def)
+                            if lhs_def.is_integer() && rhs_def.is_integer() =>
+                        {
+                            ctx.fns().vrl_expression_op_add_integer
+                        }
+                        (ast::Opcode::Add, lhs_def, rhs_def)
+                            if lhs_def.is_float() && rhs_def.is_float() =>
+                        {
+                            ctx.fns().vrl_expression_op_add_float
+                        }
+                        (ast::Opcode::Add, lhs_def, rhs_def)
+                            if lhs_def.is_bytes() && rhs_def.is_bytes() =>
+                        {
+                            ctx.fns().vrl_expression_op_add_bytes
+                        }
+                        (ast::Opcode::Add, _, _) => ctx.fns().vrl_expression_op_add,
+                        (ast::Opcode::Sub, lhs_def, rhs_def)
+                            if lhs_def.is_integer() && rhs_def.is_integer() =>
+                        {
+                            ctx.fns().vrl_expression_op_sub_integer
+                        }
+                        (ast::Opcode::Sub, lhs_def, rhs_def)
+                            if lhs_def.is_float() && rhs_def.is_float() =>
+                        {
+                            ctx.fns().vrl_expression_op_sub_float
+                        }
+                        (ast::Opcode::Sub, _, _) => ctx.fns().vrl_expression_op_sub,
+                        (ast::Opcode::Rem, lhs_def, rhs_def)
+                            if lhs_def.is_integer() && rhs_def.is_integer() =>
+                        {
+                            ctx.fns().vrl_expression_op_rem_integer
+                        }
+                        (ast::Opcode::Rem, lhs_def, rhs_def)
+                            if lhs_def.is_float() && rhs_def.is_float() =>
+                        {
+                            ctx.fns().vrl_expression_op_rem_float
+                        }
+                        (ast::Opcode::Rem, _, _) => ctx.fns().vrl_expression_op_rem,
+                        (ast::Opcode::Ne, lhs_def, rhs_def)
+                            if lhs_def.is_integer() && rhs_def.is_integer() =>
+                        {
+                            ctx.fns().vrl_expression_op_ne_integer
+                        }
+                        (ast::Opcode::Ne, lhs_def, rhs_def)
+                            if lhs_def.is_float() && rhs_def.is_float() =>
+                        {
+                            ctx.fns().vrl_expression_op_ne_float
+                        }
+                        (ast::Opcode::Ne, lhs_def, rhs_def)
+                            if lhs_def.is_bytes() && rhs_def.is_bytes() =>
+                        {
+                            ctx.fns().vrl_expression_op_ne_bytes
+                        }
+                        (ast::Opcode::Ne, _, _) => ctx.fns().vrl_expression_op_ne,
+                        (ast::Opcode::Eq, lhs_def, rhs_def)
+                            if lhs_def.is_integer() && rhs_def.is_integer() =>
+                        {
+                            ctx.fns().vrl_expression_op_eq_integer
+                        }
+                        (ast::Opcode::Eq, lhs_def, rhs_def)
+                            if lhs_def.is_float() && rhs_def.is_float() =>
+                        {
+                            ctx.fns().vrl_expression_op_eq_float
+                        }
+                        (ast::Opcode::Eq, lhs_def, rhs_def)
+                            if lhs_def.is_bytes() && rhs_def.is_bytes() =>
+                        {
+                            ctx.fns().vrl_expression_op_eq_bytes
+                        }
+                        (ast::Opcode::Eq, _, _) => ctx.fns().vrl_expression_op_eq,
+                        (ast::Opcode::Ge, lhs_def, rhs_def)
+                            if lhs_def.is_integer() && rhs_def.is_integer() =>
+                        {
+                            ctx.fns().vrl_expression_op_ge_integer
+                        }
+                        (ast::Opcode::Ge, lhs_def, rhs_def)
+                            if lhs_def.is_float() && rhs_def.is_float() =>
+                        {
+                            ctx.fns().vrl_expression_op_ge_float
+                        }
+                        (ast::Opcode::Ge, lhs_def, rhs_def)
+                            if lhs_def.is_bytes() && rhs_def.is_bytes() =>
+                        {
+                            ctx.fns().vrl_expression_op_ge_bytes
+                        }
+                        (ast::Opcode::Ge, _, _) => ctx.fns().vrl_expression_op_ge,
+                        (ast::Opcode::Gt, lhs_def, rhs_def)
+                            if lhs_def.is_integer() && rhs_def.is_integer() =>
+                        {
+                            ctx.fns().vrl_expression_op_gt_integer
+                        }
+                        (ast::Opcode::Gt, lhs_def, rhs_def)
+                            if lhs_def.is_float() && rhs_def.is_float() =>
+                        {
+                            ctx.fns().vrl_expression_op_gt_float
+                        }
+                        (ast::Opcode::Gt, lhs_def, rhs_def)
+                            if lhs_def.is_bytes() && rhs_def.is_bytes() =>
+                        {
+                            ctx.fns().vrl_expression_op_gt_bytes
+                        }
+                        (ast::Opcode::Gt, _, _) => ctx.fns().vrl_expression_op_gt,
+                        (ast::Opcode::Le, lhs_def, rhs_def)
+                            if lhs_def.is_integer() && rhs_def.is_integer() =>
+                        {
+                            ctx.fns().vrl_expression_op_le_integer
+                        }
+                        (ast::Opcode::Le, lhs_def, rhs_def)
+                            if lhs_def.is_float() && rhs_def.is_float() =>
+                        {
+                            ctx.fns().vrl_expression_op_le_float
+                        }
+                        (ast::Opcode::Le, lhs_def, rhs_def)
+                            if lhs_def.is_bytes() && rhs_def.is_bytes() =>
+                        {
+                            ctx.fns().vrl_expression_op_le_bytes
+                        }
+                        (ast::Opcode::Le, _, _) => ctx.fns().vrl_expression_op_le,
+                        (ast::Opcode::Lt, lhs_def, rhs_def)
+                            if lhs_def.is_integer() && rhs_def.is_integer() =>
+                        {
+                            ctx.fns().vrl_expression_op_lt_integer
+                        }
+                        (ast::Opcode::Lt, lhs_def, rhs_def)
+                            if lhs_def.is_float() && rhs_def.is_float() =>
+                        {
+                            ctx.fns().vrl_expression_op_lt_float
+                        }
+                        (ast::Opcode::Lt, lhs_def, rhs_def)
+                            if lhs_def.is_bytes() && rhs_def.is_bytes() =>
+                        {
+                            ctx.fns().vrl_expression_op_lt_bytes
+                        }
+                        (ast::Opcode::Lt, _, _) => ctx.fns().vrl_expression_op_lt,
+                        (ast::Opcode::Merge, lhs_def, rhs_def)
+                            if lhs_def.is_object() && rhs_def.is_object() =>
+                        {
+                            ctx.fns().vrl_expression_op_merge_object
+                        }
+                        _ => return Err("invalid operation".to_owned()),
+                    };
+
+                    function.build_call(
+                        ctx.builder(),
+                        lhs_value_ref,
+                        rhs_value_ref,
+                        ctx.result_ref(),
+                    );
+                }
+            }
+            ast::Opcode::Or => {
+                let op_or_falsy_block = ctx.append_basic_block("op_or_falsy");
+
+                ctx.emit_llvm(
+                    self.lhs.as_ref(),
+                    ctx.result_ref(),
+                    (state.0, state.1),
+                    op_end_block,
+                    vec![],
+                )?;
+
+                let is_falsy = ctx
+                    .fns()
+                    .vrl_value_is_falsy
+                    .build_call(ctx.builder(), ctx.result_ref())
+                    .try_as_basic_value()
+                    .left()
+                    .expect("result is not a basic value")
+                    .try_into()
+                    .expect("result is not an int value");
+
+                ctx.build_conditional_branch(is_falsy, op_or_falsy_block, op_end_block);
+
+                ctx.position_at_end(op_or_falsy_block);
+                ctx.emit_llvm(
+                    self.rhs.as_ref(),
+                    ctx.result_ref(),
+                    (state.0, state.1),
+                    op_end_block,
+                    vec![],
+                )?;
+            }
+            ast::Opcode::And => {
+                let op_and_falsy_block = ctx.append_basic_block("op_and_falsy");
+                let op_and_truthy_block = ctx.append_basic_block("op_and_truthy");
+
+                let lhs_resolved_ref = ctx.build_alloca_resolved_initialized("lhs");
+
+                ctx.emit_llvm(
+                    self.lhs.as_ref(),
+                    lhs_resolved_ref,
+                    (state.0, state.1),
+                    op_end_block,
+                    vec![(lhs_resolved_ref.into(), ctx.fns().vrl_resolved_drop)],
+                )?;
+
+                if lhs_def.is_fallible() {
+                    let lhs_ok_block =
+                        ctx.append_basic_block(&format!("op_{}_lhs_ok", op_identifier));
+                    let lhs_err_block =
+                        ctx.append_basic_block(&format!("op_{}_lhs_err", op_identifier));
+
+                    let is_ok = ctx
+                        .fns()
+                        .vrl_resolved_is_ok
+                        .build_call(ctx.builder(), lhs_resolved_ref)
+                        .try_as_basic_value()
+                        .left()
+                        .expect("result is not a basic value")
+                        .try_into()
+                        .expect("result is not an int value");
+
+                    ctx.build_conditional_branch(is_ok, lhs_ok_block, lhs_err_block);
+
+                    ctx.position_at_end(lhs_err_block);
+                    ctx.fns().vrl_resolved_move.build_call(
+                        ctx.builder(),
+                        lhs_resolved_ref,
+                        ctx.result_ref(),
+                    );
+                    ctx.build_unconditional_branch(op_end_block);
+
+                    ctx.position_at_end(lhs_ok_block);
+                }
+
+                let is_falsy = ctx
+                    .fns()
+                    .vrl_value_is_falsy
+                    .build_call(ctx.builder(), lhs_resolved_ref)
+                    .try_as_basic_value()
+                    .left()
+                    .expect("result is not a basic value")
+                    .try_into()
+                    .expect("result is not an int value");
+
+                ctx.build_conditional_branch(is_falsy, op_and_falsy_block, op_and_truthy_block);
+
+                ctx.position_at_end(op_and_truthy_block);
+                let rhs_resolved_ref = ctx.build_alloca_resolved_initialized("rhs");
+                ctx.emit_llvm(
+                    self.rhs.as_ref(),
+                    rhs_resolved_ref,
+                    (state.0, state.1),
+                    op_end_block,
+                    vec![(rhs_resolved_ref.into(), ctx.fns().vrl_resolved_drop)],
+                )?;
+                ctx.fns().vrl_expression_op_and_truthy.build_call(
+                    ctx.builder(),
+                    lhs_resolved_ref,
+                    rhs_resolved_ref,
+                    ctx.result_ref(),
+                );
+                ctx.build_unconditional_branch(op_end_block);
+
+                ctx.position_at_end(op_and_falsy_block);
+                ctx.fns().vrl_expression_op_and_falsy.build_call(
+                    ctx.builder(),
+                    lhs_resolved_ref,
+                    ctx.result_ref(),
+                );
+            }
+            ast::Opcode::Err => {
+                let op_err_err_block = ctx.append_basic_block("op_err_err");
+
+                let discard_error = ctx.discard_error();
+                ctx.set_discard_error(true);
+                ctx.emit_llvm(
+                    self.lhs.as_ref(),
+                    ctx.result_ref(),
+                    (state.0, state.1),
+                    op_end_block,
+                    vec![],
+                )?;
+                ctx.set_discard_error(discard_error);
+
+                let is_err = ctx
+                    .fns()
+                    .vrl_resolved_is_err
+                    .build_call(ctx.builder(), ctx.result_ref())
+                    .try_as_basic_value()
+                    .left()
+                    .expect("result is not a basic value")
+                    .try_into()
+                    .expect("result is not an int value");
+
+                ctx.build_conditional_branch(is_err, op_err_err_block, op_end_block);
+
+                ctx.position_at_end(op_err_err_block);
+                ctx.emit_llvm(
+                    self.rhs.as_ref(),
+                    ctx.result_ref(),
+                    (state.0, state.1),
+                    op_end_block,
+                    vec![],
+                )?;
+            }
+        };
+
+        ctx.build_unconditional_branch(op_end_block);
+        ctx.position_at_end(op_end_block);
+
+        Ok(())
     }
 }
 
