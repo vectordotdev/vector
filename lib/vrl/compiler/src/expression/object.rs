@@ -71,10 +71,59 @@ impl Expression for Object {
     #[cfg(feature = "llvm")]
     fn emit_llvm<'ctx>(
         &self,
-        _: (&mut LocalEnv, &mut ExternalEnv),
-        _: &mut crate::llvm::Context<'ctx>,
+        state: (&mut LocalEnv, &mut ExternalEnv),
+        ctx: &mut crate::llvm::Context<'ctx>,
     ) -> Result<(), String> {
-        todo!()
+        let begin_block = ctx.append_basic_block("object_begin");
+        let end_block = ctx.append_basic_block("object_end");
+        let insert_block = ctx.append_basic_block("object_insert");
+        let set_result_block = ctx.append_basic_block("object_set_result");
+
+        ctx.build_unconditional_branch(begin_block);
+        ctx.position_at_end(begin_block);
+
+        let btree_map_ref =
+            ctx.build_alloca_btree_map_initialized("btree_map_entries", self.inner.len());
+
+        ctx.build_unconditional_branch(insert_block);
+        ctx.position_at_end(insert_block);
+
+        for (key, expression) in &self.inner {
+            let key_ref = ctx.into_const(key.clone(), key).as_pointer_value();
+            let entry_ref = ctx.build_alloca_resolved_initialized("object_entry");
+
+            ctx.emit_llvm(
+                expression,
+                entry_ref,
+                (state.0, state.1),
+                end_block,
+                vec![
+                    (entry_ref.into(), ctx.fns().vrl_resolved_drop),
+                    (btree_map_ref.into(), ctx.fns().vrl_btree_map_drop),
+                ],
+            )?;
+
+            ctx.fns().vrl_btree_map_push.build_call(
+                ctx.builder(),
+                btree_map_ref,
+                ctx.cast_string_ref_type(key_ref),
+                entry_ref,
+            );
+        }
+
+        ctx.build_unconditional_branch(set_result_block);
+        ctx.position_at_end(set_result_block);
+
+        ctx.fns().vrl_expression_object_into_result.build_call(
+            ctx.builder(),
+            btree_map_ref,
+            ctx.result_ref(),
+        );
+
+        ctx.build_unconditional_branch(end_block);
+        ctx.position_at_end(end_block);
+
+        Ok(())
     }
 }
 
