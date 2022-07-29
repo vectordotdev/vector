@@ -49,6 +49,25 @@ impl Function for TypeDef {
 
         Ok(Box::new(TypeDefFn { type_def }))
     }
+
+    fn compile_argument(
+        &self,
+        state: (&state::LocalEnv, &state::ExternalEnv),
+        _args: &[(&'static str, Option<ResolvedArgument>)],
+        _ctx: &mut FunctionCompileContext,
+        name: &str,
+        expr: Option<&expression::Expr>,
+    ) -> CompiledArgument {
+        match (name, expr) {
+            ("value", expr) => {
+                let expr = expr.expect("argument must be provided");
+                let type_def = expr.type_def(state);
+
+                Ok(Some(Box::new(type_def) as _))
+            }
+            _ => Ok(None),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

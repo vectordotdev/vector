@@ -527,7 +527,7 @@ impl FunctionCall {
     fn compile_arguments(
         &self,
         function: &dyn Function,
-        external_env: &mut ExternalEnv,
+        state: (&mut LocalEnv, &mut ExternalEnv),
     ) -> Result<Vec<(&'static str, Option<CompiledArgument>)>, String> {
         let function_arguments = self
             .arguments
@@ -541,7 +541,7 @@ impl FunctionCall {
         // We take the external context, and pass it to the function compile context, this allows
         // functions mutable access to external state, but keeps the internal compiler state behind
         // an immutable reference, to ensure compiler state correctness.
-        let external_context = external_env.swap_external_context(AnyMap::new());
+        let external_context = state.1.swap_external_context(AnyMap::new());
 
         let mut compile_ctx =
             FunctionCompileContext::new(self.span).with_external_context(external_context);
@@ -554,7 +554,13 @@ impl FunctionCall {
                 // Call `compile_argument` for functions that need to perform any compile time processing
                 // on the argument.
                 let compiled_argument = function
-                    .compile_argument(&arguments, &mut compile_ctx, keyword, expression)
+                    .compile_argument(
+                        (state.0, state.1),
+                        &arguments,
+                        &mut compile_ctx,
+                        keyword,
+                        expression,
+                    )
                     .map_err(|error| error.to_string())?;
 
                 let argument = match compiled_argument {
@@ -569,7 +575,9 @@ impl FunctionCall {
             .collect::<Result<Vec<_>, _>>()?;
 
         // Re-insert the external context into the compiler state.
-        let _ = external_env.swap_external_context(compile_ctx.into_external_context());
+        let _ = state
+            .1
+            .swap_external_context(compile_ctx.into_external_context());
 
         Ok(compiled_arguments)
     }

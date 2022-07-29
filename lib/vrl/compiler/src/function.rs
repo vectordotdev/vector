@@ -74,6 +74,7 @@ pub trait Function: Send + Sync + fmt::Debug {
     /// at compile time.
     fn compile_argument(
         &self,
+        _state: (&LocalEnv, &ExternalEnv),
         _args: &[(&'static str, Option<ResolvedArgument>)],
         _ctx: &mut FunctionCompileContext,
         _name: &str,

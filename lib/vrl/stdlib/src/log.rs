@@ -115,6 +115,7 @@ impl Function for Log {
 
     fn compile_argument(
         &self,
+        _state: (&state::LocalEnv, &state::ExternalEnv),
         _args: &[(&'static str, Option<ResolvedArgument>)],
         ctx: &mut FunctionCompileContext,
         name: &str,

@@ -83,6 +83,7 @@ impl Function for Sha2 {
 
     fn compile_argument(
         &self,
+        _state: (&state::LocalEnv, &state::ExternalEnv),
         _args: &[(&'static str, Option<ResolvedArgument>)],
         _ctx: &mut FunctionCompileContext,
         name: &str,

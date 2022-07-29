@@ -144,6 +144,7 @@ impl Function for FindEnrichmentTableRecords {
 
     fn compile_argument(
         &self,
+        _state: (&state::LocalEnv, &state::ExternalEnv),
         args: &[(&'static str, Option<ResolvedArgument>)],
         ctx: &mut FunctionCompileContext,
         name: &str,
