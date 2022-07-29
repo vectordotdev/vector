@@ -29,6 +29,12 @@ pub struct ResolvedArgument {
     pub expression: Expr,
 }
 
+pub struct Symbol {
+    pub name: &'static str,
+    pub address: usize,
+    pub uses_context: bool,
+}
+
 pub trait Function: Send + Sync + fmt::Debug {
     /// The identifier by which the function can be called.
     fn identifier(&self) -> &'static str;
@@ -88,6 +94,10 @@ pub trait Function: Send + Sync + fmt::Debug {
     /// This returns `None` by default, indicating the function doesn't accept
     /// a closure.
     fn closure(&self) -> Option<closure::Definition> {
+        None
+    }
+
+    fn symbol(&self) -> Option<Symbol> {
         None
     }
 }
