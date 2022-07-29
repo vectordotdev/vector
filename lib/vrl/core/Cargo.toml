@@ -12,6 +12,7 @@ diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
 lookup = { path = "../../lookup" }
 thiserror = { version = "1", default-features = false }
 value = { path = "../../value" }
+vector_common = { path = "../../vector-common" }
 
 [features]
 default = ["expressions"]

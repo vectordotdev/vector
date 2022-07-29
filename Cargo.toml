@@ -95,6 +95,8 @@ members = [
   "lib/value",
   "lib/vrl/cli",
   "lib/vrl/compiler",
+  "lib/vrl/compiler/src/llvm/precompiled",
+  "lib/vrl/compiler/src/llvm/precompiled/precompiled-sys",
   "lib/vrl/compiler/src/llvm/primitive-calling-convention",
   "lib/vrl/core",
   "lib/vrl/diagnostic",

@@ -21,3 +21,8 @@ pub use expression::{ExpressionError, Resolved};
 pub use lookup::LookupBuf;
 pub use target::{MetadataTarget, SecretTarget, Target, TargetValue, TargetValueRef};
 pub use value::{kind, Kind, Value, ValueRegex};
+
+pub struct Context<'a> {
+    pub target: &'a mut dyn Target,
+    pub timezone: &'a vector_common::TimeZone,
+}
