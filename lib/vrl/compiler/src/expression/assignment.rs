@@ -190,10 +190,10 @@ impl Expression for Assignment {
     #[cfg(feature = "llvm")]
     fn emit_llvm<'ctx>(
         &self,
-        _: (&mut LocalEnv, &mut ExternalEnv),
-        _: &mut crate::llvm::Context<'ctx>,
+        state: (&mut LocalEnv, &mut ExternalEnv),
+        ctx: &mut crate::llvm::Context<'ctx>,
     ) -> Result<(), String> {
-        todo!()
+        self.variant.emit_llvm(state, ctx)
     }
 }
 
@@ -296,6 +296,56 @@ impl Target {
 
             External(path) => {
                 let _ = ctx.target_mut().target_insert(path, value);
+            }
+        }
+    }
+
+    #[cfg(feature = "llvm")]
+    fn emit_llvm_insert<'ctx>(
+        &self,
+        ctx: &mut crate::llvm::Context<'ctx>,
+        result_ref: inkwell::values::PointerValue<'ctx>,
+    ) {
+        match self {
+            Target::Noop => {}
+            Target::Internal(ident, path) => {
+                let variable_ref = ctx.get_or_insert_variable_ref(ident);
+
+                // Get the provided path, or else insert into the variable
+                // without any path appended and return early.
+                if path.is_root() {
+                    ctx.fns().vrl_resolved_clone.build_call(
+                        ctx.builder(),
+                        ctx.cast_resolved_ref_type(result_ref),
+                        variable_ref,
+                    );
+                    return;
+                }
+
+                // Update existing variable using the provided path, or create a
+                // new value in the store.
+                let path_ref = ctx.into_lookup_buf_const_ref(path.clone());
+                let vrl_expression_assignment_target_insert_internal_path = ctx
+                    .fns()
+                    .vrl_expression_assignment_target_insert_internal_path;
+                vrl_expression_assignment_target_insert_internal_path.build_call(
+                    ctx.builder(),
+                    result_ref,
+                    ctx.cast_lookup_buf_ref_type(path_ref),
+                    variable_ref,
+                );
+            }
+            Target::External(path) => {
+                let path_ref = ctx.into_lookup_buf_const_ref(path.clone());
+
+                let vrl_expression_assignment_target_insert_external =
+                    ctx.fns().vrl_expression_assignment_target_insert_external;
+                vrl_expression_assignment_target_insert_external.build_call(
+                    ctx.builder(),
+                    ctx.cast_resolved_ref_type(result_ref),
+                    ctx.cast_lookup_buf_ref_type(path_ref),
+                    ctx.context_ref(),
+                );
             }
         }
     }
@@ -433,10 +483,96 @@ where
     #[cfg(feature = "llvm")]
     fn emit_llvm<'ctx>(
         &self,
-        _: (&mut LocalEnv, &mut ExternalEnv),
-        _: &mut crate::llvm::Context<'ctx>,
+        state: (&mut LocalEnv, &mut ExternalEnv),
+        ctx: &mut crate::llvm::Context<'ctx>,
     ) -> Result<(), String> {
-        todo!()
+        match self {
+            Variant::Single { target, expr } => {
+                let begin_block = ctx.append_basic_block("assignment_single_begin");
+                let end_block = ctx.append_basic_block("assignment_single_end");
+
+                ctx.build_unconditional_branch(begin_block);
+                ctx.position_at_end(begin_block);
+
+                ctx.emit_llvm(expr.as_ref(), ctx.result_ref(), state, end_block, vec![])?;
+
+                target.emit_llvm_insert(ctx, ctx.result_ref());
+
+                ctx.build_unconditional_branch(end_block);
+                ctx.position_at_end(end_block);
+            }
+            Variant::Infallible {
+                ok,
+                err,
+                expr,
+                default,
+            } => {
+                let begin_block = ctx.append_basic_block("assignment_infallible_begin");
+                let end_block = ctx.append_basic_block("assignment_infallible_end");
+                let is_ok_block = ctx.append_basic_block("assignment_infallible_is_ok");
+                let is_err_block = ctx.append_basic_block("assignment_infallible_is_err");
+
+                ctx.build_unconditional_branch(begin_block);
+                ctx.position_at_end(begin_block);
+
+                let result_ref = ctx.result_ref();
+
+                let assignment_ref =
+                    ctx.build_alloca_resolved_initialized("assignment_infallible_expression");
+
+                ctx.emit_llvm(
+                    expr.as_ref(),
+                    assignment_ref,
+                    state,
+                    end_block,
+                    vec![(assignment_ref.into(), ctx.fns().vrl_resolved_drop)],
+                )?;
+
+                let is_ok = ctx
+                    .fns()
+                    .vrl_resolved_is_ok
+                    .build_call(ctx.builder(), assignment_ref)
+                    .try_as_basic_value()
+                    .left()
+                    .expect("result is not a basic value")
+                    .try_into()
+                    .expect("result is not an int value");
+
+                ctx.build_conditional_branch(is_ok, is_ok_block, is_err_block);
+
+                ctx.position_at_end(is_ok_block);
+                ok.emit_llvm_insert(ctx, assignment_ref);
+                let error_temp_ref =
+                    ctx.build_alloca_resolved_initialized("assignment_infallible_ok_err");
+                ctx.fns()
+                    .vrl_resolved_ok_null
+                    .build_call(ctx.builder(), error_temp_ref);
+                err.emit_llvm_insert(ctx, error_temp_ref);
+                ctx.fns()
+                    .vrl_resolved_drop
+                    .build_call(ctx.builder(), error_temp_ref);
+                ctx.fns()
+                    .vrl_resolved_move
+                    .build_call(ctx.builder(), assignment_ref, result_ref);
+                ctx.build_unconditional_branch(end_block);
+
+                ctx.position_at_end(is_err_block);
+                let default_ref = ctx.into_resolved_const_ref(Ok(default.clone()));
+                ok.emit_llvm_insert(ctx, default_ref);
+                ctx.fns()
+                    .vrl_resolved_err_into_ok
+                    .build_call(ctx.builder(), assignment_ref);
+                err.emit_llvm_insert(ctx, assignment_ref);
+                ctx.fns()
+                    .vrl_resolved_move
+                    .build_call(ctx.builder(), assignment_ref, result_ref);
+                ctx.build_unconditional_branch(end_block);
+
+                ctx.position_at_end(end_block);
+            }
+        }
+
+        Ok(())
     }
 }
 
