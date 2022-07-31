@@ -1,0 +1,25 @@
+status = string(.custom.http.status_category) ?? string(.custom.level) ?? ""
+status = downcase(status)
+if status == "" {
+    .status = 6
+} else {
+    if starts_with(status, "f") || starts_with(status, "emerg") {
+        .status = 0
+    } else if starts_with(status, "a") {
+        .status = 1
+    } else if starts_with(status, "c") {
+        .status = 2
+    } else if starts_with(status, "e") {
+        .status = 3
+    } else if starts_with(status, "w") {
+        .status = 4
+    } else if starts_with(status, "n") {
+        .status = 5
+    } else if starts_with(status, "i") {
+        .status = 6
+    } else if starts_with(status, "d") || starts_with(status, "trace") || starts_with(status, "verbose") {
+        .status = 7
+    } else if starts_with(status, "o") || starts_with(status, "s") || status == "ok" || status == "success" {
+        .status = 8
+    }
+}

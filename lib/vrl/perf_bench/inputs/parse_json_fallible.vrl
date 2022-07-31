@@ -1,0 +1,4 @@
+ok, err = parse_json(.message)
+if err == null {
+    . = ok
+}

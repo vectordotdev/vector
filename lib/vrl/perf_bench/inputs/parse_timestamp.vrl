@@ -1,0 +1,2 @@
+.timestamp_rfc_3339 = parse_timestamp!(.timestamp, format: "%+")
+.timestamp_unix = to_int(.timestamp_rfc_3339)
