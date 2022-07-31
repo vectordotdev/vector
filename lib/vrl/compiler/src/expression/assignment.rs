@@ -621,19 +621,23 @@ where
                     }
                 }
 
-                ok.insert_batch(ctx, selection_vector_ok);
-                err.insert_batch(ctx, selection_vector_err);
-
-                resolved_values_temp.truncate(0);
                 resolved_values_temp.resize(selection_vector.len(), Ok(Value::Null));
 
+                ok.insert_batch(ctx, selection_vector_ok);
                 std::mem::swap(ctx.resolved_values, resolved_values_temp);
-                err.insert_batch(ctx, selection_vector_ok);
-                for index in selection_vector_err.iter_mut() {
+                for index in selection_vector_err.iter() {
                     ctx.resolved_values[*index] = Ok(default.clone());
                 }
                 ok.insert_batch(ctx, selection_vector_err);
                 std::mem::swap(ctx.resolved_values, resolved_values_temp);
+
+                std::mem::swap(ctx.resolved_values, resolved_values_temp);
+                for index in selection_vector_ok.iter() {
+                    ctx.resolved_values[*index] = Ok(Value::Null);
+                }
+                err.insert_batch(ctx, selection_vector_ok);
+                std::mem::swap(ctx.resolved_values, resolved_values_temp);
+                err.insert_batch(ctx, selection_vector_err);
             }
         }
     }
