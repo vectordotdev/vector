@@ -195,10 +195,16 @@ impl Expression for Op {
         std::mem::swap(ctx.resolved_values, &mut self.resolved_values_rhs);
 
         self.selection_vector_ok.truncate(0);
-        for index in selection_vector {
+        for index in &self.selection_vector_lhs_ok {
             let index = *index;
             if self.resolved_values_rhs[index].is_ok() {
                 self.selection_vector_ok.push(index);
+            } else {
+                std::mem::swap(
+                    &mut ctx.resolved_values[index],
+                    &mut self.resolved_values_rhs[index],
+                );
+                self.resolved_values_rhs[index] = Ok(Null);
             }
         }
 
