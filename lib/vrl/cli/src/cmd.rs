@@ -11,7 +11,7 @@ use ::value::Value;
 use clap::Parser;
 use value::Secrets;
 use vector_common::TimeZone;
-use vrl::{diagnostic::Formatter, state, Program, Runtime, Target, VrlRuntime};
+use vrl::{diagnostic::Formatter, state, BatchRuntime, Runtime, Target, VrlRuntime};
 
 #[cfg(feature = "repl")]
 use super::repl;
@@ -118,11 +118,12 @@ fn run(opts: &Opts) -> Result<(), Error> {
 
         repl(repl_objects, &tz, opts.runtime)
     } else {
-        let objects = opts.read_into_objects()?;
+        let mut objects = opts.read_into_objects()?;
         let source = opts.read_program()?;
-        let (program, warnings) = vrl::compile(&source, &stdlib::all()).map_err(|diagnostics| {
-            Error::Parse(Formatter::new(&source, diagnostics).colored().to_string())
-        })?;
+        let (mut program, warnings) =
+            vrl::compile(&source, &stdlib::all()).map_err(|diagnostics| {
+                Error::Parse(Formatter::new(&source, diagnostics).colored().to_string())
+            })?;
 
         #[allow(clippy::print_stderr)]
         if opts.print_warnings {
@@ -130,31 +131,87 @@ fn run(opts: &Opts) -> Result<(), Error> {
             eprintln!("{warnings}")
         }
 
-        for mut object in objects {
-            let mut metadata = Value::Object(BTreeMap::new());
-            let mut secrets = Secrets::new();
-            let mut target = TargetValueRef {
-                value: &mut object,
-                metadata: &mut metadata,
-                secrets: &mut secrets,
-            };
-            let state = state::Runtime::default();
-            let runtime = Runtime::new(state);
+        let mut metadata = objects
+            .iter()
+            .map(|_| Value::Object(BTreeMap::new()))
+            .collect::<Vec<_>>();
+        let mut secrets = objects.iter().map(|_| Secrets::new()).collect::<Vec<_>>();
 
-            let result = execute(&mut target, &program, &tz, runtime, opts.runtime).map(|v| {
-                if opts.print_object {
-                    object.to_string()
-                } else {
-                    v.to_string()
+        let mut targets = objects
+            .iter_mut()
+            .zip(metadata.iter_mut())
+            .zip(secrets.iter_mut())
+            .map(|((value, metadata), secrets)| TargetValueRef {
+                value,
+                metadata,
+                secrets,
+            })
+            .collect::<Vec<_>>();
+
+        match opts.runtime {
+            VrlRuntime::Ast => {
+                for mut target in targets {
+                    let state = state::Runtime::default();
+                    let mut runtime = Runtime::new(state);
+                    let result = runtime
+                        .resolve(&mut target, &program, &tz)
+                        .map(|v| {
+                            if opts.print_object {
+                                target.value.to_string()
+                            } else {
+                                v.to_string()
+                            }
+                        })
+                        .map_err(vrl::Terminate::from)
+                        .map_err(Error::Runtime);
+
+                    #[allow(clippy::print_stdout)]
+                    #[allow(clippy::print_stderr)]
+                    match result {
+                        Ok(ok) => println!("{}", ok),
+                        Err(err) => eprintln!("{}", err),
+                    }
                 }
-            });
-
-            #[allow(clippy::print_stdout)]
-            #[allow(clippy::print_stderr)]
-            match result {
-                Ok(ok) => println!("{}", ok),
-                Err(err) => eprintln!("{}", err),
             }
+            VrlRuntime::Vectorized => {
+                let mut runtime = BatchRuntime::new();
+                let mut values = vec![Ok(Value::Null); targets.len()];
+                let mut states = (0..targets.len())
+                    .map(|_| vrl::state::Runtime::default())
+                    .collect::<Vec<_>>();
+                let mut batch_targets = targets
+                    .iter_mut()
+                    .map(|target| target as &mut dyn Target)
+                    .collect::<Vec<_>>();
+                runtime.resolve_batch(
+                    &mut values,
+                    &mut batch_targets,
+                    &mut states,
+                    &mut program,
+                    tz,
+                );
+
+                for (target, result) in targets.into_iter().zip(values) {
+                    let result = result
+                        .map(|value| {
+                            if opts.print_object {
+                                target.value.to_string()
+                            } else {
+                                value.to_string()
+                            }
+                        })
+                        .map_err(vrl::Terminate::from)
+                        .map_err(Error::Runtime);
+
+                    #[allow(clippy::print_stdout)]
+                    #[allow(clippy::print_stderr)]
+                    match result {
+                        Ok(ok) => println!("{}", ok),
+                        Err(err) => eprintln!("{}", err),
+                    }
+                }
+            }
+            VrlRuntime::Llvm => todo!(),
         }
 
         Ok(())
@@ -181,21 +238,6 @@ fn repl(objects: Vec<Value>, timezone: &TimeZone, vrl_runtime: VrlRuntime) -> Re
 #[cfg(not(feature = "repl"))]
 fn repl(_objects: Vec<Value>, _timezone: &TimeZone, _vrl_runtime: VrlRuntime) -> Result<(), Error> {
     Err(Error::ReplFeature)
-}
-
-fn execute(
-    object: &mut impl Target,
-    program: &Program,
-    timezone: &TimeZone,
-    mut runtime: Runtime,
-    vrl_runtime: VrlRuntime,
-) -> Result<Value, Error> {
-    match vrl_runtime {
-        VrlRuntime::Ast => runtime
-            .resolve(object, program, timezone)
-            .map_err(Error::Runtime),
-        VrlRuntime::Llvm => todo!(),
-    }
 }
 
 fn serde_to_vrl(value: serde_json::Value) -> Value {

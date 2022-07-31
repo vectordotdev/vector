@@ -1,4 +1,4 @@
-use std::{any::Any, fmt, sync::Arc};
+use std::{any::Any, fmt, ptr::addr_of_mut, sync::Arc};
 
 use anymap::AnyMap;
 use diagnostic::{DiagnosticMessage, Label, Note, Urls};
@@ -15,7 +15,7 @@ use crate::{
     state::{ExternalEnv, LocalEnv},
     type_def::Details,
     value::Kind,
-    Context, Expression, Function, Resolved, Span, TypeDef,
+    BatchContext, Context, Expression, Function, Resolved, Span, TypeDef,
 };
 
 pub(crate) struct Builder<'a> {
@@ -695,6 +695,40 @@ impl Expression for FunctionCall {
                 }
             }
         })
+    }
+
+    fn resolve_batch(&mut self, ctx: &mut BatchContext, selection_vector: &[usize]) {
+        self.expr.resolve_batch(ctx, selection_vector);
+
+        for index in selection_vector {
+            let resolved = addr_of_mut!(ctx.resolved_values[*index]);
+            let result = unsafe { resolved.read() }.map_err(|err| match err {
+                #[cfg(feature = "expr-abort")]
+                ExpressionError::Abort { .. } => {
+                    panic!("abort errors must only be defined by `abort` statement")
+                }
+                ExpressionError::Error {
+                    message,
+                    mut labels,
+                    notes,
+                } => {
+                    labels.push(Label::primary(message.clone(), self.span));
+
+                    ExpressionError::Error {
+                        message: format!(
+                            r#"function call error for "{}" at ({}:{}): {}"#,
+                            self.ident,
+                            self.span.start(),
+                            self.span.end(),
+                            message
+                        ),
+                        labels,
+                        notes,
+                    }
+                }
+            });
+            unsafe { resolved.write(result) };
+        }
     }
 
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
@@ -1407,7 +1441,11 @@ mod tests {
 
     impl Expression for Fn {
         fn resolve(&self, _ctx: &mut Context) -> Resolved {
-            todo!()
+            unimplemented!()
+        }
+
+        fn resolve_batch(&mut self, _ctx: &mut BatchContext, _selection_vector: &[usize]) {
+            unimplemented!()
         }
 
         fn type_def(&self, _state: (&LocalEnv, &ExternalEnv)) -> TypeDef {

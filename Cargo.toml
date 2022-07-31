@@ -850,6 +850,8 @@ language-benches = ["sinks-socket", "sources-socket", "transforms-add_fields", "
 statistic-benches = []
 metrics-benches = ["sinks-socket", "sources-socket"]
 remap-benches = ["transforms-add_fields", "transforms-coercer", "transforms-json_parser", "transforms-remap"]
+remap-vrl-benches = ["transforms-remap"]
+remap-vrl-batched-benches = ["transforms-remap"]
 transform-benches = ["transforms-filter", "transforms-dedupe", "transforms-reduce", "transforms-route"]
 codecs-benches = []
 loki-benches = ["sinks-loki"]
@@ -870,6 +872,18 @@ required-features = ["dnstap-benches"]
 name = "remap"
 harness = false
 required-features = ["remap-benches"]
+
+[[bench]]
+name = "remap_vrl"
+path = "benches/remap_vrl.rs"
+harness = false
+required-features = ["remap-vrl-benches"]
+
+[[bench]]
+name = "remap_vrl_batched"
+path = "benches/remap_vrl_batched.rs"
+harness = false
+required-features = ["remap-vrl-batched-benches"]
 
 [[bench]]
 name = "enrichment_tables_file"

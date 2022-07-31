@@ -11,12 +11,14 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use value::{Kind, Value};
 use vector_common::TimeZone;
+use vector_core::event::{EventArray, EventContainer};
 use vector_vrl_functions::set_semantic_meaning::MeaningList;
-use vrl::llvm::OptimizationLevel;
 use vrl::{
+    core::Resolved,
     diagnostic::{Formatter, Note},
+    llvm::OptimizationLevel,
     prelude::{DiagnosticMessage, ExpressionError},
-    Program, Runtime, Terminate, VrlRuntime,
+    BatchRuntime, Program, Runtime, Target, Terminate, VrlRuntime,
 };
 
 use crate::{
@@ -116,6 +118,10 @@ impl TransformConfig for RemapConfig {
         let (transform, warnings) = match self.runtime {
             VrlRuntime::Ast => {
                 let (remap, warnings) = Remap::new_ast(self.clone(), context)?;
+                (Transform::synchronous(remap), warnings)
+            }
+            VrlRuntime::Vectorized => {
+                let (remap, warnings) = Remap::new_vectorized(self.clone(), context)?;
                 (Transform::synchronous(remap), warnings)
             }
             VrlRuntime::Llvm => {
@@ -221,6 +227,7 @@ where
     reroute_dropped: bool,
     default_schema_definition: Arc<schema::Definition>,
     dropped_schema_definition: Arc<schema::Definition>,
+    values: Vec<Resolved>,
     runner: Runner,
 }
 
@@ -231,6 +238,14 @@ pub trait VrlRunner {
         program: &Program,
         timezone: &TimeZone,
     ) -> std::result::Result<value::Value, Terminate>;
+
+    fn run_batch<'a>(
+        &'a mut self,
+        values: &'a mut Vec<Resolved>,
+        targets: &'a mut [&'a mut dyn Target],
+        program: &mut Program,
+        timezone: TimeZone,
+    );
 }
 
 #[derive(Debug)]
@@ -255,7 +270,20 @@ impl VrlRunner for AstRunner {
     ) -> std::result::Result<value::Value, Terminate> {
         let result = self.runtime.resolve(target, program, timezone);
         self.runtime.clear();
-        result
+        result.map_err(Terminate::from)
+    }
+
+    fn run_batch<'a>(
+        &'a mut self,
+        values: &'a mut Vec<Resolved>,
+        targets: &'a mut [&'a mut dyn Target],
+        program: &mut Program,
+        timezone: TimeZone,
+    ) {
+        for i in 0..targets.len() {
+            values[i] = self.runtime.resolve(targets[i], program, &timezone);
+            self.runtime.clear();
+        }
     }
 }
 
@@ -271,6 +299,70 @@ impl Remap<AstRunner> {
 
         let runtime = Runtime::default();
         let runner = AstRunner { runtime };
+
+        Self::new(config, context, program, runner).map(|remap| (remap, warnings))
+    }
+}
+
+#[derive(Debug)]
+pub struct VectorizedRunner {
+    runtime: BatchRuntime,
+    states: Vec<vrl::state::Runtime>,
+}
+
+impl Clone for VectorizedRunner {
+    fn clone(&self) -> Self {
+        Self {
+            runtime: BatchRuntime::default(),
+            states: vec![],
+        }
+    }
+}
+
+impl VrlRunner for VectorizedRunner {
+    fn run(
+        &mut self,
+        target: &mut VrlTarget,
+        program: &Program,
+        timezone: &TimeZone,
+    ) -> std::result::Result<value::Value, Terminate> {
+        let mut runtime = Runtime::default();
+        runtime
+            .resolve(target, program, timezone)
+            .map_err(Terminate::from)
+    }
+
+    fn run_batch<'a>(
+        &'a mut self,
+        values: &'a mut Vec<Resolved>,
+        targets: &'a mut [&'a mut dyn Target],
+        program: &mut Program,
+        timezone: TimeZone,
+    ) {
+        for state in &mut self.states {
+            state.clear();
+        }
+        self.states
+            .resize_with(targets.len(), vrl::state::Runtime::default);
+        self.runtime
+            .resolve_batch(values, targets, &mut self.states, program, timezone);
+    }
+}
+
+impl Remap<VectorizedRunner> {
+    pub fn new_vectorized(
+        config: RemapConfig,
+        context: &TransformContext,
+    ) -> crate::Result<(Self, String)> {
+        let (program, warnings, _, _) = config.compile_vrl_program(
+            context.enrichment_tables.clone(),
+            context.merged_schema_definition.clone(),
+        )?;
+
+        let runner = VectorizedRunner {
+            runtime: BatchRuntime::default(),
+            states: vec![],
+        };
 
         Self::new(config, context, program, runner).map(|remap| (remap, warnings))
     }
@@ -312,10 +404,31 @@ impl VrlRunner for LlvmRunner {
             >(self.execute)
         };
         unsafe { execute(&mut context, &mut result) };
-        result.map_err(|error| match error {
-            ExpressionError::Abort { .. } => Terminate::Abort(error),
-            error @ ExpressionError::Error { .. } => Terminate::Error(error),
-        })
+        result.map_err(Terminate::from)
+    }
+
+    fn run_batch<'a>(
+        &'a mut self,
+        values: &'a mut Vec<Resolved>,
+        targets: &'a mut [&'a mut dyn Target],
+        _: &mut Program,
+        timezone: TimeZone,
+    ) {
+        for i in 0..targets.len() {
+            let mut context = vrl::core::Context {
+                target: targets[i],
+                timezone: &timezone,
+            };
+            let mut result = Ok(Value::Null);
+            let execute = unsafe {
+                std::mem::transmute::<
+                    _,
+                    for<'b> unsafe fn(&'b mut vrl::core::Context<'b>, &'b mut vrl::core::Resolved),
+                >(self.execute)
+            };
+            unsafe { execute(&mut context, &mut result) };
+            values[i] = result;
+        }
     }
 }
 
@@ -384,6 +497,7 @@ where
             default_schema_definition: Arc::new(default_schema_definition),
             dropped_schema_definition: Arc::new(dropped_schema_definition),
             runner,
+            values: vec![],
         })
     }
 
@@ -392,7 +506,11 @@ where
         &self.runner
     }
 
-    fn anotate_data(&self, reason: &str, error: ExpressionError) -> serde_json::Value {
+    fn annotate_data(
+        component_key: &Option<ComponentKey>,
+        reason: &str,
+        error: ExpressionError,
+    ) -> serde_json::Value {
         let message = error
             .notes()
             .iter()
@@ -404,19 +522,24 @@ where
             "dropped": {
                 "reason": reason,
                 "message": message,
-                "component_id": self.component_key,
+                "component_id": component_key,
                 "component_type": "remap",
                 "component_kind": "transform",
             }
         })
     }
 
-    fn annotate_dropped(&self, event: &mut Event, reason: &str, error: ExpressionError) {
+    fn annotate_dropped(
+        component_key: &Option<ComponentKey>,
+        event: &mut Event,
+        reason: &str,
+        error: ExpressionError,
+    ) {
         match event {
             Event::Log(ref mut log) => {
                 log.insert(
                     log_schema().metadata_key(),
-                    self.anotate_data(reason, error),
+                    Self::annotate_data(component_key, reason, error),
                 );
             }
             Event::Metric(ref mut metric) => {
@@ -424,7 +547,7 @@ where
                 metric.insert_tag(format!("{}.dropped.reason", m), reason.into());
                 metric.insert_tag(
                     format!("{}.dropped.component_id", m),
-                    self.component_key
+                    component_key
                         .as_ref()
                         .map(ToString::to_string)
                         .unwrap_or_else(String::new),
@@ -435,7 +558,7 @@ where
             Event::Trace(ref mut trace) => {
                 trace.insert(
                     log_schema().metadata_key(),
-                    self.anotate_data(reason, error),
+                    Self::annotate_data(component_key, reason, error),
                 );
             }
         }
@@ -443,6 +566,12 @@ where
 
     fn run_vrl(&mut self, target: &mut VrlTarget) -> std::result::Result<value::Value, Terminate> {
         self.runner.run(target, &self.program, &self.timezone)
+    }
+
+    fn run_vrl_batch<'a>(&'a mut self, targets: &'a mut [&'a mut dyn Target]) {
+        self.values.resize(targets.len(), Ok(Value::Null));
+        self.runner
+            .run_batch(&mut self.values, targets, &mut self.program, self.timezone);
     }
 }
 
@@ -458,7 +587,7 @@ where
         //
         // The `drop_on_{error, abort}` transform config allows operators to remove events from the
         // main output if they're failed or aborted, in which case we can skip the cloning, since
-        // any mutations made by VRL will be ignored regardless. If they hav configured
+        // any mutations made by VRL will be ignored regardless. If they have configured
         // `reroute_dropped`, however, we still need to do the clone to ensure that we can forward
         // the event to the `dropped` output.
         let forward_on_error = !self.drop_on_error || self.reroute_dropped;
@@ -510,11 +639,116 @@ where
                 } else if self.reroute_dropped {
                     let mut event = original_event.expect("event will be set");
 
-                    self.annotate_dropped(&mut event, reason, error);
+                    Self::annotate_dropped(&self.component_key, &mut event, reason, error);
                     push_dropped(event, output, &self.dropped_schema_definition);
                 }
             }
         }
+    }
+
+    fn transform_all(&mut self, events: EventArray, output: &mut TransformOutputsBuf) {
+        output.reserve(events.len());
+
+        // If a program can fail or abort at runtime and we know that we will still need to forward
+        // the event in that case (either to the main output or `dropped`, depending on the
+        // config), we need to clone the original event and keep it around, to allow us to discard
+        // any mutations made to the event while the VRL program runs, before it failed or aborted.
+        //
+        // The `drop_on_{error, abort}` transform config allows operators to remove events from the
+        // main output if they're failed or aborted, in which case we can skip the cloning, since
+        // any mutations made by VRL will be ignored regardless. If they have configured
+        // `reroute_dropped`, however, we still need to do the clone to ensure that we can forward
+        // the event to the `dropped` output.
+        let forward_on_error = !self.drop_on_error || self.reroute_dropped;
+        let forward_on_abort = !self.drop_on_abort || self.reroute_dropped;
+        let mut original_events = if (self.program.info().fallible && forward_on_error)
+            || (self.program.info().abortable && forward_on_abort)
+        {
+            Some(events.clone())
+        } else {
+            None
+        };
+
+        let program_info = self.program.info();
+        let mut targets = events
+            .into_events()
+            .map(|event| VrlTarget::new(event, program_info))
+            .collect::<Vec<_>>();
+        let mut batch_targets = targets
+            .iter_mut()
+            .map(|target| target as &mut dyn Target)
+            .collect::<Vec<_>>();
+
+        self.run_vrl_batch(&mut batch_targets);
+
+        for (i, (target, value)) in targets.into_iter().zip(self.values.iter_mut()).enumerate() {
+            let result = unsafe { (value as *mut Resolved).read() }.map_err(Terminate::from);
+            match result {
+                Ok(_) => match target.into_events() {
+                    TargetEvents::One(event) => {
+                        push_default(event, output, &self.default_schema_definition)
+                    }
+                    TargetEvents::Logs(events) => events.for_each(|event| {
+                        push_default(event, output, &self.default_schema_definition)
+                    }),
+                    TargetEvents::Traces(events) => events.for_each(|event| {
+                        push_default(event, output, &self.default_schema_definition)
+                    }),
+                },
+                Err(reason) => {
+                    let (reason, error, drop) = match reason {
+                        Terminate::Abort(error) => {
+                            emit!(RemapMappingAbort {
+                                event_dropped: self.drop_on_abort,
+                            });
+
+                            ("abort", error, self.drop_on_abort)
+                        }
+                        Terminate::Error(error) => {
+                            emit!(RemapMappingError {
+                                error: error.to_string(),
+                                event_dropped: self.drop_on_error,
+                            });
+
+                            ("error", error, self.drop_on_error)
+                        }
+                    };
+
+                    if !drop {
+                        let event = match original_events.as_mut().expect("event will be set") {
+                            EventArray::Logs(logs) => {
+                                let log = std::mem::take(&mut logs[i]);
+                                Event::from(log)
+                            }
+                            EventArray::Metrics(metrics) => Event::from(metrics[i].clone()),
+                            EventArray::Traces(traces) => {
+                                let trace = std::mem::take(&mut traces[i]);
+                                Event::from(trace)
+                            }
+                        };
+
+                        push_default(event, output, &self.default_schema_definition);
+                    } else if self.reroute_dropped {
+                        let mut event = match original_events.as_mut().expect("event will be set") {
+                            EventArray::Logs(logs) => {
+                                let log = std::mem::take(&mut logs[i]);
+                                Event::from(log)
+                            }
+                            EventArray::Metrics(metrics) => Event::from(metrics[i].clone()),
+                            EventArray::Traces(traces) => {
+                                let trace = std::mem::take(&mut traces[i]);
+                                Event::from(trace)
+                            }
+                        };
+
+                        Self::annotate_dropped(&self.component_key, &mut event, reason, error);
+                        push_dropped(event, output, &self.dropped_schema_definition);
+                    }
+                }
+            }
+        }
+
+        unsafe { self.values.set_len(0) };
     }
 }
 

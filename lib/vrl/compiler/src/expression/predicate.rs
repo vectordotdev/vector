@@ -8,12 +8,14 @@ use crate::{
     parser::Node,
     state::{ExternalEnv, LocalEnv},
     value::Kind,
-    Context, Expression, Span, TypeDef,
+    BatchContext, Context, Expression, Span, TypeDef,
 };
 
 #[derive(Clone, PartialEq)]
 pub struct Predicate {
     inner: Vec<Expr>,
+    selection_vector_this: Vec<usize>,
+    selection_vector_other: Vec<usize>,
 }
 
 impl Predicate {
@@ -42,12 +44,16 @@ impl Predicate {
             });
         }
 
-        Ok(Self { inner: exprs })
+        Ok(Self::new_unchecked(exprs))
     }
 
     #[must_use]
     pub fn new_unchecked(inner: Vec<Expr>) -> Self {
-        Self { inner }
+        Self {
+            inner,
+            selection_vector_this: vec![],
+            selection_vector_other: vec![],
+        }
     }
 }
 
@@ -58,6 +64,32 @@ impl Expression for Predicate {
             .map(|expr| expr.resolve(ctx))
             .collect::<std::result::Result<Vec<_>, _>>()
             .map(|mut v| v.pop().unwrap_or(Value::Boolean(false)))
+    }
+
+    fn resolve_batch(&mut self, ctx: &mut BatchContext, selection_vector: &[usize]) {
+        if self.inner.len() == 1 {
+            self.inner[0].resolve_batch(ctx, selection_vector);
+        } else {
+            self.selection_vector_this.resize(selection_vector.len(), 0);
+            self.selection_vector_this.copy_from_slice(selection_vector);
+
+            for block in &mut self.inner {
+                block.resolve_batch(ctx, &self.selection_vector_this);
+                self.selection_vector_other.truncate(0);
+
+                for index in selection_vector {
+                    let index = *index;
+                    if ctx.resolved_values[index].is_ok() {
+                        self.selection_vector_other.push(index);
+                    }
+                }
+
+                std::mem::swap(
+                    &mut self.selection_vector_this,
+                    &mut self.selection_vector_other,
+                );
+            }
+        }
     }
 
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
