@@ -104,6 +104,7 @@ members = [
   "lib/vrl/parser",
   "lib/vrl/stdlib",
   "lib/vrl/tests",
+  "lib/vrl/perf_bench",
   "lib/vrl/proptests",
   "lib/vrl/vrl",
   "lib/vector-vrl-functions",

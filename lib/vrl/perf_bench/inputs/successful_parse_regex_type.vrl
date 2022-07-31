@@ -1,0 +1,9 @@
+message = to_string!(.message)
+result = parse_regex!(message, r'(\[(?P<status>\d*)\].*:(.*))', numeric_groups: true)
+status = strip_whitespace(result.status)
+reason = strip_whitespace(result."3" || "")
+
+. = {
+    "status": status,
+    "reason": reason
+}

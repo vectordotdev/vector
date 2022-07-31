@@ -1,0 +1,5 @@
+{
+  "message": "[06/Nov/2014:19:10:38 +0600] 66.249.65.159 GET /news/53f8d72920ba2744fe873ebc.html 204 1245 5943 2.412 6.433 sessions_show app_name env_here 42 127.0.0.1 foo 123 \"error message here\" 456",
+  "file": "/var/log/nginx.log",
+  "source_type": "file"
+}

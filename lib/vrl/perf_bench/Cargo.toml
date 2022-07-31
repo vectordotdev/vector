@@ -1,0 +1,12 @@
+[package]
+name = "perf_bench"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde_json = { version = "1", default-features = false, features = ["preserve_order"] }
+value = { path = "../../../lib/value" }
+vector_common = { path = "../../../lib/vector-common" }
+vector_core = { path = "../../../lib/vector-core", features = ["vrl"] }
+vrl = { path = "../vrl" }
+vrl-stdlib = { path = "../stdlib" }
