@@ -288,7 +288,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            r#"Map(VrlConfig { source: ".nork == true", runtime: AstBatch })"#,
+            r#"Map(VrlConfig { source: ".nork == true", runtime: Vectorized })"#,
             format!("{:?}", conf.condition)
         )
     }

@@ -173,7 +173,7 @@ fn run(opts: &Opts) -> Result<(), Error> {
                     }
                 }
             }
-            VrlRuntime::AstBatch => {
+            VrlRuntime::Vectorized => {
                 let mut runtime = BatchRuntime::new();
                 let mut values = vec![Ok(Value::Null); targets.len()];
                 let mut states = (0..targets.len())
