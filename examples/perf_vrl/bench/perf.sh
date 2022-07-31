@@ -7,7 +7,7 @@ for file in ./inputs/*; do
     num_iterations="1000"
     batch_size="1000"
 
-    for runtime in "ast" "ast_batched"; do
+    for runtime in "ast" "vectorized"; do
         commands=$(cat <<-END
 			set timeout -1
 			spawn ../../../target/release/perf_vrl

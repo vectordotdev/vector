@@ -120,8 +120,8 @@ impl TransformConfig for RemapConfig {
                 let (remap, warnings) = Remap::new_ast(self.clone(), context)?;
                 (Transform::synchronous(remap), warnings)
             }
-            VrlRuntime::AstBatch => {
-                let (remap, warnings) = Remap::new_ast_batch(self.clone(), context)?;
+            VrlRuntime::Vectorized => {
+                let (remap, warnings) = Remap::new_vectorized(self.clone(), context)?;
                 (Transform::synchronous(remap), warnings)
             }
             VrlRuntime::Llvm => {
@@ -305,12 +305,12 @@ impl Remap<AstRunner> {
 }
 
 #[derive(Debug)]
-pub struct AstBatchRunner {
+pub struct VectorizedRunner {
     runtime: BatchRuntime,
     states: Vec<vrl::state::Runtime>,
 }
 
-impl Clone for AstBatchRunner {
+impl Clone for VectorizedRunner {
     fn clone(&self) -> Self {
         Self {
             runtime: BatchRuntime::default(),
@@ -319,7 +319,7 @@ impl Clone for AstBatchRunner {
     }
 }
 
-impl VrlRunner for AstBatchRunner {
+impl VrlRunner for VectorizedRunner {
     fn run(
         &mut self,
         target: &mut VrlTarget,
@@ -349,8 +349,8 @@ impl VrlRunner for AstBatchRunner {
     }
 }
 
-impl Remap<AstBatchRunner> {
-    pub fn new_ast_batch(
+impl Remap<VectorizedRunner> {
+    pub fn new_vectorized(
         config: RemapConfig,
         context: &TransformContext,
     ) -> crate::Result<(Self, String)> {
@@ -359,7 +359,7 @@ impl Remap<AstBatchRunner> {
             context.merged_schema_definition.clone(),
         )?;
 
-        let runner = AstBatchRunner {
+        let runner = VectorizedRunner {
             runtime: BatchRuntime::default(),
             states: vec![],
         };

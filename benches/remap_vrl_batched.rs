@@ -23,7 +23,7 @@ fn bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("remap_vrl_batched");
 
     group.bench_function("datadog_agent_remap_blackhole", |b| {
-        let (mut remap, _) = Remap::new_ast_batch(
+        let (mut remap, _) = Remap::new_vectorized(
             RemapConfig {
                 source: Some(
                     indoc! {r#"
@@ -46,7 +46,7 @@ fn bench(c: &mut Criterion) {
                 timezone: TimeZone::default(),
                 drop_on_error: true,
                 drop_on_abort: true,
-                runtime: VrlRuntime::AstBatch,
+                runtime: VrlRuntime::Vectorized,
                 ..Default::default()
             },
             &Default::default(),

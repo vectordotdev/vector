@@ -101,7 +101,7 @@ fn main() {
             stdout.flush().unwrap();
             stdin.read_line(&mut String::new()).unwrap();
         }
-        "ast_batched" => {
+        "vectorized" => {
             let mut run_vrl_batched = || {
                 let events = vec![event.clone(); batch_size];
 

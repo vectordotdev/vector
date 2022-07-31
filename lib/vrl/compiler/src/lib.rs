@@ -66,7 +66,7 @@ pub type Result<T = (Program, DiagnosticList)> = std::result::Result<T, Diagnost
 #[serde(rename_all = "snake_case")]
 pub enum VrlRuntime {
     Ast,
-    AstBatch,
+    Vectorized,
     Llvm,
 }
 
@@ -82,9 +82,9 @@ impl FromStr for VrlRuntime {
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
             "ast" => Ok(Self::Ast),
-            "ast_batch" => Ok(Self::AstBatch),
+            "vectorized" => Ok(Self::Vectorized),
             "llvm" => Ok(Self::Llvm),
-            _ => Err("runtime must be ast or ast_batch or llvm."),
+            _ => Err("runtime must be ast or vectorized or llvm."),
         }
     }
 }
@@ -96,7 +96,7 @@ impl Display for VrlRuntime {
             "{}",
             match self {
                 VrlRuntime::Ast => "ast",
-                VrlRuntime::AstBatch => "ast_batch",
+                VrlRuntime::Vectorized => "vectorized",
                 VrlRuntime::Llvm => "llvm",
             }
         )

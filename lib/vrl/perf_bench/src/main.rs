@@ -153,7 +153,7 @@ fn main() {
                 stdout.flush().unwrap();
                 stdin.read_line(&mut results_path).unwrap();
             }
-            VrlRuntime::AstBatch => {
+            VrlRuntime::Vectorized => {
                 let mut states = Vec::<Runtime>::new();
                 let mut selection_vector = Vec::new();
                 let mut run_vrl = |samples: &mut [_], i| {

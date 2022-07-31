@@ -27,7 +27,7 @@ for FILE in "$SCRIPT_DIR/inputs/"*.vrl; do
         TARGET=$(cat $TARGET_FILE | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | sed 's/\[/\\\[/g' | sed 's/\]/\\\]/g')
         TARGET_FILENAME="$(basename "$TARGET_FILE" | cut -d. -f1)"
 
-        for RUNTIME in "ast" "ast_batch" "llvm"; do
+        for RUNTIME in "ast" "vectorized" "llvm"; do
 			COMMANDS=$(cat <<-END
 				set timeout -1
 				spawn $EXECUTABLE_PATH
