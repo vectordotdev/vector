@@ -120,13 +120,13 @@ pub extern "C" fn vrl_resolved_err_into_ok(resolved: &mut Resolved) {
 
 #[no_mangle]
 #[primitive_calling_convention]
-pub extern "C" fn vrl_resolved_is_ok(resolved: &mut Resolved) -> bool {
+pub extern "C" fn vrl_resolved_is_ok(resolved: &Resolved) -> bool {
     resolved.is_ok()
 }
 
 #[no_mangle]
 #[primitive_calling_convention]
-pub extern "C" fn vrl_resolved_is_err(resolved: &mut Resolved) -> bool {
+pub extern "C" fn vrl_resolved_is_err(resolved: &Resolved) -> bool {
     resolved.is_err()
 }
 
