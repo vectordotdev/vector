@@ -312,7 +312,7 @@ pub struct CommandServerStatusWiredTigerBlockManager {
     #[serde(rename = "bytes read")]
     pub bytes_read: i32,
     #[serde(rename = "bytes written")]
-    pub bytes_written: i64,
+    pub bytes_written: i32,
     #[serde(rename = "mapped blocks read")]
     pub mapped_blocks_read: i32,
     #[serde(rename = "mapped bytes read")]
@@ -328,7 +328,7 @@ pub struct CommandServerStatusWiredTigerCache {
     #[serde(rename = "bytes written from cache")]
     pub bytes_written_from: i64,
     #[serde(rename = "maximum bytes configured")]
-    pub max_bytes: i64,
+    pub max_bytes: f64,
     #[serde(rename = "modified pages evicted")]
     pub evicted_modified: i32,
     #[serde(rename = "pages currently held in the cache")]
