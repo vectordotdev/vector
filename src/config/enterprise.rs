@@ -70,7 +70,8 @@ pub struct Options {
 
     #[serde(default)]
     pub api_key: Option<String>,
-
+    #[configurable(deprecated)]
+    pub application_key: String,
     pub configuration_key: String,
 
     #[serde(default = "default_reporting_interval_secs")]
@@ -290,6 +291,12 @@ impl TryFrom<&Config> for EnterpriseMetadata {
                 _ => return Err(EnterpriseError::MissingApiKey),
             },
         };
+
+        if let Some(_) = &opts.application_key {
+            warn!(
+                "Datadog application key is deprecated. You can safely remove `application_key` from the config."
+            );
+        }
 
         info!(
             "Datadog API key provided. Integration with {} is enabled.",
