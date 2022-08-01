@@ -1,7 +1,7 @@
-use std::{borrow::Cow, convert::TryFrom, fmt};
+use std::{convert::TryFrom, fmt};
 
 use diagnostic::{DiagnosticMessage, Label, Note};
-use lookup::{Lookup, LookupBuf, Segment};
+use lookup::{LookupBuf, SegmentBuf};
 use value::{Kind, Value};
 
 use crate::{
@@ -221,7 +221,7 @@ fn verify_overwriteable(
     assignment_span: Span,
     rhs_expr: Expr,
 ) -> Result<(), Error> {
-    let mut path = target.lookup();
+    let mut path = target.lookup_buf();
 
     let root_kind = match target {
         Target::Noop => Kind::any(),
@@ -238,14 +238,10 @@ fn verify_overwriteable(
     // or index, check the segment before it, and ensure that its kind is an
     // object or array.
     while let Some(last) = path.pop_back() {
-        let parent_kind = root_kind
-            .find_at_path(&path)
-            .ok()
-            .flatten()
-            .map_or_else(Kind::any, Cow::into_owned);
+        let parent_kind = root_kind.at_path(&path);
 
         let (variant, segment_span, valid) = match last {
-            segment @ (Segment::Field(_) | Segment::Coalesce(_)) => {
+            segment @ (SegmentBuf::Field(_) | SegmentBuf::Coalesce(_)) => {
                 let segment_str = segment.to_string();
                 let segment_start = parent_span.end() - segment_str.len();
                 let segment_span = Span::new(segment_start, parent_span.end());
@@ -255,7 +251,7 @@ fn verify_overwriteable(
 
                 ("object", segment_span, parent_kind.contains_object())
             }
-            Segment::Index(index) => {
+            SegmentBuf::Index(index) => {
                 let segment_start = parent_span.end() - format!("[{index}]").len();
                 let segment_span = Span::new(segment_start, parent_span.end());
 
@@ -355,16 +351,10 @@ impl Target {
             Self::Noop => {}
             Self::Internal(ident, path) => {
                 let type_def = match local.variable(ident) {
-                    None => {
-                        if path.is_root() {
-                            new_type_def
-                        } else {
-                            new_type_def.for_path(&path.to_lookup())
-                        }
+                    None => TypeDef::null().with_type_inserted(path, new_type_def),
+                    Some(&Details { ref type_def, .. }) => {
+                        type_def.clone().with_type_inserted(path, new_type_def)
                     }
-                    Some(&Details { ref type_def, .. }) => type_def
-                        .clone()
-                        .with_type_set_at_path(&path.to_lookup(), new_type_def),
                 };
 
                 let details = Details { type_def, value };
@@ -377,7 +367,7 @@ impl Target {
                         .target()
                         .type_def
                         .clone()
-                        .with_type_set_at_path(&path.to_lookup(), new_type_def),
+                        .with_type_inserted(path, new_type_def),
                     value,
                 });
             }
@@ -413,11 +403,11 @@ impl Target {
         }
     }
 
-    fn lookup(&self) -> Lookup<'_> {
+    fn lookup_buf(&self) -> LookupBuf {
         match self {
-            Self::Noop => Lookup::root(),
-            Self::Internal(_, path) => path.to_lookup(),
-            Self::External(path) => path.to_lookup(),
+            Self::Noop => LookupBuf::root(),
+            Self::Internal(_, path) => path.clone(),
+            Self::External(path) => path.clone(),
         }
     }
 }
@@ -547,7 +537,12 @@ where
 
         match self {
             Single { expr, .. } => expr.type_def(state),
-            Infallible { expr, .. } => expr.type_def(state).infallible(),
+            Infallible { expr, .. } => {
+                // Return type is either the "expr" type, or "bytes" (the error message).
+                let mut type_def = expr.type_def(state);
+                type_def.kind_mut().add_bytes();
+                type_def.infallible()
+            }
         }
     }
 }

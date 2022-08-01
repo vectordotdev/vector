@@ -1,9 +1,9 @@
 # result:
 #
 # error[E642]: parent path segment rejects this mutation
-#   ┌─ :3:5
+#   ┌─ :4:5
 #   │
-# 3 │ foo.bar = {}
+# 4 │ foo.bar = {}
 #   │ --- ^^^ querying a field of a non-object type is unsupported
 #   │ │
 #   │ this path resolves to a value of type string
@@ -18,26 +18,26 @@
 #   = try your code in the VRL REPL, learn more at https://vrl.dev/examples
 #
 # error[E642]: parent path segment rejects this mutation
-#   ┌─ :4:5
+#   ┌─ :5:9
 #   │
-# 4 │ foo.bar.baz = "baz"
-#   │ --- ^^^ querying a field of a non-object type is unsupported
+# 5 │ foo.bar.baz = "baz"
+#   │ ------- ^^^ querying a field of a non-object type is unsupported
 #   │ │
-#   │ this path resolves to a value of type string
+#   │ this path resolves to a value of type undefined
 #   │
 #   = try: change parent value to object, before assignment
 #   =
-#   =     foo = {}
-#   =     foo.bar.baz = "baz"
+#   =     foobar = {}
+#   =     foobar.baz = "baz"
 #   =
 #   = see documentation about error handling at https://errors.vrl.dev/#handling
 #   = see language documentation at https://vrl.dev
 #   = try your code in the VRL REPL, learn more at https://vrl.dev/examples
 #
 # error[E642]: parent path segment rejects this mutation
-#   ┌─ :7:2
+#   ┌─ :8:2
 #   │
-# 7 │ .bar = "bar"
+# 8 │ .bar = "bar"
 #   │ -^^^ querying a field of a non-object type is unsupported
 #   │ │
 #   │ this path resolves to a value of type string
@@ -52,9 +52,9 @@
 #   = try your code in the VRL REPL, learn more at https://vrl.dev/examples
 #
 # error[E642]: parent path segment rejects this mutation
-#    ┌─ :10:6
+#    ┌─ :11:6
 #    │
-# 10 │ .foo.bar = "bar"
+# 11 │ .foo.bar = "bar"
 #    │ ---- ^^^ querying a field of a non-object type is unsupported
 #    │ │
 #    │ this path resolves to a value of type boolean
@@ -69,9 +69,9 @@
 #    = try your code in the VRL REPL, learn more at https://vrl.dev/examples
 #
 # error[E642]: parent path segment rejects this mutation
-#    ┌─ :13:5
+#    ┌─ :14:5
 #    │
-# 13 │ foo.(bar | baz) = "bar baz"
+# 14 │ foo.(bar | baz) = "bar baz"
 #    │ --- ^^^^^^^^^^^ querying a field of a non-object type is unsupported
 #    │ │
 #    │ this path resolves to a value of type integer
@@ -84,6 +84,7 @@
 #    = see documentation about error handling at https://errors.vrl.dev/#handling
 #    = see language documentation at https://vrl.dev
 #    = try your code in the VRL REPL, learn more at https://vrl.dev/examples
+
 
 foo = "foo"
 foo.bar = {}

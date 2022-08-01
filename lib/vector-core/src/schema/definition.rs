@@ -1,12 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::config::LogNamespace;
-use lookup::LookupBuf;
-use value::kind::insert;
-use value::{
-    kind::{merge, Collection},
-    Kind,
-};
+use crate::config::{log_schema, LogNamespace};
+use lookup::{LookupBuf, SegmentBuf};
+use value::{kind::Collection, Kind};
 
 /// The definition of a schema.
 ///
@@ -95,10 +91,13 @@ impl Definition {
         }
     }
 
-    /// Creates a new definition that is of the kind specified.
+    /// Creates a new definition that is of the event kind specified, and an empty object for metadata.
     /// There are no meanings.
     /// The `log_namespaces` are used to list the possible namespaces the schema is for.
-    pub fn new(event_kind: Kind, log_namespaces: impl Into<BTreeSet<LogNamespace>>) -> Self {
+    pub fn new_with_default_metadata(
+        event_kind: Kind,
+        log_namespaces: impl Into<BTreeSet<LogNamespace>>,
+    ) -> Self {
         Self {
             event_kind,
             metadata_kind: Kind::object(Collection::empty()),
@@ -107,16 +106,32 @@ impl Definition {
         }
     }
 
+    /// Creates a new definition, specifying both the event and metadata kind.
+    /// There are no meanings.
+    /// The `log_namespaces` are used to list the possible namespaces the schema is for.
+    pub fn new(
+        event_kind: Kind,
+        metadata_kind: Kind,
+        log_namespaces: impl Into<BTreeSet<LogNamespace>>,
+    ) -> Self {
+        Self {
+            event_kind,
+            metadata_kind,
+            meaning: BTreeMap::default(),
+            log_namespaces: log_namespaces.into(),
+        }
+    }
+
     /// An object with any fields, and the `Legacy` namespace.
     /// This is the default schema for a source that does not explicitely provide one yet.
     pub fn default_legacy_namespace() -> Self {
-        Self::new(Kind::any_object(), [LogNamespace::Legacy])
+        Self::new_with_default_metadata(Kind::any_object(), [LogNamespace::Legacy])
     }
 
     /// An object with no fields, and the `Legacy` namespace.
     /// This is what most sources use for the legacy namespace.
     pub fn empty_legacy_namespace() -> Self {
-        Self::new(Kind::object(Collection::empty()), [LogNamespace::Legacy])
+        Self::new_with_default_metadata(Kind::object(Collection::empty()), [LogNamespace::Legacy])
     }
 
     /// Returns the source schema for a source that produce the listed log namespaces,
@@ -125,9 +140,9 @@ impl Definition {
         let is_legacy = log_namespaces.contains(&LogNamespace::Legacy);
         let is_vector = log_namespaces.contains(&LogNamespace::Vector);
         match (is_legacy, is_vector) {
-            (false, false) => Self::new(Kind::any(), []),
+            (false, false) => Self::new_with_default_metadata(Kind::any(), []),
             (true, false) => Self::default_legacy_namespace(),
-            (false, true) => Self::new(Kind::any(), [LogNamespace::Vector]),
+            (false, true) => Self::new_with_default_metadata(Kind::any(), [LogNamespace::Vector]),
             (true, true) => Self::any(),
         }
     }
@@ -135,6 +150,86 @@ impl Definition {
     /// The set of possible log namespaces that events can use. When merged, this is the union of all inputs.
     pub fn log_namespaces(&self) -> &BTreeSet<LogNamespace> {
         &self.log_namespaces
+    }
+
+    /// Adds the `source_type` and `ingest_timestamp` metadata fields, which are added to every Vector source.
+    #[must_use]
+    pub fn with_standard_vector_source_metadata(self) -> Self {
+        self.with_vector_metadata(
+            LookupBuf::from_str(log_schema().source_type_key()).expect("valid source_type key"),
+            "source_type",
+            Kind::bytes(),
+            None,
+        )
+        .with_vector_metadata(
+            LookupBuf::from_str(log_schema().timestamp_key()).expect("valid timestamp key"),
+            "ingest_timestamp",
+            Kind::timestamp(),
+            None,
+        )
+    }
+
+    /// This should be used wherever `LogNamespace::insert_source_metadata` is used to insert metadata.
+    /// This automatically detects which log namespaces are used, and also automatically
+    /// determines if there are possible conflicts from existing field names (usually from the selected decoder).
+    #[must_use]
+    pub fn with_source_metadata(
+        self,
+        source_name: &str,
+        legacy_path: impl Into<LookupBuf>,
+        vector_path: impl Into<LookupBuf>,
+        kind: Kind,
+        meaning: Option<&str>,
+    ) -> Self {
+        self.with_namespaced_metadata(source_name, legacy_path, vector_path, kind, meaning)
+    }
+
+    /// This should be used wherever `LogNamespace::insert_vector_metadata` is used to insert metadata.
+    /// This automatically detects which log namespaces are used, and also automatically
+    /// determines if there are possible conflicts from existing field names (usually from the selected decoder).
+    #[must_use]
+    pub fn with_vector_metadata(
+        self,
+        legacy_path: impl Into<LookupBuf>,
+        vector_path: impl Into<LookupBuf>,
+        kind: Kind,
+        meaning: Option<&str>,
+    ) -> Self {
+        self.with_namespaced_metadata("vector", legacy_path, vector_path, kind, meaning)
+    }
+
+    /// This generalizes the `LogNamespace::insert_*` methods for type definitions.
+    fn with_namespaced_metadata(
+        self,
+        prefix: &str,
+        legacy_path: impl Into<LookupBuf>,
+        vector_path: impl Into<LookupBuf>,
+        kind: Kind,
+        meaning: Option<&str>,
+    ) -> Self {
+        let legacy_definition = if self.log_namespaces.contains(&LogNamespace::Legacy) {
+            Some(
+                self.clone()
+                    .try_with_field(legacy_path, kind.clone(), meaning),
+            )
+        } else {
+            None
+        };
+
+        let vector_definition = if self.log_namespaces.contains(&LogNamespace::Vector) {
+            let mut path_with_prefix = vector_path.into();
+            path_with_prefix.push_front(SegmentBuf::from(prefix));
+
+            Some(self.clone().with_metadata_field(path_with_prefix, kind))
+        } else {
+            None
+        };
+
+        match (legacy_definition, vector_definition) {
+            (Some(a), Some(b)) => a.merge(b),
+            (Some(x), _) | (_, Some(x)) => x,
+            (None, None) => self,
+        }
     }
 
     /// Add type information for an event field.
@@ -155,37 +250,50 @@ impl Definition {
         let meaning = meaning.map(ToOwned::to_owned);
 
         if !path.is_root() {
-            if kind.contains_null() {
-                // field is optional, so don't coerce to an object, but still make sure it _can_ be an object
-                assert!(
-                    self.event_kind.as_object().is_some(),
-                    "Setting a field on a value that cannot be an object"
-                );
-            } else {
-                self.event_kind = self
-                    .event_kind
-                    .into_object()
-                    .expect("required field implies the type can be an object")
-                    .into();
-            }
+            assert!(
+                self.event_kind.as_object().is_some(),
+                "Setting a field on a value that cannot be an object"
+            );
         }
-        self.event_kind
-            .insert_at_path(
-                &path.to_lookup(),
-                kind,
-                insert::Strategy {
-                    inner_conflict: insert::InnerConflict::Replace,
-                    leaf_conflict: insert::LeafConflict::Replace,
-                    coalesced_path: insert::CoalescedPath::Reject,
-                },
-            )
-            .expect("Field definition not valid");
+
+        self.event_kind.set_at_path(&path, kind);
 
         if let Some(meaning) = meaning {
             self.meaning.insert(meaning, MeaningPointer::Valid(path));
         }
 
         self
+    }
+
+    /// Add type information for an event field.
+    /// This inserts type information similar to `LogEvent::try_insert`.
+    #[must_use]
+    pub fn try_with_field(
+        mut self,
+        path: impl Into<LookupBuf>,
+        kind: Kind,
+        meaning: Option<&str>,
+    ) -> Self {
+        let path = path.into();
+
+        let existing_type = self.event_kind.at_path(&path);
+
+        if existing_type.is_undefined() {
+            // Guaranteed to never be set, so the insertion will always succeed.
+            self.with_field(path.clone(), kind, meaning)
+        } else if !existing_type.contains_undefined() {
+            // Guaranteed to always be set (or is never), so the insertion will always fail.
+            self
+        } else {
+            // Not sure if the insertion will be successful. The type definition should contain both
+            // possibilities. The meaning is not set, since it can't be relied on.
+
+            let success_definition = self.clone().with_field(path.clone(), kind, None);
+            // If the existing type contains `undefined`, the new type will always be used, so remove it.
+            self.event_kind
+                .set_at_path(&path, existing_type.without_undefined());
+            self.merge(success_definition)
+        }
     }
 
     /// Add type information for an event field.
@@ -200,33 +308,13 @@ impl Definition {
         let path = path.into();
 
         if !path.is_root() {
-            if kind.contains_null() {
-                // field is optional, so don't coerce to an object, but still make sure it _can_ be an object
-                assert!(
-                    self.event_kind.as_object().is_some(),
-                    "Setting a field on a value that cannot be an object"
-                );
-            } else {
-                self.event_kind = self
-                    .event_kind
-                    .into_object()
-                    .expect("required field implies the type can be an object")
-                    .into();
-            }
+            assert!(
+                self.metadata_kind.as_object().is_some(),
+                "Setting a field on a value that cannot be an object"
+            );
         }
 
-        if let Err(err) = self.metadata_kind.insert_at_path(
-            &path.to_lookup(),
-            kind,
-            insert::Strategy {
-                inner_conflict: insert::InnerConflict::Replace,
-                leaf_conflict: insert::LeafConflict::Replace,
-                coalesced_path: insert::CoalescedPath::Reject,
-            },
-        ) {
-            panic!("Field definition not valid: {:?}", err);
-        }
-
+        self.metadata_kind.set_at_path(&path, kind);
         self
     }
 
@@ -242,7 +330,7 @@ impl Definition {
         kind: Kind,
         meaning: Option<&str>,
     ) -> Self {
-        self.with_field(path, kind.or_null(), meaning)
+        self.with_field(path, kind.or_undefined(), meaning)
     }
 
     /// Register a semantic meaning for the definition.
@@ -256,11 +344,7 @@ impl Definition {
 
         // Ensure the path exists in the collection.
         assert!(
-            self.event_kind
-                .find_at_path(&path.to_lookup())
-                .ok()
-                .flatten()
-                .is_some(),
+            self.event_kind.at_path(&path).contains_any_defined(),
             "meaning must point to a valid path"
         );
 
@@ -271,7 +355,7 @@ impl Definition {
 
     /// Set the kind for all unknown fields.
     #[must_use]
-    pub fn unknown_fields(mut self, unknown: impl Into<Option<Kind>>) -> Self {
+    pub fn unknown_fields(mut self, unknown: impl Into<Kind>) -> Self {
         let unknown = unknown.into();
         if let Some(object) = self.event_kind.as_object_mut() {
             object.set_unknown(unknown.clone());
@@ -296,14 +380,8 @@ impl Definition {
             self.meaning.insert(other_id, meaning);
         }
 
-        self.event_kind.merge(
-            other.event_kind,
-            merge::Strategy {
-                collisions: merge::CollisionStrategy::Union,
-                indices: merge::Indices::Keep,
-            },
-        );
-
+        self.event_kind = self.event_kind.union(other.event_kind);
+        self.metadata_kind = self.metadata_kind.union(other.metadata_kind);
         self.log_namespaces.append(&mut other.log_namespaces);
         self
     }
@@ -437,7 +515,7 @@ mod tests {
                 meaning,
                 want,
             },
-        ) in HashMap::from([
+        ) in [
             (
                 "simple",
                 TestCase {
@@ -447,7 +525,7 @@ mod tests {
                     want: Definition {
                         event_kind: Kind::object(BTreeMap::from([(
                             "foo".into(),
-                            Kind::boolean().or_null(),
+                            Kind::boolean().or_undefined(),
                         )])),
                         metadata_kind: Kind::object(Collection::empty()),
                         meaning: [("foo_meaning".to_owned(), "foo".into())].into(),
@@ -464,7 +542,10 @@ mod tests {
                     want: Definition {
                         event_kind: Kind::object(BTreeMap::from([(
                             "foo".into(),
-                            Kind::object(BTreeMap::from([("bar".into(), Kind::regex().or_null())])),
+                            Kind::object(BTreeMap::from([(
+                                "bar".into(),
+                                Kind::regex().or_null().or_undefined(),
+                            )])),
                         )])),
                         metadata_kind: Kind::object(Collection::empty()),
                         meaning: [(
@@ -485,7 +566,7 @@ mod tests {
                     want: Definition {
                         event_kind: Kind::object(BTreeMap::from([(
                             "foo".into(),
-                            Kind::boolean().or_null(),
+                            Kind::boolean().or_undefined(),
                         )])),
                         metadata_kind: Kind::object(Collection::empty()),
                         meaning: BTreeMap::default(),
@@ -493,8 +574,8 @@ mod tests {
                     },
                 },
             ),
-        ]) {
-            let mut got = Definition::new(Kind::object(BTreeMap::new()), []);
+        ] {
+            let mut got = Definition::new_with_default_metadata(Kind::object(BTreeMap::new()), []);
             got = got.optional_field(path, kind, meaning);
 
             assert_eq!(got, want, "{}", title);
@@ -510,7 +591,7 @@ mod tests {
             log_namespaces: BTreeSet::new(),
         };
 
-        let mut got = Definition::new(Kind::object(Collection::empty()), []);
+        let mut got = Definition::new_with_default_metadata(Kind::object(Collection::empty()), []);
         got = got.unknown_fields(Kind::boolean());
         got = got.unknown_fields(Kind::bytes().or_integer());
 

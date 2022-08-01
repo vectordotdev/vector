@@ -224,6 +224,7 @@ impl TowerRequestSettings {
         )
     }
 
+    /// Note: This has been deprecated, please do not use when creating new Sinks.
     pub fn partition_sink<B, RL, S, K>(
         &self,
         retry_logic: RL,
@@ -248,6 +249,7 @@ impl TowerRequestSettings {
         PartitionBatchSink::new(service, batch, batch_timeout)
     }
 
+    /// Note: This has been deprecated, please do not use when creating new Sinks.
     pub fn batch_sink<B, RL, S>(
         &self,
         retry_logic: RL,

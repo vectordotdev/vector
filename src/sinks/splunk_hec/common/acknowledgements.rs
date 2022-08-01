@@ -8,6 +8,7 @@ use std::{
 use hyper::Body;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc::Receiver, oneshot::Sender};
+use vector_config::configurable_component;
 use vector_core::event::EventStatus;
 
 use super::service::{HttpRequestBuilder, MetadataFields};
@@ -20,13 +21,27 @@ use crate::{
     },
 };
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+/// Splunk HEC acknowledgement configuration.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(default)]
 pub struct HecClientAcknowledgementsConfig {
+    /// Controls if the sink will integrate with [Splunk HEC indexer acknowledgements][splunk_indexer_ack_docs] for end-to-end acknowledgements.
+    ///
+    /// [splunk_indexer_ack_docs]: https://docs.splunk.com/Documentation/Splunk/8.2.3/Data/AboutHECIDXAck
     pub indexer_acknowledgements_enabled: bool,
+
+    /// The amount of time, in seconds, to wait in between queries to the Splunk HEC indexer acknowledgement endpoint.
     pub query_interval: NonZeroU8,
+
+    /// The maximum number of times an acknowledgement ID will be queried for its status.
     pub retry_limit: NonZeroU8,
+
+    /// The maximum number of pending acknowledgements from events sent to the Splunk HEC collector.
+    ///
+    /// Once reached, the sink will begin applying backpressure.
     pub max_pending_acks: NonZeroU64,
+
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",

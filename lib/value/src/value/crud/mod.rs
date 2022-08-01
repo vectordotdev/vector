@@ -80,11 +80,16 @@ impl ValueCollection for BTreeMap<String, Value> {
     }
 }
 
-fn array_index(array: &[Value], index: isize) -> usize {
+fn array_index(array: &[Value], index: isize) -> Option<usize> {
     if index >= 0 {
-        index as usize
+        Some(index as usize)
     } else {
-        (array.len() as isize + index) as usize
+        let index = array.len() as isize + index;
+        if index >= 0 {
+            Some(index as usize)
+        } else {
+            None
+        }
     }
 }
 
@@ -93,12 +98,11 @@ impl ValueCollection for Vec<Value> {
     type BorrowedKey = isize;
 
     fn get_value(&self, key: &Self::Key) -> Option<&Value> {
-        self.get(array_index(self, *key))
+        array_index(self, *key).and_then(|index| self.get(index))
     }
 
     fn get_mut_value(&mut self, key: &isize) -> Option<&mut Value> {
-        let index = array_index(self, *key);
-        self.get_mut(index)
+        array_index(self, *key).and_then(|index| self.get_mut(index))
     }
 
     fn insert_value(&mut self, key: isize, value: Value) -> Option<Value> {
@@ -128,12 +132,12 @@ impl ValueCollection for Vec<Value> {
     }
 
     fn remove_value(&mut self, key: &isize) -> Option<Value> {
-        let index = array_index(self, *key);
-        if index < self.len() {
-            Some(self.remove(index))
-        } else {
-            None
+        if let Some(index) = array_index(self, *key) {
+            if index < self.len() {
+                return Some(self.remove(index));
+            }
         }
+        None
     }
 
     fn is_empty_collection(&self) -> bool {
