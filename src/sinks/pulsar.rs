@@ -13,10 +13,10 @@ use pulsar::{
     message::proto, producer::SendFuture, proto::CommandSendReceipt, Authentication,
     Error as PulsarError, Producer, Pulsar, TokioExecutor,
 };
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
 use vector_common::internal_event::{BytesSent, EventsSent};
+use vector_config::configurable_component;
 use vector_core::config::log_schema;
 
 use crate::{
@@ -24,7 +24,7 @@ use crate::{
     config::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
     },
-    event::{Event, EventFinalizers, Finalizable},
+    event::{Event, EventFinalizers, EventStatus, Finalizable},
     sinks::util::metadata::RequestMetadata,
 };
 
@@ -34,28 +34,68 @@ enum BuildError {
     CreatePulsarSink { source: PulsarError },
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+/// Configuration for the `pulsar` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug)]
 pub struct PulsarSinkConfig {
-    // Deprecated name
+    /// The endpoint to which the Pulsar client should connect to.
     #[serde(alias = "address")]
     endpoint: String,
+
+    /// The Pulsar topic name to write events to.
     topic: String,
+
+    #[configurable(derived)]
     pub encoding: EncodingConfig,
+
+    #[configurable(derived)]
     auth: Option<AuthConfig>,
+
+    #[configurable(derived)]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+/// Authentication configuration.
+#[configurable_component]
+#[derive(Clone, Debug)]
 struct AuthConfig {
-    name: Option<String>,  // "token"
-    token: Option<String>, // <jwt token>
+    /// Basic authentication name/username.
+    ///
+    /// This can be used either for basic authentication (username/password) or JWT authentication.
+    /// When used for JWT, the value should be `token`.
+    name: Option<String>,
+
+    /// Basic authentication password/token.
+    ///
+    /// This can be used either for basic authentication (username/password) or JWT authentication.
+    /// When used for JWT, the value should be the signed JWT, in the compact representation.
+    token: Option<String>,
+
+    #[configurable(derived)]
     oauth2: Option<OAuth2Config>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+/// OAuth2-specific authenticatgion configuration.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct OAuth2Config {
+    /// The issuer URL.
     issuer_url: String,
+
+    /// The credentials URL.
+    ///
+    /// A data URL is also supported.
     credentials_url: String,
+
+    /// The OAuth2 audience.
     audience: Option<String>,
+
+    /// The OAuth2 scope.
     scope: Option<String>,
 }
 
@@ -105,6 +145,7 @@ impl GenerateConfig for PulsarSinkConfig {
             topic: "topic-1234".to_string(),
             encoding: TextSerializerConfig::new().into(),
             auth: None,
+            acknowledgements: Default::default(),
         })
         .unwrap()
     }
@@ -145,8 +186,8 @@ impl SinkConfig for PulsarSinkConfig {
         "pulsar"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        None
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
@@ -260,6 +301,7 @@ impl Sink<Event> for PulsarSink {
         let finalizers = event.take_finalizers();
         let mut bytes = BytesMut::new();
         self.encoder.encode(event, &mut bytes).map_err(|_| {
+            finalizers.update_status(EventStatus::Errored);
             // Error is handled by `Encoder`.
         })?;
 
@@ -301,6 +343,8 @@ impl Sink<Event> for PulsarSink {
                         sequence_id = %result.sequence_id,
                     );
 
+                    finalizers.update_status(EventStatus::Delivered);
+
                     emit!(EventsSent {
                         count: metadata.event_count(),
                         byte_size: metadata.events_byte_size(),
@@ -311,10 +355,9 @@ impl Sink<Event> for PulsarSink {
                         byte_size: metadata.request_encoded_size(),
                         protocol: "tcp",
                     });
-
-                    drop(finalizers);
                 }
-                Some((Err(error), _, _)) => {
+                Some((Err(error), _, finalizers)) => {
+                    finalizers.update_status(EventStatus::Errored);
                     error!(message = "Pulsar sink generated an error.", %error);
                     return Poll::Ready(Err(()));
                 }
@@ -370,6 +413,7 @@ mod integration_tests {
             topic: topic.clone(),
             encoding: TextSerializerConfig::new().into(),
             auth: None,
+            acknowledgements: Default::default(),
         };
 
         let pulsar = Pulsar::<TokioExecutor>::builder(&cnf.endpoint, TokioExecutor)

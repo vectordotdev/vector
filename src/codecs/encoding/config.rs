@@ -3,15 +3,15 @@ use codecs::{
     encoding::{Framer, FramingConfig, Serializer, SerializerConfig},
     CharacterDelimitedEncoder, LengthDelimitedEncoder, NewlineDelimitedEncoder,
 };
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
-/// Config used to build an `Encoder`.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-// `#[serde(deny_unknown_fields)]` doesn't work when flattening internally tagged enums, see
-// https://github.com/serde-rs/serde/issues/1358.
+/// Encoding configuration.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct EncodingConfig {
     #[serde(flatten)]
     encoding: SerializerConfig,
+
     #[serde(flatten)]
     transformer: Transformer,
 }
@@ -53,13 +53,15 @@ where
     }
 }
 
-/// Config used to build an `Encoder`.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+/// Encoding configuration.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct EncodingConfigWithFraming {
-    /// The framing config.
+    #[configurable(derived)]
     framing: Option<FramingConfig>,
-    /// The encoding config.
+
+    #[configurable(derived)]
     encoding: EncodingConfig,
 }
 

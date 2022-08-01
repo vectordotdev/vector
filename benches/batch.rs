@@ -136,7 +136,7 @@ impl Batch for PartitionedBuffer {
     type Input = InnerBuffer;
     type Output = InnerBuffer;
 
-    fn get_settings_defaults<D: SinkBatchSettings>(
+    fn get_settings_defaults<D: SinkBatchSettings + Clone>(
         config: BatchConfig<D, Merged>,
     ) -> Result<BatchConfig<D, Merged>, BatchError> {
         Buffer::get_settings_defaults(config)

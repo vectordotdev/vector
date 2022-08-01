@@ -1119,7 +1119,7 @@ mod integration_tests {
         .await;
     }
 
-    async fn source(status: EventStatus) -> (impl Stream<Item = Event>, SocketAddr) {
+    async fn source(status: EventStatus) -> (impl Stream<Item = Event> + Unpin, SocketAddr) {
         let (sender, recv) = SourceSender::new_test_finalize(status);
         let address = next_addr_for_ip(std::net::IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED));
         tokio::spawn(async move {

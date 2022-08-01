@@ -31,7 +31,9 @@ impl NativeDeserializerConfig {
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
         match log_namespace {
             LogNamespace::Legacy => schema::Definition::empty_legacy_namespace(),
-            LogNamespace::Vector => schema::Definition::new(Kind::any(), [log_namespace]),
+            LogNamespace::Vector => {
+                schema::Definition::new_with_default_metadata(Kind::any(), [log_namespace])
+            }
         }
     }
 }

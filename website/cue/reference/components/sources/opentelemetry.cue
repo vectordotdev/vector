@@ -1,7 +1,7 @@
 package metadata
 
 components: sources: opentelemetry: {
-	_port: 6788
+	_port: 4317
 
 	title: "OpenTelemetry"
 
@@ -12,7 +12,7 @@ components: sources: opentelemetry: {
 	classes: {
 		commonly_used: false
 		delivery:      "at_least_once"
-		deployment_roles: ["aggregator"]
+		deployment_roles: ["daemon", "aggregator"]
 		development:   "beta"
 		egress_method: "stream"
 		stateful:      false
@@ -32,8 +32,6 @@ components: sources: opentelemetry: {
 					ssl: "optional"
 				}
 			}
-			receive_buffer_bytes: enabled: false
-			keepalive: enabled:            true
 			tls: {
 				enabled:                true
 				can_verify_certificate: true
@@ -171,13 +169,6 @@ components: sources: opentelemetry: {
 					}
 				}
 			}
-		}
-		metrics: {
-			counter:      output._passthrough_counter
-			distribution: output._passthrough_distribution
-			gauge:        output._passthrough_gauge
-			histogram:    output._passthrough_histogram
-			set:          output._passthrough_set
 		}
 	}
 

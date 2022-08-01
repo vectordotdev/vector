@@ -72,6 +72,8 @@ impl Expression for MergeFn {
     }
 
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+        // TODO: this has a known bug when deep is true
+        // see: https://github.com/vectordotdev/vector/issues/13597
         self.to
             .type_def(state)
             .restrict_object()

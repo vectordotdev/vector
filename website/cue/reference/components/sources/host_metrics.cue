@@ -430,7 +430,7 @@ components: sources: host_metrics: {
 				mode: {
 					description: "Which mode the CPU was running in during the given time."
 					required:    true
-					examples: ["idle", "system", "user", "nice"]
+					examples: ["idle", "system", "user", "nice", "io_wait"]
 				}
 			}
 		}

@@ -50,12 +50,16 @@ pub fn spawn_thread<'a>(
                     // Consume events until delay amount of time has passed since the latest event.
                     while let Ok(..) = receiver.recv_timeout(delay) {}
 
+                    debug!(message = "Consumed file change events for delay.", delay = ?delay);
+
                     // We need to read paths to resolve any inode changes that may have happened.
                     // And we need to do it before raising sighup to avoid missing any change.
                     if let Err(error) = add_paths(&mut watcher, &config_paths) {
                         error!(message = "Failed to read files to watch.", %error);
                         break;
                     }
+
+                    debug!(message = "Reloaded paths.");
 
                     info!("Configuration file changed.");
                     raise_sighup();
@@ -126,7 +130,7 @@ mod tests {
     use tokio::signal::unix::{signal, SignalKind};
 
     use super::*;
-    use crate::test_util::{temp_file, trace_init};
+    use crate::test_util::{temp_dir, temp_file, trace_init};
 
     async fn test(file: &mut File, timeout: Duration) -> bool {
         let mut signal = signal(SignalKind::hangup()).expect("Signal handlers should not panic.");
@@ -142,10 +146,13 @@ mod tests {
         trace_init();
 
         let delay = Duration::from_secs(3);
-        let file_path = temp_file();
+        let dir = temp_dir().to_path_buf();
+        let file_path = dir.join("vector.toml");
+
+        std::fs::create_dir(&dir).unwrap();
         let mut file = File::create(&file_path).unwrap();
 
-        spawn_thread(&[file_path.parent().unwrap().to_path_buf()], delay).unwrap();
+        spawn_thread(&[dir], delay).unwrap();
 
         if !test(&mut file, delay * 5).await {
             panic!("Test timed out");

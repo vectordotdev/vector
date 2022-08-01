@@ -19,8 +19,8 @@ pub use common::*;
 pub use config::*;
 pub use encoder::ElasticsearchEncoder;
 use http::{uri::InvalidUri, Request};
-use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use vector_config::configurable_component;
 
 use crate::aws::AwsAuthentication;
 use crate::{
@@ -30,18 +30,36 @@ use crate::{
     template::{Template, TemplateParseError},
 };
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+/// Authentication strategies.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
 pub enum ElasticsearchAuth {
-    Basic { user: String, password: String },
-    Aws(AwsAuthentication),
+    /// HTTP Basic Authentication.
+    Basic {
+        /// Basic authentication username.
+        user: String,
+
+        /// Basic authentication password.
+        password: String,
+    },
+
+    /// Amazon OpenSearch Service-specific authentication.
+    Aws(#[configurable(derived)] AwsAuthentication),
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
+/// Indexing mode.
+#[configurable_component]
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum ElasticsearchMode {
+    /// Ingests documents in bulk, via the bulk API `index` action.
     #[serde(alias = "normal")]
     Bulk,
+
+    /// Ingests documents in bulk, via the bulk API `create` action.
+    ///
+    /// Elasticsearch Data Streams only support the `create` action.
     DataStream,
 }
 
@@ -51,10 +69,15 @@ impl Default for ElasticsearchMode {
     }
 }
 
-#[derive(Derivative, Deserialize, Serialize, Clone, Copy, Debug, PartialEq, Eq, Hash)]
+/// Bulk API actions.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative, Eq, Hash, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum BulkAction {
+    /// The `index` action.
     Index,
+
+    /// The `create` action.
     Create,
 }
 

@@ -265,8 +265,8 @@ mod test_sink {
             "test-backpressure-sink"
         }
 
-        fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-            None
+        fn acknowledgements(&self) -> &AcknowledgementsConfig {
+            &AcknowledgementsConfig::DEFAULT
         }
     }
 }

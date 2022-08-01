@@ -23,7 +23,9 @@ pub struct InternalLogsConfig {
     ///
     /// The value will be the current hostname for wherever Vector is running.
     ///
-    /// By default, the [global `host_key` option](https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key) is used.
+    /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
+    ///
+    /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     pub host_key: Option<String>,
 
     /// Overrides the name of the log field used to add the current process ID to each event.
@@ -228,7 +230,7 @@ mod tests {
         }
     }
 
-    async fn start_source() -> impl Stream<Item = Event> {
+    async fn start_source() -> impl Stream<Item = Event> + Unpin {
         let (tx, rx) = SourceSender::new_test();
 
         let source = InternalLogsConfig::default()

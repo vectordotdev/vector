@@ -26,8 +26,8 @@ impl From<Compression> for Writer {
         let writer = BytesMut::with_capacity(1_024).writer();
         match compression {
             Compression::None => Writer::Plain(writer),
-            Compression::Gzip(level) => Writer::Gzip(GzEncoder::new(writer, level)),
-            Compression::Zlib(level) => Writer::Zlib(ZlibEncoder::new(writer, level)),
+            Compression::Gzip(level) => Writer::Gzip(GzEncoder::new(writer, level.as_flate2())),
+            Compression::Zlib(level) => Writer::Zlib(ZlibEncoder::new(writer, level.as_flate2())),
         }
     }
 }

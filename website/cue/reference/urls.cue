@@ -195,6 +195,7 @@ urls: {
 	gcp_authentication_server_to_server:        "\(gcp)/docs/authentication/production"
 	gcp_authentication_service_account:         "\(gcp)/docs/authentication/production#obtaining_and_providing_service_account_credentials_manually"
 	gcp_cloud_storage:                          "\(gcp)/storage"
+	gcp_chronicle:                              "https://chronicle.security"
 	gcp_folders:                                "\(gcp)/resource-manager/docs/creating-managing-folders"
 	gcp_pubsub:                                 "\(gcp)/pubsub/"
 	gcp_pubsub_rest:                            "\(gcp)/pubsub/docs/reference/rest/"

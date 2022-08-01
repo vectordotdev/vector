@@ -8,7 +8,7 @@ mod sink;
 
 mod integration_tests;
 
-use self::config::CloudwatchLogsSinkConfig;
+pub use self::config::CloudwatchLogsSinkConfig;
 use crate::{config::SinkDescription, internal_events::TemplateRenderingError};
 
 inventory::submit! {

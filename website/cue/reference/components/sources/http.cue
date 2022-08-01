@@ -164,6 +164,13 @@ components: sources: http: {
 						examples: ["/", "/logs/event712"]
 					}
 				}
+				source_type: {
+					description: "The name of the source type."
+					required:    true
+					type: string: {
+						examples: ["http"]
+					}
+				}
 				timestamp: fields._current_timestamp
 			}
 		}
@@ -213,11 +220,12 @@ components: sources: http: {
 				"""
 			output: [{
 				log: {
-					host:         _values.local_host
-					message:      _line
-					timestamp:    _values.current_timestamp
-					path:         _path
-					"User-Agent": _user_agent
+					host:          _values.local_host
+					message:       _line
+					timestamp:     _values.current_timestamp
+					path:          _path
+					"User-Agent":  _user_agent
+					"source_type": "http"
 				}
 			}]
 		},
@@ -246,11 +254,12 @@ components: sources: http: {
 				"""
 			output: [{
 				log: {
-					host:         _values.local_host
-					key:          "val"
-					timestamp:    _values.current_timestamp
-					_path_key:    _path
-					"User-Agent": _user_agent
+					host:          _values.local_host
+					key:           "val"
+					timestamp:     _values.current_timestamp
+					_path_key:     _path
+					"User-Agent":  _user_agent
+					"source_type": "http"
 				}
 			}]
 		},

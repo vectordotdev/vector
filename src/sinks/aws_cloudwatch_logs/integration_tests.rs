@@ -119,7 +119,7 @@ async fn cloudwatch_insert_log_events_sorted() {
         if doit {
             let timestamp = chrono::Utc::now() - chrono::Duration::days(1);
 
-            events.for_each_log(|log| {
+            events.iter_logs_mut().for_each(|log| {
                 log.insert(log_schema().timestamp_key(), Value::Timestamp(timestamp));
             });
         }
