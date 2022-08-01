@@ -14,20 +14,20 @@ components: sources: azure_event_hubs: {
 
 	features: {
 		acknowledgements: true
-		collect: from: {
-			service: services.kafka
-			interface: {
-				socket: {
-					api: {
-						title: "Kafka protocol"
-						url:   urls.kafka_protocol
-					}
-					direction: "incoming"
-					port:      9093
-					protocols: ["tcp"]
-					ssl: "optional"
-				}
+		collect: {
+			checkpoint: enabled: false
+			tls: {
+				enabled:                true
+				can_verify_certificate: false
+				can_verify_hostname:    false
+				enabled_default:        false
 			}
+			from: components._kafka.features.collect.from
+		}
+		multiline: enabled: false
+		codecs: {
+			enabled:         true
+			default_framing: "bytes"
 		}
 	}
 
@@ -38,6 +38,7 @@ components: sources: azure_event_hubs: {
 	}
 
 	configuration: {
+		acknowledgements: configuration._source_acknowledgements
 		connection_string: {
 			description: """
 				The connection string.
@@ -49,16 +50,13 @@ components: sources: azure_event_hubs: {
 			}
 		}
 		namespace: {
-			common:      false
 			description: "The namespace name."
 			required:    true
 			type: string: {
 				examples: ["namespace"]
-				options: {}
 			}
 		}
 		queue_name: {
-			common:      false
 			description: "The name of the queue to listen to."
 			required:    true
 			type: string: {
