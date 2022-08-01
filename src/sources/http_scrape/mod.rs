@@ -8,7 +8,7 @@
 //!   - Call http_scrape() supplying the generic inputs for scraping and the source-specific
 //!     context.
 
-#[cfg(all(unix, feature = "sources-http_scrape"))]
+#[cfg(feature = "sources-http_scrape")]
 pub mod scrape;
 
 pub use scrape::HttpScrapeConfig;
