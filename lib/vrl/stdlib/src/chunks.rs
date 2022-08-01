@@ -1,6 +1,8 @@
 use ::value::Value;
 use vrl::prelude::*;
 
+const MAX_UTF8_CODE_POINT_LENGTH_IN_BYTES: usize = 4;
+
 fn chunks(value: Value, chunk_size: Value) -> Resolved {
     let chunk_size = chunk_size.try_integer()? as usize;
     let bytes = value.try_bytes()?;
@@ -12,7 +14,7 @@ fn chunks(value: Value, chunk_size: Value) -> Resolved {
     let mut start = 0;
     let mut end;
 
-    if chunk_size < 4 {
+    if chunk_size < MAX_UTF8_CODE_POINT_LENGTH_IN_BYTES {
         return Err(r#""chunk_size" must be greater than or equal to 4 bytes"#.into());
     }
 
@@ -33,7 +35,7 @@ fn chunks(value: Value, chunk_size: Value) -> Resolved {
         } else {
             backtrack += 1;
 
-            if backtrack > 3 {
+            if backtrack >= MAX_UTF8_CODE_POINT_LENGTH_IN_BYTES {
                 return Err("Bytes are not valid UTF-8".into());
             }
         }
