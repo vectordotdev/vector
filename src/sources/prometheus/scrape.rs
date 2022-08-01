@@ -6,13 +6,13 @@ use http::{response::Parts, Uri};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use vector_config::configurable_component;
-use vector_core::{config::LogNamespace, event::Event, ByteSizeOf};
+use vector_core::{config::LogNamespace, event::Event};
 
 use super::parser;
 use crate::{
     config::{self, GenerateConfig, Output, SourceConfig, SourceContext, SourceDescription},
     http::Auth,
-    internal_events::{PrometheusEventsReceived, PrometheusParseError},
+    internal_events::PrometheusParseError,
     sources::{
         self,
         http_scrape::{
@@ -270,11 +270,6 @@ impl HttpScraper for PrometheusScrapeContext {
 
         match parser::parse_text(&body) {
             Ok(mut events) => {
-                emit!(PrometheusEventsReceived {
-                    byte_size: events.size_of(),
-                    count: events.len(),
-                    uri: url.clone()
-                });
                 for event in events.iter_mut() {
                     let metric = event.as_mut_metric();
                     if let Some(InstanceInfo {
