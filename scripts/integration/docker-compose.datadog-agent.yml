@@ -48,7 +48,7 @@ services:
       - "--features"
       - "datadog-agent-integration-tests"
       - "--lib"
-      - "sources::datadog::agent::integration_tests::"
+      - "sources::datadog_agent::integration_tests::"
     environment:
       - AGENT_ADDRESS=datadog-agent:8181
       - AGENT_HEALTH_ADDRESS=http://datadog-agent:8182
