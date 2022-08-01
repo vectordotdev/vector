@@ -71,7 +71,7 @@ pub struct GotHttpError<'a> {
     pub roundtrip: Duration,
 }
 
-impl<'a> InternalEvent for GotHttpError<'a> {
+impl<'a> InternalEvent for GotHttpWarning<'a> {
     fn emit(self) {
         warn!(
             message = "HTTP error.",
