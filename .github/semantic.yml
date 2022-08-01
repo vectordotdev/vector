@@ -146,6 +146,7 @@ scopes:
   - kubernetes_logs source # Anything `kubernetes_logs` source related
   - logstash source # Anything `logstash` source related
   - mongodb_metrics source # Anything `mongodb_metrics` source related
+  - new source # A request for a new source
   - nginx_metrics source # Anything `nginx_metrics` source related
   - opentelemetry source # Anything `opentelemetry` source related
   - postgresql_metrics source # Anything `postgresql_metrics` source related
@@ -167,6 +168,7 @@ scopes:
   - log_to_metric transform # Anything `log_to_metric` transform related
   - lua transform # Anything `lua` transform related
   - metric_to_log transform # Anything `metric_to_log` transform related
+  - new transform # A request for a new transform
   - pipelines transform # Anything `pipelines` transform related
   - reduce transform # Anything `reduce` transform related
   - remap transform # Anything `remap` transform related
@@ -208,6 +210,7 @@ scopes:
   - logdna sink # Anything `logdna` sink related
   - loki sink # Anything `loki` sink related
   - nats sink # Anything `nats` sink related
+  - new sink # A request for a new sink
   - new_relic sink # Anything `new_relic` sink related
   - new_relic_logs sink # Anything `new_relic_logs` sink related
   - opentelemetry sink # Anything `opentelemetry` sink related
