@@ -80,9 +80,9 @@ components: sources: azure_event_hubs: {
 		kafka: {
 			title: "kafka"
 			body:  """
-		This component leverages event hubs' compatability with `kafka`.
-		See the documentation [here](\(urls.azure_event_hubs_kafka_ecosystem))
-		for details on how `azure_event_hubs` can use `kafka`.
+				This component leverages event hubs' compatability with `kafka`.
+				See the documentation [here](\(urls.azure_event_hubs_kafka_ecosystem))
+				for details on how `azure_event_hubs` can use `kafka`.
 				"""
 		}
 	}
