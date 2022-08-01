@@ -97,7 +97,7 @@ impl SourceConfig for AzureEventHubsConfig {
             },
             framing: self.framing.clone(),
             decoding: self.decoding.clone(),
-            acknowledgements: self.acknowledgements.clone(),
+            acknowledgements: self.acknowledgements,
         };
 
         source.build(cx).await
