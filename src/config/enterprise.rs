@@ -70,8 +70,8 @@ pub struct Options {
 
     #[serde(default)]
     pub api_key: Option<String>,
-    #[configurable(deprecated)]
-    pub application_key: String,
+    // deprecated
+    pub application_key: Option<String>,
     pub configuration_key: String,
 
     #[serde(default = "default_reporting_interval_secs")]
@@ -98,6 +98,7 @@ impl Default for Options {
             region: None,
             endpoint: None,
             api_key: None,
+            application_key: None,
             configuration_key: "".to_owned(),
             reporting_interval_secs: default_reporting_interval_secs(),
             max_retries: default_max_retries(),
