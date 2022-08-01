@@ -17,16 +17,20 @@ use crate::{
 };
 
 /// Configuration for the `azure_event_hubs` source.
-/// This component is a simple wrapper over the `kafka` source.
-/// See the documentation [here](https://docs.microsoft.com/en-gb/azure/event-hubs/event-hubs-for-kafka-ecosystem-overview)
+/// This component leverages event hubs' compatability with `kafka`.
+/// See the documentation [here](event_hubs_docs)
 /// for details on how `azure_event_hubs` can use `kafka`.
+///
+/// [event_hubs_docs]: https://docs.microsoft.com/en-gb/azure/event-hubs/event-hubs-for-kafka-ecosystem-overview
 #[configurable_component(source)]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub struct AzureEventHubsConfig {
     /// The connection string.
-    /// See [here](https://docs.microsoft.com/en-gb/azure/event-hubs/event-hubs-get-connection-string) for details.
+    /// See [here](connection_string) for details.
+    ///
+    /// [connection_string]: https://docs.microsoft.com/en-gb/azure/event-hubs/event-hubs-get-connection-string
     pub connection_string: String,
 
     /// The namespace name.
