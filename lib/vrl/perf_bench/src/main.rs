@@ -1,7 +1,7 @@
 #![allow(clippy::print_stdout)]
 
-use std::{collections::HashMap, io::Write, path::Path, str::FromStr, time::Duration};
-
+use serde::Serialize;
+use std::{collections::HashMap, io::Write, path::Path, str::FromStr};
 use value::Value;
 use vector_common::TimeZone;
 use vector_core::event::{Event, LogEvent, TargetEvents, VrlTarget};
@@ -11,6 +11,47 @@ use vrl::{
     state::{ExternalEnv, Runtime},
     BatchContext, Context, Target, VrlRuntime,
 };
+
+#[derive(Debug, Copy, Clone, Default, Serialize)]
+struct Sample {
+    pub nanos: u64,
+    #[cfg(feature = "performance_counters")]
+    pub cycles: u64,
+    #[cfg(feature = "performance_counters")]
+    pub load_store_instructions: u64,
+    #[cfg(feature = "performance_counters")]
+    pub l1_data_load_cache_misses: u64,
+    #[cfg(feature = "performance_counters")]
+    pub l1_data_store_cache_misses: u64,
+}
+
+impl Sample {
+    #[cfg(feature = "performance_counters")]
+    pub fn contains_empty_performance_counters(&self) -> bool {
+        self.cycles == 0
+            || self.load_store_instructions == 0
+            || self.l1_data_load_cache_misses == 0
+            || self.l1_data_store_cache_misses == 0
+    }
+}
+
+impl std::ops::Div<usize> for Sample {
+    type Output = Sample;
+
+    fn div(self, rhs: usize) -> Self::Output {
+        Self {
+            nanos: self.nanos / rhs as u64,
+            #[cfg(feature = "performance_counters")]
+            cycles: self.cycles / rhs as u64,
+            #[cfg(feature = "performance_counters")]
+            load_store_instructions: self.load_store_instructions / rhs as u64,
+            #[cfg(feature = "performance_counters")]
+            l1_data_load_cache_misses: self.l1_data_load_cache_misses / rhs as u64,
+            #[cfg(feature = "performance_counters")]
+            l1_data_store_cache_misses: self.l1_data_store_cache_misses / rhs as u64,
+        }
+    }
+}
 
 fn main() {
     let stdin = std::io::stdin();
@@ -102,14 +143,13 @@ fn main() {
         let timezone = TimeZone::default();
 
         let mut targets = Vec::new();
-        let mut samples_warmup = vec![0u64; num_iterations_warmup];
-        let mut samples = vec![0u64; num_iterations];
+        let mut samples = vec![Sample::default(); num_iterations];
 
         let mut results_path = String::new();
 
         match runtime {
             VrlRuntime::Ast => {
-                let mut run_vrl = |samples: &mut [_], i| {
+                let mut run_vrl = || {
                     let events = vec![event.clone(); batch_size];
 
                     targets = events
@@ -117,7 +157,13 @@ fn main() {
                         .map(|event| VrlTarget::new(event, program.info()))
                         .collect::<Vec<_>>();
 
-                    let start = std::time::Instant::now();
+                    #[cfg(feature = "performance_counters")]
+                    let counters_library = performance_counters::Library::new().unwrap();
+                    #[cfg(feature = "performance_counters")]
+                    let counting = counters_library.start_counting().unwrap();
+                    #[cfg(feature = "performance_counters")]
+                    let start_counters = counting.get_counters();
+                    let start_time = std::time::Instant::now();
 
                     resolved_values.truncate(0);
 
@@ -128,25 +174,58 @@ fn main() {
                         resolved_values.push(result);
                     }
 
-                    samples[i] = std::time::Instant::now()
-                        .duration_since(start)
+                    let time = std::time::Instant::now()
+                        .duration_since(start_time)
                         .as_nanos()
                         .try_into()
                         .unwrap();
+                    #[cfg(feature = "performance_counters")]
+                    let counters = counting.get_counters() - start_counters;
+
+                    Sample {
+                        nanos: time,
+                        #[cfg(feature = "performance_counters")]
+                        cycles: counters.cycles,
+                        #[cfg(feature = "performance_counters")]
+                        load_store_instructions: counters.load_store_instructions,
+                        #[cfg(feature = "performance_counters")]
+                        l1_data_load_cache_misses: counters.l1_data_load_cache_misses,
+                        #[cfg(feature = "performance_counters")]
+                        l1_data_store_cache_misses: counters.l1_data_store_cache_misses,
+                    }
                 };
 
                 println!("Warming up...");
 
-                for i in 0..num_iterations_warmup {
-                    run_vrl(&mut samples_warmup, i);
+                #[allow(clippy::never_loop)]
+                for sample in samples.iter_mut().take(num_iterations) {
+                    *sample = loop {
+                        let sample = run_vrl();
+                        #[cfg(feature = "performance_counters")]
+                        if sample.contains_empty_performance_counters() {
+                            continue;
+                        }
+                        break sample;
+                    };
                 }
+
+                samples.truncate(0);
+                samples.resize(num_iterations, Sample::default());
 
                 print!("Press enter to begin.");
                 stdout.flush().unwrap();
                 stdin.read_line(&mut String::new()).unwrap();
 
-                for i in 0..num_iterations {
-                    run_vrl(&mut samples, i);
+                #[allow(clippy::never_loop)]
+                for sample in samples.iter_mut().take(num_iterations) {
+                    *sample = loop {
+                        let sample = run_vrl();
+                        #[cfg(feature = "performance_counters")]
+                        if sample.contains_empty_performance_counters() {
+                            continue;
+                        }
+                        break sample;
+                    };
                 }
 
                 print!("Write results to path (enter for stdout): ");
@@ -156,7 +235,7 @@ fn main() {
             VrlRuntime::Vectorized => {
                 let mut states = Vec::<Runtime>::new();
                 let mut selection_vector = Vec::new();
-                let mut run_vrl = |samples: &mut [_], i| {
+                let mut run_vrl = || {
                     let events = vec![event.clone(); batch_size];
 
                     targets = events
@@ -164,7 +243,14 @@ fn main() {
                         .map(|event| VrlTarget::new(event, program.info()))
                         .collect::<Vec<_>>();
 
-                    let start = std::time::Instant::now();
+                    #[cfg(feature = "performance_counters")]
+                    let counters_library = performance_counters::Library::new().unwrap();
+                    #[cfg(feature = "performance_counters")]
+                    let counting = counters_library.start_counting().unwrap();
+                    #[cfg(feature = "performance_counters")]
+                    let start_counters = counting.get_counters();
+                    let start_time = std::time::Instant::now();
+
                     let mut batch_targets = targets
                         .iter_mut()
                         .map(|target| target as &mut dyn Target)
@@ -190,25 +276,59 @@ fn main() {
                     );
                     program.resolve_batch(&mut ctx, &selection_vector);
 
-                    samples[i] = std::time::Instant::now()
-                        .duration_since(start)
+                    let time = std::time::Instant::now()
+                        .duration_since(start_time)
                         .as_nanos()
                         .try_into()
                         .unwrap();
+
+                    #[cfg(feature = "performance_counters")]
+                    let counters = counting.get_counters() - start_counters;
+
+                    Sample {
+                        nanos: time,
+                        #[cfg(feature = "performance_counters")]
+                        cycles: counters.cycles,
+                        #[cfg(feature = "performance_counters")]
+                        load_store_instructions: counters.load_store_instructions,
+                        #[cfg(feature = "performance_counters")]
+                        l1_data_load_cache_misses: counters.l1_data_load_cache_misses,
+                        #[cfg(feature = "performance_counters")]
+                        l1_data_store_cache_misses: counters.l1_data_store_cache_misses,
+                    }
                 };
 
                 println!("Warming up...");
 
-                for i in 0..num_iterations_warmup {
-                    run_vrl(&mut samples_warmup, i);
+                #[allow(clippy::never_loop)]
+                for sample in samples.iter_mut().take(num_iterations) {
+                    *sample = loop {
+                        let sample = run_vrl();
+                        #[cfg(feature = "performance_counters")]
+                        if sample.contains_empty_performance_counters() {
+                            continue;
+                        }
+                        break sample;
+                    };
                 }
+
+                samples.truncate(0);
+                samples.resize(num_iterations, Sample::default());
 
                 print!("Press enter to begin.");
                 stdout.flush().unwrap();
                 stdin.read_line(&mut String::new()).unwrap();
 
-                for i in 0..num_iterations {
-                    run_vrl(&mut samples, i);
+                #[allow(clippy::never_loop)]
+                for sample in samples.iter_mut().take(num_iterations) {
+                    *sample = loop {
+                        let sample = run_vrl();
+                        #[cfg(feature = "performance_counters")]
+                        if sample.contains_empty_performance_counters() {
+                            continue;
+                        }
+                        break sample;
+                    };
                 }
 
                 print!("Write results to path (enter for stdout): ");
@@ -218,7 +338,7 @@ fn main() {
             VrlRuntime::Llvm => {
                 let vrl_execute = llvm_library.as_ref().unwrap().get_function().unwrap();
 
-                let mut run_vrl = |samples: &mut [_], i| {
+                let mut run_vrl = || {
                     let events = vec![event.clone(); batch_size];
 
                     targets = events
@@ -226,7 +346,13 @@ fn main() {
                         .map(|event| VrlTarget::new(event, program.info()))
                         .collect::<Vec<_>>();
 
-                    let start = std::time::Instant::now();
+                    #[cfg(feature = "performance_counters")]
+                    let counters_library = performance_counters::Library::new().unwrap();
+                    #[cfg(feature = "performance_counters")]
+                    let counting = counters_library.start_counting().unwrap();
+                    #[cfg(feature = "performance_counters")]
+                    let start_counters = counting.get_counters();
+                    let start_time = std::time::Instant::now();
 
                     resolved_values.truncate(0);
 
@@ -240,25 +366,59 @@ fn main() {
                         resolved_values.push(result);
                     }
 
-                    samples[i] = std::time::Instant::now()
-                        .duration_since(start)
+                    let time = std::time::Instant::now()
+                        .duration_since(start_time)
                         .as_nanos()
                         .try_into()
                         .unwrap();
+
+                    #[cfg(feature = "performance_counters")]
+                    let counters = counting.get_counters() - start_counters;
+
+                    Sample {
+                        nanos: time,
+                        #[cfg(feature = "performance_counters")]
+                        cycles: counters.cycles,
+                        #[cfg(feature = "performance_counters")]
+                        load_store_instructions: counters.load_store_instructions,
+                        #[cfg(feature = "performance_counters")]
+                        l1_data_load_cache_misses: counters.l1_data_load_cache_misses,
+                        #[cfg(feature = "performance_counters")]
+                        l1_data_store_cache_misses: counters.l1_data_store_cache_misses,
+                    }
                 };
 
                 println!("Warming up...");
 
-                for i in 0..num_iterations_warmup {
-                    run_vrl(&mut samples_warmup, i);
+                #[allow(clippy::never_loop)]
+                for sample in samples.iter_mut().take(num_iterations) {
+                    *sample = loop {
+                        let sample = run_vrl();
+                        #[cfg(feature = "performance_counters")]
+                        if sample.contains_empty_performance_counters() {
+                            continue;
+                        }
+                        break sample;
+                    };
                 }
+
+                samples.truncate(0);
+                samples.resize(num_iterations, Sample::default());
 
                 print!("Press enter to begin.");
                 stdout.flush().unwrap();
                 stdin.read_line(&mut String::new()).unwrap();
 
-                for i in 0..num_iterations {
-                    run_vrl(&mut samples, i);
+                #[allow(clippy::never_loop)]
+                for sample in samples.iter_mut().take(num_iterations) {
+                    *sample = loop {
+                        let sample = run_vrl();
+                        #[cfg(feature = "performance_counters")]
+                        if sample.contains_empty_performance_counters() {
+                            continue;
+                        }
+                        break sample;
+                    };
                 }
 
                 print!("Write results to path (enter for stdout): ");
@@ -268,7 +428,8 @@ fn main() {
         }
 
         let samples_unsorted = samples.clone();
-        samples.sort_unstable();
+        samples.sort_unstable_by(|a, b| a.nanos.cmp(&b.nanos));
+
         let p0 = samples[0];
         let p25 = {
             let sample = samples.len() / 4;
@@ -283,7 +444,6 @@ fn main() {
             samples[sample]
         };
         let p100 = samples[samples.len() - 1];
-        let mean = (samples.iter().sum::<u64>() as f64 / samples.len() as f64) as u64;
 
         let results_path = results_path.trim();
         if results_path.is_empty() {
@@ -301,36 +461,11 @@ fn main() {
                     TargetEvents::Traces(traces) => format!("{:?}", traces.collect::<Vec<_>>()),
                 }
             );
-            println!(
-                "p0: {:?} / {:?} (per item)",
-                Duration::from_nanos(p0),
-                Duration::from_nanos(p0 / batch_size as u64)
-            );
-            println!(
-                "p25: {:?} / {:?} (per item)",
-                Duration::from_nanos(p25),
-                Duration::from_nanos(p25 / batch_size as u64)
-            );
-            println!(
-                "p50: {:?} / {:?} (per item)",
-                Duration::from_nanos(p50),
-                Duration::from_nanos(p50 / batch_size as u64)
-            );
-            println!(
-                "p75: {:?} / {:?} (per item)",
-                Duration::from_nanos(p75),
-                Duration::from_nanos(p75 / batch_size as u64)
-            );
-            println!(
-                "p100: {:?} / {:?} (per item)",
-                Duration::from_nanos(p100),
-                Duration::from_nanos(p100 / batch_size as u64)
-            );
-            println!(
-                "mean: {:?} / {:?} (per item)",
-                Duration::from_nanos(mean),
-                Duration::from_nanos(mean / batch_size as u64)
-            );
+            println!("p0: {:?}", p0);
+            println!("p25: {:?}", p25);
+            println!("p50: {:?}", p50);
+            println!("p75: {:?}", p75);
+            println!("p100: {:?}", p100);
         } else {
             let results = serde_json::json!({
                 "program": source.trim(),
@@ -349,22 +484,16 @@ fn main() {
                 "batch_size:": batch_size,
                 "num_iterations_warmup:": num_iterations_warmup,
                 "num_iterations:": num_iterations,
-                "time": {
-                    "p0": p0,
-                    "p25": p25,
-                    "p50": p50,
-                    "p75": p75,
-                    "p100": p100,
-                    "mean": mean,
-                },
-                "time_per_item": {
-                    "p0": p0 / batch_size as u64,
-                    "p25": p25 / batch_size as u64,
-                    "p50": p50 / batch_size as u64,
-                    "p75": p75 / batch_size as u64,
-                    "p100": p100 / batch_size as u64,
-                    "mean": mean / batch_size as u64,
-                },
+                "p0": p0,
+                "p0_per_item": p0 / batch_size,
+                "p25": p25,
+                "p25_per_item": p25 / batch_size,
+                "p50": p50,
+                "p50_per_item": p50 / batch_size,
+                "p75": p75,
+                "p75_per_item": p75 / batch_size,
+                "p100": p100,
+                "p100_per_item": p100 / batch_size,
                 "samples": samples,
                 "samples_unsorted": samples_unsorted,
             });

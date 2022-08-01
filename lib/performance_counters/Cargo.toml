@@ -1,0 +1,10 @@
+[package]
+name = "performance_counters"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+
+[build-dependencies]
+bindgen = "0.60"
+cc = "1"

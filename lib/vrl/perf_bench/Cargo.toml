@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+performance_counters = { path = "../../../lib/performance_counters", optional = true }
+serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", default-features = false, features = ["preserve_order"] }
 value = { path = "../../../lib/value" }
 vector_common = { path = "../../../lib/vector-common" }

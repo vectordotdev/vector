@@ -6,12 +6,12 @@ MANIFEST_PATH="$SCRIPT_DIR/Cargo.toml"
 EXECUTABLE_PATH="$SCRIPT_DIR/../../../target/release/perf_bench"
 
 DATE=$(date '+%Y-%m-%d-%H-%M-%S')
-PERF_COMMAND="$1"
+PERFORMANCE_COUNTERS="$1"
 
-if [ -z "$PERF_COMMAND" ]; then
-	cargo build --manifest-path="$MANIFEST_PATH" --profile release
+if [ "$PERFORMANCE_COUNTERS" = "performance_counters" ]; then
+	cargo build --manifest-path="$MANIFEST_PATH" --profile release --features performance_counters
 else
-	cargo build --manifest-path="$MANIFEST_PATH" --profile bench
+	cargo build --manifest-path="$MANIFEST_PATH" --profile release
 fi
 
 OUTPUTS_DIR="$SCRIPT_DIR/outputs/$DATE"
@@ -66,32 +66,12 @@ for FILE in "$SCRIPT_DIR/inputs/"*.vrl; do
 				END
                 )
 
-                if [ ! -z "$PERF_COMMAND" ]; then
-					COMMANDS+=$(cat <<-END
-
-						spawn $PERF_COMMAND --pid=\$vrl_pid
-						set perf_id \$spawn_id
-						set perf_pid [exp_pid]
-					END
-                    )
-                fi
-
                 COMMANDS+=$(cat <<-END
 
 					send -i \$vrl_id "\n"
 					expect -i \$vrl_id "Write results to path (enter for stdout): "
 				END
                 )
-
-
-                if [ ! -z "$PERF_COMMAND" ]; then
-                    COMMANDS+=$(cat <<-END
-
-						send -i \$perf_id "\x03"
-						expect -i \$perf_id *
-					END
-                    )
-                fi
 
                 COMMANDS+=$(cat <<-END
 
