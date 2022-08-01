@@ -5,6 +5,8 @@ mod tests;
 
 mod grpc;
 mod http;
+mod reply;
+mod status;
 
 use std::net::SocketAddr;
 

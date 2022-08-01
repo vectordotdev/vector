@@ -12,12 +12,14 @@ use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Rep
 use crate::{
     event::Event,
     internal_events::StreamClosedError,
-    opentelemetry::LogService::ExportLogsServiceRequest,
+    opentelemetry::LogService::{ExportLogsServiceRequest, ExportLogsServiceResponse},
     shutdown::ShutdownSignal,
     sources::util::{decode, ErrorMessage},
     tls::MaybeTlsSettings,
     SourceSender,
 };
+
+use super::{reply::protobuf, status::Status};
 
 #[derive(Clone, Copy, Debug, Snafu)]
 pub(crate) enum ApiError {
@@ -38,12 +40,16 @@ pub(crate) async fn run_http_server(
     let routes = filters
         .with(warp::trace(move |_info| span.clone()))
         .recover(|r: Rejection| async move {
-            // TODO: otlp encoded
             if let Some(e_msg) = r.find::<ErrorMessage>() {
-                let json = warp::reply::json(e_msg);
-                Ok(warp::reply::with_status(json, e_msg.status_code()))
+                let reply = protobuf(Status {
+                    message: e_msg.message().into(),
+                    ..Default::default()
+                });
+
+                Ok(warp::reply::with_status(reply, e_msg.status_code()))
             } else {
-                // other internal error - wil return 500 internal server error
+                // other internal error - will return 500 internal server error
+                error!(message = "Failed to handle rejection", rejection = ?r);
                 Err(r)
             }
         });
@@ -70,7 +76,7 @@ pub(crate) fn build_warp_filter(
         .and(warp::header::optional::<String>("content-encoding"))
         .and(warp::body::bytes())
         .and_then(move |encoding_header: Option<String>, body: Bytes| {
-            let events = decode(&encoding_header, body).and_then(|body| decode_body(body));
+            let events = decode(&encoding_header, body).and_then(decode_body);
 
             handle_request(events, acknowledgements, out.clone(), super::LOGS)
         })
@@ -108,27 +114,26 @@ async fn handle_request(
                 .await
                 .map_err(move |error| {
                     emit!(StreamClosedError { error, count });
-                    // TODO: otlp encoded reject
                     warp::reject::custom(ApiError::ServerShutdown)
                 })?;
 
             match receiver {
-                None => Ok(warp::reply().into_response()),
+                None => Ok(protobuf(ExportLogsServiceResponse {}).into_response()),
                 Some(receiver) => match receiver.await {
-                    // TODO: otlp encoded response/reject
-                    BatchStatus::Delivered => Ok(warp::reply().into_response()),
-                    BatchStatus::Errored => Err(warp::reject::custom(ErrorMessage::new(
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        "Error delivering contents to sink".into(),
-                    ))),
-                    BatchStatus::Rejected => Err(warp::reject::custom(ErrorMessage::new(
-                        StatusCode::BAD_REQUEST,
-                        "Contents failed to deliver to sink".into(),
-                    ))),
+                    BatchStatus::Delivered => {
+                        Ok(protobuf(ExportLogsServiceResponse {}).into_response())
+                    }
+                    BatchStatus::Errored => Err(warp::reject::custom(Status {
+                        message: "Error delivering contents to sink".into(),
+                        ..Default::default()
+                    })),
+                    BatchStatus::Rejected => Err(warp::reject::custom(Status {
+                        message: "Contents failed to deliver to sink".into(),
+                        ..Default::default()
+                    })),
                 },
             }
         }
-        // TODO: otlp encoded reject
         Err(err) => Err(warp::reject::custom(err)),
     }
 }
