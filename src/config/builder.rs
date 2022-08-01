@@ -503,12 +503,12 @@ mod tests {
 
     #[test]
     fn append_overwrites_enterprise() {
-        let mut base_ent = enterprise::Options::default();
+        let base_ent = enterprise::Options::default();
         let mut base = ConfigBuilder {
             enterprise: Some(base_ent),
             ..Default::default()
         };
-        let mut other_ent = enterprise::Options::default();
+        let other_ent = enterprise::Options::default();
         let other = ConfigBuilder {
             enterprise: Some(other_ent),
             ..Default::default()
