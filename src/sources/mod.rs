@@ -113,7 +113,7 @@ pub enum Sources {
     AwsSqs(#[configurable(derived)] aws_sqs::AwsSqsConfig),
 
     /// Azure Event Hubs
-    #[cfg(feature = "sources-azure_event_hubs")]    
+    #[cfg(feature = "sources-azure_event_hubs")]
     AzureEventHubs(#[configurable(derived)] azure_event_hubs::AzureEventHubsConfig),
 
     /// Datadog Agent.
