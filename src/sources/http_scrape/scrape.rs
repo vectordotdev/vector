@@ -33,7 +33,7 @@ use vector_core::{
 const NAME: &str = "http_scrape";
 
 // TODO:
-//   - integration tests
+//   - finish the TODOs in the unit and integration tests
 //   - cue files
 
 /// Configuration for the `http_scrape` source.
@@ -43,15 +43,15 @@ pub struct HttpScrapeConfig {
     /// Endpoint to scrape events from.
     endpoint: String,
 
+    /// The interval between scrapes, in seconds.
+    #[serde(default = "super::default_scrape_interval_secs")]
+    scrape_interval_secs: u64,
+
     /// Custom parameters for the scrape request query string.
     ///
     /// One or more values for the same parameter key can be provided. The parameters provided in this option are
     /// appended to any parameters manually provided in the `endpoint` option.
     query: Option<HashMap<String, Vec<String>>>,
-
-    /// The interval between scrapes, in seconds.
-    #[serde(default = "super::default_scrape_interval_secs")]
-    scrape_interval_secs: u64,
 
     /// Decoder to use on the HTTP responses.
     #[configurable(derived)]
@@ -200,17 +200,10 @@ impl super::HttpScraper for HttpScrapeContext {
         let body = String::from_utf8_lossy(body);
         buf.extend_from_slice(body.as_bytes());
 
-        //TODO delete
-        dbg!(body);
-
         // decode and enrich
         let mut events = self.decode_events(&mut buf);
         self.enrich_events(&mut events);
 
-        // TODO delete
-        for event in &events {
-            dbg!(event);
-        }
         Some(events)
     }
 }
@@ -223,10 +216,8 @@ mod test {
     use super::*;
     use crate::{
         test_util::{
-            //collect_ready,
             components::{run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS},
-            next_addr,
-            test_generate_config,
+            next_addr, test_generate_config,
         },
         SourceSender,
     };
@@ -454,7 +445,7 @@ mod integration_tests {
         // TODO how to assert failure
 
         // let config = HttpScrapeConfig {
-        //     endpoint: format!("http://dufs:5000/auth/json.json"),
+        //     endpoint: format!("http://dufs-auth:5000/auth/json.json"),
         //     scrape_interval_secs: 1,
         //     query: None,
         //     decoding: DeserializerConfig::NativeJson,
@@ -485,12 +476,38 @@ mod integration_tests {
 
     #[tokio::test]
     async fn headers() {
-        // TODO - is this worthy of testing and how to verify
+        // TODO - is this worthy of testing and how to verify ?
     }
 
     #[tokio::test]
     async fn tls() {
-        // TODO - use dufs with tls settings
+
+        // TODO fix this, as it is there is an error from dufs with "Sending fatal alert
+        // BadRecordMac"
+
+        // and in vector error is:
+        //
+        // 2022-08-01T19:11:23.382932Z ERROR vector::internal_events::http_client: HTTP error. error=error trying to connect: error:1416F086:SSL routines:tls_process_server_certificate:certificate verify failed:ssl/statem/statem_clnt.c:1919:: self signed certificate error_type="request_failed" stage="processing"
+        // 2022-08-01T19:11:23.383435Z ERROR vector::internal_events::http_scrape: HTTP request processing error. url=https://dufs-https:5000/logs/json.json error=CallRequest { source: hyper::Error(Connect, Custom { kind: Other, error: ConnectError { error: Error { code: ErrorCode(1), cause: Some(Ssl(ErrorStack([Error { code: 337047686, library: "SSL routines", function: "tls_process_server_certificate", reason: "certificate verify failed", file: "ssl/statem/statem_clnt.c", line: 1919 }]))) }, verify_result: X509VerifyResult { code: 18, error: "self signed certificate" } } }) } error_type="request_failed" stage="receiving" internal_log_rate_secs=10
+
+        // let cert_path = "tests/data/ca/certs/ca.cert.pem";
+        // let key_path = "tests/data/ca/private/ca.key.pem";
+
+        // run_test(HttpScrapeConfig {
+        //     endpoint: format!("https://dufs-https:5000/logs/json.json"),
+        //     scrape_interval_secs: 1,
+        //     query: None,
+        //     decoding: DeserializerConfig::Json,
+        //     framing: default_framing_message_based(),
+        //     headers: None,
+        //     auth: None,
+        //     tls: Some(TlsConfig {
+        //         crt_file: Some(cert_path.into()),
+        //         key_file: Some(key_path.into()),
+        //         ..Default::default()
+        //     }),
+        // })
+        // .await;
     }
 
     #[tokio::test]

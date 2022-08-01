@@ -31,12 +31,14 @@ services:
       - backend
     command:
       - "--tls-cert"
-      - "dufs.crt"
+      - "/certs/ca.cert.pem"
       - "--tls-key"
-      - "dufs.key"
+      - "/certs/ca.key.pem"
       - "/data"
     volumes:
       - ${PWD}/tests/data/http-scrape/:/data
+      - ${PWD}/tests/data/ca/certs/ca.cert.pem:/certs/ca.cert.pem
+      - ${PWD}/tests/data/ca/private/ca.key.pem:/certs/ca.key.pem
   runner:
     build:
       context: ${PWD}
@@ -59,6 +61,7 @@ services:
     depends_on:
       - dufs
       - dufs-auth
+      - dufs-https
     volumes:
       - ${PWD}:/code
       - cargogit:/usr/local/cargo/git

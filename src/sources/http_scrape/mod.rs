@@ -145,7 +145,6 @@ pub(crate) async fn http_scrape<H: HttpScraper + std::marker::Send + Clone>(
         let mut request = builder.body(Body::empty()).expect("error creating request");
 
         if let Some(auth) = &inputs.auth {
-            dbg!(auth);
             auth.apply(&mut request);
         }
 
