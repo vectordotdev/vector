@@ -66,7 +66,7 @@ impl<'a, T: HttpBody> InternalEvent for GotHttpResponse<'a, T> {
 }
 
 #[derive(Debug)]
-pub struct GotHttpError<'a> {
+pub struct GotHttpWarning<'a> {
     pub error: &'a Error,
     pub roundtrip: Duration,
 }
