@@ -76,6 +76,7 @@ default = [
     "assert_eq",
     "boolean",
     "ceil",
+    "chunks",
     "compact",
     "contains",
     "decode_base64",
@@ -213,6 +214,7 @@ assert = []
 assert_eq = ["vector-common/conversion"]
 boolean = []
 ceil = []
+chunks = []
 compact = []
 contains = []
 cryptography = ["dep:aes", "dep:ctr", "dep:cbc", "dep:cfb-mode", "dep:ofb"]
