@@ -34,7 +34,7 @@ const NAME: &str = "http_scrape";
 
 // TODO:
 //   - finish the TODOs in the unit and integration tests
-//   - cue files
+//   - solve the placement of the HttpScrapeEventsSent
 
 /// Configuration for the `http_scrape` source.
 #[configurable_component(source)]
@@ -119,7 +119,7 @@ impl SourceConfig for HttpScrapeConfig {
         )
         .build();
 
-        // the only specific context needed is the ability to decode
+        // the only specific context needed is the codec decoding
         let context = HttpScrapeContext { decoder };
 
         let inputs = super::GenericHttpScrapeInputs::new(
@@ -393,7 +393,7 @@ mod integration_tests {
     #[tokio::test]
     async fn scraped_logs_bytes() {
         run_test(HttpScrapeConfig {
-            endpoint: format!("http://dufs:5000/logs/bytes"),
+            endpoint: "http://dufs:5000/logs/bytes".to_string(),
             scrape_interval_secs: 1,
             query: None,
             decoding: DeserializerConfig::Bytes,
@@ -408,7 +408,7 @@ mod integration_tests {
     #[tokio::test]
     async fn scraped_logs_json() {
         run_test(HttpScrapeConfig {
-            endpoint: format!("http://dufs:5000/logs/json.json"),
+            endpoint: "http://dufs:5000/logs/json.json".to_string(),
             scrape_interval_secs: 1,
             query: None,
             decoding: DeserializerConfig::Json,
@@ -423,7 +423,7 @@ mod integration_tests {
     #[tokio::test]
     async fn scraped_metrics_native_json() {
         run_test(HttpScrapeConfig {
-            endpoint: format!("http://dufs:5000/metrics/native.json"),
+            endpoint: "http://dufs:5000/metrics/native.json".to_string(),
             scrape_interval_secs: 1,
             query: None,
             decoding: DeserializerConfig::NativeJson,
@@ -437,7 +437,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn scraped_trace_native_json() {
-        // TODO - add a trace
+        // TODO - add a trace ? Or is it not really helpful since basically the same as a log ?
     }
 
     #[tokio::test]
@@ -459,7 +459,7 @@ mod integration_tests {
     #[tokio::test]
     async fn authorized() {
         run_test(HttpScrapeConfig {
-            endpoint: format!("http://dufs-auth:5000/logs/json.json"),
+            endpoint: "http://dufs-auth:5000/logs/json.json".to_string(),
             scrape_interval_secs: 1,
             query: None,
             decoding: DeserializerConfig::Json,
@@ -494,7 +494,7 @@ mod integration_tests {
         // let key_path = "tests/data/ca/private/ca.key.pem";
 
         // run_test(HttpScrapeConfig {
-        //     endpoint: format!("https://dufs-https:5000/logs/json.json"),
+        //     endpoint: "https://dufs-https:5000/logs/json.json".to_string(),
         //     scrape_interval_secs: 1,
         //     query: None,
         //     decoding: DeserializerConfig::Json,

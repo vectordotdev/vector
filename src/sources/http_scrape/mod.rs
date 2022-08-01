@@ -182,7 +182,7 @@ pub(crate) async fn http_scrape<H: HttpScraper + std::marker::Send + Clone>(
                                 // after the stream is written ? Yet I'm not seeing how to go about
                                 // that.
                                 // emit EventsSent if metrics
-                                if events.len() > 0 {
+                                if !events.is_empty() {
                                     if let Event::Metric(ref _metric) =
                                         events.first().expect("should have event")
                                     {
