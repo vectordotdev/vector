@@ -116,7 +116,7 @@ impl Expression for Predicate {
     #[cfg(feature = "llvm")]
     fn emit_llvm<'ctx>(
         &self,
-        state: (&mut LocalEnv, &mut ExternalEnv),
+        state: (&LocalEnv, &ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
     ) -> std::result::Result<(), String> {
         let predicate_begin_block = ctx.append_basic_block("predicate_begin");
@@ -126,13 +126,7 @@ impl Expression for Predicate {
         ctx.position_at_end(predicate_begin_block);
 
         for inner in &self.inner {
-            ctx.emit_llvm(
-                inner,
-                ctx.result_ref(),
-                (state.0, state.1),
-                predicate_end_block,
-                vec![],
-            )?;
+            ctx.emit_llvm(inner, ctx.result_ref(), state, predicate_end_block, vec![])?;
         }
         ctx.build_unconditional_branch(predicate_end_block);
 

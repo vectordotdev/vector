@@ -1,6 +1,6 @@
 use std::collections::{hash_map::Entry, HashMap};
 
-use anymap::AnyMap;
+use anymap::any::CloneAny;
 use lookup::LookupBuf;
 use value::{Kind, Value};
 
@@ -56,7 +56,7 @@ impl LocalEnv {
 }
 
 /// A lexical scope within the program.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ExternalEnv {
     /// The external target of the program.
     target: Details,
@@ -64,17 +64,17 @@ pub struct ExternalEnv {
     read_only_paths: Vec<ReadOnlyPath>,
 
     /// Custom context injected by the external environment
-    custom: AnyMap,
+    custom: anymap::Map<dyn CloneAny>,
 }
 
 // temporary until paths can point to metadata
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum PathRoot {
     Event,
     Metadata,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ReadOnlyPath {
     path: LookupBuf,
     recursive: bool,
@@ -97,7 +97,7 @@ impl ExternalEnv {
                 type_def: kind.into(),
                 value: None,
             },
-            custom: AnyMap::new(),
+            custom: anymap::Map::new(),
             read_only_paths: vec![],
         }
     }
@@ -179,7 +179,7 @@ impl ExternalEnv {
     }
 
     /// Sets the external context data for VRL functions to use.
-    pub fn set_external_context<T: 'static>(&mut self, data: T) {
+    pub fn set_external_context<T: 'static + CloneAny>(&mut self, data: T) {
         self.custom.insert::<T>(data);
     }
 
@@ -192,14 +192,17 @@ impl ExternalEnv {
     }
 
     /// Get external context data from the external environment.
-    pub fn get_external_context<T: 'static>(&self) -> Option<&T> {
+    pub fn get_external_context<T: 'static + CloneAny>(&self) -> Option<&T> {
         self.custom.get::<T>()
     }
 
     /// Swap the existing external contexts with new ones, returning the old ones.
     #[must_use]
     #[cfg(feature = "expr-function_call")]
-    pub(crate) fn swap_external_context(&mut self, ctx: AnyMap) -> AnyMap {
+    pub(crate) fn swap_external_context(
+        &mut self,
+        ctx: anymap::Map<dyn CloneAny>,
+    ) -> anymap::Map<dyn CloneAny> {
         std::mem::replace(&mut self.custom, ctx)
     }
 }

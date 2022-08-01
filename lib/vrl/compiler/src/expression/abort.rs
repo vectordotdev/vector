@@ -113,7 +113,7 @@ impl Expression for Abort {
     #[cfg(feature = "llvm")]
     fn emit_llvm<'ctx>(
         &self,
-        state: (&mut LocalEnv, &mut ExternalEnv),
+        state: (&LocalEnv, &ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
     ) -> Result<(), String> {
         let abort_begin_block = ctx.append_basic_block("abort_begin");

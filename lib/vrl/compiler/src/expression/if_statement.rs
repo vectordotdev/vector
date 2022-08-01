@@ -102,7 +102,7 @@ impl Expression for IfStatement {
     #[cfg(feature = "llvm")]
     fn emit_llvm<'ctx>(
         &self,
-        state: (&mut LocalEnv, &mut ExternalEnv),
+        state: (&LocalEnv, &ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
     ) -> Result<(), String> {
         let if_statement_begin_block = ctx.append_basic_block("if_statement_begin");
@@ -120,7 +120,7 @@ impl Expression for IfStatement {
         ctx.emit_llvm(
             &self.predicate,
             predicate_ref,
-            (state.0, state.1),
+            state,
             if_statement_end_block,
             vec![(predicate_ref.into(), ctx.fns().vrl_resolved_drop)],
         )?;
@@ -145,7 +145,7 @@ impl Expression for IfStatement {
         ctx.emit_llvm(
             &self.consequent,
             result_ref,
-            (state.0, state.1),
+            state,
             if_statement_end_block,
             vec![],
         )?;
@@ -156,7 +156,7 @@ impl Expression for IfStatement {
             ctx.emit_llvm(
                 alternative,
                 result_ref,
-                (state.0, state.1),
+                state,
                 if_statement_end_block,
                 vec![],
             )?;

@@ -51,7 +51,7 @@ impl Program {
     #[cfg(feature = "llvm")]
     pub fn emit_llvm<'ctx>(
         &self,
-        state: (&mut crate::state::LocalEnv, &mut crate::state::ExternalEnv),
+        state: (&crate::state::LocalEnv, &crate::state::ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
     ) -> Result<(), String> {
         self.expressions.emit_llvm(state, ctx)

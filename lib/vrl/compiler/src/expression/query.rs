@@ -167,7 +167,7 @@ impl Expression for Query {
     #[cfg(feature = "llvm")]
     fn emit_llvm<'ctx>(
         &self,
-        state: (&mut LocalEnv, &mut ExternalEnv),
+        state: (&LocalEnv, &ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
     ) -> Result<(), String> {
         let query_begin_block = ctx.append_basic_block("query_begin");
@@ -196,33 +196,21 @@ impl Expression for Query {
 
                 return Ok(());
             }
-            Target::Internal(variable) => ctx.emit_llvm(
-                variable,
-                ctx.result_ref(),
-                (state.0, state.1),
-                query_end_block,
-                vec![],
-            )?,
-            Target::FunctionCall(call) => ctx.emit_llvm(
-                call,
-                ctx.result_ref(),
-                (state.0, state.1),
-                query_end_block,
-                vec![],
-            )?,
-            Target::Container(container) => ctx.emit_llvm(
-                container,
-                ctx.result_ref(),
-                (state.0, state.1),
-                query_end_block,
-                vec![],
-            )?,
+            Target::Internal(variable) => {
+                ctx.emit_llvm(variable, ctx.result_ref(), state, query_end_block, vec![])?
+            }
+            Target::FunctionCall(call) => {
+                ctx.emit_llvm(call, ctx.result_ref(), state, query_end_block, vec![])?
+            }
+            Target::Container(container) => {
+                ctx.emit_llvm(container, ctx.result_ref(), state, query_end_block, vec![])?
+            }
         };
 
         let target_fallible = match &self.target {
             Target::Internal(_) | Target::External => false,
-            Target::FunctionCall(call) => call.type_def((state.0, state.1)).is_fallible(),
-            Target::Container(container) => container.type_def((state.0, state.1)).is_fallible(),
+            Target::FunctionCall(call) => call.type_def(state).is_fallible(),
+            Target::Container(container) => container.type_def(state).is_fallible(),
         };
 
         if target_fallible {

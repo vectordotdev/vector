@@ -507,7 +507,7 @@ impl Expression for Op {
     #[cfg(feature = "llvm")]
     fn emit_llvm<'ctx>(
         &self,
-        state: (&mut LocalEnv, &mut ExternalEnv),
+        state: (&LocalEnv, &ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
     ) -> Result<(), String> {
         let op_identifier = match self.opcode {
@@ -531,8 +531,8 @@ impl Expression for Op {
         let op_begin_block = ctx.append_basic_block(&format!("op_{}_begin", op_identifier));
         let op_end_block = ctx.append_basic_block(&format!("op_{}_end", op_identifier));
 
-        let lhs_def = self.lhs.type_def((state.0, state.1));
-        let rhs_def = self.rhs.type_def((state.0, state.1));
+        let lhs_def = self.lhs.type_def(state);
+        let rhs_def = self.rhs.type_def(state);
 
         ctx.build_unconditional_branch(op_begin_block);
         ctx.position_at_end(op_begin_block);
@@ -555,7 +555,7 @@ impl Expression for Op {
                 ctx.emit_llvm(
                     self.lhs.as_ref(),
                     lhs_resolved_ref,
-                    (state.0, state.1),
+                    state,
                     op_end_block,
                     vec![(lhs_resolved_ref.into(), ctx.fns().vrl_resolved_drop)],
                 )?;
@@ -602,7 +602,7 @@ impl Expression for Op {
                 ctx.emit_llvm(
                     self.rhs.as_ref(),
                     rhs_resolved_ref,
-                    (state.0, state.1),
+                    state,
                     op_end_block,
                     vec![(rhs_resolved_ref.into(), ctx.fns().vrl_resolved_drop)],
                 )?;
@@ -827,7 +827,7 @@ impl Expression for Op {
                 ctx.emit_llvm(
                     self.lhs.as_ref(),
                     ctx.result_ref(),
-                    (state.0, state.1),
+                    state,
                     op_end_block,
                     vec![],
                 )?;
@@ -848,7 +848,7 @@ impl Expression for Op {
                 ctx.emit_llvm(
                     self.rhs.as_ref(),
                     ctx.result_ref(),
-                    (state.0, state.1),
+                    state,
                     op_end_block,
                     vec![],
                 )?;
@@ -862,7 +862,7 @@ impl Expression for Op {
                 ctx.emit_llvm(
                     self.lhs.as_ref(),
                     lhs_resolved_ref,
-                    (state.0, state.1),
+                    state,
                     op_end_block,
                     vec![(lhs_resolved_ref.into(), ctx.fns().vrl_resolved_drop)],
                 )?;
@@ -913,7 +913,7 @@ impl Expression for Op {
                 ctx.emit_llvm(
                     self.rhs.as_ref(),
                     rhs_resolved_ref,
-                    (state.0, state.1),
+                    state,
                     op_end_block,
                     vec![(rhs_resolved_ref.into(), ctx.fns().vrl_resolved_drop)],
                 )?;
@@ -940,7 +940,7 @@ impl Expression for Op {
                 ctx.emit_llvm(
                     self.lhs.as_ref(),
                     ctx.result_ref(),
-                    (state.0, state.1),
+                    state,
                     op_end_block,
                     vec![],
                 )?;
@@ -962,7 +962,7 @@ impl Expression for Op {
                 ctx.emit_llvm(
                     self.rhs.as_ref(),
                     ctx.result_ref(),
-                    (state.0, state.1),
+                    state,
                     op_end_block,
                     vec![],
                 )?;

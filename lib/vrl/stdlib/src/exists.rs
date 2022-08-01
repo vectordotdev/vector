@@ -115,7 +115,7 @@ impl Expression for ExistsFn {
 
     fn emit_llvm<'ctx>(
         &self,
-        state: (&mut vrl::state::LocalEnv, &mut vrl::state::ExternalEnv),
+        state: (&vrl::state::LocalEnv, &vrl::state::ExternalEnv),
         ctx: &mut vrl::llvm::Context<'ctx>,
     ) -> std::result::Result<(), String> {
         let query = &self.query;

@@ -122,7 +122,7 @@ impl Expression for Block {
     #[cfg(feature = "llvm")]
     fn emit_llvm<'ctx>(
         &self,
-        state: (&mut LocalEnv, &mut ExternalEnv),
+        state: (&LocalEnv, &ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
     ) -> Result<(), String> {
         let block_begin_block = ctx.append_basic_block("block_begin");
@@ -132,15 +132,9 @@ impl Expression for Block {
         ctx.position_at_end(block_begin_block);
 
         for expr in &self.inner {
-            ctx.emit_llvm(
-                expr,
-                ctx.result_ref(),
-                (state.0, state.1),
-                block_end_block,
-                vec![],
-            )?;
+            ctx.emit_llvm(expr, ctx.result_ref(), state, block_end_block, vec![])?;
 
-            let type_def = expr.type_def((state.0, state.1));
+            let type_def = expr.type_def(state);
             if type_def.is_fallible() {
                 let is_err = ctx
                     .fns()

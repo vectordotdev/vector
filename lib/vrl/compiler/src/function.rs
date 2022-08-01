@@ -5,7 +5,7 @@ use std::{
     fmt,
 };
 
-use anymap::AnyMap;
+use anymap::any::CloneAny;
 use diagnostic::{DiagnosticMessage, Label, Note};
 use parser::ast::Ident;
 use value::{kind::Collection, Value};
@@ -114,7 +114,7 @@ pub struct Example {
 #[derive(Debug)]
 pub struct FunctionCompileContext {
     span: Span,
-    external_context: AnyMap,
+    external_context: anymap::Map<dyn CloneAny>,
 }
 
 impl FunctionCompileContext {
@@ -122,13 +122,13 @@ impl FunctionCompileContext {
     pub fn new(span: Span) -> Self {
         Self {
             span,
-            external_context: AnyMap::new(),
+            external_context: anymap::Map::new(),
         }
     }
 
     /// Add an external context to the compile context.
     #[must_use]
-    pub fn with_external_context(mut self, context: AnyMap) -> Self {
+    pub fn with_external_context(mut self, context: anymap::Map<dyn CloneAny>) -> Self {
         self.external_context = context;
         self
     }
@@ -141,18 +141,18 @@ impl FunctionCompileContext {
 
     /// Get an immutable reference to a stored external context, if one exists.
     #[must_use]
-    pub fn get_external_context<T: 'static>(&self) -> Option<&T> {
+    pub fn get_external_context<T: 'static + CloneAny>(&self) -> Option<&T> {
         self.external_context.get::<T>()
     }
 
     /// Get a mutable reference to a stored external context, if one exists.
-    pub fn get_external_context_mut<T: 'static>(&mut self) -> Option<&mut T> {
+    pub fn get_external_context_mut<T: 'static + CloneAny>(&mut self) -> Option<&mut T> {
         self.external_context.get_mut::<T>()
     }
 
     /// Consume the `FunctionCompileContext`, returning the (potentially mutated) `AnyMap`.
     #[must_use]
-    pub fn into_external_context(self) -> AnyMap {
+    pub fn into_external_context(self) -> anymap::Map<dyn CloneAny> {
         self.external_context
     }
 }

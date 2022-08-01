@@ -43,7 +43,7 @@ impl Compiler {
     pub fn compile<'a>(
         self,
         optimization_level: OptimizationLevel,
-        state: (&mut LocalEnv, &mut ExternalEnv),
+        state: (&LocalEnv, &ExternalEnv),
         program: &Program,
         stdlib: &[Box<dyn StdlibFunction>],
         mut symbols: HashMap<&'static str, usize>,
@@ -431,7 +431,7 @@ impl<'ctx> Context<'ctx> {
         &mut self,
         expression: &dyn Expression,
         resolved_ref: PointerValue<'ctx>,
-        state: (&mut LocalEnv, &mut ExternalEnv),
+        state: (&LocalEnv, &ExternalEnv),
         abort_end_block: BasicBlock<'ctx>,
         abort_drop_refs: Vec<(
             BasicMetadataValueEnum<'ctx>,
@@ -440,10 +440,10 @@ impl<'ctx> Context<'ctx> {
     ) -> Result<(), String> {
         let result_ref = self.result_ref;
         self.set_result_ref(resolved_ref);
-        expression.emit_llvm((state.0, state.1), self)?;
+        expression.emit_llvm(state, self)?;
         self.set_result_ref(result_ref);
 
-        let type_def = expression.type_def((state.0, state.1));
+        let type_def = expression.type_def(state);
         if type_def.is_abortable() {
             self.handle_abort(
                 resolved_ref.into(),

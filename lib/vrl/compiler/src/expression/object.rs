@@ -71,7 +71,7 @@ impl Expression for Object {
     #[cfg(feature = "llvm")]
     fn emit_llvm<'ctx>(
         &self,
-        state: (&mut LocalEnv, &mut ExternalEnv),
+        state: (&LocalEnv, &ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
     ) -> Result<(), String> {
         let begin_block = ctx.append_basic_block("object_begin");
@@ -95,7 +95,7 @@ impl Expression for Object {
             ctx.emit_llvm(
                 expression,
                 entry_ref,
-                (state.0, state.1),
+                state,
                 end_block,
                 vec![
                     (entry_ref.into(), ctx.fns().vrl_resolved_drop),

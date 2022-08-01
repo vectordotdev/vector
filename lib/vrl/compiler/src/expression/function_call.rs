@@ -1,6 +1,5 @@
 use std::{any::Any, fmt, ptr::addr_of_mut, sync::Arc};
 
-use anymap::AnyMap;
 use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 
 use super::Block;
@@ -423,7 +422,7 @@ impl<'a> Builder<'a> {
         // We take the external context, and pass it to the function compile context, this allows
         // functions mutable access to external state, but keeps the internal compiler state behind
         // an immutable reference, to ensure compiler state correctness.
-        let external_context = external.swap_external_context(AnyMap::new());
+        let external_context = external.swap_external_context(anymap::Map::new());
 
         let mut compile_ctx =
             FunctionCompileContext::new(self.call_span).with_external_context(external_context);
@@ -527,7 +526,7 @@ impl FunctionCall {
     fn compile_arguments(
         &self,
         function: &dyn Function,
-        state: (&mut LocalEnv, &mut ExternalEnv),
+        (local_state, external_state): (&LocalEnv, &ExternalEnv),
     ) -> Result<Vec<(&'static str, Option<CompiledArgument>)>, String> {
         let function_arguments = self
             .arguments
@@ -538,10 +537,12 @@ impl FunctionCall {
         // Resolve the arguments so they are in the order defined in the function.
         let arguments = Self::resolve_arguments(function, function_arguments);
 
+        let mut external_state = external_state.clone();
+
         // We take the external context, and pass it to the function compile context, this allows
         // functions mutable access to external state, but keeps the internal compiler state behind
         // an immutable reference, to ensure compiler state correctness.
-        let external_context = state.1.swap_external_context(AnyMap::new());
+        let external_context = external_state.swap_external_context(anymap::Map::new());
 
         let mut compile_ctx =
             FunctionCompileContext::new(self.span).with_external_context(external_context);
@@ -555,7 +556,7 @@ impl FunctionCall {
                 // on the argument.
                 let compiled_argument = function
                     .compile_argument(
-                        (state.0, state.1),
+                        (local_state, &external_state),
                         &arguments,
                         &mut compile_ctx,
                         keyword,
@@ -575,9 +576,7 @@ impl FunctionCall {
             .collect::<Result<Vec<_>, _>>()?;
 
         // Re-insert the external context into the compiler state.
-        let _ = state
-            .1
-            .swap_external_context(compile_ctx.into_external_context());
+        let _ = external_state.swap_external_context(compile_ctx.into_external_context());
 
         Ok(compiled_arguments)
     }
@@ -824,7 +823,7 @@ impl Expression for FunctionCall {
     #[cfg(feature = "llvm")]
     fn emit_llvm<'ctx>(
         &self,
-        state: (&mut LocalEnv, &mut ExternalEnv),
+        state: (&LocalEnv, &ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
     ) -> Result<(), String> {
         let begin_block = ctx.append_basic_block(&format!("function_call_{}_begin", self.ident));
@@ -843,7 +842,7 @@ impl Expression for FunctionCall {
         let uses_context = stdlib_function
             .symbol()
             .map_or(false, |symbol| symbol.uses_context);
-        let compiled_arguments = self.compile_arguments(stdlib_function, (state.0, state.1))?;
+        let compiled_arguments = self.compile_arguments(stdlib_function, state)?;
 
         let function_name = format!("vrl_fn_{}", self.ident);
         let function = ctx
@@ -904,7 +903,7 @@ impl Expression for FunctionCall {
                     ctx.emit_llvm(
                         &argument.expression,
                         argument_ref,
-                        (state.0, state.1),
+                        state,
                         abort_block,
                         drop_on_abort_refs.clone(),
                     )?;
@@ -926,7 +925,7 @@ impl Expression for FunctionCall {
                     ctx.emit_llvm(
                         &argument.expression,
                         argument_ref,
-                        (state.0, state.1),
+                        state,
                         abort_block,
                         drop_on_abort_refs.clone(),
                     )?;
@@ -961,7 +960,7 @@ impl Expression for FunctionCall {
         let span_ref = ctx
             .into_const(self.span, &self.span.to_string())
             .as_pointer_value();
-        let type_def = self.type_def((state.0, state.1));
+        let type_def = self.type_def(state);
 
         if type_def.is_fallible() && !ctx.discard_error() || self.abort_on_error {
             let is_error = ctx

@@ -71,7 +71,7 @@ impl Expression for Array {
     #[cfg(feature = "llvm")]
     fn emit_llvm<'ctx>(
         &self,
-        state: (&mut LocalEnv, &mut ExternalEnv),
+        state: (&LocalEnv, &ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
     ) -> Result<(), String> {
         let begin_block = ctx.append_basic_block("array_begin");
@@ -93,7 +93,7 @@ impl Expression for Array {
             ctx.emit_llvm(
                 value,
                 value_ref,
-                (state.0, state.1),
+                state,
                 end_block,
                 vec![
                     (value_ref.into(), ctx.fns().vrl_resolved_drop),

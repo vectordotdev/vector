@@ -26,6 +26,7 @@
     clippy::semicolon_if_nothing_returned,  // allowed in initial deny commit
     clippy::similar_names, // allowed in initial deny commit
     clippy::too_many_lines, // allowed in initial deny commit
+    where_clauses_object_safety,
 )]
 
 mod compiler;

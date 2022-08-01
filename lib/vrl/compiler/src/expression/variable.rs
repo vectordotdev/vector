@@ -71,7 +71,7 @@ impl Expression for Variable {
     #[cfg(feature = "llvm")]
     fn emit_llvm<'ctx>(
         &self,
-        _: (&mut LocalEnv, &mut ExternalEnv),
+        _: (&LocalEnv, &ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
     ) -> Result<(), String> {
         let variable_begin_block = ctx.append_basic_block("variable_begin");

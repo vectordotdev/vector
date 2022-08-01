@@ -66,7 +66,7 @@ impl Expression for Not {
     #[cfg(feature = "llvm")]
     fn emit_llvm<'ctx>(
         &self,
-        state: (&mut LocalEnv, &mut ExternalEnv),
+        state: (&LocalEnv, &ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
     ) -> std::result::Result<(), String> {
         let not_begin_block = ctx.append_basic_block("not_begin");
@@ -78,12 +78,12 @@ impl Expression for Not {
         ctx.emit_llvm(
             self.inner.as_ref(),
             ctx.result_ref(),
-            (state.0, state.1),
+            state,
             not_end_block,
             vec![],
         )?;
 
-        let type_def = self.inner.type_def((state.0, state.1));
+        let type_def = self.inner.type_def(state);
         if type_def.is_fallible() {
             let not_is_ok_block = ctx.append_basic_block("not_is_ok");
 
