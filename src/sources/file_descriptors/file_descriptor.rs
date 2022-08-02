@@ -1,6 +1,5 @@
 use std::fs::File;
 use std::io;
-use std::os::raw::c_int;
 use std::os::unix::io::FromRawFd;
 
 use super::FileDescriptorConfig;
@@ -43,7 +42,7 @@ pub struct FileDescriptorSourceConfig {
     pub decoding: DeserializerConfig,
 
     /// The file descriptor number to read from.
-    pub fd: c_int,
+    pub fd: u32,
 }
 
 impl FileDescriptorConfig for FileDescriptorSourceConfig {
@@ -106,7 +105,7 @@ pub fn pipe_source(
     shutdown: ShutdownSignal,
     out: SourceSender,
 ) -> crate::Result<crate::sources::Source> {
-    let pipe = io::BufReader::new(unsafe { File::from_raw_fd(config.fd) });
+    let pipe = io::BufReader::new(unsafe { File::from_raw_fd(config.fd as i32) });
     config.source(pipe, shutdown, out)
 }
 
@@ -135,7 +134,7 @@ mod tests {
                 host_key: Default::default(),
                 framing: None,
                 decoding: default_decoding(),
-                fd: read_fd,
+                fd: read_fd as u32,
             };
 
             let mut stream = rx;
@@ -175,7 +174,7 @@ mod tests {
             host_key: Default::default(),
             framing: None,
             decoding: default_decoding(),
-            fd: write_fd, // intentionalally giving the source a write-only fd
+            fd: write_fd as u32, // intentionally giving the source a write-only fd
         };
 
         let mut stream = rx;

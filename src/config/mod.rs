@@ -3,7 +3,6 @@ use std::{
     fmt::{self, Display, Formatter},
     hash::Hash,
     net::SocketAddr,
-    os::raw::c_int,
     path::PathBuf,
 };
 
@@ -277,7 +276,7 @@ inventory::collect!(EnrichmentTableDescription);
 pub enum Resource {
     Port(SocketAddr, Protocol),
     SystemFdOffset(usize),
-    Fd(c_int),
+    Fd(u32),
     DiskBuffer(String),
 }
 
