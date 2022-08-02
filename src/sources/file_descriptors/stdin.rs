@@ -13,6 +13,8 @@ use crate::{
 
 use super::FileDescriptorConfig;
 
+const NAME: &str = "stdin";
+
 /// Configuration for the `stdin` source.
 #[configurable_component(source)]
 #[derive(Clone, Debug)]
@@ -51,8 +53,11 @@ impl FileDescriptorConfig for StdinConfig {
     fn decoding(&self) -> DeserializerConfig {
         self.decoding.clone()
     }
+    fn name(&self) -> String {
+        NAME.to_string()
+    }
     fn description(&self) -> String {
-        "stdin".to_string()
+        NAME.to_string()
     }
 }
 
@@ -68,7 +73,7 @@ impl Default for StdinConfig {
 }
 
 inventory::submit! {
-    SourceDescription::new::<StdinConfig>("stdin")
+    SourceDescription::new::<StdinConfig>(NAME)
 }
 
 impl_generate_config_from_default!(StdinConfig);
@@ -90,7 +95,7 @@ impl SourceConfig for StdinConfig {
     }
 
     fn source_type(&self) -> &'static str {
-        "stdin"
+        NAME
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -111,7 +116,7 @@ pub fn stdin_source<R>(
 where
     R: Send + io::BufRead + 'static,
 {
-    config.source(stdin, shutdown, out, "stdin")
+    config.source(stdin, shutdown, out)
 }
 
 #[cfg(test)]

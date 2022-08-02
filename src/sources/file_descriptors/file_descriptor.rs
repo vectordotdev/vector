@@ -9,6 +9,8 @@ use indoc::indoc;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
+const NAME: &str = "file_descriptor";
+
 use crate::{
     config::{GenerateConfig, Output, Resource, SourceConfig, SourceContext, SourceDescription},
     serde::default_decoding,
@@ -54,13 +56,16 @@ impl FileDescriptorConfig for FileDescriptorSourceConfig {
     fn decoding(&self) -> DeserializerConfig {
         self.decoding.clone()
     }
+    fn name(&self) -> String {
+        NAME.to_string()
+    }
     fn description(&self) -> String {
         format!("file descriptor {}", self.fd)
     }
 }
 
 inventory::submit! {
-    SourceDescription::new::<FileDescriptorSourceConfig>("file_descriptor")
+    SourceDescription::new::<FileDescriptorSourceConfig>(NAME)
 }
 
 impl GenerateConfig for FileDescriptorSourceConfig {
@@ -84,7 +89,7 @@ impl SourceConfig for FileDescriptorSourceConfig {
     }
 
     fn source_type(&self) -> &'static str {
-        "file_descriptor"
+        NAME
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -102,7 +107,7 @@ pub fn pipe_source(
     out: SourceSender,
 ) -> crate::Result<crate::sources::Source> {
     let pipe = io::BufReader::new(unsafe { File::from_raw_fd(config.fd) });
-    config.source(pipe, shutdown, out, "file_descriptor")
+    config.source(pipe, shutdown, out)
 }
 
 #[cfg(test)]

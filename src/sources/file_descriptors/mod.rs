@@ -29,6 +29,7 @@ pub trait FileDescriptorConfig {
     fn host_key(&self) -> Option<String>;
     fn framing(&self) -> Option<FramingConfig>;
     fn decoding(&self) -> DeserializerConfig;
+    fn name(&self) -> String;
     fn description(&self) -> String;
 
     fn source<R>(
@@ -36,7 +37,6 @@ pub trait FileDescriptorConfig {
         mut reader: R,
         shutdown: ShutdownSignal,
         mut out: SourceSender,
-        name: &'static str,
     ) -> crate::Result<crate::sources::Source>
     where
         R: Send + io::BufRead + 'static,
@@ -80,6 +80,7 @@ pub trait FileDescriptorConfig {
             }
         });
 
+        let name = self.name();
         Ok(Box::pin(async move {
             let stream = StreamReader::new(receiver);
             let mut stream = FramedRead::new(stream, decoder).take_until(shutdown);
@@ -99,7 +100,7 @@ pub trait FileDescriptorConfig {
                             for mut event in events {
                                 let log = event.as_mut_log();
 
-                                log.try_insert(log_schema().source_type_key(), Bytes::from(name));
+                                log.try_insert(log_schema().source_type_key(), Bytes::from(name.clone()));
                                 log.try_insert(log_schema().timestamp_key(), now);
 
                                 if let Some(hostname) = &hostname {
