@@ -407,7 +407,6 @@ pub fn file_source(
         None => Bytes::from(config.line_delimiter.clone()),
     };
 
-    let line_delimiter_len = line_delimiter_as_bytes.len();
     let checkpointer = Checkpointer::new(&data_dir);
     let file_server = FileServer {
         paths_provider,
@@ -547,8 +546,7 @@ pub fn file_source(
             let _enter = span2.enter();
             let meta = LogEventMetadata {
                 file: &line.filename,
-                line_end_offset: line.offset,
-                line_delimiter_len: line_delimiter_len,
+                offset: line.start_offset,
                 host_key: &host_key,
                 hostname: &hostname,
                 file_key: &file_key,
@@ -562,11 +560,11 @@ pub fn file_source(
                 let entry = FinalizerEntry {
                     file_name: line.filename,
                     file_id: line.file_id,
-                    offset: line.offset,
+                    offset: line.end_offset,
                 };
                 finalizer.add(entry, receiver);
             } else {
-                checkpoints.update(line.file_id, line.offset);
+                checkpoints.update(line.file_id, line.end_offset);
             }
             event
         });
@@ -621,22 +619,30 @@ fn wrap_with_line_agg(
     let logic = line_agg::Logic::new(config);
     Box::new(
         LineAgg::new(
-            rx.map(|line| (line.filename, line.text, (line.file_id, line.offset))),
+            rx.map(|line| {
+                (
+                    line.filename,
+                    line.text,
+                    (line.file_id, line.start_offset, line.end_offset),
+                )
+            }),
             logic,
         )
-        .map(|(filename, text, (file_id, offset))| Line {
-            text,
-            filename,
-            file_id,
-            offset,
-        }),
+        .map(
+            |(filename, text, (file_id, start_offset, end_offset))| Line {
+                text,
+                filename,
+                file_id,
+                start_offset,
+                end_offset,
+            },
+        ),
     )
 }
 
 struct LogEventMetadata<'a> {
     file: &'a str,
-    line_end_offset: u64,
-    line_delimiter_len: usize,
+    offset: u64,
     host_key: &'a str,
     hostname: &'a Option<String>,
     file_key: &'a Option<String>,
@@ -644,12 +650,10 @@ struct LogEventMetadata<'a> {
 }
 
 fn create_event(line: Bytes, meta: LogEventMetadata) -> LogEvent {
-    let line_len = line.len();
-
     emit!(FileEventsReceived {
         count: 1,
         file: meta.file,
-        byte_size: line_len,
+        byte_size: line.len(),
     });
 
     let mut event = LogEvent::from_bytes_legacy(&line);
@@ -658,9 +662,7 @@ fn create_event(line: Bytes, meta: LogEventMetadata) -> LogEvent {
     event.insert(log_schema().source_type_key(), Bytes::from("file"));
 
     if let Some(offset_key) = &meta.offset_key {
-        let line_start_offset: u64 =
-            meta.line_end_offset - line_len as u64 - meta.line_delimiter_len as u64;
-        event.insert(offset_key.as_str(), line_start_offset.to_string());
+        event.insert(offset_key.as_str(), meta.offset.to_string());
     }
 
     if let Some(file_key) = &meta.file_key {
@@ -817,21 +819,15 @@ mod tests {
         let line = Bytes::from("hello world");
         let file = "some_file.rs";
 
-        // Internal offset is the end of the line including the newline char,
-        // whereas the `line` variable contains the line with the newline stripped.
-        // So 11 characters in `line` -> internal offset is 12 including the newline.
-        let line_end_offset: u64 = 12;
-
         let host_key = "host".to_string();
         let hostname = Some("Some.Machine".to_string());
         let file_key = Some("file".to_string());
         let offset_key = Some("offset".to_string());
-        let line_delimiter_len: usize = 1;
+        let offset: u64 = 0;
 
         let meta = LogEventMetadata {
             file: file,
-            line_end_offset: line_end_offset,
-            line_delimiter_len: line_delimiter_len,
+            offset: offset,
             host_key: &host_key,
             hostname: &hostname,
             file_key: &file_key,

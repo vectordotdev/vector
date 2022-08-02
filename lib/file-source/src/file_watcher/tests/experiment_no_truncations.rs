@@ -62,7 +62,7 @@ fn experiment_no_truncations(actions: Vec<FileWatcherAction>) {
                         Err(_) => {
                             unreachable!();
                         }
-                        Ok(Some(line)) if line.is_empty() => {
+                        Ok(Some(line)) if line.bytes.is_empty() => {
                             attempts -= 1;
                             assert!(fwfiles[read_index].read_line().is_none());
                             continue;
@@ -74,7 +74,7 @@ fn experiment_no_truncations(actions: Vec<FileWatcherAction>) {
                         }
                         Ok(Some(line)) => {
                             let exp = fwfiles[read_index].read_line().expect("could not readline");
-                            assert_eq!(exp.into_bytes(), line);
+                            assert_eq!(exp.into_bytes(), line.bytes);
                             // assert_eq!(sz, buf.len() + 1);
                             break;
                         }
