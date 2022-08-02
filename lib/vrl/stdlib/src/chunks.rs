@@ -74,8 +74,8 @@ impl Function for Chunks {
     fn examples(&self) -> &'static [Example] {
         &[Example {
             title: "chunks by byte",
-            source: r#"chunks("foobar", 1)"#,
-            result: Ok("hi"),
+            source: r#"chunks("abcdefgh", 4)"#,
+            result: Ok(["abcd", "efgh"]),
         }]
     }
 
