@@ -113,14 +113,12 @@ impl Expression for IfStatement {
         ctx.build_unconditional_branch(if_statement_begin_block);
         ctx.position_at_end(if_statement_begin_block);
 
-        let result_ref = ctx.result_ref();
-
         let predicate_ref = ctx.build_alloca_resolved_initialized("predicate");
 
-        ctx.emit_llvm(
+        ctx.emit_llvm_abortable(
             &self.predicate,
-            predicate_ref,
             state,
+            predicate_ref,
             if_statement_end_block,
             vec![(predicate_ref.into(), ctx.fns().vrl_resolved_drop)],
         )?;
@@ -142,28 +140,16 @@ impl Expression for IfStatement {
         ctx.build_conditional_branch(is_true, if_branch_block, else_branch_block);
 
         ctx.position_at_end(if_branch_block);
-        ctx.emit_llvm(
-            &self.consequent,
-            result_ref,
-            state,
-            if_statement_end_block,
-            vec![],
-        )?;
+        ctx.emit_llvm_for_ref(&self.consequent, state, ctx.result_ref())?;
         ctx.build_unconditional_branch(if_statement_end_block);
 
         ctx.position_at_end(else_branch_block);
         if let Some(alternative) = &self.alternative {
-            ctx.emit_llvm(
-                alternative,
-                result_ref,
-                state,
-                if_statement_end_block,
-                vec![],
-            )?;
+            ctx.emit_llvm_for_ref(alternative, state, ctx.result_ref())?;
         } else {
             ctx.fns()
                 .vrl_resolved_ok_null
-                .build_call(ctx.builder(), result_ref);
+                .build_call(ctx.builder(), ctx.result_ref());
         }
         ctx.build_unconditional_branch(if_statement_end_block);
 

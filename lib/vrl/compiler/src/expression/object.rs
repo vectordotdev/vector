@@ -92,10 +92,10 @@ impl Expression for Object {
             let key_ref = ctx.into_const(key.clone(), key).as_pointer_value();
             let entry_ref = ctx.build_alloca_resolved_initialized("object_entry");
 
-            ctx.emit_llvm(
+            ctx.emit_llvm_abortable(
                 expression,
-                entry_ref,
                 state,
+                entry_ref,
                 end_block,
                 vec![
                     (entry_ref.into(), ctx.fns().vrl_resolved_drop),

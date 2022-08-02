@@ -1,7 +1,7 @@
-use core::Resolved;
+use core::{ExpressionError, Resolved};
 use vector_common::TimeZone;
 
-use crate::{state::Runtime, Target};
+use crate::{state::Runtime, Expression, Target};
 
 pub struct Context<'a> {
     target: &'a mut dyn Target,
@@ -45,6 +45,17 @@ impl<'a> Context<'a> {
     #[must_use]
     pub fn timezone(&self) -> &TimeZone {
         self.timezone
+    }
+
+    pub fn resolve_abortable(
+        &mut self,
+        expression: &dyn Expression,
+    ) -> Result<Resolved, ExpressionError> {
+        let resolved = expression.resolve(self);
+        match resolved {
+            Err(error) if error.is_abort() => Err(error),
+            _ => Ok(resolved),
+        }
     }
 }
 

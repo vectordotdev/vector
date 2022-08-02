@@ -197,23 +197,27 @@ impl Expression for Query {
                 return Ok(());
             }
             Target::Internal(variable) => {
-                ctx.emit_llvm(variable, ctx.result_ref(), state, query_end_block, vec![])?
+                ctx.emit_llvm_for_ref(variable, state, ctx.result_ref())?
             }
+            Target::FunctionCall(call) => ctx.emit_llvm_for_ref(call, state, ctx.result_ref())?,
+            Target::Container(container) => {
+                ctx.emit_llvm_for_ref(container, state, ctx.result_ref())?
+            }
+        };
+
+        let target_check_err = match &self.target {
+            Target::Internal(_) | Target::External => false,
             Target::FunctionCall(call) => {
-                ctx.emit_llvm(call, ctx.result_ref(), state, query_end_block, vec![])?
+                let type_def = call.type_def(state);
+                type_def.is_fallible() || type_def.is_abortable()
             }
             Target::Container(container) => {
-                ctx.emit_llvm(container, ctx.result_ref(), state, query_end_block, vec![])?
+                let type_def = container.type_def(state);
+                type_def.is_fallible() || type_def.is_abortable()
             }
         };
 
-        let target_fallible = match &self.target {
-            Target::Internal(_) | Target::External => false,
-            Target::FunctionCall(call) => call.type_def(state).is_fallible(),
-            Target::Container(container) => container.type_def(state).is_fallible(),
-        };
-
-        if target_fallible {
+        if target_check_err {
             let query_target_ok_block = ctx.append_basic_block("query_target_ok");
 
             let is_ok = ctx

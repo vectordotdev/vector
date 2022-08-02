@@ -558,7 +558,7 @@ where
                 selection_vector_ok: _,
                 selection_vector_err: _,
                 resolved_values_temp: _,
-            } => match expr.resolve(ctx) {
+            } => match ctx.resolve_abortable(expr.as_ref())? {
                 Ok(value) => {
                     ok.insert(value.clone(), ctx);
                     err.insert(Value::Null, ctx);
@@ -614,8 +614,10 @@ where
                 for index in selection_vector {
                     let index = *index;
                     if let Err(error) = &ctx.resolved_values[index] {
-                        selection_vector_err.push(index);
-                        ctx.resolved_values[index] = Ok(Value::from(error.to_string()));
+                        if !error.is_abort() {
+                            selection_vector_err.push(index);
+                            ctx.resolved_values[index] = Ok(Value::from(error.to_string()));
+                        }
                     } else {
                         selection_vector_ok.push(index);
                     }
@@ -665,7 +667,7 @@ where
                 ctx.build_unconditional_branch(begin_block);
                 ctx.position_at_end(begin_block);
 
-                ctx.emit_llvm(expr.as_ref(), ctx.result_ref(), state, end_block, vec![])?;
+                ctx.emit_llvm_abortable(expr.as_ref(), state, ctx.result_ref(), end_block, vec![])?;
 
                 target.emit_llvm_insert(ctx, ctx.result_ref());
 
@@ -692,10 +694,10 @@ where
                 let assignment_ref =
                     ctx.build_alloca_resolved_initialized("assignment_infallible_expression");
 
-                ctx.emit_llvm(
+                ctx.emit_llvm_abortable(
                     expr.as_ref(),
-                    assignment_ref,
                     state,
+                    assignment_ref,
                     end_block,
                     vec![(assignment_ref.into(), ctx.fns().vrl_resolved_drop)],
                 )?;

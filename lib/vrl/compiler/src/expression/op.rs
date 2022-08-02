@@ -89,7 +89,11 @@ impl Expression for Op {
         use value::Value::{Boolean, Null};
 
         match self.opcode {
-            Err => return self.lhs.resolve(ctx).or_else(|_| self.rhs.resolve(ctx)),
+            Err => {
+                return ctx
+                    .resolve_abortable(self.lhs.as_ref())?
+                    .or_else(|_| self.rhs.resolve(ctx))
+            }
             Or => {
                 return self
                     .lhs
@@ -140,7 +144,10 @@ impl Expression for Op {
                     let resolved = &mut ctx.resolved_values[index];
                     let mut ctx = Context::new(target, state, &ctx.timezone);
                     let ctx = &mut ctx;
-                    *resolved = self.lhs.resolve(ctx).or_else(|_| self.rhs.resolve(ctx));
+                    *resolved = (|| {
+                        ctx.resolve_abortable(self.lhs.as_ref())?
+                            .or_else(|_| self.rhs.resolve(ctx))
+                    })();
                 }
             }
             Or => {
@@ -552,19 +559,13 @@ impl Expression for Op {
             | ast::Opcode::Merge => {
                 let lhs_resolved_ref = ctx.build_alloca_resolved_initialized("lhs");
 
-                ctx.emit_llvm(
-                    self.lhs.as_ref(),
-                    lhs_resolved_ref,
-                    state,
-                    op_end_block,
-                    vec![(lhs_resolved_ref.into(), ctx.fns().vrl_resolved_drop)],
-                )?;
-
                 if lhs_def.is_fallible() {
                     let lhs_ok_block =
                         ctx.append_basic_block(&format!("op_{}_lhs_ok", op_identifier));
                     let lhs_err_block =
                         ctx.append_basic_block(&format!("op_{}_lhs_err", op_identifier));
+
+                    ctx.emit_llvm_for_ref(self.lhs.as_ref(), state, lhs_resolved_ref)?;
 
                     let is_ok = ctx
                         .fns()
@@ -587,6 +588,14 @@ impl Expression for Op {
                     ctx.build_unconditional_branch(op_end_block);
 
                     ctx.position_at_end(lhs_ok_block);
+                } else {
+                    ctx.emit_llvm_abortable(
+                        self.lhs.as_ref(),
+                        state,
+                        lhs_resolved_ref,
+                        op_end_block,
+                        vec![(lhs_resolved_ref.into(), ctx.fns().vrl_resolved_drop)],
+                    )?;
                 }
 
                 let lhs_value_ref = ctx
@@ -599,19 +608,13 @@ impl Expression for Op {
 
                 let rhs_resolved_ref = ctx.build_alloca_resolved_initialized("rhs");
 
-                ctx.emit_llvm(
-                    self.rhs.as_ref(),
-                    rhs_resolved_ref,
-                    state,
-                    op_end_block,
-                    vec![(rhs_resolved_ref.into(), ctx.fns().vrl_resolved_drop)],
-                )?;
-
                 if rhs_def.is_fallible() {
                     let rhs_ok_block =
                         ctx.append_basic_block(&format!("op_{}_rhs_ok", op_identifier));
                     let rhs_err_block =
                         ctx.append_basic_block(&format!("op_{}_rhs_err", op_identifier));
+
+                    ctx.emit_llvm_for_ref(self.rhs.as_ref(), state, rhs_resolved_ref)?;
 
                     let is_ok = ctx
                         .fns()
@@ -637,6 +640,14 @@ impl Expression for Op {
                     ctx.build_unconditional_branch(op_end_block);
 
                     ctx.position_at_end(rhs_ok_block);
+                } else {
+                    ctx.emit_llvm_abortable(
+                        self.rhs.as_ref(),
+                        state,
+                        rhs_resolved_ref,
+                        op_end_block,
+                        vec![(rhs_resolved_ref.into(), ctx.fns().vrl_resolved_drop)],
+                    )?;
                 }
 
                 let rhs_value_ref = ctx
@@ -824,10 +835,10 @@ impl Expression for Op {
             ast::Opcode::Or => {
                 let op_or_falsy_block = ctx.append_basic_block("op_or_falsy");
 
-                ctx.emit_llvm(
+                ctx.emit_llvm_abortable(
                     self.lhs.as_ref(),
-                    ctx.result_ref(),
                     state,
+                    ctx.result_ref(),
                     op_end_block,
                     vec![],
                 )?;
@@ -845,13 +856,7 @@ impl Expression for Op {
                 ctx.build_conditional_branch(is_falsy, op_or_falsy_block, op_end_block);
 
                 ctx.position_at_end(op_or_falsy_block);
-                ctx.emit_llvm(
-                    self.rhs.as_ref(),
-                    ctx.result_ref(),
-                    state,
-                    op_end_block,
-                    vec![],
-                )?;
+                ctx.emit_llvm_for_ref(self.rhs.as_ref(), state, ctx.result_ref())?;
             }
             ast::Opcode::And => {
                 let op_and_falsy_block = ctx.append_basic_block("op_and_falsy");
@@ -859,19 +864,13 @@ impl Expression for Op {
 
                 let lhs_resolved_ref = ctx.build_alloca_resolved_initialized("lhs");
 
-                ctx.emit_llvm(
-                    self.lhs.as_ref(),
-                    lhs_resolved_ref,
-                    state,
-                    op_end_block,
-                    vec![(lhs_resolved_ref.into(), ctx.fns().vrl_resolved_drop)],
-                )?;
-
                 if lhs_def.is_fallible() {
                     let lhs_ok_block =
                         ctx.append_basic_block(&format!("op_{}_lhs_ok", op_identifier));
                     let lhs_err_block =
                         ctx.append_basic_block(&format!("op_{}_lhs_err", op_identifier));
+
+                    ctx.emit_llvm_for_ref(self.lhs.as_ref(), state, lhs_resolved_ref)?;
 
                     let is_ok = ctx
                         .fns()
@@ -894,6 +893,14 @@ impl Expression for Op {
                     ctx.build_unconditional_branch(op_end_block);
 
                     ctx.position_at_end(lhs_ok_block);
+                } else {
+                    ctx.emit_llvm_abortable(
+                        self.lhs.as_ref(),
+                        state,
+                        lhs_resolved_ref,
+                        op_end_block,
+                        vec![(lhs_resolved_ref.into(), ctx.fns().vrl_resolved_drop)],
+                    )?;
                 }
 
                 let is_falsy = ctx
@@ -910,13 +917,7 @@ impl Expression for Op {
 
                 ctx.position_at_end(op_and_truthy_block);
                 let rhs_resolved_ref = ctx.build_alloca_resolved_initialized("rhs");
-                ctx.emit_llvm(
-                    self.rhs.as_ref(),
-                    rhs_resolved_ref,
-                    state,
-                    op_end_block,
-                    vec![(rhs_resolved_ref.into(), ctx.fns().vrl_resolved_drop)],
-                )?;
+                ctx.emit_llvm_for_ref(self.rhs.as_ref(), state, rhs_resolved_ref)?;
                 ctx.fns().vrl_expression_op_and_truthy.build_call(
                     ctx.builder(),
                     lhs_resolved_ref,
@@ -937,10 +938,10 @@ impl Expression for Op {
 
                 let discard_error = ctx.discard_error();
                 ctx.set_discard_error(true);
-                ctx.emit_llvm(
+                ctx.emit_llvm_abortable(
                     self.lhs.as_ref(),
-                    ctx.result_ref(),
                     state,
+                    ctx.result_ref(),
                     op_end_block,
                     vec![],
                 )?;
@@ -959,13 +960,7 @@ impl Expression for Op {
                 ctx.build_conditional_branch(is_err, op_err_err_block, op_end_block);
 
                 ctx.position_at_end(op_err_err_block);
-                ctx.emit_llvm(
-                    self.rhs.as_ref(),
-                    ctx.result_ref(),
-                    state,
-                    op_end_block,
-                    vec![],
-                )?;
+                ctx.emit_llvm_for_ref(self.rhs.as_ref(), state, ctx.result_ref())?;
             }
         };
 

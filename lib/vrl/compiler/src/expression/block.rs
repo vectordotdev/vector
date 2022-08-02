@@ -132,10 +132,10 @@ impl Expression for Block {
         ctx.position_at_end(block_begin_block);
 
         for expr in &self.inner {
-            ctx.emit_llvm(expr, ctx.result_ref(), state, block_end_block, vec![])?;
-
             let type_def = expr.type_def(state);
             if type_def.is_fallible() {
+                ctx.emit_llvm_for_ref(expr, state, ctx.result_ref())?;
+
                 let is_err = ctx
                     .fns()
                     .vrl_resolved_is_err
@@ -149,6 +149,8 @@ impl Expression for Block {
                 let block_next_block = ctx.append_basic_block("block_next");
                 ctx.build_conditional_branch(is_err, block_end_block, block_next_block);
                 ctx.position_at_end(block_next_block);
+            } else {
+                ctx.emit_llvm_abortable(expr, state, ctx.result_ref(), block_end_block, vec![])?;
             }
         }
 

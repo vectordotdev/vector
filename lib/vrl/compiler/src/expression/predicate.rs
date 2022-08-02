@@ -79,7 +79,7 @@ impl Expression for Predicate {
 
                 for index in selection_vector {
                     let index = *index;
-                    if ctx.resolved_values[index].is_ok() {
+                    if !matches!(&ctx.resolved_values[index], Err(error) if error.is_abort()) {
                         self.selection_vector_other.push(index);
                     }
                 }
@@ -126,7 +126,7 @@ impl Expression for Predicate {
         ctx.position_at_end(predicate_begin_block);
 
         for inner in &self.inner {
-            ctx.emit_llvm(inner, ctx.result_ref(), state, predicate_end_block, vec![])?;
+            ctx.emit_llvm_abortable(inner, state, ctx.result_ref(), predicate_end_block, vec![])?;
         }
         ctx.build_unconditional_branch(predicate_end_block);
 

@@ -2,7 +2,7 @@ use bytes::{BufMut, BytesMut};
 use primitive_calling_convention::primitive_calling_convention;
 use std::{any::Any, collections::BTreeMap, mem::MaybeUninit};
 use vrl_core::{
-    Context, Error, ExpressionError, Label, LookupBuf, Resolved, Span, Value, VrlValueArithmetic,
+    Context, Error, ExpressionError, LookupBuf, Resolved, Span, Value, VrlValueArithmetic,
     VrlValueConvert,
 };
 
@@ -132,6 +132,12 @@ pub extern "C" fn vrl_resolved_is_err(resolved: &Resolved) -> bool {
 
 #[no_mangle]
 #[primitive_calling_convention]
+pub extern "C" fn vrl_resolved_is_abort(resolved: &Resolved) -> bool {
+    matches!(resolved, Err(error) if error.is_abort())
+}
+
+#[no_mangle]
+#[primitive_calling_convention]
 pub extern "C" fn vrl_value_boolean_is_true(resolved: &Resolved) -> bool {
     resolved
         .as_ref()
@@ -197,10 +203,7 @@ pub extern "C" fn vrl_resolved_ok_false() -> Resolved {
 pub extern "C" fn vrl_expression_abort(span: &Span, message: Resolved) -> Resolved {
     let message =
         (|| Ok::<_, ExpressionError>(message?.try_bytes_utf8_lossy()?.to_string()))().ok();
-    Err(ExpressionError::Abort {
-        span: *span,
-        message,
-    })
+    Err(ExpressionError::abort(*span, message.as_deref()))
 }
 
 #[no_mangle]
@@ -846,6 +849,7 @@ pub extern "C" fn vrl_expression_query_target(path: &LookupBuf, result: &mut Res
 pub extern "C" fn vrl_expression_function_call_abort(
     #[allow(clippy::ptr_arg)] ident: &String,
     span: &Span,
+    abort_on_error: bool,
     resolved: &mut Resolved,
 ) {
     let error = {
@@ -854,30 +858,12 @@ pub extern "C" fn vrl_expression_function_call_abort(
         moved
     };
 
-    *resolved = error.map_err(|err| match err {
-        ExpressionError::Abort { .. } => {
-            panic!("abort errors must only be defined by `abort` statement")
-        }
-        ExpressionError::Error {
-            message,
-            mut labels,
-            notes,
-        } => {
-            labels.push(Label::primary(message.clone(), span));
-
-            ExpressionError::Error {
-                message: format!(
-                    r#"function call error for "{}" at ({}:{}): {}"#,
-                    ident,
-                    span.start(),
-                    span.end(),
-                    message
-                ),
-                labels,
-                notes,
-            }
-        }
-    })
+    *resolved = Err(ExpressionError::function_abort(
+        *span,
+        ident,
+        abort_on_error,
+        error.expect_err("VRL resolved value must contain an error"),
+    ));
 }
 
 #[no_mangle]

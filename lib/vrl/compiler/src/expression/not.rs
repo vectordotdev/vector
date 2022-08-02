@@ -75,17 +75,11 @@ impl Expression for Not {
         ctx.build_unconditional_branch(not_begin_block);
         ctx.position_at_end(not_begin_block);
 
-        ctx.emit_llvm(
-            self.inner.as_ref(),
-            ctx.result_ref(),
-            state,
-            not_end_block,
-            vec![],
-        )?;
-
         let type_def = self.inner.type_def(state);
         if type_def.is_fallible() {
             let not_is_ok_block = ctx.append_basic_block("not_is_ok");
+
+            ctx.emit_llvm_for_ref(self.inner.as_ref(), state, ctx.result_ref())?;
 
             let is_err = ctx
                 .fns()
@@ -100,6 +94,14 @@ impl Expression for Not {
             ctx.build_conditional_branch(is_err, not_end_block, not_is_ok_block);
 
             ctx.position_at_end(not_is_ok_block);
+        } else {
+            ctx.emit_llvm_abortable(
+                self.inner.as_ref(),
+                state,
+                ctx.result_ref(),
+                not_end_block,
+                vec![],
+            )?;
         }
 
         ctx.fns()

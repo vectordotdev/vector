@@ -427,32 +427,42 @@ impl<'ctx> Context<'ctx> {
         alloca
     }
 
-    pub fn emit_llvm(
+    pub fn emit_llvm_abortable(
         &mut self,
         expression: &dyn Expression,
-        resolved_ref: PointerValue<'ctx>,
         state: (&LocalEnv, &ExternalEnv),
+        resolved_ref: PointerValue<'ctx>,
         abort_end_block: BasicBlock<'ctx>,
         abort_drop_refs: Vec<(
             BasicMetadataValueEnum<'ctx>,
             precompiled::PrecompiledFunction<'ctx, 1>,
         )>,
     ) -> Result<(), String> {
-        let result_ref = self.result_ref;
-        self.set_result_ref(resolved_ref);
-        expression.emit_llvm(state, self)?;
-        self.set_result_ref(result_ref);
+        self.emit_llvm_for_ref(expression, state, resolved_ref)?;
 
         let type_def = expression.type_def(state);
         if type_def.is_abortable() {
             self.handle_abort(
                 resolved_ref.into(),
-                result_ref.into(),
+                self.result_ref.into(),
                 abort_end_block,
                 abort_drop_refs,
             );
         }
 
+        Ok(())
+    }
+
+    pub fn emit_llvm_for_ref(
+        &mut self,
+        expression: &dyn Expression,
+        state: (&LocalEnv, &ExternalEnv),
+        resolved_ref: PointerValue<'ctx>,
+    ) -> Result<(), String> {
+        let result_ref = self.result_ref;
+        self.set_result_ref(resolved_ref);
+        expression.emit_llvm(state, self)?;
+        self.set_result_ref(result_ref);
         Ok(())
     }
 
@@ -471,7 +481,7 @@ impl<'ctx> Context<'ctx> {
 
         let is_err = self
             .fns()
-            .vrl_resolved_is_err
+            .vrl_resolved_is_abort
             .build_call(self.builder(), resolved_ref)
             .try_as_basic_value()
             .left()

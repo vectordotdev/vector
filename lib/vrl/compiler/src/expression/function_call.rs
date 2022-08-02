@@ -523,6 +523,10 @@ pub struct FunctionCall {
 
 #[allow(unused)] // will be used by LLVM runtime
 impl FunctionCall {
+    fn handle_err(&self, error: ExpressionError) -> ExpressionError {
+        ExpressionError::function_abort(self.span, self.ident, self.abort_on_error, error)
+    }
+
     fn compile_arguments(
         &self,
         function: &dyn Function,
@@ -669,31 +673,9 @@ enum CompiledArgument {
 
 impl Expression for FunctionCall {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        self.expr.resolve(ctx).map_err(|err| match err {
-            #[cfg(feature = "expr-abort")]
-            ExpressionError::Abort { .. } => {
-                panic!("abort errors must only be defined by `abort` statement")
-            }
-            ExpressionError::Error {
-                message,
-                mut labels,
-                notes,
-            } => {
-                labels.push(Label::primary(message.clone(), self.span));
-
-                ExpressionError::Error {
-                    message: format!(
-                        r#"function call error for "{}" at ({}:{}): {}"#,
-                        self.ident,
-                        self.span.start(),
-                        self.span.end(),
-                        message
-                    ),
-                    labels,
-                    notes,
-                }
-            }
-        })
+        self.expr
+            .resolve(ctx)
+            .map_err(|error| self.handle_err(error))
     }
 
     fn resolve_batch(&mut self, ctx: &mut BatchContext, selection_vector: &[usize]) {
@@ -701,31 +683,7 @@ impl Expression for FunctionCall {
 
         for index in selection_vector {
             let resolved = addr_of_mut!(ctx.resolved_values[*index]);
-            let result = unsafe { resolved.read() }.map_err(|err| match err {
-                #[cfg(feature = "expr-abort")]
-                ExpressionError::Abort { .. } => {
-                    panic!("abort errors must only be defined by `abort` statement")
-                }
-                ExpressionError::Error {
-                    message,
-                    mut labels,
-                    notes,
-                } => {
-                    labels.push(Label::primary(message.clone(), self.span));
-
-                    ExpressionError::Error {
-                        message: format!(
-                            r#"function call error for "{}" at ({}:{}): {}"#,
-                            self.ident,
-                            self.span.start(),
-                            self.span.end(),
-                            message
-                        ),
-                        labels,
-                        notes,
-                    }
-                }
-            });
+            let result = unsafe { resolved.read() }.map_err(|error| self.handle_err(error));
             unsafe { resolved.write(result) };
         }
     }
@@ -900,10 +858,10 @@ impl Expression for FunctionCall {
                     let argument_ref = ctx.build_alloca_resolved_initialized(&argument_name);
                     drop_on_abort_refs.push((argument_ref.into(), ctx.fns().vrl_resolved_drop));
 
-                    ctx.emit_llvm(
+                    ctx.emit_llvm_abortable(
                         &argument.expression,
-                        argument_ref,
                         state,
+                        argument_ref,
                         abort_block,
                         drop_on_abort_refs.clone(),
                     )?;
@@ -922,10 +880,10 @@ impl Expression for FunctionCall {
                     let argument_ref = ctx.build_alloca_resolved_initialized(&argument_name);
                     drop_on_abort_refs.push((argument_ref.into(), ctx.fns().vrl_resolved_drop));
 
-                    ctx.emit_llvm(
+                    ctx.emit_llvm_abortable(
                         &argument.expression,
-                        argument_ref,
                         state,
+                        argument_ref,
                         abort_block,
                         drop_on_abort_refs.clone(),
                     )?;
@@ -983,6 +941,9 @@ impl Expression for FunctionCall {
             ctx.builder(),
             ctx.cast_string_ref_type(ident_ref),
             ctx.cast_span_ref_type(span_ref),
+            ctx.context()
+                .bool_type()
+                .const_int(self.abort_on_error.into(), false),
             result_ref,
         );
         ctx.build_unconditional_branch(end_block);

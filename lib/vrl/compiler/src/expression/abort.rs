@@ -67,10 +67,7 @@ impl Expression for Abort {
             })
             .transpose()?;
 
-        Err(ExpressionError::Abort {
-            span: self.span,
-            message,
-        })
+        Err(ExpressionError::abort(self.span, message.as_deref()))
     }
 
     fn resolve_batch(&mut self, ctx: &mut BatchContext, selection_vector: &[usize]) {
@@ -99,10 +96,7 @@ impl Expression for Abort {
             let index = *index;
             let message = self.messages[index].take();
 
-            ctx.resolved_values[index] = Err(ExpressionError::Abort {
-                span: self.span,
-                message,
-            });
+            ctx.resolved_values[index] = Err(ExpressionError::abort(self.span, message.as_deref()));
         }
     }
 
@@ -128,10 +122,10 @@ impl Expression for Abort {
         let message_ref = ctx.build_alloca_resolved_initialized("message");
 
         if let Some(message) = &self.message {
-            ctx.emit_llvm(
+            ctx.emit_llvm_abortable(
                 message.as_ref(),
-                message_ref,
                 state,
+                message_ref,
                 abort_end_block,
                 vec![(message_ref.into(), ctx.fns().vrl_resolved_drop)],
             )?;

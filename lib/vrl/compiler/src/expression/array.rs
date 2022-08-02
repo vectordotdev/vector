@@ -90,10 +90,10 @@ impl Expression for Array {
         for value in &self.inner {
             let value_ref = ctx.build_alloca_resolved_initialized("value");
 
-            ctx.emit_llvm(
+            ctx.emit_llvm_abortable(
                 value,
-                value_ref,
                 state,
+                value_ref,
                 end_block,
                 vec![
                     (value_ref.into(), ctx.fns().vrl_resolved_drop),
