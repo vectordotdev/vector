@@ -56,9 +56,9 @@ impl CharacterDelimitedDecoderOptions {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct CharacterDelimitedDecoder {
     /// The delimiter used to separate byte sequences.
-    delimiter: u8,
+    pub delimiter: u8,
     /// The maximum length of the byte buffer.
-    max_length: usize,
+    pub max_length: usize,
 }
 
 impl CharacterDelimitedDecoder {

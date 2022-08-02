@@ -32,10 +32,6 @@ use vector_core::{
 /// The name of this source
 const NAME: &str = "http_scrape";
 
-// TODO:
-//   - finish the TODOs in the unit and integration tests
-//   - solve the placement of the HttpScrapeEventsSent
-
 /// Configuration for the `http_scrape` source.
 #[configurable_component(source)]
 #[derive(Clone, Debug)]
@@ -119,18 +115,21 @@ impl SourceConfig for HttpScrapeConfig {
         )
         .build();
 
+        let content_type = decoder.content_type().to_string();
+
         // the only specific context needed is the codec decoding
         let context = HttpScrapeContext { decoder };
 
-        let inputs = super::GenericHttpScrapeInputs::new(
+        let inputs = super::GenericHttpScrapeInputs {
             urls,
-            self.scrape_interval_secs,
-            self.headers.clone(),
-            self.auth.clone(),
+            interval_secs: self.scrape_interval_secs,
+            headers: self.headers.clone(),
+            content_type,
+            auth: self.auth.clone(),
             tls,
-            cx.proxy.clone(),
-            cx.shutdown,
-        );
+            proxy: cx.proxy.clone(),
+            shutdown: cx.shutdown,
+        };
 
         Ok(super::http_scrape(inputs, context, cx.out).boxed())
     }

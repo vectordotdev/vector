@@ -7,7 +7,7 @@ components: sources: http_scrape: {
 	classes: {
 		commonly_used: false
 		delivery:      "at_least_once"
-		deployment_roles: ["daemon", "sidecar"]
+		deployment_roles: ["daemon", "sidecar", "aggregator"]
 		development:   "beta"
 		egress_method: "batch"
 		stateful:      false

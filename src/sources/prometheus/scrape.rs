@@ -131,15 +131,16 @@ impl SourceConfig for PrometheusScrapeConfig {
             endpoint_info: None,
         };
 
-        let inputs = GenericHttpScrapeInputs::new(
+        let inputs = GenericHttpScrapeInputs {
             urls,
-            self.scrape_interval_secs,
-            None,
-            self.auth.clone(),
+            interval_secs: self.scrape_interval_secs,
+            headers: None,
+            content_type: "text/plain".to_string(),
+            auth: self.auth.clone(),
             tls,
-            cx.proxy.clone(),
-            cx.shutdown,
-        );
+            proxy: cx.proxy.clone(),
+            shutdown: cx.shutdown,
+        };
 
         Ok(http_scrape(inputs, context, cx.out).boxed())
     }

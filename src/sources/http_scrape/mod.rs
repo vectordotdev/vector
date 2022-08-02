@@ -21,7 +21,6 @@ use std::time::{Duration, Instant};
 use std::{collections::HashMap, future::ready};
 use tokio_stream::wrappers::IntervalStream;
 
-use crate::internal_events::HttpScrapeEventsSent;
 use crate::{
     http::{Auth, HttpClient},
     internal_events::{
@@ -36,35 +35,18 @@ use vector_core::{config::proxy::ProxyConfig, event::Event, ByteSizeOf};
 
 /// Contains the inputs generic to any http scrape.
 pub(crate) struct GenericHttpScrapeInputs {
-    urls: Vec<Uri>,
-    interval_secs: u64,
-    headers: Option<HashMap<String, String>>,
-    auth: Option<Auth>,
-    tls: TlsSettings,
-    proxy: ProxyConfig,
-    shutdown: ShutdownSignal,
-}
-
-impl GenericHttpScrapeInputs {
-    pub fn new(
-        urls: Vec<Uri>,
-        interval_secs: u64,
-        headers: Option<HashMap<String, String>>,
-        auth: Option<Auth>,
-        tls: TlsSettings,
-        proxy: ProxyConfig,
-        shutdown: ShutdownSignal,
-    ) -> Self {
-        Self {
-            urls,
-            interval_secs,
-            headers,
-            auth,
-            tls,
-            proxy,
-            shutdown,
-        }
-    }
+    /// Array of URLs to scrape
+    pub urls: Vec<Uri>,
+    /// Interval to scrape on in seconds
+    pub interval_secs: u64,
+    /// Map of Header+Value to apply to HTTP request
+    pub headers: Option<HashMap<String, String>>,
+    /// Content type of the HTTP request, determined by the source
+    pub content_type: String,
+    pub auth: Option<Auth>,
+    pub tls: TlsSettings,
+    pub proxy: ProxyConfig,
+    pub shutdown: ShutdownSignal,
 }
 
 /// The default interval to scrape the http endpoint if none is configured.
@@ -127,6 +109,8 @@ pub(crate) async fn http_scrape<H: HttpScraper + std::marker::Send + Clone>(
     .map(move |_| stream::iter(inputs.urls.clone()))
     .flatten()
     .map(move |url| {
+        // Building the HttpClient should not fail as it is just setting up the client with the
+        // proxy and tls settings.
         let client = HttpClient::new(inputs.tls.clone(), &inputs.proxy)
             .expect("Building HTTP client failed");
         let endpoint = url.to_string();
@@ -134,7 +118,7 @@ pub(crate) async fn http_scrape<H: HttpScraper + std::marker::Send + Clone>(
         let mut context = context.clone();
         context.build(&url);
 
-        let mut builder = Request::get(&url).header(http::header::ACCEPT, "text/plain");
+        let mut builder = Request::get(&url).header(http::header::ACCEPT, &inputs.content_type);
 
         // add user supplied headers
         if let Some(headers) = &inputs.headers {
@@ -142,6 +126,8 @@ pub(crate) async fn http_scrape<H: HttpScraper + std::marker::Send + Clone>(
                 builder = builder.header(header.0, header.1);
             }
         }
+
+        // building an empty request should be infallible
         let mut request = builder.body(Body::empty()).expect("error creating request");
 
         if let Some(auth) = &inputs.auth {
@@ -177,21 +163,6 @@ pub(crate) async fn http_scrape<H: HttpScraper + std::marker::Send + Clone>(
                                     count: events.len(),
                                     uri: url.clone()
                                 });
-
-                                // TODO the below seems wrong placement. It seems should happen
-                                // after the stream is written ? Yet I'm not seeing how to go about
-                                // that.
-                                // emit EventsSent if metrics
-                                if !events.is_empty() {
-                                    if let Event::Metric(ref _metric) =
-                                        events.first().expect("should have event")
-                                    {
-                                        emit!(HttpScrapeEventsSent {
-                                            count: events.len() as u64,
-                                            byte_size: events.size_of()
-                                        });
-                                    }
-                                }
                                 Some(stream::iter(events))
                             }
                             None => None,
