@@ -11,7 +11,7 @@ use crate::{
     SourceSender,
 };
 
-use super::{file_descriptor_source, FileDescriptorConfig};
+use super::FileDescriptorConfig;
 
 /// Configuration for the `stdin` source.
 #[configurable_component(source)]
@@ -111,7 +111,7 @@ pub fn stdin_source<R>(
 where
     R: Send + io::BufRead + 'static,
 {
-    file_descriptor_source(stdin, config, shutdown, out, "stdin")
+    config.source(stdin, shutdown, out, "stdin")
 }
 
 #[cfg(test)]

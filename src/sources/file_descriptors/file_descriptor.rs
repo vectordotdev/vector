@@ -3,7 +3,7 @@ use std::io;
 use std::os::raw::c_int;
 use std::os::unix::io::FromRawFd;
 
-use super::{file_descriptor_source, FileDescriptorConfig};
+use super::FileDescriptorConfig;
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use indoc::indoc;
 use vector_config::configurable_component;
@@ -102,7 +102,7 @@ pub fn pipe_source(
     out: SourceSender,
 ) -> crate::Result<crate::sources::Source> {
     let pipe = io::BufReader::new(unsafe { File::from_raw_fd(config.fd) });
-    file_descriptor_source(pipe, config, shutdown, out, "file_descriptor")
+    config.source(pipe, shutdown, out, "file_descriptor")
 }
 
 #[cfg(test)]
