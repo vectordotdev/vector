@@ -11,16 +11,16 @@ use vector_config::configurable_component;
 mod integration_tests;
 
 use crate::{
+    codecs::Transformer,
     config::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
     },
     event::Event,
     http::HttpClient,
-    codecs::Transformer,
     sinks::util::{
         http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
-        BatchConfig, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
-        UriSerde, RealtimeSizeBasedDefaultBatchSettings,
+        BatchConfig, BoxedRawValue, JsonArrayBuffer, RealtimeSizeBasedDefaultBatchSettings,
+        TowerRequestConfig, UriSerde,
     },
 };
 
@@ -40,7 +40,7 @@ pub struct ApexSinkConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    batch: BatchConfig<ApexDefaultBatchSettings>,
+    batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -53,15 +53,6 @@ pub struct ApexSinkConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     acknowledgements: AcknowledgementsConfig,
-}
-
-#[derive(Clone, Copy, Debug, Default)]
-struct ApexDefaultBatchSettings;
-
-impl SinkBatchSettings for ApexDefaultBatchSettings {
-    const MAX_EVENTS: Option<usize> = None;
-    const MAX_BYTES: Option<usize> = None;
-    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 inventory::submit! {

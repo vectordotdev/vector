@@ -18,9 +18,8 @@ components: sinks: apex: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
-				max_bytes:    null
-				max_events:   null
+				common:       true
+				max_bytes:    10_000_000
 				timeout_secs: 1.0
 			}
 			compression: {
