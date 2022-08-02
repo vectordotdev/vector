@@ -62,14 +62,14 @@ components: sinks: apex: {
 
 	configuration: {
 		uri: {
-			description: "The base URL of the Apex instance. Vector will append `/add_events` to this."
+			description: "The base URI of the Apex instance. Vector will append `/add_events` to this."
 			required:    true
 			type: string: {
 				examples: ["http://localhost:3100"]
 			}
 		}
 		project_id: {
-			description: "The id of the project in the Apex instance."
+			description: "The id of the project to associate reported logs with."
 			required:    true
 			type: string: {
 				examples: ["my-project"]

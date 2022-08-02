@@ -3,8 +3,8 @@ use futures::FutureExt;
 use futures_util::SinkExt;
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
-use serde::{Deserialize, Serialize};
 use serde_json::json;
+use vector_config::configurable_component;
 
 #[cfg(feature = "apex-integration-tests")]
 #[cfg(test)]
@@ -16,27 +16,37 @@ use crate::{
     },
     event::Event,
     http::HttpClient,
+    codecs::Transformer,
     sinks::util::{
-        encoding::Transformer,
         http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
-        BatchConfig, BoxedRawValue, JsonArrayBuffer, SinkBatchSettings, TowerRequestConfig,
-        UriSerde,
+        BatchConfig, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
+        UriSerde, RealtimeSizeBasedDefaultBatchSettings,
     },
 };
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+/// Configuration for the `apex` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct ApexSinkConfig {
+    /// The base URI of the Apex instance. Vector will append `/add_events` to this.
     uri: UriSerde,
+
+    /// The id of the project to associate reported logs with.
     project_id: String,
+
+    /// The api token to use to authenticate with Apex.
     api_token: String,
 
+    #[configurable(derived)]
     #[serde(default)]
     batch: BatchConfig<ApexDefaultBatchSettings>,
 
+    #[configurable(derived)]
     #[serde(default)]
     request: TowerRequestConfig,
 
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -89,7 +99,6 @@ impl SinkConfig for ApexSinkConfig {
             request_settings,
             batch_settings.timeout,
             client.clone(),
-            cx.acker(),
         )
         .sink_map_err(|error| error!(message = "Fatal apex sink error.", %error));
 
@@ -106,8 +115,8 @@ impl SinkConfig for ApexSinkConfig {
         "apex"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
