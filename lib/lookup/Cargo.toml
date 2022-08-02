@@ -6,7 +6,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
-serde = { version = "1.0.140", default-features = false, features = ["derive", "alloc"] }
+serde = { version = "1.0.141", default-features = false, features = ["derive", "alloc"] }
 snafu = { version = "0.7", default-features = false }
 regex = { version = "1.6.0", default-features = false, features = ["std", "perf"] }
 inherent = "1.0"

@@ -177,7 +177,7 @@ azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git",
 # Tower
 tower = { version = "0.4.13", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util"] }
 # Serde
-serde = { version = "1.0.140", default-features = false, features = ["derive"] }
+serde = { version = "1.0.141", default-features = false, features = ["derive"] }
 serde-toml-merge = { version = "0.3.0", default-features = false }
 serde_bytes = { version = "0.11.6", default-features = false, features = ["std"], optional = true }
 serde_json = { version = "1.0.82", default-features = false, features = ["raw_value"] }
@@ -225,7 +225,7 @@ axum = { version = "0.5.14", default-features = false }
 base64 = { version = "0.13.0", default-features = false, optional = true }
 bloom = { version = "0.3.2", default-features = false, optional = true }
 bollard = { version = "0.13.0", default-features = false, features = ["ssl"] }
-bytes = { version = "1.2.0", default-features = false, features = ["serde"] }
+bytes = { version = "1.2.1", default-features = false, features = ["serde"] }
 bytesize = { version = "1.1.0", default-features = false }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
 cidr-utils = { version = "0.5.7", default-features = false }
