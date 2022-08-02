@@ -17,7 +17,7 @@ use crate::{
         internal_metrics::InternalMetricsConfig, prometheus::PrometheusRemoteWriteConfig,
         splunk_hec::SplunkConfig,
     },
-    test_util::{mock::basic_sink, next_addr, start_topology, temp_dir, wait_for_tcp},
+    test_util::{self, mock::basic_sink, next_addr, start_topology, temp_dir, wait_for_tcp},
 };
 
 fn internal_metrics_source() -> InternalMetricsConfig {
@@ -104,7 +104,7 @@ async fn topology_reuse_old_port_sink() {
     // TODO: Write a test source that emits only metrics, and a test sink that can bind a TCP listener, so we can
     // replace `internal_metrics` and `prometheus_exporter` here. We additionally need to ensure the metrics subsystem
     // is enabled to use `internal_metrics`, otherwise it throws an error when trying to build the component.
-    let _ = crate::metrics::init_test();
+    test_util::metrics::init();
 
     let address = next_addr();
 
@@ -130,7 +130,7 @@ async fn topology_reuse_old_port_cross_dependency() {
     // TODO: Write a test source that emits only metrics, and a test sink that can bind a TCP listener, so we can
     // replace `internal_metrics` and `prometheus_exporter` here. We additionally need to ensure the metrics subsystem
     // is enabled to use `internal_metrics`, otherwise it throws an error when trying to build the component.
-    let _ = crate::metrics::init_test();
+    test_util::metrics::init();
 
     // Reload with source that uses address of changed sink.
     let address_0 = next_addr();
@@ -158,7 +158,7 @@ async fn topology_disk_buffer_conflict() {
     // TODO: Write a test source that emits only metrics, and a test sink that can bind a TCP listener, so we can
     // replace `internal_metrics` and `prometheus_exporter` here. We additionally need to ensure the metrics subsystem
     // is enabled to use `internal_metrics`, otherwise it throws an error when trying to build the component.
-    let _ = crate::metrics::init_test();
+    test_util::metrics::init();
 
     let address_0 = next_addr();
     let address_1 = next_addr();
@@ -202,7 +202,7 @@ async fn topology_reload_with_new_components() {
     // TODO: Write a test source that emits only metrics, and a test sink that can bind a TCP listener, so we can
     // replace `internal_metrics` and `prometheus_exporter` here. We additionally need to ensure the metrics subsystem
     // is enabled to use `internal_metrics`, otherwise it throws an error when trying to build the component.
-    let _ = crate::metrics::init_test();
+    test_util::metrics::init();
 
     // This specifically exercises that we can add new components -- no changed or removed
     // components -- via the reload mechanism and without any issues.
@@ -233,7 +233,7 @@ async fn topology_readd_input() {
     // TODO: Write a test source that emits only metrics, and a test sink that can bind a TCP listener, so we can
     // replace `internal_metrics` and `prometheus_exporter` here. We additionally need to ensure the metrics subsystem
     // is enabled to use `internal_metrics`, otherwise it throws an error when trying to build the component.
-    let _ = crate::metrics::init_test();
+    test_util::metrics::init();
 
     let address_0 = next_addr();
 

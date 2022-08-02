@@ -1,4 +1,4 @@
-use std::{collections::HashMap, num::NonZeroUsize, path::PathBuf};
+use std::{collections::HashMap, num::NonZeroUsize, path::PathBuf, time::Duration};
 
 use futures::StreamExt;
 #[cfg(feature = "enterprise")]
@@ -112,7 +112,10 @@ impl Application {
         };
 
         #[cfg(not(feature = "enterprise-tests"))]
-        metrics::init_global().expect("metrics initialization failed");
+        {
+            let idle_timeout = root_opts.expire_metrics_timeout.map(Duration::from_secs);
+            metrics::init_global(idle_timeout).expect("metrics initialization failed");
+        }
 
         let mut rt_builder = runtime::Builder::new_multi_thread();
         rt_builder.enable_all().thread_name("vector-worker");

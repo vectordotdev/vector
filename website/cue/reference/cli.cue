@@ -162,6 +162,11 @@ cli: {
 			type:        "integer"
 			env_var:     "VECTOR_THREADS"
 		}
+		"expire-metrics-timeout": {
+			description: env_vars.VECTOR_EXPIRE_METRICS_TIMEOUT.description
+			default:     env_vars.VECTOR_EXPIRE_METRICS_TIMEOUT.type.uint.default
+			env_var:     "VECTOR_EXPIRE_METRICS_TIMEOUT"
+		}
 	}
 
 	options: _core_options
@@ -547,6 +552,13 @@ cli: {
 				format is assumed.
 				"""
 			type: string: default: null
+		}
+		VECTOR_EXPIRE_METRICS_TIMEOUT: {
+			description: """
+				Configure the internal metrics system to automatically remove all metrics that have
+				not been updated in the given number of seconds.
+				"""
+			type: uint: default: null
 		}
 		VECTOR_LOG: {
 			description: "Vector's log level. Each log level includes messages from higher priority levels."

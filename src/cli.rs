@@ -149,6 +149,10 @@ pub struct RootOpts {
     /// Watch for changes in configuration file, and reload accordingly.
     #[clap(short, long, env = "VECTOR_WATCH_CONFIG")]
     pub watch_config: bool,
+
+    /// Expire internal metrics after the given number of seconds.
+    #[clap(long, env = "VECTOR_EXPIRE_METRICS_TIMEOUT")]
+    pub expire_metrics_timeout: Option<u64>,
 }
 
 impl RootOpts {

@@ -3,7 +3,7 @@ mod label_filter;
 mod recorder;
 mod storage;
 
-use std::sync::atomic::Ordering;
+use std::time::Duration;
 
 use chrono::Utc;
 use metrics::Key;
@@ -96,8 +96,8 @@ fn init(recorder: VectorRecorder) -> Result<()> {
 /// # Errors
 ///
 /// This function will error if it is called multiple times.
-pub fn init_global() -> Result<()> {
-    init(VectorRecorder::new_global())
+pub fn init_global(idle_timeout: Option<Duration>) -> Result<()> {
+    init(VectorRecorder::new_global(idle_timeout))
 }
 
 /// Initialize the thread-local metrics sub-system
@@ -105,8 +105,8 @@ pub fn init_global() -> Result<()> {
 /// # Errors
 ///
 /// This function will error if it is called multiple times.
-pub fn init_test() -> Result<()> {
-    init(VectorRecorder::new_test())
+pub fn init_test(idle_timeout: Option<Duration>) -> Result<()> {
+    init(VectorRecorder::new_test(idle_timeout))
 }
 
 impl Controller {
@@ -127,28 +127,10 @@ impl Controller {
 
     /// Take a snapshot of all gathered metrics and expose them as metric
     /// [`Event`](crate::event::Event)s.
-    #[allow(clippy::cast_precision_loss)]
     pub fn capture_metrics(&self) -> Vec<Metric> {
         let timestamp = Utc::now();
-        let mut metrics = Vec::<Metric>::new();
 
-        self.recorder.with_registry(|registry| {
-            registry.visit_counters(|key, counter| {
-                // NOTE this will truncate if the value is greater than 2**52.
-                let value = counter.load(Ordering::Relaxed) as f64;
-                let value = MetricValue::Counter { value };
-                metrics.push(Metric::from_metric_kv(key, value, timestamp));
-            });
-            registry.visit_gauges(|key, gauge| {
-                let value = gauge.load(Ordering::Relaxed);
-                let value = MetricValue::Gauge { value };
-                metrics.push(Metric::from_metric_kv(key, value, timestamp));
-            });
-            registry.visit_histograms(|key, histogram| {
-                let value = histogram.make_metric();
-                metrics.push(Metric::from_metric_kv(key, value, timestamp));
-            });
-        });
+        let mut metrics = self.recorder.with_registry(Registry::visit_metrics);
 
         // Add aliases for deprecated metrics
         for i in 0..metrics.len() {
@@ -172,12 +154,11 @@ impl Controller {
             }
         }
 
-        let cardinality = MetricValue::Counter {
-            value: (metrics.len() + 1) as f64,
-        };
+        #[allow(clippy::cast_precision_loss)]
+        let value = (metrics.len() + 1) as f64;
         metrics.push(Metric::from_metric_kv(
             &CARDINALITY_KEY,
-            cardinality,
+            MetricValue::Counter { value },
             timestamp,
         ));
 
@@ -233,9 +214,15 @@ macro_rules! update_counter {
 mod tests {
     use super::*;
 
+    const IDLE_TIMEOUT: Duration = Duration::from_millis(500);
+
+    fn init_metrics() -> &'static Controller {
+        let _ = init_test(Some(IDLE_TIMEOUT));
+        Controller::get().expect("Could not get global metrics controller")
+    }
+
     fn prepare_metrics(cardinality: usize) -> &'static Controller {
-        let _ = init_test();
-        let controller = Controller::get().unwrap();
+        let controller = init_metrics();
         controller.reset();
 
         for idx in 0..cardinality {
@@ -254,5 +241,18 @@ mod tests {
             let list = controller.capture_metrics();
             assert_eq!(list.len(), cardinality + 1);
         }
+    }
+
+    #[test]
+    fn expires_metrics() {
+        let controller = init_metrics();
+
+        metrics::counter!("test2", 1);
+        metrics::counter!("test3", 2);
+        assert_eq!(controller.capture_metrics().len(), 3);
+
+        std::thread::sleep(IDLE_TIMEOUT * 2);
+        metrics::counter!("test2", 3);
+        assert_eq!(controller.capture_metrics().len(), 2);
     }
 }
