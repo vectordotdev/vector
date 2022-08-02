@@ -116,12 +116,86 @@ components: sources: http_scrape: {
 		}
 	}
 
-	output: metrics: {
-		counter:      output._passthrough_counter
-		distribution: output._passthrough_distribution
-		gauge:        output._passthrough_gauge
-		histogram:    output._passthrough_histogram
-		set:          output._passthrough_set
+	output: {
+		logs: {
+			text: {
+				description: "An individual line from a `text/plain` HTTP request"
+				fields: {
+					message: {
+						description:   "The raw line line from the incoming payload."
+						relevant_when: "encoding == \"text\""
+						required:      true
+						type: string: {
+							examples: ["Hello world"]
+						}
+					}
+					source_type: {
+						description: "The name of the source type."
+						required:    true
+						type: string: {
+							examples: ["http_scrape"]
+						}
+					}
+					timestamp: fields._current_timestamp
+				}
+			}
+			structured: {
+				description: "An individual line from an `application/json` request"
+				fields: {
+					"*": {
+						common:        false
+						description:   "Any field contained in your JSON payload"
+						relevant_when: "encoding != \"text\""
+						required:      false
+						type: "*": {}
+					}
+					source_type: {
+						description: "The name of the source type."
+						required:    true
+						type: string: {
+							examples: ["http_scrape"]
+						}
+					}
+					timestamp: fields._current_timestamp
+				}
+			}
+		}
+		metrics: {
+			_extra_tags: {
+				"source_type": {
+					description: "The name of the source type."
+					examples: ["http_scrape"]
+					required: true
+				}
+			}
+			counter: output._passthrough_counter & {
+				tags: _extra_tags
+			}
+			distribution: output._passthrough_distribution & {
+				tags: _extra_tags
+			}
+			gauge: output._passthrough_gauge & {
+				tags: _extra_tags
+			}
+			histogram: output._passthrough_histogram & {
+				tags: _extra_tags
+			}
+			set: output._passthrough_set & {
+				tags: _extra_tags
+			}
+		}
+		traces: {
+			description: "A trace received through an HTTP request."
+			fields: {
+				source_type: {
+					description: "The name of the source type."
+					required:    true
+					type: string: {
+						examples: ["http_scrape"]
+					}
+				}
+			}
+		}
 	}
 
 	telemetry: metrics: {

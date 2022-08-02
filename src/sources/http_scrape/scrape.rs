@@ -176,12 +176,20 @@ impl HttpScrapeContext {
         events
     }
 
-    /// Enriches log events
+    /// Enriches events with source_type, timestamp
     fn enrich_events(&self, events: &mut Vec<Event>) {
         for event in events {
-            if let Event::Log(ref mut log) = event {
-                log.try_insert(log_schema().source_type_key(), Bytes::from(NAME));
-                log.try_insert(log_schema().timestamp_key(), Utc::now());
+            match event {
+                Event::Log(ref mut log) => {
+                    log.try_insert(log_schema().source_type_key(), Bytes::from(NAME));
+                    log.try_insert(log_schema().timestamp_key(), Utc::now());
+                }
+                Event::Metric(ref mut metric) => {
+                    metric.insert_tag(log_schema().source_type_key().to_string(), NAME.to_string());
+                }
+                Event::Trace(ref mut trace) => {
+                    trace.insert(log_schema().source_type_key(), Bytes::from(NAME));
+                }
             }
         }
     }
@@ -210,6 +218,8 @@ impl super::HttpScraper for HttpScrapeContext {
 
 #[cfg(test)]
 mod test {
+    use futures::{poll, StreamExt};
+    use std::task::Poll;
     use tokio::time::{sleep, Duration};
     use warp::Filter;
 
@@ -227,10 +237,10 @@ mod test {
         test_generate_config::<HttpScrapeConfig>();
     }
 
+    // I haven't seen a better way to validate an error occurred, but it seems like there should be
+    // a way, since if this is run live it generates an HTTP error.
     #[tokio::test]
     async fn invalid_endpoint() {
-        let (tx, _rx) = SourceSender::new_test();
-
         let source = HttpScrapeConfig {
             endpoint: "http://nope".to_string(),
             scrape_interval_secs: 1,
@@ -240,21 +250,22 @@ mod test {
             headers: None,
             auth: None,
             tls: None,
-        }
-        .build(SourceContext::new_test(tx, None))
-        .await
-        .unwrap();
-        tokio::spawn(source);
+        };
+
+        // Build the source and set ourselves up to both drive it to completion as well as collect all the events it sends out.
+        let (tx, mut rx) = SourceSender::new_test();
+        let context = SourceContext::new_test(tx, None);
+
+        let source = source
+            .build(context)
+            .await
+            .expect("source should not fail to build");
 
         sleep(Duration::from_secs(1)).await;
 
-        // TODO how to verify there was an error
+        drop(source);
 
-        // let _ = collect_ready(rx)
-        //     .await
-        //     .into_iter()
-        //     .map(|e| e.into_metric())
-        //     .collect::<Vec<_>>();
+        assert_eq!(poll!(rx.next()), Poll::Ready(None));
     }
 
     async fn run_test(config: HttpScrapeConfig) -> Vec<Event> {
@@ -380,7 +391,7 @@ mod integration_tests {
     use super::*;
     use crate::test_util::components::{run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS};
 
-    async fn run_test(config: HttpScrapeConfig) {
+    async fn run_test(config: HttpScrapeConfig) -> Vec<Event> {
         let events = run_and_assert_source_compliance(
             config,
             Duration::from_secs(1),
@@ -388,6 +399,7 @@ mod integration_tests {
         )
         .await;
         assert!(!events.is_empty());
+        events
     }
 
     #[tokio::test]
@@ -407,7 +419,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn scraped_logs_json() {
-        run_test(HttpScrapeConfig {
+        let events = run_test(HttpScrapeConfig {
             endpoint: "http://dufs:5000/logs/json.json".to_string(),
             scrape_interval_secs: 1,
             query: None,
@@ -418,11 +430,13 @@ mod integration_tests {
             tls: None,
         })
         .await;
+        let log = events[0].as_log();
+        assert_eq!(log[log_schema().source_type_key()], NAME.into());
     }
 
     #[tokio::test]
     async fn scraped_metrics_native_json() {
-        run_test(HttpScrapeConfig {
+        let events = run_test(HttpScrapeConfig {
             endpoint: "http://dufs:5000/metrics/native.json".to_string(),
             scrape_interval_secs: 1,
             query: None,
@@ -433,11 +447,30 @@ mod integration_tests {
             tls: None,
         })
         .await;
+
+        let metric = events[0].as_metric();
+        assert_eq!(
+            metric.tags().unwrap()[log_schema().source_type_key()],
+            NAME.to_string()
+        );
     }
 
     #[tokio::test]
     async fn scraped_trace_native_json() {
-        // TODO - add a trace ? Or is it not really helpful since basically the same as a log ?
+        let events = run_test(HttpScrapeConfig {
+            endpoint: "http://dufs:5000/traces/native.json".to_string(),
+            scrape_interval_secs: 1,
+            query: None,
+            decoding: DeserializerConfig::NativeJson,
+            framing: default_framing_message_based(),
+            headers: None,
+            auth: None,
+            tls: None,
+        })
+        .await;
+
+        let trace = events[0].as_trace();
+        assert_eq!(trace.as_map()[log_schema().source_type_key()], NAME.into());
     }
 
     #[tokio::test]

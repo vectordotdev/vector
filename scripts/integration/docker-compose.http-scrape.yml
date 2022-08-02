@@ -11,8 +11,7 @@ services:
       - "/data"
     volumes:
       - ${PWD}/tests/data/http-scrape/:/data
-  # the project suggests that two services should not be necessary
-  # yet I was not able to only auth protect one path for view/download access.
+  # To validate Basic HTTP authentication option
   dufs-auth:
     image: docker.io/sigoden/dufs:latest
     networks:
@@ -25,6 +24,7 @@ services:
       - "/data"
     volumes:
       - ${PWD}/tests/data/http-scrape/:/data
+  # To validate TLS options
   dufs-https:
     image: docker.io/sigoden/dufs:latest
     networks:
