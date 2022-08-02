@@ -48,19 +48,21 @@ impl Expression for Array {
     fn type_info(&self, state: &TypeState) -> TypeInfo {
         let mut state = state.clone();
 
-        let type_defs = self
-            .inner
-            .iter()
-            .map(|expr| {
-                let info = expr.type_info(&state);
-                state = info.state;
-                info.result
-            })
-            .collect::<Vec<_>>();
+        let mut type_defs = vec![];
+        let mut fallible = false;
 
-        // If any of the stored expressions is fallible, the entire array is
-        // fallible.
-        let fallible = type_defs.iter().any(TypeDef::is_fallible);
+        for expr in &self.inner {
+            let type_def = expr.apply_type_info(&mut state);
+
+            // If any expression is fallible, the entire array is fallible.
+            fallible |= type_def.is_fallible();
+
+            // If any expression aborts, the entire array aborts
+            if type_def.is_never() {
+                return TypeInfo::new(state, TypeDef::never().with_fallibility(fallible));
+            }
+            type_defs.push(type_def);
+        }
 
         let collection = type_defs
             .into_iter()

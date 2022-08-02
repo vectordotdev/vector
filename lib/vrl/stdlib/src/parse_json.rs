@@ -235,9 +235,9 @@ fn inner_kind() -> Kind {
 fn type_def() -> TypeDef {
     TypeDef::bytes()
         .fallible()
-        .add_boolean()
-        .add_integer()
-        .add_float()
+        .or_boolean()
+        .or_integer()
+        .or_float()
         .add_null()
         .add_array(Collection::from_unknown(inner_kind()))
         .add_object(Collection::from_unknown(inner_kind()))

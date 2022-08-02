@@ -30,6 +30,7 @@
 
 mod compiler;
 mod context;
+mod external_context;
 mod program;
 mod test_util;
 
@@ -39,6 +40,7 @@ pub mod state;
 pub mod type_def;
 pub mod value;
 
+pub use self::external_context::ExternalContext;
 pub use compiler::Compiler;
 pub use core::{
     value, ExpressionError, MetadataTarget, Resolved, SecretTarget, Target, TargetValue,

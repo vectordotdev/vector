@@ -113,6 +113,14 @@ pub trait Expression: Send + Sync + fmt::Debug + DynClone {
         unimplemented!("type_info not implemented for {:?}", self)
     }
 
+    /// Applies state changes from the expression to the given state, and
+    /// returns the result type.
+    fn apply_type_info(&self, state: &mut TypeState) -> TypeDef {
+        let new_info = self.type_info(state);
+        *state = new_info.state;
+        new_info.result
+    }
+
     /// Format the expression into a consistent style.
     ///
     /// This defaults to not formatting, so that function implementations don't

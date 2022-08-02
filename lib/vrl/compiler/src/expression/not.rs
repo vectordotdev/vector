@@ -1,8 +1,9 @@
 use std::fmt;
 
 use diagnostic::{DiagnosticMessage, Label, Note, Urls};
+use vector_config::schemars::_private::NoSerialize;
 
-use crate::state::TypeState;
+use crate::state::{TypeInfo, TypeState};
 use crate::{
     expression::{Expr, Resolved},
     parser::Node,
@@ -42,10 +43,13 @@ impl Expression for Not {
         Ok((!self.inner.resolve(ctx)?.try_boolean()?).into())
     }
 
-    fn type_def(&self, state: &TypeState) -> TypeDef {
-        let fallible = self.inner.type_def(state).is_fallible();
-
-        TypeDef::boolean().with_fallibility(fallible)
+    fn type_info(&self, state: &TypeState) -> TypeInfo {
+        let mut state = state.clone();
+        let result = self.inner.apply_type_info(&mut state);
+        TypeInfo::new(
+            state,
+            TypeDef::boolean().with_fallibility(result.is_fallible()),
+        )
     }
 }
 

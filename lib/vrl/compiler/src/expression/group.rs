@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::state::TypeState;
+use crate::state::{TypeInfo, TypeState};
 use crate::{
     expression::{Expr, Resolved},
     state::{ExternalEnv, LocalEnv},
@@ -25,8 +25,8 @@ impl Expression for Group {
         self.inner.resolve(ctx)
     }
 
-    fn type_def(&self, state: &TypeState) -> TypeDef {
-        self.inner.type_def(state)
+    fn type_info(&self, state: &TypeState) -> TypeInfo {
+        self.inner.type_info(state)
     }
 }
 

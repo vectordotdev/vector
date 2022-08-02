@@ -3,7 +3,7 @@ use std::fmt;
 use lookup::LookupBuf;
 use value::{kind::remove, Kind, Value};
 
-use crate::state::TypeState;
+use crate::state::{TypeInfo, TypeState};
 use crate::{
     expression::{Container, Resolved, Variable},
     parser::ast::Ident,
@@ -116,15 +116,17 @@ impl Expression for Query {
         }
     }
 
-    fn type_def(&self, state: &TypeState) -> TypeDef {
+    fn type_info(&self, state: &TypeState) -> TypeInfo {
         use Target::{Container, External, FunctionCall, Internal};
 
-        match &self.target {
+        let result = match &self.target {
             External => state.external.target().clone().type_def.at_path(&self.path),
             Internal(variable) => variable.type_def(state).at_path(&self.path),
             FunctionCall(call) => call.type_def(state).at_path(&self.path),
             Container(container) => container.type_def(state).at_path(&self.path),
-        }
+        };
+
+        TypeInfo::new(state, result)
     }
 }
 

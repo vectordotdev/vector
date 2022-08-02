@@ -11,33 +11,42 @@ use crate::{
 #[derive(Debug, Clone, PartialEq)]
 pub struct Block {
     inner: Vec<Expr>,
+
+    // false - This is just an inline block of code
+    // true - This is a block of code nested in a child scope
+    new_scope: bool,
 }
 
 impl Block {
     #[must_use]
-    pub fn new(inner: Vec<Expr>) -> Self {
-        Self { inner }
+    fn new(inner: Vec<Expr>, new_scope: bool) -> Self {
+        Self { inner, new_scope }
+    }
+
+    #[must_use]
+    pub fn new_scoped(inner: Vec<Expr>) -> Self {
+        Self::new(inner, true)
+    }
+
+    #[must_use]
+    pub fn new_inline(inner: Vec<Expr>) -> Self {
+        Self::new(inner, false)
     }
 
     #[must_use]
     pub fn into_inner(self) -> Vec<Expr> {
         self.inner
     }
+
+    pub fn exprs(&self) -> &Vec<Expr> {
+        &self.inner
+    }
 }
 
 impl Expression for Block {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        // NOTE:
-        //
-        // Technically, this invalidates the scoping invariant of variables
-        // defined in child scopes to not be accessible in parent scopes.
-        //
-        // However, because we guard against this (using the "undefined
-        // variable" check) at compile-time, we can omit any (costly) run-time
-        // operations to track/restore variables across scopes.
-        //
-        // This also means we don't need to make any changes to the VM runtime,
-        // as it uses the same compiler as this AST runtime.
+        // Variables are checked at compile-time to ensure only variables
+        // in scope can be accessed here, so it doesn't need to be checked at runtime.
         let (last, other) = self.inner.split_last().expect("at least one expression");
 
         other
@@ -48,14 +57,14 @@ impl Expression for Block {
     }
 
     fn type_info(&self, state: &TypeState) -> TypeInfo {
+        let parent_locals = state.local.clone();
+
         let mut state = state.clone();
-        let mut result = TypeDef::undefined();
+        let mut result = TypeDef::null();
         let mut fallible = false;
 
         for expr in &self.inner {
-            let info = expr.type_info(&state);
-            state = info.state;
-            result = info.result;
+            result = expr.apply_type_info(&mut state);
 
             if result.is_fallible() {
                 fallible = true;
@@ -63,6 +72,10 @@ impl Expression for Block {
             if result.is_never() {
                 break;
             }
+        }
+
+        if self.new_scope {
+            state.local = parent_locals.apply_child_scope(state.local);
         }
 
         TypeInfo::new(state, result.with_fallibility(fallible))

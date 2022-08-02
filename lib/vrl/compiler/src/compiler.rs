@@ -12,7 +12,7 @@ use crate::{
     parser::ast::RootExpr,
     program::ProgramInfo,
     state::{ExternalEnv, LocalEnv},
-    Function, Program,
+    ExternalContext, Function, Program,
 };
 
 pub(crate) type Diagnostics = Vec<Box<dyn DiagnosticMessage>>;
@@ -45,7 +45,10 @@ impl<'a> Compiler<'a> {
         fns: &'a [Box<dyn Function>],
         ast: parser::Program,
         state: &TypeState,
+        external_context: &mut ExternalContext,
     ) -> Result<(Program, DiagnosticList), DiagnosticList> {
+        let mut state = state.clone();
+
         let mut compiler = Self {
             fns,
             diagnostics: vec![],
@@ -56,7 +59,7 @@ impl<'a> Compiler<'a> {
             skip_missing_query_target: vec![],
             fallible_expression_error: None,
         };
-        let expressions = compiler.compile_root_exprs(ast, &state);
+        let expressions = compiler.compile_root_exprs(ast, &mut state);
 
         let (errors, warnings): (Vec<_>, Vec<_>) =
             compiler.diagnostics.into_iter().partition(|diagnostic| {
@@ -74,7 +77,7 @@ impl<'a> Compiler<'a> {
             target_assignments: compiler.external_assignments,
         };
 
-        let expressions = Block::new(expressions);
+        let expressions = Block::new_inline(expressions);
 
         Ok((
             Program {
@@ -89,7 +92,7 @@ impl<'a> Compiler<'a> {
     fn compile_exprs(
         &mut self,
         nodes: impl IntoIterator<Item = Node<ast::Expr>>,
-        state: &TypeState,
+        state: &mut TypeState,
     ) -> Option<Vec<Expr>> {
         let mut exprs = vec![];
         for node in nodes {
@@ -107,7 +110,7 @@ impl<'a> Compiler<'a> {
         Some(exprs)
     }
 
-    fn compile_expr(&mut self, node: Node<ast::Expr>, state: &TypeState) -> Option<Expr> {
+    fn compile_expr(&mut self, node: Node<ast::Expr>, state: &mut TypeState) -> Option<Expr> {
         use ast::Expr::{
             Abort, Assignment, Container, FunctionCall, IfStatement, Literal, Op, Query, Unary,
             Variable,
@@ -141,11 +144,7 @@ impl<'a> Compiler<'a> {
     }
 
     #[cfg(feature = "expr-literal")]
-    fn compile_literal(
-        &mut self,
-        node: Node<ast::Literal>,
-        type_state: &TypeState,
-    ) -> Option<Expr> {
+    fn compile_literal(&mut self, node: Node<ast::Literal>, state: &mut TypeState) -> Option<Expr> {
         use ast::Literal::{Boolean, Float, Integer, Null, RawString, Regex, String, Timestamp};
         use bytes::Bytes;
 
@@ -159,7 +158,7 @@ impl<'a> Compiler<'a> {
                     // Rewrite the template into an expression and compile that block.
                     return self.compile_expr(
                         Node::new(span, template.rewrite_to_concatenated_strings()),
-                        type_state,
+                        state,
                     );
                 }
             }
@@ -192,7 +191,7 @@ impl<'a> Compiler<'a> {
     fn compile_container(
         &mut self,
         node: Node<ast::Container>,
-        state: &TypeState,
+        state: &mut TypeState,
     ) -> Option<Container> {
         use ast::Container::{Array, Block, Group, Object};
 
@@ -206,7 +205,7 @@ impl<'a> Compiler<'a> {
         Some(Container::new(variant))
     }
 
-    fn compile_group(&mut self, node: Node<ast::Group>, state: &TypeState) -> Option<Group> {
+    fn compile_group(&mut self, node: Node<ast::Group>, state: &mut TypeState) -> Option<Group> {
         let expr = self.compile_expr(node.into_inner().into_inner(), state)?;
 
         Some(Group::new(expr))
@@ -215,13 +214,9 @@ impl<'a> Compiler<'a> {
     fn compile_root_exprs(
         &mut self,
         nodes: impl IntoIterator<Item = Node<ast::RootExpr>>,
-        state: &TypeState,
+        state: &mut TypeState,
     ) -> Vec<Expr> {
         let mut node_exprs = vec![];
-
-        // After a terminating expression, the state is stored, but the remaining expressions are checked.
-        // let mut terminated_state = None;
-        //TODO: refactor terminating state
 
         for root_expr in nodes {
             match root_expr.into_inner() {
@@ -233,25 +228,12 @@ impl<'a> Compiler<'a> {
                             self.diagnostics.push(error);
                         }
 
-                        // if terminated_state.is_none() {
-                        // let type_def = expr.type_def(state);
                         node_exprs.push(expr);
-                        // an expression that has the "never" type is a terminating expression
-                        // if type_def.is_never() {
-                        // terminated_state =
-                        //     Some(state);
-                        // }
-                        // }
                     }
                 }
                 RootExpr::Error(err) => self.handle_parser_error(err),
             }
         }
-
-        // if let Some((local, details)) = terminated_state {
-        //     self.local = local;
-        //     external.update_target(details);
-        // }
 
         if node_exprs.is_empty() {
             node_exprs.push(Expr::Noop(Noop));
@@ -259,46 +241,22 @@ impl<'a> Compiler<'a> {
         node_exprs
     }
 
-    fn compile_block(&mut self, node: Node<ast::Block>, state: &TypeState) -> Option<Block> {
-        // We get a copy of the current local state, so that we can use it to
-        // remove any *new* state added in the block, as that state is lexically
-        // scoped to the block, and must not be visible to the rest of the
-        // program.
-        let local_snapshot = state.local.clone();
-
-        // We can now start compiling the expressions within the block, which
-        // will use the existing local state of the compiler, as blocks have
-        // access to any state of their parent expressions.
-        let exprs = match self.compile_exprs(node.into_inner().into_iter(), state) {
-            Some(exprs) => exprs,
-            None => {
-                // self.local = local_snapshot.apply_child_scope(self.local.clone());
-                return None;
-            }
-        };
-
-        // Now that we've compiled the expressions, we pass them into the block,
-        // and also a copy of the local state, which includes any state added by
-        // the compiled expressions in the block.
-        let block = Block::new(exprs);
-
-        // Take the local state snapshot captured before we started compiling
-        // the block, and merge back into it any mutations that happened to
-        // state the snapshot was already tracking. Then, revert the compiler
-        // local state to the updated snapshot.
-
-        // self.local = local_snapshot.apply_child_scope(self.local.clone());
+    fn compile_block(&mut self, node: Node<ast::Block>, state: &mut TypeState) -> Option<Block> {
+        let original_state = state.clone();
+        let exprs = self.compile_exprs(node.into_inner().into_iter(), state)?;
+        let block = Block::new_scoped(exprs);
+        *state = block.type_info(&original_state).state;
 
         Some(block)
     }
 
-    fn compile_array(&mut self, node: Node<ast::Array>, state: &TypeState) -> Option<Array> {
+    fn compile_array(&mut self, node: Node<ast::Array>, state: &mut TypeState) -> Option<Array> {
         let exprs = self.compile_exprs(node.into_inner().into_iter(), state)?;
 
         Some(Array::new(exprs))
     }
 
-    fn compile_object(&mut self, node: Node<ast::Object>, state: &TypeState) -> Option<Object> {
+    fn compile_object(&mut self, node: Node<ast::Object>, state: &mut TypeState) -> Option<Object> {
         use std::collections::BTreeMap;
 
         let (keys, exprs): (Vec<String>, Vec<Option<Expr>>) = node
@@ -318,57 +276,41 @@ impl<'a> Compiler<'a> {
     fn compile_if_statement(
         &mut self,
         node: Node<ast::IfStatement>,
-        state: &TypeState,
+        state: &mut TypeState,
     ) -> Option<IfStatement> {
         let ast::IfStatement {
             predicate,
-            consequent,
-            alternative,
+            if_node,
+            else_node,
         } = node.into_inner();
+
+        let original_state = state.clone();
 
         let predicate = self
             .compile_predicate(predicate, state)?
             .map_err(|err| self.diagnostics.push(Box::new(err)))
             .ok()?;
 
-        // let original_locals = self.local.clone();
-        // let original_external = external.target().clone();
+        let after_predicate_state = state.clone();
 
-        let consequent = self.compile_block(consequent, state)?;
+        let if_block = self.compile_block(if_node, state)?;
 
-        match alternative {
-            Some(block) => {
-                // let consequent_locals = state.local.clone();
-                // let consequent_external = state.external.target().clone();
+        let else_block = if let Some(else_node) = else_node {
+            *state = after_predicate_state;
+            Some(self.compile_block(else_node, state)?)
+        } else {
+            None
+        };
 
-                // self.local = original_locals;
-                // external.update_target(original_external);
+        let if_statement = IfStatement {
+            predicate,
+            if_block,
+            else_block,
+        };
 
-                let else_block = self.compile_block(block, state)?;
-
-                // assignments must be the result of either the if or else block, but not the original value
-                // self.local = self.local.clone().merge(consequent_locals);
-
-                // external.update_target(consequent_external.merge(external.target().clone()));
-
-                Some(IfStatement {
-                    predicate,
-                    consequent,
-                    alternative: Some(else_block),
-                })
-            }
-            None => {
-                // assignments must be the result of either the if block or the original value
-                // self.local = self.local.clone().merge(original_locals);
-                // external.update_target(original_external.merge(external.target().clone()));
-
-                Some(IfStatement {
-                    predicate,
-                    consequent,
-                    alternative: None,
-                })
-            }
-        }
+        *state = original_state;
+        if_statement.apply_type_info(state);
+        Some(if_statement)
     }
 
     #[cfg(not(feature = "expr-if_statement"))]
@@ -384,7 +326,7 @@ impl<'a> Compiler<'a> {
     fn compile_predicate(
         &mut self,
         node: Node<ast::Predicate>,
-        state: &TypeState,
+        state: &mut TypeState,
     ) -> Option<predicate::Result> {
         use ast::Predicate::{Many, One};
 
@@ -403,8 +345,10 @@ impl<'a> Compiler<'a> {
     }
 
     #[cfg(feature = "expr-op")]
-    fn compile_op(&mut self, node: Node<ast::Op>, state: &TypeState) -> Option<Op> {
+    fn compile_op(&mut self, node: Node<ast::Op>, state: &mut TypeState) -> Option<Op> {
         use parser::ast::Opcode;
+
+        let original_state = state.clone();
 
         let op = node.into_inner();
         let ast::Op(lhs, opcode, rhs) = op;
@@ -421,9 +365,12 @@ impl<'a> Compiler<'a> {
         let rhs_span = rhs.span();
         let rhs = Node::new(rhs_span, self.compile_expr(*rhs, state)?);
 
-        Op::new(lhs, opcode, rhs, state)
+        let op = Op::new(lhs, opcode, rhs, state)
             .map_err(|err| self.diagnostics.push(Box::new(err)))
-            .ok()
+            .ok()?;
+
+        *state = op.type_info(&original_state).state;
+        Some(op)
     }
 
     #[cfg(not(feature = "expr-op"))]
@@ -438,7 +385,7 @@ impl<'a> Compiler<'a> {
         span: diagnostic::Span,
         target: &Node<ast::AssignmentTarget>,
         expr: Box<Node<ast::Expr>>,
-        state: &TypeState,
+        state: &mut TypeState,
     ) -> Option<Box<Node<Expr>>> {
         Some(Box::new(Node::new(
             span,
@@ -460,7 +407,7 @@ impl<'a> Compiler<'a> {
     fn compile_assignment(
         &mut self,
         node: Node<ast::Assignment>,
-        state: &TypeState,
+        state: &mut TypeState,
     ) -> Option<Assignment> {
         use assignment::Variant;
         use ast::{
@@ -468,6 +415,8 @@ impl<'a> Compiler<'a> {
             AssignmentOp,
         };
         use value::Value;
+
+        let original_state = state.clone();
 
         let assignment = node.into_inner();
 
@@ -551,6 +500,9 @@ impl<'a> Compiler<'a> {
             }
         }
 
+        *state = original_state;
+        assignment.apply_type_info(state);
+
         Some(assignment)
     }
 
@@ -564,7 +516,7 @@ impl<'a> Compiler<'a> {
     }
 
     #[cfg(feature = "expr-query")]
-    fn compile_query(&mut self, node: Node<ast::Query>, state: &TypeState) -> Option<Query> {
+    fn compile_query(&mut self, node: Node<ast::Query>, state: &mut TypeState) -> Option<Query> {
         let ast::Query { target, path } = node.into_inner();
 
         if self
@@ -597,7 +549,7 @@ impl<'a> Compiler<'a> {
     fn compile_query_target(
         &mut self,
         node: Node<ast::QueryTarget>,
-        state: &TypeState,
+        state: &mut TypeState,
     ) -> Option<query::Target> {
         use ast::QueryTarget::{Container, External, FunctionCall, Internal};
 
@@ -626,7 +578,7 @@ impl<'a> Compiler<'a> {
     fn compile_function_call(
         &mut self,
         node: Node<ast::FunctionCall>,
-        state: &TypeState,
+        state: &mut TypeState,
     ) -> Option<FunctionCall> {
         let call_span = node.span();
         let ast::FunctionCall {
@@ -715,7 +667,7 @@ impl<'a> Compiler<'a> {
     fn compile_function_argument(
         &mut self,
         node: Node<ast::FunctionArgument>,
-        state: &TypeState,
+        state: &mut TypeState,
     ) -> Option<FunctionArgument> {
         let ast::FunctionArgument { ident, expr } = node.into_inner();
         let expr = Node::new(expr.span(), self.compile_expr(expr, state)?);
@@ -737,7 +689,11 @@ impl<'a> Compiler<'a> {
         None
     }
 
-    fn compile_variable(&mut self, node: Node<ast::Ident>, state: &TypeState) -> Option<Variable> {
+    fn compile_variable(
+        &mut self,
+        node: Node<ast::Ident>,
+        state: &mut TypeState,
+    ) -> Option<Variable> {
         let (span, ident) = node.take();
 
         if self
@@ -753,7 +709,7 @@ impl<'a> Compiler<'a> {
     }
 
     #[cfg(feature = "expr-unary")]
-    fn compile_unary(&mut self, node: Node<ast::Unary>, state: &TypeState) -> Option<Unary> {
+    fn compile_unary(&mut self, node: Node<ast::Unary>, state: &mut TypeState) -> Option<Unary> {
         use ast::Unary::Not;
 
         let variant = match node.into_inner() {
@@ -775,7 +731,7 @@ impl<'a> Compiler<'a> {
     }
 
     #[cfg(feature = "expr-unary")]
-    fn compile_not(&mut self, node: Node<ast::Not>, state: &TypeState) -> Option<Not> {
+    fn compile_not(&mut self, node: Node<ast::Not>, state: &mut TypeState) -> Option<Not> {
         let (not, expr) = node.into_inner().take();
 
         let node = Node::new(expr.span(), self.compile_expr(*expr, state)?);
@@ -786,7 +742,7 @@ impl<'a> Compiler<'a> {
     }
 
     #[cfg(feature = "expr-abort")]
-    fn compile_abort(&mut self, node: Node<ast::Abort>, state: &TypeState) -> Option<Abort> {
+    fn compile_abort(&mut self, node: Node<ast::Abort>, state: &mut TypeState) -> Option<Abort> {
         self.abortable = true;
         let (span, abort) = node.take();
         let message = match abort.message {

@@ -38,7 +38,7 @@ impl<'a> Builder<'a> {
         abort_on_error: bool,
         arguments: Vec<Node<FunctionArgument>>,
         funcs: &'a [Box<dyn Function>],
-        state: &TypeState,
+        state: &mut TypeState,
         closure_variables: Option<Node<Vec<Node<Ident>>>>,
     ) -> Result<Self, Error> {
         let (ident_span, ident) = ident.take();
@@ -167,7 +167,14 @@ impl<'a> Builder<'a> {
 
         //
         // // Check function closure validity.
-        // let closure = Self::check_closure();
+        let closure = Self::check_closure(
+            function,
+            closure_variables,
+            call_span,
+            &list,
+            state,
+            ident_span,
+        )?;
 
         Ok(Self {
             abort_on_error,
@@ -176,242 +183,255 @@ impl<'a> Builder<'a> {
             ident_span,
             function_id,
             arguments: Arc::new(arguments),
-            closure: None,
+            closure,
             list,
             function: function.as_ref(),
         })
     }
 
-    fn check_closure() {
-        // let closure = match (function.closure(), closure_variables) {
-        //     // Error if closure is provided for function that doesn't support
-        //     // any.
-        //     (None, Some(variables)) => {
-        //         let closure_span = variables.span();
-        //
-        //         return Err(Error::UnexpectedClosure {
-        //             call_span,
-        //             closure_span,
-        //         });
-        //     }
-        //
-        //     // Error if closure is missing from function that expects one.
-        //     (Some(definition), None) => {
-        //         let example = definition.inputs.get(0).map(|input| input.example);
-        //
-        //         return Err(Error::MissingClosure { call_span, example });
-        //     }
-        //
-        //     // Check for invalid closure signature.
-        //     (Some(definition), Some(variables)) => {
-        //         let mut matched = None;
-        //         let mut err_found_type_def = None;
-        //
-        //         for input in definition.inputs {
-        //             // Check type definition for linked parameter.
-        //             match list.arguments.get(input.parameter_keyword) {
-        //                 // No argument provided for the given parameter keyword.
-        //                 //
-        //                 // This means the closure can't act on the input
-        //                 // definition, so we continue on to the next. If no
-        //                 // input definitions are valid, the closure is invalid.
-        //                 None => continue,
-        //
-        //                 // We've found the function argument over which the
-        //                 // closure is going to resolve. We need to ensure the
-        //                 // type of this argument is as expected by the closure.
-        //                 Some(expr) => {
-        //                     let type_def = expr.type_def(type_state);
-        //
-        //                     // The type definition of the value does not match
-        //                     // the expected closure type, continue to check if
-        //                     // the closure eventually accepts this definition.
-        //                     //
-        //                     // Keep track of the type information, so that we
-        //                     // can report these in a diagnostic error if no
-        //                     // other input definition matches.
-        //                     if !input.kind.is_superset(type_def.kind()) {
-        //                         err_found_type_def = Some(type_def.kind().clone());
-        //                         continue;
-        //                     }
-        //
-        //                     matched = Some((input.clone(), expr));
-        //                     break;
-        //                 }
-        //             };
-        //         }
-        //
-        //         // None of the inputs matched the value type, this is a user error.
-        //         match matched {
-        //             None => {
-        //                 return Err(Error::ClosureParameterTypeMismatch {
-        //                     call_span,
-        //                     found_kind: err_found_type_def.unwrap_or_else(Kind::any),
-        //                 })
-        //             }
-        //
-        //             Some((input, target)) => {
-        //                 // Now that we know we have a matching parameter argument with a valid type
-        //                 // definition, we can move on to checking/defining the closure arguments.
-        //                 //
-        //                 // In doing so we:
-        //                 //
-        //                 // - check the arity of the closure arguments
-        //                 // - set the expected type definition of each argument
-        //                 if input.variables.len() != variables.len() {
-        //                     let closure_arguments_span =
-        //                         variables.first().map_or(call_span, |node| {
-        //                             (node.span().start(), variables.last().unwrap().span().end())
-        //                                 .into()
-        //                         });
-        //
-        //                     return Err(Error::ClosureArityMismatch {
-        //                         ident_span,
-        //                         closure_arguments_span,
-        //                         expected: input.variables.len(),
-        //                         supplied: variables.len(),
-        //                     });
-        //                 }
-        //
-        //                 // Get the provided argument identifier in the same position as defined in the
-        //                 // input definition.
-        //                 //
-        //                 // That is, if the function closure definition expects:
-        //                 //
-        //                 //   [bytes, integer]
-        //                 //
-        //                 // Then, given for an actual implementation of:
-        //                 //
-        //                 //   foo() -> { |bar, baz| }
-        //                 //
-        //                 // We set "bar" (index 0) to return bytes, and "baz" (index 1) to return an
-        //                 // integer.
-        //                 for (index, input_var) in input.variables.clone().into_iter().enumerate() {
-        //                     let call_ident = &variables[index];
-        //                     let type_def = target.type_def(state);
-        //
-        //                     let (type_def, value) = match input_var.kind {
-        //                         // The variable kind is expected to be exactly
-        //                         // the kind provided by the closure definition.
-        //                         VariableKind::Exact(kind) => (kind.into(), None),
-        //
-        //                         // The variable kind is expected to be equal to
-        //                         // the ind of the target of the closure.
-        //                         VariableKind::Target => (target.type_def(state), target.as_value()),
-        //
-        //                         // The variable kind is expected to be equal to
-        //                         // the reduced kind of all values within the
-        //                         // target collection type.
-        //                         //
-        //                         // This assumes the target is a collection type,
-        //                         // or else it'll return "any".
-        //                         VariableKind::TargetInnerValue => {
-        //                             let kind = if let Some(object) = type_def.as_object() {
-        //                                 object.reduced_kind()
-        //                             } else if let Some(array) = type_def.as_array() {
-        //                                 array.reduced_kind()
-        //                             } else {
-        //                                 Kind::any()
-        //                             };
-        //
-        //                             (kind.into(), None)
-        //                         }
-        //
-        //                         // The variable kind is expected to be equal to
-        //                         // the kind of all keys within the target
-        //                         // collection type.
-        //                         //
-        //                         // This means it's either a string for an
-        //                         // object, integer for an array, or
-        //                         // a combination of the two if the target isn't
-        //                         // known to be exactly one of the two.
-        //                         //
-        //                         // If the target can resolve to a non-collection
-        //                         // type, this again returns "any".
-        //                         VariableKind::TargetInnerKey => {
-        //                             let mut kind = Kind::never();
-        //
-        //                             if !type_def.is_collection() {
-        //                                 kind = Kind::any()
-        //                             } else {
-        //                                 if type_def.is_object() {
-        //                                     kind.add_bytes();
-        //                                 }
-        //                                 if type_def.is_array() {
-        //                                     kind.add_integer();
-        //                                 }
-        //                             }
-        //
-        //                             (kind.into(), None)
-        //                         }
-        //                     };
-        //
-        //                     let details = Details { type_def, value };
-        //
-        //                     local.insert_variable(call_ident.clone().into_inner(), details);
-        //                 }
-        //
-        //                 let variables = variables
-        //                     .into_inner()
-        //                     .into_iter()
-        //                     .map(Node::into_inner)
-        //                     .collect();
-        //
-        //                 Some((variables, input))
-        //             }
-        //         }
-        //     }
-        //
-        //     _ => None,
-        // };
+    fn check_closure(
+        function: &Box<dyn Function>,
+        closure_variables: Option<Node<Vec<Node<Ident>>>>,
+        call_span: Span,
+        list: &ArgumentList,
+        state: &mut TypeState,
+        ident_span: Span,
+    ) -> Result<Option<(Vec<Ident>, closure::Input)>, Error> {
+        let closure = match (function.closure(), closure_variables) {
+            // Error if closure is provided for function that doesn't support
+            // any.
+            (None, Some(variables)) => {
+                let closure_span = variables.span();
+
+                return Err(Error::UnexpectedClosure {
+                    call_span,
+                    closure_span,
+                });
+            }
+
+            // Error if closure is missing from function that expects one.
+            (Some(definition), None) => {
+                let example = definition.inputs.get(0).map(|input| input.example);
+
+                return Err(Error::MissingClosure { call_span, example });
+            }
+
+            // Check for invalid closure signature.
+            (Some(definition), Some(variables)) => {
+                let mut matched = None;
+                let mut err_found_type_def = None;
+
+                for input in definition.inputs {
+                    // Check type definition for linked parameter.
+                    match list.arguments.get(input.parameter_keyword) {
+                        // No argument provided for the given parameter keyword.
+                        //
+                        // This means the closure can't act on the input
+                        // definition, so we continue on to the next. If no
+                        // input definitions are valid, the closure is invalid.
+                        None => continue,
+
+                        // We've found the function argument over which the
+                        // closure is going to resolve. We need to ensure the
+                        // type of this argument is as expected by the closure.
+                        Some(expr) => {
+                            let type_def = expr.type_def(state);
+
+                            // The type definition of the value does not match
+                            // the expected closure type, continue to check if
+                            // the closure eventually accepts this definition.
+                            //
+                            // Keep track of the type information, so that we
+                            // can report these in a diagnostic error if no
+                            // other input definition matches.
+                            if !input.kind.is_superset(type_def.kind()) {
+                                err_found_type_def = Some(type_def.kind().clone());
+                                continue;
+                            }
+
+                            matched = Some((input.clone(), expr));
+                            break;
+                        }
+                    };
+                }
+
+                // None of the inputs matched the value type, this is a user error.
+                match matched {
+                    None => {
+                        return Err(Error::ClosureParameterTypeMismatch {
+                            call_span,
+                            found_kind: err_found_type_def.unwrap_or_else(Kind::any),
+                        })
+                    }
+
+                    Some((input, target)) => {
+                        // Now that we know we have a matching parameter argument with a valid type
+                        // definition, we can move on to checking/defining the closure arguments.
+                        //
+                        // In doing so we:
+                        //
+                        // - check the arity of the closure arguments
+                        // - set the expected type definition of each argument
+                        if input.variables.len() != variables.len() {
+                            let closure_arguments_span =
+                                variables.first().map_or(call_span, |node| {
+                                    (node.span().start(), variables.last().unwrap().span().end())
+                                        .into()
+                                });
+
+                            return Err(Error::ClosureArityMismatch {
+                                ident_span,
+                                closure_arguments_span,
+                                expected: input.variables.len(),
+                                supplied: variables.len(),
+                            });
+                        }
+
+                        // Get the provided argument identifier in the same position as defined in the
+                        // input definition.
+                        //
+                        // That is, if the function closure definition expects:
+                        //
+                        //   [bytes, integer]
+                        //
+                        // Then, given for an actual implementation of:
+                        //
+                        //   foo() -> { |bar, baz| }
+                        //
+                        // We set "bar" (index 0) to return bytes, and "baz" (index 1) to return an
+                        // integer.
+                        for (index, input_var) in input.variables.clone().into_iter().enumerate() {
+                            let call_ident = &variables[index];
+                            let type_def = target.type_def(state);
+
+                            let (type_def, value) = match input_var.kind {
+                                // The variable kind is expected to be exactly
+                                // the kind provided by the closure definition.
+                                VariableKind::Exact(kind) => (kind.into(), None),
+
+                                // The variable kind is expected to be equal to
+                                // the ind of the target of the closure.
+                                VariableKind::Target => (target.type_def(state), target.as_value()),
+
+                                // The variable kind is expected to be equal to
+                                // the reduced kind of all values within the
+                                // target collection type.
+                                //
+                                // This assumes the target is a collection type,
+                                // or else it'll return "any".
+                                VariableKind::TargetInnerValue => {
+                                    let kind = if let Some(object) = type_def.as_object() {
+                                        object.reduced_kind()
+                                    } else if let Some(array) = type_def.as_array() {
+                                        array.reduced_kind()
+                                    } else {
+                                        Kind::any()
+                                    };
+
+                                    (kind.into(), None)
+                                }
+
+                                // The variable kind is expected to be equal to
+                                // the kind of all keys within the target
+                                // collection type.
+                                //
+                                // This means it's either a string for an
+                                // object, integer for an array, or
+                                // a combination of the two if the target isn't
+                                // known to be exactly one of the two.
+                                //
+                                // If the target can resolve to a non-collection
+                                // type, this again returns "any".
+                                VariableKind::TargetInnerKey => {
+                                    let mut kind = Kind::never();
+
+                                    if !type_def.is_collection() {
+                                        kind = Kind::any()
+                                    } else {
+                                        if type_def.is_object() {
+                                            kind.add_bytes();
+                                        }
+                                        if type_def.is_array() {
+                                            kind.add_integer();
+                                        }
+                                    }
+
+                                    (kind.into(), None)
+                                }
+                            };
+
+                            let details = Details { type_def, value };
+
+                            state
+                                .local
+                                .insert_variable(call_ident.clone().into_inner(), details);
+                        }
+
+                        let variables = variables
+                            .into_inner()
+                            .into_iter()
+                            .map(Node::into_inner)
+                            .collect();
+
+                        Some((variables, input))
+                    }
+                }
+            }
+
+            _ => None,
+        };
+        Ok(closure)
     }
 
     pub(crate) fn compile(
         mut self,
-        state: &TypeState,
+        state: &mut TypeState,
         closure_block: Option<Node<Block>>,
         mut local_snapshot: LocalEnv,
         fallible_expression_error: &mut Option<Box<dyn DiagnosticMessage>>,
     ) -> Result<FunctionCall, Error> {
         let mut closure_fallible = false;
         let mut closure = None;
-        //
-        // // Check if we have a closure we need to compile.
-        // if let Some((variables, input)) = self.closure.clone() {
-        //     let block = closure_block.expect("closure must contain block");
-        //
-        //     // At this point, we've compiled the block, so we can remove the
-        //     // closure variables from the compiler's local environment.
-        //     variables
-        //         .iter()
-        //         .for_each(|ident| match local_snapshot.remove_variable(ident) {
-        //             Some(details) => local.insert_variable(ident.clone(), details),
-        //             None => {
-        //                 local.remove_variable(ident);
-        //             }
-        //         });
-        //
-        //     closure_fallible = block.type_def(state).is_fallible();
-        //
-        //     let (block_span, block) = block.take();
-        //
-        //     // Check the type definition of the resulting block.This needs to match
-        //     // whatever is configured by the closure input type.
-        //     let found_kind = block.type_def(state).into();
-        //     let expected_kind = input.output.into_kind();
-        //     if !expected_kind.is_superset(&found_kind) {
-        //         return Err(Error::ReturnTypeMismatch {
-        //             block_span,
-        //             found_kind,
-        //             expected_kind,
-        //         });
-        //     }
-        //
-        //     let fnclosure = FunctionClosure::new(variables, block);
-        //     self.list.set_closure(fnclosure.clone());
-        //
-        //     closure = Some(fnclosure);
-        // };
+
+        // Check if we have a closure we need to compile.
+        if let Some((variables, input)) = self.closure.clone() {
+            // TODO: This assumes the closure will run exactly once, which is incorrect.
+            // see: https://github.com/vectordotdev/vector/issues/13782
+
+            let block = closure_block.expect("closure must contain block");
+
+            // At this point, we've compiled the block, so we can remove the
+            // closure variables from the compiler's local environment.
+            variables
+                .iter()
+                .for_each(|ident| match local_snapshot.remove_variable(ident) {
+                    Some(details) => state.local.insert_variable(ident.clone(), details),
+                    None => {
+                        state.local.remove_variable(ident);
+                    }
+                });
+
+            closure_fallible = block.type_def(state).is_fallible();
+
+            let (block_span, block) = block.take();
+
+            // Check the type definition of the resulting block.This needs to match
+            // whatever is configured by the closure input type.
+            let found_kind = block.type_def(state).into();
+            let expected_kind = input.output.into_kind();
+            if !expected_kind.is_superset(&found_kind) {
+                return Err(Error::ReturnTypeMismatch {
+                    block_span,
+                    found_kind,
+                    expected_kind,
+                });
+            }
+
+            let fnclosure = FunctionClosure::new(variables, block);
+            self.list.set_closure(fnclosure.clone());
+
+            closure = Some(fnclosure);
+        };
 
         let call_span = self.call_span;
         let ident_span = self.ident_span;
@@ -619,7 +639,12 @@ impl Expression for FunctionCall {
     }
 
     fn type_info(&self, state: &TypeState) -> TypeInfo {
-        let mut info = self.expr.type_info(state);
+        let mut state = state.clone();
+
+        // TODO: functions with a closure do not correctly calculate type definitions
+        // see: https://github.com/vectordotdev/vector/issues/13782
+
+        let mut expr_result = self.expr.apply_type_info(&mut state);
 
         // If one of the arguments only partially matches the function type
         // definition, then we mark the entire function as fallible.
@@ -678,7 +703,7 @@ impl Expression for FunctionCall {
         // For the third event, both functions fail.
         //
         if !self.arguments_with_unknown_type_validity.is_empty() {
-            info.result = info.result.with_fallibility(true);
+            expr_result = expr_result.with_fallibility(true);
         }
 
         // If the function has a closure attached, and that closure is fallible,
@@ -694,14 +719,14 @@ impl Expression for FunctionCall {
         // possible to silence potential closure errors using the "abort on
         // error" function-call feature (see below).
         if self.closure_fallible {
-            info.result = info.result.with_fallibility(true);
+            expr_result = expr_result.with_fallibility(true);
         }
 
         if self.abort_on_error {
-            info.result = info.result.with_fallibility(false);
+            expr_result = expr_result.with_fallibility(false);
         }
 
-        info
+        TypeInfo::new(state, expr_result)
     }
 }
 

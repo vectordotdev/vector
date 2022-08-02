@@ -36,7 +36,6 @@ impl Assignment {
                 let target_span = target.span();
                 let expr_span = expr.span();
                 let assignment_span = Span::new(target_span.start(), expr_span.start() - 1);
-                // let type_def = expr.type_def(state);
 
                 // Fallible expressions require infallible assignment.
                 if fallible_rhs.is_some() {
@@ -71,10 +70,6 @@ impl Assignment {
                     expr.clone(),
                 )?;
 
-                let value = expr.as_value();
-
-                // target.insert_type_def(local, external, type_def, value);
-
                 Variant::Single {
                     target,
                     expr: Box::new(expr),
@@ -86,7 +81,7 @@ impl Assignment {
                 let err_span = err.span();
                 let expr_span = expr.span();
                 let assignment_span = Span::new(ok_span.start(), err_span.end());
-                let type_def = expr.type_def(state);
+                let type_def = expr.type_info(state).result;
 
                 // Infallible expressions do not need fallible assignment.
                 if type_def.is_infallible() {
@@ -132,9 +127,6 @@ impl Assignment {
 
                 let type_def = type_def.infallible();
                 let default_value = type_def.default_value();
-                // let value = expr.as_value();
-
-                // ok.insert_type_def(local, external, type_def, value);
 
                 // "err" target is assigned `null` or a string containing the
                 // error message.
@@ -148,9 +140,6 @@ impl Assignment {
                     assignment_span,
                     expr.clone(),
                 )?;
-
-                // let type_def = TypeDef::bytes().add_null().infallible();
-                // err.insert_type_def(local, external, type_def, None);
 
                 Variant::Infallible {
                     ok,
@@ -524,29 +513,13 @@ where
         Ok(value)
     }
 
-    // fn type_def(&self, state: &TypeState) -> TypeDef {
-    //     use Variant::{Infallible, Single};
-    //
-    //     match self {
-    //         Single { expr, .. } => expr.type_def(state),
-    //         Infallible { expr, .. } => {
-    //             // Return type is either the "expr" type, or "bytes" (the error message).
-    //             let mut type_def = expr.type_def(state);
-    //             type_def.kind_mut().add_bytes();
-    //             type_def.infallible()
-    //         }
-    //     }
-    // }
-
     fn type_info(&self, state: &TypeState) -> TypeInfo {
+        let mut state = state.clone();
         match &self {
             Variant::Single { target, expr } => {
-                let expr_info = expr.type_info(state);
-
-                let expr_result = expr_info.result;
-                let mut final_state = expr_info.state;
-                target.insert_type_def(&mut final_state, expr_result.clone(), expr.as_value());
-                TypeInfo::new(final_state, expr_result)
+                let expr_result = expr.apply_type_info(&mut state);
+                target.insert_type_def(&mut state, expr_result.clone(), expr.as_value());
+                TypeInfo::new(state, expr_result)
             }
             Variant::Infallible {
                 ok,
@@ -554,10 +527,22 @@ where
                 expr,
                 default,
             } => {
-                unimplemented!()
+                let expr_result = expr.apply_type_info(&mut state);
+
+                // The "ok" type is either the result of the expression, or a "default" value when the expression fails.
+                let ok_type = expr_result.clone().union(TypeDef::from(default.kind()));
+                ok.insert_type_def(&mut state, ok_type, expr.as_value());
+
+                // The "err" type is either the error message "bytes" or "null" (not undefined).
+                let err_type = TypeDef::from(Kind::bytes().or_null());
+                err.insert_type_def(&mut state, err_type, None);
+
+                // Return type of the assignment expression itself is either the "expr" type or "bytes (the error message).
+                let assignment_result = expr_result.infallible().or_bytes();
+
+                TypeInfo::new(state, assignment_result)
             }
         }
-        // TypeInfo::new(final_state, self.variant.type_def(state))
     }
 }
 

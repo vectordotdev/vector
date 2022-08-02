@@ -33,6 +33,15 @@ pub struct TypeState {
     pub external: ExternalEnv,
 }
 
+impl TypeState {
+    pub fn merge(self, other: Self) -> Self {
+        Self {
+            local: self.local.merge(other.local),
+            external: self.external.merge(other.external),
+        }
+    }
+}
+
 /// Local environment, limited to a given scope.
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct LocalEnv {
@@ -92,8 +101,6 @@ pub struct ExternalEnv {
     metadata: Kind,
 
     read_only_paths: BTreeSet<ReadOnlyPath>,
-    // /// Custom context injected by the external environment
-    // custom: AnyMap,
 }
 
 // temporary until paths can point to metadata
@@ -120,6 +127,15 @@ impl Default for ExternalEnv {
 }
 
 impl ExternalEnv {
+    pub fn merge(self, other: Self) -> Self {
+        Self {
+            target: self.target.merge(other.target),
+            metadata: self.metadata.union(other.metadata),
+            // TODO: this field will be removed, this implementation is incorrect right now
+            read_only_paths: BTreeSet::new(),
+        }
+    }
+
     /// Creates a new external environment that starts with an initial given
     /// [`Kind`].
     #[must_use]
@@ -208,11 +224,6 @@ impl ExternalEnv {
         self.metadata = kind;
     }
 
-    // /// Sets the external context data for VRL functions to use.
-    // pub fn set_external_context<T: 'static>(&mut self, data: T) {
-    //     self.custom.insert::<T>(data);
-    // }
-
     /// Marks everything as read only. Any mutations on read-only values will result in a
     /// compile time error.
     pub fn read_only(mut self) -> Self {
@@ -220,18 +231,6 @@ impl ExternalEnv {
         self.set_read_only_metadata_path(LookupBuf::root(), true);
         self
     }
-
-    // /// Get external context data from the external environment.
-    // pub fn get_external_context<T: 'static>(&self) -> Option<&T> {
-    //     self.custom.get::<T>()
-    // }
-
-    // /// Swap the existing external contexts with new ones, returning the old ones.
-    // #[must_use]
-    // #[cfg(feature = "expr-function_call")]
-    // pub(crate) fn swap_external_context(&mut self, ctx: AnyMap) -> AnyMap {
-    //     std::mem::replace(&mut self.custom, ctx)
-    // }
 }
 
 /// The state used at runtime to track changes as they happen.
