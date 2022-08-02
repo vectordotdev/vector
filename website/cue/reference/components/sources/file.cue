@@ -197,7 +197,7 @@ components: sources: file: {
 			required:    false
 			type: string: {
 				default: null
-				examples: "offset"
+				examples: ["offset"]
 			}
 		}
 		oldest_first: {
