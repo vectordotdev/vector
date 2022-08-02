@@ -33,7 +33,7 @@ arbitrary = ["dep:quickcheck"]
 
 [dev-dependencies]
 async-graphql = { version = "4.0.6", default-features = false }
-indoc = { version = "1.0.6", default-features = false }
+indoc = { version = "1.0.7", default-features = false }
 quickcheck = "1.0.3"
 lookup = { path = "../lookup", default-features = false, features = ["arbitrary"] }
 serde = { version = "1.0.141", default-features = false, features = ["derive", "rc"]}
