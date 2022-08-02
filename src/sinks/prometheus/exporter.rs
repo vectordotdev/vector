@@ -56,24 +56,69 @@ enum BuildError {
     FlushPeriodTooShort { min: u64 },
 }
 
+/// Configuration for the `prometheus_exporter` sink.
 #[serde_as]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct PrometheusExporterConfig {
+    /// The default namespace for any metrics sent.
+    ///
+    /// This namespace is only used if a metric has no existing namespace. When a namespace is
+    /// present, it is used as a prefix to the metric name, and separated with an underscore (`_`).
+    ///
+    /// It should follow the Prometheus [naming conventions][prom_naming_docs].
+    ///
+    /// [prom_naming_docs]: https://prometheus.io/docs/practices/naming/#metric-names
     #[serde(alias = "namespace")]
     pub default_namespace: Option<String>,
+
+    /// The address to expose for scraping.
+    ///
+    /// The metrics are exposed at the typical Prometheus exporter path, `/metrics`.
     #[serde(default = "default_address")]
     pub address: SocketAddr,
+
     pub tls: Option<TlsEnableableConfig>,
+
+    /// Default buckets to use for aggregating [distribution][dist_metric_docs] metrics into histograms.
+    ///
+    /// [dist_metric_docs]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/metric/#distribution
     #[serde(default = "super::default_histogram_buckets")]
     pub buckets: Vec<f64>,
+
+    /// Quantiles to use for aggregating [distribution][dist_metric_docs] metrics into a summary.
+    ///
+    /// [dist_metric_docs]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/metric/#distribution
     #[serde(default = "super::default_summary_quantiles")]
     pub quantiles: Vec<f64>,
+
+    /// Whether or not to render [distributions][dist_metric_docs] as an [aggregated histogram][prom_agg_hist_docs] or  [aggregated summary][prom_agg_summ_docs].
+    ///
+    /// While Vector supports distributions as a lossless way to represent a set of samples for a
+    /// metric, Prometheus clients (the application being scraped, which is this sink) must
+    /// aggregate locally into either an aggregated histogram or aggregated summary.
+    ///
+    /// [dist_metric_docs]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/metric/#distribution
+    /// [prom_agg_hist_docs]: https://prometheus.io/docs/concepts/metric_types/#histogram
+    /// [prom_agg_summ_docs]: https://prometheus.io/docs/concepts/metric_types/#summary
     #[serde(default = "default_distributions_as_summaries")]
     pub distributions_as_summaries: bool,
+
+    /// The interval, in seconds, on which metrics are flushed.
+    ///
+    /// On the flush interval, if a metric has not been seen since the last flush interval, it is
+    /// considered expired and is removed.
+    ///
+    /// Be sure to configure this value higher than your client’s scrape interval.
     #[serde(default = "default_flush_period_secs")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     pub flush_period_secs: Duration,
+
+    /// Suppresses timestamps on the Prometheus output.
+    ///
+    /// This can sometimes be useful when the source of metrics leads to their timestamps being too
+    /// far in the past for Prometheus to allow them, such as when aggregating metrics over long
+    /// time periods, or when replaying old metrics from a disk buffer.
     #[serde(default)]
     pub suppress_timestamp: bool,
 }

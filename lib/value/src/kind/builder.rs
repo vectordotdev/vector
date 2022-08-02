@@ -36,7 +36,7 @@ impl Kind {
             timestamp: None,
             regex: None,
             null: Some(()),
-            undefined: Some(()),
+            undefined: None,
             array: Some(Collection::json()),
             object: Some(Collection::json()),
         }

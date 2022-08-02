@@ -4,10 +4,10 @@ use async_trait::async_trait;
 use bytes::BytesMut;
 use codecs::JsonSerializerConfig;
 use futures::{stream::BoxStream, FutureExt, StreamExt, TryFutureExt};
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
 use vector_common::internal_event::{BytesSent, EventsSent};
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -42,21 +42,39 @@ enum BuildError {
  * Code dealing with the SinkConfig struct.
  */
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+/// Configuration for the `nats` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct NatsSinkConfig {
+    #[configurable(derived)]
     encoding: EncodingConfig,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+
+    /// A name assigned to the NATS connection.
     #[serde(default = "default_name", alias = "name")]
     connection_name: String,
+
+    /// The NATS subject to publish messages to.
+    #[configurable(metadata(templateable))]
     subject: String,
+
+    /// The NATS URL to connect to.
+    ///
+    /// The URL must take the form of `nats://server:port`.
     url: String,
+
+    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
+
+    #[configurable(derived)]
     auth: Option<NatsAuthConfig>,
 }
 
