@@ -81,12 +81,12 @@ pub(crate) fn build_warp_filter(
         .and(warp::header::optional::<String>("content-encoding"))
         .and(warp::body::bytes())
         .and_then(move |encoding_header: Option<String>, body: Bytes| {
+            let events = decode(&encoding_header, body).and_then(decode_body);
             emit!(HttpBytesReceived {
-                byte_size: body.len(),
+                byte_size: event.len(),
                 http_path: "/v1/logs",
                 protocol,
             });
-            let events = decode(&encoding_header, body).and_then(decode_body);
 
             handle_request(events, acknowledgements, out.clone(), super::LOGS)
         })
