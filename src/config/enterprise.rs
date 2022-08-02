@@ -8,7 +8,7 @@ use http::Request;
 use hyper::{header::LOCATION, Body, StatusCode};
 use indexmap::IndexMap;
 use rand::Rng;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use tokio::{
     sync::mpsc::{self},
     time::{sleep, Duration},
@@ -35,6 +35,7 @@ use crate::{
     },
     transforms::{filter::FilterConfig, remap::RemapConfig},
 };
+use vector_config::configurable_component;
 
 static HOST_METRICS_KEY: &str = "#datadog_host_metrics";
 static TAG_METRICS_KEY: &str = "#datadog_tag_metrics";
@@ -54,38 +55,53 @@ static DATADOG_REPORTING_PATH_STUB: &str = "/api/unstable/observability_pipeline
 pub static DATADOG_API_KEY_ENV_VAR_SHORT: &str = "DD_API_KEY";
 pub static DATADOG_API_KEY_ENV_VAR_FULL: &str = "DATADOG_API_KEY";
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
+#[configurable_component]
 #[serde(deny_unknown_fields)]
+/// Observability Pipelines config options.
 pub struct Options {
     #[serde(default = "default_enabled")]
+    /// Enables Observability Pipelines.
     pub enabled: bool,
 
     #[serde(default = "default_enable_logs_reporting")]
+    /// Enables reporting of internal component logs to DataDog.
     pub enable_logs_reporting: bool,
 
     #[serde(default)]
+    /// DataDog site (e.g. datadoghq.eu).
     site: Option<String>,
+    /// DataDog region, used to derive a default site for a given region.
     region: Option<Region>,
+    #[configurable(derived)]
+    /// DataDog endpoint, takes precedence over the region and the site, used mainly for dev environments.
     endpoint: Option<String>,
 
     #[serde(default)]
+    /// DataDog API key.
     pub api_key: Option<String>,
-    // deprecated
+    #[configurable(deprecated)]
+    /// DataDog Application key(deprecated).
     pub application_key: Option<String>,
+    /// Observability Pipeline's configuration key.
     pub configuration_key: String,
 
     #[serde(default = "default_reporting_interval_secs")]
+    /// A time interval to scrap and report host metrics.
     pub reporting_interval_secs: f64,
 
     #[serde(default = "default_max_retries")]
+    /// The maximum number of retries to report a Vector configuration at startup.
     pub max_retries: u32,
 
     #[serde(
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
+    #[configurable(derived)]
     proxy: ProxyConfig,
 
+    /// Additional tags, added to generated DataDog metrics
     tags: Option<IndexMap<String, String>>,
 }
 
