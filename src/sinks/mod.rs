@@ -92,6 +92,7 @@ pub mod vector;
 #[cfg(feature = "sinks-websocket")]
 pub mod websocket;
 
+use vector_config::configurable_component;
 pub use vector_core::sink::VectorSink;
 
 pub type Healthcheck = BoxFuture<'static, crate::Result<()>>;
@@ -116,7 +117,6 @@ pub enum HealthcheckError {
     UnexpectedStatus { status: ::http::StatusCode },
 }
 
-/*
 /// Configurable sinks in Vector.
 #[configurable_component]
 #[derive(Clone, Debug)]
@@ -196,6 +196,12 @@ pub enum Sinks {
     #[cfg(feature = "sinks-file")]
     File(#[configurable(derived)] file::FileSinkConfig),
 
+    /// Google Chronicle (unstructured).
+    #[cfg(feature = "sinks-gcp")]
+    GcpChronicleUnstructured(
+        #[configurable(derived)] gcp::chronicle_unstructured::ChronicleUnstructuredConfig,
+    ),
+
     /// GCP Stackdriver Logs.
     #[cfg(feature = "sinks-gcp")]
     GcpStackdriverLogs(#[configurable(derived)] gcp::stackdriver_logs::StackdriverConfig),
@@ -250,7 +256,7 @@ pub enum Sinks {
 
     /// NATS.
     #[cfg(feature = "sinks-nats")]
-    Nats(#[configurable(derived)] nats::NatsSinkConfig),
+    Nats(#[configurable(derived)] self::nats::NatsSinkConfig),
 
     /// New Relic.
     #[cfg(feature = "sinks-new_relic")]
@@ -312,4 +318,3 @@ pub enum Sinks {
     #[cfg(feature = "sinks-websocket")]
     Websocket(#[configurable(derived)] websocket::WebSocketSinkConfig),
 }
-*/

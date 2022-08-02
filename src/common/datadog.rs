@@ -31,14 +31,15 @@ pub(crate) enum DatadogMetricType {
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub(crate) struct DatadogPoint<T>(pub(crate) i64, pub(crate) T);
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+/// A Datadog region.
 #[configurable_component]
+#[derive(Clone, Copy, Debug, PartialEq)]
 #[serde(rename_all = "snake_case")]
-/// DataDog region, used to derive a site
 pub enum Region {
-    /// US
+    /// US region.
     Us,
-    /// EU
+
+    /// EU region.
     Eu,
 }
 

@@ -52,9 +52,6 @@ impl From<std::io::Error> for Error {
 }
 
 /// Framing configuration.
-// Unfortunately, copying options of the nested enum variants is necessary
-// since `serde` doesn't allow `flatten`ing these:
-// https://github.com/serde-rs/serde/issues/1402.
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(tag = "method", rename_all = "snake_case")]

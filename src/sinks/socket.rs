@@ -2,7 +2,7 @@ use codecs::{
     encoding::{Framer, FramingConfig},
     TextSerializerConfig,
 };
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 #[cfg(unix)]
 use crate::sinks::util::unix::UnixSinkConfig;
@@ -15,43 +15,68 @@ use crate::{
     sinks::util::{tcp::TcpSinkConfig, udp::UdpSinkConfig},
 };
 
-#[derive(Deserialize, Serialize, Debug)]
-// `#[serde(deny_unknown_fields)]` doesn't work when flattening internally tagged enums, see
-// https://github.com/serde-rs/serde/issues/1358.
+/// Configuration for the `socket` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug)]
 pub struct SocketSinkConfig {
     #[serde(flatten)]
     pub mode: Mode,
+
+    #[configurable(derived)]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Socket mode.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum Mode {
-    Tcp(TcpMode),
-    Udp(UdpMode),
+    /// TCP.
+    Tcp(#[configurable(transparent)] TcpMode),
+
+    /// UDP.
+    Udp(#[configurable(transparent)] UdpMode),
+
+    /// Unix Domain Socket.
     #[cfg(unix)]
-    Unix(UnixMode),
+    Unix(#[configurable(transparent)] UnixMode),
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// TCP configuration.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct TcpMode {
     #[serde(flatten)]
     config: TcpSinkConfig,
+
     #[serde(flatten)]
     encoding: EncodingConfigWithFraming,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// UDP configuration.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct UdpMode {
     #[serde(flatten)]
     config: UdpSinkConfig,
+
+    #[configurable(derived)]
     encoding: EncodingConfig,
 }
 
+/// Unix Domain Socket configuration.
 #[cfg(unix)]
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct UnixMode {
     #[serde(flatten)]
     config: UnixSinkConfig,
+
     #[serde(flatten)]
     encoding: EncodingConfigWithFraming,
 }
@@ -72,15 +97,24 @@ impl GenerateConfig for SocketSinkConfig {
 }
 
 impl SocketSinkConfig {
-    pub const fn new(mode: Mode) -> Self {
-        SocketSinkConfig { mode }
+    pub const fn new(mode: Mode, acknowledgements: AcknowledgementsConfig) -> Self {
+        SocketSinkConfig {
+            mode,
+            acknowledgements,
+        }
     }
 
-    pub fn make_basic_tcp_config(address: String) -> Self {
-        Self::new(Mode::Tcp(TcpMode {
-            config: TcpSinkConfig::from_address(address),
-            encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
-        }))
+    pub fn make_basic_tcp_config(
+        address: String,
+        acknowledgements: AcknowledgementsConfig,
+    ) -> Self {
+        Self::new(
+            Mode::Tcp(TcpMode {
+                config: TcpSinkConfig::from_address(address),
+                encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
+            }),
+            acknowledgements,
+        )
     }
 }
 
@@ -128,8 +162,8 @@ impl SinkConfig for SocketSinkConfig {
         "socket"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        None
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
@@ -174,6 +208,7 @@ mod test {
                 config: UdpSinkConfig::from_address(addr.to_string()),
                 encoding: JsonSerializerConfig::new().into(),
             }),
+            acknowledgements: Default::default(),
         };
         let context = SinkContext::new_test();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
@@ -218,6 +253,7 @@ mod test {
                 config: TcpSinkConfig::from_address(addr.to_string()),
                 encoding: (None::<FramingConfig>, JsonSerializerConfig::new()).into(),
             }),
+            acknowledgements: Default::default(),
         };
 
         let context = SinkContext::new_test();
@@ -296,6 +332,7 @@ mod test {
                 ),
                 encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
             }),
+            acknowledgements: Default::default(),
         };
         let context = SinkContext::new_test();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
@@ -414,6 +451,7 @@ mod test {
                 config: TcpSinkConfig::from_address(addr.to_string()),
                 encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
             }),
+            acknowledgements: Default::default(),
         };
 
         let context = SinkContext::new_test();

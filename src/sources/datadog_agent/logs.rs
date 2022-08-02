@@ -13,7 +13,7 @@ use crate::{
     event::Event,
     internal_events::EventsReceived,
     sources::{
-        datadog::agent::{self, handle_request, ApiKeyQueryParams, DatadogAgentSource, LogMsg},
+        datadog_agent::{handle_request, ApiKeyQueryParams, DatadogAgentSource, LogMsg},
         util::ErrorMessage,
     },
     SourceSender,
@@ -54,7 +54,7 @@ pub(crate) fn build_warp_filter(
                     });
 
                 if multiple_outputs {
-                    handle_request(events, acknowledgements, out.clone(), Some(agent::LOGS))
+                    handle_request(events, acknowledgements, out.clone(), Some(super::LOGS))
                 } else {
                     handle_request(events, acknowledgements, out.clone(), None)
                 }

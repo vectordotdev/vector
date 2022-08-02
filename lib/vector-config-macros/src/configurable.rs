@@ -1,7 +1,10 @@
 use proc_macro::TokenStream;
 use proc_macro2::Span;
-use quote::quote;
-use syn::{parse_macro_input, parse_quote, DeriveInput, ExprPath, Ident, Type};
+use quote::{quote, quote_spanned};
+use syn::{
+    parse_macro_input, parse_quote, spanned::Spanned, token::Colon2, DeriveInput, ExprPath, Ident,
+    PathArguments, Type,
+};
 use vector_config_common::{attributes::CustomAttribute, validation::Validation};
 
 use crate::ast::{Container, Data, Field, Style, Tagging, Variant};
@@ -61,7 +64,7 @@ pub fn derive_configurable_impl(input: TokenStream) -> TokenStream {
             #[automatically_derived]
             #[allow(unused_qualifications)]
             impl #impl_generics ::vector_config::Configurable for #name #ty_generics #where_clause {
-                fn referencable_name() -> Option<&'static str> {
+                fn referenceable_name() -> Option<&'static str> {
                     Some(std::concat!(std::module_path!(), "::", #ref_name))
                 }
 
@@ -71,6 +74,7 @@ pub fn derive_configurable_impl(input: TokenStream) -> TokenStream {
             }
         };
     };
+
     configurable_impl.into()
 }
 
@@ -136,14 +140,18 @@ fn build_struct_generate_schema_fn(
 }
 
 fn generate_struct_field(field: &Field<'_>) -> proc_macro2::TokenStream {
-    let field_as_configurable = get_field_type_as_configurable(field);
+    let field_schema_ty = get_field_schema_ty(field);
 
     let field_metadata_ref = Ident::new("field_metadata", Span::call_site());
     let field_metadata = generate_field_metadata(&field_metadata_ref, field);
 
+    let spanned_generate_schema = quote_spanned! {field.span()=>
+        <#field_schema_ty as ::vector_config::Configurable>::generate_schema(schema_gen, #field_metadata_ref.as_subschema())
+    };
+
     quote! {
         #field_metadata
-        let mut subschema = #field_as_configurable::generate_schema(schema_gen, #field_metadata_ref.as_subschema());
+        let mut subschema = #spanned_generate_schema;
         ::vector_config::schema::finalize_schema(schema_gen, &mut subschema, #field_metadata_ref);
     }
 }
@@ -155,7 +163,7 @@ fn generate_named_struct_field(
     let field_name = field
         .ident()
         .expect("named struct fields must always have an ident");
-    let field_as_configurable = get_field_type_as_configurable(field);
+    let field_schema_ty = get_field_schema_ty(field);
     let field_already_contained = format!(
         "schema properties already contained entry for `{}`, this should not occur",
         field_name
@@ -177,10 +185,13 @@ fn generate_named_struct_field(
         // If there is no default value specified for either the field itself, or the container the
         // field is a part of, then we consider it required unless the field type itself is inherently
         // optional, such as being `Option<T>`.
+        let spanned_is_optional = quote_spanned! {field.span()=>
+            <#field_schema_ty as ::vector_config::Configurable>::is_optional()
+        };
         let maybe_field_required =
             if container.default_value().is_none() && field.default_value().is_none() {
                 Some(quote! {
-                    if !#field_as_configurable::is_optional() {
+                    if !#spanned_is_optional {
                         assert!(required.insert(#field_key.to_string()), #field_already_contained);
                     }
                 })
@@ -324,18 +335,27 @@ fn generate_container_metadata(
 }
 
 fn generate_field_metadata(meta_ident: &Ident, field: &Field<'_>) -> proc_macro2::TokenStream {
-    let field_as_configurable = get_field_type_as_configurable(field);
+    let field_ty = field.ty();
+    let field_schema_ty = get_field_schema_ty(field);
+
+    let spanned_metadata = quote_spanned! {field.span()=>
+        <#field_schema_ty as ::vector_config::Configurable>::metadata()
+    };
 
     let maybe_title = get_metadata_title(meta_ident, field.title());
     let maybe_description = get_metadata_description(meta_ident, field.description());
-    let maybe_default_value = get_metadata_default_value(meta_ident, field.default_value());
+    let maybe_default_value = if field_ty != field_schema_ty {
+        get_metadata_default_value_delegated(meta_ident, field_schema_ty, field.default_value())
+    } else {
+        get_metadata_default_value(meta_ident, field.default_value())
+    };
     let maybe_deprecated = get_metadata_deprecated(meta_ident, field.deprecated());
     let maybe_transparent = get_metadata_transparent(meta_ident, field.transparent());
     let maybe_validation = get_metadata_validation(meta_ident, field.validation());
     let maybe_custom_attributes = get_metadata_custom_attributes(meta_ident, field.metadata());
 
     quote! {
-        let mut #meta_ident = #field_as_configurable::metadata();
+        let mut #meta_ident = #spanned_metadata;
         #maybe_title
         #maybe_description
         #maybe_default_value
@@ -350,34 +370,23 @@ fn generate_variant_metadata(
     meta_ident: &Ident,
     variant: &Variant<'_>,
 ) -> proc_macro2::TokenStream {
-    let variant_as_configurable = get_variant_type_as_configurable();
-
     let maybe_title = get_metadata_title(meta_ident, variant.title());
     let description = get_metadata_description(meta_ident, variant.description())
         .expect("enum variants without a description should be rejected during AST parsing");
     let maybe_deprecated = get_metadata_deprecated(meta_ident, variant.deprecated());
     let maybe_custom_attributes = get_metadata_custom_attributes(meta_ident, variant.metadata());
 
+    // We specifically use `()` as the type here because we need to generate the metadata for this
+    // variant, but there's no unique concrete type for a variant, only the type of the enum
+    // container it exists within. We also don't want to use the metadata of the enum container, as
+    // it might have values that would conflict with the metadata of this specific variant.
     quote! {
-        let mut #meta_ident = #variant_as_configurable::metadata();
+        let mut #meta_ident = ::vector_config::Metadata::<()>::default();
         #maybe_title
         #description
         #maybe_deprecated
         #maybe_custom_attributes
     }
-}
-
-fn get_field_type_as_configurable(field: &Field<'_>) -> proc_macro2::TokenStream {
-    let field_ty = field.ty();
-    quote! { <#field_ty as ::vector_config::Configurable> }
-}
-
-fn get_variant_type_as_configurable() -> proc_macro2::TokenStream {
-    // We hardcode this to a unit tuple because we don't have access to the actual type of the variant's enum container,
-    // at least not without parsing it specifically as a type token from an amalgamated version of the enum ident... but
-    // it doesn't actually matter because enums don't support default values, which is the only spot in `Metadata<T>`
-    // where the `T` gets used, so we can carry all the other pertinent details with `()`... it's still a littlw wonky, though.
-    quote! { <() as ::vector_config::Configurable> }
 }
 
 fn get_metadata_title(
@@ -406,9 +415,23 @@ fn get_metadata_default_value(
     meta_ident: &Ident,
     default_value: Option<ExprPath>,
 ) -> Option<proc_macro2::TokenStream> {
-    default_value.map(|path| {
+    default_value.map(|value| {
         quote! {
-            #meta_ident.set_default_value(#path());
+            #meta_ident.set_default_value(#value());
+        }
+    })
+}
+
+fn get_metadata_default_value_delegated(
+    meta_ident: &Ident,
+    default_ty: &syn::Type,
+    default_value: Option<ExprPath>,
+) -> Option<proc_macro2::TokenStream> {
+    default_value.map(|value| {
+        let default_ty = get_ty_for_expr_pos(default_ty);
+
+        quote! {
+            #meta_ident.set_default_value(#default_ty::from(#value()));
         }
     })
 }
@@ -470,9 +493,19 @@ fn get_metadata_custom_attributes(
     }
 }
 
+fn get_field_schema_ty<'a>(field: &'a Field<'a>) -> &'a syn::Type {
+    // If there's a delegated type being used for field (de)serialization, that's ultimately the type
+    // we use to declare the schema, because we have to generate the schema for whatever type is
+    // actually being (de)serialized, not the final type that the intermediate value ends up getting
+    // converted to.
+    //
+    // Otherwise, we just use the actual field type.
+    field.delegated_ty().unwrap_or_else(|| field.ty())
+}
+
 fn generate_named_enum_field(field: &Field<'_>) -> proc_macro2::TokenStream {
     let field_name = field.ident().expect("field should be named");
-    let field_as_configurable = get_field_type_as_configurable(field);
+    let field_ty = field.ty();
     let field_already_contained = format!(
         "schema properties already contained entry for `{}`, this should not occur",
         field_name
@@ -484,9 +517,12 @@ fn generate_named_enum_field(field: &Field<'_>) -> proc_macro2::TokenStream {
     // Fields that have no default value are inherently required.  Unlike fields on a normal
     // struct, we can't derive a default value for an individual field because `serde`
     // doesn't allow even specifying a default value for an enum overall, only structs.
+    let spanned_is_optional = quote_spanned! {field.span()=>
+        <#field_ty as ::vector_config::Configurable>::is_optional()
+    };
     let maybe_field_required = if field.default_value().is_none() {
         Some(quote! {
-            if !#field_as_configurable::is_optional() {
+        if !#spanned_is_optional {
                 if !required.insert(#field_key.to_string()) {
                     panic!(#field_already_contained);
                 }
@@ -819,5 +855,35 @@ fn generate_enum_variant_subschema(
 
             subschemas.push(subschema);
         }
+    }
+}
+
+/// Gets a type token suitable for use in expression position.
+///
+/// Normally, we refer to types with generic type parameters using their condensed form: `T<...>`.
+/// Sometimes, however, we must refer to them with their disambiguated form: `T::<...>`. This is due
+/// to a limitation in syntax parsing between types in statement versus expression position.
+///
+/// Statement position would be somehwere like declaring a field on a struct, where using angle
+/// brackets has no ambiguous meaning, as you can't compare two items as part of declaring a struct
+/// field. Conversely, expression position implies anywhere we could normally provide an expression,
+/// and expressions can certainly contain comparisons. As such, we need to use the disambiguated
+/// form in expression position.
+///
+/// While most commonly used for passing generic type parameters to functions/methods themselves,
+/// this is also known as the "turbofish" syntax.
+fn get_ty_for_expr_pos(ty: &syn::Type) -> syn::Type {
+    match ty {
+        syn::Type::Path(tp) => {
+            let mut new_tp = tp.clone();
+            for segment in new_tp.path.segments.iter_mut() {
+                if let PathArguments::AngleBracketed(ab) = &mut segment.arguments {
+                    ab.colon2_token = Some(Colon2::default());
+                }
+            }
+
+            syn::Type::Path(new_tp)
+        }
+        _ => ty.clone(),
     }
 }

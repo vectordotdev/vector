@@ -71,7 +71,13 @@ pub struct GcsResponse {
 
 impl DriverResponse for GcsResponse {
     fn event_status(&self) -> EventStatus {
-        EventStatus::Delivered
+        if self.inner.status().is_success() {
+            EventStatus::Delivered
+        } else if self.inner.status().is_server_error() {
+            EventStatus::Errored
+        } else {
+            EventStatus::Rejected
+        }
     }
 
     fn events_sent(&self) -> EventsSent {

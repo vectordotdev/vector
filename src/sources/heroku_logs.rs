@@ -341,7 +341,7 @@ mod tests {
         query_parameters: Vec<String>,
         status: EventStatus,
         acknowledgements: bool,
-    ) -> (impl Stream<Item = Event>, SocketAddr) {
+    ) -> (impl Stream<Item = Event> + Unpin, SocketAddr) {
         let (sender, recv) = SourceSender::new_test_finalize(status);
         let address = next_addr();
         let context = SourceContext::new_test(sender, None);

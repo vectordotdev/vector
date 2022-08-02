@@ -11,7 +11,7 @@ pub mod aws_s3;
 #[cfg(feature = "sources-aws_sqs")]
 pub mod aws_sqs;
 #[cfg(any(feature = "sources-datadog_agent"))]
-pub mod datadog;
+pub mod datadog_agent;
 #[cfg(feature = "sources-demo_logs")]
 pub mod demo_logs;
 #[cfg(all(unix, feature = "sources-dnstap"))]
@@ -112,7 +112,7 @@ pub enum Sources {
 
     /// Datadog Agent.
     #[cfg(feature = "sources-datadog_agent")]
-    DatadogAgent(#[configurable(derived)] datadog::agent::DatadogAgentConfig),
+    DatadogAgent(#[configurable(derived)] datadog_agent::DatadogAgentConfig),
 
     /// Demo logs.
     #[cfg(feature = "sources-demo_logs")]
