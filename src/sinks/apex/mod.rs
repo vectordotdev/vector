@@ -29,7 +29,9 @@ use crate::{
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct ApexSinkConfig {
-    /// The base URI of the Apex instance. Vector will append `/add_events` to this.
+    /// The base URI of the Apex instance.
+    ///
+    /// Vector will append `/add_events` to this.
     uri: UriSerde,
 
     /// The id of the project to associate reported logs with.
