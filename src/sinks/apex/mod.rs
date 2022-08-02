@@ -86,6 +86,7 @@ impl SinkConfig for ApexSinkConfig {
 
         let client = HttpClient::new(None, cx.proxy())?;
 
+        // TODO: Update this to a new-style sink when BatchedHttpSink is deprecated.
         let sink = BatchedHttpSink::new(
             self.clone(),
             buffer,
