@@ -6,12 +6,15 @@ use http::StatusCode;
 use prost::Message;
 use snafu::Snafu;
 use tracing::Span;
-use vector_core::event::{BatchNotifier, BatchStatus};
+use vector_core::{
+    event::{BatchNotifier, BatchStatus},
+    ByteSizeOf,
+};
 use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Reply};
 
 use crate::{
     event::Event,
-    internal_events::StreamClosedError,
+    internal_events::{EventsReceived, HttpBytesReceived, StreamClosedError},
     opentelemetry::LogService::{ExportLogsServiceRequest, ExportLogsServiceResponse},
     shutdown::ShutdownSignal,
     sources::util::{decode, ErrorMessage},
@@ -67,6 +70,7 @@ pub(crate) async fn run_http_server(
 pub(crate) fn build_warp_filter(
     acknowledgements: bool,
     out: SourceSender,
+    protocol: &'static str,
 ) -> BoxedFilter<(Response,)> {
     warp::post()
         .and(warp::path!("v1" / "logs"))
@@ -77,6 +81,11 @@ pub(crate) fn build_warp_filter(
         .and(warp::header::optional::<String>("content-encoding"))
         .and(warp::body::bytes())
         .and_then(move |encoding_header: Option<String>, body: Bytes| {
+            emit!(HttpBytesReceived {
+                byte_size: body.len(),
+                http_path: "/v1/logs",
+                protocol,
+            });
             let events = decode(&encoding_header, body).and_then(decode_body);
 
             handle_request(events, acknowledgements, out.clone(), super::LOGS)
@@ -92,11 +101,17 @@ fn decode_body(body: Bytes) -> Result<Vec<Event>, ErrorMessage> {
         )
     })?;
 
-    let events = request
+    let events: Vec<Event> = request
         .resource_logs
         .into_iter()
         .flat_map(|v| v.into_iter())
         .collect();
+
+    emit!(EventsReceived {
+        byte_size: events.size_of(),
+        count: events.len(),
+    });
+
     Ok(events)
 }
 

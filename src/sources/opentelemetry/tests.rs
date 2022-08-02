@@ -27,7 +27,7 @@ fn generate_config() {
 }
 
 #[tokio::test]
-async fn receive_message() {
+async fn receive_grpc_logs() {
     assert_source_compliance(&SOURCE_TAGS, async {
         let grpc_addr = next_addr();
         let http_addr = next_addr();

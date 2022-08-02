@@ -121,7 +121,8 @@ impl SourceConfig for OpentelemetryConfig {
         });
 
         let http_tls_settings = MaybeTlsSettings::from_config(&self.http.tls, true)?;
-        let filters = build_warp_filter(acknowledgements, cx.out);
+        let protocol = http_tls_settings.http_protocol_name();
+        let filters = build_warp_filter(acknowledgements, cx.out, protocol);
         let http_source =
             run_http_server(self.http.address, http_tls_settings, filters, cx.shutdown);
 
