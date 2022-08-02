@@ -1,9 +1,9 @@
 ---
-title: Pipe
-description: Collect logs sent via [pipe](https://en.wikipedia.org/wiki/File_descriptor)
+title: File Descriptor
+description: Collect logs from a [file descriptor](https://en.wikipedia.org/wiki/File_descriptor)
 kind: source
 layout: component
-tags: ["pipe", "component", "source", "logs"]
+tags: ["file_descriptor", "component", "source", "logs"]
 ---
 
 {{/*

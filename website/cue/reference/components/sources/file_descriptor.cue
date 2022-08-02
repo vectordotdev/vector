@@ -1,7 +1,7 @@
 package metadata
 
-components: sources: pipe: {
-	title: "PIPE"
+components: sources: file_descriptor: {
+	title: "File Descriptor"
 
 	classes: {
 		commonly_used: false
@@ -52,7 +52,7 @@ components: sources: pipe: {
 			category:    "Context"
 			common:      false
 			description: """
-				The key name added to each event representing the current host. This can also be globally set via the
+				The key name added to each event representing the current hostname. This can also be globally set via the
 				[global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key).
 				"""
 			required:    false
@@ -72,7 +72,7 @@ components: sources: pipe: {
 	}
 
 	output: logs: line: {
-		description: "An individual event from the pipe."
+		description: "An individual event from the file descriptor."
 		fields: {
 			host:      fields._local_host
 			message:   fields._raw_line
@@ -116,6 +116,5 @@ components: sources: pipe: {
 		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
 		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
 		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
-		stdin_reads_failed_total:             components.sources.internal_metrics.output.metrics.stdin_reads_failed_total
 	}
 }

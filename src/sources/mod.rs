@@ -24,7 +24,10 @@ pub mod eventstoredb_metrics;
 pub mod exec;
 #[cfg(feature = "sources-file")]
 pub mod file;
-#[cfg(any(feature = "sources-stdin", all(unix, feature = "sources-pipe")))]
+#[cfg(any(
+    feature = "sources-stdin",
+    all(unix, feature = "sources-file-descriptor")
+))]
 pub mod file_descriptors;
 #[cfg(feature = "sources-fluent")]
 pub mod fluent;
@@ -138,6 +141,12 @@ pub enum Sources {
     #[cfg(feature = "sources-file")]
     File(#[configurable(derived)] file::FileConfig),
 
+    /// File descriptor.
+    #[cfg(all(unix, feature = "sources-file-descriptor"))]
+    FileDescriptor(
+        #[configurable(derived)] file_descriptors::file_descriptor::FileDescriptorSourceConfig,
+    ),
+
     /// Fluent.
     #[cfg(feature = "sources-fluent")]
     Fluent(#[configurable(derived)] fluent::FluentConfig),
@@ -201,10 +210,6 @@ pub enum Sources {
     /// NGINX Metrics.
     #[cfg(feature = "sources-nginx_metrics")]
     NginxMetrics(#[configurable(derived)] nginx_metrics::NginxMetricsConfig),
-
-    /// Pipe.
-    #[cfg(all(unix, feature = "sources-pipe"))]
-    Pipe(#[configurable(derived)] file_descriptors::pipe::PipeConfig),
 
     /// PostgreSQL Metrics.
     #[cfg(feature = "sources-postgresql_metrics")]

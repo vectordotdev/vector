@@ -15,11 +15,11 @@ use crate::{
     shutdown::ShutdownSignal,
     SourceSender,
 };
-/// Configuration for the `pipe` source.
+/// Configuration for the `file_descriptor` source.
 #[configurable_component(source)]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct PipeConfig {
+pub struct FileDescriptorSourceConfig {
     /// The maximum buffer size, in bytes, of incoming messages.
     ///
     /// Messages larger than this are truncated.
@@ -44,7 +44,7 @@ pub struct PipeConfig {
     pub fd: c_int,
 }
 
-impl FileDescriptorConfig for PipeConfig {
+impl FileDescriptorConfig for FileDescriptorSourceConfig {
     fn host_key(&self) -> Option<String> {
         self.host_key.clone()
     }
@@ -55,15 +55,15 @@ impl FileDescriptorConfig for PipeConfig {
         self.decoding.clone()
     }
     fn description(&self) -> String {
-        format!("fd {}", self.fd)
+        format!("file descriptor {}", self.fd)
     }
 }
 
 inventory::submit! {
-    SourceDescription::new::<PipeConfig>("pipe")
+    SourceDescription::new::<FileDescriptorSourceConfig>("file_descriptor")
 }
 
-impl GenerateConfig for PipeConfig {
+impl GenerateConfig for FileDescriptorSourceConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(indoc! {r#"
             fd = 10
@@ -73,8 +73,8 @@ impl GenerateConfig for PipeConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "pipe")]
-impl SourceConfig for PipeConfig {
+#[typetag::serde(name = "file_descriptor")]
+impl SourceConfig for FileDescriptorSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
         pipe_source(self.clone(), cx.shutdown, cx.out)
     }
@@ -84,7 +84,7 @@ impl SourceConfig for PipeConfig {
     }
 
     fn source_type(&self) -> &'static str {
-        "pipe"
+        "file_descriptor"
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -97,12 +97,12 @@ impl SourceConfig for PipeConfig {
 }
 
 pub fn pipe_source(
-    config: PipeConfig,
+    config: FileDescriptorSourceConfig,
     shutdown: ShutdownSignal,
     out: SourceSender,
 ) -> crate::Result<crate::sources::Source> {
     let pipe = io::BufReader::new(unsafe { File::from_raw_fd(config.fd) });
-    file_descriptor_source(pipe, config, shutdown, out, "pipe")
+    file_descriptor_source(pipe, config, shutdown, out, "file_descriptor")
 }
 
 #[cfg(test)]
@@ -117,15 +117,15 @@ mod tests {
 
     #[test]
     fn generate_config() {
-        crate::test_util::test_generate_config::<PipeConfig>();
+        crate::test_util::test_generate_config::<FileDescriptorSourceConfig>();
     }
 
     #[tokio::test]
-    async fn pipe_decodes_line() {
+    async fn file_descriptor_decodes_line() {
         assert_source_compliance(&["protocol"], async {
             let (tx, rx) = SourceSender::new_test();
             let (read_fd, write_fd) = pipe().unwrap();
-            let config = PipeConfig {
+            let config = FileDescriptorSourceConfig {
                 max_length: crate::serde::default_max_length(),
                 host_key: Default::default(),
                 framing: None,
@@ -162,10 +162,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn pipe_handles_invalid_fd() {
+    async fn file_descriptor_handles_invalid_fd() {
         let (tx, rx) = SourceSender::new_test();
         let (_read_fd, write_fd) = pipe().unwrap();
-        let config = PipeConfig {
+        let config = FileDescriptorSourceConfig {
             max_length: crate::serde::default_max_length(),
             host_key: Default::default(),
             framing: None,

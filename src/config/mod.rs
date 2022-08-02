@@ -352,7 +352,7 @@ impl Display for Resource {
         match self {
             Resource::Port(address, protocol) => write!(fmt, "{} {}", protocol, address),
             Resource::SystemFdOffset(offset) => write!(fmt, "systemd {}th socket", offset + 1),
-            Resource::Fd(fd) => write!(fmt, "fd: {}", fd),
+            Resource::Fd(fd) => write!(fmt, "file descriptor: {}", fd),
             Resource::DiskBuffer(name) => write!(fmt, "disk buffer {:?}", name),
         }
     }
@@ -629,50 +629,54 @@ mod tests {
     #[tokio::test]
     #[cfg(unix)]
     async fn conflicting_stdin_and_fd_resources() {
-        let result = load(
+        let errors = load(
             r#"
             [sources.stdin]
             type = "stdin"
 
-            [sources.pipe]
-            type = "pipe"
+            [sources.file_descriptor]
+            type = "file_descriptor"
             fd = 0
 
             [sinks.out]
             type = "basic_sink"
-            inputs = ["stdin", "pipe"]
+            inputs = ["stdin", "file_descriptor"]
             "#,
             Format::Toml,
         )
-        .await;
+        .await
+        .unwrap_err();
 
-        let expected = Err(vec!["Resource `fd: 0` is claimed by multiple components: {ComponentKey { id: \"stdin\" }, ComponentKey { id: \"pipe\" }}".to_string()]);
-        assert_eq!(result, expected);
+        assert_eq!(errors.len(), 1);
+        let expected_prefix = "Resource `file descriptor: 0` is claimed by multiple components:";
+        assert!(errors[0].starts_with(expected_prefix));
     }
 
     #[tokio::test]
     #[cfg(unix)]
     async fn conflicting_fd_resources() {
-        let result = load(
+        let errors = load(
             r#"
-            [sources.pipe1]
-            type = "pipe"
+            [sources.file_descriptor1]
+            type = "file_descriptor"
             fd = 10
 
-            [sources.pipe2]
-            type = "pipe"
+            [sources.file_descriptor2]
+            type = "file_descriptor"
             fd = 10
 
             [sinks.out]
             type = "basic_sink"
-            inputs = ["pipe1", "pipe2"]
+            inputs = ["file_descriptor1", "file_descriptor2"]
             "#,
             Format::Toml,
         )
-        .await;
+        .await
+        .unwrap_err();
 
-        let expected = Err(vec!["Resource `fd: 10` is claimed by multiple components: {ComponentKey { id: \"pipe1\" }, ComponentKey { id: \"pipe2\" }}".to_string()]);
-        assert_eq!(result, expected);
+        assert_eq!(errors.len(), 1);
+        let expected_prefix = "Resource `file descriptor: 10` is claimed by multiple components:";
+        assert!(errors[0].starts_with(expected_prefix));
     }
 
     #[tokio::test]
@@ -680,17 +684,17 @@ mod tests {
     async fn no_conflict_fd_resources() {
         let result = load(
             r#"
-            [sources.pipe1]
-            type = "pipe"
+            [sources.file_descriptor1]
+            type = "file_descriptor"
             fd = 10
 
-            [sources.pipe2]
-            type = "pipe"
+            [sources.file_descriptor2]
+            type = "file_descriptor"
             fd = 20
 
             [sinks.out]
             type = "basic_sink"
-            inputs = ["pipe1", "pipe2"]
+            inputs = ["file_descriptor1", "file_descriptor2"]
             "#,
             Format::Toml,
         )

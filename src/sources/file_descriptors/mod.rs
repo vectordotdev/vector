@@ -20,8 +20,8 @@ use crate::{
     SourceSender,
 };
 
-#[cfg(all(unix, feature = "sources-pipe"))]
-pub mod pipe;
+#[cfg(all(unix, feature = "sources-file-descriptor"))]
+pub mod file_descriptor;
 #[cfg(feature = "sources-stdin")]
 pub mod stdin;
 
