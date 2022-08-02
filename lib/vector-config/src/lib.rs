@@ -53,7 +53,7 @@
 // then multiline parsing is disabled". Including that description on `MultilineConfig` itself is kind of weird because
 // it forces that on everyone else using it, where, in some cases, it may not be optional at all.
 //
-// TODO: Right now, we're manually generating a referencable name where it makes sense by appending the module path to
+// TODO: Right now, we're manually generating a referenceable name where it makes sense by appending the module path to
 // the ident for structs/enums, and by crafting the name by hand for anything like stdlib impls, or impls on external
 // types.
 //
@@ -61,7 +61,7 @@
 // fully-qualified path of a type, which we would need (in general, regardless of whether or not we used that function)
 // because we don't want definition types totally changing name between compiler versions, etc.
 //
-// This is obviously also tricky from a re-export standpoint i.e. what is the referencable name of a type that uses the
+// This is obviously also tricky from a re-export standpoint i.e. what is the referenceable name of a type that uses the
 // derive macros for `Configurable` but is exporter somewhere entirely different? The path would refer to the source nol
 // matter what, as it's based on how `std::module_path!()` works. Technically speaking, that's still correct from a "we
 // shouldn't create duplicate schemas for T" standpoint, but could manifest as a non-obvious divergence.
@@ -81,17 +81,41 @@
 // can essentially define flags i.e. `docs:templateable` as a metadata value for marking a field as working with
 // Vector's template syntax, since doing `templateable = true` is weird given that we never otherwise specifically
 // disable it. In other words, we want a way to define feature flags in metadata.
-
+//
+// TODO: Should we add a way, and/or make it the default, that if you only supply a description of a
+// field, it concats the description of the type of the field? for example, you have:
+//
+// /// Predefined ACLs.
+// ///
+// /// For more information, see this link.
+// pub enum PredefinedAcl { ... }
+//
+// and then somewhere else, you use it like this:
+//
+// /// The Predefined ACL to apply to newly created objects.
+// field: PredefinedAcl,
+//
+// the resulting docs for `field` should look as if we wrote this:
+//
+// /// The Predefined ACL to apply to newly created objects.
+// ///
+// /// For more information, see this link.
+//
+// basically, we're always documenting these shared types fully, but sometimes their title is
+// written in an intentionally generic way, and we may want to spice up the wording so it's
+// context-specific i.e. we're using predefined ACLs for new objects, or using it for new firewall
+// rules, or ... so on and so forth. and by concating the existing description on the shared type,
+// we can continue to include high-quality doc comments with contextual links, examples, etc and
+// avoid duplication.
+//
+// TODO: Should we always apply the transparent marker to fields when they're the only field in a
+// tuple struct/tuple variant? There's also some potential interplay with using the `derived` helper
+// attribute on the tuple struct/tuple variant itself to signal that we want to pull the
+// title/description from the field instead, which coluld be useful when using newtype wrappers
+// around existing/remote types for the purpose of making them `Configurable`.
 #![deny(warnings)]
 
 use core::fmt;
-use core::marker::PhantomData;
-
-use num::ConfigurableNumber;
-use serde::{Deserialize, Serialize};
-
-pub mod schema;
-
 // Re-export of the various public dependencies required by the generated code to simplify the import requirements for
 // crates actually using the macros/derives.
 pub mod indexmap {
@@ -103,9 +127,15 @@ pub mod schemars {
 
 mod external;
 mod num;
+pub use self::num::ConfigurableNumber;
+pub mod schema;
+pub mod ser;
 mod stdlib;
+mod str;
+pub use self::str::ConfigurableString;
 
 use vector_config_common::attributes::CustomAttribute;
+
 // Re-export of the `#[configurable_component]` and `#[derive(Configurable)]` proc macros.
 pub use vector_config_macros::*;
 
@@ -119,7 +149,7 @@ pub mod validation {
 }
 
 #[derive(Clone)]
-pub struct Metadata<'de, T: Configurable<'de>> {
+pub struct Metadata<T> {
     title: Option<&'static str>,
     description: Option<&'static str>,
     default_value: Option<T>,
@@ -127,10 +157,9 @@ pub struct Metadata<'de, T: Configurable<'de>> {
     deprecated: bool,
     transparent: bool,
     validations: Vec<validation::Validation>,
-    _de: PhantomData<&'de ()>,
 }
 
-impl<'de, T: Configurable<'de>> Metadata<'de, T> {
+impl<T> Metadata<T> {
     pub fn with_title(title: &'static str) -> Self {
         Self {
             title: Some(title),
@@ -169,6 +198,10 @@ impl<'de, T: Configurable<'de>> Metadata<'de, T> {
         self.description = None;
     }
 
+    pub fn default_value(&self) -> Option<&T> {
+        self.default_value.as_ref()
+    }
+
     pub fn with_default_value(default: T) -> Self {
         Self {
             default_value: Some(default),
@@ -176,22 +209,18 @@ impl<'de, T: Configurable<'de>> Metadata<'de, T> {
         }
     }
 
-    pub fn default_value(&self) -> Option<T> {
-        self.default_value.clone()
-    }
-
     pub fn set_default_value(&mut self, default_value: T) {
         self.default_value = Some(default_value);
     }
 
-    pub fn clear_default_value(&mut self) {
-        self.default_value = None;
+    pub fn consume_default_value(&mut self) -> Option<T> {
+        self.default_value.take()
     }
 
-    pub fn map_default_value<F, U>(self, f: F) -> Metadata<'de, U>
+    pub fn map_default_value<F, U>(self, f: F) -> Metadata<U>
     where
         F: FnOnce(T) -> U,
-        U: Configurable<'de>,
+        U: Configurable,
     {
         Metadata {
             title: self.title,
@@ -201,7 +230,6 @@ impl<'de, T: Configurable<'de>> Metadata<'de, T> {
             deprecated: self.deprecated,
             transparent: self.transparent,
             validations: self.validations,
-            _de: PhantomData,
         }
     }
 
@@ -253,7 +281,7 @@ impl<'de, T: Configurable<'de>> Metadata<'de, T> {
         self.validations.clear();
     }
 
-    pub fn merge(mut self, other: Metadata<'de, T>) -> Self {
+    pub fn merge(mut self, other: Metadata<T>) -> Self {
         self.custom_attributes.extend(other.custom_attributes);
         self.validations.extend(other.validations);
 
@@ -265,14 +293,13 @@ impl<'de, T: Configurable<'de>> Metadata<'de, T> {
             deprecated: other.deprecated,
             transparent: other.transparent,
             validations: self.validations,
-            _de: PhantomData,
         }
     }
 
     /// Converts this metadata from holding a default value of `T` to `U`.
     ///
     /// If a default value was present before, it is dropped.
-    pub fn convert<U: Configurable<'de>>(self) -> Metadata<'de, U> {
+    pub fn convert<U>(self) -> Metadata<U> {
         Metadata {
             title: self.title,
             description: self.description,
@@ -281,7 +308,6 @@ impl<'de, T: Configurable<'de>> Metadata<'de, T> {
             deprecated: self.deprecated,
             transparent: self.transparent,
             validations: self.validations,
-            _de: PhantomData,
         }
     }
 
@@ -293,7 +319,6 @@ impl<'de, T: Configurable<'de>> Metadata<'de, T> {
         Self {
             title: self.title,
             description: self.description,
-            default_value: self.default_value.clone(),
             custom_attributes: Vec::new(),
             transparent: self.transparent,
             ..Default::default()
@@ -301,8 +326,8 @@ impl<'de, T: Configurable<'de>> Metadata<'de, T> {
     }
 }
 
-impl<'de, T: Configurable<'de>> Metadata<'de, Option<T>> {
-    pub fn flatten_default(self) -> Metadata<'de, T> {
+impl<T> Metadata<Option<T>> {
+    pub fn flatten_default(self) -> Metadata<T> {
         Metadata {
             title: self.title,
             description: self.description,
@@ -311,12 +336,11 @@ impl<'de, T: Configurable<'de>> Metadata<'de, Option<T>> {
             deprecated: self.deprecated,
             transparent: self.transparent,
             validations: self.validations,
-            _de: PhantomData,
         }
     }
 }
 
-impl<'de, T: Configurable<'de>> Default for Metadata<'de, T> {
+impl<T> Default for Metadata<T> {
     fn default() -> Self {
         Self {
             title: None,
@@ -326,12 +350,11 @@ impl<'de, T: Configurable<'de>> Default for Metadata<'de, T> {
             deprecated: false,
             transparent: false,
             validations: Vec::new(),
-            _de: PhantomData,
         }
     }
 }
 
-impl<'de, T: Configurable<'de>> fmt::Debug for Metadata<'de, T> {
+impl<T> fmt::Debug for Metadata<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Metadata")
             .field("title", &self.title)
@@ -360,15 +383,15 @@ impl<'de, T: Configurable<'de>> fmt::Debug for Metadata<'de, T> {
 /// `Configurable` provides the machinery to allow describing and encoding the shape of a type, recursively, so that by
 /// instrumenting all transitive types of the configuration, the schema can be discovered by generating the schema from
 /// some root type.
-pub trait Configurable<'de>: Serialize + Deserialize<'de> + Sized
+pub trait Configurable
 where
-    Self: Clone,
+    Self: Sized,
 {
-    /// Gets the referencable name of this value, if any.
+    /// Gets the referenceable name of this value, if any.
     ///
     /// When specified, this implies the value is both complex and standardized, and should be
     /// reused within any generated schema it is present in.
-    fn referencable_name() -> Option<&'static str> {
+    fn referenceable_name() -> Option<&'static str> {
         None
     }
 
@@ -387,7 +410,7 @@ where
     }
 
     /// Gets the metadata for this value.
-    fn metadata() -> Metadata<'de, Self> {
+    fn metadata() -> Metadata<Self> {
         let mut metadata = Metadata::default();
         if let Some(description) = Self::description() {
             metadata.set_description(description);
@@ -398,14 +421,14 @@ where
     /// Generates the schema for this value.
     fn generate_schema(
         gen: &mut schemars::gen::SchemaGenerator,
-        overrides: Metadata<'de, Self>,
+        overrides: Metadata<Self>,
     ) -> schemars::schema::SchemaObject;
 }
 
 #[doc(hidden)]
-pub fn __ensure_numeric_validation_bounds<'de, N>(metadata: &Metadata<'de, N>)
+pub fn __ensure_numeric_validation_bounds<N>(metadata: &Metadata<N>)
 where
-    N: Configurable<'de> + ConfigurableNumber,
+    N: Configurable + ConfigurableNumber,
 {
     // In `Validation::ensure_conformance`, we do some checks on any supplied numeric bounds to try and ensure they're
     // no larger than the largest f64 value where integer/floasting-point conversions are still lossless.  What we

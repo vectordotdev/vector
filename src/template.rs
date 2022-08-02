@@ -1,4 +1,4 @@
-use std::{borrow::Cow, convert::TryFrom, hash::Hash, path::PathBuf};
+use std::{borrow::Cow, convert::TryFrom, fmt, hash::Hash, path::PathBuf};
 
 use bytes::Bytes;
 use chrono::{
@@ -8,7 +8,7 @@ use chrono::{
 use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
 use snafu::Snafu;
-use vector_config::configurable_component;
+use vector_config::{configurable_component, ConfigurableString};
 
 use crate::{
     config::log_schema,
@@ -16,6 +16,18 @@ use crate::{
 };
 
 static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\{\{(?P<key>[^\}]+)\}\}").unwrap());
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Snafu)]
+pub enum TemplateParseError {
+    #[snafu(display("Invalid strftime item"))]
+    StrftimeError,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Snafu)]
+pub enum TemplateRenderingError {
+    #[snafu(display("Missing fields on event: {:?}", missing_keys))]
+    MissingKeys { missing_keys: Vec<String> },
+}
 
 /// A templated field.
 ///
@@ -41,16 +53,11 @@ pub struct Template {
     has_fields: bool,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Snafu)]
-pub enum TemplateParseError {
-    #[snafu(display("Invalid strftime item"))]
-    StrftimeError,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Snafu)]
-pub enum TemplateRenderingError {
-    #[snafu(display("Missing fields on event: {:?}", missing_keys))]
-    MissingKeys { missing_keys: Vec<String> },
+impl Template {
+    /// Returns `true` if this template string has a length of zero, and `false` otherwise.
+    pub fn is_empty(&self) -> bool {
+        self.src.is_empty()
+    }
 }
 
 impl TryFrom<&str> for Template {
@@ -102,6 +109,15 @@ impl From<Template> for String {
         template.src
     }
 }
+
+impl fmt::Display for Template {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.src)
+    }
+}
+
+// This is safe because we literally defer to `String` for the schema of `Template`.
+impl ConfigurableString for Template {}
 
 const fn is_error(item: &Item) -> bool {
     matches!(item, Item::Error)

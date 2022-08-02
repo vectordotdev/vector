@@ -116,6 +116,13 @@ components: sources: aws_sqs: components._aws & {
 					syntax: "literal"
 				}
 			}
+			source_type: {
+				description: "The name of the source type."
+				required:    true
+				type: string: {
+					examples: ["aws_sqs"]
+				}
+			}
 			timestamp: fields._current_timestamp & {
 				description: "The time this message was sent to SQS."
 			}

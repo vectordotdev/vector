@@ -394,7 +394,7 @@ async fn run_insert_tests_with_config(
         let mut doit = false;
         let events = events.map(move |mut events| {
             if doit {
-                events.for_each_log(|log| {
+                events.iter_logs_mut().for_each(|log| {
                     log.insert("_type", 1);
                 });
             }

@@ -5,7 +5,6 @@ use bytes::Bytes;
 use futures::stream::{BoxStream, StreamExt};
 use tower::Service;
 use vector_core::{
-    buffers::Acker,
     event::{EventFinalizers, Finalizable},
     stream::{BatcherSettings, DriverResponse},
 };
@@ -15,10 +14,10 @@ use super::{
     NewRelicApiRequest, NewRelicCredentials, NewRelicEncoder,
 };
 use crate::{
+    codecs::Transformer,
     event::Event,
     sinks::util::{
         builder::SinkBuilderExt,
-        encoding::Transformer,
         metadata::{RequestMetadata, RequestMetadataBuilder},
         request_builder::EncodeResult,
         Compression, RequestBuilder, StreamSink,
@@ -134,7 +133,6 @@ impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
 
 pub struct NewRelicSink<S> {
     pub service: S,
-    pub acker: Acker,
     pub transformer: Transformer,
     pub encoder: NewRelicEncoder,
     pub credentials: Arc<NewRelicCredentials>,
@@ -172,7 +170,7 @@ where
                     }
                 },
             )
-            .into_driver(self.service, self.acker);
+            .into_driver(self.service);
 
         sink.run().await
     }

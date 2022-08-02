@@ -1,4 +1,4 @@
-use super::create_default_buffer_v1;
+use super::{create_default_buffer_v1, read_next};
 use crate::{
     assert_reader_writer_v1_positions,
     test::{with_temp_dir, MultiEventRecord},
@@ -11,18 +11,18 @@ async fn ensure_event_count_makes_it_through_unfettered() {
 
         async move {
             // Create a regular buffer, no customizations required.
-            let (mut writer, mut reader, _) = create_default_buffer_v1(data_dir);
+            let (mut writer, mut reader) = create_default_buffer_v1(data_dir);
             assert_reader_writer_v1_positions!(reader, writer, 0, 0);
 
             // Write a simple multi-event record and make sure the writer offset moves forward by
             // the expected amount, since the entry key should be increment by event count:
-            let record = MultiEventRecord(12);
-            writer.send(record).await;
+            let record = MultiEventRecord::new(12);
+            writer.send(record.clone()).await;
             writer.flush();
             assert_reader_writer_v1_positions!(reader, writer, 0, 12);
 
             // And now read it out which should give us a matching record:
-            let read_record = reader.next().await.expect("read should not fail");
+            let read_record = read_next(&mut reader).await;
             assert_reader_writer_v1_positions!(reader, writer, 12, 12);
             assert_eq!(record, read_record);
         }
@@ -39,7 +39,7 @@ async fn ensure_write_offset_valid_after_reload_with_multievent() {
 
         async move {
             // Create a regular buffer, no customizations required.
-            let (mut writer, reader, _) = create_default_buffer_v1(data_dir.clone());
+            let (mut writer, reader) = create_default_buffer_v1(data_dir.clone());
             assert_reader_writer_v1_positions!(reader, writer, 0, 0);
 
             // Write some simple multi-event records and make writer offset moves forward by the
@@ -48,7 +48,7 @@ async fn ensure_write_offset_valid_after_reload_with_multievent() {
             let mut total_write_offset = 0;
             for count in counts {
                 total_write_offset += count;
-                let record = MultiEventRecord(count);
+                let record = MultiEventRecord::new(count);
 
                 writer.send(record).await;
                 writer.flush();
@@ -59,7 +59,7 @@ async fn ensure_write_offset_valid_after_reload_with_multievent() {
             drop(writer);
             drop(reader);
 
-            let (writer, reader, _) = create_default_buffer_v1::<_, MultiEventRecord>(data_dir);
+            let (writer, reader) = create_default_buffer_v1::<_, MultiEventRecord>(data_dir);
             assert_reader_writer_v1_positions!(reader, writer, 0, total_write_offset as usize);
         }
     })

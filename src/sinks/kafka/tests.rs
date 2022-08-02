@@ -11,16 +11,14 @@ mod integration_test {
     };
 
     use bytes::Bytes;
+    use codecs::TextSerializerConfig;
     use futures::StreamExt;
     use rdkafka::{
         consumer::{BaseConsumer, Consumer},
         message::Headers,
         Message, Offset, TopicPartitionList,
     };
-    use vector_core::{
-        buffers::Acker,
-        event::{BatchNotifier, BatchStatus},
-    };
+    use vector_core::event::{BatchNotifier, BatchStatus};
 
     use crate::{
         event::Value,
@@ -31,10 +29,7 @@ mod integration_test {
                 sink::KafkaSink,
                 *,
             },
-            util::{
-                encoding::{EncodingConfig, StandardEncodings},
-                BatchConfig, NoDefaultsBatchSettings,
-            },
+            util::{BatchConfig, NoDefaultsBatchSettings},
             VectorSink,
         },
         test_util::{
@@ -62,7 +57,7 @@ mod integration_test {
             bootstrap_servers: kafka_address(9091),
             topic: topic.clone(),
             key_field: None,
-            encoding: EncodingConfig::from(StandardEncodings::Text).into(),
+            encoding: TextSerializerConfig::new().into(),
             batch: BatchConfig::default(),
             compression: KafkaCompression::None,
             auth: KafkaAuthConfig::default(),
@@ -114,7 +109,7 @@ mod integration_test {
             bootstrap_servers: kafka_address(9091),
             topic: format!("{}-%Y%m%d", topic),
             compression: KafkaCompression::None,
-            encoding: EncodingConfig::from(StandardEncodings::Text).into(),
+            encoding: TextSerializerConfig::new().into(),
             key_field: None,
             auth: KafkaAuthConfig {
                 sasl: None,
@@ -127,11 +122,10 @@ mod integration_test {
             headers_key: None,
             acknowledgements: Default::default(),
         };
-        let (acker, _ack_counter) = Acker::basic();
         config.clone().to_rdkafka(KafkaRole::Consumer)?;
         config.clone().to_rdkafka(KafkaRole::Producer)?;
         self::sink::healthcheck(config.clone()).await?;
-        KafkaSink::new(config, acker)
+        KafkaSink::new(config)
     }
 
     #[tokio::test]
@@ -249,7 +243,7 @@ mod integration_test {
             bootstrap_servers: server.clone(),
             topic: format!("{}-%Y%m%d", topic),
             key_field: None,
-            encoding: EncodingConfig::from(StandardEncodings::Text).into(),
+            encoding: TextSerializerConfig::new().into(),
             batch: BatchConfig::default(),
             compression,
             auth: kafka_auth.clone(),
@@ -261,8 +255,7 @@ mod integration_test {
         };
         let topic = format!("{}-{}", topic, chrono::Utc::now().format("%Y%m%d"));
         println!("Topic name generated in test: {:?}", topic);
-        let (acker, ack_counter) = Acker::basic();
-        let sink = KafkaSink::new(config, acker).unwrap();
+        let sink = KafkaSink::new(config).unwrap();
         let sink = VectorSink::from_event_streamsink(sink);
 
         let num_events = 1000;
@@ -278,7 +271,7 @@ mod integration_test {
                 header_1_key.to_owned(),
                 Value::Bytes(Bytes::from(header_1_value)),
             );
-            events.for_each_log(move |log| {
+            events.iter_logs_mut().for_each(move |log| {
                 log.insert(headers_key.as_str(), header_values.clone());
             });
             events
@@ -291,7 +284,7 @@ mod integration_test {
         client_config.set("bootstrap.servers", server.as_str());
         client_config.set("group.id", &random_string(10));
         client_config.set("enable.partition.eof", "true");
-        let _ = kafka_auth.apply(&mut client_config).unwrap();
+        kafka_auth.apply(&mut client_config).unwrap();
 
         let mut tpl = TopicPartitionList::new();
         tpl.add_partition(&topic, 0)
@@ -341,10 +334,5 @@ mod integration_test {
 
         assert_eq!(out.len(), input.len());
         assert_eq!(out, input);
-
-        assert_eq!(
-            ack_counter.load(std::sync::atomic::Ordering::Relaxed),
-            num_events
-        );
     }
 }

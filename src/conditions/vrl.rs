@@ -1,6 +1,8 @@
 use value::Value;
 use vector_common::TimeZone;
 use vector_config::configurable_component;
+use vector_core::compile_vrl;
+use vrl::state::LocalEnv;
 use vrl::{diagnostic::Formatter, Program, Runtime, VrlRuntime};
 
 use crate::event::TargetEvents;
@@ -46,12 +48,14 @@ impl ConditionalConfig for VrlConfig {
         let mut state = vrl::state::ExternalEnv::default().read_only();
         state.set_external_context(enrichment_tables.clone());
 
-        let (program, warnings) = vrl::compile_with_state(&self.source, &functions, &mut state)
-            .map_err(|diagnostics| {
-                Formatter::new(&self.source, diagnostics)
-                    .colored()
-                    .to_string()
-            })?;
+        let (program, warnings) =
+            compile_vrl(&self.source, &functions, &mut state, LocalEnv::default()).map_err(
+                |diagnostics| {
+                    Formatter::new(&self.source, diagnostics)
+                        .colored()
+                        .to_string()
+                },
+            )?;
 
         if !warnings.is_empty() {
             let warnings = Formatter::new(&self.source, warnings).colored().to_string();

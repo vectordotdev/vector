@@ -18,6 +18,7 @@ pub use parser::{parse_dnstap_data, DnstapParser};
 pub mod schema;
 use dnsmsg_parser::{dns_message, dns_message_parser};
 pub use schema::DnstapEventSchema;
+use vector_core::config::LogNamespace;
 
 /// Configuration for the `dnstap` source.
 #[configurable_component(source)]
@@ -31,8 +32,9 @@ pub struct DnstapConfig {
     ///
     /// The value will be the socket path itself.
     ///
-    /// By default, the [global `host_key` option](https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key) is
-    /// used.
+    /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
+    ///
+    /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     pub host_key: Option<String>,
 
     /// Absolute path to the socket file to read DNSTAP data from.
@@ -118,7 +120,7 @@ impl SourceConfig for DnstapConfig {
         build_framestream_unix_source(frame_handler, cx.shutdown, cx.out)
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 

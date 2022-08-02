@@ -1,7 +1,6 @@
 use std::{
     cmp,
     collections::BTreeMap,
-    convert::TryInto,
     io::{self, Write},
     mem,
     sync::Arc,
@@ -204,7 +203,7 @@ impl DatadogMetricsEncoder {
                     {
                         return Ok(Some(metric));
                     }
-                    let _ = serde_json::to_writer(&mut self.state.buf, series)
+                    serde_json::to_writer(&mut self.state.buf, series)
                         .context(JsonEncodingFailedSnafu)?;
                 }
             }
@@ -268,7 +267,7 @@ impl DatadogMetricsEncoder {
         }
 
         // We should be safe to write our holding buffer to the compressor and store the metric.
-        let _ = self.state.writer.write_all(&self.state.buf)?;
+        self.state.writer.write_all(&self.state.buf)?;
         self.state.written += n;
         Ok(true)
     }
@@ -323,7 +322,7 @@ impl DatadogMetricsEncoder {
 
         // Consume of all of the "pending" metrics and try to write them out as sketches.
         let pending = mem::take(&mut self.state.pending);
-        let _ = write_sketches(
+        write_sketches(
             &pending,
             &self.default_namespace,
             self.log_schema,
@@ -349,7 +348,7 @@ impl DatadogMetricsEncoder {
 
     pub fn finish(&mut self) -> Result<(Bytes, Vec<Metric>, usize), FinishError> {
         // Try to encode any pending metrics we had stored up.
-        let _ = self.try_encode_pending()?;
+        self.try_encode_pending()?;
 
         // Write any payload footer necessary for the configured endpoint.
         let n = write_payload_footer(self.endpoint, &mut self.state.writer)
@@ -433,10 +432,10 @@ fn generate_series_metrics(
     let tags = Some(encode_tags(&tags));
     let interval = last_sent
         .map(|then| then.elapsed())
-        .map(|d| d.as_secs().try_into().unwrap_or(i64::MAX));
+        .map(|d| d.as_secs() as u32);
 
-    let results = match metric.value() {
-        MetricValue::Counter { value } => vec![DatadogSeriesMetric {
+    let results = match (metric.value(), metric.interval_ms()) {
+        (MetricValue::Counter { value }, None) => vec![DatadogSeriesMetric {
             metric: name,
             r#type: DatadogMetricType::Count,
             interval,
@@ -446,7 +445,18 @@ fn generate_series_metrics(
             source_type_name,
             device,
         }],
-        MetricValue::Set { values } => vec![DatadogSeriesMetric {
+        (MetricValue::Counter { value }, Some(i)) => vec![DatadogSeriesMetric {
+            metric: name,
+            r#type: DatadogMetricType::Rate,
+            // Datadog expects interval to be in seconds and a rate metric to be per second
+            interval: Some(i.get() / 1000),
+            points: vec![DatadogPoint(ts, (*value) * 1000.0 / (i.get() as f64))],
+            tags,
+            host,
+            source_type_name,
+            device,
+        }],
+        (MetricValue::Set { values }, _) => vec![DatadogSeriesMetric {
             metric: name,
             r#type: DatadogMetricType::Gauge,
             interval: None,
@@ -456,7 +466,7 @@ fn generate_series_metrics(
             source_type_name,
             device,
         }],
-        MetricValue::Gauge { value } => vec![DatadogSeriesMetric {
+        (MetricValue::Gauge { value }, _) => vec![DatadogSeriesMetric {
             metric: name,
             r#type: DatadogMetricType::Gauge,
             interval: None,
@@ -466,7 +476,7 @@ fn generate_series_metrics(
             source_type_name,
             device,
         }],
-        value => {
+        (value, _) => {
             return Err(EncoderError::InvalidMetric {
                 expected: "series",
                 metric_value: value.as_name(),

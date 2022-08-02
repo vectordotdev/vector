@@ -42,7 +42,7 @@ export CURRENT_DIR = $(shell pwd)
 # Override this to automatically enter a container containing the correct, full, official build environment for Vector, ready for development
 export ENVIRONMENT ?= false
 # The upstream container we publish artifacts to on a successful master build.
-export ENVIRONMENT_UPSTREAM ?= timberio/vector-dev:sha-3eadc96742a33754a5859203b58249f6a806972a
+export ENVIRONMENT_UPSTREAM ?= docker.io/timberio/vector-dev:sha-3eadc96742a33754a5859203b58249f6a806972a
 # Override to disable building the container, having it pull from the Github packages repo instead
 # TODO: Disable this by default. Blocked by `docker pull` from Github Packages requiring authenticated login
 export ENVIRONMENT_AUTOBUILD ?= true
@@ -433,7 +433,7 @@ check: ## Run prerequisite code checks
 check-all: ## Check everything
 check-all: check-fmt check-clippy check-style check-docs
 check-all: check-version check-examples check-component-features
-check-all: check-scripts
+check-all: check-scripts check-deny
 
 .PHONY: check-component-features
 check-component-features: ## Check that all component features are setup properly
@@ -470,6 +470,10 @@ check-examples: ## Check that the config/examples files are valid
 .PHONY: check-scripts
 check-scripts: ## Check that scipts do not have common mistakes
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-scripts.sh
+
+.PHONY: check-deny
+check-deny: ## Check advisories licenses and sources for crate dependencies
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-deny.sh
 
 check-events: ## Check that events satisfy patterns set in https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-events

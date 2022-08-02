@@ -1,26 +1,20 @@
 mod ddsketch;
-mod handle;
 mod label_filter;
 mod recorder;
+mod storage;
 
-use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
+use chrono::Utc;
 use metrics::Key;
 use metrics_tracing_context::TracingContextLayer;
-use metrics_util::{layers::Layer, Generational, NotTracked};
+use metrics_util::layers::Layer;
 use once_cell::sync::OnceCell;
 use snafu::Snafu;
 
-pub use crate::metrics::{
-    ddsketch::{AgentDDSketch, BinMap, Config},
-    handle::{Counter, Handle},
-};
-use crate::{
-    event::Metric,
-    metrics::{label_filter::VectorLabelFilter, recorder::VectorRecorder},
-};
-
-pub(self) type Registry = metrics_util::Registry<Key, Handle, NotTracked<Handle>>;
+pub use self::ddsketch::{AgentDDSketch, BinMap, Config};
+use self::{label_filter::VectorLabelFilter, recorder::Registry, recorder::VectorRecorder};
+use crate::event::{Metric, MetricValue};
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -133,11 +127,26 @@ impl Controller {
 
     /// Take a snapshot of all gathered metrics and expose them as metric
     /// [`Event`](crate::event::Event)s.
+    #[allow(clippy::cast_precision_loss)]
     pub fn capture_metrics(&self) -> Vec<Metric> {
-        let mut metrics: Vec<Metric> = Vec::new();
+        let timestamp = Utc::now();
+        let mut metrics = Vec::<Metric>::new();
+
         self.recorder.with_registry(|registry| {
-            registry.visit(|_kind, (key, handle)| {
-                metrics.push(Metric::from_metric_kv(key, handle.get_inner()));
+            registry.visit_counters(|key, counter| {
+                // NOTE this will truncate if the value is greater than 2**52.
+                let value = counter.load(Ordering::Relaxed) as f64;
+                let value = MetricValue::Counter { value };
+                metrics.push(Metric::from_metric_kv(key, value, timestamp));
+            });
+            registry.visit_gauges(|key, gauge| {
+                let value = gauge.load(Ordering::Relaxed);
+                let value = MetricValue::Gauge { value };
+                metrics.push(Metric::from_metric_kv(key, value, timestamp));
+            });
+            registry.visit_histograms(|key, histogram| {
+                let value = histogram.make_metric();
+                metrics.push(Metric::from_metric_kv(key, value, timestamp));
             });
         });
 
@@ -163,8 +172,14 @@ impl Controller {
             }
         }
 
-        let handle = Handle::Counter(Arc::new(Counter::with_count(metrics.len() as u64 + 1)));
-        metrics.push(Metric::from_metric_kv(&CARDINALITY_KEY, &handle));
+        let cardinality = MetricValue::Counter {
+            value: (metrics.len() + 1) as f64,
+        };
+        metrics.push(Metric::from_metric_kv(
+            &CARDINALITY_KEY,
+            cardinality,
+            timestamp,
+        ));
 
         metrics
     }
