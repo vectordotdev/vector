@@ -706,17 +706,11 @@ mod tests {
         let object1 = type_def.as_object().unwrap();
 
         assert!(object1.known().is_empty());
-        assert!(object1.unknown().unwrap().as_exact().unwrap().is_object());
+        assert!(object1.unknown_kind().contains_object());
 
-        let object2 = object1
-            .unknown()
-            .unwrap()
-            .as_exact()
-            .unwrap()
-            .as_object()
-            .unwrap();
+        let object2 = object1.unknown_kind().as_object().cloned().unwrap();
 
         assert!(object2.known().is_empty());
-        assert!(object2.unknown().unwrap().is_any());
+        assert!(object2.unknown_kind().is_any());
     }
 }

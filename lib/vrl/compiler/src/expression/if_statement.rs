@@ -34,7 +34,7 @@ impl Expression for IfStatement {
 
         match &self.alternative {
             None => type_def.add_null(),
-            Some(alternative) => type_def.merge_deep(alternative.type_def(state)),
+            Some(alternative) => type_def.union(alternative.type_def(state)),
         }
     }
 }

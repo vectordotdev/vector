@@ -85,8 +85,10 @@ pub struct AwsS3Config {
     /// Only relevant when `strategy = "sqs"`.
     sqs: Option<sqs::Config>,
 
-    /// The ARN of an [IAM role](\(urls.aws_iam_role)) to assume at startup.
-    #[deprecated]
+    /// The ARN of an [IAM role][iam_role] to assume at startup.
+    ///
+    /// [iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
+    #[configurable(deprecated)]
     assume_role: Option<String>,
 
     #[configurable(derived)]

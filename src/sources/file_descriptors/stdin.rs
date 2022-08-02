@@ -28,7 +28,9 @@ pub struct StdinConfig {
     ///
     /// The value will be the current hostname for wherever Vector is running.
     ///
-    /// By default, the [global `host_key` option](https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key) is used.
+    /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
+    ///
+    /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     pub host_key: Option<String>,
 
     #[configurable(derived)]
@@ -117,9 +119,8 @@ mod tests {
     use std::io::Cursor;
 
     use super::*;
-    use crate::{
-        config::log_schema, test_util::components::assert_source_compliance, SourceSender,
-    };
+    use crate::config::log_schema;
+    use crate::{test_util::components::assert_source_compliance, SourceSender};
     use futures::StreamExt;
 
     #[test]

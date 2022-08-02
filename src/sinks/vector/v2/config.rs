@@ -2,9 +2,9 @@ use http::Uri;
 use hyper::client::HttpConnector;
 use hyper_openssl::HttpsConnector;
 use hyper_proxy::ProxyConnector;
-use serde::{Deserialize, Serialize};
 use tonic::body::BoxBody;
 use tower::ServiceBuilder;
+use vector_config::configurable_component;
 
 use crate::{
     config::{
@@ -26,18 +26,37 @@ use crate::{
     tls::{tls_connector_builder, MaybeTlsSettings, TlsEnableableConfig},
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for version two of the `vector` sink.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct VectorConfig {
+    /// The downstream Vector address to connect to.
+    ///
+    /// The address _must_ include a port.
     address: String,
+
+    /// Whether or not to compress requests.
+    ///
+    /// If set to `true`, requests will be compressed with [`gzip`][gzip_docs].
+    ///
+    /// [gzip_docs]: https://en.wikipedia.org/wiki/Gzip
     #[serde(default)]
     compression: bool,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<RealtimeEventBasedDefaultBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    #[configurable(derived)]
     #[serde(default)]
     tls: Option<TlsEnableableConfig>,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",

@@ -287,8 +287,6 @@ impl ConfigBuilder {
             errors.push(error);
         }
 
-        self.schema = with.schema;
-
         #[cfg(feature = "enterprise")]
         {
             match (self.enterprise.as_ref(), with.enterprise) {
@@ -320,15 +318,7 @@ impl ConfigBuilder {
 
         self.global.proxy = self.global.proxy.merge(&with.global.proxy);
 
-        if self.schema.log_namespace.is_some()
-            && with.schema.log_namespace.is_some()
-            && self.schema.log_namespace != with.schema.log_namespace
-        {
-            errors.push(
-                format!("conflicting values for 'log_namespace' found. Both {:?} and {:?} used in the same component",
-                                self.schema.log_namespace(), with.schema.log_namespace())
-            );
-        }
+        self.schema.append(with.schema, &mut errors);
 
         self.schema.log_namespace = self.schema.log_namespace.or(with.schema.log_namespace);
 
@@ -474,7 +464,7 @@ mod tests {
     /// should ideally be able to fix so that the original hash passes!
     fn version_hash_match() {
         assert_eq!(
-            "53dff3cdc4bcf9ac23a04746b253b2f3ba8b1120e483e13d586b3643a4e066de",
+            "bc0825487e137ee1d1fc76c616795d041c4825b4ca5a7236455ea4515238885c",
             ConfigBuilder::default().sha256_hash()
         );
     }

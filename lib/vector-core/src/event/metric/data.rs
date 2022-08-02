@@ -1,3 +1,5 @@
+use std::num::NonZeroU32;
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use vector_common::byte_size_of::ByteSizeOf;
@@ -6,8 +8,8 @@ use super::{MetricKind, MetricValue};
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct MetricData {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub timestamp: Option<DateTime<Utc>>,
+    #[serde(flatten)]
+    pub time: MetricTime,
 
     pub kind: MetricKind,
 
@@ -15,10 +17,19 @@ pub struct MetricData {
     pub value: MetricValue,
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
+pub struct MetricTime {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timestamp: Option<DateTime<Utc>>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub interval_ms: Option<NonZeroU32>,
+}
+
 impl MetricData {
     /// Gets a reference to the timestamp for this data, if available.
     pub fn timestamp(&self) -> Option<&DateTime<Utc>> {
-        self.timestamp.as_ref()
+        self.time.timestamp.as_ref()
     }
 
     /// Gets a reference to the value of this data.
@@ -37,7 +48,7 @@ impl MetricData {
     #[must_use]
     pub fn into_absolute(self) -> Self {
         Self {
-            timestamp: self.timestamp,
+            time: self.time,
             kind: MetricKind::Absolute,
             value: self.value,
         }
@@ -49,40 +60,58 @@ impl MetricData {
     #[must_use]
     pub fn into_incremental(self) -> Self {
         Self {
-            timestamp: self.timestamp,
+            time: self.time,
             kind: MetricKind::Incremental,
             value: self.value,
         }
     }
 
     /// Creates a `MetricData` directly from the raw components of another `MetricData`.
-    pub fn from_parts(
-        timestamp: Option<DateTime<Utc>>,
-        kind: MetricKind,
-        value: MetricValue,
-    ) -> Self {
-        Self {
-            timestamp,
-            kind,
-            value,
-        }
+    pub fn from_parts(time: MetricTime, kind: MetricKind, value: MetricValue) -> Self {
+        Self { time, kind, value }
     }
 
     /// Decomposes a `MetricData` into its individual parts.
-    pub fn into_parts(self) -> (Option<DateTime<Utc>>, MetricKind, MetricValue) {
-        (self.timestamp, self.kind, self.value)
+    pub fn into_parts(self) -> (MetricTime, MetricKind, MetricValue) {
+        (self.time, self.kind, self.value)
     }
 
     /// Updates this metric by adding the value from `other`.
     #[must_use]
     pub fn update(&mut self, other: &Self) -> bool {
+        let (new_ts, new_interval) = match (
+            self.time.timestamp,
+            self.time.interval_ms,
+            other.time.timestamp,
+            other.time.interval_ms,
+        ) {
+            (Some(t1), Some(i1), Some(t2), Some(i2)) => {
+                let delta_t = match TryInto::<u32>::try_into(
+                    t1.timestamp_millis().abs_diff(t2.timestamp_millis()),
+                ) {
+                    Ok(delta_t) => delta_t,
+                    Err(_) => return false,
+                };
+
+                if t1 > t2 {
+                    // The interval window starts from the beginning of `other` (aka `t2`)
+                    // and goes to the end of `self` (which is `t1 + i1`).
+                    (Some(t2), NonZeroU32::new(delta_t + i1.get()))
+                } else {
+                    // The interval window starts from the beginning of `self` (aka `t1`)
+                    // and goes to the end of `other` (which is `t2 + i2`).
+
+                    (Some(t1), NonZeroU32::new(delta_t + i2.get()))
+                }
+            }
+            (Some(t), _, None, _) | (None, _, Some(t), _) => (Some(t), None),
+            (Some(t1), _, Some(t2), _) => (Some(t1.max(t2)), None),
+            (_, _, _, _) => (None, None),
+        };
+
         self.value.add(&other.value) && {
-            // Update the timestamp to the latest one
-            self.timestamp = match (self.timestamp, other.timestamp) {
-                (None, None) => None,
-                (Some(t), None) | (None, Some(t)) => Some(t),
-                (Some(t1), Some(t2)) => Some(t1.max(t2)),
-            };
+            self.time.timestamp = new_ts;
+            self.time.interval_ms = new_interval;
             true
         }
     }
@@ -117,7 +146,7 @@ impl AsRef<MetricData> for MetricData {
 
 impl PartialOrd for MetricData {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.timestamp.partial_cmp(&other.timestamp)
+        self.time.timestamp.partial_cmp(&other.time.timestamp)
     }
 }
 
