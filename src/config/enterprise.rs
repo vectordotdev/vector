@@ -309,7 +309,7 @@ impl TryFrom<&Config> for EnterpriseMetadata {
             },
         };
 
-        if let Some(_) = &opts.application_key {
+        if opts.application_key.is_some() {
             warn!(
                 "Datadog application key is deprecated. You can safely remove `application_key` from the config."
             );
