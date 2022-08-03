@@ -7,13 +7,9 @@ use serde::{Deserialize, Serialize};
 use tokio::time;
 use url::Url;
 
-use super::Result;
+use super::{ProviderConfig, Result};
 use crate::{
-    config::{
-        self,
-        provider::{ProviderConfig, ProviderDescription},
-        ProxyConfig,
-    },
+    config::{self, ProxyConfig},
     http::HttpClient,
     signal,
     tls::{TlsConfig, TlsSettings},
@@ -195,9 +191,3 @@ impl ProviderConfig for HttpConfig {
         "http"
     }
 }
-
-inventory::submit! {
-    ProviderDescription::new::<HttpConfig>("http")
-}
-
-impl_generate_config_from_default!(HttpConfig);

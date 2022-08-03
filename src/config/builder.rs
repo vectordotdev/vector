@@ -13,9 +13,9 @@ use super::api;
 #[cfg(feature = "enterprise")]
 use super::enterprise;
 use super::{
-    compiler, provider, schema, ComponentKey, Config, EnrichmentTableConfig, EnrichmentTableOuter,
-    HealthcheckOptions, SecretBackend, SinkConfig, SinkOuter, SourceConfig, SourceOuter,
-    TestDefinition, TransformOuter,
+    compiler, providers::ProviderConfig, schema, ComponentKey, Config, EnrichmentTableConfig,
+    EnrichmentTableOuter, HealthcheckOptions, SecretBackend, SinkConfig, SinkOuter, SourceConfig,
+    SourceOuter, TestDefinition, TransformOuter,
 };
 
 #[derive(Deserialize, Serialize, Debug, Default)]
@@ -43,7 +43,7 @@ pub struct ConfigBuilder {
     pub transforms: IndexMap<ComponentKey, TransformOuter<String>>,
     #[serde(default)]
     pub tests: Vec<TestDefinition<String>>,
-    pub provider: Option<Box<dyn provider::ProviderConfig>>,
+    pub provider: Option<Box<dyn ProviderConfig>>,
     #[serde(default)]
     pub secret: IndexMap<ComponentKey, Box<dyn SecretBackend>>,
 }
@@ -61,7 +61,7 @@ struct ConfigBuilderHash<'a> {
     sinks: BTreeMap<&'a ComponentKey, &'a SinkOuter<String>>,
     transforms: BTreeMap<&'a ComponentKey, &'a TransformOuter<String>>,
     tests: &'a Vec<TestDefinition<String>>,
-    provider: &'a Option<Box<dyn provider::ProviderConfig>>,
+    provider: &'a Option<Box<dyn ProviderConfig>>,
     secret: BTreeMap<&'a ComponentKey, &'a dyn SecretBackend>,
 }
 

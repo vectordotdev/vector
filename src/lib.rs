@@ -70,7 +70,6 @@ pub(crate) mod nats;
 pub mod opentelemetry;
 #[allow(unreachable_pub)]
 pub(crate) mod proto;
-pub mod providers;
 pub mod serde;
 #[cfg(windows)]
 pub mod service;

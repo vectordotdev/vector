@@ -27,7 +27,7 @@ pub mod format;
 mod graph;
 mod id;
 mod loading;
-pub mod provider;
+mod providers;
 mod schema;
 mod sink;
 mod source;
