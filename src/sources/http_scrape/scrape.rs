@@ -217,9 +217,11 @@ impl super::HttpScraper for HttpScrapeContext {
 
 #[cfg(test)]
 mod test {
-    use futures::{poll, StreamExt};
-    use std::task::Poll;
+    //use futures::{poll, StreamExt};
+    use futures::StreamExt;
+    //use std::task::Poll;
     use tokio::time::{sleep, Duration};
+    use tokio::{pin, select};
     use warp::Filter;
 
     use super::*;
@@ -260,11 +262,51 @@ mod test {
             .await
             .expect("source should not fail to build");
 
-        sleep(Duration::from_secs(1)).await;
+        // If a timeout was given, use that, otherwise, use an infinitely long one.
+        let source_timeout = sleep(Duration::from_millis(3000));
+        pin!(source_timeout);
 
-        drop(source);
+        let _source_handle = tokio::spawn(source);
 
-        assert_eq!(poll!(rx.next()), Poll::Ready(None));
+        loop {
+            select! {
+                _ = &mut source_timeout => {
+                    assert!(false, "should error before timing out");
+                    break
+                },
+                Some(_event) = rx.next() => {
+                    assert!(false, "should not be a valid endpoint");
+                    break
+                },
+                //result = &mut source => {
+                //    match result {
+                //        Ok(_) => {
+                //            assert!(false, "should not be a valid endpoint");
+                //        }
+                //        Err(e) => {
+                //            dbg!(e);
+                //        }
+                //    }
+                //    break
+                //},
+            }
+        }
+
+        //drop(source);
+
+        //sleep(Duration::from_secs(1)).await;
+
+        //let option = source.now_or_never();
+
+        //assert!(option.is_some());
+
+        //let result = option.unwrap();
+
+        //assert!(result.is_err());
+
+        //drop(source);
+
+        //assert_eq!(poll!(rx.next()), Poll::Ready(None));
     }
 
     async fn run_test(config: HttpScrapeConfig) -> Vec<Event> {
@@ -479,16 +521,30 @@ mod integration_tests {
     async fn unauthorized() {
         // TODO how to assert failure
 
-        // let config = HttpScrapeConfig {
-        //     endpoint: format!("http://dufs-auth:5000/auth/json.json"),
+        // let source = HttpScrapeConfig {
+        //     endpoint: format!("http://dufs-auth:5000/logs/json.json"),
         //     scrape_interval_secs: 1,
         //     query: None,
-        //     decoding: DeserializerConfig::NativeJson,
+        //     decoding: DeserializerConfig::Json,
         //     framing: default_framing_message_based(),
         //     headers: None,
         //     auth: None,
         //     tls: None,
         // };
+        // // Build the source and set ourselves up to both drive it to completion as well as collect all the events it sends out.
+        // let (tx, mut rx) = SourceSender::new_test();
+        // let context = SourceContext::new_test(tx, None);
+
+        // let source = source
+        //     .build(context)
+        //     .await
+        //     .expect("source should not fail to build");
+
+        // sleep(Duration::from_secs(1)).await;
+
+        // drop(source);
+
+        // assert_eq!(poll!(rx.next()), Poll::Ready(None));
     }
 
     #[tokio::test]
@@ -516,19 +572,6 @@ mod integration_tests {
 
     #[tokio::test]
     async fn tls() {
-        // TODO fix this, as it is there is an error from dufs with "Sending fatal alert
-        // BadRecordMac"
-
-        // and in vector error is:
-        //
-        // 2022-08-01T19:11:23.382932Z ERROR vector::internal_events::http_client: HTTP error. error=error trying to connect: error:1416F086:SSL routines:tls_process_server_certificate:certificate verify failed:ssl/statem/statem_clnt.c:1919:: self signed certificate error_type="request_failed" stage="processing"
-        // 2022-08-01T19:11:23.383435Z ERROR vector::internal_events::http_scrape: HTTP request processing error. url=https://dufs-https:5000/logs/json.json error=CallRequest { source: hyper::Error(Connect, Custom { kind: Other, error: ConnectError { error: Error { code: ErrorCode(1), cause: Some(Ssl(ErrorStack([Error { code: 337047686, library: "SSL routines", function: "tls_process_server_certificate", reason: "certificate verify failed", file: "ssl/statem/statem_clnt.c", line: 1919 }]))) }, verify_result: X509VerifyResult { code: 18, error: "self signed certificate" } } }) } error_type="request_failed" stage="receiving" internal_log_rate_secs=10
-
-        //let cert_path = "tests/data/ca/certs/ca.cert.pem";
-        //let key_path = "tests/data/ca/private/ca.key.pem";
-        // let cert_path = "tests/data/ca/intermediate_server/certs/localhost.cert.pem";
-        // let key_path = "tests/data/ca/intermediate_server/private/localhost.key.pem";
-
         run_test(HttpScrapeConfig {
             endpoint: "https://dufs-https:5000/logs/json.json".to_string(),
             scrape_interval_secs: 1,
@@ -538,8 +581,6 @@ mod integration_tests {
             headers: None,
             auth: None,
             tls: Some(TlsConfig {
-                crt_file: Some(tls::TEST_PEM_CRT_PATH.into()),
-                key_file: Some(tls::TEST_PEM_KEY_PATH.into()),
                 ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
                 ..Default::default()
             }),
