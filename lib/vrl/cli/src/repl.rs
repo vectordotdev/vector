@@ -169,7 +169,7 @@ fn resolve(
     // The CLI should be moved out of the "vrl" module, and then it can use the `vector-core::compile_vrl` function which includes this automatically
     config.set_read_only_metadata_path(LookupBuf::from("vector"), true);
 
-    let program = match vrl::compile_with_state(program, &functions, &state, config) {
+    let program = match vrl::compile_with_state(program, &functions, state, config) {
         Ok(result) => result.program,
         Err(diagnostics) => {
             return Err(Formatter::new(program, diagnostics).colored().to_string());

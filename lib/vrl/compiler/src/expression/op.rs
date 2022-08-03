@@ -606,15 +606,15 @@ mod tests {
         }
 
         divide_dynamic_rhs {
-            expr: |(local, _): (&mut LocalEnv, &mut ExternalEnv)| {
-                local.insert_variable(Ident::new("foo"), crate::type_def::Details {
+            expr: |state: &mut TypeState| {
+                state.local.insert_variable(Ident::new("foo"), crate::type_def::Details {
                     type_def: TypeDef::null(),
                     value: None,
                 });
 
                 Op {
                     lhs: Box::new(Literal::from(1).into()),
-                    rhs: Box::new(Variable::new(Span::default(), Ident::new("foo"), local).unwrap().into()),
+                    rhs: Box::new(Variable::new(Span::default(), Ident::new("foo"), &state.local).unwrap().into()),
                     opcode: Div,
                 }
             },
@@ -812,7 +812,7 @@ mod tests {
                 lhs: Box::new(
                     IfStatement {
                         predicate: Predicate::new_unchecked(vec![Literal::from(true).into()]),
-                        if_block: Block::new(vec![Literal::from("string").into()], LocalEnv::default()),
+                        if_block: Block::new_scoped(vec![Literal::from("string").into()]),
                         else_block: None,
                     }.into()),
                 rhs: Box::new(Literal::from("another string").into()),
@@ -826,8 +826,8 @@ mod tests {
                 lhs: Box::new(
                     IfStatement {
                         predicate: Predicate::new_unchecked(vec![Literal::from(true).into()]),
-                        if_block: Block::new(vec![Literal::from("string").into()], LocalEnv::default()),
-                        else_block:  Some(Block::new(vec![Literal::from(42).into()], LocalEnv::default()))
+                        if_block: Block::new_scoped(vec![Literal::from("string").into()]),
+                        else_block:  Some(Block::new_scoped(vec![Literal::from(42).into()]))
                 }.into()),
                 rhs: Box::new(Literal::from("another string").into()),
                 opcode: Or,

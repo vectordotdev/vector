@@ -89,13 +89,19 @@ pub trait Expression: Send + Sync + fmt::Debug + DynClone {
     }
 
     /// Resolve an expression to its [`TypeDef`] type definition.
-    /// This must be called with the _initial_ TypeState.
+    /// This must be called with the _initial_ `TypeState`.
+    ///
+    /// Consider calling `type_info` instead if you want to capture changes in the type
+    /// state from side-effects.
     fn type_def(&self, state: &TypeState) -> TypeDef {
         self.type_info(state).result
     }
 
     /// Calculates the type state after an expression resolves, including the expression result itself.
-    /// This must be called with the _initial_ TypeState.
+    /// This must be called with the _initial_ `TypeState`.
+    ///
+    /// Consider using `apply_type_info` instead if you want to just access
+    /// the expr result type, while updating an existing state.
     fn type_info(&self, state: &TypeState) -> TypeInfo;
 
     /// Applies state changes from the expression to the given state, and

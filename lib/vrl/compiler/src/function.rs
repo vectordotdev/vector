@@ -119,10 +119,12 @@ impl FunctionCompileContext {
         self.config.get_custom_mut()
     }
 
+    #[must_use]
     pub fn is_read_only_metadata_path(&self, path: &LookupBuf) -> bool {
         self.config.is_read_only_metadata_path(path)
     }
 
+    #[must_use]
     pub fn is_read_only_event_path(&self, path: &LookupBuf) -> bool {
         self.config.is_read_only_event_path(path)
     }
@@ -469,6 +471,7 @@ fn required<T>(argument: Option<T>) -> T {
 #[cfg(any(test, feature = "test"))]
 mod test_impls {
     use super::*;
+    use crate::parser::Node;
 
     impl From<HashMap<&'static str, Value>> for ArgumentList {
         fn from(map: HashMap<&'static str, Value>) -> Self {
@@ -482,27 +485,27 @@ mod test_impls {
         }
     }
 
-    impl From<Vec<Node<FunctionArgument>>> for ArgumentList {
-        fn from(arguments: Vec<Node<FunctionArgument>>) -> Self {
-            let arguments = arguments
-                .into_iter()
-                .map(|arg| {
-                    let arg = arg.into_inner();
-                    // TODO: find a better API design that doesn't require unwrapping.
-                    let key = arg.parameter().expect("exists").keyword;
-                    let expr = arg.into_inner();
-                    let state = TypeState::default();
-                    let type_def = expr.type_def(&state);
-                    (key, (expr, type_def))
-                })
-                .collect::<HashMap<_, _>>();
-
-            Self {
-                arguments,
-                ..Default::default()
-            }
-        }
-    }
+    // impl From<Vec<Node<FunctionArgument>>> for ArgumentList {
+    //     fn from(arguments: Vec<Node<FunctionArgument>>) -> Self {
+    //         let arguments = arguments
+    //             .into_iter()
+    //             .map(|arg| {
+    //                 let arg = arg.into_inner();
+    //                 // TODO: find a better API design that doesn't require unwrapping.
+    //                 let key = arg.parameter().expect("exists").keyword;
+    //                 let expr = arg.into_inner();
+    //                 let state = TypeState::default();
+    //                 let type_def = expr.type_def(&state);
+    //                 (key, (expr, type_def))
+    //             })
+    //             .collect::<HashMap<_, _>>();
+    //
+    //         Self {
+    //             arguments,
+    //             ..Default::default()
+    //         }
+    //     }
+    // }
 
     impl From<ArgumentList> for Vec<(&'static str, Option<FunctionArgument>)> {
         fn from(args: ArgumentList) -> Self {

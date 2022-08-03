@@ -181,7 +181,7 @@ fn main() {
         functions.append(&mut vector_vrl_functions::vrl_functions());
         let test_enrichment = test_enrichment::test_enrichment_table();
 
-        let mut external_env = vrl::state::ExternalEnv::default();
+        let external_env = vrl::state::ExternalEnv::default();
         let mut config = CompileConfig::default();
         config.set_custom(test_enrichment.clone());
 

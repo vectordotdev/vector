@@ -11,6 +11,7 @@ pub struct CompileConfig {
 
 impl CompileConfig {
     /// Get external context data from the external environment.
+    #[must_use]
     pub fn get_custom<T: 'static>(&self) -> Option<&T> {
         self.custom.get::<T>()
     }
@@ -29,10 +30,12 @@ impl CompileConfig {
         &mut self.custom
     }
 
+    #[must_use]
     pub fn is_read_only_event_path(&self, path: &LookupBuf) -> bool {
         self.is_read_only_path(path, PathRoot::Event)
     }
 
+    #[must_use]
     pub fn is_read_only_metadata_path(&self, path: &LookupBuf) -> bool {
         self.is_read_only_path(path, PathRoot::Metadata)
     }

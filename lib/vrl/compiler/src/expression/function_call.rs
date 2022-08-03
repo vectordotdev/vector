@@ -166,7 +166,7 @@ impl<'a> Builder<'a> {
         //
         // // Check function closure validity.
         let closure = Self::check_closure(
-            function,
+            function.as_ref(),
             closure_variables,
             call_span,
             &list,
@@ -187,7 +187,7 @@ impl<'a> Builder<'a> {
     }
 
     fn check_closure(
-        function: &Box<dyn Function>,
+        function: &dyn Function,
         closure_variables: Option<Node<Vec<Node<Ident>>>>,
         call_span: Span,
         list: &ArgumentList,
@@ -1167,12 +1167,12 @@ impl DiagnosticMessage for Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{state::ExternalEnv, value::kind};
+    use crate::{value::kind, FunctionExpression};
 
     #[derive(Clone, Debug)]
     struct Fn;
 
-    impl Expression for Fn {
+    impl FunctionExpression for Fn {
         fn resolve(&self, _ctx: &mut Context) -> Resolved {
             todo!()
         }
@@ -1216,11 +1216,11 @@ mod tests {
 
         fn compile(
             &self,
-            _state: (&mut LocalEnv, &mut ExternalEnv),
+            _state: &TypeState,
             _ctx: &mut FunctionCompileContext,
             _arguments: ArgumentList,
         ) -> crate::function::Compiled {
-            Ok(Box::new(Fn))
+            Ok(Fn.as_expr())
         }
     }
 
@@ -1242,26 +1242,24 @@ mod tests {
 
     #[cfg(feature = "expr-literal")]
     fn create_function_call(arguments: Vec<Node<FunctionArgument>>) -> FunctionCall {
-        let mut local = LocalEnv::default();
-        let mut external = ExternalEnv::default();
-
+        let mut state = TypeState::default();
+        let mut config = CompileConfig::default();
         Builder::new(
             Span::new(0, 0),
             Node::new(Span::new(0, 0), Ident::new("test")),
             false,
             arguments,
             &[Box::new(TestFn) as _],
-            &mut local,
-            &mut external,
+            &mut state,
             None,
         )
         .unwrap()
         .compile(
-            &mut local,
-            &mut external,
+            &mut state,
             None,
             LocalEnv::default(),
             &mut None,
+            &mut config,
         )
         .unwrap()
     }

@@ -44,7 +44,7 @@ impl ConditionalConfig for VrlConfig {
             .chain(vector_vrl_functions::vrl_functions())
             .collect::<Vec<_>>();
 
-        let mut state = vrl::state::TypeState::default();
+        let state = vrl::state::TypeState::default();
 
         let mut config = CompileConfig::default();
         config.set_custom(enrichment_tables.clone());
@@ -54,7 +54,7 @@ impl ConditionalConfig for VrlConfig {
             program,
             warnings,
             config: _,
-        } = compile_vrl(&self.source, &functions, &mut state, config).map_err(|diagnostics| {
+        } = compile_vrl(&self.source, &functions, &state, config).map_err(|diagnostics| {
             Formatter::new(&self.source, diagnostics)
                 .colored()
                 .to_string()

@@ -188,7 +188,6 @@ impl fmt::Debug for Target {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::state;
 
     #[test]
     fn test_type_def() {
@@ -197,8 +196,8 @@ mod tests {
             path: LookupBuf::root(),
         };
 
-        let state = (&state::LocalEnv::default(), &state::ExternalEnv::default());
-        let type_def = query.type_info(state).result;
+        let state = TypeState::default();
+        let type_def = query.type_info(&state).result;
 
         assert!(type_def.is_infallible());
         assert!(type_def.is_object());

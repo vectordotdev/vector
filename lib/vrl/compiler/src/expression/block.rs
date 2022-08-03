@@ -36,6 +36,7 @@ impl Block {
         self.inner
     }
 
+    #[must_use]
     pub fn exprs(&self) -> &Vec<Expr> {
         &self.inner
     }

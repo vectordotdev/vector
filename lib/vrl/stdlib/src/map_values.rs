@@ -132,7 +132,7 @@ impl FunctionExpression for MapValuesFn {
         let mut value = self.value.type_def(ctx);
         let closure = self.closure.block_type_def.kind().clone();
 
-        recursive_type_def(&mut value, closure.clone(), true);
+        recursive_type_def(&mut value, closure, true);
         value
     }
 }
