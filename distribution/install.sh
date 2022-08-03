@@ -197,7 +197,8 @@ install_from_archive() {
         ensure cp -r "$_unpack_dir/etc/." "$prefix/etc"
         ensure mkdir -p "$prefix/share/vector/config"
         ensure cp -r "$_unpack_dir/config/." "$prefix/share/vector/config"
-        ensure cp "$_unpack_dir"/{LICENSE,README.md} "$prefix/share/vector/"
+        ensure cp "$_unpack_dir"/README.md "$prefix/share/vector/"
+        ensure cp "$_unpack_dir"/LICENSE "$prefix/share/vector/"
         # all files have been moved, we can safely remove the unpack directory
         ignore rm -rf "$_unpack_dir"
     fi
