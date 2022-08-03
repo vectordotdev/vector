@@ -521,8 +521,10 @@ mod integration_tests {
         // 2022-08-01T19:11:23.382932Z ERROR vector::internal_events::http_client: HTTP error. error=error trying to connect: error:1416F086:SSL routines:tls_process_server_certificate:certificate verify failed:ssl/statem/statem_clnt.c:1919:: self signed certificate error_type="request_failed" stage="processing"
         // 2022-08-01T19:11:23.383435Z ERROR vector::internal_events::http_scrape: HTTP request processing error. url=https://dufs-https:5000/logs/json.json error=CallRequest { source: hyper::Error(Connect, Custom { kind: Other, error: ConnectError { error: Error { code: ErrorCode(1), cause: Some(Ssl(ErrorStack([Error { code: 337047686, library: "SSL routines", function: "tls_process_server_certificate", reason: "certificate verify failed", file: "ssl/statem/statem_clnt.c", line: 1919 }]))) }, verify_result: X509VerifyResult { code: 18, error: "self signed certificate" } } }) } error_type="request_failed" stage="receiving" internal_log_rate_secs=10
 
-        // let cert_path = "tests/data/ca/certs/ca.cert.pem";
-        // let key_path = "tests/data/ca/private/ca.key.pem";
+        //let cert_path = "tests/data/ca/certs/ca.cert.pem";
+        //let key_path = "tests/data/ca/private/ca.key.pem";
+        // let cert_path = "tests/data/ca/intermediate_server/certs/localhost.cert.pem";
+        // let key_path = "tests/data/ca/intermediate_server/private/localhost.key.pem";
 
         // run_test(HttpScrapeConfig {
         //     endpoint: "https://dufs-https:5000/logs/json.json".to_string(),
