@@ -44,7 +44,7 @@ impl Function for IsString {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(IsStringFn { value }))
+        Ok(IsStringFn { value }.as_expr())
     }
 }
 
@@ -53,7 +53,7 @@ struct IsStringFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for IsStringFn {
+impl FunctionExpression for IsStringFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         self.value.resolve(ctx).map(|v| value!(v.is_bytes()))
     }

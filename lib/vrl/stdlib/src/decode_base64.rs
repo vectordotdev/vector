@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use ::value::Value;
+use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
 
 use crate::util::Base64Charset;
@@ -56,7 +57,7 @@ impl Function for DecodeBase64 {
         let value = arguments.required("value");
         let charset = arguments.optional("charset");
 
-        Ok(Box::new(DecodeBase64Fn { value, charset }))
+        Ok(DecodeBase64Fn { value, charset }.as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -74,7 +75,7 @@ struct DecodeBase64Fn {
     charset: Option<Box<dyn Expression>>,
 }
 
-impl Expression for DecodeBase64Fn {
+impl FunctionExpression for DecodeBase64Fn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let charset = self.charset.as_ref().map(|c| c.resolve(ctx)).transpose()?;

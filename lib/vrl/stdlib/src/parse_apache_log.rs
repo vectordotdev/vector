@@ -79,11 +79,12 @@ impl Function for ParseApacheLog {
 
         let timestamp_format = arguments.optional("timestamp_format");
 
-        Ok(Box::new(ParseApacheLogFn {
+        Ok(ParseApacheLogFn {
             value,
             format,
             timestamp_format,
-        }))
+        }
+        .as_expr())
     }
 
     fn compile_argument(
@@ -139,7 +140,7 @@ struct ParseApacheLogFn {
     timestamp_format: Option<Box<dyn Expression>>,
 }
 
-impl Expression for ParseApacheLogFn {
+impl FunctionExpression for ParseApacheLogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?;
         let timestamp_format = self

@@ -98,7 +98,7 @@ impl Function for Slice {
         let start = arguments.required("start");
         let end = arguments.optional("end");
 
-        Ok(Box::new(SliceFn { value, start, end }))
+        Ok(SliceFn { value, start, end }.as_expr())
     }
 }
 
@@ -109,7 +109,7 @@ struct SliceFn {
     end: Option<Box<dyn Expression>>,
 }
 
-impl Expression for SliceFn {
+impl FunctionExpression for SliceFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let start = self.start.resolve(ctx)?.try_integer()?;
         let end = match &self.end {

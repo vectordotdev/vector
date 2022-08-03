@@ -1,5 +1,6 @@
 use ::value::Value;
 use percent_encoding::percent_decode;
+use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
 
 fn decode_percent(value: Value) -> Resolved {
@@ -34,7 +35,7 @@ impl Function for DecodePercent {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(DecodePercentFn { value }))
+        Ok(DecodePercentFn { value }.as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -51,7 +52,7 @@ struct DecodePercentFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for DecodePercentFn {
+impl FunctionExpression for DecodePercentFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
 

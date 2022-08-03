@@ -1,4 +1,5 @@
 use ::value::Value;
+use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
 
 fn boolean(value: Value) -> Resolved {
@@ -49,7 +50,7 @@ impl Function for Boolean {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(BooleanFn { value }))
+        Ok(BooleanFn { value }.as_expr())
     }
 }
 
@@ -58,7 +59,7 @@ struct BooleanFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for BooleanFn {
+impl FunctionExpression for BooleanFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         boolean(self.value.resolve(ctx)?)
     }

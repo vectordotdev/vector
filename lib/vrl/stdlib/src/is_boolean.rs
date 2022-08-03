@@ -44,7 +44,7 @@ impl Function for IsBoolean {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(IsBooleanFn { value }))
+        Ok(IsBooleanFn { value }.as_expr())
     }
 }
 
@@ -53,7 +53,7 @@ struct IsBooleanFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for IsBooleanFn {
+impl FunctionExpression for IsBooleanFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         self.value.resolve(ctx).map(|v| value!(v.is_boolean()))
     }

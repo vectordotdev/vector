@@ -83,11 +83,12 @@ impl Function for Split {
         let pattern = arguments.required("pattern");
         let limit = arguments.optional("limit").unwrap_or(expr!(999_999_999));
 
-        Ok(Box::new(SplitFn {
+        Ok(SplitFn {
             value,
             pattern,
             limit,
-        }))
+        }
+        .as_expr())
     }
 }
 
@@ -98,7 +99,7 @@ pub(crate) struct SplitFn {
     limit: Box<dyn Expression>,
 }
 
-impl Expression for SplitFn {
+impl FunctionExpression for SplitFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let limit = self.limit.resolve(ctx)?;

@@ -53,11 +53,12 @@ impl Function for MatchArray {
         let pattern = arguments.required("pattern");
         let all = arguments.optional("all");
 
-        Ok(Box::new(MatchArrayFn {
+        Ok(MatchArrayFn {
             value,
             pattern,
             all,
-        }))
+        }
+        .as_expr())
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -88,7 +89,7 @@ pub(crate) struct MatchArrayFn {
     all: Option<Box<dyn Expression>>,
 }
 
-impl Expression for MatchArrayFn {
+impl FunctionExpression for MatchArrayFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let list = self.value.resolve(ctx)?;
         let pattern = self.pattern.resolve(ctx)?;

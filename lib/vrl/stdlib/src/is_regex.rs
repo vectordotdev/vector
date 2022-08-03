@@ -44,7 +44,7 @@ impl Function for IsRegex {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(IsRegexFn { value }))
+        Ok(IsRegexFn { value }.as_expr())
     }
 }
 
@@ -53,7 +53,7 @@ struct IsRegexFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for IsRegexFn {
+impl FunctionExpression for IsRegexFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         self.value.resolve(ctx).map(|v| value!(v.is_regex()))
     }

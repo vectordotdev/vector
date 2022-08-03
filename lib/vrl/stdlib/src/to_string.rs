@@ -101,7 +101,7 @@ impl Function for ToString {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(ToStringFn { value }))
+        Ok(ToStringFn { value }.as_expr())
     }
 }
 
@@ -110,7 +110,7 @@ struct ToStringFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ToStringFn {
+impl FunctionExpression for ToStringFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
 

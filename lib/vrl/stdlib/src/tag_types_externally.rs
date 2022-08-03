@@ -53,7 +53,7 @@ impl Function for TagTypesExternally {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(TagTypesExternallyFn { value }))
+        Ok(TagTypesExternallyFn { value }.as_expr())
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -70,7 +70,7 @@ struct TagTypesExternallyFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for TagTypesExternallyFn {
+impl FunctionExpression for TagTypesExternallyFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let tagged_externally = tag_type_externally(value);

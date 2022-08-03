@@ -69,7 +69,7 @@ impl Function for ParseAwsVpcFlowLog {
         let value = arguments.required("value");
         let format = arguments.optional("format");
 
-        Ok(Box::new(ParseAwsVpcFlowLogFn::new(value, format)))
+        Ok(ParseAwsVpcFlowLogFn::new(value, format).as_expr())
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -100,7 +100,7 @@ impl ParseAwsVpcFlowLogFn {
     }
 }
 
-impl Expression for ParseAwsVpcFlowLogFn {
+impl FunctionExpression for ParseAwsVpcFlowLogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let format = self

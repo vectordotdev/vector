@@ -54,7 +54,7 @@ impl Function for Includes {
         let value = arguments.required("value");
         let item = arguments.required("item");
 
-        Ok(Box::new(IncludesFn { value, item }))
+        Ok(IncludesFn { value, item }.as_expr())
     }
 }
 
@@ -64,7 +64,7 @@ struct IncludesFn {
     item: Box<dyn Expression>,
 }
 
-impl Expression for IncludesFn {
+impl FunctionExpression for IncludesFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let list = self.value.resolve(ctx)?;
         let item = self.item.resolve(ctx)?;

@@ -1,4 +1,5 @@
 use ::value::Value;
+use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
 
 fn downcase(value: Value) -> Resolved {
@@ -29,7 +30,7 @@ impl Function for Downcase {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(DowncaseFn { value }))
+        Ok(DowncaseFn { value }.as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -46,7 +47,7 @@ struct DowncaseFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for DowncaseFn {
+impl FunctionExpression for DowncaseFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         downcase(value)

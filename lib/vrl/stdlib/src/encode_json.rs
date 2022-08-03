@@ -1,4 +1,5 @@
 use ::value::Value;
+use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
 
 fn encode_json(value: Value) -> Resolved {
@@ -33,7 +34,7 @@ impl Function for EncodeJson {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(EncodeJsonFn { value }))
+        Ok(EncodeJsonFn { value }.as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -50,7 +51,7 @@ struct EncodeJsonFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for EncodeJsonFn {
+impl FunctionExpression for EncodeJsonFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         encode_json(value)

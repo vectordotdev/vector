@@ -44,7 +44,7 @@ impl Function for IsArray {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(IsArrayFn { value }))
+        Ok(IsArrayFn { value }.as_expr())
     }
 }
 
@@ -53,7 +53,7 @@ struct IsArrayFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for IsArrayFn {
+impl FunctionExpression for IsArrayFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         self.value.resolve(ctx).map(|v| value!(v.is_array()))
     }

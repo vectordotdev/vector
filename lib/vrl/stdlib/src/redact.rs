@@ -91,11 +91,12 @@ impl Function for Redact {
 
         let redactor = Redactor::Full;
 
-        Ok(Box::new(RedactFn {
+        Ok(RedactFn {
             value,
             filters,
             redactor,
-        }))
+        }
+        .as_expr())
     }
 
     fn compile_argument(
@@ -174,7 +175,7 @@ fn redact(value: Value, filters: &[Filter], redactor: &Redactor) -> Value {
     }
 }
 
-impl Expression for RedactFn {
+impl FunctionExpression for RedactFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let filters = &self.filters;

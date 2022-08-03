@@ -76,7 +76,7 @@ impl Function for IpCidrContains {
         let cidr = arguments.required("cidr");
         let value = arguments.required("value");
 
-        Ok(Box::new(IpCidrContainsFn { cidr, value }))
+        Ok(IpCidrContainsFn { cidr, value }.as_expr())
     }
 }
 
@@ -86,7 +86,7 @@ struct IpCidrContainsFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for IpCidrContainsFn {
+impl FunctionExpression for IpCidrContainsFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let cidr = self.cidr.resolve(ctx)?;

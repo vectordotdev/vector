@@ -72,7 +72,7 @@ impl Function for Round {
         let value = arguments.required("value");
         let precision = arguments.optional("precision").unwrap_or(expr!(0));
 
-        Ok(Box::new(RoundFn { value, precision }))
+        Ok(RoundFn { value, precision }.as_expr())
     }
 }
 
@@ -82,7 +82,7 @@ struct RoundFn {
     precision: Box<dyn Expression>,
 }
 
-impl Expression for RoundFn {
+impl FunctionExpression for RoundFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let precision = self.precision.resolve(ctx)?;
         let value = self.value.resolve(ctx)?;

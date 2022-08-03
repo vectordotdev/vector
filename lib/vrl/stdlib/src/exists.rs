@@ -1,3 +1,4 @@
+use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -65,7 +66,7 @@ impl Function for Exists {
     ) -> Compiled {
         let query = arguments.required_query("field")?;
 
-        Ok(Box::new(ExistsFn { query }))
+        Ok(ExistsFn { query }.as_expr())
     }
 }
 
@@ -103,7 +104,7 @@ fn exists(query: &expression::Query, ctx: &mut Context) -> Resolved {
     Ok(false.into())
 }
 
-impl Expression for ExistsFn {
+impl FunctionExpression for ExistsFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         exists(&self.query, ctx)
     }

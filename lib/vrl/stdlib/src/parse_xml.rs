@@ -128,7 +128,7 @@ impl Function for ParseXml {
         let parse_null = arguments.optional("parse_null");
         let parse_number = arguments.optional("parse_number");
 
-        Ok(Box::new(ParseXmlFn {
+        Ok(ParseXmlFn {
             value,
             trim,
             include_attr,
@@ -138,7 +138,8 @@ impl Function for ParseXml {
             parse_bool,
             parse_null,
             parse_number,
-        }))
+        }
+        .as_expr())
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -206,7 +207,7 @@ struct ParseXmlFn {
     parse_number: Option<Box<dyn Expression>>,
 }
 
-impl Expression for ParseXmlFn {
+impl FunctionExpression for ParseXmlFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
 

@@ -54,7 +54,7 @@ impl Function for Push {
         let value = arguments.required("value");
         let item = arguments.required("item");
 
-        Ok(Box::new(PushFn { value, item }))
+        Ok(PushFn { value, item }.as_expr())
     }
 }
 
@@ -64,7 +64,7 @@ struct PushFn {
     item: Box<dyn Expression>,
 }
 
-impl Expression for PushFn {
+impl FunctionExpression for PushFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let list = self.value.resolve(ctx)?;
         let item = self.item.resolve(ctx)?;

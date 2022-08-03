@@ -40,7 +40,7 @@ impl Function for RemoveSecret {
         mut arguments: ArgumentList,
     ) -> Compiled {
         let key = arguments.required("key");
-        Ok(Box::new(RemoveSecretFn { key }))
+        Ok(RemoveSecretFn { key }.as_expr())
     }
 }
 
@@ -49,7 +49,7 @@ struct RemoveSecretFn {
     key: Box<dyn Expression>,
 }
 
-impl Expression for RemoveSecretFn {
+impl FunctionExpression for RemoveSecretFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let key = self.key.resolve(ctx)?;
         remove_secret(ctx, key)

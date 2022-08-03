@@ -156,7 +156,7 @@ impl Function for ToBool {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(ToBoolFn { value }))
+        Ok(ToBoolFn { value }.as_expr())
     }
 }
 
@@ -165,7 +165,7 @@ struct ToBoolFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ToBoolFn {
+impl FunctionExpression for ToBoolFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
 

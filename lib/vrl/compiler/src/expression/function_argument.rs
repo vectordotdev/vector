@@ -3,7 +3,7 @@ use std::{fmt, ops::Deref};
 use crate::{
     expression::Expr,
     parser::{Ident, Node},
-    Parameter,
+    Parameter, TypeDef,
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -11,14 +11,16 @@ pub struct FunctionArgument {
     ident: Option<Node<Ident>>,
     parameter: Option<Parameter>,
     expr: Node<Expr>,
+    type_def: TypeDef,
 }
 
 impl FunctionArgument {
-    pub(crate) fn new(ident: Option<Node<Ident>>, expr: Node<Expr>) -> Self {
+    pub(crate) fn new(ident: Option<Node<Ident>>, expr: Node<Expr>, type_def: TypeDef) -> Self {
         Self {
             ident,
             parameter: None,
             expr,
+            type_def,
         }
     }
 
@@ -47,6 +49,10 @@ impl FunctionArgument {
 
     pub(crate) fn into_inner(self) -> Expr {
         self.expr.into_inner()
+    }
+
+    pub(crate) fn type_def(&self) -> TypeDef {
+        self.type_def.clone()
     }
 }
 

@@ -89,7 +89,7 @@ impl ParseGroks {
         let grok_rules = parse_grok_rules::parse_grok_rules(&patterns, aliases)
             .map_err(|e| Box::new(Error::InvalidGrokPattern(e)) as Box<dyn DiagnosticMessage>)?;
 
-        Ok(Box::new(ParseGroksFn { value, grok_rules }))
+        Ok(ParseGroksFn { value, grok_rules }.as_expr())
     }
 
     pub(crate) fn compile_pattern_argument(
@@ -245,7 +245,7 @@ pub(crate) struct ParseGroksFn {
     pub(crate) grok_rules: Vec<GrokRule>,
 }
 
-impl Expression for ParseGroksFn {
+impl FunctionExpression for ParseGroksFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let bytes = value.try_bytes_utf8_lossy()?;

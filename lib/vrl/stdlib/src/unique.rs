@@ -32,7 +32,7 @@ impl Function for Unique {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(UniqueFn { value }))
+        Ok(UniqueFn { value }.as_expr())
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -49,7 +49,7 @@ pub(crate) struct UniqueFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for UniqueFn {
+impl FunctionExpression for UniqueFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         unique(value)

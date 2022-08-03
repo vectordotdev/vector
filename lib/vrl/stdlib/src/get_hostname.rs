@@ -21,7 +21,7 @@ impl Function for GetHostname {
         _ctx: &mut FunctionCompileContext,
         _: ArgumentList,
     ) -> Compiled {
-        Ok(Box::new(GetHostnameFn))
+        Ok(GetHostnameFn.as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -36,7 +36,7 @@ impl Function for GetHostname {
 #[derive(Debug, Clone)]
 struct GetHostnameFn;
 
-impl Expression for GetHostnameFn {
+impl FunctionExpression for GetHostnameFn {
     fn resolve(&self, _: &mut Context) -> Resolved {
         get_hostname()
     }

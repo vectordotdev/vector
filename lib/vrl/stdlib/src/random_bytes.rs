@@ -58,7 +58,7 @@ impl Function for RandomBytes {
             })?;
         }
 
-        Ok(Box::new(RandomBytesFn { length }))
+        Ok(RandomBytesFn { length }.as_expr())
     }
 }
 
@@ -78,7 +78,7 @@ struct RandomBytesFn {
     length: Box<dyn Expression>,
 }
 
-impl Expression for RandomBytesFn {
+impl FunctionExpression for RandomBytesFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let length = self.length.resolve(ctx)?;
         random_bytes(length)

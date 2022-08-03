@@ -55,7 +55,7 @@ impl Function for Floor {
         let value = arguments.required("value");
         let precision = arguments.optional("precision");
 
-        Ok(Box::new(FloorFn { value, precision }))
+        Ok(FloorFn { value, precision }.as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -73,7 +73,7 @@ struct FloorFn {
     precision: Option<Box<dyn Expression>>,
 }
 
-impl Expression for FloorFn {
+impl FunctionExpression for FloorFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let precision = self
             .precision

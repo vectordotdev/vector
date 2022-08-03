@@ -51,7 +51,7 @@ impl Function for GetMetadataField {
             MetadataKey::Legacy(_) => Kind::bytes().or_null(),
             MetadataKey::Query(query) => state.external.metadata_kind().at_path(query.path()),
         };
-        Ok(Box::new(GetMetadataFieldFn { key, kind }))
+        Ok(GetMetadataFieldFn { key, kind }.as_expr())
     }
 }
 
@@ -61,7 +61,7 @@ struct GetMetadataFieldFn {
     kind: Kind,
 }
 
-impl Expression for GetMetadataFieldFn {
+impl FunctionExpression for GetMetadataFieldFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         get_metadata_field(ctx, &self.key)
     }

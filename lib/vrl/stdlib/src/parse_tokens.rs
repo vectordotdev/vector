@@ -41,7 +41,7 @@ impl Function for ParseTokens {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(ParseTokensFn { value }))
+        Ok(ParseTokensFn { value }.as_expr())
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -58,7 +58,7 @@ struct ParseTokensFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ParseTokensFn {
+impl FunctionExpression for ParseTokensFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         parse_tokens(value)

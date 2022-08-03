@@ -58,7 +58,7 @@ impl Function for IpNtop {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(IpNtopFn { value }))
+        Ok(IpNtopFn { value }.as_expr())
     }
 }
 
@@ -67,7 +67,7 @@ struct IpNtopFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for IpNtopFn {
+impl FunctionExpression for IpNtopFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         ip_ntop(value)

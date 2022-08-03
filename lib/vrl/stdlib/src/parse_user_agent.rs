@@ -134,11 +134,12 @@ impl Function for ParseUserAgent {
             }
         };
 
-        Ok(Box::new(ParseUserAgentFn {
+        Ok(ParseUserAgentFn {
             value,
             mode,
             parser,
-        }))
+        }
+        .as_expr())
     }
 
     fn compile_argument(
@@ -223,7 +224,7 @@ struct ParseUserAgentFn {
     parser: Arc<dyn Fn(&str) -> Value + Send + Sync>,
 }
 
-impl Expression for ParseUserAgentFn {
+impl FunctionExpression for ParseUserAgentFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let string = value.try_bytes_utf8_lossy()?;

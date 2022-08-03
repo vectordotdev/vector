@@ -125,12 +125,13 @@ impl Function for FormatNumber {
         let decimal_separator = arguments.optional("decimal_separator");
         let grouping_separator = arguments.optional("grouping_separator");
 
-        Ok(Box::new(FormatNumberFn {
+        Ok(FormatNumberFn {
             value,
             scale,
             decimal_separator,
             grouping_separator,
-        }))
+        }
+        .as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -150,7 +151,7 @@ struct FormatNumberFn {
     grouping_separator: Option<Box<dyn Expression>>,
 }
 
-impl Expression for FormatNumberFn {
+impl FunctionExpression for FormatNumberFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let scale = self

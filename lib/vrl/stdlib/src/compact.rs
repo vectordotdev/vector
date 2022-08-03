@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use ::value::Value;
+use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
 
 use crate::util;
@@ -134,7 +135,7 @@ impl Function for Compact {
         let array = arguments.optional("array");
         let nullish = arguments.optional("nullish");
 
-        Ok(Box::new(CompactFn {
+        Ok(CompactFn {
             value,
             recursive,
             null,
@@ -142,7 +143,8 @@ impl Function for Compact {
             object,
             array,
             nullish,
-        }))
+        }
+        .as_expr())
     }
 }
 
@@ -197,7 +199,7 @@ impl CompactOptions {
     }
 }
 
-impl Expression for CompactFn {
+impl FunctionExpression for CompactFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let recursive = self
             .recursive

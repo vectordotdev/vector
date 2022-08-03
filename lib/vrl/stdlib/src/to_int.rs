@@ -110,7 +110,7 @@ impl Function for ToInt {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(ToIntFn { value }))
+        Ok(ToIntFn { value }.as_expr())
     }
 }
 
@@ -119,7 +119,7 @@ struct ToIntFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ToIntFn {
+impl FunctionExpression for ToIntFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
 

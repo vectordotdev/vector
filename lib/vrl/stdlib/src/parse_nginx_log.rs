@@ -70,11 +70,12 @@ impl Function for ParseNginxLog {
 
         let timestamp_format = arguments.optional("timestamp_format");
 
-        Ok(Box::new(ParseNginxLogFn {
+        Ok(ParseNginxLogFn {
             value,
             format,
             timestamp_format,
-        }))
+        }
+        .as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -148,7 +149,7 @@ struct ParseNginxLogFn {
     timestamp_format: Option<Box<dyn Expression>>,
 }
 
-impl Expression for ParseNginxLogFn {
+impl FunctionExpression for ParseNginxLogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?;
         let timestamp_format = self

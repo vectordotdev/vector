@@ -80,7 +80,7 @@ impl Function for IpSubnet {
         let value = arguments.required("value");
         let subnet = arguments.required("subnet");
 
-        Ok(Box::new(IpSubnetFn { value, subnet }))
+        Ok(IpSubnetFn { value, subnet }.as_expr())
     }
 }
 
@@ -90,7 +90,7 @@ struct IpSubnetFn {
     subnet: Box<dyn Expression>,
 }
 
-impl Expression for IpSubnetFn {
+impl FunctionExpression for IpSubnetFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let mask = self.subnet.resolve(ctx)?;

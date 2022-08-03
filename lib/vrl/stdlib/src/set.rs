@@ -130,7 +130,7 @@ impl Function for Set {
         let path = arguments.required("path");
         let data = arguments.required("data");
 
-        Ok(Box::new(SetFn { value, path, data }))
+        Ok(SetFn { value, path, data }.as_expr())
     }
 }
 
@@ -141,7 +141,7 @@ pub(crate) struct SetFn {
     data: Box<dyn Expression>,
 }
 
-impl Expression for SetFn {
+impl FunctionExpression for SetFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let path = self.path.resolve(ctx)?;
         let value = self.value.resolve(ctx)?;

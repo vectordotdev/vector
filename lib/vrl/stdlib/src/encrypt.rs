@@ -7,6 +7,7 @@ use aes::cipher::{
 use cfb_mode::Encryptor as Cfb;
 use ctr::Ctr64LE;
 use ofb::Ofb;
+use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
 
 type Aes128Cbc = cbc::Encryptor<aes::Aes128>;
@@ -205,12 +206,13 @@ impl Function for Encrypt {
             }
         }
 
-        Ok(Box::new(EncryptFn {
+        Ok(EncryptFn {
             plaintext,
             algorithm,
             key,
             iv,
-        }))
+        }
+        .as_expr())
     }
 }
 
@@ -222,7 +224,7 @@ struct EncryptFn {
     iv: Box<dyn Expression>,
 }
 
-impl Expression for EncryptFn {
+impl FunctionExpression for EncryptFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let plaintext = self.plaintext.resolve(ctx)?;
         let algorithm = self.algorithm.resolve(ctx)?;

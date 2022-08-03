@@ -54,7 +54,7 @@ impl Function for SetSecret {
     ) -> Compiled {
         let key = arguments.required("key");
         let secret = arguments.required("secret");
-        Ok(Box::new(SetSecretFn { key, secret }))
+        Ok(SetSecretFn { key, secret }.as_expr())
     }
 }
 
@@ -64,7 +64,7 @@ struct SetSecretFn {
     secret: Box<dyn Expression>,
 }
 
-impl Expression for SetSecretFn {
+impl FunctionExpression for SetSecretFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let key = self.key.resolve(ctx)?;
         let secret = self.secret.resolve(ctx)?;

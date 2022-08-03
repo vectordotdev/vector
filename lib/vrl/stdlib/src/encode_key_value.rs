@@ -2,6 +2,7 @@ use std::result::Result;
 
 use ::value::Value;
 use vector_common::encode_key_value;
+use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
 
 /// Also used by `encode_logfmt`.
@@ -90,13 +91,14 @@ impl Function for EncodeKeyValue {
             .optional("flatten_boolean")
             .unwrap_or_else(|| expr!(false));
 
-        Ok(Box::new(EncodeKeyValueFn {
+        Ok(EncodeKeyValueFn {
             value,
             fields,
             key_value_delimiter,
             field_delimiter,
             flatten_boolean,
-        }))
+        }
+        .as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -141,7 +143,7 @@ fn resolve_fields(fields: Value) -> Result<Vec<String>, ExpressionError> {
         .collect()
 }
 
-impl Expression for EncodeKeyValueFn {
+impl FunctionExpression for EncodeKeyValueFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let fields = self

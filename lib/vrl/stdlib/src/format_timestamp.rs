@@ -45,7 +45,7 @@ impl Function for FormatTimestamp {
         let value = arguments.required("value");
         let format = arguments.required("format");
 
-        Ok(Box::new(FormatTimestampFn { value, format }))
+        Ok(FormatTimestampFn { value, format }.as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -63,7 +63,7 @@ struct FormatTimestampFn {
     format: Box<dyn Expression>,
 }
 
-impl Expression for FormatTimestampFn {
+impl FunctionExpression for FormatTimestampFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.format.resolve(ctx)?;
         let ts = self.value.resolve(ctx)?;

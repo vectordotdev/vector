@@ -7,6 +7,7 @@ use aes::cipher::{
 use cfb_mode::Decryptor as Cfb;
 use ctr::Ctr64LE;
 use ofb::Ofb;
+use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
 
 use crate::encrypt::{get_iv_bytes, get_key_bytes, is_valid_algorithm};
@@ -146,12 +147,13 @@ impl Function for Decrypt {
             }
         }
 
-        Ok(Box::new(DecryptFn {
+        Ok(DecryptFn {
             ciphertext,
             algorithm,
             key,
             iv,
-        }))
+        }
+        .as_expr())
     }
 }
 
@@ -163,7 +165,7 @@ struct DecryptFn {
     iv: Box<dyn Expression>,
 }
 
-impl Expression for DecryptFn {
+impl FunctionExpression for DecryptFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let ciphertext = self.ciphertext.resolve(ctx)?;
         let algorithm = self.algorithm.resolve(ctx)?;

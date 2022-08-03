@@ -46,7 +46,7 @@ impl Function for IpToIpv6 {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(IpToIpv6Fn { value }))
+        Ok(IpToIpv6Fn { value }.as_expr())
     }
 }
 
@@ -55,7 +55,7 @@ struct IpToIpv6Fn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for IpToIpv6Fn {
+impl FunctionExpression for IpToIpv6Fn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         ip_to_ipv6(value)

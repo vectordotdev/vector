@@ -85,7 +85,7 @@ impl Function for ParseInt {
         let value = arguments.required("value");
         let base = arguments.optional("base");
 
-        Ok(Box::new(ParseIntFn { value, base }))
+        Ok(ParseIntFn { value, base }.as_expr())
     }
 }
 
@@ -95,7 +95,7 @@ struct ParseIntFn {
     base: Option<Box<dyn Expression>>,
 }
 
-impl Expression for ParseIntFn {
+impl FunctionExpression for ParseIntFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let base = self

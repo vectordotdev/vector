@@ -56,7 +56,7 @@ impl Function for FormatInt {
         let value = arguments.required("value");
         let base = arguments.optional("base");
 
-        Ok(Box::new(FormatIntFn { value, base }))
+        Ok(FormatIntFn { value, base }.as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -87,7 +87,7 @@ struct FormatIntFn {
     base: Option<Box<dyn Expression>>,
 }
 
-impl Expression for FormatIntFn {
+impl FunctionExpression for FormatIntFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
 

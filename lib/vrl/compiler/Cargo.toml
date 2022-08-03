@@ -25,6 +25,7 @@ expr-literal = []
 expr-op = []
 expr-query = []
 expr-unary = []
+test = []
 
 [dependencies]
 core = { package = "vrl-core", path = "../core", default-features = false }

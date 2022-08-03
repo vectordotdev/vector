@@ -1,3 +1,4 @@
+use anymap::AnyMap;
 use diagnostic::{DiagnosticList, DiagnosticMessage, Severity, Span};
 use lookup::LookupBuf;
 use parser::ast::{self, Node, QueryTarget};
@@ -12,7 +13,7 @@ use crate::{
     parser::ast::RootExpr,
     program::ProgramInfo,
     state::{ExternalEnv, LocalEnv},
-    ExternalContext, Function, Program,
+    ExternalContext, Function, Program, TypeDef,
 };
 
 pub(crate) type Diagnostics = Vec<Box<dyn DiagnosticMessage>>;
@@ -38,6 +39,8 @@ pub struct Compiler<'a> {
     /// back to `None`, if the parent expression of a fallible expression
     /// nullifies the fallibility of that expression.
     fallible_expression_error: Option<Box<dyn DiagnosticMessage>>,
+
+    external_context: AnyMap,
 }
 
 impl<'a> Compiler<'a> {
@@ -47,6 +50,7 @@ impl<'a> Compiler<'a> {
         state: &TypeState,
         external_context: &mut ExternalContext,
     ) -> Result<(Program, DiagnosticList), DiagnosticList> {
+        let initial_state = state.clone();
         let mut state = state.clone();
 
         let mut compiler = Self {
@@ -58,6 +62,7 @@ impl<'a> Compiler<'a> {
             external_assignments: vec![],
             skip_missing_query_target: vec![],
             fallible_expression_error: None,
+            external_context: external_context.swap_external_context(AnyMap::new()),
         };
         let expressions = compiler.compile_root_exprs(ast, &mut state);
 
@@ -77,13 +82,14 @@ impl<'a> Compiler<'a> {
             target_assignments: compiler.external_assignments,
         };
 
-        let expressions = Block::new_inline(expressions);
+        let _ = external_context.swap_external_context(compiler.external_context);
 
+        let expressions = Block::new_inline(expressions);
         Ok((
             Program {
                 expressions,
                 info,
-                initial_state: state.clone(),
+                initial_state,
             },
             warnings.into(),
         ))
@@ -97,24 +103,26 @@ impl<'a> Compiler<'a> {
         let mut exprs = vec![];
         for node in nodes {
             let expr = self.compile_expr(node, state)?;
-            let type_def = expr.type_def(state);
             exprs.push(expr);
-
-            if type_def.is_never() {
-                // This is a terminal expression. Further expressions must not be
-                // compiled since they will never execute, but could alter the types of
-                // variables in local or external scopes through assignments.
-                break;
-            }
         }
         Some(exprs)
     }
 
     fn compile_expr(&mut self, node: Node<ast::Expr>, state: &mut TypeState) -> Option<Expr> {
+        self.compile_expr_2(node, state)
+            .map(|(expr, _type_def)| expr)
+    }
+
+    fn compile_expr_2(
+        &mut self,
+        node: Node<ast::Expr>,
+        state: &mut TypeState,
+    ) -> Option<(Expr, TypeDef)> {
         use ast::Expr::{
             Abort, Assignment, Container, FunctionCall, IfStatement, Literal, Op, Query, Unary,
             Variable,
         };
+        let original_state = state.clone();
 
         let span = node.span();
 
@@ -135,12 +143,14 @@ impl<'a> Compiler<'a> {
         // currently not tracking any existing fallible expression in the chain
         // of expressions, then this is the first expression within that chain
         // that can cause the entire chain to be fallible.
-        if expr.type_info(state).result.is_fallible() && self.fallible_expression_error.is_none() {
+
+        let type_def = expr.type_info(&original_state).result;
+        if type_def.is_fallible() && self.fallible_expression_error.is_none() {
             let error = crate::expression::Error::Fallible { span };
             self.fallible_expression_error = Some(Box::new(error) as _);
         }
 
-        Some(expr)
+        Some((expr, type_def))
     }
 
     #[cfg(feature = "expr-literal")]
@@ -242,12 +252,21 @@ impl<'a> Compiler<'a> {
     }
 
     fn compile_block(&mut self, node: Node<ast::Block>, state: &mut TypeState) -> Option<Block> {
+        self.compile_block_with_type(node, state)
+            .map(|(block, _type_def)| block)
+    }
+
+    fn compile_block_with_type(
+        &mut self,
+        node: Node<ast::Block>,
+        state: &mut TypeState,
+    ) -> Option<(Block, TypeDef)> {
         let original_state = state.clone();
         let exprs = self.compile_exprs(node.into_inner().into_iter(), state)?;
         let block = Block::new_scoped(exprs);
-        *state = block.type_info(&original_state).state;
-
-        Some(block)
+        let type_info = block.type_info(&original_state);
+        *state = type_info.state;
+        Some((block, type_info.result))
     }
 
     fn compile_array(&mut self, node: Node<ast::Array>, state: &mut TypeState) -> Option<Array> {
@@ -588,6 +607,7 @@ impl<'a> Compiler<'a> {
             closure,
         } = node.into_inner();
 
+        let original_state = state.clone();
         // TODO: Remove this (hacky) code once dynamic path syntax lands.
         //
         // See: https://github.com/vectordotdev/vector/issues/12547
@@ -626,7 +646,7 @@ impl<'a> Compiler<'a> {
 
         // First, we create a new function-call builder to validate the
         // expression.
-        function_call::Builder::new(
+        let function = function_call::Builder::new(
             call_span,
             ident,
             abort_on_error,
@@ -644,8 +664,8 @@ impl<'a> Compiler<'a> {
                 None => None,
                 Some(block) => {
                     let span = block.span();
-                    match self.compile_block(block, state) {
-                        Some(block) => Some(Node::new(span, block)),
+                    match self.compile_block_with_type(block, state) {
+                        Some(block_with_type) => Some(Node::new(span, block_with_type)),
                         None => return None,
                     }
                 }
@@ -657,10 +677,17 @@ impl<'a> Compiler<'a> {
                     block,
                     local_snapshot,
                     &mut self.fallible_expression_error,
+                    &mut self.external_context,
                 )
                 .map_err(|err| self.diagnostics.push(Box::new(err)))
                 .ok()
-        })
+        });
+
+        if let Some(function) = &function {
+            *state = function.type_info(&original_state).state;
+        }
+
+        function
     }
 
     #[cfg(feature = "expr-function_call")]
@@ -669,10 +696,15 @@ impl<'a> Compiler<'a> {
         node: Node<ast::FunctionArgument>,
         state: &mut TypeState,
     ) -> Option<FunctionArgument> {
-        let ast::FunctionArgument { ident, expr } = node.into_inner();
-        let expr = Node::new(expr.span(), self.compile_expr(expr, state)?);
+        let ast::FunctionArgument {
+            ident,
+            expr: ast_expr,
+        } = node.into_inner();
+        let span = ast_expr.span();
+        let (expr, type_def) = self.compile_expr_2(ast_expr, state)?;
+        let node = Node::new(span, expr);
 
-        Some(FunctionArgument::new(ident, expr))
+        Some(FunctionArgument::new(ident, node, type_def))
     }
 
     #[cfg(not(feature = "expr-function_call"))]

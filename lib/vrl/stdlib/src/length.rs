@@ -60,7 +60,7 @@ impl Function for Length {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(LengthFn { value }))
+        Ok(LengthFn { value }.as_expr())
     }
 }
 
@@ -69,7 +69,7 @@ struct LengthFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for LengthFn {
+impl FunctionExpression for LengthFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
 

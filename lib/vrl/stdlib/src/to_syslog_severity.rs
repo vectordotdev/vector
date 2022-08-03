@@ -59,7 +59,7 @@ impl Function for ToSyslogSeverity {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(ToSyslogSeverityFn { value }))
+        Ok(ToSyslogSeverityFn { value }.as_expr())
     }
 }
 
@@ -68,7 +68,7 @@ struct ToSyslogSeverityFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ToSyslogSeverityFn {
+impl FunctionExpression for ToSyslogSeverityFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let level = self.value.resolve(ctx)?;
         to_syslog_severity(level)

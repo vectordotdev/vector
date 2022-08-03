@@ -44,7 +44,7 @@ impl Function for IsObject {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(IsObjectFn { value }))
+        Ok(IsObjectFn { value }.as_expr())
     }
 }
 
@@ -53,7 +53,7 @@ struct IsObjectFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for IsObjectFn {
+impl FunctionExpression for IsObjectFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         self.value.resolve(ctx).map(|v| value!(v.is_object()))
     }

@@ -49,7 +49,7 @@ impl Function for Integer {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(IntegerFn { value }))
+        Ok(IntegerFn { value }.as_expr())
     }
 }
 
@@ -58,7 +58,7 @@ struct IntegerFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for IntegerFn {
+impl FunctionExpression for IntegerFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         int(self.value.resolve(ctx)?)
     }

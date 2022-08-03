@@ -40,7 +40,7 @@ impl Function for GetEnvVar {
     ) -> Compiled {
         let name = arguments.required("name");
 
-        Ok(Box::new(GetEnvVarFn { name }))
+        Ok(GetEnvVarFn { name }.as_expr())
     }
 }
 
@@ -49,7 +49,7 @@ struct GetEnvVarFn {
     name: Box<dyn Expression>,
 }
 
-impl Expression for GetEnvVarFn {
+impl FunctionExpression for GetEnvVarFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.name.resolve(ctx)?;
         get_env_var(value)

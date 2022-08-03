@@ -51,7 +51,7 @@ impl Function for ParseRubyHash {
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
-        Ok(Box::new(ParseRubyHashFn { value }))
+        Ok(ParseRubyHashFn { value }.as_expr())
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -68,7 +68,7 @@ struct ParseRubyHashFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ParseRubyHashFn {
+impl FunctionExpression for ParseRubyHashFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         parse_ruby_hash(value)

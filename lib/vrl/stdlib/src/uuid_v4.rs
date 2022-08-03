@@ -31,14 +31,14 @@ impl Function for UuidV4 {
         _ctx: &mut FunctionCompileContext,
         _: ArgumentList,
     ) -> Compiled {
-        Ok(Box::new(UuidV4Fn))
+        Ok(UuidV4Fn.as_expr())
     }
 }
 
 #[derive(Debug, Clone, Copy)]
 struct UuidV4Fn;
 
-impl Expression for UuidV4Fn {
+impl FunctionExpression for UuidV4Fn {
     fn resolve(&self, _: &mut Context) -> Resolved {
         Ok(uuid_v4())
     }

@@ -69,7 +69,7 @@ impl Function for MatchDatadogQuery {
         // VRL `Value` against the Datadog Search Syntax literal.
         let filter = build_matcher(&node, &VrlFilter::default());
 
-        Ok(Box::new(MatchDatadogQueryFn { value, filter }))
+        Ok(MatchDatadogQueryFn { value, filter }.as_expr())
     }
 
     fn compile_argument(
@@ -133,7 +133,7 @@ struct MatchDatadogQueryFn {
     filter: Box<dyn Matcher<Value>>,
 }
 
-impl Expression for MatchDatadogQueryFn {
+impl FunctionExpression for MatchDatadogQueryFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
 

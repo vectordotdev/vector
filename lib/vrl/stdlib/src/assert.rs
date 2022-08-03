@@ -1,4 +1,5 @@
 use ::value::Value;
+use vrl::prelude::expression::FunctionExpression;
 use vrl::{diagnostic::Note, prelude::*};
 
 fn assert(condition: Value, message: Option<Value>, format: Option<String>) -> Resolved {
@@ -75,7 +76,7 @@ impl Function for Assert {
         let condition = arguments.required("condition");
         let message = arguments.optional("message");
 
-        Ok(Box::new(AssertFn { condition, message }))
+        Ok(AssertFn { condition, message }.as_expr())
     }
 }
 
@@ -85,7 +86,7 @@ struct AssertFn {
     message: Option<Box<dyn Expression>>,
 }
 
-impl Expression for AssertFn {
+impl FunctionExpression for AssertFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let condition = self.condition.resolve(ctx)?;
         let format = self.condition.format();

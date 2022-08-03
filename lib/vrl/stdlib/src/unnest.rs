@@ -104,7 +104,7 @@ impl Function for Unnest {
         let path = arguments.required_query("path")?;
         let root = LookupBuf::root();
 
-        Ok(Box::new(UnnestFn { path, root }))
+        Ok(UnnestFn { path, root }.as_expr())
     }
 
     fn compile_argument(
@@ -155,7 +155,7 @@ impl UnnestFn {
     }
 }
 
-impl Expression for UnnestFn {
+impl FunctionExpression for UnnestFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         unnest(&self.path, &self.root, ctx)
     }

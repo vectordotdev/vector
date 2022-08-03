@@ -63,7 +63,7 @@ impl Function for ParseSyslog {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(ParseSyslogFn { value }))
+        Ok(ParseSyslogFn { value }.as_expr())
     }
 }
 
@@ -72,7 +72,7 @@ pub(crate) struct ParseSyslogFn {
     pub(crate) value: Box<dyn Expression>,
 }
 
-impl Expression for ParseSyslogFn {
+impl FunctionExpression for ParseSyslogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
 

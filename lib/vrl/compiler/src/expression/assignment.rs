@@ -530,7 +530,10 @@ where
                 let expr_result = expr.apply_type_info(&mut state);
 
                 // The "ok" type is either the result of the expression, or a "default" value when the expression fails.
-                let ok_type = expr_result.clone().union(TypeDef::from(default.kind()));
+                let ok_type = expr_result
+                    .clone()
+                    .union(TypeDef::from(default.kind()))
+                    .infallible();
                 ok.insert_type_def(&mut state, ok_type, expr.as_value());
 
                 // The "err" type is either the error message "bytes" or "null" (not undefined).

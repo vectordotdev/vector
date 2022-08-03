@@ -1,4 +1,5 @@
 use ::value::Value;
+use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
 
 fn contains(value: Value, substring: Value, case_sensitive: bool) -> Resolved {
@@ -60,11 +61,12 @@ impl Function for Contains {
         let substring = arguments.required("substring");
         let case_sensitive = arguments.optional("case_sensitive").unwrap_or(expr!(true));
 
-        Ok(Box::new(ContainsFn {
+        Ok(ContainsFn {
             value,
             substring,
             case_sensitive,
-        }))
+        }
+        .as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -90,7 +92,7 @@ struct ContainsFn {
     case_sensitive: Box<dyn Expression>,
 }
 
-impl Expression for ContainsFn {
+impl FunctionExpression for ContainsFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let substring = self.substring.resolve(ctx)?;

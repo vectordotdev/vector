@@ -41,7 +41,7 @@ impl Function for ParseTimestamp {
         let value = arguments.required("value");
         let format = arguments.required("format");
 
-        Ok(Box::new(ParseTimestampFn { value, format }))
+        Ok(ParseTimestampFn { value, format }.as_expr())
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -66,7 +66,7 @@ struct ParseTimestampFn {
     format: Box<dyn Expression>,
 }
 
-impl Expression for ParseTimestampFn {
+impl FunctionExpression for ParseTimestampFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let format = self.format.resolve(ctx)?;

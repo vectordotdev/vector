@@ -49,7 +49,7 @@ impl Function for Float {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(FloatFn { value }))
+        Ok(FloatFn { value }.as_expr())
     }
 }
 
@@ -58,7 +58,7 @@ struct FloatFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for FloatFn {
+impl FunctionExpression for FloatFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         float(self.value.resolve(ctx)?)
     }

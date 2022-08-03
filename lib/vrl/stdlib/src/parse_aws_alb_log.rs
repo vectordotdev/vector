@@ -42,7 +42,7 @@ impl Function for ParseAwsAlbLog {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(ParseAwsAlbLogFn::new(value)))
+        Ok(ParseAwsAlbLogFn::new(value).as_expr())
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -65,7 +65,7 @@ impl ParseAwsAlbLogFn {
     }
 }
 
-impl Expression for ParseAwsAlbLogFn {
+impl FunctionExpression for ParseAwsAlbLogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?;
         parse_aws_alb_log(bytes)

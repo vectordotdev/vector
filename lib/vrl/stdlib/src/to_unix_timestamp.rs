@@ -72,7 +72,7 @@ impl Function for ToUnixTimestamp {
             })
             .unwrap_or_default();
 
-        Ok(Box::new(ToUnixTimestampFn { value, unit }))
+        Ok(ToUnixTimestampFn { value, unit }.as_expr())
     }
 
     fn compile_argument(
@@ -158,7 +158,7 @@ struct ToUnixTimestampFn {
     unit: Unit,
 }
 
-impl Expression for ToUnixTimestampFn {
+impl FunctionExpression for ToUnixTimestampFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let unit = self.unit;

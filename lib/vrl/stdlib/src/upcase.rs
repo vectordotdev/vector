@@ -38,7 +38,7 @@ impl Function for Upcase {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(UpcaseFn { value }))
+        Ok(UpcaseFn { value }.as_expr())
     }
 }
 
@@ -47,7 +47,7 @@ struct UpcaseFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for UpcaseFn {
+impl FunctionExpression for UpcaseFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         upcase(value)

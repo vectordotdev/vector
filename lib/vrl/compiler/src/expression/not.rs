@@ -22,7 +22,7 @@ pub struct Not {
 impl Not {
     pub fn new(node: Node<Expr>, not_span: Span, state: &TypeState) -> Result {
         let (expr_span, expr) = node.take();
-        let type_def = expr.type_def(state);
+        let type_def = expr.type_info(state).result;
 
         if !type_def.is_boolean() {
             return Err(Error {

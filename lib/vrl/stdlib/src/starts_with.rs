@@ -126,11 +126,12 @@ impl Function for StartsWith {
         let substring = arguments.required("substring");
         let case_sensitive = arguments.optional("case_sensitive").unwrap_or(expr!(true));
 
-        Ok(Box::new(StartsWithFn {
+        Ok(StartsWithFn {
             value,
             substring,
             case_sensitive,
-        }))
+        }
+        .as_expr())
     }
 }
 
@@ -141,7 +142,7 @@ struct StartsWithFn {
     case_sensitive: Box<dyn Expression>,
 }
 
-impl Expression for StartsWithFn {
+impl FunctionExpression for StartsWithFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let case_sensitive = if self.case_sensitive.resolve(ctx)?.try_boolean()? {
             Case::Sensitive

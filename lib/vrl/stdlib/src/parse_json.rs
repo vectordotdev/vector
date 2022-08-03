@@ -182,8 +182,8 @@ impl Function for ParseJson {
         let max_depth = arguments.optional("max_depth");
 
         match max_depth {
-            Some(max_depth) => Ok(Box::new(ParseJsonMaxDepthFn { value, max_depth })),
-            None => Ok(Box::new(ParseJsonFn { value })),
+            Some(max_depth) => Ok(ParseJsonMaxDepthFn { value, max_depth }.as_expr()),
+            None => Ok(ParseJsonFn { value }.as_expr()),
         }
     }
 }
@@ -193,7 +193,7 @@ struct ParseJsonFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ParseJsonFn {
+impl FunctionExpression for ParseJsonFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         parse_json(value)
@@ -210,7 +210,7 @@ struct ParseJsonMaxDepthFn {
     max_depth: Box<dyn Expression>,
 }
 
-impl Expression for ParseJsonMaxDepthFn {
+impl FunctionExpression for ParseJsonMaxDepthFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let max_depth = self.max_depth.resolve(ctx)?;

@@ -104,7 +104,7 @@ impl Function for ParseGlog {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(ParseGlogFn { value }))
+        Ok(ParseGlogFn { value }.as_expr())
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -121,7 +121,7 @@ struct ParseGlogFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ParseGlogFn {
+impl FunctionExpression for ParseGlogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?;
         parse_glog(bytes)

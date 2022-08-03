@@ -78,7 +78,7 @@ impl Function for Flatten {
             .optional("separator")
             .unwrap_or_else(|| expr!(DEFAULT_SEPARATOR));
         let value = arguments.required("value");
-        Ok(Box::new(FlattenFn { value, separator }))
+        Ok(FlattenFn { value, separator }.as_expr())
     }
 }
 
@@ -88,7 +88,7 @@ struct FlattenFn {
     separator: Box<dyn Expression>,
 }
 
-impl Expression for FlattenFn {
+impl FunctionExpression for FlattenFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let separator = self.separator.resolve(ctx)?;

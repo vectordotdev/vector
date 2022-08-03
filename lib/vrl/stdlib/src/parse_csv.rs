@@ -55,7 +55,7 @@ impl Function for ParseCsv {
     ) -> Compiled {
         let value = arguments.required("value");
         let delimiter = arguments.optional("delimiter").unwrap_or(expr!(","));
-        Ok(Box::new(ParseCsvFn { value, delimiter }))
+        Ok(ParseCsvFn { value, delimiter }.as_expr())
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -80,7 +80,7 @@ struct ParseCsvFn {
     delimiter: Box<dyn Expression>,
 }
 
-impl Expression for ParseCsvFn {
+impl FunctionExpression for ParseCsvFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let csv_string = self.value.resolve(ctx)?;
         let delimiter = self.delimiter.resolve(ctx)?;

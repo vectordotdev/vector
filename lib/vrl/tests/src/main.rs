@@ -16,7 +16,7 @@ use vector_common::TimeZone;
 use vrl::{
     diagnostic::Formatter,
     prelude::{BTreeMap, VrlValueConvert},
-    state, Runtime, SecretTarget, TargetValueRef, Terminate, VrlRuntime,
+    state, ExternalContext, Runtime, SecretTarget, TargetValueRef, Terminate, VrlRuntime,
 };
 use vrl_tests::{docs, Test};
 
@@ -181,7 +181,8 @@ fn main() {
         let test_enrichment = test_enrichment::test_enrichment_table();
 
         let mut external_env = vrl::state::ExternalEnv::default();
-        external_env.set_external_context(test_enrichment.clone());
+        let mut external_context = ExternalContext::default();
+        external_context.set_external_context(test_enrichment.clone());
 
         // Set some read-only paths that can be tested
         for (path, recursive) in &test.read_only_paths {
@@ -192,7 +193,12 @@ fn main() {
         }
 
         let compile_start = Instant::now();
-        let program = vrl::compile_with_external(&test.source, &functions, &mut external_env);
+        let program = vrl::compile_with_external(
+            &test.source,
+            &functions,
+            &mut external_env,
+            &mut external_context,
+        );
         let compile_end = compile_start.elapsed();
 
         let want = test.result.clone();

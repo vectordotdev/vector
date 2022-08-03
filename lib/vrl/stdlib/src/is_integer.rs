@@ -44,7 +44,7 @@ impl Function for IsInteger {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(IsIntegerFn { value }))
+        Ok(IsIntegerFn { value }.as_expr())
     }
 }
 
@@ -53,7 +53,7 @@ struct IsIntegerFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for IsIntegerFn {
+impl FunctionExpression for IsIntegerFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         self.value.resolve(ctx).map(|v| value!(v.is_integer()))
     }

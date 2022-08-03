@@ -13,7 +13,10 @@ pub trait FunctionExpression: Send + Sync + fmt::Debug + DynClone + Clone + 'sta
     /// Resolve an expression to a concrete [`Value`].
     /// This method is executed at runtime.
     /// An expression is allowed to fail, which aborts the running program.
-    fn resolve(&self, ctx: &Context) -> Resolved;
+    // This should be a read-only reference to `Context`, but function args
+    // are resolved in the function themselves, which can theoretically mutate
+    // see: https://github.com/vectordotdev/vector/issues/13752
+    fn resolve(&self, ctx: &mut Context) -> Resolved;
 
     /// The resulting type that the function resolves to.
     fn type_def(&self, state: &TypeState) -> TypeDef;

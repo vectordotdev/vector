@@ -45,7 +45,7 @@ impl Function for Tally {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(TallyFn { value }))
+        Ok(TallyFn { value }.as_expr())
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -62,7 +62,7 @@ pub(crate) struct TallyFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for TallyFn {
+impl FunctionExpression for TallyFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         tally(value)

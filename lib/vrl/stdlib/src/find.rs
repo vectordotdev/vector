@@ -57,11 +57,12 @@ impl Function for Find {
         let pattern = arguments.required("pattern");
         let from = arguments.optional("from");
 
-        Ok(Box::new(FindFn {
+        Ok(FindFn {
             value,
             pattern,
             from,
-        }))
+        }
+        .as_expr())
     }
 }
 
@@ -107,7 +108,7 @@ impl FindFn {
     }
 }
 
-impl Expression for FindFn {
+impl FunctionExpression for FindFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let pattern = self.pattern.resolve(ctx)?;

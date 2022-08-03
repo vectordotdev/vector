@@ -51,10 +51,11 @@ use std::{fmt::Display, str::FromStr};
 pub use context::Context;
 use diagnostic::DiagnosticList;
 pub(crate) use diagnostic::Span;
-pub use expression::Expression;
+pub use expression::{Expression, FunctionExpression};
 pub use function::{Function, Parameter};
 pub use paste::paste;
 pub use program::{Program, ProgramInfo};
+pub use state::{TypeInfo, TypeState};
 pub use type_def::TypeDef;
 use vector_config::configurable_component;
 

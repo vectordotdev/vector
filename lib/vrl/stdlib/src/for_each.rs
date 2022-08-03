@@ -56,7 +56,7 @@ impl Function for ForEach {
         let value = arguments.required("value");
         let closure = arguments.required_closure()?;
 
-        Ok(Box::new(ForEachFn { value, closure }))
+        Ok(ForEachFn { value, closure }.as_expr())
     }
 
     fn closure(&self) -> Option<closure::Definition> {
@@ -92,18 +92,20 @@ struct ForEachFn {
     closure: FunctionClosure,
 }
 
-impl Expression for ForEachFn {
+impl FunctionExpression for ForEachFn {
     fn resolve(&self, ctx: &mut Context) -> Result<Value> {
         let value = self.value.resolve(ctx)?;
-        let FunctionClosure { variables, block } = &self.closure;
+        let FunctionClosure {
+            variables,
+            block,
+            block_type_def: _,
+        } = &self.closure;
         let runner = closure::Runner::new(variables, |ctx| block.resolve(ctx));
 
         for_each(value, ctx, runner)
     }
 
-    fn type_def(&self, ctx: &state::TypeState) -> TypeDef {
-        let fallible = self.closure.block.type_def(ctx).is_fallible();
-
-        TypeDef::null().with_fallibility(fallible)
+    fn type_def(&self, _ctx: &state::TypeState) -> TypeDef {
+        TypeDef::null()
     }
 }

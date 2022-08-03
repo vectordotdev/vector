@@ -44,7 +44,7 @@ impl Function for IsFloat {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(IsFloatFn { value }))
+        Ok(IsFloatFn { value }.as_expr())
     }
 }
 
@@ -53,7 +53,7 @@ struct IsFloatFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for IsFloatFn {
+impl FunctionExpression for IsFloatFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         self.value.resolve(ctx).map(|v| value!(v.is_float()))
     }

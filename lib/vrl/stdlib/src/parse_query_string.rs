@@ -59,7 +59,7 @@ impl Function for ParseQueryString {
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
-        Ok(Box::new(ParseQueryStringFn { value }))
+        Ok(ParseQueryStringFn { value }.as_expr())
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -76,7 +76,7 @@ struct ParseQueryStringFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ParseQueryStringFn {
+impl FunctionExpression for ParseQueryStringFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?;
         parse_query_string(bytes)

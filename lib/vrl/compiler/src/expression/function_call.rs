@@ -15,7 +15,7 @@ use crate::{
     state::{ExternalEnv, LocalEnv},
     type_def::Details,
     value::Kind,
-    Context, Expression, Function, Resolved, Span, TypeDef,
+    Context, Expression, ExternalContext, Function, Resolved, Span, TypeDef,
 };
 
 pub(crate) struct Builder<'a> {
@@ -119,7 +119,7 @@ impl<'a> Builder<'a> {
             })?;
 
             // Check if the argument is of the expected type.
-            let argument_type_def = argument.type_info(state).result;
+            let argument_type_def = argument.type_def();
             let expr_kind = argument_type_def.kind();
             let param_kind = parameter.kind();
 
@@ -147,7 +147,7 @@ impl<'a> Builder<'a> {
                 });
             }
 
-            list.insert(parameter.keyword, argument.into_inner());
+            list.insert(parameter.keyword, argument.into_inner(), argument_type_def);
         }
 
         // Check missing required arguments.
@@ -175,7 +175,6 @@ impl<'a> Builder<'a> {
             state,
             ident_span,
         )?;
-
         Ok(Self {
             abort_on_error,
             arguments_with_unknown_type_validity,
@@ -234,8 +233,9 @@ impl<'a> Builder<'a> {
                         // We've found the function argument over which the
                         // closure is going to resolve. We need to ensure the
                         // type of this argument is as expected by the closure.
-                        Some(expr) => {
-                            let type_def = expr.type_def(state);
+                        Some((expr, type_def)) => {
+                            //TODO: use existing type_def
+                            let type_def = expr.type_info(state).result;
 
                             // The type definition of the value does not match
                             // the expected closure type, continue to check if
@@ -302,7 +302,7 @@ impl<'a> Builder<'a> {
                         // integer.
                         for (index, input_var) in input.variables.clone().into_iter().enumerate() {
                             let call_ident = &variables[index];
-                            let type_def = target.type_def(state);
+                            let type_def = target.type_info(state).result;
 
                             let (type_def, value) = match input_var.kind {
                                 // The variable kind is expected to be exactly
@@ -311,7 +311,9 @@ impl<'a> Builder<'a> {
 
                                 // The variable kind is expected to be equal to
                                 // the ind of the target of the closure.
-                                VariableKind::Target => (target.type_def(state), target.as_value()),
+                                VariableKind::Target => {
+                                    (target.type_info(state).result, target.as_value())
+                                }
 
                                 // The variable kind is expected to be equal to
                                 // the reduced kind of all values within the
@@ -386,52 +388,13 @@ impl<'a> Builder<'a> {
     pub(crate) fn compile(
         mut self,
         state: &mut TypeState,
-        closure_block: Option<Node<Block>>,
+        closure_block: Option<Node<(Block, TypeDef)>>,
         mut local_snapshot: LocalEnv,
         fallible_expression_error: &mut Option<Box<dyn DiagnosticMessage>>,
+        external_context: &mut AnyMap,
     ) -> Result<FunctionCall, Error> {
-        let mut closure_fallible = false;
-        let mut closure = None;
-
-        // Check if we have a closure we need to compile.
-        if let Some((variables, input)) = self.closure.clone() {
-            // TODO: This assumes the closure will run exactly once, which is incorrect.
-            // see: https://github.com/vectordotdev/vector/issues/13782
-
-            let block = closure_block.expect("closure must contain block");
-
-            // At this point, we've compiled the block, so we can remove the
-            // closure variables from the compiler's local environment.
-            variables
-                .iter()
-                .for_each(|ident| match local_snapshot.remove_variable(ident) {
-                    Some(details) => state.local.insert_variable(ident.clone(), details),
-                    None => {
-                        state.local.remove_variable(ident);
-                    }
-                });
-
-            closure_fallible = block.type_def(state).is_fallible();
-
-            let (block_span, block) = block.take();
-
-            // Check the type definition of the resulting block.This needs to match
-            // whatever is configured by the closure input type.
-            let found_kind = block.type_def(state).into();
-            let expected_kind = input.output.into_kind();
-            if !expected_kind.is_superset(&found_kind) {
-                return Err(Error::ReturnTypeMismatch {
-                    block_span,
-                    found_kind,
-                    expected_kind,
-                });
-            }
-
-            let fnclosure = FunctionClosure::new(variables, block);
-            self.list.set_closure(fnclosure.clone());
-
-            closure = Some(fnclosure);
-        };
+        let (closure, closure_fallible) =
+            self.compile_closure(closure_block, local_snapshot, state)?;
 
         let call_span = self.call_span;
         let ident_span = self.ident_span;
@@ -439,27 +402,25 @@ impl<'a> Builder<'a> {
         // We take the external context, and pass it to the function compile context, this allows
         // functions mutable access to external state, but keeps the internal compiler state behind
         // an immutable reference, to ensure compiler state correctness.
-        // TODO: fix
-        // let external_context = external.swap_external_context(AnyMap::new());
+        let temp_external_context = std::mem::replace(external_context, AnyMap::new());
 
-        let mut compile_ctx = FunctionCompileContext::new(self.call_span); //.with_external_context(external_context);
+        let mut compile_ctx = FunctionCompileContext::new(self.call_span)
+            .with_external_context(temp_external_context);
 
         let mut expr = self
             .function
             .compile(state, &mut compile_ctx, self.list.clone())
             .map_err(|error| Error::Compilation { call_span, error })?;
 
-        // // Re-insert the external context into the compiler state.
-        // // TODO: fix
-        // // let _ = external.swap_external_context(compile_ctx.into_external_context());
-        //
+        // Re-insert the external context into the compiler state.
+        let _ = std::mem::replace(external_context, compile_ctx.into_external_context());
 
         // Asking for an infallible function to abort on error makes no sense.
         // We consider this an error at compile-time, because it makes the
         // resulting program incorrectly convey this function call might fail.
         if self.abort_on_error
             && self.arguments_with_unknown_type_validity.is_empty()
-            && !expr.type_def(state).is_fallible()
+            && !expr.type_info(state).result.is_fallible()
         {
             return Err(Error::AbortInfallible {
                 ident_span,
@@ -483,7 +444,7 @@ impl<'a> Builder<'a> {
                         .map(|arg| arg.inner().to_string())
                         .collect::<Vec<_>>(),
                     parameter,
-                    got: argument.expr().type_def(state).into(),
+                    got: argument.expr().type_info(state).result.into(),
                     argument: argument.clone().into_inner(),
                     argument_span: argument
                         .keyword_span()
@@ -493,15 +454,7 @@ impl<'a> Builder<'a> {
                 *fallible_expression_error = Some(Box::new(error) as _);
             }
         }
-        //
-        // // Update the state if necessary.
-        // //TODO: fix
-        // // expr.update_state(local, external)
-        // //     .map_err(|err| Error::UpdateState {
-        // //         call_span,
-        // //         error: err.to_string(),
-        // //     })?;
-        //
+
         Ok(FunctionCall {
             abort_on_error: self.abort_on_error,
             expr,
@@ -514,9 +467,58 @@ impl<'a> Builder<'a> {
             arguments: self.arguments.clone(),
         })
     }
+
+    fn compile_closure(
+        &mut self,
+        closure_block: Option<Node<(Block, TypeDef)>>,
+        mut locals: LocalEnv,
+        state: &mut TypeState,
+    ) -> Result<(Option<FunctionClosure>, bool), Error> {
+        // Check if we have a closure we need to compile.
+        if let Some((variables, input)) = self.closure.clone() {
+            // TODO: This assumes the closure will run exactly once, which is incorrect.
+            // see: https://github.com/vectordotdev/vector/issues/13782
+
+            let block = closure_block.expect("closure must contain block");
+
+            // At this point, we've compiled the block, so we can remove the
+            // closure variables from the compiler's local environment.
+            variables
+                .iter()
+                .for_each(|ident| match locals.remove_variable(ident) {
+                    Some(details) => state.local.insert_variable(ident.clone(), details),
+                    None => {
+                        state.local.remove_variable(ident);
+                    }
+                });
+
+            let (block_span, (block, block_type_def)) = block.take();
+
+            let closure_fallible = block_type_def.is_fallible();
+
+            // Check the type definition of the resulting block.This needs to match
+            // whatever is configured by the closure input type.
+            let block_type_def = block.type_info(state).result;
+            let expected_kind = input.output.into_kind();
+            if !expected_kind.is_superset(block_type_def.kind()) {
+                return Err(Error::ReturnTypeMismatch {
+                    block_span,
+                    found_kind: block_type_def.kind().clone(),
+                    expected_kind,
+                });
+            }
+
+            let fnclosure = FunctionClosure::new(variables, block, block_type_def);
+            self.list.set_closure(fnclosure.clone());
+
+            // closure = Some(fnclosure);
+            Ok((Some(fnclosure), closure_fallible))
+        } else {
+            Ok((None, false))
+        }
+    }
 }
 
-#[allow(unused)] // will be used by LLVM runtime
 #[derive(Clone)]
 pub struct FunctionCall {
     abort_on_error: bool,
@@ -539,7 +541,6 @@ pub struct FunctionCall {
     arguments: Arc<Vec<Node<FunctionArgument>>>,
 }
 
-#[allow(unused)] // will be used by LLVM runtime
 impl FunctionCall {
     /// Takes the arguments passed and resolves them into the order they are defined
     /// in the function
@@ -644,6 +645,14 @@ impl Expression for FunctionCall {
         // TODO: functions with a closure do not correctly calculate type definitions
         // see: https://github.com/vectordotdev/vector/issues/13782
 
+        // Evaluate arguments to correctly calculate any side-effects from them.
+        // This doesn't actually match current runtime behavior in some cases,
+        // but that will be changed.
+        // see: https://github.com/vectordotdev/vector/issues/13752
+        for arg_node in &*self.arguments {
+            let _result = arg_node.inner().expr().apply_type_info(&mut state);
+        }
+
         let mut expr_result = self.expr.apply_type_info(&mut state);
 
         // If one of the arguments only partially matches the function type
@@ -702,6 +711,7 @@ impl Expression for FunctionCall {
         // For the second event, only the `slice` function succeeds.
         // For the third event, both functions fail.
         //
+
         if !self.arguments_with_unknown_type_validity.is_empty() {
             expr_result = expr_result.with_fallibility(true);
         }
@@ -1239,6 +1249,7 @@ mod tests {
         FunctionArgument::new(
             ident.map(|ident| create_node(Ident::new(ident))),
             create_node(Expr::Literal(Literal::Integer(value))),
+            TypeDef::integer(),
         )
     }
 

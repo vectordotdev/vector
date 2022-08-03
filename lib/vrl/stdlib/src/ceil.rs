@@ -1,4 +1,5 @@
 use ::value::Value;
+use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
 
 use crate::util::round_to_precision;
@@ -55,7 +56,7 @@ impl Function for Ceil {
         let value = arguments.required("value");
         let precision = arguments.optional("precision");
 
-        Ok(Box::new(CeilFn { value, precision }))
+        Ok(CeilFn { value, precision }.as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -73,7 +74,7 @@ struct CeilFn {
     precision: Option<Box<dyn Expression>>,
 }
 
-impl Expression for CeilFn {
+impl FunctionExpression for CeilFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let precision = self
             .precision

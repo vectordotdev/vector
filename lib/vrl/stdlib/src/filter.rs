@@ -79,7 +79,7 @@ impl Function for Filter {
         let value = arguments.required("value");
         let closure = arguments.required_closure()?;
 
-        Ok(Box::new(FilterFn { value, closure }))
+        Ok(FilterFn { value, closure }.as_expr())
     }
 
     fn closure(&self) -> Option<closure::Definition> {
@@ -115,10 +115,14 @@ struct FilterFn {
     closure: FunctionClosure,
 }
 
-impl Expression for FilterFn {
+impl FunctionExpression for FilterFn {
     fn resolve(&self, ctx: &mut Context) -> Result<Value> {
         let value = self.value.resolve(ctx)?;
-        let FunctionClosure { variables, block } = &self.closure;
+        let FunctionClosure {
+            variables,
+            block,
+            block_type_def: _,
+        } = &self.closure;
         let runner = closure::Runner::new(variables, |ctx| block.resolve(ctx));
 
         filter(value, ctx, runner)

@@ -196,7 +196,7 @@ impl Function for ToTimestamp {
             })
             .unwrap_or_default();
 
-        Ok(Box::new(ToTimestampFn { value, unit }))
+        Ok(ToTimestampFn { value, unit }.as_expr())
     }
 
     fn compile_argument(
@@ -282,7 +282,7 @@ struct ToTimestampFn {
     unit: Unit,
 }
 
-impl Expression for ToTimestampFn {
+impl FunctionExpression for ToTimestampFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let unit = self.unit;

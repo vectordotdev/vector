@@ -50,7 +50,7 @@ impl Function for Join {
         let value = arguments.required("value");
         let separator = arguments.optional("separator");
 
-        Ok(Box::new(JoinFn { value, separator }))
+        Ok(JoinFn { value, separator }.as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -68,7 +68,7 @@ struct JoinFn {
     separator: Option<Box<dyn Expression>>,
 }
 
-impl Expression for JoinFn {
+impl FunctionExpression for JoinFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let array = self.value.resolve(ctx)?;
         let separator = self

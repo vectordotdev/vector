@@ -27,7 +27,7 @@ impl Abort {
         let message = message
             .map(|node| {
                 let (expr_span, expr) = node.take();
-                let type_def = expr.type_def(state);
+                let type_def = expr.type_info(state).result;
 
                 if type_def.is_fallible() {
                     Err(Error {

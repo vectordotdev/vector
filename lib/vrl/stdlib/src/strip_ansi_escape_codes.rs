@@ -39,7 +39,7 @@ impl Function for StripAnsiEscapeCodes {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(StripAnsiEscapeCodesFn { value }))
+        Ok(StripAnsiEscapeCodesFn { value }.as_expr())
     }
 }
 
@@ -48,7 +48,7 @@ struct StripAnsiEscapeCodesFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for StripAnsiEscapeCodesFn {
+impl FunctionExpression for StripAnsiEscapeCodesFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?;
 

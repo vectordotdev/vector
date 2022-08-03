@@ -39,7 +39,7 @@ impl Function for Strlen {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(StrlenFn { value }))
+        Ok(StrlenFn { value }.as_expr())
     }
 }
 
@@ -48,7 +48,7 @@ struct StrlenFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for StrlenFn {
+impl FunctionExpression for StrlenFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
 

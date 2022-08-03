@@ -44,7 +44,7 @@ impl Function for IsTimestamp {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(IsTimestampFn { value }))
+        Ok(IsTimestampFn { value }.as_expr())
     }
 }
 
@@ -53,7 +53,7 @@ struct IsTimestampFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for IsTimestampFn {
+impl FunctionExpression for IsTimestampFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         self.value.resolve(ctx).map(|v| value!(v.is_timestamp()))
     }

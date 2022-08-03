@@ -69,7 +69,7 @@ impl Function for IsEmpty {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(IsEmptyFn { value }))
+        Ok(IsEmptyFn { value }.as_expr())
     }
 }
 
@@ -78,7 +78,7 @@ struct IsEmptyFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for IsEmptyFn {
+impl FunctionExpression for IsEmptyFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         is_empty(value)

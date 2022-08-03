@@ -92,9 +92,7 @@ impl Function for ParseAwsCloudWatchLogSubscriptionMessage {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(ParseAwsCloudWatchLogSubscriptionMessageFn {
-            value,
-        }))
+        Ok(ParseAwsCloudWatchLogSubscriptionMessageFn { value }.as_expr())
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -111,7 +109,7 @@ struct ParseAwsCloudWatchLogSubscriptionMessageFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ParseAwsCloudWatchLogSubscriptionMessageFn {
+impl FunctionExpression for ParseAwsCloudWatchLogSubscriptionMessageFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?;
         parse_aws_cloudwatch_log_subscription_message(bytes)

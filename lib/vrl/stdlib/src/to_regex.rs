@@ -42,7 +42,7 @@ impl Function for ToRegex {
     ) -> Compiled {
         warn!("`to_regex` is an expensive function that could impact throughput.");
         let value = arguments.required("value");
-        Ok(Box::new(ToRegexFn { value }))
+        Ok(ToRegexFn { value }.as_expr())
     }
 }
 
@@ -51,7 +51,7 @@ struct ToRegexFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ToRegexFn {
+impl FunctionExpression for ToRegexFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         to_regex(value)

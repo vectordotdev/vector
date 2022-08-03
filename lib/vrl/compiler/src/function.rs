@@ -16,7 +16,7 @@ use crate::{
     parser::Node,
     state::{ExternalEnv, LocalEnv},
     value::{kind, Kind},
-    Span,
+    Span, TypeDef,
 };
 
 pub type Compiled = Result<Box<dyn Expression>, Box<dyn DiagnosticMessage>>;
@@ -219,7 +219,7 @@ impl Parameter {
 
 #[derive(Debug, Default, Clone)]
 pub struct ArgumentList {
-    pub(crate) arguments: HashMap<&'static str, Expr>,
+    pub(crate) arguments: HashMap<&'static str, (Expr, TypeDef)>,
 
     /// A closure argument differs from regular arguments, in that it isn't an
     /// expression by itself, and it also isn't tied to a parameter string in
@@ -436,8 +436,8 @@ impl ArgumentList {
     }
 
     #[cfg(feature = "expr-function_call")]
-    pub(crate) fn insert(&mut self, k: &'static str, v: Expr) {
-        self.arguments.insert(k, v);
+    pub(crate) fn insert(&mut self, k: &'static str, v: Expr, type_def: TypeDef) {
+        self.arguments.insert(k, (v, type_def));
     }
 
     #[cfg(feature = "expr-function_call")]
@@ -446,7 +446,21 @@ impl ArgumentList {
     }
 
     pub(crate) fn optional_expr(&mut self, keyword: &'static str) -> Option<Expr> {
-        self.arguments.get(keyword).cloned()
+        self.arguments
+            .get(keyword)
+            .cloned()
+            .map(|(expr, _type_def)| expr)
+    }
+
+    pub fn optional_type(&mut self, keyword: &'static str) -> Option<TypeDef> {
+        self.arguments
+            .get(keyword)
+            .cloned()
+            .map(|(_expr, type_def)| type_def)
+    }
+
+    pub fn required_type(&mut self, keyword: &'static str) -> TypeDef {
+        required(self.optional_type(keyword))
     }
 
     pub fn required_expr(&mut self, keyword: &'static str) -> Expr {
@@ -458,53 +472,60 @@ fn required<T>(argument: Option<T>) -> T {
     argument.expect("invalid function signature")
 }
 
-impl From<HashMap<&'static str, Value>> for ArgumentList {
-    fn from(map: HashMap<&'static str, Value>) -> Self {
-        Self {
-            arguments: map
+#[cfg(any(test, feature = "test"))]
+mod test_impls {
+    use super::*;
+
+    impl From<HashMap<&'static str, Value>> for ArgumentList {
+        fn from(map: HashMap<&'static str, Value>) -> Self {
+            Self {
+                arguments: map
+                    .into_iter()
+                    .map(|(k, v)| (k, (v.clone().into(), v.kind().into())))
+                    .collect::<HashMap<_, _>>(),
+                closure: None,
+            }
+        }
+    }
+
+    impl From<Vec<Node<FunctionArgument>>> for ArgumentList {
+        fn from(arguments: Vec<Node<FunctionArgument>>) -> Self {
+            let arguments = arguments
                 .into_iter()
-                .map(|(k, v)| (k, v.into()))
-                .collect::<HashMap<_, _>>(),
-            closure: None,
+                .map(|arg| {
+                    let arg = arg.into_inner();
+                    // TODO: find a better API design that doesn't require unwrapping.
+                    let key = arg.parameter().expect("exists").keyword;
+                    let expr = arg.into_inner();
+                    let state = TypeState::default();
+                    let type_def = expr.type_def(&state);
+                    (key, (expr, type_def))
+                })
+                .collect::<HashMap<_, _>>();
+
+            Self {
+                arguments,
+                ..Default::default()
+            }
         }
     }
-}
 
-impl From<Vec<Node<FunctionArgument>>> for ArgumentList {
-    fn from(arguments: Vec<Node<FunctionArgument>>) -> Self {
-        let arguments = arguments
-            .into_iter()
-            .map(|arg| {
-                let arg = arg.into_inner();
-                // TODO: find a better API design that doesn't require unwrapping.
-                let key = arg.parameter().expect("exists").keyword;
-                let expr = arg.into_inner();
-
-                (key, expr)
-            })
-            .collect::<HashMap<_, _>>();
-
-        Self {
-            arguments,
-            ..Default::default()
+    impl From<ArgumentList> for Vec<(&'static str, Option<FunctionArgument>)> {
+        fn from(args: ArgumentList) -> Self {
+            args.arguments
+                .iter()
+                .map(|(key, (expr, type_def))| {
+                    (
+                        *key,
+                        Some(FunctionArgument::new(
+                            None,
+                            Node::new(Span::default(), expr.clone()),
+                            type_def.clone(),
+                        )),
+                    )
+                })
+                .collect()
         }
-    }
-}
-
-impl From<ArgumentList> for Vec<(&'static str, Option<FunctionArgument>)> {
-    fn from(args: ArgumentList) -> Self {
-        args.arguments
-            .iter()
-            .map(|(key, expr)| {
-                (
-                    *key,
-                    Some(FunctionArgument::new(
-                        None,
-                        Node::new(Span::default(), expr.clone()),
-                    )),
-                )
-            })
-            .collect()
     }
 }
 
@@ -514,14 +535,16 @@ impl From<ArgumentList> for Vec<(&'static str, Option<FunctionArgument>)> {
 pub struct FunctionClosure {
     pub variables: Vec<Ident>,
     pub block: Block,
+    pub block_type_def: TypeDef,
 }
 
 impl FunctionClosure {
     #[must_use]
-    pub fn new<T: Into<Ident>>(variables: Vec<T>, block: Block) -> Self {
+    pub fn new<T: Into<Ident>>(variables: Vec<T>, block: Block, block_type_def: TypeDef) -> Self {
         Self {
             variables: variables.into_iter().map(Into::into).collect(),
             block,
+            block_type_def,
         }
     }
 }

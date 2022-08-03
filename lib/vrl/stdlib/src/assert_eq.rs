@@ -1,4 +1,5 @@
 use ::value::Value;
+use vrl::prelude::expression::FunctionExpression;
 use vrl::{diagnostic::Note, prelude::*};
 
 fn assert_eq(left: Value, right: Value, message: Option<Value>) -> Resolved {
@@ -79,11 +80,12 @@ impl Function for AssertEq {
         let right = arguments.required("right");
         let message = arguments.optional("message");
 
-        Ok(Box::new(AssertEqFn {
+        Ok(AssertEqFn {
             left,
             right,
             message,
-        }))
+        }
+        .as_expr())
     }
 }
 
@@ -94,7 +96,7 @@ struct AssertEqFn {
     message: Option<Box<dyn Expression>>,
 }
 
-impl Expression for AssertEqFn {
+impl FunctionExpression for AssertEqFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let left = self.left.resolve(ctx)?;
         let right = self.right.resolve(ctx)?;

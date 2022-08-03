@@ -54,11 +54,12 @@ impl Function for ParseRegex {
             .optional("numeric_groups")
             .unwrap_or_else(|| expr!(false));
 
-        Ok(Box::new(ParseRegexFn {
+        Ok(ParseRegexFn {
             value,
             pattern,
             numeric_groups,
-        }))
+        }
+        .as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -119,7 +120,7 @@ pub(crate) struct ParseRegexFn {
     numeric_groups: Box<dyn Expression>,
 }
 
-impl Expression for ParseRegexFn {
+impl FunctionExpression for ParseRegexFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let numeric_groups = self.numeric_groups.resolve(ctx)?;

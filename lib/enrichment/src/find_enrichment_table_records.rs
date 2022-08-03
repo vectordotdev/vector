@@ -133,14 +133,15 @@ impl Function for FindEnrichmentTableRecords {
                 .map_err(|err| Box::new(err) as Box<_>)?,
         );
 
-        Ok(Box::new(FindEnrichmentTableRecordsFn {
+        Ok(FindEnrichmentTableRecordsFn {
             table,
             condition,
             index,
             select,
             case_sensitive,
             enrichment_tables: registry.as_readonly(),
-        }))
+        }
+        .as_expr())
     }
 
     fn compile_argument(
@@ -188,7 +189,7 @@ pub struct FindEnrichmentTableRecordsFn {
     enrichment_tables: TableSearch,
 }
 
-impl Expression for FindEnrichmentTableRecordsFn {
+impl FunctionExpression for FindEnrichmentTableRecordsFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let condition = self
             .condition

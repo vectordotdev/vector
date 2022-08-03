@@ -46,7 +46,7 @@ impl Function for ReverseDns {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(ReverseDnsFn { value }))
+        Ok(ReverseDnsFn { value }.as_expr())
     }
 }
 
@@ -55,7 +55,7 @@ struct ReverseDnsFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ReverseDnsFn {
+impl FunctionExpression for ReverseDnsFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         reverse_dns(value)

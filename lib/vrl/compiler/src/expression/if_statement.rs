@@ -56,15 +56,6 @@ impl Expression for IfStatement {
             TypeInfo::new(final_state, result)
         }
     }
-
-    fn type_def(&self, state: &TypeState) -> TypeDef {
-        let type_def = self.if_block.type_def(state);
-
-        match &self.else_block {
-            None => type_def.add_null(),
-            Some(alternative) => type_def.union(alternative.type_def(state)),
-        }
-    }
 }
 
 impl fmt::Display for IfStatement {

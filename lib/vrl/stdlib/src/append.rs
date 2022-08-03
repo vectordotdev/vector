@@ -1,4 +1,5 @@
 use ::value::Value;
+use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
 
 fn append(value: Value, items: Value) -> Resolved {
@@ -48,7 +49,7 @@ impl Function for Append {
         let value = arguments.required("value");
         let items = arguments.required("items");
 
-        Ok(Box::new(AppendFn { value, items }))
+        Ok(AppendFn { value, items }.as_expr())
     }
 }
 
@@ -58,7 +59,7 @@ struct AppendFn {
     items: Box<dyn Expression>,
 }
 
-impl Expression for AppendFn {
+impl FunctionExpression for AppendFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let items = self.items.resolve(ctx)?;

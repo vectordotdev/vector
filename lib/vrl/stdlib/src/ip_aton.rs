@@ -43,7 +43,7 @@ impl Function for IpAton {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(IpAtonFn { value }))
+        Ok(IpAtonFn { value }.as_expr())
     }
 }
 
@@ -52,7 +52,7 @@ struct IpAtonFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for IpAtonFn {
+impl FunctionExpression for IpAtonFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         ip_aton(value)

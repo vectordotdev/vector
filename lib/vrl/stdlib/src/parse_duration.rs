@@ -87,7 +87,7 @@ impl Function for ParseDuration {
         let value = arguments.required("value");
         let unit = arguments.required("unit");
 
-        Ok(Box::new(ParseDurationFn { value, unit }))
+        Ok(ParseDurationFn { value, unit }.as_expr())
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -112,7 +112,7 @@ struct ParseDurationFn {
     unit: Box<dyn Expression>,
 }
 
-impl Expression for ParseDurationFn {
+impl FunctionExpression for ParseDurationFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?;
         let unit = self.unit.resolve(ctx)?;

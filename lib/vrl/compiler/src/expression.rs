@@ -94,24 +94,12 @@ pub trait Expression: Send + Sync + fmt::Debug + DynClone {
     /// Resolve an expression to its [`TypeDef`] type definition.
     /// This must be called with the _initial_ TypeState.
     fn type_def(&self, state: &TypeState) -> TypeDef {
-        panic!("deprecated type_def called for {:?}", self);
+        self.type_info(state).result
     }
 
-    /// Updates the state if necessary.
-    /// By default it does nothing.
-    // deprecated
-    fn update_state(
-        &mut self,
-        _local: &mut LocalEnv,
-        _external: &mut ExternalEnv,
-    ) -> Result<(), ExpressionError> {
-        Ok(())
-    }
-
-    fn type_info(&self, state: &TypeState) -> TypeInfo {
-        // TODO: remove this
-        unimplemented!("type_info not implemented for {:?}", self)
-    }
+    /// Calculates the type state after an expression resolves, including the expression result itself.
+    /// This must be called with the _initial_ TypeState.
+    fn type_info(&self, state: &TypeState) -> TypeInfo;
 
     /// Applies state changes from the expression to the given state, and
     /// returns the result type.

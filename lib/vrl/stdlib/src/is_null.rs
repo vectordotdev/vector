@@ -44,7 +44,7 @@ impl Function for IsNull {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(IsNullFn { value }))
+        Ok(IsNullFn { value }.as_expr())
     }
 }
 
@@ -53,7 +53,7 @@ struct IsNullFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for IsNullFn {
+impl FunctionExpression for IsNullFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         self.value.resolve(ctx).map(|v| value!(v.is_null()))
     }

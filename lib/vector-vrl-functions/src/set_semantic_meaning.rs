@@ -147,14 +147,14 @@ impl Function for SetSemanticMeaning {
             list.insert(meaning, path);
         };
 
-        Ok(Box::new(SetSemanticMeaningFn))
+        Ok(SetSemanticMeaningFn.as_expr())
     }
 }
 
 #[derive(Debug, Clone)]
 struct SetSemanticMeaningFn;
 
-impl Expression for SetSemanticMeaningFn {
+impl FunctionExpression for SetSemanticMeaningFn {
     fn resolve(&self, _ctx: &mut Context) -> Resolved {
         Ok(Value::Null)
     }

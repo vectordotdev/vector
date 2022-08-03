@@ -49,7 +49,7 @@ impl Function for Object {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(ObjectFn { value }))
+        Ok(ObjectFn { value }.as_expr())
     }
 }
 
@@ -58,7 +58,7 @@ struct ObjectFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ObjectFn {
+impl FunctionExpression for ObjectFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         object(self.value.resolve(ctx)?)
     }

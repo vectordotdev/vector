@@ -75,7 +75,7 @@ impl Function for ToSyslogFacility {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(ToSyslogFacilityFn { value }))
+        Ok(ToSyslogFacilityFn { value }.as_expr())
     }
 }
 
@@ -84,7 +84,7 @@ struct ToSyslogFacilityFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ToSyslogFacilityFn {
+impl FunctionExpression for ToSyslogFacilityFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
 

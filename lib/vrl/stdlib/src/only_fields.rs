@@ -33,7 +33,7 @@ impl Function for OnlyFields {
             }
         }
 
-        Ok(Box::new(OnlyFieldsFn { paths }))
+        Ok(OnlyFieldsFn { paths }.as_expr())
     }
 }
 
@@ -42,7 +42,7 @@ pub struct OnlyFieldsFn {
     paths: Vec<Path>,
 }
 
-impl Expression for OnlyFieldsFn {
+impl FunctionExpression for OnlyFieldsFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let paths = self.paths.iter().map(Path::to_string).collect::<Vec<_>>();
 

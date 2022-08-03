@@ -111,7 +111,7 @@ impl Function for ToFloat {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(ToFloatFn { value }))
+        Ok(ToFloatFn { value }.as_expr())
     }
 }
 
@@ -120,7 +120,7 @@ struct ToFloatFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ToFloatFn {
+impl FunctionExpression for ToFloatFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
 

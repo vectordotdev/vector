@@ -42,6 +42,6 @@ impl Function for ParseLinuxAuthorization {
         let value = arguments.required("value");
 
         // The parse_linux_authorization function is just an alias for parse_syslog
-        Ok(Box::new(ParseSyslogFn { value }))
+        Ok(ParseSyslogFn { value }.as_expr())
     }
 }

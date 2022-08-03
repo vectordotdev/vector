@@ -1,4 +1,5 @@
 use ::value::Value;
+use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
 
 fn array(value: Value) -> Resolved {
@@ -49,7 +50,7 @@ impl Function for Array {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(ArrayFn { value }))
+        Ok(ArrayFn { value }.as_expr())
     }
 }
 
@@ -58,7 +59,7 @@ struct ArrayFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ArrayFn {
+impl FunctionExpression for ArrayFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         array(self.value.resolve(ctx)?)
     }

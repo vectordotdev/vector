@@ -105,7 +105,7 @@ impl Function for ParseKlog {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(ParseKlogFn { value }))
+        Ok(ParseKlogFn { value }.as_expr())
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -122,7 +122,7 @@ struct ParseKlogFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ParseKlogFn {
+impl FunctionExpression for ParseKlogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?;
         parse_klog(bytes)

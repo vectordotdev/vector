@@ -59,7 +59,7 @@ impl Function for ToSyslogLevel {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(ToSyslogLevelFn { value }))
+        Ok(ToSyslogLevelFn { value }.as_expr())
     }
 }
 
@@ -68,7 +68,7 @@ struct ToSyslogLevelFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ToSyslogLevelFn {
+impl FunctionExpression for ToSyslogLevelFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
 

@@ -78,7 +78,7 @@ impl Function for Sha2 {
             .try_bytes()
             .expect("variant not bytes");
 
-        Ok(Box::new(Sha2Fn { value, variant }))
+        Ok(Sha2Fn { value, variant }.as_expr())
     }
 
     fn compile_argument(
@@ -109,7 +109,7 @@ struct Sha2Fn {
     variant: Bytes,
 }
 
-impl Expression for Sha2Fn {
+impl FunctionExpression for Sha2Fn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let variant = &self.variant;

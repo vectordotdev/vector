@@ -1,5 +1,6 @@
 use ::value::Value;
 use vrl::prelude::*;
+use vrl::state::TypeInfo;
 
 #[inline]
 fn del(query: &expression::Query, ctx: &mut Context) -> Resolved {
@@ -96,9 +97,7 @@ impl Function for Del {
             .into());
         }
 
-        let return_type = query.type_def(state);
-
-        Ok(Box::new(DelFn { query, return_type }))
+        Ok(Box::new(DelFn { query }))
     }
 
     fn compile_argument(
@@ -131,7 +130,6 @@ impl Function for Del {
 #[derive(Debug, Clone)]
 pub(crate) struct DelFn {
     query: expression::Query,
-    return_type: TypeDef,
 }
 
 impl DelFn {
@@ -168,33 +166,25 @@ impl Expression for DelFn {
         del(&self.query, ctx)
     }
 
-    fn type_def(&self, _: &state::TypeState) -> TypeDef {
-        // The return type can't be queried from the state since it was deleted in "update_state"
-        self.return_type.clone()
-    }
+    fn type_info(&self, state: &state::TypeState) -> TypeInfo {
+        let mut state = state.clone();
 
-    // fn update_state(
-    //     &mut self,
-    //     _local: &mut state::LocalEnv,
-    //     external: &mut state::ExternalEnv,
-    // ) -> std::result::Result<(), ExpressionError> {
-    //     // FIXME(Jean): This should also delete non-external queries, as `del(foo.bar)` is
-    //     // supported.
-    //     if self.query.is_external() {
-    //         if let Err(
-    //             value::kind::remove::Error::RootPath
-    //             | value::kind::remove::Error::CoalescedPath
-    //             | value::kind::remove::Error::NegativeIndexPath,
-    //         ) = self.query.delete_type_def(external)
-    //         {
-    //             // This function is (currently) infallible, so we ignore any errors here.
-    //             //
-    //             // see: https://github.com/vectordotdev/vector/issues/11264
-    //         }
-    //     }
-    //
-    //     Ok(())
-    // }
+        let return_type = self.query.apply_type_info(&mut state);
+
+        if self.query.is_external() {
+            if let Err(
+                value::kind::remove::Error::RootPath
+                | value::kind::remove::Error::CoalescedPath
+                | value::kind::remove::Error::NegativeIndexPath,
+            ) = self.query.delete_type_def(&mut state.external)
+            {
+                // This function is (currently) infallible, so we ignore any errors here.
+                //
+                // see: https://github.com/vectordotdev/vector/issues/11264
+            }
+        }
+        TypeInfo::new(state, return_type)
+    }
 }
 
 impl fmt::Display for DelFn {
