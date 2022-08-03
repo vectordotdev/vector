@@ -20,9 +20,7 @@ use once_cell::sync::Lazy;
 pub use secret::*;
 pub use source::*;
 
-use super::{
-    builder::ConfigBuilder, format, validation, vars, Config, ConfigPath, Format, FormatHint,
-};
+use super::{builder::ConfigBuilder, format, vars, Config, ConfigPath, Format, FormatHint};
 use crate::signal;
 
 pub static CONFIG_PATHS: Lazy<Mutex<Vec<ConfigPath>>> = Lazy::new(Mutex::default);
@@ -151,14 +149,17 @@ pub async fn load_from_paths_with_provider_and_secrets(
         load_builder_from_paths(config_paths)?
     };
 
-    validation::check_provider(&builder)?;
     signal_handler.clear();
 
-    // If there's a provider, overwrite the existing config builder with the remote variant.
-    if let Some(mut provider) = builder.provider {
-        builder = provider.build(signal_handler).await?;
-        debug!(message = "Provider configured.", provider = ?provider.provider_type());
-    }
+    // This is where we conceptually go from the config as it is on disk to whatever the "full"
+    // config is going to be. In the simplest case these are the same thing, and all
+    // sources/transforms/sinks are defined directly. In the case of a `[provider]` block or other
+    // remote configuration, we expect to get the actual topology from elsewhere. It would be a bit
+    // clearer if on-disk config and full topology config were better differentiated in the type
+    // system, but for now we essentially just replace one `ConfigBuilder` with another.
+    let mut provider = super::providers::from_builder(&mut builder)?;
+    builder = provider.build(signal_handler).await?;
+    debug!(message = "Provider configured.", provider = ?provider.provider_type());
 
     let (new_config, build_warnings) = builder.build_with_warnings()?;
 

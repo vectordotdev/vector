@@ -5,19 +5,6 @@ use vector_core::internal_event::DEFAULT_OUTPUT;
 
 use super::{builder::ConfigBuilder, ComponentKey, Config, OutputId, Resource};
 
-/// Check that provide + topology config aren't present in the same builder, which is an error.
-pub fn check_provider(config: &ConfigBuilder) -> Result<(), Vec<String>> {
-    if config.provider.is_some()
-        && (!config.sources.is_empty() || !config.transforms.is_empty() || !config.sinks.is_empty())
-    {
-        Err(vec![
-            "No sources/transforms/sinks are allowed if provider config is present.".to_owned(),
-        ])
-    } else {
-        Ok(())
-    }
-}
-
 pub fn check_names<'a, I: Iterator<Item = &'a ComponentKey>>(names: I) -> Result<(), Vec<String>> {
     let errors: Vec<_> = names
         .filter(|component_key| component_key.id().contains('.'))
