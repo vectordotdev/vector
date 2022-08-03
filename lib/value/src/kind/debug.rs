@@ -17,6 +17,8 @@ fn insert_kind(tree: &mut BTreeMap<String, Value>, kind: &Kind, show_unknown: bo
         insert_if_true(tree, "never", true);
     } else if kind.is_any() {
         insert_if_true(tree, "any", true);
+    } else if kind.is_json() {
+        insert_if_true(tree, "json", true);
     } else {
         insert_if_true(tree, "bytes", kind.contains_bytes());
         insert_if_true(tree, "integer", kind.contains_integer());

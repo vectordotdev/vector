@@ -254,7 +254,7 @@ mod test {
             stream_test(
                 addr,
                 VectorConfig::from_address(addr.into()),
-                SinkConfig::from_address(format!("localhost:{}", addr.port())),
+                SinkConfig::from_address(format!("localhost:{}", addr.port()), Default::default()),
             )
             .await;
         })
@@ -276,7 +276,10 @@ mod test {
                     config
                 },
                 {
-                    let mut config = SinkConfig::from_address(format!("localhost:{}", addr.port()));
+                    let mut config = SinkConfig::from_address(
+                        format!("localhost:{}", addr.port()),
+                        Default::default(),
+                    );
                     config.set_tls(Some(TlsEnableableConfig {
                         enabled: Some(true),
                         options: TlsConfig {

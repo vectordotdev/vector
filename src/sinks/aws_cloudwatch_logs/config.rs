@@ -198,8 +198,8 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
         "aws_cloudwatch_logs"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 

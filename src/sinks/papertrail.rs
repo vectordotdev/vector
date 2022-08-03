@@ -39,6 +39,14 @@ pub struct PapertrailConfig {
     /// The value to use as the `process` in Papertrail.
     #[configurable(metadata(templateable))]
     process: Option<Template>,
+
+    #[configurable(derived)]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 inventory::submit! {
@@ -109,8 +117,8 @@ impl SinkConfig for PapertrailConfig {
         "papertrail"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        None
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 

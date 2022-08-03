@@ -1,7 +1,10 @@
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::{quote, quote_spanned};
-use syn::{parse_macro_input, parse_quote, spanned::Spanned, DeriveInput, ExprPath, Ident, Type};
+use syn::{
+    parse_macro_input, parse_quote, spanned::Spanned, token::Colon2, DeriveInput, ExprPath, Ident,
+    PathArguments, Type,
+};
 use vector_config_common::{attributes::CustomAttribute, validation::Validation};
 
 use crate::ast::{Container, Data, Field, Style, Tagging, Variant};
@@ -71,6 +74,7 @@ pub fn derive_configurable_impl(input: TokenStream) -> TokenStream {
             }
         };
     };
+
     configurable_impl.into()
 }
 
@@ -136,13 +140,13 @@ fn build_struct_generate_schema_fn(
 }
 
 fn generate_struct_field(field: &Field<'_>) -> proc_macro2::TokenStream {
-    let field_ty = field.ty();
+    let field_schema_ty = get_field_schema_ty(field);
 
     let field_metadata_ref = Ident::new("field_metadata", Span::call_site());
     let field_metadata = generate_field_metadata(&field_metadata_ref, field);
 
     let spanned_generate_schema = quote_spanned! {field.span()=>
-        <#field_ty as ::vector_config::Configurable>::generate_schema(schema_gen, #field_metadata_ref.as_subschema())
+        <#field_schema_ty as ::vector_config::Configurable>::generate_schema(schema_gen, #field_metadata_ref.as_subschema())
     };
 
     quote! {
@@ -159,7 +163,7 @@ fn generate_named_struct_field(
     let field_name = field
         .ident()
         .expect("named struct fields must always have an ident");
-    let field_ty = field.ty();
+    let field_schema_ty = get_field_schema_ty(field);
     let field_already_contained = format!(
         "schema properties already contained entry for `{}`, this should not occur",
         field_name
@@ -182,7 +186,7 @@ fn generate_named_struct_field(
         // field is a part of, then we consider it required unless the field type itself is inherently
         // optional, such as being `Option<T>`.
         let spanned_is_optional = quote_spanned! {field.span()=>
-            <#field_ty as ::vector_config::Configurable>::is_optional()
+            <#field_schema_ty as ::vector_config::Configurable>::is_optional()
         };
         let maybe_field_required =
             if container.default_value().is_none() && field.default_value().is_none() {
@@ -332,13 +336,19 @@ fn generate_container_metadata(
 
 fn generate_field_metadata(meta_ident: &Ident, field: &Field<'_>) -> proc_macro2::TokenStream {
     let field_ty = field.ty();
+    let field_schema_ty = get_field_schema_ty(field);
+
     let spanned_metadata = quote_spanned! {field.span()=>
-        <#field_ty as ::vector_config::Configurable>::metadata()
+        <#field_schema_ty as ::vector_config::Configurable>::metadata()
     };
 
     let maybe_title = get_metadata_title(meta_ident, field.title());
     let maybe_description = get_metadata_description(meta_ident, field.description());
-    let maybe_default_value = get_metadata_default_value(meta_ident, field.default_value());
+    let maybe_default_value = if field_ty != field_schema_ty {
+        get_metadata_default_value_delegated(meta_ident, field_schema_ty, field.default_value())
+    } else {
+        get_metadata_default_value(meta_ident, field.default_value())
+    };
     let maybe_deprecated = get_metadata_deprecated(meta_ident, field.deprecated());
     let maybe_transparent = get_metadata_transparent(meta_ident, field.transparent());
     let maybe_validation = get_metadata_validation(meta_ident, field.validation());
@@ -405,9 +415,23 @@ fn get_metadata_default_value(
     meta_ident: &Ident,
     default_value: Option<ExprPath>,
 ) -> Option<proc_macro2::TokenStream> {
-    default_value.map(|path| {
+    default_value.map(|value| {
         quote! {
-            #meta_ident.set_default_value(#path());
+            #meta_ident.set_default_value(#value());
+        }
+    })
+}
+
+fn get_metadata_default_value_delegated(
+    meta_ident: &Ident,
+    default_ty: &syn::Type,
+    default_value: Option<ExprPath>,
+) -> Option<proc_macro2::TokenStream> {
+    default_value.map(|value| {
+        let default_ty = get_ty_for_expr_pos(default_ty);
+
+        quote! {
+            #meta_ident.set_default_value(#default_ty::from(#value()));
         }
     })
 }
@@ -467,6 +491,16 @@ fn get_metadata_custom_attributes(
     quote! {
         #(#mapped_custom_attributes)*
     }
+}
+
+fn get_field_schema_ty<'a>(field: &'a Field<'a>) -> &'a syn::Type {
+    // If there's a delegated type being used for field (de)serialization, that's ultimately the type
+    // we use to declare the schema, because we have to generate the schema for whatever type is
+    // actually being (de)serialized, not the final type that the intermediate value ends up getting
+    // converted to.
+    //
+    // Otherwise, we just use the actual field type.
+    field.delegated_ty().unwrap_or_else(|| field.ty())
 }
 
 fn generate_named_enum_field(field: &Field<'_>) -> proc_macro2::TokenStream {
@@ -821,5 +855,35 @@ fn generate_enum_variant_subschema(
 
             subschemas.push(subschema);
         }
+    }
+}
+
+/// Gets a type token suitable for use in expression position.
+///
+/// Normally, we refer to types with generic type parameters using their condensed form: `T<...>`.
+/// Sometimes, however, we must refer to them with their disambiguated form: `T::<...>`. This is due
+/// to a limitation in syntax parsing between types in statement versus expression position.
+///
+/// Statement position would be somehwere like declaring a field on a struct, where using angle
+/// brackets has no ambiguous meaning, as you can't compare two items as part of declaring a struct
+/// field. Conversely, expression position implies anywhere we could normally provide an expression,
+/// and expressions can certainly contain comparisons. As such, we need to use the disambiguated
+/// form in expression position.
+///
+/// While most commonly used for passing generic type parameters to functions/methods themselves,
+/// this is also known as the "turbofish" syntax.
+fn get_ty_for_expr_pos(ty: &syn::Type) -> syn::Type {
+    match ty {
+        syn::Type::Path(tp) => {
+            let mut new_tp = tp.clone();
+            for segment in new_tp.path.segments.iter_mut() {
+                if let PathArguments::AngleBracketed(ab) = &mut segment.arguments {
+                    ab.colon2_token = Some(Colon2::default());
+                }
+            }
+
+            syn::Type::Path(new_tp)
+        }
+        _ => ty.clone(),
     }
 }
