@@ -228,7 +228,7 @@ impl TypeDef {
     }
 
     #[inline]
-    pub fn add_array(mut self, collection: impl Into<Collection<Index>>) -> Self {
+    pub fn or_array(mut self, collection: impl Into<Collection<Index>>) -> Self {
         self.kind.add_array(collection);
         self
     }
@@ -261,7 +261,7 @@ impl TypeDef {
     }
 
     #[inline]
-    pub fn add_object(mut self, collection: impl Into<Collection<Field>>) -> Self {
+    pub fn or_object(mut self, collection: impl Into<Collection<Field>>) -> Self {
         self.kind.add_object(collection);
         self
     }

@@ -18,11 +18,10 @@ macro_rules! test_type_def {
             $(
                 #[test]
                 fn $name() {
-                    let mut local = $crate::state::LocalEnv::default();
-                    let mut external = $crate::state::ExternalEnv::default();
-                    let expression = Box::new($expr((&mut local, &mut external)));
+                    let mut state = $crate::state::TypeState::default();
+                    let expression = Box::new($expr((&mut state.local, &mut state.external)));
 
-                    assert_eq!(expression.type_def((&local, &external)), $def);
+                    assert_eq!(expression.type_def(&state), $def);
                 }
             )+
         }
@@ -90,10 +89,9 @@ macro_rules! test_function {
             #[test]
             fn [<$name _ $case:snake:lower>]() {
                 $before
-                let mut local = $crate::state::LocalEnv::default();
-                let mut external = $crate::state::ExternalEnv::default();
+                let mut state = $crate::state::TypeState::default();
 
-                let (expression, want) = $crate::__prep_bench_or_test!($func, (&mut local, &mut external), $args, $(Ok(::value::Value::from($ok)))? $(Err($err.to_owned()))?);
+                let (expression, want) = $crate::__prep_bench_or_test!($func, &mut state, $args, $(Ok(::value::Value::from($ok)))? $(Err($err.to_owned()))?);
                 match expression {
                     Ok(expression) => {
                         let mut runtime_state = $crate::state::Runtime::default();
@@ -105,7 +103,7 @@ macro_rules! test_function {
                             .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
 
                         assert_eq!(got_value, want);
-                        let got_tdef = expression.type_def((&local, &external));
+                        let got_tdef = expression.type_def(&state);
 
                         assert_eq!(got_tdef, $tdef);
                     }

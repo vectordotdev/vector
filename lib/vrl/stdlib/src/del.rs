@@ -134,7 +134,7 @@ pub(crate) struct DelFn {
 
 impl DelFn {
     #[cfg(test)]
-    fn new(path: &str, return_type: TypeDef) -> Self {
+    fn new(path: &str) -> Self {
         use std::str::FromStr;
 
         Self {
@@ -142,7 +142,6 @@ impl DelFn {
                 expression::Target::External,
                 FromStr::from_str(path).unwrap(),
             ),
-            return_type,
         }
     }
 }
@@ -206,43 +205,43 @@ mod tests {
                 // String field exists
                 btreemap! { "exists" => "value" },
                 Ok(value!("value")),
-                DelFn::new("exists", TypeDef::bytes()),
+                DelFn::new("exists"),
             ),
             (
                 // String field doesn't exist
                 btreemap! { "exists" => "value" },
                 Ok(value!(null)),
-                DelFn::new("does_not_exist", TypeDef::null()),
+                DelFn::new("does_not_exist"),
             ),
             (
                 // Array field exists
                 btreemap! { "exists" => value!([1, 2, 3]) },
                 Ok(value!([1, 2, 3])),
-                DelFn::new("exists", value!([1, 2, 3]).kind().into()),
+                DelFn::new("exists"),
             ),
             (
                 // Null field exists
                 btreemap! { "exists" => value!(null) },
                 Ok(value!(null)),
-                DelFn::new("exists", TypeDef::null()),
+                DelFn::new("exists"),
             ),
             (
                 // Map field exists
                 btreemap! {"exists" => btreemap! { "foo" => "bar" }},
                 Ok(value!(btreemap! {"foo" => "bar" })),
-                DelFn::new("exists", value!(btreemap! {"foo" => "bar" }).kind().into()),
+                DelFn::new("exists"),
             ),
             (
                 // Integer field exists
                 btreemap! { "exists" => 127 },
                 Ok(value!(127)),
-                DelFn::new("exists", TypeDef::integer()),
+                DelFn::new("exists"),
             ),
             (
                 // Array field exists
                 btreemap! {"exists" => value!([1, 2, 3]) },
                 Ok(value!(2)),
-                DelFn::new(".exists[1]", TypeDef::integer()),
+                DelFn::new(".exists[1]"),
             ),
         ];
         let tz = TimeZone::default();

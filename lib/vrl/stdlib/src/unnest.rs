@@ -218,6 +218,7 @@ pub(crate) fn invert_array_at_path(typedef: &TypeDef, path: &LookupBuf) -> TypeD
 #[cfg(test)]
 mod tests {
     use vector_common::{btreemap, TimeZone};
+    use vrl::state::TypeState;
 
     use super::*;
 
@@ -476,6 +477,7 @@ mod tests {
             )}),
             Kind::object(Collection::empty()),
         );
+        let state = TypeState { local, external };
 
         let tz = TimeZone::default();
         for (object, expected, func, expected_typedef) in cases {
@@ -483,7 +485,7 @@ mod tests {
             let mut runtime_state = vrl::state::Runtime::default();
             let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
 
-            let got_typedef = func.type_def((&local, &external));
+            let got_typedef = func.type_def(&state);
 
             let got = func
                 .resolve(&mut ctx)

@@ -239,8 +239,8 @@ fn type_def() -> TypeDef {
         .or_integer()
         .or_float()
         .add_null()
-        .add_array(Collection::from_unknown(inner_kind()))
-        .add_object(Collection::from_unknown(inner_kind()))
+        .or_array(Collection::from_unknown(inner_kind()))
+        .or_object(Collection::from_unknown(inner_kind()))
 }
 
 #[cfg(test)]
@@ -266,12 +266,12 @@ mod tests {
             args: func_args![ value: r#"{"field": "value"# ],
             want: Err("unable to parse json: EOF while parsing a string at line 1 column 16"),
             tdef: TypeDef::bytes().fallible()
-                .add_boolean()
-                .add_integer()
-                .add_float()
-                .add_null()
-                .add_array(Collection::from_unknown(inner_kind()))
-                .add_object(Collection::from_unknown(inner_kind())),
+                .or_boolean()
+                .or_integer()
+                .or_float()
+                .or_null()
+                .or_array(Collection::from_unknown(inner_kind()))
+                .or_object(Collection::from_unknown(inner_kind())),
         }
 
         max_depth {
@@ -296,12 +296,12 @@ mod tests {
             args: func_args![ value: r#"{"field": "value"#, max_depth: 3 ],
             want: Err("unable to read json: EOF while parsing a string at line 1 column 16"),
             tdef: TypeDef::bytes().fallible()
-                .add_boolean()
-                .add_integer()
-                .add_float()
-                .add_null()
-                .add_array(Collection::from_unknown(inner_kind()))
-                .add_object(Collection::from_unknown(inner_kind())),
+                .or_boolean()
+                .or_integer()
+                .or_float()
+                .or_null()
+                .or_array(Collection::from_unknown(inner_kind()))
+                .or_object(Collection::from_unknown(inner_kind())),
         }
 
         invalid_input_max_depth {

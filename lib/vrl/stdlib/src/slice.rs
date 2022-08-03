@@ -127,7 +127,7 @@ impl FunctionExpression for SliceFn {
         match self.value.type_def(state) {
             v if v.is_bytes() => td.union(v),
             v if v.is_array() => td.union(v).collect_subtypes(),
-            _ => td.or_bytes().add_array(Collection::any()),
+            _ => td.or_bytes().or_array(Collection::any()),
         }
     }
 }

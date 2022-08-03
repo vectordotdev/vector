@@ -271,7 +271,7 @@ impl FunctionExpression for ParseXmlFn {
 
 fn type_def() -> TypeDef {
     TypeDef::bytes()
-        .add_object(Collection::from_unknown(inner_kind()))
+        .or_object(Collection::from_unknown(inner_kind()))
         .fallible()
 }
 
@@ -682,8 +682,7 @@ mod tests {
 
     #[test]
     fn test_kind() {
-        let local = state::LocalEnv::default();
-        let external = state::ExternalEnv::default();
+        let state = state::TypeState::default();
 
         let func = ParseXmlFn {
             value: value!(true).into_expression(),
@@ -697,7 +696,7 @@ mod tests {
             parse_number: None,
         };
 
-        let type_def = func.type_def((&local, &external));
+        let type_def = func.type_def(&state);
 
         assert!(type_def.is_fallible());
         assert!(!type_def.is_exact());
