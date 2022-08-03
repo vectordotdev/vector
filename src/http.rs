@@ -139,13 +139,13 @@ pub fn build_proxy_connector(
     tls_settings: MaybeTlsSettings,
     proxy_config: &ProxyConfig,
 ) -> Result<ProxyConnector<HttpsConnector<HttpConnector>>, HttpError> {
-    // Create dedicated TLS connector with user tls settings.
+    // Create dedicated TLS connector for the proxied connection with user tls settings.
     let tls = tls_connector_builder(&tls_settings)
         .context(BuildTlsConnectorSnafu)?
         .build();
     let https = build_tls_connector(tls_settings)?;
     let mut proxy = ProxyConnector::new(https).unwrap();
-    // Make proxy connector aware of user TLS settings:
+    // Make proxy connector aware of user TLS settings by setting the TLS connector:
     // https://github.com/vectordotdev/vector/issues/13683
     proxy.set_tls(Some(tls));
     proxy_config
