@@ -388,7 +388,10 @@ mod integration_tests {
     use tokio::time::Duration;
 
     use super::*;
-    use crate::test_util::components::{run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS};
+    use crate::{
+        test_util::components::{run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS},
+        tls,
+    };
 
     async fn run_test(config: HttpScrapeConfig) -> Vec<Event> {
         let events = run_and_assert_source_compliance(
@@ -526,21 +529,22 @@ mod integration_tests {
         // let cert_path = "tests/data/ca/intermediate_server/certs/localhost.cert.pem";
         // let key_path = "tests/data/ca/intermediate_server/private/localhost.key.pem";
 
-        // run_test(HttpScrapeConfig {
-        //     endpoint: "https://dufs-https:5000/logs/json.json".to_string(),
-        //     scrape_interval_secs: 1,
-        //     query: None,
-        //     decoding: DeserializerConfig::Json,
-        //     framing: default_framing_message_based(),
-        //     headers: None,
-        //     auth: None,
-        //     tls: Some(TlsConfig {
-        //         crt_file: Some(cert_path.into()),
-        //         key_file: Some(key_path.into()),
-        //         ..Default::default()
-        //     }),
-        // })
-        // .await;
+        run_test(HttpScrapeConfig {
+            endpoint: "https://dufs-https:5000/logs/json.json".to_string(),
+            scrape_interval_secs: 1,
+            query: None,
+            decoding: DeserializerConfig::Json,
+            framing: default_framing_message_based(),
+            headers: None,
+            auth: None,
+            tls: Some(TlsConfig {
+                crt_file: Some(tls::TEST_PEM_CRT_PATH.into()),
+                key_file: Some(tls::TEST_PEM_KEY_PATH.into()),
+                ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
+                ..Default::default()
+            }),
+        })
+        .await;
     }
 
     #[tokio::test]
