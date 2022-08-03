@@ -508,9 +508,14 @@ impl<'a> Compiler<'a> {
             }
         };
 
-        let assignment = Assignment::new(node, state, self.fallible_expression_error.as_deref())
-            .map_err(|err| self.diagnostics.push(Box::new(err)))
-            .ok()?;
+        let assignment = Assignment::new(
+            node,
+            state,
+            self.fallible_expression_error.as_deref(),
+            &self.config,
+        )
+        .map_err(|err| self.diagnostics.push(Box::new(err)))
+        .ok()?;
 
         // Track any potential external target assignments within the program.
         //
@@ -680,7 +685,7 @@ impl<'a> Compiler<'a> {
                     block,
                     local_snapshot,
                     &mut self.fallible_expression_error,
-                    self.config.custom_mut(),
+                    &mut self.config,
                 )
                 .map_err(|err| self.diagnostics.push(Box::new(err)))
                 .ok()

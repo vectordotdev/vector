@@ -45,10 +45,10 @@ impl ConditionalConfig for VrlConfig {
             .collect::<Vec<_>>();
 
         let mut state = vrl::state::TypeState::default();
-        state.external = state.external.read_only();
 
         let mut config = CompileConfig::default();
-        config.set_external_context(enrichment_tables.clone());
+        config.set_custom(enrichment_tables.clone());
+        config.set_read_only();
 
         let CompilationResult {
             program,

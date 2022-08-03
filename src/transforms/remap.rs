@@ -143,8 +143,8 @@ impl RemapConfig {
         };
         let mut config = CompileConfig::default();
 
-        config.set_external_context(enrichment_tables);
-        config.set_external_context(MeaningList::default());
+        config.set_custom(enrichment_tables);
+        config.set_custom(MeaningList::default());
 
         compile_vrl(&source, &functions, &state, config)
             .map_err(|diagnostics| {
@@ -207,7 +207,7 @@ impl TransformConfig for RemapConfig {
             )
             .map(|(program, _, _, external_context)| {
                 let meaning = external_context
-                    .get_external_context::<MeaningList>()
+                    .get_custom::<MeaningList>()
                     .cloned()
                     .expect("context exists")
                     .0;

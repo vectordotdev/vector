@@ -391,7 +391,7 @@ impl<'a> Builder<'a> {
         closure_block: Option<Node<(Block, TypeDef)>>,
         mut local_snapshot: LocalEnv,
         fallible_expression_error: &mut Option<Box<dyn DiagnosticMessage>>,
-        external_context: &mut AnyMap,
+        config: &mut CompileConfig,
     ) -> Result<FunctionCall, Error> {
         let (closure, closure_fallible) =
             self.compile_closure(closure_block, local_snapshot, state)?;
@@ -402,10 +402,9 @@ impl<'a> Builder<'a> {
         // We take the external context, and pass it to the function compile context, this allows
         // functions mutable access to external state, but keeps the internal compiler state behind
         // an immutable reference, to ensure compiler state correctness.
-        let temp_external_context = std::mem::replace(external_context, AnyMap::new());
+        let temp_config = std::mem::take(config);
 
-        let mut compile_ctx = FunctionCompileContext::new(self.call_span)
-            .with_external_context(temp_external_context);
+        let mut compile_ctx = FunctionCompileContext::new(self.call_span, temp_config);
 
         let mut expr = self
             .function
@@ -413,7 +412,7 @@ impl<'a> Builder<'a> {
             .map_err(|error| Error::Compilation { call_span, error })?;
 
         // Re-insert the external context into the compiler state.
-        let _ = std::mem::replace(external_context, compile_ctx.into_external_context());
+        let _ = std::mem::replace(config, compile_ctx.into_config());
 
         // Asking for an infallible function to abort on error makes no sense.
         // We consider this an error at compile-time, because it makes the

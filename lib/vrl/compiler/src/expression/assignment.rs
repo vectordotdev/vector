@@ -15,7 +15,7 @@ use crate::{
     state::{ExternalEnv, LocalEnv},
     type_def::Details,
     value::kind::DefaultValue,
-    Context, Expression, Span, TypeDef,
+    CompileConfig, Context, Expression, Span, TypeDef,
 };
 
 #[derive(Clone, PartialEq)]
@@ -28,6 +28,7 @@ impl Assignment {
         node: Node<Variant<Node<ast::AssignmentTarget>, Node<Expr>>>,
         state: &TypeState,
         fallible_rhs: Option<&dyn DiagnosticMessage>,
+        config: &CompileConfig,
     ) -> Result<Self, Error> {
         let (_, variant) = node.take();
 
@@ -60,7 +61,7 @@ impl Assignment {
 
                 let expr = expr.into_inner();
                 let target = Target::try_from(target.into_inner())?;
-                verify_mutable(&target, state, expr_span, assignment_span)?;
+                verify_mutable(&target, config, expr_span, assignment_span)?;
                 verify_overwriteable(
                     &target,
                     state,
@@ -115,7 +116,7 @@ impl Assignment {
                 // set to being infallible, as the error will be captured by the
                 // "err" target.
                 let ok = Target::try_from(ok.into_inner())?;
-                verify_mutable(&ok, state, expr_span, ok_span)?;
+                verify_mutable(&ok, config, expr_span, ok_span)?;
                 verify_overwriteable(
                     &ok,
                     state,
@@ -131,7 +132,7 @@ impl Assignment {
                 // "err" target is assigned `null` or a string containing the
                 // error message.
                 let err = Target::try_from(err.into_inner())?;
-                verify_mutable(&err, state, expr_span, err_span)?;
+                verify_mutable(&err, config, expr_span, err_span)?;
                 verify_overwriteable(
                     &err,
                     state,
@@ -174,13 +175,13 @@ impl Assignment {
 
 fn verify_mutable(
     target: &Target,
-    state: &TypeState,
+    config: &CompileConfig,
     expr_span: Span,
     assignment_span: Span,
 ) -> Result<(), Error> {
     match target {
         Target::External(lookup_buf) => {
-            if state.external.is_read_only_event_path(lookup_buf) {
+            if config.is_read_only_event_path(lookup_buf) {
                 Err(Error {
                     variant: ErrorVariant::ReadOnly,
                     expr_span,

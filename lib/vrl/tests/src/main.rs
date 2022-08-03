@@ -183,7 +183,7 @@ fn main() {
 
         let mut external_env = vrl::state::ExternalEnv::default();
         let mut config = CompileConfig::default();
-        config.set_external_context(test_enrichment.clone());
+        config.set_custom(test_enrichment.clone());
 
         // Set some read-only paths that can be tested
         for (path, recursive) in &test.read_only_paths {

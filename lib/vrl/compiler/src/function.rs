@@ -7,6 +7,7 @@ use std::{
 
 use anymap::AnyMap;
 use diagnostic::{DiagnosticMessage, Label, Note};
+use lookup::LookupBuf;
 use parser::ast::Ident;
 use value::{kind::Collection, Value};
 
@@ -16,7 +17,7 @@ use crate::{
     parser::Node,
     state::{ExternalEnv, LocalEnv},
     value::{kind, Kind},
-    Span, TypeDef,
+    CompileConfig, Span, TypeDef,
 };
 
 pub type Compiled = Result<Box<dyn Expression>, Box<dyn DiagnosticMessage>>;
@@ -94,26 +95,15 @@ pub struct Example {
     pub result: Result<&'static str, &'static str>,
 }
 
-#[derive(Debug)]
 pub struct FunctionCompileContext {
     span: Span,
-    external_context: AnyMap,
+    config: CompileConfig,
 }
 
 impl FunctionCompileContext {
     #[must_use]
-    pub fn new(span: Span) -> Self {
-        Self {
-            span,
-            external_context: AnyMap::new(),
-        }
-    }
-
-    /// Add an external context to the compile context.
-    #[must_use]
-    pub fn with_external_context(mut self, context: AnyMap) -> Self {
-        self.external_context = context;
-        self
+    pub fn new(span: Span, config: CompileConfig) -> Self {
+        Self { span, config }
     }
 
     /// Span information for the function call.
@@ -125,18 +115,26 @@ impl FunctionCompileContext {
     /// Get an immutable reference to a stored external context, if one exists.
     #[must_use]
     pub fn get_external_context<T: 'static>(&self) -> Option<&T> {
-        self.external_context.get::<T>()
+        self.config.get_custom()
     }
 
     /// Get a mutable reference to a stored external context, if one exists.
     pub fn get_external_context_mut<T: 'static>(&mut self) -> Option<&mut T> {
-        self.external_context.get_mut::<T>()
+        self.config.get_custom_mut()
+    }
+
+    pub fn is_read_only_metadata_path(&self, path: &LookupBuf) -> bool {
+        self.config.is_read_only_metadata_path(path)
+    }
+
+    pub fn is_read_only_event_path(&self, path: &LookupBuf) -> bool {
+        self.config.is_read_only_event_path(path)
     }
 
     /// Consume the `FunctionCompileContext`, returning the (potentially mutated) `AnyMap`.
     #[must_use]
-    pub fn into_external_context(self) -> AnyMap {
-        self.external_context
+    pub fn into_config(self) -> CompileConfig {
+        self.config
     }
 }
 

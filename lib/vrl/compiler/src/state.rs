@@ -99,22 +99,6 @@ pub struct ExternalEnv {
 
     /// The type of metadata
     metadata: Kind,
-
-    read_only_paths: BTreeSet<ReadOnlyPath>,
-}
-
-// temporary until paths can point to metadata
-#[derive(Debug, Clone, Ord, Eq, PartialEq, PartialOrd)]
-pub enum PathRoot {
-    Event,
-    Metadata,
-}
-
-#[derive(Debug, Clone, Ord, Eq, PartialEq, PartialOrd)]
-pub struct ReadOnlyPath {
-    path: LookupBuf,
-    recursive: bool,
-    root: PathRoot,
 }
 
 impl Default for ExternalEnv {
@@ -131,8 +115,6 @@ impl ExternalEnv {
         Self {
             target: self.target.merge(other.target),
             metadata: self.metadata.union(other.metadata),
-            // TODO: this field will be removed, this implementation is incorrect right now
-            read_only_paths: BTreeSet::new(),
         }
     }
 
@@ -146,57 +128,7 @@ impl ExternalEnv {
                 value: None,
             },
             metadata,
-            // custom: AnyMap::new(),
-            read_only_paths: BTreeSet::new(),
         }
-    }
-
-    pub fn is_read_only_event_path(&self, path: &LookupBuf) -> bool {
-        self.is_read_only_path(path, PathRoot::Event)
-    }
-
-    pub fn is_read_only_metadata_path(&self, path: &LookupBuf) -> bool {
-        self.is_read_only_path(path, PathRoot::Metadata)
-    }
-
-    pub(crate) fn is_read_only_path(&self, path: &LookupBuf, root: PathRoot) -> bool {
-        for read_only_path in &self.read_only_paths {
-            if read_only_path.root != root {
-                continue;
-            }
-
-            // any paths that are a parent of read-only paths also can't be modified
-            if read_only_path.path.can_start_with(path) {
-                return true;
-            }
-
-            if read_only_path.recursive {
-                if path.can_start_with(&read_only_path.path) {
-                    return true;
-                }
-            } else if path == &read_only_path.path {
-                return true;
-            }
-        }
-        false
-    }
-
-    /// Adds a path that is considered read only. Assignments to any paths that match
-    /// will fail at compile time.
-    pub(crate) fn set_read_only_path(&mut self, path: LookupBuf, recursive: bool, root: PathRoot) {
-        self.read_only_paths.insert(ReadOnlyPath {
-            path,
-            recursive,
-            root,
-        });
-    }
-
-    pub fn set_read_only_event_path(&mut self, path: LookupBuf, recursive: bool) {
-        self.set_read_only_path(path, recursive, PathRoot::Event);
-    }
-
-    pub fn set_read_only_metadata_path(&mut self, path: LookupBuf, recursive: bool) {
-        self.set_read_only_path(path, recursive, PathRoot::Metadata);
     }
 
     pub(crate) fn target(&self) -> &Details {
@@ -222,14 +154,6 @@ impl ExternalEnv {
 
     pub fn update_metadata(&mut self, kind: Kind) {
         self.metadata = kind;
-    }
-
-    /// Marks everything as read only. Any mutations on read-only values will result in a
-    /// compile time error.
-    pub fn read_only(mut self) -> Self {
-        self.set_read_only_event_path(LookupBuf::root(), true);
-        self.set_read_only_metadata_path(LookupBuf::root(), true);
-        self
     }
 }
 

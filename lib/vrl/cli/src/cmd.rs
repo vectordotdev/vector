@@ -125,11 +125,11 @@ fn run(opts: &Opts) -> Result<(), Error> {
         let objects = opts.read_into_objects()?;
         let source = opts.read_program()?;
 
-        let mut state = TypeState::default();
         // The CLI should be moved out of the "vrl" module, and then it can use the `vector-core::compile_vrl` function which includes this automatically
-        state
-            .external
-            .set_read_only_metadata_path(LookupBuf::from("vector"), true);
+        let mut config = CompileConfig::default();
+        config.set_read_only_metadata_path(LookupBuf::from("vector"), true);
+
+        let state = TypeState::default();
 
         let CompilationResult {
             program,

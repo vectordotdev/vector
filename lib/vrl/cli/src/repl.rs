@@ -165,12 +165,9 @@ fn resolve(
     let mut functions = stdlib::all();
     functions.extend(vector_vrl_functions::vrl_functions());
 
+    let mut config = CompileConfig::default();
     // The CLI should be moved out of the "vrl" module, and then it can use the `vector-core::compile_vrl` function which includes this automatically
-    state
-        .external
-        .set_read_only_metadata_path(LookupBuf::from("vector"), true);
-
-    let config = CompileConfig::default();
+    config.set_read_only_metadata_path(LookupBuf::from("vector"), true);
 
     let program = match vrl::compile_with_state(program, &functions, &state, config) {
         Ok(result) => result.program,
