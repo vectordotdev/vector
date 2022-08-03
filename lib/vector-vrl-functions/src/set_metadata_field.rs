@@ -55,13 +55,13 @@ impl Function for SetMetadataField {
 
     fn compile(
         &self,
-        _state: &TypeState,
+        state: &TypeState,
         ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let key = get_metadata_key(&mut arguments)?;
         let value = arguments.required_expr("value");
-        let value_type_def = arguments.required_type("value");
+        let value_type_def = value.type_def(state);
 
         if let MetadataKey::Query(query) = &key {
             if ctx.is_read_only_metadata_path(query.path()) {

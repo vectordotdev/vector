@@ -43,31 +43,23 @@ impl Function for TypeDef {
 
     fn compile(
         &self,
-        _state: &TypeState,
+        state: &TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
-        // println!(
-        //     "type def compile input: {:?}",
-        //     state.external.target_kind().debug_info()
-        // );
         let value = arguments.required("value");
-        let type_def = arguments.required_type("value");
-        Ok(TypeDefFn { value, type_def }.as_expr())
+        let type_def = value.type_def(state);
+        Ok(TypeDefFn { type_def }.as_expr())
     }
 }
 
 #[derive(Debug, Clone)]
 struct TypeDefFn {
-    value: Box<dyn Expression>,
     type_def: VrlTypeDef,
 }
 
 impl FunctionExpression for TypeDefFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        // the value isn't used, but it must be resolved to correctly resolve any side-effects
-        // see: https://github.com/vectordotdev/vector/issues/13752
-        let _result = self.value.resolve(ctx);
+    fn resolve(&self, _ctx: &mut Context) -> Resolved {
         Ok(type_def(&self.type_def.clone()))
     }
 

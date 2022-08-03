@@ -36,6 +36,7 @@ impl<'a> Builder<'a> {
         abort_on_error: bool,
         arguments: Vec<Node<FunctionArgument>>,
         funcs: &'a [Box<dyn Function>],
+        state_before_function_args: &TypeState,
         state: &mut TypeState,
         closure_variables: Option<Node<Vec<Node<Ident>>>>,
     ) -> Result<Self, Error> {
@@ -117,7 +118,7 @@ impl<'a> Builder<'a> {
             })?;
 
             // Check if the argument is of the expected type.
-            let argument_type_def = argument.type_def();
+            let argument_type_def = argument.expr().type_def(state_before_function_args);
             let expr_kind = argument_type_def.kind();
             let param_kind = parameter.kind();
 
@@ -145,7 +146,7 @@ impl<'a> Builder<'a> {
                 });
             }
 
-            list.insert(parameter.keyword, argument.into_inner(), argument_type_def);
+            list.insert(parameter.keyword, argument.into_inner());
         }
 
         // Check missing required arguments.
@@ -173,6 +174,7 @@ impl<'a> Builder<'a> {
             state,
             ident_span,
         )?;
+
         Ok(Self {
             abort_on_error,
             arguments_with_unknown_type_validity,
@@ -231,7 +233,8 @@ impl<'a> Builder<'a> {
                         // We've found the function argument over which the
                         // closure is going to resolve. We need to ensure the
                         // type of this argument is as expected by the closure.
-                        Some((expr, type_def)) => {
+                        Some(expr) => {
+                            let type_def = expr.type_def(state);
                             // The type definition of the value does not match
                             // the expected closure type, continue to check if
                             // the closure eventually accepts this definition.
@@ -382,6 +385,7 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn compile(
         mut self,
+        state_before_function_args: &TypeState,
         state: &mut TypeState,
         closure_block: Option<Node<(Block, TypeDef)>>,
         local_snapshot: LocalEnv,
@@ -403,7 +407,11 @@ impl<'a> Builder<'a> {
 
         let expr = self
             .function
-            .compile(state, &mut compile_ctx, self.list.clone())
+            .compile(
+                state_before_function_args,
+                &mut compile_ctx,
+                self.list.clone(),
+            )
             .map_err(|error| Error::Compilation { call_span, error })?;
 
         // Re-insert the external context into the compiler state.
@@ -414,7 +422,10 @@ impl<'a> Builder<'a> {
         // resulting program incorrectly convey this function call might fail.
         if self.abort_on_error
             && self.arguments_with_unknown_type_validity.is_empty()
-            && !expr.type_info(state).result.is_fallible()
+            && !expr
+                .type_info(state_before_function_args)
+                .result
+                .is_fallible()
         {
             return Err(Error::AbortInfallible {
                 ident_span,
@@ -438,7 +449,11 @@ impl<'a> Builder<'a> {
                         .map(|arg| arg.inner().to_string())
                         .collect::<Vec<_>>(),
                     parameter,
-                    got: argument.expr().type_info(state).result.into(),
+                    got: argument
+                        .expr()
+                        .type_info(state_before_function_args)
+                        .result
+                        .into(),
                     argument: argument.clone().into_inner(),
                     argument_span: argument
                         .keyword_span()
@@ -1236,13 +1251,13 @@ mod tests {
         FunctionArgument::new(
             ident.map(|ident| create_node(Ident::new(ident))),
             create_node(Expr::Literal(Literal::Integer(value))),
-            TypeDef::integer(),
         )
     }
 
     #[cfg(feature = "expr-literal")]
     fn create_function_call(arguments: Vec<Node<FunctionArgument>>) -> FunctionCall {
         let mut state = TypeState::default();
+        let original_state = state.clone();
         let mut config = CompileConfig::default();
         Builder::new(
             Span::new(0, 0),
@@ -1250,11 +1265,13 @@ mod tests {
             false,
             arguments,
             &[Box::new(TestFn) as _],
+            &original_state,
             &mut state,
             None,
         )
         .unwrap()
         .compile(
+            &original_state,
             &mut state,
             None,
             LocalEnv::default(),

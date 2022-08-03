@@ -215,7 +215,7 @@ impl Parameter {
 
 #[derive(Debug, Default, Clone)]
 pub struct ArgumentList {
-    pub(crate) arguments: HashMap<&'static str, (Expr, TypeDef)>,
+    pub(crate) arguments: HashMap<&'static str, Expr>,
 
     /// A closure argument differs from regular arguments, in that it isn't an
     /// expression by itself, and it also isn't tied to a parameter string in
@@ -432,8 +432,8 @@ impl ArgumentList {
     }
 
     #[cfg(feature = "expr-function_call")]
-    pub(crate) fn insert(&mut self, k: &'static str, v: Expr, type_def: TypeDef) {
-        self.arguments.insert(k, (v, type_def));
+    pub(crate) fn insert(&mut self, k: &'static str, v: Expr) {
+        self.arguments.insert(k, v);
     }
 
     #[cfg(feature = "expr-function_call")]
@@ -442,21 +442,7 @@ impl ArgumentList {
     }
 
     pub(crate) fn optional_expr(&mut self, keyword: &'static str) -> Option<Expr> {
-        self.arguments
-            .get(keyword)
-            .cloned()
-            .map(|(expr, _type_def)| expr)
-    }
-
-    pub fn optional_type(&mut self, keyword: &'static str) -> Option<TypeDef> {
-        self.arguments
-            .get(keyword)
-            .cloned()
-            .map(|(_expr, type_def)| type_def)
-    }
-
-    pub fn required_type(&mut self, keyword: &'static str) -> TypeDef {
-        required(self.optional_type(keyword))
+        self.arguments.get(keyword).cloned()
     }
 
     pub fn required_expr(&mut self, keyword: &'static str) -> Expr {
@@ -478,46 +464,23 @@ mod test_impls {
             Self {
                 arguments: map
                     .into_iter()
-                    .map(|(k, v)| (k, (v.clone().into(), v.kind().into())))
+                    .map(|(k, v)| (k, v.into()))
                     .collect::<HashMap<_, _>>(),
                 closure: None,
             }
         }
     }
 
-    // impl From<Vec<Node<FunctionArgument>>> for ArgumentList {
-    //     fn from(arguments: Vec<Node<FunctionArgument>>) -> Self {
-    //         let arguments = arguments
-    //             .into_iter()
-    //             .map(|arg| {
-    //                 let arg = arg.into_inner();
-    //                 // TODO: find a better API design that doesn't require unwrapping.
-    //                 let key = arg.parameter().expect("exists").keyword;
-    //                 let expr = arg.into_inner();
-    //                 let state = TypeState::default();
-    //                 let type_def = expr.type_def(&state);
-    //                 (key, (expr, type_def))
-    //             })
-    //             .collect::<HashMap<_, _>>();
-    //
-    //         Self {
-    //             arguments,
-    //             ..Default::default()
-    //         }
-    //     }
-    // }
-
     impl From<ArgumentList> for Vec<(&'static str, Option<FunctionArgument>)> {
         fn from(args: ArgumentList) -> Self {
             args.arguments
                 .iter()
-                .map(|(key, (expr, type_def))| {
+                .map(|(key, expr)| {
                     (
                         *key,
                         Some(FunctionArgument::new(
                             None,
                             Node::new(Span::default(), expr.clone()),
-                            type_def.clone(),
                         )),
                     )
                 })

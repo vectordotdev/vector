@@ -110,15 +110,6 @@ impl<'a> Compiler<'a> {
     }
 
     fn compile_expr(&mut self, node: Node<ast::Expr>, state: &mut TypeState) -> Option<Expr> {
-        self.compile_expr_2(node, state)
-            .map(|(expr, _type_def)| expr)
-    }
-
-    fn compile_expr_2(
-        &mut self,
-        node: Node<ast::Expr>,
-        state: &mut TypeState,
-    ) -> Option<(Expr, TypeDef)> {
         use ast::Expr::{
             Abort, Assignment, Container, FunctionCall, IfStatement, Literal, Op, Query, Unary,
             Variable,
@@ -151,7 +142,7 @@ impl<'a> Compiler<'a> {
             self.fallible_expression_error = Some(Box::new(error) as _);
         }
 
-        Some((expr, type_def))
+        Some(expr)
     }
 
     #[cfg(feature = "expr-literal")]
@@ -650,6 +641,12 @@ impl<'a> Compiler<'a> {
         // arguments might overwrite.
         let local_snapshot = state.local.clone();
 
+        // TODO: The state passed into functions should be after function arguments
+        //    have resolved, but this will break many functions relying on calling `type_def`
+        //    on it's own args.
+        // see: https://github.com/vectordotdev/vector/issues/13752
+        let state_before_function = original_state.clone();
+
         // First, we create a new function-call builder to validate the
         // expression.
         let function = function_call::Builder::new(
@@ -658,6 +655,7 @@ impl<'a> Compiler<'a> {
             abort_on_error,
             arguments,
             self.fns,
+            &state_before_function,
             state,
             closure_variables,
         )
@@ -679,6 +677,7 @@ impl<'a> Compiler<'a> {
 
             builder
                 .compile(
+                    &state_before_function,
                     state,
                     block,
                     local_snapshot,
@@ -707,10 +706,10 @@ impl<'a> Compiler<'a> {
             expr: ast_expr,
         } = node.into_inner();
         let span = ast_expr.span();
-        let (expr, type_def) = self.compile_expr_2(ast_expr, state)?;
+        let expr = self.compile_expr(ast_expr, state)?;
         let node = Node::new(span, expr);
 
-        Some(FunctionArgument::new(ident, node, type_def))
+        Some(FunctionArgument::new(ident, node))
     }
 
     #[cfg(not(feature = "expr-function_call"))]
