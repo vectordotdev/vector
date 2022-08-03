@@ -34,10 +34,10 @@ pub struct ApexSinkConfig {
     /// Vector will append `/add_events` to this.
     uri: UriSerde,
 
-    /// The id of the project to associate reported logs with.
+    /// The ID of the project to associate reported logs with.
     project_id: String,
 
-    /// The api token to use to authenticate with Apex.
+    /// The API token to use to authenticate with Apex.
     api_token: String,
 
     #[configurable(derived)]
