@@ -13,7 +13,7 @@ use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    codecs::DecodingConfig,
+    codecs::{Decoder, DecodingConfig},
     config::log_schema,
     internal_events::{BytesReceived, OldEventsReceived, StreamClosedError},
     shutdown::ShutdownSignal,
@@ -34,9 +34,9 @@ pub trait FileDescriptorConfig {
 
     fn source<R>(
         &self,
-        mut reader: R,
+        reader: R,
         shutdown: ShutdownSignal,
-        mut out: SourceSender,
+        out: SourceSender,
     ) -> crate::Result<crate::sources::Source>
     where
         R: Send + io::BufRead + 'static,
@@ -45,6 +45,8 @@ pub trait FileDescriptorConfig {
             .host_key()
             .unwrap_or_else(|| log_schema().host_key().to_string());
         let hostname = crate::get_hostname().ok();
+        let description = self.description();
+        let name = self.name();
 
         let decoding = self.decoding();
         let framing = self
@@ -52,87 +54,105 @@ pub trait FileDescriptorConfig {
             .unwrap_or_else(|| decoding.default_stream_framing());
         let decoder = DecodingConfig::new(framing, decoding, LogNamespace::Legacy).build();
 
-        let (mut sender, receiver) = mpsc::channel(1024);
+        let (sender, receiver) = mpsc::channel(1024);
 
         // Spawn background thread with blocking I/O to process fd.
         //
         // This is recommended by Tokio, as otherwise the process will not shut down
         // until another newline is entered. See
         // https://github.com/tokio-rs/tokio/blob/a73428252b08bf1436f12e76287acbc4600ca0e5/tokio/src/io/stdin.rs#L33-L42
-        let description = self.description();
         thread::spawn(move || {
             info!("Capturing {}.", description);
-
-            loop {
-                let (buffer, len) = match reader.fill_buf() {
-                    Ok(buffer) if buffer.is_empty() => break, // EOF.
-                    Ok(buffer) => (Ok(Bytes::copy_from_slice(buffer)), buffer.len()),
-                    Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
-                    Err(error) => (Err(error), 0),
-                };
-
-                reader.consume(len);
-
-                if executor::block_on(sender.send(buffer)).is_err() {
-                    // Receiver has closed so we should shutdown.
-                    break;
-                }
-            }
+            read_from_fd(reader, sender);
         });
 
-        let name = self.name();
-        Ok(Box::pin(async move {
-            let stream = StreamReader::new(receiver);
-            let mut stream = FramedRead::new(stream, decoder).take_until(shutdown);
-            let mut stream = stream! {
-                while let Some(result) = stream.next().await {
-                    match result {
-                        Ok((events, byte_size)) => {
-                            emit!(BytesReceived { byte_size, protocol: "none" });
+        Ok(Box::pin(process_stream(
+            receiver, decoder, out, shutdown, host_key, name, hostname,
+        )))
+    }
+}
 
-                            emit!(OldEventsReceived {
-                                byte_size: events.size_of(),
-                                count: events.len()
-                            });
+type Sender = mpsc::Sender<std::result::Result<bytes::Bytes, std::io::Error>>;
+fn read_from_fd<R>(mut reader: R, mut sender: Sender)
+where
+    R: Send + io::BufRead + 'static,
+{
+    loop {
+        let (buffer, len) = match reader.fill_buf() {
+            Ok(buffer) if buffer.is_empty() => break, // EOF.
+            Ok(buffer) => (Ok(Bytes::copy_from_slice(buffer)), buffer.len()),
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(error) => (Err(error), 0),
+        };
 
-                            let now = Utc::now();
+        reader.consume(len);
 
-                            for mut event in events {
-                                let log = event.as_mut_log();
+        if executor::block_on(sender.send(buffer)).is_err() {
+            // Receiver has closed so we should shutdown.
+            break;
+        }
+    }
+}
 
-                                log.try_insert(log_schema().source_type_key(), Bytes::from(name.clone()));
-                                log.try_insert(log_schema().timestamp_key(), now);
+type Receiver = mpsc::Receiver<std::result::Result<bytes::Bytes, std::io::Error>>;
+async fn process_stream(
+    receiver: Receiver,
+    decoder: Decoder,
+    mut out: SourceSender,
+    shutdown: ShutdownSignal,
+    host_key: String,
+    name: String,
+    hostname: Option<String>,
+) -> Result<(), ()> {
+    let stream = StreamReader::new(receiver);
+    let mut stream = FramedRead::new(stream, decoder).take_until(shutdown);
+    let mut stream = stream! {
+        while let Some(result) = stream.next().await {
+            match result {
+                Ok((events, byte_size)) => {
+                    emit!(BytesReceived { byte_size, protocol: "none" });
 
-                                if let Some(hostname) = &hostname {
-                                    log.try_insert(host_key.as_str(), hostname.clone());
-                                }
+                    emit!(OldEventsReceived {
+                        byte_size: events.size_of(),
+                        count: events.len()
+                    });
 
-                                yield event;
-                            }
+                    let now = Utc::now();
+
+                    for mut event in events {
+                        let log = event.as_mut_log();
+
+                        log.try_insert(log_schema().source_type_key(), Bytes::from(name.clone()));
+                        log.try_insert(log_schema().timestamp_key(), now);
+
+                        if let Some(hostname) = &hostname {
+                            log.try_insert(host_key.as_str(), hostname.clone());
                         }
-                        Err(error) => {
-                            // Error is logged by `crate::codecs::Decoder`, no
-                            // further handling is needed here.
-                            if !error.can_continue() {
-                                break;
-                            }
-                        }
+
+                        yield event;
+                    }
+                }
+                Err(error) => {
+                    // Error is logged by `crate::codecs::Decoder`, no
+                    // further handling is needed here.
+                    if !error.can_continue() {
+                        break;
                     }
                 }
             }
-            .boxed();
+        }
+    }
+    .boxed();
 
-            match out.send_event_stream(&mut stream).await {
-                Ok(()) => {
-                    info!("Finished sending.");
-                    Ok(())
-                }
-                Err(error) => {
-                    let (count, _) = stream.size_hint();
-                    emit!(StreamClosedError { error, count });
-                    Err(())
-                }
-            }
-        }))
+    match out.send_event_stream(&mut stream).await {
+        Ok(()) => {
+            info!("Finished sending.");
+            Ok(())
+        }
+        Err(error) => {
+            let (count, _) = stream.size_hint();
+            emit!(StreamClosedError { error, count });
+            Err(())
+        }
     }
 }
