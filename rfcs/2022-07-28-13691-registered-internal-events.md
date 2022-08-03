@@ -198,6 +198,11 @@ handle.emit(ByteSize(received.len()));
 - This increases the complexity of the internal event interface, presenting two different interfaces
   for internal events.
 
+- Internal events that can be registered are necessarily distinct from existing events that can be
+  simply emitted. That is, you cannot `register!(BytesSent { … })`, nor can you
+  `emit!(RegisteredBytesSent { … })` (although the latter could be modified to allow
+  `emit!(RegisteredBytesSent { … }, ByteSize(…))`).
+
 ## Alternatives
 
 The simplest method of providing this is to just write new internal event structures that are
