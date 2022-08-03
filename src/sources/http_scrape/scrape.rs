@@ -115,7 +115,7 @@ impl SourceConfig for HttpScrapeConfig {
         )
         .build();
 
-        let content_type = decoder.content_type().to_string();
+        let content_type = self.decoding.content_type(&self.framing).to_string();
 
         // the only specific context needed is the codec decoding
         let context = HttpScrapeContext { decoder };

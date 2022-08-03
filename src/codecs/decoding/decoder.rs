@@ -1,10 +1,7 @@
 use bytes::{Bytes, BytesMut};
-use codecs::{
-    decoding::{
-        format::Deserializer as _, BoxedFramingError, BytesDeserializer, Deserializer, Error,
-        Framer, NewlineDelimitedDecoder,
-    },
-    CharacterDelimitedDecoder,
+use codecs::decoding::{
+    format::Deserializer as _, BoxedFramingError, BytesDeserializer, Deserializer, Error, Framer,
+    NewlineDelimitedDecoder,
 };
 use smallvec::SmallVec;
 use vector_core::config::LogNamespace;
@@ -78,32 +75,6 @@ impl Decoder {
                 emit!(DecoderDeserializeFailed { error: &error });
                 Error::ParsingError(error)
             })
-    }
-
-    /// Get the HTTP content type.
-    pub const fn content_type(&self) -> &str {
-        match (&self.deserializer, &self.framer) {
-            (Deserializer::Json(_) | Deserializer::NativeJson(_), Framer::NewlineDelimited(_)) => {
-                "application/x-ndjson"
-            }
-            (
-                Deserializer::Gelf(_) | Deserializer::Json(_) | Deserializer::NativeJson(_),
-                Framer::CharacterDelimited(CharacterDelimitedDecoder {
-                    delimiter: b',',
-                    max_length: usize::MAX,
-                }),
-            ) => "application/json",
-            (Deserializer::Native(_), _) => "application/octet-stream",
-            (
-                Deserializer::Json(_)
-                | Deserializer::Syslog(_)
-                | Deserializer::NativeJson(_)
-                | Deserializer::Bytes(_)
-                | Deserializer::Gelf(_)
-                | Deserializer::Boxed(_),
-                _,
-            ) => "text/plain",
-        }
     }
 }
 
