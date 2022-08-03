@@ -138,9 +138,6 @@ install_from_archive() {
     local _arch="$RETVAL"
     assert_nz "$_arch" "arch"
 
-    # this path could be a relative, change it to absolute path, ref: https://stackoverflow.com/a/21188136/11667450
-    prefix="$(cd "$(dirname "$prefix")" && pwd)/$(basename "$prefix")"
-
     local _archive_arch=""
     case "$_arch" in
         x86_64-apple-darwin)
