@@ -14,7 +14,7 @@ use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Rep
 
 use crate::{
     event::Event,
-    internal_events::{EventsReceived, HttpBytesReceived, StreamClosedError},
+    internal_events::{HttpBytesReceived, HttpEventsReceived, StreamClosedError},
     opentelemetry::LogService::{ExportLogsServiceRequest, ExportLogsServiceResponse},
     shutdown::ShutdownSignal,
     sources::util::{decode, ErrorMessage},
@@ -81,7 +81,7 @@ pub(crate) fn build_warp_filter(
         .and(warp::header::optional::<String>("content-encoding"))
         .and(warp::body::bytes())
         .and_then(move |encoding_header: Option<String>, body: Bytes| {
-            let events = decode(&encoding_header, body).and_then(decode_body);
+            let events = decode(&encoding_header, body).and_then(decode_body(body, protocol));
             emit!(HttpBytesReceived {
                 byte_size: events.len(),
                 http_path: "/v1/logs",
@@ -93,7 +93,7 @@ pub(crate) fn build_warp_filter(
         .boxed()
 }
 
-fn decode_body(body: Bytes) -> Result<Vec<Event>, ErrorMessage> {
+fn decode_body(body: Bytes, protocol: &'static str) -> Result<Vec<Event>, ErrorMessage> {
     let request = ExportLogsServiceRequest::decode(body).map_err(|error| {
         ErrorMessage::new(
             StatusCode::BAD_REQUEST,
@@ -110,6 +110,8 @@ fn decode_body(body: Bytes) -> Result<Vec<Event>, ErrorMessage> {
     emit!(EventsReceived {
         byte_size: events.size_of(),
         count: events.len(),
+        http_path: "/v1/logs",
+        protocol
     });
 
     Ok(events)
