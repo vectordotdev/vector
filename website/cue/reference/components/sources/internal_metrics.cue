@@ -907,7 +907,7 @@ components: sources: internal_metrics: {
 			}
 		}
 		processing_errors_total: {
-			description:       "The total number of processing errors encountered by this component."
+			description:       "The total number of processing errors encountered by this component. This metric is deprecated in favor of `component_errors_total`."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags & {

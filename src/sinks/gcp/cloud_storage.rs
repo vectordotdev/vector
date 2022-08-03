@@ -215,8 +215,8 @@ impl SinkConfig for GcsSinkConfig {
         NAME
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 

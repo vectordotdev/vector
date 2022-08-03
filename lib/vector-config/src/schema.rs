@@ -11,9 +11,11 @@ use schemars::{
 use serde::Serialize;
 use serde_json::{Map, Value};
 
-use crate::{num::ConfigurableNumber, Configurable, CustomAttribute, Metadata};
+use crate::{num::ConfigurableNumber, Configurable, ConfigurableString, CustomAttribute, Metadata};
 
-/// Finalizes the schema by ensuring all metadata is applied and registering it in the generator.
+/// Finalizes the schema.
+///
+/// This ensures all metadata is applied and registers `T` in the generator if possible.
 ///
 /// As many configuration types are reused often, such as nearly all sinks allowing configuration of batching
 /// behavior via `BatchConfig`, we utilize JSONSchema's ability to define a named schema and then
@@ -361,5 +363,63 @@ where
         meta_schema: None,
         schema,
         definitions: schema_gen.take_definitions(),
+    }
+}
+
+/// Asserts that the key type `K` generates a string-like schema, suitable for use in maps.
+///
+/// This function generates a schema for `K` and ensures that the resulting schema is explicitly,
+/// but only, represented as a `string` data type. This is necessary to ensure that `K` can be used
+/// as the key type for maps, as maps are represented by the `object` data type in JSON Schema,
+/// which must have fields with valid string identifiers.
+///
+/// ## Panics
+///
+/// If the schema is not a valid, string-like schema, this function will panic with an error message
+/// indicating as such, and will include the key type, `K`, which represents the input schema, and
+/// the container type, `C`, that the key type is attempting to be used with.
+pub fn assert_string_schema_for_map<K: ConfigurableString, C>(gen: &mut SchemaGenerator) {
+    // We need to force the schema to be treated as transparent so that when the schema generation
+    // finalizes the schema, we don't throw an error due to a lack of title/description.
+    let mut key_metadata = K::metadata();
+    key_metadata.set_transparent();
+
+    let key_schema = K::generate_schema(gen, key_metadata);
+    let wrapped_schema = Schema::Object(key_schema);
+
+    // Get a reference to the underlying schema if we're dealing with a reference, or just use what
+    // we have if it's the actual definition.
+    let underlying_schema = if wrapped_schema.is_ref() {
+        gen.dereference(&wrapped_schema)
+    } else {
+        Some(&wrapped_schema)
+    };
+
+    let is_string_like = match underlying_schema {
+        Some(Schema::Object(schema_object)) => match schema_object.instance_type.as_ref() {
+            Some(sov) => match sov {
+                // Has to be a string.
+                SingleOrVec::Single(it) => **it == InstanceType::String,
+                // As long as there's only one instance type, and it's string, we're fine
+                // with that, too.
+                SingleOrVec::Vec(its) => {
+                    its.len() == 1
+                        && its
+                            .get(0)
+                            .filter(|it| *it == &InstanceType::String)
+                            .is_some()
+                }
+            },
+            // We match explicitly, so a lack of declared instance types is not considered
+            // valid here.
+            None => false,
+        },
+        // We match explicitly, so boolean schemas aren't considered valid here.
+        _ => false,
+    };
+
+    if !is_string_like {
+        panic!("Tried to use key type `{}` with `{}`, but actual schema for `{}` is not string-like! This is a violation of the implementation of `ConfigurableString`.",
+            std::any::type_name::<K>(), std::any::type_name::<C>(), std::any::type_name::<K>());
     }
 }

@@ -17,7 +17,7 @@ lookup_lib = {package = "lookup", path = "../../lookup", optional = true }
 vector_common = { path = "../../vector-common", default-features = false, optional = true }
 
 base64 = { version = "0.13", optional = true }
-bytes = { version = "1.2.0", optional = true }
+bytes = { version = "1.2.1", optional = true }
 chrono = { version = "0.4", optional = true }
 cidr-utils = { version = "0.5", optional = true }
 csv = { version = "1.1", optional = true }

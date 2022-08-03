@@ -143,8 +143,8 @@ impl SinkConfig for CloudWatchMetricsSinkConfig {
         "aws_cloudwatch_metrics"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 

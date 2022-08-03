@@ -7,9 +7,9 @@ use std::{
 use bytes::{BufMut, BytesMut};
 use futures::{future, stream, SinkExt, TryFutureExt};
 use futures_util::FutureExt;
-use serde::{Deserialize, Serialize};
 use tokio_util::codec::Encoder;
 use tower::{Service, ServiceBuilder};
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use super::util::SinkBatchSettings;
@@ -37,23 +37,43 @@ pub struct StatsdSvc {
     inner: UdpService,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
-// TODO: add back when serde-rs/serde#1358 is addressed
-// #[serde(deny_unknown_fields)]
+/// Configuration for the `statsd` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug)]
 pub struct StatsdSinkConfig {
+    /// Sets the default namespace for any metrics sent.
+    ///
+    /// This namespace is only used if a metric has no existing namespace. When a namespace is
+    /// present, it is used as a prefix to the metric name, and separated with a period (`.`).
     #[serde(alias = "namespace")]
     pub default_namespace: Option<String>,
+
     #[serde(flatten)]
     pub mode: Mode,
+
+    #[configurable(derived)]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Socket mode.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum Mode {
-    Tcp(TcpSinkConfig),
-    Udp(StatsdUdpConfig),
+    /// TCP.
+    Tcp(#[configurable(transparent)] TcpSinkConfig),
+
+    /// UDP.
+    Udp(#[configurable(transparent)] StatsdUdpConfig),
+
+    /// Unix Domain Socket.
     #[cfg(unix)]
-    Unix(UnixSinkConfig),
+    Unix(#[configurable(transparent)] UnixSinkConfig),
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -65,11 +85,14 @@ impl SinkBatchSettings for StatsdDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 1.0;
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// UDP configuration.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct StatsdUdpConfig {
     #[serde(flatten)]
     pub udp: UdpSinkConfig,
 
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<StatsdDefaultBatchSettings>,
 }
@@ -90,6 +113,7 @@ impl GenerateConfig for StatsdSinkConfig {
                 batch: Default::default(),
                 udp: UdpSinkConfig::from_address(default_address().to_string()),
             }),
+            acknowledgements: Default::default(),
         })
         .unwrap()
     }
@@ -146,8 +170,8 @@ impl SinkConfig for StatsdSinkConfig {
         "statsd"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        None
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
@@ -482,6 +506,7 @@ mod test {
                 batch,
                 udp: UdpSinkConfig::from_address(addr.to_string()),
             }),
+            acknowledgements: Default::default(),
         };
 
         let context = SinkContext::new_test();

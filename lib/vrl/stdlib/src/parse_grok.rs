@@ -136,7 +136,6 @@ mod test {
             args: func_args![ value: "2020-10-02T23:22:12.223222Z",
                               pattern: "(%{TIMESTAMP_ISO8601:timestamp}|%{LOGLEVEL:level})"],
             want: Ok(Value::from(btreemap! {
-                "level" => "",
                 "timestamp" => "2020-10-02T23:22:12.223222Z",
             })),
             tdef: TypeDef::object(Collection::any()).fallible(),
