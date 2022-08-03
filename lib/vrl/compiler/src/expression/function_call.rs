@@ -234,9 +234,6 @@ impl<'a> Builder<'a> {
                         // closure is going to resolve. We need to ensure the
                         // type of this argument is as expected by the closure.
                         Some((expr, type_def)) => {
-                            //TODO: use existing type_def
-                            let type_def = expr.type_info(state).result;
-
                             // The type definition of the value does not match
                             // the expected closure type, continue to check if
                             // the closure eventually accepts this definition.

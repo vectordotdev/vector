@@ -67,7 +67,7 @@ impl FunctionExpression for TypeDefFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         // the value isn't used, but it must be resolved to correctly resolve any side-effects
         // see: https://github.com/vectordotdev/vector/issues/13752
-        let _value = self.value.resolve(ctx);
+        let _result = self.value.resolve(ctx);
         Ok(type_def(&self.type_def.clone()))
     }
 
