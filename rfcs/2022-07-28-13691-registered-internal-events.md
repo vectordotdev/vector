@@ -134,7 +134,7 @@ Finally, here is a sample implementation of the above traits, taken from the exi
 ```rust
 use metrics::Counter;
 
-struct RegisterEndpointBytesReceived {
+struct RegisteredEndpointBytesReceived {
     bytes_total: Counter,
     protocol: &'static str,
     endpoint: String,
@@ -146,7 +146,7 @@ struct EndpointBytesReceivedHandle {
     endpoint: String,
 }
 
-impl RegisterInternalEvent for RegisterEndpointBytesReceived {
+impl RegisterInternalEvent for RegisteredEndpointBytesReceived {
     type Handle = EndpointBytesReceivedHandle;
 
     fn register(self) -> Self::Handle {
@@ -178,14 +178,24 @@ impl InternalEventHandle for EndpointBytesReceivedHandle {
 
 // In component code:
 
-use crate::internal_events::{InternalEventHandle, RegisterEndpointBytesReceived};
+use crate::internal_events::{InternalEventHandle, RegisteredEndpointBytesReceived};
 
-let handle = register!(RegisterEndpointBytesReceived {
+let handle = register!(RegisteredEndpointBytesReceived {
     protocol = "https",
     endpoint = self.config.endpoint.clone(),
 );
 
 handle.emit(ByteSize(received.len()));
+```
+
+Storing this handle in a structure requires using either the internal handle name or using the
+`Handle` data type:
+
+```rust
+struct RunningSource {
+    bytes_sent_alt1: <RegisteredEndpointBytesSent as RegisterInternalEvent>::Handle,
+    bytes_sent_alt2: EndpointBytesReceivedHandle,
+}
 ```
 
 ## Rationale
@@ -202,6 +212,13 @@ handle.emit(ByteSize(received.len()));
   simply emitted. That is, you cannot `register!(BytesSent { … })`, nor can you
   `emit!(RegisteredBytesSent { … })` (although the latter could be modified to allow
   `emit!(RegisteredBytesSent { … }, ByteSize(…))`).
+
+- The syntax for naming the handle for storing it in structures is awkward. Writing a macro to
+  handle this is probably overkill. This is particularly awkward if the registration struct uses a
+  lifetime, since this then requires naming that lifetime to access the handle type, which in turn
+  requires a named lifetime bound on the containing structure _even if the handle itself doesn't
+  require one_. This can be avoided by using the handle name itself, but that requires additional
+  knowledge of the internal event details.
 
 ## Alternatives
 
