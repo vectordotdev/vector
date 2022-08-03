@@ -72,11 +72,25 @@ impl Function for Chunks {
     }
 
     fn examples(&self) -> &'static [Example] {
-        &[Example {
-            title: "chunks by byte",
-            source: r#"chunks("abcdefgh", 4)"#,
-            result: Ok(["abcd", "efgh"]),
-        }]
+        &[
+            Example {
+                title: "chunks by byte",
+                source: r#"chunks("abcdefgh", 4)"#,
+                result: Ok(r#"["abcd", "efgh"]"#),
+            },
+            Example {
+                title: "chunk sizes respect unicode code point boundaries",
+                source: r#"chunks("ab你好", 4)"#,
+                result: Ok(r#"["ab", "你", "好"]"#),
+            },
+            Example {
+                title: "chunk size cannot be less than 4 bytes in length",
+                source: r#"chunks("hello world", 3)"#,
+                result: Err(
+                    r#"function call error for "chunks" at (0:24): "chunk_size" must be greater than or equal to 4 bytes"#,
+                ),
+            },
+        ]
     }
 
     fn compile(
