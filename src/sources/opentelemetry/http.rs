@@ -83,7 +83,7 @@ pub(crate) fn build_warp_filter(
         .and_then(move |encoding_header: Option<String>, body: Bytes| {
             let events = decode(&encoding_header, body).and_then(decode_body);
             emit!(HttpBytesReceived {
-                byte_size: event.len(),
+                byte_size: events.len(),
                 http_path: "/v1/logs",
                 protocol,
             });
