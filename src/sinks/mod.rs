@@ -124,6 +124,10 @@ pub enum HealthcheckError {
 #[derive(Clone, Debug)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Sinks {
+    /// Apex Logs.
+    #[cfg(feature = "sinks-apex")]
+    Apex(#[configurable(derived)] apex::ApexSinkConfig),
+
     /// AWS CloudWatch Logs.
     #[cfg(feature = "sinks-aws_cloudwatch_logs")]
     AwsCloudwatchLogs(#[configurable(derived)] aws_cloudwatch_logs::CloudwatchLogsSinkConfig),
