@@ -1,21 +1,17 @@
 pub mod closure;
 
+use diagnostic::{DiagnosticMessage, Label, Note};
+use lookup::LookupBuf;
+use parser::ast::Ident;
 use std::{
     collections::{BTreeMap, HashMap},
     fmt,
 };
-
-use anymap::AnyMap;
-use diagnostic::{DiagnosticMessage, Label, Note};
-use lookup::LookupBuf;
-use parser::ast::Ident;
 use value::{kind::Collection, Value};
 
-use crate::state::TypeState;
 use crate::{
     expression::{container::Variant, Block, Container, Expr, Expression, FunctionArgument},
-    parser::Node,
-    state::{ExternalEnv, LocalEnv},
+    state::TypeState,
     value::{kind, Kind},
     CompileConfig, Span, TypeDef,
 };

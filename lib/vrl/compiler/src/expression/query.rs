@@ -1,16 +1,14 @@
-use std::fmt;
-
-use lookup::LookupBuf;
-use value::{kind::remove, Kind, Value};
-
-use crate::state::{TypeInfo, TypeState};
 use crate::{
     expression::{Container, Resolved, Variable},
     parser::ast::Ident,
-    state::{ExternalEnv, LocalEnv},
+    state::ExternalEnv,
+    state::{TypeInfo, TypeState},
     type_def::Details,
-    Context, Expression, TypeDef,
+    Context, Expression,
 };
+use lookup::LookupBuf;
+use std::fmt;
+use value::{kind::remove, Kind, Value};
 
 #[derive(Clone, PartialEq)]
 pub struct Query {

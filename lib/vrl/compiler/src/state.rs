@@ -1,7 +1,4 @@
-use std::collections::{hash_map::Entry, BTreeSet, HashMap};
-
-use anymap::AnyMap;
-use lookup::LookupBuf;
+use std::collections::{hash_map::Entry, HashMap};
 use value::{Kind, Value};
 
 use crate::{parser::ast::Ident, type_def::Details, value::Collection, TypeDef};

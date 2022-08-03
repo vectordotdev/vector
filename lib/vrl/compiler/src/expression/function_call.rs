@@ -1,7 +1,5 @@
-use std::{fmt, sync::Arc};
-
-use anymap::AnyMap;
 use diagnostic::{DiagnosticMessage, Label, Note, Urls};
+use std::{fmt, sync::Arc};
 
 use super::Block;
 use crate::state::{TypeInfo, TypeState};
@@ -12,7 +10,7 @@ use crate::{
         ArgumentList, Example, FunctionClosure, FunctionCompileContext, Parameter,
     },
     parser::{Ident, Node},
-    state::{ExternalEnv, LocalEnv},
+    state::LocalEnv,
     type_def::Details,
     value::Kind,
     CompileConfig, Context, Expression, Function, Resolved, Span, TypeDef,
@@ -386,7 +384,7 @@ impl<'a> Builder<'a> {
         mut self,
         state: &mut TypeState,
         closure_block: Option<Node<(Block, TypeDef)>>,
-        mut local_snapshot: LocalEnv,
+        local_snapshot: LocalEnv,
         fallible_expression_error: &mut Option<Box<dyn DiagnosticMessage>>,
         config: &mut CompileConfig,
     ) -> Result<FunctionCall, Error> {
@@ -403,7 +401,7 @@ impl<'a> Builder<'a> {
 
         let mut compile_ctx = FunctionCompileContext::new(self.call_span, temp_config);
 
-        let mut expr = self
+        let expr = self
             .function
             .compile(state, &mut compile_ctx, self.list.clone())
             .map_err(|error| Error::Compilation { call_span, error })?;
@@ -521,6 +519,8 @@ pub struct FunctionCall {
     expr: Box<dyn Expression>,
     arguments_with_unknown_type_validity: Vec<(Parameter, Node<FunctionArgument>)>,
     closure_fallible: bool,
+    // will be used with: https://github.com/vectordotdev/vector/issues/13782
+    #[allow(dead_code)]
     closure: Option<FunctionClosure>,
 
     // used for enhancing runtime error messages (using abort-instruction).
@@ -531,8 +531,8 @@ pub struct FunctionCall {
     // used for equality check
     ident: &'static str,
 
-    // The index of the function in the list of stdlib functions.
-    // Used by the VM to identify this function when called.
+    // May be used by the LLVM runtime. If not, it should be removed
+    #[allow(dead_code)]
     function_id: usize,
     arguments: Arc<Vec<Node<FunctionArgument>>>,
 }
@@ -542,6 +542,8 @@ impl FunctionCall {
     /// in the function
     /// The error path in this function should never really be hit as the compiler should
     /// catch these whilst creating the AST.
+    // May be used by the LLVM runtime. If not, it should be removed
+    #[allow(dead_code)]
     fn resolve_arguments(
         &self,
         function: &(dyn Function),
@@ -834,9 +836,6 @@ pub(crate) enum Error {
     #[error("fallible argument")]
     FallibleArgument { expr_span: Span },
 
-    #[error("error updating state {}", error)]
-    UpdateState { call_span: Span, error: String },
-
     #[error("unexpected closure")]
     UnexpectedClosure { call_span: Span, closure_span: Span },
 
@@ -868,8 +867,7 @@ impl DiagnosticMessage for Error {
         use Error::{
             AbortInfallible, ClosureArityMismatch, ClosureParameterTypeMismatch, Compilation,
             FallibleArgument, InvalidArgumentKind, MissingArgument, MissingClosure,
-            ReturnTypeMismatch, Undefined, UnexpectedClosure, UnknownKeyword, UpdateState,
-            WrongNumberOfArgs,
+            ReturnTypeMismatch, Undefined, UnexpectedClosure, UnknownKeyword, WrongNumberOfArgs,
         };
 
         match self {
@@ -881,7 +879,6 @@ impl DiagnosticMessage for Error {
             AbortInfallible { .. } => 620,
             InvalidArgumentKind { .. } => 110,
             FallibleArgument { .. } => 630,
-            UpdateState { .. } => 640,
             UnexpectedClosure { .. } => 109,
             MissingClosure { .. } => 111,
             ClosureArityMismatch { .. } => 120,
@@ -894,8 +891,7 @@ impl DiagnosticMessage for Error {
         use Error::{
             AbortInfallible, ClosureArityMismatch, ClosureParameterTypeMismatch, Compilation,
             FallibleArgument, InvalidArgumentKind, MissingArgument, MissingClosure,
-            ReturnTypeMismatch, Undefined, UnexpectedClosure, UnknownKeyword, UpdateState,
-            WrongNumberOfArgs,
+            ReturnTypeMismatch, Undefined, UnexpectedClosure, UnknownKeyword, WrongNumberOfArgs,
         };
 
         match self {
@@ -1040,11 +1036,6 @@ impl DiagnosticMessage for Error {
                     expr_span,
                 ),
             ],
-
-            UpdateState { call_span, error } => vec![Label::primary(
-                format!("an error occurred updating the compiler state: {}", error),
-                call_span,
-            )],
             UnexpectedClosure { call_span, closure_span } => vec![
                 Label::primary("unexpected closure", closure_span),
                 Label::context("this function does not accept a closure", call_span)

@@ -44,7 +44,7 @@ impl CompileConfig {
         self.set_read_only_metadata_path(LookupBuf::root(), true);
     }
 
-    pub(crate) fn is_read_only_path(&self, path: &LookupBuf, root: PathRoot) -> bool {
+    fn is_read_only_path(&self, path: &LookupBuf, root: PathRoot) -> bool {
         for read_only_path in &self.read_only_paths {
             if read_only_path.root != root {
                 continue;
@@ -68,7 +68,7 @@ impl CompileConfig {
 
     /// Adds a path that is considered read only. Assignments to any paths that match
     /// will fail at compile time.
-    pub(crate) fn set_read_only_path(&mut self, path: LookupBuf, recursive: bool, root: PathRoot) {
+    fn set_read_only_path(&mut self, path: LookupBuf, recursive: bool, root: PathRoot) {
         self.read_only_paths.insert(ReadOnlyPath {
             path,
             recursive,

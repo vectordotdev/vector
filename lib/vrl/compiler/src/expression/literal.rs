@@ -7,10 +7,9 @@ use ordered_float::NotNan;
 use regex::Regex;
 use value::{Value, ValueRegex};
 
-use crate::state::{TypeInfo, TypeState};
 use crate::{
     expression::Resolved,
-    state::{ExternalEnv, LocalEnv},
+    state::{TypeInfo, TypeState},
     Context, Expression, Span, TypeDef,
 };
 

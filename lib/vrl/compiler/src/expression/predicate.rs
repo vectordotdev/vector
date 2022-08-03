@@ -3,13 +3,12 @@ use std::fmt;
 use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 
 use crate::expression::Block;
-use crate::state::{TypeInfo, TypeState};
 use crate::{
     expression::{Expr, Resolved},
     parser::Node,
-    state::{ExternalEnv, LocalEnv},
+    state::{TypeInfo, TypeState},
     value::Kind,
-    Context, Expression, Span, TypeDef,
+    Context, Expression, Span,
 };
 
 pub(crate) type Result = std::result::Result<Predicate, Error>;
