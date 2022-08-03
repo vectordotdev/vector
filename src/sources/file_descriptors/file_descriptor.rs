@@ -13,8 +13,6 @@ const NAME: &str = "file_descriptor";
 use crate::{
     config::{GenerateConfig, Output, Resource, SourceConfig, SourceContext, SourceDescription},
     serde::default_decoding,
-    shutdown::ShutdownSignal,
-    SourceSender,
 };
 /// Configuration for the `file_descriptor` source.
 #[configurable_component(source)]
@@ -80,7 +78,8 @@ impl GenerateConfig for FileDescriptorSourceConfig {
 #[typetag::serde(name = "file_descriptor")]
 impl SourceConfig for FileDescriptorSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
-        pipe_source(self.clone(), cx.shutdown, cx.out)
+        let pipe = io::BufReader::new(unsafe { File::from_raw_fd(self.fd as i32) });
+        self.source(pipe, cx.shutdown, cx.out)
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
@@ -98,15 +97,6 @@ impl SourceConfig for FileDescriptorSourceConfig {
     fn can_acknowledge(&self) -> bool {
         false
     }
-}
-
-pub fn pipe_source(
-    config: FileDescriptorSourceConfig,
-    shutdown: ShutdownSignal,
-    out: SourceSender,
-) -> crate::Result<crate::sources::Source> {
-    let pipe = io::BufReader::new(unsafe { File::from_raw_fd(config.fd as i32) });
-    config.source(pipe, shutdown, out)
 }
 
 #[cfg(test)]
@@ -142,10 +132,8 @@ mod tests {
             write(write_fd, b"hello world\nhello world again\n").unwrap();
             close(write_fd).unwrap();
 
-            pipe_source(config, ShutdownSignal::noop(), tx)
-                .unwrap()
-                .await
-                .unwrap();
+            let context = SourceContext::new_test(tx, None);
+            config.build(context).await.unwrap().await.unwrap();
 
             let event = stream.next().await;
             assert_eq!(
@@ -182,10 +170,8 @@ mod tests {
         write(write_fd, b"hello world\nhello world again\n").unwrap();
         close(write_fd).unwrap();
 
-        pipe_source(config, ShutdownSignal::noop(), tx)
-            .unwrap()
-            .await
-            .unwrap();
+        let context = SourceContext::new_test(tx, None);
+        config.build(context).await.unwrap().await.unwrap();
 
         // The error "Bad file descriptor" will be logged when the source attempts to read
         // for the first time.

@@ -7,8 +7,6 @@ use vector_core::config::LogNamespace;
 use crate::{
     config::{Output, Resource, SourceConfig, SourceContext, SourceDescription},
     serde::default_decoding,
-    shutdown::ShutdownSignal,
-    SourceSender,
 };
 
 use super::FileDescriptorConfig;
@@ -82,12 +80,7 @@ impl_generate_config_from_default!(StdinConfig);
 #[typetag::serde(name = "stdin")]
 impl SourceConfig for StdinConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
-        stdin_source(
-            io::BufReader::new(io::stdin()),
-            self.clone(),
-            cx.shutdown,
-            cx.out,
-        )
+        self.source(io::BufReader::new(io::stdin()), cx.shutdown, cx.out)
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
@@ -107,25 +100,15 @@ impl SourceConfig for StdinConfig {
     }
 }
 
-pub fn stdin_source<R>(
-    stdin: R,
-    config: StdinConfig,
-    shutdown: ShutdownSignal,
-    out: SourceSender,
-) -> crate::Result<crate::sources::Source>
-where
-    R: Send + io::BufRead + 'static,
-{
-    config.source(stdin, shutdown, out)
-}
-
 #[cfg(test)]
 mod tests {
     use std::io::Cursor;
 
     use super::*;
     use crate::config::log_schema;
-    use crate::{test_util::components::assert_source_compliance, SourceSender};
+    use crate::{
+        shutdown::ShutdownSignal, test_util::components::assert_source_compliance, SourceSender,
+    };
     use futures::StreamExt;
 
     #[test]
@@ -140,7 +123,8 @@ mod tests {
             let config = StdinConfig::default();
             let buf = Cursor::new("hello world\nhello world again");
 
-            stdin_source(buf, config, ShutdownSignal::noop(), tx)
+            config
+                .source(buf, ShutdownSignal::noop(), tx)
                 .unwrap()
                 .await
                 .unwrap();
