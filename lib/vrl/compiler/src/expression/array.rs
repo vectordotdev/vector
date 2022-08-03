@@ -2,10 +2,9 @@ use std::{collections::BTreeMap, fmt, ops::Deref};
 
 use value::Value;
 
-use crate::state::{TypeInfo, TypeState};
 use crate::{
     expression::{Expr, Resolved},
-    state::{ExternalEnv, LocalEnv},
+    state::{TypeInfo, TypeState},
     Context, Expression, TypeDef,
 };
 

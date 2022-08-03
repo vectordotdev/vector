@@ -3,11 +3,7 @@ use std::fmt;
 use value::Value;
 
 use crate::state::{TypeInfo, TypeState};
-use crate::{
-    expression::Resolved,
-    state::{ExternalEnv, LocalEnv},
-    Context, Expression, TypeDef,
-};
+use crate::{expression::Resolved, Context, Expression, TypeDef};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Noop;

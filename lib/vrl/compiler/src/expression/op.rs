@@ -7,7 +7,6 @@ use crate::state::{TypeInfo, TypeState};
 use crate::{
     expression::{self, Expr, Resolved},
     parser::{ast, Node},
-    state::{ExternalEnv, LocalEnv},
     value::VrlValueArithmetic,
     Context, Expression, TypeDef,
 };

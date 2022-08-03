@@ -4,10 +4,9 @@ use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 use parser::ast::Node;
 
 use super::Expr;
-use crate::state::{TypeInfo, TypeState};
 use crate::{
     expression::{ExpressionError, Resolved},
-    state::{ExternalEnv, LocalEnv},
+    state::{TypeInfo, TypeState},
     value::{Kind, VrlValueConvert},
     Context, Expression, Span, TypeDef,
 };

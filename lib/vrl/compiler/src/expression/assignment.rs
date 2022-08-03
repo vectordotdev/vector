@@ -1,18 +1,16 @@
-use core::ExpressionError;
 use std::{convert::TryFrom, fmt};
 
 use diagnostic::{DiagnosticMessage, Label, Note};
 use lookup::{LookupBuf, SegmentBuf};
 use value::{Kind, Value};
 
-use crate::state::{TypeInfo, TypeState};
 use crate::{
     expression::{assignment::ErrorVariant::InvalidParentPathSegment, Expr, Resolved},
     parser::{
         ast::{self, Ident},
         Node,
     },
-    state::{ExternalEnv, LocalEnv},
+    state::{TypeInfo, TypeState},
     type_def::Details,
     value::kind::DefaultValue,
     CompileConfig, Context, Expression, Span, TypeDef,

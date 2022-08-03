@@ -1,14 +1,12 @@
-use core::ExpressionError;
-use std::fmt;
-
 use diagnostic::{DiagnosticMessage, Label};
+use std::fmt;
 use value::Value;
 
 use crate::state::{TypeInfo, TypeState};
 use crate::{
     expression::{levenstein, Resolved},
     parser::ast::Ident,
-    state::{ExternalEnv, LocalEnv},
+    state::LocalEnv,
     Context, Expression, Span, TypeDef,
 };
 

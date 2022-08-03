@@ -1,11 +1,9 @@
-use diagnostic::DiagnosticList;
 use lookup::LookupBuf;
 
 use crate::state::TypeState;
 use crate::{
     expression::{Block, Resolved},
-    state::LocalEnv,
-    CompileConfig, Context, Expression,
+    Context, Expression,
 };
 
 #[derive(Debug, Clone)]

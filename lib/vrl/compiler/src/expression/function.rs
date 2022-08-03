@@ -1,4 +1,4 @@
-use crate::state::{ExternalEnv, LocalEnv, TypeInfo, TypeState};
+use crate::state::{TypeInfo, TypeState};
 use crate::{Context, Expression, TypeDef};
 use core::{ExpressionError, Resolved};
 use dyn_clone::DynClone;

@@ -1,10 +1,9 @@
 use std::fmt;
 
-use crate::state::{TypeInfo, TypeState};
 use crate::{
     expression::{Array, Block, Group, Object, Resolved, Value},
-    state::{ExternalEnv, LocalEnv},
-    Context, Expression, TypeDef,
+    state::{TypeInfo, TypeState},
+    Context, Expression,
 };
 
 #[derive(Debug, Clone, PartialEq)]

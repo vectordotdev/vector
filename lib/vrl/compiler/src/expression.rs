@@ -4,10 +4,7 @@ use diagnostic::{DiagnosticMessage, Label, Note};
 use dyn_clone::{clone_trait_object, DynClone};
 use value::Value;
 
-use crate::{
-    state::{ExternalEnv, LocalEnv},
-    Context, Span, TypeDef,
-};
+use crate::{Context, Span, TypeDef};
 
 #[cfg(feature = "expr-abort")]
 mod abort;

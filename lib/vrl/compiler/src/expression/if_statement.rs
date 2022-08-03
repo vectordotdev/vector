@@ -5,9 +5,8 @@ use value::Value;
 use crate::state::{TypeInfo, TypeState};
 use crate::{
     expression::{Block, Predicate, Resolved},
-    state::{ExternalEnv, LocalEnv},
     value::VrlValueConvert,
-    Context, Expression, TypeDef,
+    Context, Expression,
 };
 
 #[derive(Debug, Clone, PartialEq)]

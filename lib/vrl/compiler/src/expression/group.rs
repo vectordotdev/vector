@@ -3,8 +3,7 @@ use std::fmt;
 use crate::state::{TypeInfo, TypeState};
 use crate::{
     expression::{Expr, Resolved},
-    state::{ExternalEnv, LocalEnv},
-    Context, Expression, TypeDef,
+    Context, Expression,
 };
 
 #[derive(Debug, Clone, PartialEq)]

@@ -1,13 +1,11 @@
 use std::fmt;
 
 use diagnostic::{DiagnosticMessage, Label, Note, Urls};
-use vector_config::schemars::_private::NoSerialize;
 
 use crate::state::{TypeInfo, TypeState};
 use crate::{
     expression::{Expr, Resolved},
     parser::Node,
-    state::{ExternalEnv, LocalEnv},
     value::{Kind, VrlValueConvert},
     Context, Expression, Span, TypeDef,
 };
