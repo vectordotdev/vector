@@ -784,6 +784,7 @@ mod test {
     use vector_common::btreemap;
     use vector_core::config::proxy::ProxyConfig;
     use vrl::prelude::Collection;
+    use vrl::CompileConfig;
     use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
 
     use super::{
@@ -959,10 +960,13 @@ mod test {
             }),
             Kind::object(Collection::empty()),
         );
-        assert!(
-            vrl::compile_with_external(vrl.as_str(), vrl_stdlib::all().as_ref(), &mut state)
-                .is_ok()
-        );
+        assert!(vrl::compile_with_external(
+            vrl.as_str(),
+            vrl_stdlib::all().as_ref(),
+            &mut state,
+            CompileConfig::default()
+        )
+        .is_ok());
     }
 
     #[test]

@@ -13,10 +13,16 @@ use crate::{
     parser::ast::RootExpr,
     program::ProgramInfo,
     state::{ExternalEnv, LocalEnv},
-    ExternalContext, Function, Program, TypeDef,
+    CompileConfig, Function, Program, TypeDef,
 };
 
 pub(crate) type Diagnostics = Vec<Box<dyn DiagnosticMessage>>;
+
+pub struct CompilationResult {
+    pub program: Program,
+    pub warnings: DiagnosticList,
+    pub config: CompileConfig,
+}
 
 pub struct Compiler<'a> {
     fns: &'a [Box<dyn Function>],
@@ -40,7 +46,7 @@ pub struct Compiler<'a> {
     /// nullifies the fallibility of that expression.
     fallible_expression_error: Option<Box<dyn DiagnosticMessage>>,
 
-    external_context: AnyMap,
+    config: CompileConfig,
 }
 
 impl<'a> Compiler<'a> {
@@ -48,8 +54,8 @@ impl<'a> Compiler<'a> {
         fns: &'a [Box<dyn Function>],
         ast: parser::Program,
         state: &TypeState,
-        external_context: &mut ExternalContext,
-    ) -> Result<(Program, DiagnosticList), DiagnosticList> {
+        config: CompileConfig,
+    ) -> Result<CompilationResult, DiagnosticList> {
         let initial_state = state.clone();
         let mut state = state.clone();
 
@@ -62,7 +68,7 @@ impl<'a> Compiler<'a> {
             external_assignments: vec![],
             skip_missing_query_target: vec![],
             fallible_expression_error: None,
-            external_context: external_context.swap_external_context(AnyMap::new()),
+            config,
         };
         let expressions = compiler.compile_root_exprs(ast, &mut state);
 
@@ -75,24 +81,21 @@ impl<'a> Compiler<'a> {
             return Err(errors.into());
         }
 
-        let info = ProgramInfo {
-            fallible: compiler.fallible,
-            abortable: compiler.abortable,
-            target_queries: compiler.external_queries,
-            target_assignments: compiler.external_assignments,
-        };
-
-        let _ = external_context.swap_external_context(compiler.external_context);
-
-        let expressions = Block::new_inline(expressions);
-        Ok((
-            Program {
-                expressions,
-                info,
+        let result = CompilationResult {
+            program: Program {
+                expressions: Block::new_inline(expressions),
+                info: ProgramInfo {
+                    fallible: compiler.fallible,
+                    abortable: compiler.abortable,
+                    target_queries: compiler.external_queries,
+                    target_assignments: compiler.external_assignments,
+                },
                 initial_state,
             },
-            warnings.into(),
-        ))
+            warnings: warnings.into(),
+            config: compiler.config,
+        };
+        Ok(result)
     }
 
     fn compile_exprs(
@@ -677,7 +680,7 @@ impl<'a> Compiler<'a> {
                     block,
                     local_snapshot,
                     &mut self.fallible_expression_error,
-                    &mut self.external_context,
+                    self.config.custom_mut(),
                 )
                 .map_err(|err| self.diagnostics.push(Box::new(err)))
                 .ok()

@@ -13,8 +13,8 @@ use lookup::LookupBuf;
 use value::Secrets;
 use vector_common::TimeZone;
 use vrl::state::TypeState;
-use vrl::ExternalContext;
 use vrl::{diagnostic::Formatter, state, Program, Runtime, Target, VrlRuntime};
+use vrl::{CompilationResult, CompileConfig};
 
 #[cfg(feature = "repl")]
 use super::repl;
@@ -131,15 +131,14 @@ fn run(opts: &Opts) -> Result<(), Error> {
             .external
             .set_read_only_metadata_path(LookupBuf::from("vector"), true);
 
-        let (program, warnings) = vrl::compile_with_state(
-            &source,
-            &stdlib::all(),
-            &state,
-            &mut ExternalContext::default(),
-        )
-        .map_err(|diagnostics| {
-            Error::Parse(Formatter::new(&source, diagnostics).colored().to_string())
-        })?;
+        let CompilationResult {
+            program,
+            warnings,
+            config: _,
+        } = vrl::compile_with_state(&source, &stdlib::all(), &state, CompileConfig::default())
+            .map_err(|diagnostics| {
+                Error::Parse(Formatter::new(&source, diagnostics).colored().to_string())
+            })?;
 
         #[allow(clippy::print_stderr)]
         if opts.print_warnings {

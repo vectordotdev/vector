@@ -20,7 +20,7 @@ use vector_common::TimeZone;
 use vector_vrl_functions::vrl_functions;
 use vrl::state::TypeState;
 use vrl::{
-    diagnostic::Formatter, prelude::BTreeMap, state, ExternalContext, Runtime, Target, VrlRuntime,
+    diagnostic::Formatter, prelude::BTreeMap, state, CompileConfig, Runtime, Target, VrlRuntime,
 };
 
 // Create a list of all possible error values for potential docs lookup
@@ -170,11 +170,10 @@ fn resolve(
         .external
         .set_read_only_metadata_path(LookupBuf::from("vector"), true);
 
-    let mut external_context = ExternalContext::default();
+    let config = CompileConfig::default();
 
-    let program = match vrl::compile_with_state(program, &functions, &state, &mut external_context)
-    {
-        Ok((program, _)) => program,
+    let program = match vrl::compile_with_state(program, &functions, &state, config) {
+        Ok(result) => result.program,
         Err(diagnostics) => {
             return Err(Formatter::new(program, diagnostics).colored().to_string());
         }

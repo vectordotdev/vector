@@ -1,11 +1,11 @@
 use anymap::AnyMap;
 
-pub struct ExternalContext {
+pub struct CompileConfig {
     /// Custom context injected by the external environment
     custom: AnyMap,
 }
 
-impl ExternalContext {
+impl CompileConfig {
     /// Get external context data from the external environment.
     pub fn get_external_context<T: 'static>(&self) -> Option<&T> {
         self.custom.get::<T>()
@@ -22,9 +22,13 @@ impl ExternalContext {
     pub fn set_external_context<T: 'static>(&mut self, data: T) {
         self.custom.insert::<T>(data);
     }
+
+    pub fn custom_mut(&mut self) -> &mut AnyMap {
+        &mut self.custom
+    }
 }
 
-impl Default for ExternalContext {
+impl Default for CompileConfig {
     fn default() -> Self {
         Self {
             custom: AnyMap::new(),

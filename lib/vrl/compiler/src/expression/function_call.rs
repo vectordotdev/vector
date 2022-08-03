@@ -15,7 +15,7 @@ use crate::{
     state::{ExternalEnv, LocalEnv},
     type_def::Details,
     value::Kind,
-    Context, Expression, ExternalContext, Function, Resolved, Span, TypeDef,
+    CompileConfig, Context, Expression, Function, Resolved, Span, TypeDef,
 };
 
 pub(crate) struct Builder<'a> {
