@@ -3482,9 +3482,9 @@ checksum = "f178e61cdbfe084aa75a2f4f7a25a5bb09701a47ae1753608f194b15783c937a"
 
 [[package]]
 name = "inherent"
-version = "1.0.1"
+version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "daa5135cb6aa90ee17b4f0a0fb2908059b0830f90fda333f12816f275b21820c"
+checksum = "2fb971b57a573f221e77621bea15a412033924a30beb9511fa2867572e41ea0e"
 dependencies = [
  "proc-macro2",
  "quote",
