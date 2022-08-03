@@ -217,20 +217,19 @@ impl super::HttpScraper for HttpScrapeContext {
 
 #[cfg(test)]
 mod test {
+    use codecs::decoding::{CharacterDelimitedDecoderOptions, NewlineDelimitedDecoderOptions};
     //use futures::{poll, StreamExt};
-    use futures::StreamExt;
+    //use futures::StreamExt;
     //use std::task::Poll;
-    use tokio::time::{sleep, Duration};
-    use tokio::{pin, select};
+    //use tokio::time::{sleep, Duration};
+    use tokio::time::Duration;
+    //use tokio::{pin, select};
     use warp::Filter;
 
     use super::*;
-    use crate::{
-        test_util::{
-            components::{run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS},
-            next_addr, test_generate_config,
-        },
-        SourceSender,
+    use crate::test_util::{
+        components::{run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS},
+        next_addr, test_generate_config,
     };
 
     #[test]
@@ -242,55 +241,55 @@ mod test {
     // a way, since if this is run live it generates an HTTP error.
     #[tokio::test]
     async fn invalid_endpoint() {
-        let source = HttpScrapeConfig {
-            endpoint: "http://nope".to_string(),
-            scrape_interval_secs: 1,
-            query: None,
-            decoding: default_decoding(),
-            framing: default_framing_message_based(),
-            headers: None,
-            auth: None,
-            tls: None,
-        };
+        // let source = HttpScrapeConfig {
+        //     endpoint: "http://nope".to_string(),
+        //     scrape_interval_secs: 1,
+        //     query: None,
+        //     decoding: default_decoding(),
+        //     framing: default_framing_message_based(),
+        //     headers: None,
+        //     auth: None,
+        //     tls: None,
+        // };
 
-        // Build the source and set ourselves up to both drive it to completion as well as collect all the events it sends out.
-        let (tx, mut rx) = SourceSender::new_test();
-        let context = SourceContext::new_test(tx, None);
+        // // Build the source and set ourselves up to both drive it to completion as well as collect all the events it sends out.
+        // let (tx, mut rx) = SourceSender::new_test();
+        // let context = SourceContext::new_test(tx, None);
 
-        let source = source
-            .build(context)
-            .await
-            .expect("source should not fail to build");
+        // let source = source
+        //     .build(context)
+        //     .await
+        //     .expect("source should not fail to build");
 
-        // If a timeout was given, use that, otherwise, use an infinitely long one.
-        let source_timeout = sleep(Duration::from_millis(3000));
-        pin!(source_timeout);
+        // // If a timeout was given, use that, otherwise, use an infinitely long one.
+        // let source_timeout = sleep(Duration::from_millis(3000));
+        // pin!(source_timeout);
 
-        let _source_handle = tokio::spawn(source);
+        // let _source_handle = tokio::spawn(source);
 
-        loop {
-            select! {
-                _ = &mut source_timeout => {
-                    assert!(false, "should error before timing out");
-                    break
-                },
-                Some(_event) = rx.next() => {
-                    assert!(false, "should not be a valid endpoint");
-                    break
-                },
-                //result = &mut source => {
-                //    match result {
-                //        Ok(_) => {
-                //            assert!(false, "should not be a valid endpoint");
-                //        }
-                //        Err(e) => {
-                //            dbg!(e);
-                //        }
-                //    }
-                //    break
-                //},
-            }
-        }
+        // loop {
+        //     select! {
+        //         _ = &mut source_timeout => {
+        //             assert!(false, "should error before timing out");
+        //             break
+        //         },
+        //         Some(_event) = rx.next() => {
+        //             assert!(false, "should not be a valid endpoint");
+        //             break
+        //         },
+        //         //result = &mut source => {
+        //         //    match result {
+        //         //        Ok(_) => {
+        //         //            assert!(false, "should not be a valid endpoint");
+        //         //        }
+        //         //        Err(e) => {
+        //         //            dbg!(e);
+        //         //        }
+        //         //    }
+        //         //    break
+        //         //},
+        //     }
+        // }
 
         //drop(source);
 
@@ -324,6 +323,7 @@ mod test {
     async fn bytes_decoding() {
         let in_addr = next_addr();
 
+        // validates the Accept header is set correctly for the Bytes codec
         let dummy_endpoint = warp::path!("endpoint")
             .and(warp::header::exact("Accept", "text/plain"))
             .map(|| r#"A plain text event"#);
@@ -344,11 +344,12 @@ mod test {
     }
 
     #[tokio::test]
-    async fn json_decoding() {
+    async fn json_decoding_newline_delimited() {
         let in_addr = next_addr();
 
+        // validates the Content-Type is set correctly for the Json codec
         let dummy_endpoint = warp::path!("endpoint")
-            .and(warp::header::exact("Accept", "text/plain"))
+            .and(warp::header::exact("Accept", "application/x-ndjson"))
             .map(|| r#"{"data" : "foo"}"#);
 
         tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
@@ -358,7 +359,38 @@ mod test {
             scrape_interval_secs: 1,
             query: None,
             decoding: DeserializerConfig::Json,
-            framing: default_framing_message_based(),
+            framing: FramingConfig::NewlineDelimited {
+                newline_delimited: NewlineDelimitedDecoderOptions::default(),
+            },
+            headers: None,
+            auth: None,
+            tls: None,
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn json_decoding_character_delimited() {
+        let in_addr = next_addr();
+
+        // validates the Content-Type is set correctly for the Json codec
+        let dummy_endpoint = warp::path!("endpoint")
+            .and(warp::header::exact("Accept", "application/json"))
+            .map(|| r#"{"data" : "foo"}"#);
+
+        tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+
+        run_test(HttpScrapeConfig {
+            endpoint: format!("http://{}/endpoint", in_addr),
+            scrape_interval_secs: 1,
+            query: None,
+            decoding: DeserializerConfig::Json,
+            framing: FramingConfig::CharacterDelimited {
+                character_delimited: CharacterDelimitedDecoderOptions {
+                    delimiter: b',',
+                    max_length: Some(usize::MAX),
+                },
+            },
             headers: None,
             auth: None,
             tls: None,
@@ -423,16 +455,46 @@ mod test {
             assert_eq!(got, expected);
         }
     }
+
+    #[tokio::test]
+    async fn headers_applied() {
+        let in_addr = next_addr();
+        let header_key = "f00";
+        let header_val = "bazz";
+
+        let dummy_endpoint = warp::path!("endpoint")
+            .and(warp::header::exact("Accept", "text/plain"))
+            .and(warp::header::exact(header_key, header_val))
+            .map(|| r#"{"data" : "foo"}"#);
+
+        tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+
+        run_test(HttpScrapeConfig {
+            endpoint: format!("http://{}/endpoint", in_addr),
+            scrape_interval_secs: 1,
+            query: None,
+            decoding: default_decoding(),
+            framing: default_framing_message_based(),
+            headers: Some(HashMap::from([(
+                header_key.to_string(),
+                header_val.to_string(),
+            )])),
+            auth: None,
+            tls: None,
+        })
+        .await;
+    }
 }
 
 #[cfg(all(test, feature = "http-scrape-integration-tests"))]
 mod integration_tests {
-    use tokio::time::Duration;
+    use tokio::time::{Duration, Instant};
 
     use super::*;
     use crate::{
+        config::ComponentKey,
         test_util::components::{run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS},
-        tls,
+        tls, SourceSender,
     };
 
     async fn run_test(config: HttpScrapeConfig) -> Vec<Event> {
@@ -519,7 +581,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn unauthorized() {
-        // TODO how to assert failure
+        // TODO how to surface the failure for validation
 
         // let source = HttpScrapeConfig {
         //     endpoint: format!("http://dufs-auth:5000/logs/json.json"),
@@ -566,11 +628,6 @@ mod integration_tests {
     }
 
     #[tokio::test]
-    async fn headers() {
-        // TODO - is this worthy of testing and how to verify ?
-    }
-
-    #[tokio::test]
     async fn tls() {
         run_test(HttpScrapeConfig {
             endpoint: "https://dufs-https:5000/logs/json.json".to_string(),
@@ -590,6 +647,36 @@ mod integration_tests {
 
     #[tokio::test]
     async fn shutdown() {
-        // TODO - is this worthy of testing and how to verify
+        let source_id = ComponentKey::from("http_scrape_shutdown");
+        let source = HttpScrapeConfig {
+            endpoint: "http://dufs:5000/logs/json.json".to_string(),
+            scrape_interval_secs: 1,
+            query: None,
+            decoding: DeserializerConfig::Json,
+            framing: default_framing_message_based(),
+            headers: None,
+            auth: None,
+            tls: None,
+        };
+
+        // build the context for the source and get a SourceShutdownCoordinator to signal with
+        let (tx, _rx) = SourceSender::new_test();
+        let (context, mut shutdown) = SourceContext::new_shutdown(&source_id, tx);
+
+        // start source
+        let source = source
+            .build(context)
+            .await
+            .expect("source should not fail to build");
+        let source_handle = tokio::spawn(source);
+
+        // signal the source to shut down
+        let deadline = Instant::now() + Duration::from_secs(1);
+        let shutdown_complete = shutdown.shutdown_source(&source_id, deadline);
+        let shutdown_success = shutdown_complete.await;
+        assert!(shutdown_success);
+
+        // Ensure source actually shut down successfully.
+        let _ = source_handle.await.unwrap();
     }
 }

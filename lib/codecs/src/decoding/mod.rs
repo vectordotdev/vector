@@ -340,7 +340,7 @@ impl DeserializerConfig {
                     character_delimited:
                         CharacterDelimitedDecoderOptions {
                             delimiter: b',',
-                            max_length: None,
+                            max_length: Some(usize::MAX),
                         },
                 },
             ) => "application/json",
