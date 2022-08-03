@@ -68,14 +68,14 @@ components: sinks: apex: {
 			}
 		}
 		project_id: {
-			description: "The id of the project to associate reported logs with."
+			description: "The ID of the project to associate reported logs with."
 			required:    true
 			type: string: {
 				examples: ["my-project"]
 			}
 		}
 		api_token: {
-			description: "The api token to use to authenticate with Apex."
+			description: "The API token to use to authenticate with Apex."
 			required:    true
 			type: string: {
 				examples: ["${API_TOKEN}"]
