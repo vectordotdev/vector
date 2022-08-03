@@ -43,6 +43,9 @@ pub enum AwsAuthentication {
 
         /// Timeout for assuming the role, in seconds.
         load_timeout_secs: Option<u64>,
+
+        /// Region to send STS requests through
+        region: Option<String>,
     },
 
     /// Default authentication strategy which tries a variety of substrategies in a one-after-the-other fashion.
@@ -56,7 +59,7 @@ pub enum AwsAuthentication {
 impl AwsAuthentication {
     pub async fn credentials_provider(
         &self,
-        region: Region,
+        service_region: Region,
     ) -> crate::Result<SharedCredentialsProvider> {
         match self {
             Self::Static {
@@ -73,15 +76,17 @@ impl AwsAuthentication {
             AwsAuthentication::Role {
                 assume_role,
                 load_timeout_secs,
+                region,
             } => {
+                let auth_region = region.clone().map(Region::new).unwrap_or(service_region);
                 let provider = AssumeRoleProviderBuilder::new(assume_role)
-                    .region(region.clone())
-                    .build(default_credentials_provider(region, *load_timeout_secs).await);
+                    .region(auth_region.clone())
+                    .build(default_credentials_provider(auth_region, *load_timeout_secs).await);
 
                 Ok(SharedCredentialsProvider::new(provider))
             }
             AwsAuthentication::Default { load_timeout_secs } => Ok(SharedCredentialsProvider::new(
-                default_credentials_provider(region, *load_timeout_secs).await,
+                default_credentials_provider(service_region, *load_timeout_secs).await,
             )),
         }
     }
@@ -182,6 +187,7 @@ mod tests {
             assume_role = "root"
             auth.assume_role = "auth.root"
             auth.load_timeout_secs = 10
+            auth.region = "us-west-2"
         "#,
         )
         .unwrap();
@@ -190,9 +196,11 @@ mod tests {
             AwsAuthentication::Role {
                 assume_role,
                 load_timeout_secs,
+                region
             } => {
                 assert_eq!(&assume_role, "auth.root");
                 assert_eq!(load_timeout_secs, Some(10));
+                assert_eq!(region.unwrap(), "us-west-2");
             }
             _ => panic!(),
         }

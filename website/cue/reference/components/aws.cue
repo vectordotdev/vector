@@ -39,6 +39,16 @@ components: _aws: {
 							examples: ["arn:aws:iam::123456789098:role/my_role"]
 						}
 					}
+					region: {
+						category:    "Auth",
+						common: 	 false
+						description: "The [AWS region](\(urls.aws_regions)) to call STS against"
+						required: 	 false
+						type: string: {
+							default: null
+							examples: ["us-west-2"]
+						}
+					}
 					load_timeout_secs: {
 						category:    "Auth"
 						common:      false
