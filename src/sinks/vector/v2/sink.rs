@@ -1,16 +1,20 @@
+use std::fmt;
+
 use async_trait::async_trait;
 use futures::{stream::BoxStream, StreamExt};
 use prost::Message;
-use tower::util::BoxService;
-use vector_core::{buffers::Acker, stream::BatcherSettings, ByteSizeOf};
+use tower::Service;
+use vector_core::{
+    stream::{BatcherSettings, DriverResponse},
+    ByteSizeOf,
+};
 
 use crate::{
     event::{proto::EventWrapper, Event, EventFinalizers, Finalizable},
     sinks::{
         util::{SinkBuilderExt, StreamSink},
-        vector::v2::service::{VectorRequest, VectorResponse},
+        vector::v2::service::VectorRequest,
     },
-    Error,
 };
 
 struct EventData {
@@ -19,13 +23,18 @@ struct EventData {
     wrapper: EventWrapper,
 }
 
-pub struct VectorSink {
+pub struct VectorSink<S> {
     pub batch_settings: BatcherSettings,
-    pub service: BoxService<VectorRequest, VectorResponse, Error>,
-    pub acker: Acker,
+    pub service: S,
 }
 
-impl VectorSink {
+impl<S> VectorSink<S>
+where
+    S: Service<VectorRequest> + Send + 'static,
+    S::Future: Send + 'static,
+    S::Response: DriverResponse + Send + 'static,
+    S::Error: fmt::Debug + Into<crate::Error> + Send,
+{
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         input
             .map(|mut event| EventData {
@@ -41,14 +50,20 @@ impl VectorSink {
                     req.events.push(item.wrapper);
                 },
             ))
-            .into_driver(self.service, self.acker)
+            .into_driver(self.service)
             .run()
             .await
     }
 }
 
 #[async_trait]
-impl StreamSink<Event> for VectorSink {
+impl<S> StreamSink<Event> for VectorSink<S>
+where
+    S: Service<VectorRequest> + Send + 'static,
+    S::Future: Send + 'static,
+    S::Response: DriverResponse + Send + 'static,
+    S::Error: fmt::Debug + Into<crate::Error> + Send,
+{
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
     }

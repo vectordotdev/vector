@@ -1,9 +1,8 @@
 use async_graphql::Object;
 use vector_core::config::ComponentKey;
 
-use crate::event::Metric;
-
 use super::{by_component_key, sum_metrics, SentEventsTotal};
+use crate::event::Metric;
 
 #[derive(Debug, Clone)]
 pub struct Output {

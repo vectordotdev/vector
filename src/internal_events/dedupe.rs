@@ -7,11 +7,8 @@ pub struct DedupeEventDiscarded {
 }
 
 impl InternalEvent for DedupeEventDiscarded {
-    fn emit_logs(&self) {
+    fn emit(self) {
         trace!(message = "Encountered duplicate event; discarding.", event = ?self.event);
-    }
-
-    fn emit_metrics(&self) {
         counter!("events_discarded_total", 1);
     }
 }

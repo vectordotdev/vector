@@ -15,93 +15,93 @@ struct BlockIoStat {
 
 #[derive(Deserialize)]
 struct BlockIoStats {
-    io_merged_recursive: Vec<BlockIoStat>,
-    io_queue_recursive: Vec<BlockIoStat>,
-    io_service_bytes_recursive: Vec<BlockIoStat>,
-    io_service_time_recursive: Vec<BlockIoStat>,
-    io_serviced_recursive: Vec<BlockIoStat>,
-    io_time_recursive: Vec<BlockIoStat>,
-    io_wait_time_recursive: Vec<BlockIoStat>,
-    sectors_recursive: Vec<BlockIoStat>,
+    io_merged_recursive: Option<Vec<BlockIoStat>>,
+    io_queue_recursive: Option<Vec<BlockIoStat>>,
+    io_service_bytes_recursive: Option<Vec<BlockIoStat>>,
+    io_service_time_recursive: Option<Vec<BlockIoStat>>,
+    io_serviced_recursive: Option<Vec<BlockIoStat>>,
+    io_time_recursive: Option<Vec<BlockIoStat>>,
+    io_wait_time_recursive: Option<Vec<BlockIoStat>>,
+    sectors_recursive: Option<Vec<BlockIoStat>>,
 }
 
 #[derive(Deserialize)]
 struct CpuUsage {
-    total_usage: f64,
-    percpu_usage: Vec<f64>,
-    usage_in_usermode: f64,
-    usage_in_kernelmode: f64,
+    total_usage: Option<f64>,
+    percpu_usage: Option<Vec<f64>>,
+    usage_in_usermode: Option<f64>,
+    usage_in_kernelmode: Option<f64>,
 }
 
 #[derive(Deserialize)]
 struct ThrottlingData {
-    periods: f64,
-    throttled_periods: f64,
-    throttled_time: f64,
+    periods: Option<f64>,
+    throttled_periods: Option<f64>,
+    throttled_time: Option<f64>,
 }
 
 #[derive(Deserialize)]
 struct CpuStats {
-    cpu_usage: CpuUsage,
-    system_cpu_usage: f64,
-    online_cpus: usize,
-    throttling_data: ThrottlingData,
+    cpu_usage: Option<CpuUsage>,
+    system_cpu_usage: Option<f64>,
+    online_cpus: Option<usize>,
+    throttling_data: Option<ThrottlingData>,
 }
 
 #[derive(Deserialize)]
 struct MemoryExtStats {
-    active_anon: f64,
-    active_file: f64,
-    cache: f64,
-    dirty: f64,
-    inactive_anon: f64,
-    inactive_file: f64,
-    mapped_file: f64,
-    pgfault: f64,
-    pgmajfault: f64,
-    pgpgin: f64,
-    pgpgout: f64,
-    rss: f64,
-    rss_huge: f64,
-    unevictable: f64,
-    writeback: f64,
-    total_active_anon: f64,
-    total_active_file: f64,
-    total_cache: f64,
-    total_dirty: f64,
-    total_inactive_anon: f64,
-    total_inactive_file: f64,
-    total_mapped_file: f64,
-    total_pgfault: f64,
-    total_pgmajfault: f64,
-    total_pgpgin: f64,
-    total_pgpgout: f64,
-    total_rss: f64,
-    total_rss_huge: f64,
-    total_unevictable: f64,
-    total_writeback: f64,
-    hierarchical_memory_limit: f64,
-    hierarchical_memsw_limit: f64,
+    active_anon: Option<f64>,
+    active_file: Option<f64>,
+    cache: Option<f64>,
+    dirty: Option<f64>,
+    inactive_anon: Option<f64>,
+    inactive_file: Option<f64>,
+    mapped_file: Option<f64>,
+    pgfault: Option<f64>,
+    pgmajfault: Option<f64>,
+    pgpgin: Option<f64>,
+    pgpgout: Option<f64>,
+    rss: Option<f64>,
+    rss_huge: Option<f64>,
+    unevictable: Option<f64>,
+    writeback: Option<f64>,
+    total_active_anon: Option<f64>,
+    total_active_file: Option<f64>,
+    total_cache: Option<f64>,
+    total_dirty: Option<f64>,
+    total_inactive_anon: Option<f64>,
+    total_inactive_file: Option<f64>,
+    total_mapped_file: Option<f64>,
+    total_pgfault: Option<f64>,
+    total_pgmajfault: Option<f64>,
+    total_pgpgin: Option<f64>,
+    total_pgpgout: Option<f64>,
+    total_rss: Option<f64>,
+    total_rss_huge: Option<f64>,
+    total_unevictable: Option<f64>,
+    total_writeback: Option<f64>,
+    hierarchical_memory_limit: Option<f64>,
+    hierarchical_memsw_limit: Option<f64>,
 }
 
 #[derive(Deserialize)]
 struct MemoryStats {
-    usage: f64,
-    max_usage: f64,
-    limit: f64,
-    stats: MemoryExtStats,
+    usage: Option<f64>,
+    max_usage: Option<f64>,
+    limit: Option<f64>,
+    stats: Option<MemoryExtStats>,
 }
 
 #[derive(Deserialize)]
 struct NetworkStats {
-    rx_bytes: f64,
-    rx_packets: f64,
-    rx_errors: f64,
-    rx_dropped: f64,
-    tx_bytes: f64,
-    tx_packets: f64,
-    tx_errors: f64,
-    tx_dropped: f64,
+    rx_bytes: Option<f64>,
+    rx_packets: Option<f64>,
+    rx_errors: Option<f64>,
+    rx_dropped: Option<f64>,
+    tx_bytes: Option<f64>,
+    tx_packets: Option<f64>,
+    tx_errors: Option<f64>,
+    tx_dropped: Option<f64>,
 }
 
 #[derive(Deserialize)]
@@ -113,7 +113,7 @@ struct ContainerStats {
     cpu_stats: Option<CpuStats>,
     memory_stats: Option<MemoryStats>,
     #[serde(default)]
-    networks: BTreeMap<String, NetworkStats>,
+    networks: Option<BTreeMap<String, NetworkStats>>,
 }
 
 fn counter(
@@ -168,7 +168,7 @@ fn blkio_metrics(
 ) -> Vec<Metric> {
     let mut metrics = vec![];
 
-    metrics.extend(blkio.io_merged_recursive.iter().map(|s| {
+    metrics.extend(blkio.io_merged_recursive.iter().flatten().map(|s| {
         counter(
             "blkio",
             "recursive_io_merged_total",
@@ -178,7 +178,7 @@ fn blkio_metrics(
             blkio_tags(s, tags),
         )
     }));
-    metrics.extend(blkio.io_queue_recursive.iter().map(|s| {
+    metrics.extend(blkio.io_queue_recursive.iter().flatten().map(|s| {
         counter(
             "blkio",
             "recursive_io_queued_total",
@@ -188,7 +188,7 @@ fn blkio_metrics(
             blkio_tags(s, tags),
         )
     }));
-    metrics.extend(blkio.io_service_bytes_recursive.iter().map(|s| {
+    metrics.extend(blkio.io_service_bytes_recursive.iter().flatten().map(|s| {
         counter(
             "blkio",
             "recursive_io_service_bytes_total",
@@ -198,7 +198,7 @@ fn blkio_metrics(
             blkio_tags(s, tags),
         )
     }));
-    metrics.extend(blkio.io_service_time_recursive.iter().map(|s| {
+    metrics.extend(blkio.io_service_time_recursive.iter().flatten().map(|s| {
         counter(
             "blkio",
             "recursive_io_service_time_seconds_total",
@@ -208,7 +208,7 @@ fn blkio_metrics(
             blkio_tags(s, tags),
         )
     }));
-    metrics.extend(blkio.io_serviced_recursive.iter().map(|s| {
+    metrics.extend(blkio.io_serviced_recursive.iter().flatten().map(|s| {
         counter(
             "blkio",
             "recursive_io_serviced_total",
@@ -218,7 +218,7 @@ fn blkio_metrics(
             blkio_tags(s, tags),
         )
     }));
-    metrics.extend(blkio.io_time_recursive.iter().map(|s| {
+    metrics.extend(blkio.io_time_recursive.iter().flatten().map(|s| {
         counter(
             "blkio",
             "recursive_io_time_seconds_total",
@@ -228,7 +228,7 @@ fn blkio_metrics(
             blkio_tags(s, tags),
         )
     }));
-    metrics.extend(blkio.io_wait_time_recursive.iter().map(|s| {
+    metrics.extend(blkio.io_wait_time_recursive.iter().flatten().map(|s| {
         counter(
             "blkio",
             "recursive_io_wait_time_seconds_total",
@@ -238,7 +238,7 @@ fn blkio_metrics(
             blkio_tags(s, tags),
         )
     }));
-    metrics.extend(blkio.sectors_recursive.iter().map(|s| {
+    metrics.extend(blkio.sectors_recursive.iter().flatten().map(|s| {
         counter(
             "blkio",
             "recursive_sectors_total",
@@ -258,65 +258,106 @@ fn cpu_metrics(
     namespace: &Option<String>,
     tags: &BTreeMap<String, String>,
 ) -> Vec<Metric> {
-    let mut metrics = vec![gauge(
-        "cpu",
-        "online_cpus",
-        namespace.clone(),
-        timestamp,
-        cpu.online_cpus as f64,
-        tags.clone(),
-    )];
+    // Eight expected metrics not including online_cpus
+    let size = 8 + cpu.online_cpus.unwrap_or(0);
+    let mut metrics = Vec::with_capacity(size);
 
-    metrics.extend(
-        vec![
-            ("usage_system_jiffies_total", cpu.system_cpu_usage),
-            (
-                "usage_usermode_jiffies_total",
-                cpu.cpu_usage.usage_in_usermode,
-            ),
-            (
-                "usage_kernelmode_jiffies_total",
-                cpu.cpu_usage.usage_in_kernelmode,
-            ),
-            ("usage_total_jiffies_total", cpu.cpu_usage.total_usage),
-            ("throttling_periods_total", cpu.throttling_data.periods),
-            (
-                "throttled_periods_total",
-                cpu.throttling_data.throttled_periods,
-            ),
-            (
-                "throttled_time_seconds_total",
-                cpu.throttling_data.throttled_time / 1_000_000_000.0,
-            ),
-        ]
-        .iter()
-        .map(|(name, value)| {
-            counter(
-                "cpu",
-                name,
-                namespace.clone(),
-                timestamp,
-                *value,
-                tags.clone(),
-            )
-        }),
-    );
+    if let Some(online_cpus) = cpu.online_cpus {
+        metrics.push(gauge(
+            "cpu",
+            "online_cpus",
+            namespace.clone(),
+            timestamp,
+            online_cpus as f64,
+            tags.clone(),
+        ));
+    }
 
-    metrics.extend((0..cpu.online_cpus).filter_map(|index| {
-        cpu.cpu_usage.percpu_usage.get(index).map(|value| {
-            let mut tags = tags.clone();
-            tags.insert("cpu".into(), index.to_string());
+    if let Some(system_cpu_usage) = cpu.system_cpu_usage {
+        metrics.push(counter(
+            "cpu",
+            "usage_system_jiffies_total",
+            namespace.clone(),
+            timestamp,
+            system_cpu_usage,
+            tags.clone(),
+        ));
+    }
 
-            counter(
-                "cpu",
-                "usage_percpu_jiffies_total",
-                namespace.clone(),
-                timestamp,
-                *value,
-                tags,
-            )
-        })
-    }));
+    if let Some(cpu_usage) = &cpu.cpu_usage {
+        metrics.extend(
+            [
+                ("usage_usermode_jiffies_total", cpu_usage.usage_in_usermode),
+                (
+                    "usage_kernelmode_jiffies_total",
+                    cpu_usage.usage_in_kernelmode,
+                ),
+                ("usage_total_jiffies_total", cpu_usage.total_usage),
+            ]
+            .iter()
+            .filter_map(|(name, value)| {
+                value.map(|value| {
+                    counter(
+                        "cpu",
+                        name,
+                        namespace.clone(),
+                        timestamp,
+                        value,
+                        tags.clone(),
+                    )
+                })
+            }),
+        );
+    }
+
+    if let Some(throttling_data) = &cpu.throttling_data {
+        metrics.extend(
+            [
+                ("throttling_periods_total", throttling_data.periods),
+                ("throttled_periods_total", throttling_data.throttled_periods),
+                (
+                    "throttled_time_seconds_total",
+                    throttling_data
+                        .throttled_time
+                        .map(|throttled_time| throttled_time / 1_000_000_000.0),
+                ),
+            ]
+            .iter()
+            .filter_map(|(name, value)| {
+                value.map(|value| {
+                    counter(
+                        "cpu",
+                        name,
+                        namespace.clone(),
+                        timestamp,
+                        value,
+                        tags.clone(),
+                    )
+                })
+            }),
+        );
+    }
+
+    if let Some(cpu_usage) = &cpu.cpu_usage {
+        if let (Some(percpu_usage), Some(online_cpus)) = (&cpu_usage.percpu_usage, cpu.online_cpus)
+        {
+            metrics.extend((0..online_cpus).filter_map(|index| {
+                percpu_usage.get(index).map(|value| {
+                    let mut tags = tags.clone();
+                    tags.insert("cpu".into(), index.to_string());
+
+                    counter(
+                        "cpu",
+                        "usage_percpu_jiffies_total",
+                        namespace.clone(),
+                        timestamp,
+                        *value,
+                        tags,
+                    )
+                })
+            }));
+        }
+    }
 
     metrics
 }
@@ -327,89 +368,104 @@ fn memory_metrics(
     namespace: &Option<String>,
     tags: &BTreeMap<String, String>,
 ) -> Vec<Metric> {
-    let mut metrics = vec![];
+    let mut metrics = Vec::with_capacity(35);
 
     metrics.extend(
-        vec![
+        [
             ("used_bytes", memory.usage),
             ("max_used_bytes", memory.max_usage),
             ("limit_bytes", memory.limit),
-            ("active_anonymous_bytes", memory.stats.active_anon),
-            ("active_file_bytes", memory.stats.active_file),
-            ("cache_bytes", memory.stats.cache),
-            ("dirty_bytes", memory.stats.dirty),
-            ("inactive_anonymous_bytes", memory.stats.inactive_anon),
-            ("inactive_file_bytes", memory.stats.inactive_file),
-            ("mapped_file_bytes", memory.stats.mapped_file),
-            ("rss_bytes", memory.stats.rss),
-            ("rss_hugepages_bytes", memory.stats.rss_huge),
-            ("unevictable_bytes", memory.stats.unevictable),
-            ("writeback_bytes", memory.stats.writeback),
-            (
-                "total_active_anonymous_bytes",
-                memory.stats.total_active_anon,
-            ),
-            ("total_active_file_bytes", memory.stats.total_active_file),
-            ("total_cache_bytes", memory.stats.total_cache),
-            ("total_dirty_bytes", memory.stats.total_dirty),
-            (
-                "total_inactive_anonymous_bytes",
-                memory.stats.total_inactive_anon,
-            ),
-            (
-                "total_inactive_file_bytes",
-                memory.stats.total_inactive_file,
-            ),
-            ("total_mapped_file_bytes", memory.stats.total_mapped_file),
-            ("total_rss_bytes", memory.stats.total_rss),
-            ("total_rss_hugepages_bytes", memory.stats.total_rss_huge),
-            ("total_unevictable_bytes", memory.stats.total_unevictable),
-            ("total_writeback_bytes", memory.stats.total_writeback),
-            (
-                "hierarchical_memory_limit_bytes",
-                memory.stats.hierarchical_memory_limit,
-            ),
-            (
-                "hierarchical_memsw_limit_bytes",
-                memory.stats.hierarchical_memsw_limit,
-            ),
         ]
         .iter()
-        .map(|(name, value)| {
-            gauge(
-                "memory",
-                name,
-                namespace.clone(),
-                timestamp,
-                *value,
-                tags.clone(),
-            )
+        .filter_map(|(name, value)| {
+            value.map(|value| {
+                gauge(
+                    "memory",
+                    name,
+                    namespace.clone(),
+                    timestamp,
+                    value,
+                    tags.clone(),
+                )
+            })
         }),
     );
 
-    metrics.extend(
-        vec![
-            ("page_faults_total", memory.stats.pgfault),
-            ("major_faults_total", memory.stats.pgmajfault),
-            ("page_charged_total", memory.stats.pgpgin),
-            ("page_uncharged_total", memory.stats.pgpgout),
-            ("total_page_faults_total", memory.stats.total_pgfault),
-            ("total_major_faults_total", memory.stats.total_pgmajfault),
-            ("total_page_charged_total", memory.stats.total_pgpgin),
-            ("total_page_uncharged_total", memory.stats.total_pgpgout),
-        ]
-        .iter()
-        .map(|(name, value)| {
-            counter(
-                "memory",
-                name,
-                namespace.clone(),
-                timestamp,
-                *value,
-                tags.clone(),
-            )
-        }),
-    );
+    if let Some(stats) = &memory.stats {
+        metrics.extend(
+            [
+                ("active_anonymous_bytes", stats.active_anon),
+                ("active_file_bytes", stats.active_file),
+                ("cache_bytes", stats.cache),
+                ("dirty_bytes", stats.dirty),
+                ("inactive_anonymous_bytes", stats.inactive_anon),
+                ("inactive_file_bytes", stats.inactive_file),
+                ("mapped_file_bytes", stats.mapped_file),
+                ("rss_bytes", stats.rss),
+                ("rss_hugepages_bytes", stats.rss_huge),
+                ("unevictable_bytes", stats.unevictable),
+                ("writeback_bytes", stats.writeback),
+                ("total_active_anonymous_bytes", stats.total_active_anon),
+                ("total_active_file_bytes", stats.total_active_file),
+                ("total_cache_bytes", stats.total_cache),
+                ("total_dirty_bytes", stats.total_dirty),
+                ("total_inactive_anonymous_bytes", stats.total_inactive_anon),
+                ("total_inactive_file_bytes", stats.total_inactive_file),
+                ("total_mapped_file_bytes", stats.total_mapped_file),
+                ("total_rss_bytes", stats.total_rss),
+                ("total_rss_hugepages_bytes", stats.total_rss_huge),
+                ("total_unevictable_bytes", stats.total_unevictable),
+                ("total_writeback_bytes", stats.total_writeback),
+                (
+                    "hierarchical_memory_limit_bytes",
+                    stats.hierarchical_memory_limit,
+                ),
+                (
+                    "hierarchical_memsw_limit_bytes",
+                    stats.hierarchical_memsw_limit,
+                ),
+            ]
+            .iter()
+            .filter_map(|(name, value)| {
+                value.map(|value| {
+                    gauge(
+                        "memory",
+                        name,
+                        namespace.clone(),
+                        timestamp,
+                        value,
+                        tags.clone(),
+                    )
+                })
+            }),
+        );
+
+        metrics.extend(
+            [
+                ("page_faults_total", stats.pgfault),
+                ("major_faults_total", stats.pgmajfault),
+                ("page_charged_total", stats.pgpgin),
+                ("page_uncharged_total", stats.pgpgout),
+                ("total_page_faults_total", stats.total_pgfault),
+                ("total_major_faults_total", stats.total_pgmajfault),
+                ("total_page_charged_total", stats.total_pgpgin),
+                ("total_page_uncharged_total", stats.total_pgpgout),
+            ]
+            .iter()
+            .filter_map(|(name, value)| {
+                value.map(|value| {
+                    counter(
+                        "memory",
+                        name,
+                        namespace.clone(),
+                        timestamp,
+                        value,
+                        tags.clone(),
+                    )
+                })
+            }),
+        );
+    }
 
     metrics
 }
@@ -424,7 +480,7 @@ fn network_metrics(
     let mut tags = tags.clone();
     tags.insert("device".into(), interface.into());
 
-    vec![
+    [
         ("receive_bytes_total", network.rx_bytes),
         ("receive_packets_total", network.rx_packets),
         ("receive_packets_drop_total", network.rx_dropped),
@@ -435,13 +491,14 @@ fn network_metrics(
         ("transmit_errs_total", network.tx_errors),
     ]
     .iter()
+    .filter(|(_name, value)| value.is_some())
     .map(|(name, value)| {
         counter(
             "network",
             name,
             namespace.clone(),
             timestamp,
-            *value,
+            value.unwrap(),
             tags.clone(),
         )
     })
@@ -474,7 +531,7 @@ pub(super) fn parse(
             metrics.extend(memory_metrics(&memory, container.ts, &namespace, &tags));
         }
 
-        for (interface, network) in container.networks.iter() {
+        for (interface, network) in container.networks.iter().flatten() {
             metrics.extend(network_metrics(
                 interface,
                 network,

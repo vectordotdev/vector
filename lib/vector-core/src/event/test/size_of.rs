@@ -1,5 +1,6 @@
 use std::mem;
 
+use lookup::path;
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
 
 use super::*;
@@ -114,11 +115,13 @@ fn log_operation_maintains_size() {
             match action {
                 Action::InsertFlat { key, value } => {
                     let new_value_sz = value.size_of();
-                    let old_value_sz = log_event.get_flat(&key).map_or(0, ByteSizeOf::size_of);
+                    let old_value_sz = log_event
+                        .get(path!(key.as_str()))
+                        .map_or(0, ByteSizeOf::size_of);
                     if !log_event.contains(key.as_str()) {
                         current_size += key.size_of();
                     }
-                    log_event.insert_flat(&key, value);
+                    log_event.insert(path!(&key), value);
                     current_size -= old_value_sz;
                     current_size += new_value_sz;
                 }

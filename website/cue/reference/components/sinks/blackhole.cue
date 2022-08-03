@@ -32,7 +32,7 @@ components: sinks: blackhole: {
 	configuration: {
 		print_interval_secs: {
 			common:      false
-			description: "The number of seconds between reporting a summary of activity."
+			description: "The number of seconds between reporting a summary of activity. Set to `0` to disable reporting."
 			required:    false
 			type: uint: {
 				default: 1
@@ -53,8 +53,16 @@ components: sinks: blackhole: {
 	}
 
 	input: {
-		logs:    true
-		metrics: null
+		logs: true
+		metrics: {
+			counter:      true
+			distribution: true
+			gauge:        true
+			histogram:    true
+			set:          true
+			summary:      true
+		}
+		traces: true
 	}
 
 	telemetry: metrics: {

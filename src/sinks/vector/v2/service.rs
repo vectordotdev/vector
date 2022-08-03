@@ -9,8 +9,7 @@ use prost::Message;
 use proto_event::EventWrapper;
 use tonic::{body::BoxBody, IntoRequest};
 use vector_core::{
-    buffers::Ackable, event::proto as proto_event, internal_event::EventsSent,
-    stream::DriverResponse,
+    event::proto as proto_event, internal_event::EventsSent, stream::DriverResponse,
 };
 
 use crate::{
@@ -54,12 +53,6 @@ pub struct VectorRequest {
     pub events_byte_size: usize,
 }
 
-impl Ackable for VectorRequest {
-    fn ack_size(&self) -> usize {
-        self.events.len()
-    }
-}
-
 impl Finalizable for VectorRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
         self.finalizers.take_finalizers()
@@ -70,12 +63,17 @@ impl VectorService {
     pub fn new(
         hyper_client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
         uri: Uri,
+        compression: bool,
     ) -> Self {
         let (protocol, endpoint) = uri::protocol_endpoint(uri.clone());
-        let proto_client = proto_vector::Client::new(HyperSvc {
+        let mut proto_client = proto_vector::Client::new(HyperSvc {
             uri,
             client: hyper_client,
         });
+
+        if compression {
+            proto_client = proto_client.send_gzip();
+        }
         Self {
             client: proto_client,
             protocol,
@@ -112,7 +110,7 @@ impl tower::Service<VectorRequest> for VectorService {
                 .client
                 .push_events(request.into_request())
                 .map_ok(|_response| {
-                    emit!(&EndpointBytesSent {
+                    emit!(EndpointBytesSent {
                         byte_size,
                         protocol: &service.protocol,
                         endpoint: &service.endpoint,

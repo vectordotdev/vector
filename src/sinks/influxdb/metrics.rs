@@ -1,14 +1,14 @@
 use std::{
     collections::{BTreeMap, HashMap},
     future::ready,
-    num::NonZeroU64,
     task::Poll,
 };
 
 use bytes::{Bytes, BytesMut};
 use futures::{future::BoxFuture, stream, SinkExt};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use tower::Service;
+use vector_config::configurable_component;
 use vector_core::{
     event::metric::{MetricSketch, Quantile},
     ByteSizeOf,
@@ -35,7 +35,7 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
 };
 
 #[derive(Clone)]
@@ -51,27 +51,49 @@ pub struct InfluxDbDefaultBatchSettings;
 impl SinkBatchSettings for InfluxDbDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(20);
     const MAX_BYTES: Option<usize> = None;
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+/// Configuration for the `influxdb_metrics` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct InfluxDbConfig {
+    /// Sets the default namespace for any metrics sent.
+    ///
+    /// This namespace is only used if a metric has no existing namespace. When a namespace is
+    /// present, it is used as a prefix to the metric name, and separated with a period (`.`).
     #[serde(alias = "namespace")]
     pub default_namespace: Option<String>,
+
+    /// The endpoint to send data to.
     pub endpoint: String,
+
     #[serde(flatten)]
     pub influxdb1_settings: Option<InfluxDb1Settings>,
+
     #[serde(flatten)]
     pub influxdb2_settings: Option<InfluxDb2Settings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<InfluxDbDefaultBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    /// A map of additional tags, in the form of key/value pairs, to add to each measurement.
     pub tags: Option<HashMap<String, String>>,
-    pub tls: Option<TlsOptions>,
+
+    #[configurable(derived)]
+    pub tls: Option<TlsConfig>,
+
+    /// The list of quantiles to calculate when sending distribution metrics.
     #[serde(default = "default_summary_quantiles")]
     pub quantiles: Vec<f64>,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -109,7 +131,7 @@ impl SinkConfig for InfluxDbConfig {
             client.clone(),
         )?;
         validate_quantiles(&self.quantiles)?;
-        let sink = InfluxDbSvc::new(self.clone(), cx, client)?;
+        let sink = InfluxDbSvc::new(self.clone(), client)?;
         Ok((sink, healthcheck))
     }
 
@@ -121,17 +143,13 @@ impl SinkConfig for InfluxDbConfig {
         "influxdb_metrics"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
 impl InfluxDbSvc {
-    pub fn new(
-        config: InfluxDbConfig,
-        cx: SinkContext,
-        client: HttpClient,
-    ) -> crate::Result<VectorSink> {
+    pub fn new(config: InfluxDbConfig, client: HttpClient) -> crate::Result<VectorSink> {
         let settings = influxdb_settings(
             config.influxdb1_settings.clone(),
             config.influxdb2_settings.clone(),
@@ -164,13 +182,12 @@ impl InfluxDbSvc {
                 influxdb_http_service,
                 MetricsBuffer::new(batch.size),
                 batch.timeout,
-                cx.acker(),
             )
             .with_flat_map(move |event: Event| {
                 stream::iter({
                     let byte_size = event.size_of();
                     normalizer
-                        .apply(event.into_metric())
+                        .normalize(event.into_metric())
                         .map(|metric| Ok(EncodedEvent::new(metric, byte_size)))
                 })
             })
@@ -244,7 +261,7 @@ fn merge_tags(
 pub struct InfluxMetricNormalize;
 
 impl MetricNormalize for InfluxMetricNormalize {
-    fn apply_state(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+    fn normalize(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         match (metric.kind(), &metric.value()) {
             // Counters are disaggregated. We take the previous value from the state
             // and emit the difference between previous and current as a Counter
@@ -357,10 +374,16 @@ fn get_type_and_fields(
                             quantile: *q,
                             value: ddsketch.quantile(*q).unwrap_or(0.0),
                         };
-                        (quantile.as_percentile(), Field::Float(quantile.value))
+                        (
+                            quantile.to_percentile_string(),
+                            Field::Float(quantile.value),
+                        )
                     })
                     .collect::<HashMap<_, _>>();
-                fields.insert("count".to_owned(), Field::UnsignedInt(ddsketch.count()));
+                fields.insert(
+                    "count".to_owned(),
+                    Field::UnsignedInt(u64::from(ddsketch.count())),
+                );
                 fields.insert(
                     "min".to_owned(),
                     Field::Float(ddsketch.min().unwrap_or(f64::MAX)),
@@ -921,6 +944,7 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use chrono::{SecondsFormat, Utc};
+    use futures::stream;
     use pretty_assertions::assert_eq;
 
     use crate::{
@@ -938,14 +962,15 @@ mod integration_tests {
             },
             InfluxDb1Settings, InfluxDb2Settings,
         },
-        tls::{self, TlsOptions},
+        test_util::components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
+        tls::{self, TlsConfig},
     };
 
     #[tokio::test]
     async fn inserts_metrics_v1_over_https() {
         insert_metrics_v1(
             address_v1(true).as_str(),
-            Some(TlsOptions {
+            Some(TlsConfig {
                 ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
                 ..Default::default()
             }),
@@ -958,7 +983,7 @@ mod integration_tests {
         insert_metrics_v1(address_v1(false).as_str(), None).await
     }
 
-    async fn insert_metrics_v1(url: &str, tls: Option<TlsOptions>) {
+    async fn insert_metrics_v1(url: &str, tls: Option<TlsConfig>) {
         crate::test_util::trace_init();
         let database = onboarding_v1(url).await;
 
@@ -985,7 +1010,7 @@ mod integration_tests {
 
         let events: Vec<_> = (0..10).map(create_event).collect();
         let (sink, _) = config.build(cx).await.expect("error when building config");
-        sink.run_events(events.clone()).await.unwrap();
+        run_and_assert_sink_compliance(sink, stream::iter(events.clone()), &HTTP_SINK_TAGS).await;
 
         let res = query_v1_json(url, &format!("show series on {}", database)).await;
 
@@ -1099,8 +1124,8 @@ mod integration_tests {
         }
 
         let client = HttpClient::new(None, cx.proxy()).unwrap();
-        let sink = InfluxDbSvc::new(config, cx, client).unwrap();
-        sink.run_events(events).await.unwrap();
+        let sink = InfluxDbSvc::new(config, client).unwrap();
+        run_and_assert_sink_compliance(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
 
         let mut body = std::collections::HashMap::new();
         body.insert("query", format!("from(bucket:\"my-bucket\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"ns.{}\")", metric));

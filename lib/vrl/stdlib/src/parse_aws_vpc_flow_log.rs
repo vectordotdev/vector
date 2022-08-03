@@ -1,6 +1,19 @@
 use std::collections::BTreeMap;
 
+use ::value::Value;
 use vrl::prelude::*;
+
+fn parse_aws_vpc_flow_log(value: Value, format: Option<Value>) -> Resolved {
+    let bytes = value.try_bytes()?;
+    let input = String::from_utf8_lossy(&bytes);
+    if let Some(expr) = format {
+        let bytes = expr.try_bytes()?;
+        parse_log(&input, Some(&String::from_utf8_lossy(&bytes)))
+    } else {
+        parse_log(&input, None)
+    }
+    .map_err(Into::into)
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseAwsVpcFlowLog;
@@ -49,7 +62,7 @@ impl Function for ParseAwsVpcFlowLog {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -89,54 +102,52 @@ impl ParseAwsVpcFlowLogFn {
 
 impl Expression for ParseAwsVpcFlowLogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?.try_bytes()?;
-        let input = String::from_utf8_lossy(&bytes);
+        let value = self.value.resolve(ctx)?;
+        let format = self
+            .format
+            .as_ref()
+            .map(|expr| expr.resolve(ctx))
+            .transpose()?;
 
-        if let Some(expr) = &self.format {
-            let bytes = expr.resolve(ctx)?.try_bytes()?;
-            parse_log(&input, Some(&String::from_utf8_lossy(&bytes)))
-        } else {
-            parse_log(&input, None)
-        }
-        .map_err(Into::into)
+        parse_aws_vpc_flow_log(value, format)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::object(inner_kind()).fallible(/* log parsing error */)
     }
 }
 
 fn inner_kind() -> BTreeMap<Field, Kind> {
-    map! {
-        "account_id": Kind::integer() | Kind::null(),
-        "action": Kind::bytes() | Kind::null(),
-        "az_id": Kind::bytes() | Kind::null(),
-        "bytes": Kind::integer() | Kind::null(),
-        "dstaddr": Kind::bytes() | Kind::null(),
-        "dstport": Kind::integer() | Kind::null(),
-        "end": Kind::integer() | Kind::null(),
-        "instance_id": Kind::bytes() | Kind::null(),
-        "interface_id": Kind::bytes() | Kind::null(),
-        "log_status": Kind::bytes() | Kind::null(),
-        "packets": Kind::integer() | Kind::null(),
-        "pkt_dstaddr": Kind::bytes() | Kind::null(),
-        "pkt_srcaddr": Kind::bytes() | Kind::null(),
-        "protocol": Kind::integer() | Kind::null(),
-        "region": Kind::bytes() | Kind::null(),
-        "srcaddr": Kind::bytes() | Kind::null(),
-        "srcport": Kind::integer() | Kind::null(),
-        "start": Kind::integer() | Kind::null(),
-        "sublocation_id": Kind::bytes() | Kind::null(),
-        "sublocation_type": Kind::bytes() | Kind::null(),
-        "subnet_id": Kind::bytes() | Kind::null(),
-        "tcp_flags": Kind::integer() | Kind::null(),
-        "type": Kind::bytes() | Kind::null(),
-        "version": Kind::integer() | Kind::null(),
-        "vpc_id": Kind::bytes() | Kind::null(),
-    }
-    .into_iter()
-    .map(|(key, kind): (&str, _)| (key.into(), kind))
-    .collect()
+    BTreeMap::from([
+        (Field::from("account_id"), Kind::integer() | Kind::null()),
+        (Field::from("action"), Kind::bytes() | Kind::null()),
+        (Field::from("az_id"), Kind::bytes() | Kind::null()),
+        (Field::from("bytes"), Kind::integer() | Kind::null()),
+        (Field::from("dstaddr"), Kind::bytes() | Kind::null()),
+        (Field::from("dstport"), Kind::integer() | Kind::null()),
+        (Field::from("end"), Kind::integer() | Kind::null()),
+        (Field::from("instance_id"), Kind::bytes() | Kind::null()),
+        (Field::from("interface_id"), Kind::bytes() | Kind::null()),
+        (Field::from("log_status"), Kind::bytes() | Kind::null()),
+        (Field::from("packets"), Kind::integer() | Kind::null()),
+        (Field::from("pkt_dstaddr"), Kind::bytes() | Kind::null()),
+        (Field::from("pkt_srcaddr"), Kind::bytes() | Kind::null()),
+        (Field::from("protocol"), Kind::integer() | Kind::null()),
+        (Field::from("region"), Kind::bytes() | Kind::null()),
+        (Field::from("srcaddr"), Kind::bytes() | Kind::null()),
+        (Field::from("srcport"), Kind::integer() | Kind::null()),
+        (Field::from("start"), Kind::integer() | Kind::null()),
+        (Field::from("sublocation_id"), Kind::bytes() | Kind::null()),
+        (
+            Field::from("sublocation_type"),
+            Kind::bytes() | Kind::null(),
+        ),
+        (Field::from("subnet_id"), Kind::bytes() | Kind::null()),
+        (Field::from("tcp_flags"), Kind::integer() | Kind::null()),
+        (Field::from("type"), Kind::bytes() | Kind::null()),
+        (Field::from("version"), Kind::integer() | Kind::null()),
+        (Field::from("vpc_id"), Kind::bytes() | Kind::null()),
+    ])
 }
 
 type ParseResult<T> = std::result::Result<T, String>;
@@ -281,19 +292,19 @@ mod tests {
         default {
              args: func_args![value: "2 123456789010 eni-1235b8ca123456789 172.31.16.139 172.31.16.21 20641 22 6 20 4249 1418530010 1418530070 ACCEPT OK"],
              want: Ok(value!({
-                 "account_id": 123456789010_i64,
+                 "account_id": 123_456_789_010_i64,
                  "action": "ACCEPT",
                  "bytes": 4249,
                  "dstaddr": "172.31.16.21",
                  "dstport": 22,
-                 "end": 1418530070,
+                 "end": 1_418_530_070,
                  "interface_id": "eni-1235b8ca123456789",
                  "log_status": "OK",
                  "packets": 20,
                  "protocol": 6,
                  "srcaddr": "172.31.16.139",
                  "srcport": 20641,
-                 "start": 1418530010,
+                 "start": 1_418_530_010,
                  "version": 2
              })),
              tdef: TypeDef::object(inner_kind()).fallible(),
@@ -303,12 +314,12 @@ mod tests {
              args: func_args![value: "3 vpc-abcdefab012345678 subnet-aaaaaaaa012345678 i-01234567890123456 eni-1235b8ca123456789 123456789010 IPv4 52.213.180.42 10.0.0.62 43416 5001 52.213.180.42 10.0.0.62 6 568 8 1566848875 1566848933 ACCEPT 2 OK",
                               format: "version vpc_id subnet_id instance_id interface_id account_id type srcaddr dstaddr srcport dstport pkt_srcaddr pkt_dstaddr protocol bytes packets start end action tcp_flags log_status"],
              want: Ok(value!({
-                 "account_id": 123456789010_i64,
+                 "account_id": 123_456_789_010_i64,
                  "action": "ACCEPT",
                  "bytes": 568,
                  "dstaddr": "10.0.0.62",
                  "dstport": 5001,
-                 "end": 1566848933,
+                 "end": 1_566_848_933,
                  "instance_id": "i-01234567890123456",
                  "interface_id": "eni-1235b8ca123456789",
                  "log_status": "OK",
@@ -318,7 +329,7 @@ mod tests {
                  "protocol": 6,
                  "srcaddr": "52.213.180.42",
                  "srcport": 43416,
-                 "start": 1566848875,
+                 "start": 1_566_848_875,
                  "subnet_id": "subnet-aaaaaaaa012345678",
                  "tcp_flags": 2,
                  "type": "IPv4",

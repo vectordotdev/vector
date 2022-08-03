@@ -195,6 +195,7 @@ impl CustomFilter<FileSourceMetricFile<'_>> for FileSourceMetricsFilesFilter {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 #[Object]
 impl FileSourceMetrics {
     /// File metrics

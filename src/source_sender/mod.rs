@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use futures::{SinkExt, Stream, StreamExt};
+use futures::{Stream, StreamExt};
 use vector_buffers::topology::channel::{self, LimitedReceiver, LimitedSender};
 #[cfg(test)]
 use vector_core::event::{into_event_stream, EventStatus};
@@ -15,7 +15,9 @@ mod errors;
 
 pub use errors::{ClosedError, StreamSendError};
 
-const CHUNK_SIZE: usize = 1000;
+pub(crate) const CHUNK_SIZE: usize = 1000;
+#[cfg(test)]
+const TEST_BUFFER_SIZE: usize = 100;
 
 #[derive(Debug)]
 pub struct Builder {
@@ -88,19 +90,43 @@ impl SourceSender {
 
     #[cfg(test)]
     pub fn new_test() -> (Self, impl Stream<Item = Event> + Unpin) {
-        let (pipe, recv) = Self::new_with_buffer(100);
-        let recv = recv.flat_map(into_event_stream);
+        let (pipe, recv) = Self::new_with_buffer(TEST_BUFFER_SIZE);
+        let recv = recv.into_stream().flat_map(into_event_stream);
         (pipe, recv)
     }
 
     #[cfg(test)]
     pub fn new_test_finalize(status: EventStatus) -> (Self, impl Stream<Item = Event> + Unpin) {
-        let (pipe, recv) = Self::new_with_buffer(100);
+        let (pipe, recv) = Self::new_with_buffer(TEST_BUFFER_SIZE);
         // In a source test pipeline, there is no sink to acknowledge
         // events, so we have to add a map to the receiver to handle the
         // finalization.
-        let recv = recv.flat_map(move |mut events| {
-            events.for_each_event(|mut event| {
+        let recv = recv.into_stream().flat_map(move |mut events| {
+            events.iter_events_mut().for_each(|mut event| {
+                let metadata = event.metadata_mut();
+                metadata.update_status(status);
+                metadata.update_sources();
+            });
+            into_event_stream(events)
+        });
+        (pipe, recv)
+    }
+
+    #[cfg(test)]
+    pub fn new_test_error_after(n: usize) -> (Self, impl Stream<Item = Event> + Unpin) {
+        let (pipe, recv) = Self::new_with_buffer(TEST_BUFFER_SIZE);
+        // In a source test pipeline, there is no sink to acknowledge
+        // events, so we have to add a map to the receiver to handle the
+        // finalization.
+        let mut count: usize = 0;
+        let recv = recv.into_stream().flat_map(move |mut events| {
+            let status = if count == n {
+                EventStatus::Errored
+            } else {
+                EventStatus::Delivered
+            };
+            count += 1;
+            events.iter_events_mut().for_each(|mut event| {
                 let metadata = event.metadata_mut();
                 metadata.update_status(status);
                 metadata.update_sources();
@@ -117,8 +143,8 @@ impl SourceSender {
         name: String,
     ) -> impl Stream<Item = EventArray> + Unpin {
         let (inner, recv) = Inner::new_with_buffer(100, name.clone());
-        let recv = recv.map(move |mut events| {
-            events.for_each_event(|mut event| {
+        let recv = recv.into_stream().map(move |mut events| {
+            events.iter_events_mut().for_each(|mut event| {
                 let metadata = event.metadata_mut();
                 metadata.update_status(status);
                 metadata.update_sources();
@@ -189,8 +215,8 @@ impl Inner {
     async fn send(&mut self, events: EventArray) -> Result<(), ClosedError> {
         let byte_size = events.size_of();
         let count = events.len();
-        self.inner.send(events).await?;
-        emit!(&EventsSent {
+        self.inner.send(events).await.map_err(|_| ClosedError)?;
+        emit!(EventsSent {
             count,
             byte_size,
             output: Some(self.output.as_ref()),
@@ -232,7 +258,7 @@ impl Inner {
                     byte_size += this_size;
                 }
                 Err(error) => {
-                    emit!(&EventsSent {
+                    emit!(EventsSent {
                         count,
                         byte_size,
                         output: Some(self.output.as_ref()),
@@ -242,7 +268,7 @@ impl Inner {
             }
         }
 
-        emit!(&EventsSent {
+        emit!(EventsSent {
             count,
             byte_size,
             output: Some(self.output.as_ref()),

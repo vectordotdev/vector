@@ -1,13 +1,13 @@
 use std::{io, io::Write};
 
-use vector_core::ByteSizeOf;
+use vector_core::{event::Event, ByteSizeOf};
 
 use crate::{
+    codecs::Transformer,
     event::{EventFinalizers, Finalizable, LogEvent},
-    internal_events::ElasticsearchEventEncoded,
     sinks::{
         elasticsearch::BulkAction,
-        util::encoding::{as_tracked_write, Encoder, VisitLogMut},
+        util::encoding::{as_tracked_write, Encoder},
     },
 };
 
@@ -32,6 +32,7 @@ impl ByteSizeOf for ProcessedEvent {
 
 #[derive(PartialEq, Default, Clone, Debug)]
 pub struct ElasticsearchEncoder {
+    pub transformer: Transformer,
     pub doc_type: String,
     pub suppress_type_name: bool,
 }
@@ -44,6 +45,11 @@ impl Encoder<Vec<ProcessedEvent>> for ElasticsearchEncoder {
     ) -> std::io::Result<usize> {
         let mut written_bytes = 0;
         for event in input {
+            let log = {
+                let mut event = Event::from(event.log);
+                self.transformer.transform(&mut event);
+                event.into_log()
+            };
             written_bytes += write_bulk_action(
                 writer,
                 event.bulk_action.as_str(),
@@ -53,17 +59,12 @@ impl Encoder<Vec<ProcessedEvent>> for ElasticsearchEncoder {
                 &event.id,
             )?;
             written_bytes +=
-                as_tracked_write::<_, _, io::Error>(writer, &event.log, |mut writer, log| {
+                as_tracked_write::<_, _, io::Error>(writer, &log, |mut writer, log| {
                     writer.write_all(&[b'\n'])?;
                     serde_json::to_writer(&mut writer, log)?;
                     writer.write_all(&[b'\n'])?;
                     Ok(())
                 })?;
-
-            emit!(&ElasticsearchEventEncoded {
-                byte_size: written_bytes,
-                index: event.index,
-            });
         }
         Ok(written_bytes)
     }
@@ -107,15 +108,6 @@ fn write_bulk_action(
             }
         },
     )
-}
-
-impl VisitLogMut for ProcessedEvent {
-    fn visit_logs_mut<F>(&mut self, func: F)
-    where
-        F: Fn(&mut LogEvent),
-    {
-        func(&mut self.log);
-    }
 }
 
 #[cfg(test)]

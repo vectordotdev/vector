@@ -74,12 +74,27 @@ components: transforms: aws_ec2_metadata: {
 		proxy: configuration._proxy
 		refresh_interval_secs: {
 			common:      true
-			description: "The interval in seconds at which the EC2 Metadata api will be called."
+			description: "The interval in seconds on which the metadata from the IMDSv2 will be refreshed."
 			required:    false
 			type: uint: {
 				default: 10
 				unit:    null
 			}
+		}
+		refresh_timeout_secs: {
+			common:      true
+			description: "The timeout in seconds for requests to the IMDSv2."
+			required:    false
+			type: uint: {
+				default: 1
+				unit:    null
+			}
+		}
+		required: {
+			common:      false
+			description: "Whether or not vector should exit with error if initial metadata request fails."
+			required:    false
+			type: bool: default: true
 		}
 	}
 
@@ -102,11 +117,21 @@ components: transforms: aws_ec2_metadata: {
 			set:          true
 			summary:      true
 		}
+		traces: false
 	}
 
 	output: logs: log: {
 		description: "Log event enriched with EC2 metadata"
 		fields: {
+			"account-id": {
+				description: "The `account-id` that launched the EC2 instance."
+				required:    false
+				common:      true
+				type: string: {
+					default: null
+					examples: ["123456789"]
+				}
+			}
 			"ami-id": {
 				description: "The `ami-id` that the current EC2 instance is using."
 				required:    true

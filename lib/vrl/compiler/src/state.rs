@@ -1,144 +1,210 @@
+use std::collections::{hash_map::Entry, BTreeSet, HashMap};
+
 use anymap::AnyMap;
-use std::collections::HashMap;
+use lookup::LookupBuf;
+use value::{Kind, Value};
 
-use value::Kind;
+use crate::{parser::ast::Ident, type_def::Details, value::Collection};
 
-use crate::{expression::assignment, parser::ast::Ident, Value};
-
-/// The state held by the compiler.
-///
-/// This state allows the compiler to track certain invariants during
-/// compilation, which in turn drives our progressive type checking system.
-#[derive(Debug)]
-pub struct Compiler {
-    /// Stored external target type definitions.
-    //
-    // TODO(Jean): Change this to point to a `value::Collection<Field>` type, to ensure the target
-    // is always an object. Although we probably also need to support arrays, in which case we
-    // should wrap it in an enum to also support `value::Collection<Index>`.
-    target: Option<assignment::Details>,
-
-    /// Stored internal variable type definitions.
-    variables: HashMap<Ident, assignment::Details>,
-
-    /// Context passed between the client program and a VRL function.
-    external_context: AnyMap,
-
-    /// On request, the compiler can store its state in this field, which can
-    /// later be used to revert the compiler state to the previously stored
-    /// state.
-    ///
-    /// This is used by the compiler to try and parse part of an expression, but
-    /// back out of it if only part of the expression could be parsed. We still
-    /// want the parser to continue parsing, and so it can swap the failed
-    /// expression with a "no-op" one, but has to have a way for the compiler to
-    /// forget any state it started tracking while parsing the old, defunct
-    /// expression.
-    snapshot: Option<Box<Self>>,
+/// Local environment, limited to a given scope.
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct LocalEnv {
+    pub(crate) bindings: HashMap<Ident, Details>,
 }
 
-impl Default for Compiler {
-    fn default() -> Self {
-        Self {
-            external_context: AnyMap::new(),
-            target: None,
-            variables: HashMap::default(),
-            snapshot: None,
-        }
-    }
-}
-
-impl Compiler {
-    pub fn new() -> Self {
-        Default::default()
-    }
-
-    /// Creates a new compiler that starts with an initial given [`Kind`].
-    pub fn new_with_kind(kind: Kind) -> Self {
-        Self {
-            target: Some(assignment::Details {
-                type_def: kind.into(),
-                value: None,
-            }),
-            ..Default::default()
-        }
-    }
-
-    /// Get the kind information of the program target (e.g. the type accessed through `.`).
-    pub fn target_kind(&self) -> Option<&Kind> {
-        self.target()
-            .as_ref()
-            .map(|details| details.type_def.kind())
-    }
-
+impl LocalEnv {
     pub(crate) fn variable_idents(&self) -> impl Iterator<Item = &Ident> + '_ {
-        self.variables.keys()
+        self.bindings.keys()
     }
 
-    pub(crate) fn variable(&self, ident: &Ident) -> Option<&assignment::Details> {
-        self.variables.get(ident)
+    pub(crate) fn variable(&self, ident: &Ident) -> Option<&Details> {
+        self.bindings.get(ident)
     }
 
-    pub(crate) fn insert_variable(&mut self, ident: Ident, details: assignment::Details) {
-        self.variables.insert(ident, details);
+    #[cfg(any(feature = "expr-assignment", feature = "expr-function_call"))]
+    pub(crate) fn insert_variable(&mut self, ident: Ident, details: Details) {
+        self.bindings.insert(ident, details);
     }
 
-    pub(crate) fn target(&self) -> Option<&assignment::Details> {
-        self.target.as_ref()
+    #[cfg(feature = "expr-function_call")]
+    pub(crate) fn remove_variable(&mut self, ident: &Ident) -> Option<Details> {
+        self.bindings.remove(ident)
     }
 
-    pub(crate) fn update_target(&mut self, details: assignment::Details) {
-        self.target = Some(details);
-    }
-
-    /// Take a snapshot of the current state of the compiler.
-    ///
-    /// This overwrites any existing snapshot currently stored.
-    pub(crate) fn snapshot(&mut self) {
-        let target = self.target.clone();
-        let variables = self.variables.clone();
-
-        let snapshot = Self {
-            target,
-            variables,
-            external_context: AnyMap::new(),
-            snapshot: None,
-        };
-
-        self.snapshot = Some(Box::new(snapshot));
-    }
-
-    /// Roll back the compiler state to a previously stored snapshot.
-    pub(crate) fn rollback(&mut self) {
-        if let Some(snapshot) = self.snapshot.take() {
-            let external_context = self.swap_external_context(AnyMap::new());
-            *self = *snapshot;
-            self.external_context = external_context;
+    /// Any state the child scope modified that was part of the parent is copied to the parent scope
+    pub(crate) fn apply_child_scope(mut self, child: Self) -> Self {
+        for (ident, child_details) in child.bindings {
+            if let Some(self_details) = self.bindings.get_mut(&ident) {
+                *self_details = child_details;
+            }
         }
+
+        self
+    }
+
+    /// Merges two local envs together. This is useful in cases such as if statements
+    /// where different `LocalEnv`'s can be created, and the result is decided at runtime.
+    /// The compile-time type must be the union of the options.
+    pub(crate) fn merge(mut self, other: Self) -> Self {
+        for (ident, other_details) in other.bindings {
+            if let Some(self_details) = self.bindings.get_mut(&ident) {
+                *self_details = self_details.clone().merge(other_details);
+            }
+        }
+        self
+    }
+}
+
+/// A lexical scope within the program.
+#[derive(Debug)]
+pub struct ExternalEnv {
+    /// The external target of the program.
+    target: Details,
+
+    /// The type of metadata
+    metadata: Kind,
+
+    read_only_paths: BTreeSet<ReadOnlyPath>,
+
+    /// Custom context injected by the external environment
+    custom: AnyMap,
+}
+
+// temporary until paths can point to metadata
+#[derive(Debug, Ord, Eq, PartialEq, PartialOrd)]
+pub enum PathRoot {
+    Event,
+    Metadata,
+}
+
+#[derive(Debug, Ord, Eq, PartialEq, PartialOrd)]
+pub struct ReadOnlyPath {
+    path: LookupBuf,
+    recursive: bool,
+    root: PathRoot,
+}
+
+impl Default for ExternalEnv {
+    fn default() -> Self {
+        Self::new_with_kind(
+            Kind::object(Collection::any()),
+            Kind::object(Collection::any()),
+        )
+    }
+}
+
+impl ExternalEnv {
+    /// Creates a new external environment that starts with an initial given
+    /// [`Kind`].
+    #[must_use]
+    pub fn new_with_kind(target: Kind, metadata: Kind) -> Self {
+        Self {
+            target: Details {
+                type_def: target.into(),
+                value: None,
+            },
+            metadata,
+            custom: AnyMap::new(),
+            read_only_paths: BTreeSet::new(),
+        }
+    }
+
+    pub fn is_read_only_event_path(&self, path: &LookupBuf) -> bool {
+        self.is_read_only_path(path, PathRoot::Event)
+    }
+
+    pub fn is_read_only_metadata_path(&self, path: &LookupBuf) -> bool {
+        self.is_read_only_path(path, PathRoot::Metadata)
+    }
+
+    pub(crate) fn is_read_only_path(&self, path: &LookupBuf, root: PathRoot) -> bool {
+        for read_only_path in &self.read_only_paths {
+            if read_only_path.root != root {
+                continue;
+            }
+
+            // any paths that are a parent of read-only paths also can't be modified
+            if read_only_path.path.can_start_with(path) {
+                return true;
+            }
+
+            if read_only_path.recursive {
+                if path.can_start_with(&read_only_path.path) {
+                    return true;
+                }
+            } else if path == &read_only_path.path {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Adds a path that is considered read only. Assignments to any paths that match
+    /// will fail at compile time.
+    pub(crate) fn set_read_only_path(&mut self, path: LookupBuf, recursive: bool, root: PathRoot) {
+        self.read_only_paths.insert(ReadOnlyPath {
+            path,
+            recursive,
+            root,
+        });
+    }
+
+    pub fn set_read_only_event_path(&mut self, path: LookupBuf, recursive: bool) {
+        self.set_read_only_path(path, recursive, PathRoot::Event);
+    }
+
+    pub fn set_read_only_metadata_path(&mut self, path: LookupBuf, recursive: bool) {
+        self.set_read_only_path(path, recursive, PathRoot::Metadata);
+    }
+
+    pub(crate) fn target(&self) -> &Details {
+        &self.target
+    }
+
+    pub(crate) fn target_mut(&mut self) -> &mut Details {
+        &mut self.target
+    }
+
+    pub fn target_kind(&self) -> &Kind {
+        self.target().type_def.kind()
+    }
+
+    pub fn metadata_kind(&self) -> &Kind {
+        &self.metadata
+    }
+
+    #[cfg(any(feature = "expr-assignment", feature = "expr-query"))]
+    pub(crate) fn update_target(&mut self, details: Details) {
+        self.target = details;
+    }
+
+    pub fn update_metadata(&mut self, kind: Kind) {
+        self.metadata = kind;
     }
 
     /// Sets the external context data for VRL functions to use.
     pub fn set_external_context<T: 'static>(&mut self, data: T) {
-        self.external_context.insert::<T>(data);
+        self.custom.insert::<T>(data);
     }
 
-    /// Retrieves the first data of the required type from the external context.
-    #[must_use]
+    /// Marks everything as read only. Any mutations on read-only values will result in a
+    /// compile time error.
+    pub fn read_only(mut self) -> Self {
+        self.set_read_only_event_path(LookupBuf::root(), true);
+        self.set_read_only_metadata_path(LookupBuf::root(), true);
+        self
+    }
+
+    /// Get external context data from the external environment.
     pub fn get_external_context<T: 'static>(&self) -> Option<&T> {
-        self.external_context.get::<T>()
-    }
-
-    /// Retrieves a mutable reference to the first data of the required type from
-    /// the external context.
-    #[must_use]
-    pub fn get_external_context_mut<T: 'static>(&mut self) -> Option<&mut T> {
-        self.external_context.get_mut::<T>()
+        self.custom.get::<T>()
     }
 
     /// Swap the existing external contexts with new ones, returning the old ones.
     #[must_use]
+    #[cfg(feature = "expr-function_call")]
     pub(crate) fn swap_external_context(&mut self, ctx: AnyMap) -> AnyMap {
-        std::mem::replace(&mut self.external_context, ctx)
+        std::mem::replace(&mut self.custom, ctx)
     }
 }
 
@@ -150,6 +216,7 @@ pub struct Runtime {
 }
 
 impl Runtime {
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.variables.is_empty()
     }
@@ -158,6 +225,7 @@ impl Runtime {
         self.variables.clear();
     }
 
+    #[must_use]
     pub fn variable(&self, ident: &Ident) -> Option<&Value> {
         self.variables.get(ident)
     }
@@ -168,5 +236,19 @@ impl Runtime {
 
     pub(crate) fn insert_variable(&mut self, ident: Ident, value: Value) {
         self.variables.insert(ident, value);
+    }
+
+    pub(crate) fn remove_variable(&mut self, ident: &Ident) {
+        self.variables.remove(ident);
+    }
+
+    pub(crate) fn swap_variable(&mut self, ident: Ident, value: Value) -> Option<Value> {
+        match self.variables.entry(ident) {
+            Entry::Occupied(mut v) => Some(std::mem::replace(v.get_mut(), value)),
+            Entry::Vacant(v) => {
+                v.insert(value);
+                None
+            }
+        }
     }
 }

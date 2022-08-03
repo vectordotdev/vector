@@ -1,9 +1,13 @@
-use bytes::{BufMut, Bytes, BytesMut};
 use std::collections::BTreeMap;
 
-use super::{Error, Value};
-use crate::value::{Kind, VrlValueConvert};
-use crate::ExpressionError;
+use bytes::{BufMut, Bytes, BytesMut};
+use value::Value;
+
+use super::Error;
+use crate::{
+    value::{Kind, VrlValueConvert},
+    ExpressionError,
+};
 
 pub trait VrlValueArithmetic: Sized {
     /// Similar to [`std::ops::Mul`], but fallible (e.g. `TryMul`).
@@ -281,7 +285,7 @@ impl VrlValueArithmetic for Value {
     /// Similar to [`std::cmp::Eq`], but does a lossless comparison for integers
     /// and floats.
     fn eq_lossy(&self, rhs: &Self) -> bool {
-        use Value::*;
+        use Value::{Float, Integer};
 
         match self {
             Integer(lhv) => rhs

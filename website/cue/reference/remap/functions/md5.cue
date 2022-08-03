@@ -1,7 +1,7 @@
 package metadata
 
 remap: functions: md5: {
-	category: "Hash"
+	category: "Cryptography"
 	description: """
 		Calculates an md5 hash of the `value`.
 		"""

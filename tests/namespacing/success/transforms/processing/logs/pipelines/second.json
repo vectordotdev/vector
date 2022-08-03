@@ -1,9 +1,0 @@
-{
-  "name": "Second pipeline",
-  "transforms": [
-    {
-      "type": "remap",
-      "source": ".though_second = true"
-    }
-  ]
-}

@@ -1,4 +1,19 @@
+use crate::{get_metadata_key, MetadataKey};
+use ::value::Value;
 use vrl::prelude::*;
+
+fn get_metadata_field(
+    ctx: &mut Context,
+    key: &MetadataKey,
+) -> std::result::Result<Value, ExpressionError> {
+    Ok(match key {
+        MetadataKey::Legacy(key) => Value::from(ctx.target().get_secret(key)),
+        MetadataKey::Query(query) => ctx
+            .target()
+            .get_metadata(query.path())?
+            .unwrap_or(Value::Null),
+    })
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct GetMetadataField;
@@ -11,50 +26,46 @@ impl Function for GetMetadataField {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "key",
-            kind: kind::BYTES,
+            kind: kind::ANY,
             required: true,
         }]
     }
 
     fn examples(&self) -> &'static [Example] {
         &[Example {
-            title: "Get the datadog api key",
-            source: r#"get_metadata_field("datadog_api_key")"#,
+            title: "Get metadata",
+            source: r#"get_metadata_field(.my_metadata_field)"#,
             result: Ok("null"),
         }]
     }
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        (_local, external): (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
-        let keys = vec![value!("datadog_api_key"), value!("splunk_hec_token")];
-        let key = arguments
-            .required_enum("key", &keys)?
-            .try_bytes_utf8_lossy()
-            .expect("key not bytes")
-            .to_string();
-
-        Ok(Box::new(GetMetadataFieldFn { key }))
+        let key = get_metadata_key(&mut arguments)?;
+        let kind = match &key {
+            MetadataKey::Legacy(_) => Kind::bytes().or_null(),
+            MetadataKey::Query(query) => external.metadata_kind().at_path(query.path()),
+        };
+        Ok(Box::new(GetMetadataFieldFn { key, kind }))
     }
 }
 
 #[derive(Debug, Clone)]
 struct GetMetadataFieldFn {
-    key: String,
+    key: MetadataKey,
+    kind: Kind,
 }
 
 impl Expression for GetMetadataFieldFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        ctx.target()
-            .get_metadata(&self.key)
-            .map(|value| value.unwrap_or(Value::Null))
-            .map_err(Into::into)
+        get_metadata_field(ctx, &self.key)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::bytes().add_null().infallible()
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+        TypeDef::from(self.kind.clone()).infallible()
     }
 }

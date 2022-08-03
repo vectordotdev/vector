@@ -1,10 +1,11 @@
+version: "3"
+
 services:
   pulsar:
-    image: apachepulsar/pulsar
+    image: docker.io/apachepulsar/pulsar
     command: bin/pulsar standalone
     ports:
       - 6650:6650
-
   runner:
     build:
       context: ${PWD}
@@ -22,19 +23,17 @@ services:
       - "pulsar-integration-tests"
       - "--lib"
       - "::pulsar::"
-      - "--"
-      - "--nocapture"
     depends_on:
       - pulsar
     environment:
       - PULSAR_ADDRESS=pulsar://pulsar:6650
     volumes:
+      - ${PWD}:/code
+      - target:/code/target
       - cargogit:/usr/local/cargo/git
       - cargoregistry:/usr/local/cargo/registry
-      - ${PWD}:/code
 
-# this is made to improve the build when running locally
 volumes:
+  target: {}
   cargogit: {}
   cargoregistry: {}
-

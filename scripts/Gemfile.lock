@@ -2,7 +2,7 @@ GEM
   remote: https://rubygems.org/
   specs:
     citrus (3.0.2)
-    git (1.7.0)
+    git (1.11.0)
       rchardet (~> 1.8)
     paint (2.2.0)
     rchardet (1.8.0)
@@ -14,7 +14,7 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
-  git (~> 1.7.0)
+  git (~> 1.11.0)
   paint (~> 2.1)
   semantic (~> 1.6.1)
   toml-rb (~> 2.0)

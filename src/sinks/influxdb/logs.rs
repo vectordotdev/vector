@@ -1,15 +1,13 @@
-use std::{
-    collections::{BTreeMap, HashMap, HashSet},
-    num::NonZeroU64,
-};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use bytes::{Bytes, BytesMut};
 use futures::SinkExt;
 use http::{Request, Uri};
 use indoc::indoc;
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 use crate::{
+    codecs::Transformer,
     config::{
         log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
         SinkDescription,
@@ -22,13 +20,12 @@ use crate::{
             InfluxDb1Settings, InfluxDb2Settings, ProtocolVersion,
         },
         util::{
-            encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
             http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
             BatchConfig, Buffer, Compression, SinkBatchSettings, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
 };
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -37,31 +34,57 @@ pub struct InfluxDbLogsDefaultBatchSettings;
 impl SinkBatchSettings for InfluxDbLogsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = None;
     const MAX_BYTES: Option<usize> = Some(1_000_000);
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+/// Configuration for the `influxdb_logs` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct InfluxDbLogsConfig {
+    /// The namespace of the measurement name to use.
+    ///
+    /// When specified, the measurement name will be `<namespace>.vector`.
+    ///
+    /// This field is deprecated, and `measurement` should be used instead.
+    #[configurable(deprecated)]
     pub namespace: Option<String>,
+
+    /// The name of the InfluxDB measurement that will be written to.
     pub measurement: Option<String>,
+
+    /// The endpoint to send data to.
     pub endpoint: String,
+
+    /// The list of names of log fields that should be added as tags to each measurement.
     #[serde(default)]
     pub tags: Vec<String>,
+
     #[serde(flatten)]
     pub influxdb1_settings: Option<InfluxDb1Settings>,
+
     #[serde(flatten)]
     pub influxdb2_settings: Option<InfluxDb2Settings>,
+
+    #[configurable(derived)]
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
     )]
-    pub encoding: EncodingConfigWithDefault<Encoding>,
+    pub encoding: Transformer,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<InfluxDbLogsDefaultBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
-    pub tls: Option<TlsOptions>,
+
+    #[configurable(derived)]
+    pub tls: Option<TlsConfig>,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -77,15 +100,7 @@ struct InfluxDbLogsSink {
     protocol_version: ProtocolVersion,
     measurement: String,
     tags: HashSet<String>,
-    encoding: EncodingConfig<Encoding>,
-}
-
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
-#[serde(rename_all = "snake_case")]
-#[derivative(Default)]
-pub enum Encoding {
-    #[derivative(Default)]
-    Default,
+    transformer: Transformer,
 }
 
 inventory::submit! {
@@ -144,7 +159,7 @@ impl SinkConfig for InfluxDbLogsConfig {
             protocol_version,
             measurement,
             tags,
-            encoding: self.encoding.clone().into(),
+            transformer: self.encoding.clone(),
         };
 
         let sink = BatchedHttpSink::new(
@@ -153,7 +168,6 @@ impl SinkConfig for InfluxDbLogsConfig {
             request,
             batch.timeout,
             client,
-            cx.acker(),
         )
         .sink_map_err(|error| error!(message = "Fatal influxdb_logs sink error.", %error));
 
@@ -168,8 +182,8 @@ impl SinkConfig for InfluxDbLogsConfig {
         "influxdb_logs"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
@@ -177,17 +191,21 @@ struct InfluxDbLogsEncoder {
     protocol_version: ProtocolVersion,
     measurement: String,
     tags: HashSet<String>,
-    encoding: EncodingConfig<Encoding>,
+    transformer: Transformer,
 }
 
 impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
     fn encode_event(&mut self, event: Event) -> Option<BytesMut> {
-        let mut event = event.into_log();
-        event.insert("metric_type", "logs".to_string());
-        self.encoding.apply_rules(&mut event);
+        let mut log = event.into_log();
+        log.insert("metric_type", "logs".to_string());
+        let mut log = {
+            let mut event = Event::from(log);
+            self.transformer.transform(&mut event);
+            event.into_log()
+        };
 
         // Timestamp
-        let timestamp = encode_timestamp(match event.remove(log_schema().timestamp_key()) {
+        let timestamp = encode_timestamp(match log.remove(log_schema().timestamp_key()) {
             Some(Value::Timestamp(ts)) => Some(ts),
             _ => None,
         });
@@ -195,7 +213,7 @@ impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
         // Tags + Fields
         let mut tags: BTreeMap<String, String> = BTreeMap::new();
         let mut fields: HashMap<String, Field> = HashMap::new();
-        event.all_fields().for_each(|(key, value)| {
+        log.convert_to_fields().for_each(|(key, value)| {
             if self.tags.contains(&key) {
                 tags.insert(key, value.to_string_lossy());
             } else {
@@ -231,7 +249,7 @@ impl HttpSink for InfluxDbLogsSink {
             protocol_version: self.protocol_version,
             measurement: self.measurement.clone(),
             tags: self.tags.clone(),
-            encoding: self.encoding.clone(),
+            transformer: self.transformer.clone(),
         }
     }
 
@@ -337,7 +355,7 @@ mod tests {
 
     #[test]
     fn test_encode_event_apply_rules() {
-        let mut event = Event::from("hello");
+        let mut event = Event::Log(LogEvent::from("hello"));
         event.as_mut_log().insert("host", "aws.cloud.eur");
         event.as_mut_log().insert("timestamp", ts());
 
@@ -348,7 +366,9 @@ mod tests {
             "vector",
             ["metric_type", "host"].to_vec(),
         );
-        sink.encoding.except_fields = Some(vec!["host".into()]);
+        sink.transformer
+            .set_except_fields(Some(vec!["host".into()]))
+            .unwrap();
         let mut encoder = sink.build_encoder();
 
         let bytes = encoder.encode_event(event.clone()).unwrap();
@@ -360,7 +380,9 @@ mod tests {
         assert_fields(line_protocol.2.to_string(), ["message=\"hello\""].to_vec());
         assert_eq!("1542182950000000011\n", line_protocol.3);
 
-        sink.encoding.except_fields = Some(vec!["metric_type".into()]);
+        sink.transformer
+            .set_except_fields(Some(vec!["metric_type".into()]))
+            .unwrap();
         let mut encoder = sink.build_encoder();
         let bytes = encoder.encode_event(event.clone()).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
@@ -374,7 +396,7 @@ mod tests {
 
     #[test]
     fn test_encode_event_v1() {
-        let mut event = Event::from("hello");
+        let mut event = Event::Log(LogEvent::from("hello"));
         event.as_mut_log().insert("host", "aws.cloud.eur");
         event.as_mut_log().insert("source_type", "file");
 
@@ -419,7 +441,7 @@ mod tests {
 
     #[test]
     fn test_encode_event() {
-        let mut event = Event::from("hello");
+        let mut event = Event::Log(LogEvent::from("hello"));
         event.as_mut_log().insert("host", "aws.cloud.eur");
         event.as_mut_log().insert("source_type", "file");
 
@@ -464,7 +486,7 @@ mod tests {
 
     #[test]
     fn test_encode_event_without_tags() {
-        let mut event = Event::from("hello");
+        let mut event = Event::Log(LogEvent::from("hello"));
 
         event.as_mut_log().insert("value", 100);
         event.as_mut_log().insert("timestamp", ts());
@@ -494,18 +516,14 @@ mod tests {
 
     #[test]
     fn test_encode_nested_fields() {
-        let mut event = Event::new_empty_log();
+        let mut event = LogEvent::default();
 
-        event.as_mut_log().insert("a", 1);
-        event.as_mut_log().insert("nested.field", "2");
-        event.as_mut_log().insert("nested.bool", true);
-        event
-            .as_mut_log()
-            .insert("nested.array[0]", "example-value");
-        event
-            .as_mut_log()
-            .insert("nested.array[2]", "another-value");
-        event.as_mut_log().insert("nested.array[3]", 15);
+        event.insert("a", 1);
+        event.insert("nested.field", "2");
+        event.insert("nested.bool", true);
+        event.insert("nested.array[0]", "example-value");
+        event.insert("nested.array[2]", "another-value");
+        event.insert("nested.array[3]", 15);
 
         let sink = create_sink(
             "http://localhost:9999",
@@ -516,7 +534,7 @@ mod tests {
         );
         let mut encoder = sink.build_encoder();
 
-        let bytes = encoder.encode_event(event).unwrap();
+        let bytes = encoder.encode_event(event.into()).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
 
         let line_protocol = split_line_protocol(string);
@@ -539,7 +557,7 @@ mod tests {
 
     #[test]
     fn test_add_tag() {
-        let mut event = Event::from("hello");
+        let mut event = Event::Log(LogEvent::from("hello"));
         event.as_mut_log().insert("source_type", "file");
 
         event.as_mut_log().insert("as_a_tag", 10);
@@ -735,7 +753,7 @@ mod tests {
             protocol_version,
             measurement,
             tags,
-            encoding: EncodingConfigWithDefault::default().into(),
+            transformer: Default::default(),
         }
     }
 }
@@ -755,7 +773,7 @@ mod integration_tests {
             test_util::{address_v2, onboarding_v2, BUCKET, ORG, TOKEN},
             InfluxDb2Settings,
         },
-        test_util::components::{self, HTTP_SINK_TAGS},
+        test_util::components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
     };
 
     #[tokio::test]
@@ -801,7 +819,7 @@ mod integration_tests {
 
         let events = vec![Event::Log(event1), Event::Log(event2)];
 
-        components::run_sink_events(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
+        run_and_assert_sink_compliance(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
 
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 

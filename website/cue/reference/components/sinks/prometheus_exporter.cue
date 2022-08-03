@@ -16,12 +16,11 @@ components: sinks: prometheus_exporter: {
 	}
 
 	features: {
-		acknowledgements: false
+		acknowledgements: true
 		healthcheck: enabled: false
 		exposes: {
 			tls: {
 				enabled:                true
-				can_enable:             true
 				can_verify_certificate: true
 				enabled_default:        false
 			}
@@ -60,7 +59,7 @@ components: sinks: prometheus_exporter: {
 
 	configuration: {
 		address: {
-			description: "The address to expose for scraping."
+			description: "The address to expose for scraping. The metrics are exposed at the typical Prometheus exporter path, `/metrics`"
 			required:    true
 			warnings: []
 			type: string: {
@@ -125,6 +124,12 @@ components: sinks: prometheus_exporter: {
 			required:    false
 			type: bool: default: false
 		}
+		suppress_timestamp: {
+			common:      false
+			description: "Whether or not to strip metric timestamp in the response."
+			required:    false
+			type: bool: default: true
+		}
 	}
 
 	input: {
@@ -137,6 +142,7 @@ components: sinks: prometheus_exporter: {
 			set:          false
 			summary:      true
 		}
+		traces: false
 	}
 
 	examples: [

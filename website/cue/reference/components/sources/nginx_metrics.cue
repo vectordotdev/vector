@@ -77,7 +77,6 @@ components: sources: nginx_metrics: {
 			}
 		}
 		tls: configuration._tls_connect & {_args: {
-			can_enable:             true
 			can_verify_certificate: true
 			can_verify_hostname:    true
 			enabled_default:        false

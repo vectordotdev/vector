@@ -1,14 +1,18 @@
-use std::num::NonZeroU64;
+// TODO: In order to correctly assert component specification compliance, we would have to do some more advanced mocking
+// off the endpoint, which would include also providing a mock OAuth2 endpoint to allow for generating a token from the
+// mocked credentials. Let this TODO serve as a placeholder for doing that in the future.
 
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use futures::{sink::SinkExt, FutureExt};
-use http::{header::AUTHORIZATION, HeaderValue, Uri};
-use serde::{Deserialize, Serialize};
+use goauth::scopes::Scope;
+use http::Uri;
+use vector_config::configurable_component;
 
 use crate::{
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Metric, MetricValue},
+    gcp::{GcpAuthConfig, GcpAuthenticator},
     http::HttpClient,
     sinks::{
         gcp,
@@ -19,7 +23,7 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
 };
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -28,22 +32,45 @@ pub struct StackdriverMetricsDefaultBatchSettings;
 impl SinkBatchSettings for StackdriverMetricsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(1);
     const MAX_BYTES: Option<usize> = None;
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
-#[serde(deny_unknown_fields)]
+/// Configuration for the `gcp_stackdriver_metrics` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug, Default)]
 pub struct StackdriverConfig {
+    /// The project ID to which to publish metrics.
+    ///
+    /// See the [Google Cloud Platform project management documentation][project_docs] for more details.
+    ///
+    /// [project_docs]: https://cloud.google.com/resource-manager/docs/creating-managing-projects
     pub project_id: String,
+
+    /// The monitored resource to associate the metrics with.
     pub resource: gcp::GcpTypedResource,
-    pub credentials_path: Option<String>,
+
+    #[serde(flatten)]
+    pub auth: GcpAuthConfig,
+
+    /// The default namespace to use for metrics that do not have one.
+    ///
+    /// Metrics with the same name can only be differentiated by their namespace, and not all
+    /// metrics have their own namespace.
     #[serde(default = "default_metric_namespace_value")]
     pub default_namespace: String,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<StackdriverMetricsDefaultBatchSettings>,
-    pub tls: Option<TlsOptions>,
+
+    #[configurable(derived)]
+    pub tls: Option<TlsConfig>,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -66,17 +93,8 @@ inventory::submit! {
 #[typetag::serde(name = "gcp_stackdriver_metrics")]
 impl SinkConfig for StackdriverConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let mut token = gouth::Builder::new().scopes(&[
-            "https://www.googleapis.com/auth/cloud-platform",
-            "https://www.googleapis.com/auth/monitoring",
-            "https://www.googleapis.com/auth/monitoring.write",
-        ]);
+        let auth = self.auth.build(Scope::MonitoringWrite).await?;
 
-        if let Some(credentials_path) = self.credentials_path.as_ref() {
-            token = token.file(credentials_path);
-        }
-
-        let token = token.build()?;
         let healthcheck = healthcheck().boxed();
         let started = chrono::Utc::now();
         let request = self.request.unwrap_with(&TowerRequestConfig {
@@ -91,7 +109,7 @@ impl SinkConfig for StackdriverConfig {
         let sink = HttpEventSink {
             config: self.clone(),
             started,
-            token,
+            auth,
         };
 
         let sink = BatchedHttpSink::new(
@@ -100,7 +118,6 @@ impl SinkConfig for StackdriverConfig {
             request,
             batch_settings.timeout,
             client,
-            cx.acker(),
         )
         .sink_map_err(
             |error| error!(message = "Fatal gcp_stackdriver_metrics sink error.", %error),
@@ -117,15 +134,15 @@ impl SinkConfig for StackdriverConfig {
         "gcp_stackdriver_metrics"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
 struct HttpEventSink {
     config: StackdriverConfig,
     started: DateTime<Utc>,
-    token: gouth::Token,
+    auth: GcpAuthenticator,
 }
 
 struct StackdriverMetricsEncoder;
@@ -170,7 +187,7 @@ impl HttpSink for HttpEventSink {
             namespace, series.name.name
         );
 
-        let end_time = data.timestamp.unwrap_or_else(chrono::Utc::now);
+        let end_time = data.time.timestamp.unwrap_or_else(chrono::Utc::now);
 
         let (point_value, interval, metric_kind) = match &data.value {
             MetricValue::Counter { value } => {
@@ -227,13 +244,10 @@ impl HttpSink for HttpEventSink {
         )
         .parse()?;
 
-        let request = hyper::Request::post(uri)
+        let mut request = hyper::Request::post(uri)
             .header("content-type", "application/json")
-            .header(
-                AUTHORIZATION,
-                self.token.header_value()?.parse::<HeaderValue>()?,
-            )
             .body(body)?;
+        self.auth.apply(&mut request);
 
         Ok(request)
     }

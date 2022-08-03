@@ -7,14 +7,14 @@ mkfile_dir := $(dir $(mkfile_path))
 # Begin OS detection
 ifeq ($(OS),Windows_NT) # is Windows_NT on XP, 2000, 7, Vista, 10...
     export OPERATING_SYSTEM := Windows
-	export RUST_TARGET ?= "x86_64-unknown-windows-msvc"
-    export DEFAULT_FEATURES = default-msvc
-	undefine DNSTAP_BENCHES
+    export RUST_TARGET ?= "x86_64-unknown-windows-msvc"
+    export FEATURES ?= default-msvc
+    undefine DNSTAP_BENCHES
 else
     export OPERATING_SYSTEM := $(shell uname)  # same as "uname -s"
-	export RUST_TARGET ?= "x86_64-unknown-linux-gnu"
-    export DEFAULT_FEATURES = default
-	export DNSTAP_BENCHES := dnstap-benches
+    export RUST_TARGET ?= "x86_64-unknown-linux-gnu"
+    export FEATURES ?= default
+    export DNSTAP_BENCHES := dnstap-benches
 endif
 
 # Override this with any scopes for testing/benching.
@@ -42,7 +42,7 @@ export CURRENT_DIR = $(shell pwd)
 # Override this to automatically enter a container containing the correct, full, official build environment for Vector, ready for development
 export ENVIRONMENT ?= false
 # The upstream container we publish artifacts to on a successful master build.
-export ENVIRONMENT_UPSTREAM ?= timberio/ci_image:sha-5e4db9de84473ea817048e204561eb54a4f025d8
+export ENVIRONMENT_UPSTREAM ?= docker.io/timberio/vector-dev:sha-3eadc96742a33754a5859203b58249f6a806972a
 # Override to disable building the container, having it pull from the Github packages repo instead
 # TODO: Disable this by default. Blocked by `docker pull` from Github Packages requiring authenticated login
 export ENVIRONMENT_AUTOBUILD ?= true
@@ -169,12 +169,12 @@ environment-push: environment-prepare ## Publish a new version of the container 
 build: check-build-tools
 build: export CFLAGS += -g0 -O3
 build: ## Build the project in release mode (Supports `ENVIRONMENT=true`)
-	${MAYBE_ENVIRONMENT_EXEC} cargo build --release --no-default-features --features ${DEFAULT_FEATURES}
+	${MAYBE_ENVIRONMENT_EXEC} cargo build --release --no-default-features --features ${FEATURES}
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
 .PHONY: build-dev
 build-dev: ## Build the project in development mode (Supports `ENVIRONMENT=true`)
-	${MAYBE_ENVIRONMENT_EXEC} cargo build --no-default-features --features ${DEFAULT_FEATURES}
+	${MAYBE_ENVIRONMENT_EXEC} cargo build --no-default-features --features ${FEATURES}
 
 .PHONY: build-x86_64-unknown-linux-gnu
 build-x86_64-unknown-linux-gnu: target/x86_64-unknown-linux-gnu/release/vector ## Build a release binary for the x86_64-unknown-linux-gnu triple.
@@ -296,11 +296,11 @@ target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
 # https://github.com/rust-lang/cargo/issues/6454
 .PHONY: test
 test: ## Run the unit test suite
-	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --workspace --no-fail-fast --no-default-features --features "${DEFAULT_FEATURES}" ${SCOPE}
+	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --workspace --no-fail-fast --no-default-features --features "${FEATURES}" ${SCOPE}
 
 .PHONY: test-docs
 test-docs: ## Run the docs test suite
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --doc --workspace --no-fail-fast --no-default-features --features "${DEFAULT_FEATURES}" ${SCOPE}
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --doc --workspace --no-fail-fast --no-default-features --features "${FEATURES}" ${SCOPE}
 
 .PHONY: test-all
 test-all: test test-docs test-behavior test-integration ## Runs all tests: unit, docs, behaviorial, and integration.
@@ -313,9 +313,22 @@ test-x86_64-unknown-linux-gnu: cross-test-x86_64-unknown-linux-gnu ## Runs unit 
 test-aarch64-unknown-linux-gnu: cross-test-aarch64-unknown-linux-gnu ## Runs unit tests on the aarch64-unknown-linux-gnu triple
 	${EMPTY}
 
+.PHONY: test-behavior-config
+test-behavior-config: ## Runs configuration related behaviorial tests
+	${MAYBE_ENVIRONMENT_EXEC} cargo build --bin secret-backend-example
+	${MAYBE_ENVIRONMENT_EXEC} cargo run -- test tests/behavior/config/*
+
+.PHONY: test-behavior-%
+test-behavior-%: ## Runs behaviorial test for a given category
+	${MAYBE_ENVIRONMENT_EXEC} cargo run -- test tests/behavior/$*/*
+
 .PHONY: test-behavior
-test-behavior: ## Runs behaviorial test
-	${MAYBE_ENVIRONMENT_EXEC} cargo run -- test tests/behavior/**/*
+test-behavior: ## Runs all behaviorial tests
+test-behavior: test-behavior-transforms test-behavior-formats test-behavior-config
+
+.PHONY: test-enterprise
+test-enterprise: ## Runs enterprise related behavioral tests
+	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --workspace --no-fail-fast --no-default-features --features "enterprise-tests" --test enterprise
 
 .PHONY: test-integration
 test-integration: ## Runs all integration tests
@@ -324,7 +337,7 @@ test-integration: test-integration-eventstoredb_metrics test-integration-fluent 
 test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb_metrics test-integration-nats
 test-integration: test-integration-nginx test-integration-postgresql_metrics test-integration-prometheus test-integration-pulsar
 test-integration: test-integration-redis test-integration-splunk test-integration-dnstap test-integration-datadog-agent test-integration-datadog-logs
-test-integration: test-integration-shutdown
+test-integration: test-integration-datadog-traces test-integration-shutdown
 
 .PHONY: test-integration-amqp
 test-integration-amqp: ## Runs Amqp integration tests
@@ -349,35 +362,17 @@ test-integration-aws-cloudwatch-logs: ## Runs AWS Cloudwatch Logs integration te
 .PHONY: test-integration-datadog-agent
 test-integration-datadog-agent: ## Runs Datadog Agent integration tests
 	@test $${TEST_DATADOG_API_KEY?TEST_DATADOG_API_KEY must be set}
-	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.datadog-agent.yml run runner
-
-.PHONY: test-integration-nats
-test-integration-nats: ## Runs NATS integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh nats stop
-	@scripts/setup_integration_env.sh nats start
-	sleep 10 # Many services are very slow... Give them a sec..
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features nats-integration-tests --lib ::nats::
+	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.datadog-agent.yml build
+	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.datadog-agent.yml run --rm runner
 ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh nats stop
-endif
-
-tests/data/dnstap/socket:
-	mkdir -p tests/data/dnstap/socket
-	chmod 777 tests/data/dnstap/socket
-
-.PHONY: test-integration-dnstap
-test-integration-dnstap: tests/data/dnstap/socket
-	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.dnstap.yml run --rm runner
-ifeq ($(AUTODESPAWN), true)
-	make test-integration-dnstap-cleanup
+	make test-integration-datadog-agent-cleanup
 endif
 
 test-integration-%-cleanup:
 	${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml rm --force --stop -v
 
 test-integration-%:
+	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml build
 	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.$*.yml run --rm runner
 ifeq ($(AUTODESPAWN), true)
 	make test-integration-$*-cleanup
@@ -385,7 +380,7 @@ endif
 
 .PHONY: test-e2e-kubernetes
 test-e2e-kubernetes: ## Runs Kubernetes E2E tests (Sorry, no `ENVIRONMENT=true` support)
-	@scripts/test-e2e-kubernetes.sh
+	RUST_VERSION=${RUST_VERSION} scripts/test-e2e-kubernetes.sh
 
 .PHONY: test-cli
 test-cli: ## Runs cli tests
@@ -443,17 +438,17 @@ bench-all: bench-remap-functions
 
 .PHONY: check
 check: ## Run prerequisite code checks
-	${MAYBE_ENVIRONMENT_EXEC} cargo check --all --no-default-features --features ${DEFAULT_FEATURES}
+	${MAYBE_ENVIRONMENT_EXEC} cargo check --workspace --all-targets --features all-integration-tests
 
 .PHONY: check-all
 check-all: ## Check everything
 check-all: check-fmt check-clippy check-style check-docs
 check-all: check-version check-examples check-component-features
-check-all: check-scripts
+check-all: check-scripts check-deny
 
 .PHONY: check-component-features
 check-component-features: ## Check that all component features are setup properly
-	${MAYBE_ENVIRONMENT_EXEC} cargo hack check --workspace --each-feature --exclude-features "sources-utils-http sources-utils-http-encoding sources-utils-http-prelude sources-utils-http-query sources-utils-tcp-keepalive sources-utils-tcp-socket sources-utils-tls sources-utils-udp sources-utils-unix sinks-utils-udp" --all-targets
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-component-features
 
 .PHONY: check-clippy
 check-clippy: ## Check code with Clippy
@@ -486,6 +481,10 @@ check-examples: ## Check that the config/examples files are valid
 .PHONY: check-scripts
 check-scripts: ## Check that scipts do not have common mistakes
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-scripts.sh
+
+.PHONY: check-deny
+check-deny: ## Check advisories licenses and sources for crate dependencies
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-deny.sh
 
 check-events: ## Check that events satisfy patterns set in https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-events
@@ -633,10 +632,6 @@ sync-install: ## Sync the install.sh script for access via sh.vector.dev
 test-vrl: ## Run the VRL test suite
 	@scripts/test-vrl.sh
 
-.PHONY: check-stdlib-features
-check-stdlib-features: ## Ensure VRL stdlib features build
-	${MAYBE_ENVIRONMENT_EXEC} env RUSTFLAGS="-D warnings" cargo hack check --each-feature --package vrl-stdlib --exclude-features default
-
 ##@ Utility
 
 .PHONY: build-ci-docker-images
@@ -685,3 +680,7 @@ git-hooks: ## Add Vector-local git hooks for commit sign-off
 cargo-install-%: override TOOL = $(@:cargo-install-%=%)
 cargo-install-%:
 	$(if $(findstring true,$(AUTOINSTALL)),cargo install ${TOOL} --quiet; cargo clean,)
+
+.PHONY: ci-generate-publish-metadata
+ci-generate-publish-metadata: ## Generates the necessary metadata required for building/publishing Vector.
+	@scripts/ci-generate-publish-metadata.sh

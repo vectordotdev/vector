@@ -157,6 +157,16 @@ impl component_sent_events_throughputs_subscription::ComponentSentEventsThroughp
 
 }
 
+/// ComponentErrorsTotalsSubscription contains metrics on the number of errors
+/// (metrics ending in `_errors_total`), against specific components.
+#[derive(GraphQLQuery, Debug, Copy, Clone)]
+#[graphql(
+    schema_path = "graphql/schema.json",
+    query_path = "graphql/subscriptions/component_errors_totals.graphql",
+    response_derives = "Debug"
+)]
+pub struct ComponentErrorsTotalsSubscription;
+
 /// Extension methods for metrics subscriptions
 pub trait MetricsSubscriptionExt {
     /// Executes an uptime metrics subscription.
@@ -227,6 +237,11 @@ pub trait MetricsSubscriptionExt {
         &self,
         interval: i64,
     ) -> crate::BoxedSubscription<ComponentSentEventsThroughputsSubscription>;
+
+    fn component_errors_totals_subscription(
+        &self,
+        interval: i64,
+    ) -> crate::BoxedSubscription<ComponentErrorsTotalsSubscription>;
 }
 
 impl MetricsSubscriptionExt for crate::SubscriptionClient {
@@ -367,5 +382,16 @@ impl MetricsSubscriptionExt for crate::SubscriptionClient {
         );
 
         self.start::<ComponentSentEventsThroughputsSubscription>(&request_body)
+    }
+
+    fn component_errors_totals_subscription(
+        &self,
+        interval: i64,
+    ) -> BoxedSubscription<ComponentErrorsTotalsSubscription> {
+        let request_body = ComponentErrorsTotalsSubscription::build_query(
+            component_errors_totals_subscription::Variables { interval },
+        );
+
+        self.start::<ComponentErrorsTotalsSubscription>(&request_body)
     }
 }

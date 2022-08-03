@@ -20,7 +20,7 @@ components: sinks: new_relic_logs: {
 				enabled:      true
 				common:       false
 				max_bytes:    1_000_000
-				timeout_secs: 1
+				timeout_secs: 1.0
 			}
 			compression: {
 				enabled: true
@@ -44,7 +44,7 @@ components: sinks: new_relic_logs: {
 				interface: {
 					socket: {
 						api: {
-							title: "New Relic  Log API"
+							title: "New Relic Log API"
 							url:   urls.new_relic_log_api
 						}
 						direction: "outgoing"
@@ -103,6 +103,7 @@ components: sinks: new_relic_logs: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	telemetry: components.sinks.http.telemetry

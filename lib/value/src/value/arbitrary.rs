@@ -1,9 +1,11 @@
-use crate::Value;
+use std::collections::BTreeMap;
+
 use bytes::Bytes;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use ordered_float::NotNan;
 use quickcheck::{Arbitrary, Gen};
-use std::collections::BTreeMap;
+
+use crate::Value;
 
 const MAX_ARRAY_SIZE: usize = 4;
 const MAX_MAP_SIZE: usize = 4;

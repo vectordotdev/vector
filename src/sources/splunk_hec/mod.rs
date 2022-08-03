@@ -10,9 +10,12 @@ use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::MultiGzDecoder;
 use futures::FutureExt;
 use http::StatusCode;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::{de::Read as JsonRead, Deserializer, Value as JsonValue};
 use snafu::Snafu;
+use tracing::Span;
+use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 use vector_core::{event::BatchNotifier, ByteSizeOf};
 use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
 
@@ -34,7 +37,7 @@ use crate::{
     },
     serde::bool_or_struct,
     source_sender::ClosedError,
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
     SourceSender,
 };
 
@@ -46,23 +49,46 @@ pub const INDEX: &str = "splunk_index";
 pub const SOURCE: &str = "splunk_source";
 pub const SOURCETYPE: &str = "splunk_sourcetype";
 
-/// Accepts HTTP requests.
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the `splunk_hec` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
-pub(self) struct SplunkConfig {
-    /// Local address on which to listen
+pub struct SplunkConfig {
+    /// The address to listen for connections on.
+    ///
+    /// The address _must_ include a port.
     #[serde(default = "default_socket_address")]
-    address: SocketAddr,
-    /// Splunk HEC token. Deprecated - use `valid_tokens` instead
+    pub address: SocketAddr,
+
+    /// Optional authorization token.
+    ///
+    /// If supplied, incoming requests must supply this token in the `Authorization` header, just as a client would if
+    /// it was communicating with the Splunk HEC endpoint directly.
+    ///
+    /// If _not_ supplied, the `Authorization` header will be ignored and requests will not be authenticated.
+    #[configurable(deprecated)]
     token: Option<String>,
-    /// A list of tokens to accept. Omit this to accept any token
+
+    /// Optional list of valid authorization tokens.
+    ///
+    /// If supplied, incoming requests must supply one of these tokens in the `Authorization` header, just as a client
+    /// would if it was communicating with the Splunk HEC endpoint directly.
+    ///
+    /// If _not_ supplied, the `Authorization` header will be ignored and requests will not be authenticated.
     valid_tokens: Option<Vec<String>>,
-    tls: Option<TlsConfig>,
-    /// Splunk HEC indexer acknowledgement settings
+
+    /// Whether or not to forward the Splunk HEC authentication token with events.
+    ///
+    /// If set to `true`, when incoming requests contain a Splunk HEC token, the token used will kept in the
+    /// event metadata and be preferentially used if the event is sent to a Splunk HEC sink.
+    store_hec_token: bool,
+
+    #[configurable(derived)]
+    tls: Option<TlsEnableableConfig>,
+
+    #[configurable(derived)]
     #[serde(deserialize_with = "bool_or_struct")]
     acknowledgements: HecAcknowledgementsConfig,
-    /// Splunk HEC token passthrough
-    store_hec_token: bool,
 }
 
 inventory::submit! {
@@ -107,7 +133,7 @@ impl SourceConfig for SplunkConfig {
             .and(
                 warp::path::full()
                     .map(|path: warp::filters::path::FullPath| {
-                        emit!(&SplunkHecRequestReceived {
+                        emit!(SplunkHecRequestReceived {
                             path: path.as_str()
                         });
                     })
@@ -129,7 +155,7 @@ impl SourceConfig for SplunkConfig {
         let listener = tls.bind(&self.address).await?;
 
         Ok(Box::pin(async move {
-            let span = crate::trace::current_span();
+            let span = Span::current();
             warp::serve(services.with(warp::trace(move |_info| span.clone())))
                 .serve_incoming_with_graceful_shutdown(
                     listener.accept_stream(),
@@ -141,7 +167,7 @@ impl SourceConfig for SplunkConfig {
         }))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -169,7 +195,7 @@ struct SplunkSource {
 impl SplunkSource {
     fn new(config: &SplunkConfig, protocol: &'static str, cx: SourceContext) -> Self {
         let acknowledgements = cx.do_acknowledgements(&config.acknowledgements.inner);
-        let shutdown = cx.shutdown.shared();
+        let shutdown = cx.shutdown;
         let valid_tokens = config
             .valid_tokens
             .iter()
@@ -207,7 +233,11 @@ impl SplunkSource {
         let store_hec_token = self.store_hec_token;
 
         warp::post()
-            .and(path!("event").or(path!("event" / "1.0")))
+            .and(
+                path!("event")
+                    .or(path!("event" / "1.0"))
+                    .or(warp::path::end()),
+            )
             .and(self.authorization())
             .and(splunk_channel)
             .and(warp::addr::remote())
@@ -226,7 +256,7 @@ impl SplunkSource {
                       path: warp::path::FullPath| {
                     let mut out = out.clone();
                     let idx_ack = idx_ack.clone();
-                    emit!(&HttpBytesReceived {
+                    emit!(HttpBytesReceived {
                         byte_size: body.len(),
                         http_path: path.as_str(),
                         protocol,
@@ -280,7 +310,7 @@ impl SplunkSource {
                         }
 
                         if !events.is_empty() {
-                            emit!(&EventsReceived {
+                            emit!(EventsReceived {
                                 count: events.len(),
                                 byte_size: events.size_of(),
                             });
@@ -327,7 +357,7 @@ impl SplunkSource {
                       path: warp::path::FullPath| {
                     let mut out = out.clone();
                     let idx_ack = idx_ack.clone();
-                    emit!(&HttpBytesReceived {
+                    emit!(HttpBytesReceived {
                         byte_size: body.len(),
                         http_path: path.as_str(),
                         protocol,
@@ -345,9 +375,9 @@ impl SplunkSource {
                             _ => None,
                         };
                         let mut event = raw_event(body, gzip, channel_id, remote, xff, batch)?;
-                        event.metadata_mut().set_splunk_hec_token(
-                            token.filter(|_| store_hec_token).map(Into::into),
-                        );
+                        if let Some(token) = token.filter(|_| store_hec_token) {
+                            event.metadata_mut().set_splunk_hec_token(token.into());
+                        }
 
                         let res = out.send_event(event).await;
                         res.map(|_| maybe_ack_id)
@@ -360,25 +390,20 @@ impl SplunkSource {
     }
 
     fn health_service(&self) -> BoxedFilter<(Response,)> {
-        let valid_credentials = self.valid_credentials.clone();
-        let authorize =
-            warp::header::optional("Authorization").and_then(move |token: Option<String>| {
-                let valid_credentials = valid_credentials.clone();
-                async move {
-                    if valid_credentials.is_empty() {
-                        return Ok(());
-                    }
-                    match token {
-                        Some(token) if valid_credentials.contains(&token) => Ok(()),
-                        _ => Err(Rejection::from(ApiError::BadRequest)),
-                    }
-                }
-            });
-
+        // The Splunk docs document this endpoint as returning a 400 if given an invalid Splunk
+        // token, but, in practice, it seems to ignore the token altogether
+        //
+        // The response body was taken from Splunk 8.2.4
+        //
+        // https://docs.splunk.com/Documentation/Splunk/8.2.5/RESTREF/RESTinput#services.2Fcollector.2Fhealth
         warp::get()
             .and(path!("health" / "1.0").or(path!("health")))
-            .and(authorize)
-            .map(move |_, _| warp::reply().into_response())
+            .map(move |_| {
+                http::Response::builder()
+                    .header(http::header::CONTENT_TYPE, "application/json")
+                    .body(hyper::Body::from(r#"{"text":"HEC is healthy","code":17}"#))
+                    .expect("static response")
+            })
             .boxed()
     }
 
@@ -495,7 +520,7 @@ struct EventIterator<'de, R: JsonRead<'de>> {
     /// Remaining extracted default values
     extractors: [DefaultExtractor; 4],
     /// Event finalization
-    batch: Option<Arc<BatchNotifier>>,
+    batch: Option<BatchNotifier>,
     /// Splunk HEC Token for passthrough
     token: Option<Arc<str>>,
 }
@@ -506,7 +531,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
         channel: Option<String>,
         remote: Option<SocketAddr>,
         remote_addr: Option<String>,
-        batch: Option<Arc<BatchNotifier>>,
+        batch: Option<BatchNotifier>,
         token: Option<Arc<str>>,
     ) -> Self {
         EventIterator {
@@ -537,8 +562,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
 
     fn build_event(&mut self, mut json: JsonValue) -> Result<Event, Rejection> {
         // Construct Event from parsed json event
-        let mut event = Event::new_empty_log();
-        let log = event.as_mut_log();
+        let mut log = LogEvent::default();
 
         // Add source type
         log.insert(log_schema().source_type_key(), Bytes::from("splunk_hec"));
@@ -627,22 +651,21 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
 
         // Extract default extracted fields
         for de in self.extractors.iter_mut() {
-            de.extract(log, &mut json);
+            de.extract(&mut log, &mut json);
         }
 
         // Add passthrough token if present
         if let Some(token) = &self.token {
-            log.metadata_mut()
-                .set_splunk_hec_token(Some(Arc::clone(token)));
+            log.metadata_mut().set_splunk_hec_token(Arc::clone(token));
         }
 
         if let Some(batch) = self.batch.clone() {
-            event.add_batch_notifier(batch);
+            log = log.with_batch_notifier(&batch);
         }
 
         self.events += 1;
 
-        Ok(event)
+        Ok(log.into())
     }
 }
 
@@ -660,7 +683,7 @@ impl<'de, R: JsonRead<'de>> Iterator for EventIterator<'de, R> {
                 }
             }
             Some(Err(error)) => {
-                emit!(&SplunkHecRequestBodyInvalidError {
+                emit!(SplunkHecRequestBodyInvalidError {
                     error: error.into()
                 });
                 Some(Err(
@@ -760,7 +783,7 @@ fn raw_event(
     channel: String,
     remote: Option<SocketAddr>,
     xff: Option<String>,
-    batch: Option<Arc<BatchNotifier>>,
+    batch: Option<BatchNotifier>,
 ) -> Result<Event, Rejection> {
     // Process gzip
     let message: Value = if gzip {
@@ -769,7 +792,7 @@ fn raw_event(
             Ok(0) => return Err(ApiError::NoData.into()),
             Ok(_) => Value::from(Bytes::from(data)),
             Err(error) => {
-                emit!(&SplunkHecRequestBodyInvalidError { error });
+                emit!(SplunkHecRequestBodyInvalidError { error });
                 return Err(ApiError::InvalidDataFormat { event: 0 }.into());
             }
         }
@@ -778,8 +801,7 @@ fn raw_event(
     };
 
     // Construct event
-    let mut event = Event::new_empty_log();
-    let log = event.as_mut_log();
+    let mut log = LogEvent::default();
 
     // Add message
     log.insert(log_schema().message_key(), message);
@@ -800,14 +822,13 @@ fn raw_event(
     log.insert(log_schema().timestamp_key(), Utc::now());
 
     // Add source type
-    event
-        .as_mut_log()
-        .try_insert(log_schema().source_type_key(), Bytes::from("splunk_hec"));
+    log.try_insert(log_schema().source_type_key(), Bytes::from("splunk_hec"));
     if let Some(batch) = batch {
-        event.add_batch_notifier(batch);
+        log = log.with_batch_notifier(&batch);
     }
 
-    emit!(&EventsReceived {
+    let event = Event::from(log);
+    emit!(EventsReceived {
         count: 1,
         byte_size: event.size_of(),
     });
@@ -916,7 +937,7 @@ fn finish_ok(maybe_ack_id: Option<u64>) -> Response {
 
 async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
     if let Some(&error) = rejection.find::<ApiError>() {
-        emit!(&SplunkHecRequestError { error });
+        emit!(SplunkHecRequestError { error });
         Ok((match error {
             ApiError::MissingAuthorization => {
                 response_json(StatusCode::UNAUTHORIZED, splunk_response::TOKEN_IS_REQUIRED)
@@ -978,6 +999,7 @@ mod tests {
     use std::{net::SocketAddr, num::NonZeroU64};
 
     use chrono::{TimeZone, Utc};
+    use codecs::{JsonSerializerConfig, TextSerializerConfig};
     use futures_util::Stream;
     use reqwest::{RequestBuilder, Response};
     use serde::Deserialize;
@@ -985,17 +1007,19 @@ mod tests {
 
     use super::{acknowledgements::HecAcknowledgementsConfig, parse_timestamp, SplunkConfig};
     use crate::{
+        codecs::EncodingConfig,
         config::{log_schema, SinkConfig, SinkContext, SourceConfig, SourceContext},
-        event::Event,
+        event::{Event, LogEvent},
         sinks::{
-            splunk_hec::logs::{config::HecLogsSinkConfig, encoder::HecLogsEncoder},
-            util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
+            splunk_hec::common::timestamp_key,
+            splunk_hec::logs::config::HecLogsSinkConfig,
+            util::{BatchConfig, Compression, TowerRequestConfig},
             Healthcheck, VectorSink,
         },
         sources::splunk_hec::acknowledgements::{HecAckStatusRequest, HecAckStatusResponse},
         test_util::{
             collect_n,
-            components::{self, HTTP_PUSH_SOURCE_TAGS, SOURCE_TESTS},
+            components::{assert_source_compliance, HTTP_PUSH_SOURCE_TAGS},
             next_addr, wait_for_tcp,
         },
         SourceSender,
@@ -1022,7 +1046,6 @@ mod tests {
         acknowledgements: Option<HecAcknowledgementsConfig>,
         store_hec_token: bool,
     ) -> (impl Stream<Item = Event> + Unpin, SocketAddr) {
-        components::init_test();
         let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
         let address = next_addr();
         let valid_tokens =
@@ -1049,7 +1072,7 @@ mod tests {
 
     async fn sink(
         address: SocketAddr,
-        encoding: impl Into<EncodingConfig<HecLogsEncoder>>,
+        encoding: EncodingConfig,
         compression: Compression,
     ) -> (VectorSink, Healthcheck) {
         HecLogsSinkConfig {
@@ -1060,13 +1083,15 @@ mod tests {
             index: None,
             sourcetype: None,
             source: None,
-            encoding: encoding.into(),
+            encoding,
             compression,
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             tls: None,
             acknowledgements: Default::default(),
             timestamp_nanos_key: None,
+            timestamp_key: timestamp_key(),
+            endpoint_target: Default::default(),
         }
         .build(SinkContext::new_test())
         .await
@@ -1074,7 +1099,7 @@ mod tests {
     }
 
     async fn start(
-        encoding: impl Into<EncodingConfig<HecLogsEncoder>>,
+        encoding: EncodingConfig,
         compression: Compression,
         acknowledgements: Option<HecAcknowledgementsConfig>,
     ) -> (VectorSink, impl Stream<Item = Event> + Unpin) {
@@ -1085,20 +1110,23 @@ mod tests {
     }
 
     async fn channel_n(
-        messages: Vec<impl Into<Event> + Send + 'static>,
+        messages: Vec<impl Into<String> + Send + 'static>,
         sink: VectorSink,
         source: impl Stream<Item = Event> + Unpin,
     ) -> Vec<Event> {
         let n = messages.len();
 
         tokio::spawn(async move {
-            sink.run_events(messages.into_iter().map(Into::into))
-                .await
-                .unwrap();
+            sink.run_events(
+                messages
+                    .into_iter()
+                    .map(|s| Event::Log(LogEvent::from(s.into()))),
+            )
+            .await
+            .unwrap();
         });
 
         let events = collect_n(source, n).await;
-        SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
         assert_eq!(n, events.len());
 
         events
@@ -1177,7 +1205,8 @@ mod tests {
     #[tokio::test]
     async fn no_compression_text_event() {
         let message = "gzip_text_event";
-        let (sink, source) = start(HecLogsEncoder::Text, Compression::None, None).await;
+        let (sink, source) =
+            start(TextSerializerConfig::new().into(), Compression::None, None).await;
 
         let event = channel_n(vec![message], sink, source).await.remove(0);
 
@@ -1193,7 +1222,12 @@ mod tests {
     #[tokio::test]
     async fn one_simple_text_event() {
         let message = "one_simple_text_event";
-        let (sink, source) = start(HecLogsEncoder::Text, Compression::gzip_default(), None).await;
+        let (sink, source) = start(
+            TextSerializerConfig::new().into(),
+            Compression::gzip_default(),
+            None,
+        )
+        .await;
 
         let event = channel_n(vec![message], sink, source).await.remove(0);
 
@@ -1209,7 +1243,8 @@ mod tests {
     #[tokio::test]
     async fn multiple_simple_text_event() {
         let n = 200;
-        let (sink, source) = start(HecLogsEncoder::Text, Compression::None, None).await;
+        let (sink, source) =
+            start(TextSerializerConfig::new().into(), Compression::None, None).await;
 
         let messages = (0..n)
             .map(|i| format!("multiple_simple_text_event_{}", i))
@@ -1230,7 +1265,12 @@ mod tests {
     #[tokio::test]
     async fn one_simple_json_event() {
         let message = "one_simple_json_event";
-        let (sink, source) = start(HecLogsEncoder::Json, Compression::gzip_default(), None).await;
+        let (sink, source) = start(
+            JsonSerializerConfig::new().into(),
+            Compression::gzip_default(),
+            None,
+        )
+        .await;
 
         let event = channel_n(vec![message], sink, source).await.remove(0);
 
@@ -1246,7 +1286,12 @@ mod tests {
     #[tokio::test]
     async fn multiple_simple_json_event() {
         let n = 200;
-        let (sink, source) = start(HecLogsEncoder::Json, Compression::gzip_default(), None).await;
+        let (sink, source) = start(
+            JsonSerializerConfig::new().into(),
+            Compression::gzip_default(),
+            None,
+        )
+        .await;
 
         let messages = (0..n)
             .map(|i| format!("multiple_simple_json_event{}", i))
@@ -1266,31 +1311,38 @@ mod tests {
 
     #[tokio::test]
     async fn json_event() {
-        let (sink, source) = start(HecLogsEncoder::Json, Compression::gzip_default(), None).await;
+        let (sink, source) = start(
+            JsonSerializerConfig::new().into(),
+            Compression::gzip_default(),
+            None,
+        )
+        .await;
 
-        let mut event = Event::new_empty_log();
-        event.as_mut_log().insert("greeting", "hello");
-        event.as_mut_log().insert("name", "bob");
-        sink.run_events(vec![event]).await.unwrap();
+        let mut log = LogEvent::default();
+        log.insert("greeting", "hello");
+        log.insert("name", "bob");
+        sink.run_events(vec![log.into()]).await.unwrap();
 
-        let event = collect_n(source, 1).await.remove(0);
-        assert_eq!(event.as_log()["greeting"], "hello".into());
-        assert_eq!(event.as_log()["name"], "bob".into());
-        assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
-        assert_eq!(
-            event.as_log()[log_schema().source_type_key()],
-            "splunk_hec".into()
-        );
+        let event = collect_n(source, 1).await.remove(0).into_log();
+        assert_eq!(event["greeting"], "hello".into());
+        assert_eq!(event["name"], "bob".into());
+        assert!(event.get(log_schema().timestamp_key()).is_some());
+        assert_eq!(event[log_schema().source_type_key()], "splunk_hec".into());
         assert!(event.metadata().splunk_hec_token().is_none());
     }
 
     #[tokio::test]
     async fn line_to_message() {
-        let (sink, source) = start(HecLogsEncoder::Json, Compression::gzip_default(), None).await;
+        let (sink, source) = start(
+            JsonSerializerConfig::new().into(),
+            Compression::gzip_default(),
+            None,
+        )
+        .await;
 
-        let mut event = Event::new_empty_log();
-        event.as_mut_log().insert("line", "hello");
-        sink.run_events(vec![event]).await.unwrap();
+        let mut event = LogEvent::default();
+        event.insert("line", "hello");
+        sink.run_events(vec![event.into()]).await.unwrap();
 
         let event = collect_n(source, 1).await.remove(0);
         assert_eq!(event.as_log()[log_schema().message_key()], "hello".into());
@@ -1299,123 +1351,156 @@ mod tests {
 
     #[tokio::test]
     async fn raw() {
-        let message = "raw";
-        let (source, address) = source(None).await;
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let message = "raw";
+            let (source, address) = source(None).await;
 
-        assert_eq!(200, post(address, "services/collector/raw", message).await);
+            assert_eq!(200, post(address, "services/collector/raw", message).await);
 
-        let event = collect_n(source, 1).await.remove(0);
-        SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
-        assert_eq!(event.as_log()[log_schema().message_key()], message.into());
-        assert_eq!(event.as_log()[&super::CHANNEL], "channel".into());
-        assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
-        assert_eq!(
-            event.as_log()[log_schema().source_type_key()],
-            "splunk_hec".into()
-        );
-        assert!(event.metadata().splunk_hec_token().is_none());
+            let event = collect_n(source, 1).await.remove(0);
+            assert_eq!(event.as_log()[log_schema().message_key()], message.into());
+            assert_eq!(event.as_log()[&super::CHANNEL], "channel".into());
+            assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
+            assert_eq!(
+                event.as_log()[log_schema().source_type_key()],
+                "splunk_hec".into()
+            );
+            assert!(event.metadata().splunk_hec_token().is_none());
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn root() {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let message = r#"{ "event": { "message": "root"} }"#;
+            let (source, address) = source(None).await;
+
+            assert_eq!(200, post(address, "services/collector", message).await);
+
+            let event = collect_n(source, 1).await.remove(0);
+            assert_eq!(event.as_log()[log_schema().message_key()], "root".into());
+            assert_eq!(event.as_log()[&super::CHANNEL], "channel".into());
+            assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
+            assert_eq!(
+                event.as_log()[log_schema().source_type_key()],
+                "splunk_hec".into()
+            );
+            assert!(event.metadata().splunk_hec_token().is_none());
+        })
+        .await;
     }
 
     #[tokio::test]
     async fn channel_header() {
-        let message = "raw";
-        let (source, address) = source(None).await;
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let message = "raw";
+            let (source, address) = source(None).await;
 
-        let opts = SendWithOpts {
-            channel: Some(Channel::Header("guid")),
-            forwarded_for: None,
-        };
+            let opts = SendWithOpts {
+                channel: Some(Channel::Header("guid")),
+                forwarded_for: None,
+            };
 
-        assert_eq!(
-            200,
-            send_with(address, "services/collector/raw", message, TOKEN, &opts).await
-        );
+            assert_eq!(
+                200,
+                send_with(address, "services/collector/raw", message, TOKEN, &opts).await
+            );
 
-        let event = collect_n(source, 1).await.remove(0);
-        SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
-        assert_eq!(event.as_log()[&super::CHANNEL], "guid".into());
+            let event = collect_n(source, 1).await.remove(0);
+            assert_eq!(event.as_log()[&super::CHANNEL], "guid".into());
+        })
+        .await;
     }
 
     #[tokio::test]
     async fn xff_header_raw() {
-        let message = "raw";
-        let (source, address) = source(None).await;
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let message = "raw";
+            let (source, address) = source(None).await;
 
-        let opts = SendWithOpts {
-            channel: Some(Channel::Header("guid")),
-            forwarded_for: Some(String::from("10.0.0.1")),
-        };
+            let opts = SendWithOpts {
+                channel: Some(Channel::Header("guid")),
+                forwarded_for: Some(String::from("10.0.0.1")),
+            };
 
-        assert_eq!(
-            200,
-            send_with(address, "services/collector/raw", message, TOKEN, &opts).await
-        );
+            assert_eq!(
+                200,
+                send_with(address, "services/collector/raw", message, TOKEN, &opts).await
+            );
 
-        let event = collect_n(source, 1).await.remove(0);
-        SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
-        assert_eq!(event.as_log()[log_schema().host_key()], "10.0.0.1".into());
+            let event = collect_n(source, 1).await.remove(0);
+            assert_eq!(event.as_log()[log_schema().host_key()], "10.0.0.1".into());
+        })
+        .await;
     }
 
     // Test helps to illustrate that a payload's `host` value should override an x-forwarded-for header
     #[tokio::test]
     async fn xff_header_event_with_host_field() {
-        let message = r#"{"event":"first", "host": "10.1.0.2"}"#;
-        let (source, address) = source(None).await;
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let message = r#"{"event":"first", "host": "10.1.0.2"}"#;
+            let (source, address) = source(None).await;
 
-        let opts = SendWithOpts {
-            channel: Some(Channel::Header("guid")),
-            forwarded_for: Some(String::from("10.0.0.1")),
-        };
+            let opts = SendWithOpts {
+                channel: Some(Channel::Header("guid")),
+                forwarded_for: Some(String::from("10.0.0.1")),
+            };
 
-        assert_eq!(
-            200,
-            send_with(address, "services/collector/event", message, TOKEN, &opts).await
-        );
+            assert_eq!(
+                200,
+                send_with(address, "services/collector/event", message, TOKEN, &opts).await
+            );
 
-        let event = collect_n(source, 1).await.remove(0);
-        SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
-        assert_eq!(event.as_log()[log_schema().host_key()], "10.1.0.2".into());
+            let event = collect_n(source, 1).await.remove(0);
+            assert_eq!(event.as_log()[log_schema().host_key()], "10.1.0.2".into());
+        })
+        .await;
     }
 
     // Test helps to illustrate that a payload's `host` value should override an x-forwarded-for header
     #[tokio::test]
     async fn xff_header_event_without_host_field() {
-        let message = r#"{"event":"first", "color": "blue"}"#;
-        let (source, address) = source(None).await;
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let message = r#"{"event":"first", "color": "blue"}"#;
+            let (source, address) = source(None).await;
 
-        let opts = SendWithOpts {
-            channel: Some(Channel::Header("guid")),
-            forwarded_for: Some(String::from("10.0.0.1")),
-        };
+            let opts = SendWithOpts {
+                channel: Some(Channel::Header("guid")),
+                forwarded_for: Some(String::from("10.0.0.1")),
+            };
 
-        assert_eq!(
-            200,
-            send_with(address, "services/collector/event", message, TOKEN, &opts).await
-        );
+            assert_eq!(
+                200,
+                send_with(address, "services/collector/event", message, TOKEN, &opts).await
+            );
 
-        let event = collect_n(source, 1).await.remove(0);
-        SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
-        assert_eq!(event.as_log()[log_schema().host_key()], "10.0.0.1".into());
+            let event = collect_n(source, 1).await.remove(0);
+            assert_eq!(event.as_log()[log_schema().host_key()], "10.0.0.1".into());
+        })
+        .await;
     }
 
     #[tokio::test]
     async fn channel_query_param() {
-        let message = "raw";
-        let (source, address) = source(None).await;
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let message = "raw";
+            let (source, address) = source(None).await;
 
-        let opts = SendWithOpts {
-            channel: Some(Channel::QueryParam("guid")),
-            forwarded_for: None,
-        };
+            let opts = SendWithOpts {
+                channel: Some(Channel::QueryParam("guid")),
+                forwarded_for: None,
+            };
 
-        assert_eq!(
-            200,
-            send_with(address, "services/collector/raw", message, TOKEN, &opts).await
-        );
+            assert_eq!(
+                200,
+                send_with(address, "services/collector/raw", message, TOKEN, &opts).await
+            );
 
-        let event = collect_n(source, 1).await.remove(0);
-        SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
-        assert_eq!(event.as_log()[&super::CHANNEL], "guid".into());
+            let event = collect_n(source, 1).await.remove(0);
+            assert_eq!(event.as_log()[&super::CHANNEL], "guid".into());
+        })
+        .await;
     }
 
     #[tokio::test]
@@ -1440,162 +1525,221 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn secondary_token() {
-        let message = r#"{"event":"first", "color": "blue"}"#;
-        let (_source, address) = source_with(None, Some(VALID_TOKENS), None, false).await;
-        let options = SendWithOpts {
-            channel: None,
-            forwarded_for: None,
-        };
+    async fn health_ignores_token() {
+        let (_source, address) = source(None).await;
 
-        assert_eq!(
-            200,
-            send_with(
-                address,
-                "services/collector/event",
-                message,
-                VALID_TOKENS.get(1).unwrap(),
-                &options
-            )
+        let res = reqwest::Client::new()
+            .get(&format!("http://{}/services/collector/health", address))
+            .header("Authorization", format!("Splunk {}", "invalid token"))
+            .send()
             .await
-        );
-        SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
+            .unwrap();
+
+        assert_eq!(200, res.status().as_u16());
+    }
+
+    #[tokio::test]
+    async fn health() {
+        let (_source, address) = source(None).await;
+
+        let res = reqwest::Client::new()
+            .get(&format!("http://{}/services/collector/health", address))
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(200, res.status().as_u16());
+    }
+
+    #[tokio::test]
+    async fn secondary_token() {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let message = r#"{"event":"first", "color": "blue"}"#;
+            let (_source, address) = source_with(None, Some(VALID_TOKENS), None, false).await;
+            let options = SendWithOpts {
+                channel: None,
+                forwarded_for: None,
+            };
+
+            assert_eq!(
+                200,
+                send_with(
+                    address,
+                    "services/collector/event",
+                    message,
+                    VALID_TOKENS.get(1).unwrap(),
+                    &options
+                )
+                .await
+            );
+        })
+        .await;
     }
 
     #[tokio::test]
     async fn event_service_token_passthrough_enabled() {
-        let message = "passthrough_token_enabled";
-        let (source, address) = source_with(None, Some(VALID_TOKENS), None, true).await;
-        let (sink, health) = sink(address, HecLogsEncoder::Text, Compression::gzip_default()).await;
-        assert!(health.await.is_ok());
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let message = "passthrough_token_enabled";
+            let (source, address) = source_with(None, Some(VALID_TOKENS), None, true).await;
+            let (sink, health) = sink(
+                address,
+                TextSerializerConfig::new().into(),
+                Compression::gzip_default(),
+            )
+            .await;
+            assert!(health.await.is_ok());
 
-        let event = channel_n(vec![message], sink, source).await.remove(0);
+            let event = channel_n(vec![message], sink, source).await.remove(0);
 
-        SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
-        assert_eq!(event.as_log()[log_schema().message_key()], message.into());
-        assert_eq!(
-            &event.metadata().splunk_hec_token().as_ref().unwrap()[..],
-            TOKEN
-        );
+            assert_eq!(event.as_log()[log_schema().message_key()], message.into());
+            assert_eq!(
+                &event.metadata().splunk_hec_token().as_ref().unwrap()[..],
+                TOKEN
+            );
+        })
+        .await;
     }
 
     #[tokio::test]
     async fn raw_service_token_passthrough_enabled() {
-        let message = "raw";
-        let (source, address) = source_with(None, Some(VALID_TOKENS), None, true).await;
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let message = "raw";
+            let (source, address) = source_with(None, Some(VALID_TOKENS), None, true).await;
 
-        assert_eq!(200, post(address, "services/collector/raw", message).await);
+            assert_eq!(200, post(address, "services/collector/raw", message).await);
 
-        let event = collect_n(source, 1).await.remove(0);
-        SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
-        assert_eq!(event.as_log()[log_schema().message_key()], message.into());
-        assert_eq!(event.as_log()[&super::CHANNEL], "channel".into());
-        assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
-        assert_eq!(
-            event.as_log()[log_schema().source_type_key()],
-            "splunk_hec".into()
-        );
-        assert_eq!(
-            &event.metadata().splunk_hec_token().as_ref().unwrap()[..],
-            TOKEN
-        );
+            let event = collect_n(source, 1).await.remove(0);
+            assert_eq!(event.as_log()[log_schema().message_key()], message.into());
+            assert_eq!(event.as_log()[&super::CHANNEL], "channel".into());
+            assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
+            assert_eq!(
+                event.as_log()[log_schema().source_type_key()],
+                "splunk_hec".into()
+            );
+            assert_eq!(
+                &event.metadata().splunk_hec_token().as_ref().unwrap()[..],
+                TOKEN
+            );
+        })
+        .await;
     }
 
     #[tokio::test]
     async fn no_authorization() {
-        let message = "no_authorization";
-        let (source, address) = source_with(None, None, None, false).await;
-        let (sink, health) = sink(address, HecLogsEncoder::Text, Compression::gzip_default()).await;
-        assert!(health.await.is_ok());
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let message = "no_authorization";
+            let (source, address) = source_with(None, None, None, false).await;
+            let (sink, health) = sink(
+                address,
+                TextSerializerConfig::new().into(),
+                Compression::gzip_default(),
+            )
+            .await;
+            assert!(health.await.is_ok());
 
-        let event = channel_n(vec![message], sink, source).await.remove(0);
+            let event = channel_n(vec![message], sink, source).await.remove(0);
 
-        SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
-        assert_eq!(event.as_log()[log_schema().message_key()], message.into());
-        assert!(event.metadata().splunk_hec_token().is_none())
+            assert_eq!(event.as_log()[log_schema().message_key()], message.into());
+            assert!(event.metadata().splunk_hec_token().is_none());
+        })
+        .await;
     }
 
     #[tokio::test]
     async fn no_authorization_token_passthrough_enabled() {
-        let message = "no_authorization";
-        let (source, address) = source_with(None, None, None, true).await;
-        let (sink, health) = sink(address, HecLogsEncoder::Text, Compression::gzip_default()).await;
-        assert!(health.await.is_ok());
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let message = "no_authorization";
+            let (source, address) = source_with(None, None, None, true).await;
+            let (sink, health) = sink(
+                address,
+                TextSerializerConfig::new().into(),
+                Compression::gzip_default(),
+            )
+            .await;
+            assert!(health.await.is_ok());
 
-        let event = channel_n(vec![message], sink, source).await.remove(0);
+            let event = channel_n(vec![message], sink, source).await.remove(0);
 
-        SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
-        assert_eq!(event.as_log()[log_schema().message_key()], message.into());
-        assert_eq!(
-            &event.metadata().splunk_hec_token().as_ref().unwrap()[..],
-            TOKEN
-        );
+            assert_eq!(event.as_log()[log_schema().message_key()], message.into());
+            assert_eq!(
+                &event.metadata().splunk_hec_token().as_ref().unwrap()[..],
+                TOKEN
+            );
+        })
+        .await;
     }
 
     #[tokio::test]
     async fn partial() {
-        let message = r#"{"event":"first"}{"event":"second""#;
-        let (source, address) = source(None).await;
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let message = r#"{"event":"first"}{"event":"second""#;
+            let (source, address) = source(None).await;
 
-        assert_eq!(
-            400,
-            post(address, "services/collector/event", message).await
-        );
+            assert_eq!(
+                400,
+                post(address, "services/collector/event", message).await
+            );
 
-        let event = collect_n(source, 1).await.remove(0);
-        SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
-        assert_eq!(event.as_log()[log_schema().message_key()], "first".into());
-        assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
-        assert_eq!(
-            event.as_log()[log_schema().source_type_key()],
-            "splunk_hec".into()
-        );
+            let event = collect_n(source, 1).await.remove(0);
+            assert_eq!(event.as_log()[log_schema().message_key()], "first".into());
+            assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
+            assert_eq!(
+                event.as_log()[log_schema().source_type_key()],
+                "splunk_hec".into()
+            );
+        })
+        .await;
     }
 
     #[tokio::test]
     async fn handles_newlines() {
-        let message = r#"
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let message = r#"
 {"event":"first"}
         "#;
-        let (source, address) = source(None).await;
+            let (source, address) = source(None).await;
 
-        assert_eq!(
-            200,
-            post(address, "services/collector/event", message).await
-        );
+            assert_eq!(
+                200,
+                post(address, "services/collector/event", message).await
+            );
 
-        let event = collect_n(source, 1).await.remove(0);
-        SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
-        assert_eq!(event.as_log()[log_schema().message_key()], "first".into());
-        assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
-        assert_eq!(
-            event.as_log()[log_schema().source_type_key()],
-            "splunk_hec".into()
-        );
+            let event = collect_n(source, 1).await.remove(0);
+            assert_eq!(event.as_log()[log_schema().message_key()], "first".into());
+            assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
+            assert_eq!(
+                event.as_log()[log_schema().source_type_key()],
+                "splunk_hec".into()
+            );
+        })
+        .await;
     }
 
     #[tokio::test]
     async fn handles_spaces() {
-        let message = r#" {"event":"first"} "#;
-        let (source, address) = source(None).await;
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let message = r#" {"event":"first"} "#;
+            let (source, address) = source(None).await;
 
-        assert_eq!(
-            200,
-            post(address, "services/collector/event", message).await
-        );
+            assert_eq!(
+                200,
+                post(address, "services/collector/event", message).await
+            );
 
-        let event = collect_n(source, 1).await.remove(0);
-        SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
-        assert_eq!(event.as_log()[log_schema().message_key()], "first".into());
-        assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
-        assert_eq!(
-            event.as_log()[log_schema().source_type_key()],
-            "splunk_hec".into()
-        );
+            let event = collect_n(source, 1).await.remove(0);
+            assert_eq!(event.as_log()[log_schema().message_key()], "first".into());
+            assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
+            assert_eq!(
+                event.as_log()[log_schema().source_type_key()],
+                "splunk_hec".into()
+            );
+        })
+        .await;
     }
 
     #[tokio::test]
     async fn handles_non_utf8() {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
         let message = b" {\"event\": { \"non\": \"A non UTF8 character \xE4\", \"number\": 2, \"bool\": true } } ";
         let (source, address) = source(None).await;
 
@@ -1610,7 +1754,6 @@ mod tests {
         assert_eq!(200, b.send().await.unwrap().status().as_u16());
 
         let event = collect_n(source, 1).await.remove(0);
-        SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
         assert_eq!(event.as_log()["non"], "A non UTF8 character �".into());
         assert_eq!(event.as_log()["number"], 2.into());
         assert_eq!(event.as_log()["bool"], true.into());
@@ -1619,10 +1762,12 @@ mod tests {
             event.as_log()[log_schema().source_type_key()],
             "splunk_hec".into()
         );
+    }).await;
     }
 
     #[tokio::test]
     async fn default() {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
         let message = r#"{"event":"first","source":"main"}{"event":"second"}{"event":"third","source":"secondary"}"#;
         let (source, address) = source(None).await;
 
@@ -1633,7 +1778,6 @@ mod tests {
 
         let events = collect_n(source, 3).await;
 
-        SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
         assert_eq!(
             events[0].as_log()[log_schema().message_key()],
             "first".into()
@@ -1651,6 +1795,7 @@ mod tests {
             "third".into()
         );
         assert_eq!(events[2].as_log()[&super::SOURCE], "secondary".into());
+    }).await;
     }
 
     #[test]
@@ -1692,14 +1837,21 @@ mod tests {
     /// https://github.com/seanmonstar/warp/pull/713
     #[tokio::test]
     async fn host_test() {
-        let message = "for the host";
-        let (sink, source) = start(HecLogsEncoder::Text, Compression::gzip_default(), None).await;
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let message = "for the host";
+            let (sink, source) = start(
+                TextSerializerConfig::new().into(),
+                Compression::gzip_default(),
+                None,
+            )
+            .await;
 
-        let event = channel_n(vec![message], sink, source).await.remove(0);
+            let event = channel_n(vec![message], sink, source).await.remove(0);
 
-        SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
-        assert_eq!(event.as_log()[log_schema().message_key()], message.into());
-        assert!(event.as_log().get(log_schema().host_key()).is_none());
+            assert_eq!(event.as_log()[log_schema().message_key()], message.into());
+            assert!(event.as_log().get(log_schema().host_key()).is_none());
+        })
+        .await;
     }
 
     #[derive(Deserialize)]

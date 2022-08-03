@@ -7,10 +7,11 @@ use http::{uri::PathAndQuery, Request, StatusCode, Uri};
 use hyper::{body::to_bytes as body_to_bytes, Body};
 use lookup::lookup_v2::{parse_path, OwnedPath};
 use once_cell::sync::Lazy;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use snafu::ResultExt as _;
 use tokio::time::{sleep, Duration, Instant};
-use tracing_futures::Instrument;
+use tracing::Instrument;
+use vector_config::configurable_component;
 
 use crate::{
     config::{
@@ -24,6 +25,7 @@ use crate::{
     transforms::{TaskTransform, Transform},
 };
 
+const ACCOUNT_ID_KEY: &str = "account-id";
 const AMI_ID_KEY: &str = "ami-id";
 const AVAILABILITY_ZONE_KEY: &str = "availability-zone";
 const INSTANCE_ID_KEY: &str = "instance-id";
@@ -72,19 +74,35 @@ static API_TOKEN: Lazy<PathAndQuery> = Lazy::new(|| PathAndQuery::from_static("/
 static TOKEN_HEADER: Lazy<Bytes> = Lazy::new(|| Bytes::from("X-aws-ec2-metadata-token"));
 static HOST: Lazy<Uri> = Lazy::new(|| Uri::from_static("http://169.254.169.254"));
 
-#[derive(Default, Debug, Serialize, Deserialize, Clone)]
+/// Configuration for the `aws_ec2_metadata` transform.
+#[configurable_component(transform)]
+#[derive(Clone, Debug, Default)]
 pub struct Ec2Metadata {
-    // Deprecated name
+    /// Overrides the default EC2 metadata endpoint.
     #[serde(alias = "host")]
     endpoint: Option<String>,
+
+    /// Sets a prefix for all event fields added by the transform.
     namespace: Option<String>,
+
+    /// The interval between querying for updated metadata, in seconds.
     refresh_interval_secs: Option<u64>,
+
+    /// A list of metadata fields to include in each transformed event.
     fields: Option<Vec<String>>,
+
+    /// The timeout for querying the EC2 metadata endpoint, in seconds.
+    refresh_timeout_secs: Option<u64>,
+
+    #[configurable(derived)]
     #[serde(
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     proxy: ProxyConfig,
+
+    /// Requires the transform to be able to successfully query the EC2 metadata before Vector can start.
+    required: Option<bool>,
 }
 
 #[derive(Clone, Debug)]
@@ -100,6 +118,7 @@ struct MetadataKey {
 
 #[derive(Debug)]
 struct Keys {
+    account_id_key: MetadataKey,
     ami_id_key: MetadataKey,
     availability_zone_key: MetadataKey,
     instance_id_key: MetadataKey,
@@ -152,6 +171,11 @@ impl TransformConfig for Ec2Metadata {
             .fields
             .clone()
             .unwrap_or_else(|| DEFAULT_FIELD_WHITELIST.clone());
+        let refresh_timeout = self
+            .refresh_timeout_secs
+            .map(Duration::from_secs)
+            .unwrap_or_else(|| Duration::from_secs(1));
+        let required = self.required.unwrap_or(true);
 
         let proxy = ProxyConfig::merge_with_env(&context.globals.proxy, &self.proxy);
         let http_client = HttpClient::new(None, &proxy)?;
@@ -162,17 +186,25 @@ impl TransformConfig for Ec2Metadata {
             keys,
             Arc::clone(&state),
             refresh_interval,
+            refresh_timeout,
             fields,
         );
 
-        client.refresh_metadata().await?;
+        // If initial metadata is not required, log and proceed. Otherwise return error.
+        if let Err(error) = client.refresh_metadata().await {
+            if required {
+                return Err(error);
+            } else {
+                emit!(AwsEc2MetadataRefreshError { error });
+            }
+        }
 
         tokio::spawn(
             async move {
                 client.run().await;
             }
             // TODO: Once #1338 is done we can fetch the current span
-            .instrument(info_span!("aws_ec2_metadata: worker")),
+            .instrument(info_span!("aws_ec2_metadata: worker").or_current()),
         );
 
         Ok(Transform::event_task(Ec2MetadataTransform { state }))
@@ -231,6 +263,7 @@ struct MetadataClient {
     keys: Keys,
     state: Arc<ArcSwap<Vec<(MetadataKey, Bytes)>>>,
     refresh_interval: Duration,
+    refresh_timeout: Duration,
     fields: HashSet<String>,
 }
 
@@ -255,6 +288,7 @@ impl MetadataClient {
         keys: Keys,
         state: Arc<ArcSwap<Vec<(MetadataKey, Bytes)>>>,
         refresh_interval: Duration,
+        refresh_timeout: Duration,
         fields: Vec<String>,
     ) -> Self {
         Self {
@@ -264,6 +298,7 @@ impl MetadataClient {
             keys,
             state,
             refresh_interval,
+            refresh_timeout,
             fields: fields.into_iter().collect(),
         }
     }
@@ -272,10 +307,10 @@ impl MetadataClient {
         loop {
             match self.refresh_metadata().await {
                 Ok(_) => {
-                    emit!(&AwsEc2MetadataRefreshSuccessful);
+                    emit!(AwsEc2MetadataRefreshSuccessful);
                 }
                 Err(error) => {
-                    emit!(&AwsEc2MetadataRefreshError { error });
+                    emit!(AwsEc2MetadataRefreshError { error });
                 }
             }
 
@@ -301,10 +336,8 @@ impl MetadataClient {
             .header("X-aws-ec2-metadata-token-ttl-seconds", "21600")
             .body(Body::empty())?;
 
-        let res = self
-            .client
-            .send(req)
-            .await
+        let res = tokio::time::timeout(self.refresh_timeout, self.client.send(req))
+            .await?
             .map_err(crate::Error::from)
             .and_then(|res| match res.status() {
                 StatusCode::OK => Ok(res),
@@ -338,6 +371,10 @@ impl MetadataClient {
 
         // Fetch all resources, _then_ add them to the state map.
         if let Some(document) = self.get_document().await? {
+            if self.fields.contains(ACCOUNT_ID_KEY) {
+                new_state.push((self.keys.account_id_key.clone(), document.account_id.into()));
+            }
+
             if self.fields.contains(AMI_ID_KEY) {
                 new_state.push((self.keys.ami_id_key.clone(), document.image_id.into()));
             }
@@ -431,7 +468,11 @@ impl MetadataClient {
                     for (i, role_name) in role_names.lines().enumerate() {
                         new_state.push((
                             MetadataKey {
-                                log_path: self.keys.role_name_key.log_path.with_index_appended(i),
+                                log_path: self
+                                    .keys
+                                    .role_name_key
+                                    .log_path
+                                    .with_index_appended(i as isize),
                                 metric_tag: format!(
                                     "{}[{}]",
                                     self.keys.role_name_key.metric_tag, i
@@ -467,10 +508,8 @@ impl MetadataClient {
             .header(TOKEN_HEADER.as_ref(), token.as_ref())
             .body(Body::empty())?;
 
-        match self
-            .client
-            .send(req)
-            .await
+        match tokio::time::timeout(self.refresh_timeout, self.client.send(req))
+            .await?
             .map_err(crate::Error::from)
             .and_then(|res| match res.status() {
                 StatusCode::OK => Ok(Some(res)),
@@ -506,6 +545,7 @@ fn create_key(namespace: &Option<String>, key: &str) -> MetadataKey {
 impl Keys {
     pub fn new(namespace: &Option<String>) -> Self {
         Keys {
+            account_id_key: create_key(namespace, ACCOUNT_ID_KEY),
             ami_id_key: create_key(namespace, AMI_ID_KEY),
             availability_zone_key: create_key(namespace, AVAILABILITY_ZONE_KEY),
             instance_id_key: create_key(namespace, INSTANCE_ID_KEY),
@@ -557,8 +597,9 @@ mod integration_tests {
     use super::*;
     use crate::{
         event::{metric, EventArray, LogEvent, Metric},
-        test_util::trace_init,
+        test_util::{next_addr, trace_init},
     };
+    use warp::Filter;
 
     fn ec2_metadata_address() -> String {
         std::env::var("EC2_METADATA_ADDRESS").unwrap_or_else(|_| "http://localhost:8111".into())
@@ -591,6 +632,10 @@ mod integration_tests {
                 "i-096fba6d03d36d262",
             ),
             (
+                vec![OwnedSegment::field(ACCOUNT_ID_KEY)].into(),
+                "071959437513",
+            ),
+            (
                 vec![OwnedSegment::field(AMI_ID_KEY)].into(),
                 "ami-05f27d4d6770a43d2",
             ),
@@ -616,6 +661,7 @@ mod integration_tests {
             (LOCAL_IPV4_KEY, "192.1.1.2"),
             (LOCAL_HOSTNAME_KEY, "mock-hostname"),
             (INSTANCE_ID_KEY, "i-096fba6d03d36d262"),
+            (ACCOUNT_ID_KEY, "071959437513"),
             (AMI_ID_KEY, "ami-05f27d4d6770a43d2"),
             (INSTANCE_TYPE_KEY, "t2.micro"),
             (REGION_KEY, "us-east-1"),
@@ -650,8 +696,12 @@ mod integration_tests {
     async fn enrich_log() {
         trace_init();
 
+        let mut fields = DEFAULT_FIELD_WHITELIST.clone();
+        fields.extend(vec![String::from(ACCOUNT_ID_KEY)].into_iter());
+
         let transform = make_transform(Ec2Metadata {
             endpoint: Some(ec2_metadata_address()),
+            fields: Some(fields),
             ..Default::default()
         })
         .await;
@@ -674,12 +724,77 @@ mod integration_tests {
         assert_eq!(event.into_log(), expected_log);
     }
 
+    #[tokio::test(flavor = "multi_thread")]
+    async fn timeout() {
+        trace_init();
+
+        let addr = next_addr();
+
+        async fn sleepy() -> Result<impl warp::Reply, std::convert::Infallible> {
+            tokio::time::sleep(Duration::from_secs(3)).await;
+            Ok("I waited 3 seconds!")
+        }
+
+        let slow = warp::any().and_then(sleepy);
+        let server = warp::serve(slow).bind(addr);
+        let _server = tokio::spawn(server);
+
+        let config = Ec2Metadata {
+            endpoint: Some(format!("http://{}", addr)),
+            refresh_timeout_secs: Some(1),
+            ..Default::default()
+        };
+
+        match config.build(&TransformContext::default()).await {
+            Ok(_) => panic!("expected timeout failure"),
+            // cannot create tokio::time::error::Elapsed to compare with since constructor is
+            // private
+            Err(err) => assert_eq!(
+                err.to_string(),
+                "Unable to fetch metadata authentication token: deadline has elapsed."
+            ),
+        }
+    }
+
+    // validates the configuration setting 'required'=false allows vector to run
+    #[tokio::test(flavor = "multi_thread")]
+    async fn not_required() {
+        trace_init();
+
+        let addr = next_addr();
+
+        async fn sleepy() -> Result<impl warp::Reply, std::convert::Infallible> {
+            tokio::time::sleep(Duration::from_secs(3)).await;
+            Ok("I waited 3 seconds!")
+        }
+
+        let slow = warp::any().and_then(sleepy);
+        let server = warp::serve(slow).bind(addr);
+        let _server = tokio::spawn(server);
+
+        let config = Ec2Metadata {
+            endpoint: Some(format!("http://{}", addr)),
+            refresh_timeout_secs: Some(1),
+            required: Some(false),
+            ..Default::default()
+        };
+
+        assert!(
+            config.build(&TransformContext::default()).await.is_ok(),
+            "expected no failure because 'required' config value set to false"
+        );
+    }
+
     #[tokio::test]
     async fn enrich_metric() {
         trace_init();
 
+        let mut fields = DEFAULT_FIELD_WHITELIST.clone();
+        fields.extend(vec![String::from(ACCOUNT_ID_KEY)].into_iter());
+
         let transform = make_transform(Ec2Metadata {
             endpoint: Some(ec2_metadata_address()),
+            fields: Some(fields),
             ..Default::default()
         })
         .await;

@@ -24,7 +24,12 @@ administration: {
 			}
 
 			// Calculate the download URL without needing site templating
-			download_url: "\(urls.vector_packages_root)/vector/{v1}/vector-{v2}-\(_version_postfix)\(filename)"
+			if _file_type != "deb" {
+				download_url: "\(urls.vector_packages_root)/vector/{v1}/vector-{v2}-\(_version_postfix)\(filename)"
+			}
+			if _file_type == "deb" {
+				download_url: "\(urls.vector_packages_root)/vector/{v1}/vector_{v2}-1_\(_version_postfix)\(filename)"
+			}
 
 			// Unused fields
 			target:               string // The Rust compilation target

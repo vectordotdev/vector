@@ -1,4 +1,24 @@
+use crate::{get_metadata_key, MetadataKey};
+use ::value::kind::remove;
+use ::value::Value;
 use vrl::prelude::*;
+use vrl::state::{ExternalEnv, LocalEnv};
+
+fn remove_metadata_field(
+    ctx: &mut Context,
+    key: &MetadataKey,
+) -> std::result::Result<Value, ExpressionError> {
+    Ok(match key {
+        MetadataKey::Legacy(key) => {
+            ctx.target_mut().remove_secret(key);
+            Value::Null
+        }
+        MetadataKey::Query(query) => {
+            ctx.target_mut().remove_metadata(query.path())?;
+            Value::Null
+        }
+    })
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct RemoveMetadataField;
@@ -11,7 +31,7 @@ impl Function for RemoveMetadataField {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "key",
-            kind: kind::BYTES,
+            kind: kind::ANY,
             required: true,
         }]
     }
@@ -26,16 +46,20 @@ impl Function for RemoveMetadataField {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        (_, external): (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
-        let keys = vec![value!("datadog_api_key"), value!("splunk_hec_token")];
-        let key = arguments
-            .required_enum("key", &keys)?
-            .try_bytes_utf8_lossy()
-            .expect("key not bytes")
-            .to_string();
+        let key = get_metadata_key(&mut arguments)?;
+
+        if let MetadataKey::Query(query) = &key {
+            if external.is_read_only_metadata_path(query.path()) {
+                return Err(vrl::function::Error::ReadOnlyMutation {
+                    context: format!("{} is read-only, and cannot be removed", query),
+                }
+                .into());
+            }
+        }
 
         Ok(Box::new(RemoveMetadataFieldFn { key }))
     }
@@ -43,16 +67,43 @@ impl Function for RemoveMetadataField {
 
 #[derive(Debug, Clone)]
 struct RemoveMetadataFieldFn {
-    key: String,
+    key: MetadataKey,
 }
 
 impl Expression for RemoveMetadataFieldFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        ctx.target_mut().remove_metadata(&self.key)?;
-        Ok(Value::Null)
+        remove_metadata_field(ctx, &self.key)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::null().infallible()
+    }
+
+    fn update_state(
+        &mut self,
+        _local: &mut LocalEnv,
+        external: &mut ExternalEnv,
+    ) -> std::result::Result<(), ExpressionError> {
+        if let MetadataKey::Query(query) = &self.key {
+            let mut new_kind = external.metadata_kind().clone();
+
+            let result = new_kind.remove_at_path(
+                &query.path().to_lookup(),
+                remove::Strategy {
+                    coalesced_path: remove::CoalescedPath::Reject,
+                },
+            );
+
+            match result {
+                Ok(_) => external.update_metadata(new_kind),
+                Err(_) => {
+                    // This isn't ideal, but "remove_at_path" doesn't support
+                    // the path used, so no assumptions can be made about the resulting type
+                    // see: https://github.com/vectordotdev/vector/issues/13460
+                    external.update_metadata(Kind::any())
+                }
+            }
+        }
+        Ok(())
     }
 }

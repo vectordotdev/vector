@@ -1,4 +1,9 @@
-use std::{mem, path::PathBuf, time::Duration};
+use std::{
+    mem,
+    num::{NonZeroU64, NonZeroUsize},
+    path::PathBuf,
+    time::Duration,
+};
 
 use criterion::{
     criterion_group, criterion_main, measurement::WallTime, BatchSize, BenchmarkGroup, BenchmarkId,
@@ -69,21 +74,21 @@ impl Drop for PathGuard {
 
 fn create_disk_v1_variant(_max_events: usize, max_size: u64) -> BufferType {
     BufferType::DiskV1 {
-        max_size,
+        max_size: NonZeroU64::new(max_size).unwrap(),
         when_full: WhenFull::DropNewest,
     }
 }
 
 fn create_disk_v2_variant(_max_events: usize, max_size: u64) -> BufferType {
     BufferType::DiskV2 {
-        max_size,
+        max_size: NonZeroU64::new(max_size).unwrap(),
         when_full: WhenFull::DropNewest,
     }
 }
 
 fn create_in_memory_variant(max_events: usize, _max_size: u64) -> BufferType {
     BufferType::Memory {
-        max_events,
+        max_events: NonZeroUsize::new(max_events).unwrap(),
         when_full: WhenFull::DropNewest,
     }
 }

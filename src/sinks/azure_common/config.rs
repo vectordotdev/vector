@@ -1,13 +1,14 @@
 use std::sync::Arc;
 
 use azure_core::{new_http_client, HttpError};
+use azure_identity::{AutoRefreshingTokenCredential, DefaultAzureCredential};
 use azure_storage::prelude::*;
 use azure_storage_blobs::{blob::responses::PutBlockBlobResponse, prelude::*};
 use bytes::Bytes;
 use futures::FutureExt;
 use http::StatusCode;
 use snafu::Snafu;
-use vector_core::{buffers::Ackable, internal_event::EventsSent, stream::DriverResponse};
+use vector_core::{internal_event::EventsSent, stream::DriverResponse};
 
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
@@ -20,12 +21,6 @@ pub struct AzureBlobRequest {
     pub content_encoding: Option<&'static str>,
     pub content_type: &'static str,
     pub metadata: AzureBlobMetadata,
-}
-
-impl Ackable for AzureBlobRequest {
-    fn ack_size(&self) -> usize {
-        self.metadata.count
-    }
 }
 
 impl Finalizable for AzureBlobRequest {
@@ -117,13 +112,41 @@ pub fn build_healthcheck(
 }
 
 pub fn build_client(
-    connection_string: String,
+    connection_string: Option<String>,
+    storage_account: Option<String>,
     container_name: String,
 ) -> crate::Result<Arc<ContainerClient>> {
-    let client =
-        StorageAccountClient::new_connection_string(new_http_client(), connection_string.as_str())?
+    let client;
+    match (connection_string, storage_account) {
+        (Some(connection_string_p), None) => {
+            client = StorageAccountClient::new_connection_string(
+                new_http_client(),
+                &connection_string_p,
+            )?
             .as_storage_client()
             .as_container_client(container_name);
+        }
+        (None, Some(storage_account_p)) => {
+            let creds = std::sync::Arc::new(DefaultAzureCredential::default());
+            let auto_creds = Box::new(AutoRefreshingTokenCredential::new(creds));
 
+            client = StorageAccountClient::new_token_credential(
+                new_http_client(),
+                storage_account_p,
+                auto_creds,
+            )
+            .as_storage_client()
+            .as_container_client(container_name);
+        }
+        (None, None) => {
+            return Err("Either `connection_string` or `storage_account` has to be provided".into())
+        }
+        (Some(_), Some(_)) => {
+            return Err(
+                "`connection_string` and `storage_account` can't be provided at the same time"
+                    .into(),
+            )
+        }
+    }
     Ok(client)
 }

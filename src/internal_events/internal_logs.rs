@@ -7,12 +7,12 @@ pub struct InternalLogsBytesReceived {
 }
 
 impl InternalEvent for InternalLogsBytesReceived {
-    fn emit_logs(&self) {
+    fn emit(self) {
         // MUST not emit logs here to avoid an infinite log loop
-    }
-
-    fn emit_metrics(&self) {
-        counter!("component_received_bytes_total", self.byte_size as u64);
+        counter!(
+            "component_received_bytes_total", self.byte_size as u64,
+            "protocol" => "internal",
+        );
     }
 }
 
@@ -23,11 +23,8 @@ pub struct InternalLogsEventsReceived {
 }
 
 impl InternalEvent for InternalLogsEventsReceived {
-    fn emit_logs(&self) {
+    fn emit(self) {
         // MUST not emit logs here to avoid an infinite log loop
-    }
-
-    fn emit_metrics(&self) {
         counter!("component_received_events_total", self.count as u64);
         counter!(
             "component_received_event_bytes_total",

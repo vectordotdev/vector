@@ -333,11 +333,11 @@ components: {
 			// `batch` describes how the component batches data. This is only
 			// relevant if a component has an `egress_method` of "batch".
 			batch: {
-				enabled:      bool
-				common:       bool
-				max_bytes?:   uint | null
-				max_events?:  uint | null
-				timeout_secs: uint16 | null
+				enabled:       bool
+				common?:       bool
+				max_bytes?:    uint | null
+				max_events?:   uint | null
+				timeout_secs?: float | null
 			}
 		}
 
@@ -361,7 +361,7 @@ components: {
 					enabled: bool
 
 					if enabled {
-						batched: bool | *false
+						framing: bool | *false
 						enum:    [#EncodingCodec, ...#EncodingCodec] | null
 					}
 				}
@@ -410,7 +410,6 @@ components: {
 		enabled: bool
 
 		if enabled {
-			can_enable:             bool
 			can_verify_certificate: bool
 			if Args.mode == "connect" {
 				can_verify_hostname: bool
@@ -422,11 +421,17 @@ components: {
 	#Input: {
 		logs:    bool
 		metrics: #MetricInput | null
+		traces:  bool
 	}
 
 	#LogOutput: [Name=string]: {
 		description: string
 		name:        Name
+		fields:      #Schema
+	}
+
+	#TraceOutput: {
+		description: string
 		fields:      #Schema
 	}
 
@@ -451,6 +456,7 @@ components: {
 	#OutputData: {
 		logs?:    #LogOutput
 		metrics?: #MetricOutput
+		traces?:  #TraceOutput
 	}
 
 	#Output: {
@@ -529,8 +535,8 @@ components: {
 		// `warnings` describes any warnings the user should know about the
 		// component.
 		//
-		// For example, the `grok_parser` might offer a performance warning
-		// since the `regex_parser` and other transforms are faster.
+		// For example, a transform might be known to have performance issues
+		// or a lack of support for specific features, etc.
 		warnings: [...string] | null // Allow for empty list
 
 		// `notices` communicates useful information to the user that is neither
@@ -552,6 +558,24 @@ components: {
 		classes: #Classes & {_args: kind: Kind}
 
 		configuration: {
+			_gcp_api_key: {
+				common:      false
+				description: "A [Google Cloud API key](\(urls.gcp_authentication_api_key)) used to authenticate access the pubsub project and topic. Either this or `credentials_path` must be set."
+				required:    false
+				type: string: {
+					default: null
+					examples: ["${GCP_API_KEY}", "ef8d5de700e7989468166c40fc8a0ccd"]
+				}
+			}
+			_gcp_credentials_path: {
+				common:      true
+				description: "The filename for a Google Cloud service account credentials JSON file used to authenticate access to the pubsub project and topic. If this is unset, Vector checks the `GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename.\n\nIf no filename is named, Vector will attempt to fetch an instance service account for the compute instance the program is running on. If Vector is not running on a GCE instance, you must define a credentials file as above."
+				required:    false
+				type: string: {
+					default: null
+					examples: ["/path/to/credentials.json"]
+				}
+			}
 			_source_acknowledgements: {
 				common:      true
 				description: "Controls how acknowledgements are handled by this source. These settings override the global `acknowledgement` settings. This setting is deprecated in favor of enabling `acknowledgements` in the destination sink."
@@ -569,7 +593,6 @@ components: {
 
 			_tls_accept: {
 				_args: {
-					can_enable:             bool
 					can_verify_certificate: bool | *true
 					enabled_default:        bool
 				}
@@ -579,13 +602,11 @@ components: {
 				description: "Configures the TLS options for incoming connections."
 				required:    false
 				type: object: options: {
-					if Args.can_enable {
-						enabled: {
-							common:      false
-							description: "Require TLS for incoming connections. If this is set, an identity certificate is also required."
-							required:    false
-							type: bool: default: Args.enabled_default
-						}
+					enabled: {
+						common:      false
+						description: "Require TLS for incoming connections. If this is set, an identity certificate is also required."
+						required:    false
+						type: bool: default: Args.enabled_default
 					}
 
 					ca_file: {
@@ -595,6 +616,15 @@ components: {
 						type: string: {
 							default: null
 							examples: ["/path/to/certificate_authority.crt"]
+						}
+					}
+					client_metadata_key: {
+						common:      false
+						description: "The key name added to each event with the client certificate's metadata."
+						required:    false
+						type: string: {
+							default: null
+							examples: ["client_cert"]
 						}
 					}
 					crt_file: {
@@ -638,7 +668,6 @@ components: {
 
 			_tls_connect: {
 				_args: {
-					can_enable:             bool
 					can_verify_certificate: bool | *true
 					can_verify_hostname:    bool | *false
 					enabled_default:        bool
@@ -649,13 +678,11 @@ components: {
 				description: "Configures the TLS options for outgoing connections."
 				required:    false
 				type: object: options: {
-					if Args.can_enable {
-						enabled: {
-							common:      true
-							description: "Enable TLS during connections to the remote."
-							required:    false
-							type: bool: default: Args.enabled_default
-						}
+					enabled: {
+						common:      true
+						description: "Enable TLS during connections to the remote."
+						required:    false
+						type: bool: default: Args.enabled_default
 					}
 
 					ca_file: {
@@ -698,7 +725,7 @@ components: {
 					if Args.can_verify_certificate {
 						verify_certificate: {
 							common:      false
-							description: "If `true` (the default), Vector will validate the TLS certificate of the remote host."
+							description: "If `true` (the default), Vector will validate the TLS certificate of the remote host. Specifically the issuer is checked but not CRLs (Certificate Revocation Lists)."
 							required:    false
 							type: bool: default: true
 						}

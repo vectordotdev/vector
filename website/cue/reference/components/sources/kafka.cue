@@ -9,7 +9,6 @@ components: sources: kafka: {
 			checkpoint: enabled: false
 			tls: {
 				enabled:                true
-				can_enable:             true
 				can_verify_certificate: false
 				can_verify_hostname:    false
 				enabled_default:        false
@@ -213,6 +212,13 @@ components: sources: kafka: {
 				required:    true
 				type: string: {
 					examples: ["partition"]
+				}
+			}
+			source_type: {
+				description: "The name of the source type."
+				required:    true
+				type: string: {
+					examples: ["kafka"]
 				}
 			}
 			timestamp: fields._current_timestamp & {

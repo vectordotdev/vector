@@ -43,7 +43,7 @@ where
         loop {
             match ready!(this.stream.as_mut().poll_next(cx)) {
                 Some(metric) => {
-                    if let Some(normalized) = this.normalizer.apply(metric) {
+                    if let Some(normalized) = this.normalizer.normalize(metric) {
                         return Poll::Ready(Some(normalized));
                     }
                 }

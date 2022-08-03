@@ -1,20 +1,18 @@
 use std::{
-    pin::Pin,
+    fmt,
     sync::{
         atomic::{AtomicU64, AtomicUsize, Ordering},
         Arc,
     },
-    task::{Context, Poll, Waker},
 };
 
 use bytes::BytesMut;
-use futures::{task::AtomicWaker, Sink};
 use leveldb::database::{
     batch::{Batch, Writebatch},
     options::WriteOptions,
     Database,
 };
-use parking_lot::Mutex;
+use tokio::sync::Notify;
 
 use super::Key;
 use crate::{buffer_usage_data::BufferUsageHandle, Bufferable};
@@ -32,10 +30,10 @@ where
     pub(crate) offset: Arc<AtomicUsize>,
     /// Writers notify Reader through this Waker.
     /// Shared with Reader.
-    pub(crate) write_notifier: Arc<AtomicWaker>,
-    /// Waiting queue for when the disk is full.
+    pub(crate) read_waker: Arc<Notify>,
+    /// Reader notifies Writers through this Waker.
     /// Shared with Reader.
-    pub(crate) blocked_write_tasks: Arc<Mutex<Vec<Waker>>>,
+    pub(crate) write_waker: Arc<Notify>,
     /// Batched writes.
     pub(crate) writebatch: Writebatch<Key>,
     /// Events in batch.
@@ -64,8 +62,8 @@ where
         Self {
             db: self.db.as_ref().map(Arc::clone),
             offset: Arc::clone(&self.offset),
-            write_notifier: Arc::clone(&self.write_notifier),
-            blocked_write_tasks: Arc::clone(&self.blocked_write_tasks),
+            read_waker: Arc::clone(&self.read_waker),
+            write_waker: Arc::clone(&self.write_waker),
             writebatch: Writebatch::new(),
             batch_size: 0,
             max_size: self.max_size,
@@ -76,67 +74,25 @@ where
     }
 }
 
-impl<T> Sink<T> for Writer<T>
-where
-    T: Bufferable,
-{
-    type Error = ();
-
-    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        if self.slot.is_none() {
-            Poll::Ready(Ok(()))
-        } else {
-            // Assumes that flush will only succeed if it has also emptied the
-            // slot, hence we don't need to recheck if the slot is empty.
-            self.poll_flush(cx)
-        }
-    }
-
-    fn start_send(mut self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
-        if let Some(event) = self.try_send(item) {
-            debug_assert!(self.slot.is_none());
-            self.slot = Some(event);
-        }
-        Ok(())
-    }
-
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        if let Some(event) = self.slot.take() {
-            if let Some(event) = self.try_send(event) {
-                self.slot = Some(event);
-
-                self.blocked_write_tasks.lock().push(cx.waker().clone());
-
-                if self.current_size.load(Ordering::Acquire) == 0 {
-                    // This is a rare case where the reader managed to consume
-                    // and delete all events in the buffer. In this case there
-                    // is a scenario where the reader won't be polled again
-                    // hence this sink will never be notified again so this will
-                    // stall.
-                    //
-                    // To avoid this we notify the reader to notify this writer.
-                    self.write_notifier.wake();
-                }
-
-                return Poll::Pending;
-            }
-        }
-
-        self.flush();
-
-        Poll::Ready(Ok(()))
-    }
-
-    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.poll_flush(cx)
-    }
-}
-
 impl<T> Writer<T>
 where
     T: Bufferable,
 {
-    fn try_send(&mut self, item: T) -> Option<T> {
+    #[cfg_attr(test, instrument(skip(self), level = "debug"))]
+    pub async fn send(&mut self, mut item: T) {
+        loop {
+            match self.try_send(item) {
+                None => break,
+                Some(old_item) => {
+                    item = old_item;
+                    self.write_waker.notified().await;
+                }
+            }
+        }
+    }
+
+    #[cfg_attr(test, instrument(skip(self), level = "debug"))]
+    pub fn try_send(&mut self, item: T) -> Option<T> {
         let event_len = item.event_count();
 
         // Encode the item.
@@ -173,15 +129,15 @@ where
         None
     }
 
-    fn flush(&mut self) {
+    #[cfg_attr(test, instrument(skip(self), level = "debug"))]
+    pub fn flush(&mut self) {
         // This doesn't write all the way through to disk and doesn't need to be
         // wrapped with `blocking`. (It does get written to a memory mapped
         // table that will be flushed even in the case of a process crash.)
-        if self.batch_size > 0 {
-            self.write_batch();
-        }
+        self.write_batch();
     }
 
+    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     fn write_batch(&mut self) {
         self.db
             .as_mut()
@@ -191,7 +147,7 @@ where
         self.writebatch = Writebatch::new();
         self.batch_size = 0;
 
-        self.write_notifier.wake();
+        self.read_waker.notify_one();
     }
 }
 
@@ -217,8 +173,24 @@ where
         // Arc::strong_count to be > 1 and then we drop the Arc which would
         // cause a stall.
         self.db.take();
+
         // We need to wake up the reader so it can return None if there are no
         // more writers
-        self.write_notifier.wake();
+        self.read_waker.notify_waiters();
+    }
+}
+
+impl<T: Bufferable> fmt::Debug for Writer<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Writer")
+            .field("offset", &self.offset)
+            .field("read_waker", &self.read_waker)
+            .field("write_waker", &self.write_waker)
+            .field("batch_size", &self.batch_size)
+            .field("max_size", &self.max_size)
+            .field("current_size", &self.current_size)
+            .field("slot", &self.slot)
+            .field("usage_handle", &self.usage_handle)
+            .finish()
     }
 }

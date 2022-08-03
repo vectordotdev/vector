@@ -182,6 +182,7 @@ Vector provides rich filtering options for Kubernetes log collection:
 * The `exclude_paths_glob_patterns` option enables you to exclude Kubernetes log files by filename and path.
 * The `extra_field_selector` option specifies the field selector to filter Pods with, to be used in addition to the built-in `Node` filter.
 * The `extra_label_selector` option specifies the label selector filter Pods with, to be used in addition to the built-in [`vector.dev/exclude` filter][exclude_filter].
+* The `extra_namespace_label_selector` option specifies the label selector filter Namespaces with, to be used in addition to the built-in [`vector.dev/exclude` filter][exclude_filter].
 
 ### Kubernetes API access control
 

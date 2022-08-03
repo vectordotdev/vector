@@ -1,12 +1,10 @@
-use compiler::{
-    vm::{OpCode, Vm},
-    ExpressionError, Function,
-};
-use lookup::LookupBuf;
 use std::{error::Error, fmt};
-use vector_common::TimeZone;
 
-use crate::{state, Context, Program, Target, Value};
+use compiler::ExpressionError;
+use lookup::LookupBuf;
+use value::Value;
+
+use crate::{state, Context, Program, Target, TimeZone};
 
 pub type RuntimeResult = Result<Value, Terminate>;
 
@@ -49,6 +47,11 @@ impl Runtime {
     pub fn new(state: state::Runtime) -> Self {
         Self {
             state,
+
+            // `LookupBuf` uses a `VecDeque` internally, which always allocates, even
+            // when it's empty (for `LookupBuf::root()`), so we do the
+            // allocation on initialization of the runtime, instead of on every
+            // `resolve` run.
             root_lookup: LookupBuf::root(),
         }
     }
@@ -69,22 +72,9 @@ impl Runtime {
         program: &Program,
         timezone: &TimeZone,
     ) -> RuntimeResult {
-        // Validate that the path is an object.
-        //
-        // VRL technically supports any `Value` object as the root, but the
-        // assumption is people are expected to use it to query objects.
+        // Validate that the path is a value.
         match target.target_get(&self.root_lookup) {
-            Ok(Some(Value::Object(_))) => {}
-            Ok(Some(value)) => {
-                return Err(Terminate::Error(
-                    format!(
-                        "target must be a valid object, got {}: {}",
-                        value.kind(),
-                        value
-                    )
-                    .into(),
-                ))
-            }
+            Ok(Some(_)) => {}
             Ok(None) => {
                 return Err(Terminate::Error(
                     "expected target object, got nothing".to_owned().into(),
@@ -97,42 +87,10 @@ impl Runtime {
             }
         };
 
-        let mut context = Context::new(target, &mut self.state, timezone);
+        let mut ctx = Context::new(target, &mut self.state, timezone);
 
-        let mut values = program
-            .iter()
-            .map(|expr| {
-                expr.resolve(&mut context).map_err(|err| match err {
-                    ExpressionError::Abort { .. } => Terminate::Abort(err),
-                    err @ ExpressionError::Error { .. } => Terminate::Error(err),
-                })
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-
-        Ok(values.pop().unwrap_or(Value::Null))
-    }
-
-    pub fn compile(&self, fns: Vec<Box<dyn Function>>, program: &Program) -> Result<Vm, String> {
-        let mut vm = Vm::new(fns);
-
-        for expr in program.iter() {
-            expr.compile_to_vm(&mut vm)?;
-        }
-
-        vm.write_opcode(OpCode::Return);
-
-        Ok(vm)
-    }
-
-    /// Given the provided [`Target`], runs the [`Vm`] to completion.
-    pub fn run_vm(
-        &mut self,
-        vm: &Vm,
-        target: &mut dyn Target,
-        timezone: &TimeZone,
-    ) -> Result<Value, Terminate> {
-        let mut context = Context::new(target, &mut self.state, timezone);
-        vm.interpret(&mut context).map_err(|err| match err {
+        program.resolve(&mut ctx).map_err(|err| match err {
+            #[cfg(feature = "expr-abort")]
             ExpressionError::Abort { .. } => Terminate::Abort(err),
             err @ ExpressionError::Error { .. } => Terminate::Error(err),
         })

@@ -1,6 +1,5 @@
 use std::{
     collections::BTreeMap,
-    num::NonZeroU64,
     task::{Context, Poll},
 };
 
@@ -8,17 +7,15 @@ use aws_sdk_cloudwatch::error::PutMetricDataError;
 use aws_sdk_cloudwatch::model::{Dimension, MetricDatum};
 use aws_sdk_cloudwatch::types::DateTime as AwsDateTime;
 use aws_sdk_cloudwatch::types::SdkError;
-use aws_sdk_cloudwatch::{Client as CloudwatchClient, Endpoint, Region};
-use aws_smithy_client::erase::DynConnector;
-use aws_types::credentials::SharedCredentialsProvider;
+use aws_sdk_cloudwatch::{Client as CloudwatchClient, Region};
 use futures::{future, future::BoxFuture, stream, FutureExt, SinkExt};
-use serde::{Deserialize, Serialize};
 use tower::Service;
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use super::util::SinkBatchSettings;
-use crate::aws::aws_sdk::{create_client, is_retriable_error, ClientBuilder};
 use crate::aws::RegionOrEndpoint;
+use crate::aws::{create_client, is_retriable_error, ClientBuilder};
 use crate::{
     aws::auth::AwsAuthentication,
     config::{
@@ -32,10 +29,9 @@ use crate::{
         batch::BatchConfig,
         buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
         retries::RetryLogic,
-        Compression, EncodedEvent, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
-        TowerRequestConfig,
+        Compression, EncodedEvent, PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig,
     },
-    tls::TlsOptions,
+    tls::TlsConfig,
 };
 
 #[derive(Clone)]
@@ -49,27 +45,53 @@ pub struct CloudWatchMetricsDefaultBatchSettings;
 impl SinkBatchSettings for CloudWatchMetricsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(20);
     const MAX_BYTES: Option<usize> = None;
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+/// Configuration for the `aws_cloudwatch_metrics` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct CloudWatchMetricsSinkConfig {
+    /// The default namespace to use for metrics that do not have one.
+    ///
+    /// Metrics with the same name can only be differentiated by their namespace, and not all
+    /// metrics have their own namespace.
     #[serde(alias = "namespace")]
     pub default_namespace: String,
+
+    /// The [AWS region][aws_region] of the target service.
+    ///
+    /// [aws_region]: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.RegionsAndAvailabilityZones.html
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub compression: Compression,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<CloudWatchMetricsDefaultBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
-    pub tls: Option<TlsOptions>,
-    // Deprecated name. Moved to auth.
+
+    #[configurable(derived)]
+    pub tls: Option<TlsConfig>,
+
+    /// The ARN of an [IAM role][iam_role] to assume at startup.
+    ///
+    /// [iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
+    #[configurable(deprecated)]
     assume_role: Option<String>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub auth: AwsAuthentication,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -87,31 +109,16 @@ impl_generate_config_from_default!(CloudWatchMetricsSinkConfig);
 struct CloudwatchMetricsClientBuilder;
 
 impl ClientBuilder for CloudwatchMetricsClientBuilder {
-    type ConfigBuilder = aws_sdk_cloudwatch::config::Builder;
-    type Client = CloudwatchClient;
+    type Config = aws_sdk_cloudwatch::config::Config;
+    type Client = aws_sdk_cloudwatch::client::Client;
+    type DefaultMiddleware = aws_sdk_cloudwatch::middleware::DefaultMiddleware;
 
-    fn create_config_builder(
-        credentials_provider: SharedCredentialsProvider,
-    ) -> Self::ConfigBuilder {
-        aws_sdk_cloudwatch::config::Builder::new().credentials_provider(credentials_provider)
+    fn default_middleware() -> Self::DefaultMiddleware {
+        aws_sdk_cloudwatch::middleware::DefaultMiddleware::new()
     }
 
-    fn with_endpoint_resolver(
-        builder: Self::ConfigBuilder,
-        endpoint: Endpoint,
-    ) -> Self::ConfigBuilder {
-        builder.endpoint_resolver(endpoint)
-    }
-
-    fn with_region(builder: Self::ConfigBuilder, region: Region) -> Self::ConfigBuilder {
-        builder.region(region)
-    }
-
-    fn client_from_conf_conn(
-        builder: Self::ConfigBuilder,
-        connector: DynConnector,
-    ) -> Self::Client {
-        Self::Client::from_conf_conn(builder.build(), connector)
+    fn build(client: aws_smithy_client::Client, config: &aws_types::SdkConfig) -> Self::Client {
+        aws_sdk_cloudwatch::client::Client::with_config(client, config.into())
     }
 }
 
@@ -124,7 +131,7 @@ impl SinkConfig for CloudWatchMetricsSinkConfig {
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let client = self.create_client(&cx.proxy).await?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
-        let sink = CloudWatchMetricsSvc::new(self.clone(), client, cx)?;
+        let sink = CloudWatchMetricsSvc::new(self.clone(), client)?;
         Ok((sink, healthcheck))
     }
 
@@ -136,8 +143,8 @@ impl SinkConfig for CloudWatchMetricsSinkConfig {
         "aws_cloudwatch_metrics"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
@@ -172,6 +179,7 @@ impl CloudWatchMetricsSinkConfig {
             self.region.endpoint()?,
             proxy,
             &self.tls,
+            true,
         )
         .await
     }
@@ -181,29 +189,26 @@ impl CloudWatchMetricsSvc {
     pub fn new(
         config: CloudWatchMetricsSinkConfig,
         client: CloudwatchClient,
-        cx: SinkContext,
     ) -> crate::Result<super::VectorSink> {
         let default_namespace = config.default_namespace.clone();
         let batch = config.batch.into_batch_settings()?;
-        let request = config.request.unwrap_with(&TowerRequestConfig {
+        let request_settings = config.request.unwrap_with(&TowerRequestConfig {
             timeout_secs: Some(30),
             rate_limit_num: Some(150),
             ..Default::default()
         });
 
-        let cloudwatch_metrics = CloudWatchMetricsSvc { client };
-
-        let svc = request.service(CloudWatchMetricsRetryLogic, cloudwatch_metrics);
-
+        let service = CloudWatchMetricsSvc { client };
         let buffer = PartitionBuffer::new(MetricsBuffer::new(batch.size));
         let mut normalizer = MetricNormalizer::<AwsCloudwatchMetricNormalize>::default();
 
-        let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
+        let sink = request_settings
+            .partition_sink(CloudWatchMetricsRetryLogic, service, buffer, batch.timeout)
             .sink_map_err(|error| error!(message = "Fatal CloudwatchMetrics sink error.", %error))
             .with_flat_map(move |event: Event| {
                 stream::iter({
                     let byte_size = event.size_of();
-                    normalizer.apply(event.into_metric()).map(|mut metric| {
+                    normalizer.normalize(event.into_metric()).map(|mut metric| {
                         let namespace = metric
                             .take_namespace()
                             .take()
@@ -278,7 +283,7 @@ impl CloudWatchMetricsSvc {
 struct AwsCloudwatchMetricNormalize;
 
 impl MetricNormalize for AwsCloudwatchMetricNormalize {
-    fn apply_state(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+    fn normalize(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         match metric.value() {
             MetricValue::Gauge { .. } => state.make_absolute(metric),
             _ => state.make_incremental(metric),
@@ -362,7 +367,7 @@ mod tests {
     fn config() -> CloudWatchMetricsSinkConfig {
         CloudWatchMetricsSinkConfig {
             default_namespace: "vector".into(),
-            region: RegionOrEndpoint::with_endpoint("local".to_owned()),
+            region: RegionOrEndpoint::with_region("local".to_owned()),
             ..Default::default()
         }
     }
@@ -492,13 +497,15 @@ mod tests {
 mod integration_tests {
     use chrono::offset::TimeZone;
     use chrono::Utc;
-    use futures::StreamExt;
     use rand::seq::SliceRandom;
 
     use super::*;
     use crate::{
         event::{metric::StatisticKind, Event, MetricKind},
-        test_util::random_string,
+        test_util::{
+            components::{run_and_assert_sink_compliance, AWS_SINK_TAGS},
+            random_string,
+        },
     };
 
     fn cloudwatch_address() -> String {
@@ -508,7 +515,7 @@ mod integration_tests {
     fn config() -> CloudWatchMetricsSinkConfig {
         CloudWatchMetricsSinkConfig {
             default_namespace: "vector".into(),
-            region: RegionOrEndpoint::with_endpoint(cloudwatch_address().as_str()),
+            region: RegionOrEndpoint::with_both("local", cloudwatch_address().as_str()),
             ..Default::default()
         }
     }
@@ -528,7 +535,7 @@ mod integration_tests {
         let cx = SinkContext::new_test();
         let config = config();
         let client = config.create_client(&cx.globals.proxy).await.unwrap();
-        let sink = CloudWatchMetricsSvc::new(config, client, cx).unwrap();
+        let sink = CloudWatchMetricsSvc::new(config, client).unwrap();
 
         let mut events = Vec::new();
 
@@ -580,8 +587,7 @@ mod integration_tests {
             events.push(event);
         }
 
-        let stream = stream::iter(events).map(Into::into);
-        sink.run(stream).await.unwrap();
+        run_and_assert_sink_compliance(sink, stream::iter(events), &AWS_SINK_TAGS).await;
     }
 
     #[tokio::test]
@@ -589,7 +595,7 @@ mod integration_tests {
         let cx = SinkContext::new_test();
         let config = config();
         let client = config.create_client(&cx.globals.proxy).await.unwrap();
-        let sink = CloudWatchMetricsSvc::new(config, client, cx).unwrap();
+        let sink = CloudWatchMetricsSvc::new(config, client).unwrap();
 
         let mut events = Vec::new();
 
@@ -609,7 +615,6 @@ mod integration_tests {
 
         events.shuffle(&mut rand::thread_rng());
 
-        let stream = stream::iter(events).map(Into::into);
-        sink.run(stream).await.unwrap();
+        run_and_assert_sink_compliance(sink, stream::iter(events), &AWS_SINK_TAGS).await;
     }
 }

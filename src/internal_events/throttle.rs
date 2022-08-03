@@ -7,14 +7,11 @@ pub(crate) struct ThrottleEventDiscarded {
 }
 
 impl InternalEvent for ThrottleEventDiscarded {
-    fn emit_logs(&self) {
+    fn emit(self) {
         debug!(message = "Rate limit exceeded.", key = ?self.key);
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "events_discarded_total", 1,
-            "key" => self.key.to_owned()
+            "key" => self.key,
         );
     }
 }

@@ -45,7 +45,7 @@ pub fn decode(header: &Option<String>, mut body: Bytes) -> Result<Bytes, ErrorMe
 }
 
 fn handle_decode_error(encoding: &str, error: impl std::error::Error) -> ErrorMessage {
-    emit!(&HttpDecompressError {
+    emit!(HttpDecompressError {
         encoding,
         error: &error
     });

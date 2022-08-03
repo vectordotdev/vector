@@ -1,0 +1,14 @@
+# result: {
+#    "object": {
+#       "x": { "boolean": true, "null": true },
+#       "y": { "bytes": true, "null": true }
+#    }
+# }
+
+. = {}
+result = if true {
+   .x = true
+} else {
+   .y = "hi"
+}
+type_def(.)

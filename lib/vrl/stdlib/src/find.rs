@@ -1,5 +1,15 @@
-use ::value::ValueRegex;
+use ::value::{Value, ValueRegex};
 use vrl::prelude::*;
+
+fn find(value: Value, pattern: Value, from: Option<Value>) -> Resolved {
+    let from = match from {
+        Some(value) => value.try_integer()?,
+        None => 0,
+    } as usize;
+
+    Ok(FindFn::find(value, pattern, from)?
+        .map_or(Value::Integer(-1), |value| Value::Integer(value as i64)))
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Find;
@@ -39,7 +49,7 @@ impl Function for Find {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -71,7 +81,7 @@ impl FindFn {
         if pattern.len() > value.len() {
             return None;
         }
-        for from in offset..(value.len() - pattern.len() + 1) {
+        for from in offset..=(value.len() - pattern.len()) {
             let to = from + pattern.len();
             if value[from..to] == pattern {
                 return Some(from);
@@ -101,17 +111,16 @@ impl Expression for FindFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let pattern = self.pattern.resolve(ctx)?;
-        let from = match &self.from {
-            Some(expr) => expr.resolve(ctx)?.try_integer()?,
-            None => 0,
-        } as usize;
+        let from = self
+            .from
+            .as_ref()
+            .map(|expr| expr.resolve(ctx))
+            .transpose()?;
 
-        Ok(Self::find(value, pattern, from)?
-            .map(|value| Value::Integer(value as i64))
-            .unwrap_or_else(|| Value::Integer(-1)))
+        find(value, pattern, from)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::integer().infallible()
     }
 }
@@ -163,7 +172,7 @@ mod tests {
 
         wrong_pattern {
             args: func_args![value: "foobar", pattern: Value::Integer(42)],
-            want: Err("expected regex or string, got integer"),
+            want: Err("expected string or regex, got integer"),
             tdef: TypeDef::integer().infallible(),
         }
     ];

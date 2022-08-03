@@ -1,6 +1,5 @@
-use std::collections::{HashMap, HashSet, VecDeque};
-
 use indexmap::{set::IndexSet, IndexMap};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use super::{
     schema, ComponentKey, DataType, Output, OutputId, SinkOuter, SourceOuter, TransformOuter,
@@ -37,23 +36,30 @@ impl Graph {
         sources: &IndexMap<ComponentKey, SourceOuter>,
         transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
         sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
+        expansions: &IndexMap<String, Vec<String>>,
+        schema: schema::Options,
     ) -> Result<Self, Vec<String>> {
-        Self::new_inner(sources, transforms, sinks, false)
+        Self::new_inner(sources, transforms, sinks, expansions, false, schema)
     }
 
     pub fn new_unchecked(
         sources: &IndexMap<ComponentKey, SourceOuter>,
         transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
         sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
+        expansions: &IndexMap<String, Vec<String>>,
+        schema: schema::Options,
     ) -> Self {
-        Self::new_inner(sources, transforms, sinks, true).expect("errors ignored")
+        Self::new_inner(sources, transforms, sinks, expansions, true, schema)
+            .expect("errors ignored")
     }
 
     fn new_inner(
         sources: &IndexMap<ComponentKey, SourceOuter>,
         transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
         sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
+        expansions: &IndexMap<String, Vec<String>>,
         ignore_errors: bool,
+        schema: schema::Options,
     ) -> Result<Self, Vec<String>> {
         let mut graph = Graph::default();
         let mut errors = Vec::new();
@@ -63,17 +69,17 @@ impl Graph {
             graph.nodes.insert(
                 id.clone(),
                 Node::Source {
-                    outputs: config.inner.outputs(),
+                    outputs: config.inner.outputs(schema.log_namespace()),
                 },
             );
         }
 
-        for (id, config) in transforms.iter() {
+        for (id, transform) in transforms.iter() {
             graph.nodes.insert(
                 id.clone(),
                 Node::Transform {
-                    in_ty: config.inner.input().data_type(),
-                    outputs: config.inner.outputs(&schema::Definition::empty()),
+                    in_ty: transform.inner.input().data_type(),
+                    outputs: transform.inner.outputs(&schema::Definition::any()),
                 },
             );
         }
@@ -93,7 +99,7 @@ impl Graph {
 
         for (id, config) in transforms.iter() {
             for input in config.inputs.iter() {
-                if let Err(e) = graph.add_input(input, id, &available_inputs) {
+                if let Err(e) = graph.add_input(input, id, &available_inputs, expansions) {
                     errors.push(e);
                 }
             }
@@ -101,7 +107,7 @@ impl Graph {
 
         for (id, config) in sinks.iter() {
             for input in config.inputs.iter() {
-                if let Err(e) = graph.add_input(input, id, &available_inputs) {
+                if let Err(e) = graph.add_input(input, id, &available_inputs, expansions) {
                     errors.push(e);
                 }
             }
@@ -119,12 +125,18 @@ impl Graph {
         from: &str,
         to: &ComponentKey,
         available_inputs: &HashMap<String, OutputId>,
+        expansions: &IndexMap<String, Vec<String>>,
     ) -> Result<(), String> {
         if let Some(output_id) = available_inputs.get(from) {
             self.edges.push(Edge {
                 from: output_id.clone(),
                 to: to.clone(),
             });
+            Ok(())
+        } else if let Some(expanded) = expansions.get(from) {
+            for item in expanded {
+                self.add_input(item, to, available_inputs, expansions)?;
+            }
             Ok(())
         } else {
             let output_type = match self.nodes.get(to) {
@@ -388,7 +400,9 @@ mod test {
         fn add_transform_output(&mut self, id: &str, name: &str, ty: DataType) {
             let id = id.into();
             match self.nodes.get_mut(&id) {
-                Some(Node::Transform { outputs, .. }) => outputs.push(Output::from((name, ty))),
+                Some(Node::Transform { outputs, .. }) => {
+                    outputs.push(Output::default(ty).with_port(name))
+                }
                 _ => panic!("invalid transform"),
             }
         }
@@ -407,7 +421,8 @@ mod test {
 
         fn test_add_input(&mut self, node: &str, input: &str) -> Result<(), String> {
             let available_inputs = self.input_map().unwrap();
-            self.add_input(input, &node.into(), &available_inputs)
+            let expansions = IndexMap::new();
+            self.add_input(input, &node.into(), &available_inputs, &expansions)
         }
     }
 
@@ -621,7 +636,7 @@ mod test {
                 in_ty: DataType::all(),
                 outputs: vec![
                     Output::default(DataType::all()),
-                    Output::from(("bar", DataType::all())),
+                    Output::default(DataType::all()).with_port("bar"),
                 ],
             },
         );
@@ -639,7 +654,7 @@ mod test {
                 in_ty: DataType::all(),
                 outputs: vec![
                     Output::default(DataType::all()),
-                    Output::from(("errors", DataType::all())),
+                    Output::default(DataType::all()).with_port("errors"),
                 ],
             },
         );

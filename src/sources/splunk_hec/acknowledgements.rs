@@ -8,28 +8,54 @@ use std::{
     time::{Duration, Instant},
 };
 
-use futures_util::future::Shared;
+use futures::StreamExt;
 use roaring::RoaringTreemap;
 use serde::{Deserialize, Serialize};
 use tokio::time::interval;
-use vector_core::event::BatchStatusReceiver;
+use vector_common::{finalization::BatchStatusReceiver, finalizer::UnorderedFinalizer};
+use vector_config::configurable_component;
 use warp::Rejection;
 
 use super::ApiError;
-use crate::{
-    config::AcknowledgementsConfig, shutdown::ShutdownSignal,
-    sources::util::finalizer::OrderedFinalizer,
-};
+use crate::{config::AcknowledgementsConfig, event::BatchStatus, shutdown::ShutdownSignal};
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Acknowledgement configuration for the `splunk_hec` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(default)]
 pub struct HecAcknowledgementsConfig {
     #[serde(flatten)]
     pub inner: AcknowledgementsConfig,
+
+    /// The maximum number of ack statuses pending query across all channels.
+    ///
+    /// Equivalent to the `max_number_of_acked_requests_pending_query` Splunk HEC setting.
+    ///
+    /// Minimum of `1`.
     pub max_pending_acks: NonZeroU64,
+
+    /// The maximum number of Splunk HEC channels clients can use with this source.
+    ///
+    /// Minimum of `1`.
     pub max_number_of_ack_channels: NonZeroU64,
+
+    /// The maximum number of ack statuses pending query for a single channel.
+    ///
+    /// Equivalent to the `max_number_of_acked_requests_pending_query_per_ack_channel` Splunk HEC setting.
+    ///
+    /// Minimum of `1`.
     pub max_pending_acks_per_channel: NonZeroU64,
+
+    /// Whether or not to remove channels after idling for `max_idle_time` seconds.
+    ///
+    /// A channel is idling if it is not used for sending data or querying ack statuses.
     pub ack_idle_cleanup: bool,
+
+    /// The amount of time, in seconds, a channel is allowed to idle before removal.
+    ///
+    /// Channels can potentially idle for longer than this setting but clients should not rely on such behavior.
+    ///
+    /// Minimum of `1`.
     pub max_idle_time: NonZeroU64,
 }
 
@@ -60,12 +86,12 @@ pub struct IndexerAcknowledgement {
     max_pending_acks_per_channel: u64,
     max_number_of_ack_channels: u64,
     channels: Arc<tokio::sync::Mutex<HashMap<String, Arc<Channel>>>>,
-    shutdown: Shared<ShutdownSignal>,
+    shutdown: ShutdownSignal,
     total_pending_acks: AtomicU64,
 }
 
 impl IndexerAcknowledgement {
-    pub fn new(config: HecAcknowledgementsConfig, shutdown: Shared<ShutdownSignal>) -> Self {
+    pub fn new(config: HecAcknowledgementsConfig, shutdown: ShutdownSignal) -> Self {
         let channels: Arc<tokio::sync::Mutex<HashMap<String, Arc<Channel>>>> =
             Arc::new(tokio::sync::Mutex::new(HashMap::new()));
         let max_idle_time = u64::from(config.max_idle_time);
@@ -164,26 +190,31 @@ pub struct Channel {
     last_used_timestamp: RwLock<Instant>,
     currently_available_ack_id: AtomicU64,
     ack_ids_status: Arc<Mutex<RoaringTreemap>>,
-    ack_event_finalizer: OrderedFinalizer<u64>,
+    ack_event_finalizer: UnorderedFinalizer<u64>,
 }
 
 impl Channel {
-    fn new(max_pending_acks_per_channel: u64, shutdown: Shared<ShutdownSignal>) -> Self {
+    fn new(max_pending_acks_per_channel: u64, shutdown: ShutdownSignal) -> Self {
         let ack_ids_status = Arc::new(Mutex::new(RoaringTreemap::new()));
         let finalizer_ack_ids_status = Arc::clone(&ack_ids_status);
-        let ack_event_finalizer = OrderedFinalizer::new(shutdown, move |ack_id: u64| {
-            let mut ack_ids_status = finalizer_ack_ids_status.lock().unwrap();
-            ack_ids_status.insert(ack_id);
-            if ack_ids_status.len() > max_pending_acks_per_channel {
-                match ack_ids_status.min() {
-                    Some(min) => ack_ids_status.remove(min),
-                    // max pending acks per channel is guaranteed to be >= 1,
-                    // thus there must be at least one ack id available to remove
-                    None => unreachable!(
-                        "Indexer acknowledgements channel must allow at least one pending ack"
-                    ),
-                };
-            };
+        let (ack_event_finalizer, mut ack_stream) = UnorderedFinalizer::new(shutdown);
+        tokio::spawn(async move {
+            while let Some((status, ack_id)) = ack_stream.next().await {
+                if status == BatchStatus::Delivered {
+                    let mut ack_ids_status = finalizer_ack_ids_status.lock().unwrap();
+                    ack_ids_status.insert(ack_id);
+                    if ack_ids_status.len() > max_pending_acks_per_channel {
+                        match ack_ids_status.min() {
+                            Some(min) => ack_ids_status.remove(min),
+                            // max pending acks per channel is guaranteed to be >= 1,
+                            // thus there must be at least one ack id available to remove
+                            None => unreachable!(
+                                "Indexer acknowledgements channel must allow at least one pending ack"
+                            ),
+                        };
+                    }
+                }
+            }
         });
 
         Self {
@@ -245,38 +276,44 @@ pub struct HecAckStatusResponse {
 mod tests {
     use std::num::NonZeroU64;
 
-    use futures_util::FutureExt;
     use tokio::{time, time::sleep};
-    use vector_core::event::BatchNotifier;
+    use vector_core::event::{BatchNotifier, EventFinalizer, EventStatus};
 
-    use super::IndexerAcknowledgement;
-    use crate::{
-        shutdown::ShutdownSignal,
-        sources::splunk_hec::acknowledgements::{Channel, HecAcknowledgementsConfig},
-    };
+    use super::{Channel, HecAcknowledgementsConfig, IndexerAcknowledgement};
+    use crate::shutdown::ShutdownSignal;
 
     #[tokio::test]
     async fn test_channel_get_ack_id_and_acks_status() {
-        let shutdown = ShutdownSignal::noop().shared();
+        channel_get_ack_id_and_status(EventStatus::Delivered, true).await;
+    }
+
+    #[tokio::test]
+    async fn test_channel_get_ack_id_and_nacks_status() {
+        channel_get_ack_id_and_status(EventStatus::Rejected, false).await;
+    }
+
+    async fn channel_get_ack_id_and_status(status: EventStatus, result: bool) {
+        let shutdown = ShutdownSignal::noop();
         let max_pending_acks_per_channel = 10;
         let channel = Channel::new(max_pending_acks_per_channel, shutdown);
         let expected_ack_ids: Vec<u64> = (0..10).collect();
 
         for expected_ack_id in &expected_ack_ids {
-            let (_tx, batch_rx) = BatchNotifier::new_with_receiver();
+            let (tx, batch_rx) = BatchNotifier::new_with_receiver();
             assert_eq!(*expected_ack_id, channel.get_ack_id(batch_rx));
+            EventFinalizer::new(tx).update_status(status);
         }
         // Let the ack finalizer task run
         sleep(time::Duration::from_secs(1)).await;
         assert!(channel
             .get_acks_status(&expected_ack_ids)
             .values()
-            .all(|status| *status));
+            .all(|&status| status == result));
     }
 
     #[tokio::test]
     async fn test_channel_get_acks_status_repeat() {
-        let shutdown = ShutdownSignal::noop().shared();
+        let shutdown = ShutdownSignal::noop();
         let max_pending_acks_per_channel = 10;
         let channel = Channel::new(max_pending_acks_per_channel, shutdown);
         let expected_ack_ids: Vec<u64> = (0..10).collect();
@@ -300,7 +337,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_channel_get_ack_id_exceed_max_pending_acks_per_channel() {
-        let shutdown = ShutdownSignal::noop().shared();
+        let shutdown = ShutdownSignal::noop();
         let max_pending_acks_per_channel = 10;
         let channel = Channel::new(max_pending_acks_per_channel, shutdown);
         let dropped_pending_ack_ids: Vec<u64> = (0..10).collect();
@@ -329,7 +366,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_indexer_ack_exceed_max_pending_acks_drop_acks() {
-        let shutdown = ShutdownSignal::noop().shared();
+        let shutdown = ShutdownSignal::noop();
         let config = HecAcknowledgementsConfig {
             inner: true.into(),
             max_pending_acks: NonZeroU64::new(10).unwrap(),
@@ -372,7 +409,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_indexer_ack_exceed_max_pending_acks_server_busy() {
-        let shutdown = ShutdownSignal::noop().shared();
+        let shutdown = ShutdownSignal::noop();
         let config = HecAcknowledgementsConfig {
             inner: true.into(),
             max_pending_acks: NonZeroU64::new(1).unwrap(),
@@ -396,7 +433,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_indexer_ack_create_channels() {
-        let shutdown = ShutdownSignal::noop().shared();
+        let shutdown = ShutdownSignal::noop();
         let config = HecAcknowledgementsConfig {
             inner: true.into(),
             ..Default::default()
@@ -425,7 +462,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_indexer_ack_create_channels_exceed_max_number_of_ack_channels() {
-        let shutdown = ShutdownSignal::noop().shared();
+        let shutdown = ShutdownSignal::noop();
         let config = HecAcknowledgementsConfig {
             inner: true.into(),
             max_number_of_ack_channels: NonZeroU64::new(1).unwrap(),
@@ -446,7 +483,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_indexer_ack_channel_idle_expiration() {
-        let shutdown = ShutdownSignal::noop().shared();
+        let shutdown = ShutdownSignal::noop();
         let config = HecAcknowledgementsConfig {
             inner: true.into(),
             max_number_of_ack_channels: NonZeroU64::new(1).unwrap(),
@@ -469,7 +506,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_indexer_ack_channel_active_does_not_expire() {
-        let shutdown = ShutdownSignal::noop().shared();
+        let shutdown = ShutdownSignal::noop();
         let config = HecAcknowledgementsConfig {
             inner: true.into(),
             ack_idle_cleanup: true,

@@ -1,13 +1,14 @@
 use std::{borrow::Cow, collections::BTreeMap};
 
-use crate::expression::{Container, Variant};
-use crate::value::{Error, Kind};
-use crate::{expression::Expr, Expression};
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
+use value::{kind::Collection, Value, ValueRegex};
 
-use value::kind::Collection;
-use value::{Value, ValueRegex};
+use crate::{
+    expression::{Container, Expr, Variant},
+    value::{Error, Kind},
+    Expression,
+};
 
 pub trait VrlValueConvert: Sized {
     /// Convert a given [`Value`] into a [`Expression`] trait object.
@@ -160,6 +161,7 @@ impl TryFrom<Expr> for Value {
 
     fn try_from(expr: Expr) -> Result<Self, Self::Error> {
         match expr {
+            #[cfg(feature = "expr-literal")]
             Expr::Literal(literal) => Ok(literal.to_value()),
             Expr::Container(Container {
                 variant: Variant::Object(object),

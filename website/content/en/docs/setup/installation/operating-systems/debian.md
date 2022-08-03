@@ -1,7 +1,7 @@
 ---
 title: Install Vector on Debian
 short: Debian
-supported_installers: ["APT", "dpkg", "Vector installer", "Docker", "Helm"]
+supported_installers: ["APT", "dpkg", "Vector installer", "Docker"]
 weight: 3
 ---
 

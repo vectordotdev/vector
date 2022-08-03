@@ -6,23 +6,19 @@ The key words “MUST”, “MUST NOT”, “REQUIRED”, “SHALL”, “SHALL 
 “SHOULD NOT”, “RECOMMENDED”, “MAY”, and “OPTIONAL” in this document are to be
 interpreted as described in [RFC 2119].
 
-<!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
-
-1. [Introduction](#introduction)
-1. [Scope](#scope)
-1. [Terminology](#terminology)
-   1. [Entity](#entity)
-   1. [Option](#option)
-1. [Schema](#schema)
-   1. [Naming](#naming)
-      1. [Entity naming](#entity-naming)
-      1. [Option naming](#option-naming)
-   1. [Types](#types)
-   1. [Polymorphism](#polymorphism)
-      1. [Entity polymorphism](#entity-polymorphism)
-      1. [Option polymorphism](#option-polymorphism)
-
-<!-- /MarkdownTOC -->
+- [Introduction](#introduction)
+- [Scope](#scope)
+- [Terminology](#terminology)
+  - [Entity](#entity)
+  - [Option](#option)
+- [Schema](#schema)
+  - [Naming](#naming)
+    - [Entity naming](#entity-naming)
+    - [Option naming](#option-naming)
+  - [Types](#types)
+  - [Polymorphism](#polymorphism)
+    - [Entity polymorphism](#entity-polymorphism)
+    - [Option polymorphism](#option-polymorphism)
 
 ## Introduction
 
@@ -59,29 +55,29 @@ under entities and also used to define global Vector behavior.
 
 #### Entity naming
 
-* MUST only contain ASCII alphanumeric, lowercase, and underscores
-  * The `.` character is reserved for special purposes (e.g., error stream routing)
-* MUST be in snake case format when multiple words are used (e.g., `timeout_seconds`)
+- MUST only contain ASCII alphanumeric, lowercase, and underscores
+  - The `.` character is reserved for special purposes (e.g., error stream routing)
+- MUST be in snake case format when multiple words are used (e.g., `timeout_seconds`)
 
 #### Option naming
 
-* MUST only contain ASCII alphanumeric, lowercase, and underscores
-* MUST be in snake case format when multiple words are used (e.g., `timeout_seconds`)
-* SHOULD use nouns, not verbs, as names (e.g., `fingerprint` instead of `fingerprinting`)
-* MUST suffix options with their _full_ unit name (e.g., `_seconds`, `_bytes`, etc.)
-* SHOULD consistent with units within the same scope. (e.g., don't mix seconds and milliseconds)
-* MUST NOT repeat the name space in the option name (e.g., `fingerprint.bytes` instead of `fingerprint.fingerprint_bytes`)
+- MUST only contain ASCII alphanumeric, lowercase, and underscores
+- MUST be in snake case format when multiple words are used (e.g., `timeout_seconds`)
+- SHOULD use nouns, not verbs, as names (e.g., `fingerprint` instead of `fingerprinting`)
+- MUST suffix options with their _full_ unit name (e.g., `_seconds`, `_bytes`, etc.)
+- SHOULD consistent with units within the same scope. (e.g., don't mix seconds and milliseconds)
+- MUST NOT repeat the name space in the option name (e.g., `fingerprint.bytes` instead of `fingerprint.fingerprint_bytes`)
 
 ### Types
 
 Types MUST consist of [JSON types] only, minus the `null` type:
 
-* `string`
-* `number`
-* `integer`
-* `object`
-* `array`
-* `boolean`
+- `string`
+- `number`
+- `integer`
+- `object`
+- `array`
+- `boolean`
 
 ### Polymorphism
 
@@ -94,9 +90,9 @@ supported for entity namespaces.
 
 Options MUST NOT support polymorphism:
 
-* MUST be strongly typed
-* MUST be [externally tagged] for mutually exclusive sets of options
-  * REQUIRED to implement a top-level `type` key that accept the tag value
+- MUST be strongly typed
+- MUST be [externally tagged] for mutually exclusive sets of options
+  - REQUIRED to implement a top-level `type` key that accept the tag value
 
 For example:
 

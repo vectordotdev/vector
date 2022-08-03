@@ -1,7 +1,7 @@
 use futures::FutureExt;
 use indoc::indoc;
-use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
+use vector_config::configurable_component;
 use vector_core::config::proxy::ProxyConfig;
 
 use crate::{
@@ -18,24 +18,44 @@ use crate::{
         util::{http::HttpStatusRetryLogic, ServiceBuilderExt, TowerRequestConfig},
         Healthcheck, VectorSink,
     },
-    tls::TlsConfig,
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the `datadog_events` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogEventsConfig {
+    /// The endpoint to send events to.
     pub endpoint: Option<String>,
-    // Deprecated, replaced by the site option
+
+    /// The Datadog region to send events to.
+    ///
+    /// This option is deprecated, and the `site` field should be used instead.
+    #[configurable(deprecated)]
     pub region: Option<Region>,
+
+    /// The Datadog [site][dd_site] to send events to.
+    ///
+    /// [dd_site]: https://docs.datadoghq.com/getting_started/site
     pub site: Option<String>,
+
+    /// The default Datadog [API key][api_key] to send events with.
+    ///
+    /// If an event has a Datadog [API key][api_key] set explicitly in its metadata, it will take
+    /// precedence over the default.
+    ///
+    /// [api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
     pub default_api_key: String,
 
-    // Deprecated, not sure it actually makes sense to allow messing with TLS configuration?
-    pub(super) tls: Option<TlsConfig>,
+    #[configurable(derived)]
+    pub(super) tls: Option<TlsEnableableConfig>,
 
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -54,14 +74,17 @@ impl GenerateConfig for DatadogEventsConfig {
 }
 
 impl DatadogEventsConfig {
-    fn get_api_events_endpoint(&self) -> String {
+    fn get_api_events_endpoint(&self) -> http::Uri {
         let api_base_endpoint =
             get_api_base_endpoint(self.endpoint.as_ref(), self.site.as_ref(), self.region);
-        format!("{}/api/v1/events", api_base_endpoint)
+
+        // We know this URI will be valid since we have just built it up ourselves.
+        http::Uri::try_from(format!("{}/api/v1/events", api_base_endpoint)).expect("URI not valid")
     }
 
     fn build_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
-        let client = HttpClient::new(None, proxy)?;
+        let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
+        let client = HttpClient::new(tls, proxy)?;
         Ok(client)
     }
 
@@ -71,7 +94,7 @@ impl DatadogEventsConfig {
         Ok(healthcheck(client, validate_endpoint, self.default_api_key.clone()).boxed())
     }
 
-    fn build_sink(&self, client: HttpClient, cx: SinkContext) -> crate::Result<VectorSink> {
+    fn build_sink(&self, client: HttpClient) -> crate::Result<VectorSink> {
         let service = DatadogEventsService::new(
             self.get_api_events_endpoint(),
             self.default_api_key.clone(),
@@ -86,10 +109,7 @@ impl DatadogEventsConfig {
             .settings(request_settings, retry_logic)
             .service(service);
 
-        let sink = DatadogEventsSink {
-            service,
-            acker: cx.acker(),
-        };
+        let sink = DatadogEventsSink { service };
 
         Ok(VectorSink::from_event_streamsink(sink))
     }
@@ -101,7 +121,7 @@ impl SinkConfig for DatadogEventsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.build_client(cx.proxy())?;
         let healthcheck = self.build_healthcheck(client.clone())?;
-        let sink = self.build_sink(client, cx)?;
+        let sink = self.build_sink(client)?;
 
         Ok((sink, healthcheck))
     }
@@ -114,8 +134,8 @@ impl SinkConfig for DatadogEventsConfig {
         "datadog_events"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 

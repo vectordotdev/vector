@@ -1,7 +1,8 @@
-use crate::value::Value;
 use mlua::prelude::LuaResult;
 use mlua::{FromLua, Lua, ToLua, Value as LuaValue};
 use ordered_float::NotNan;
+
+use crate::value::Value;
 
 impl<'a> ToLua<'a> for Value {
     #![allow(clippy::wrong_self_convention)] // this trait is defined by mlua
@@ -17,7 +18,7 @@ impl<'a> ToLua<'a> for Value {
             Value::Timestamp(t) => timestamp_to_table(lua, t).map(LuaValue::Table),
             Value::Object(m) => lua.create_table_from(m.into_iter()).map(LuaValue::Table),
             Value::Array(a) => lua.create_sequence_from(a.into_iter()).map(LuaValue::Table),
-            Value::Null => lua.create_string("").map(LuaValue::String),
+            Self::Null => lua.create_string("").map(LuaValue::String),
         }
     }
 }

@@ -42,7 +42,7 @@ fn route(c: &mut Criterion) {
     ] {
         fields.insert(String::from(alpha), Value::Bytes(Bytes::from(alpha)));
     }
-    let event = Event::from(LogEvent::from_parts(fields, EventMetadata::default()));
+    let event = Event::from(LogEvent::from_map(fields, EventMetadata::default()));
 
     let mut outputs = Vec::new();
     for name in [

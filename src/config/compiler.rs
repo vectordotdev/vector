@@ -6,6 +6,21 @@ use super::{
     builder::ConfigBuilder, graph::Graph, schema, validation, ComponentKey, Config, OutputId,
 };
 
+/// to handle the expansions when building the graph we need to be able to get the list of inputs
+/// that will replace a single input, as a String.
+pub(crate) fn to_string_expansions(
+    input: &IndexMap<ComponentKey, Vec<ComponentKey>>,
+) -> IndexMap<String, Vec<String>> {
+    input
+        .iter()
+        .map(|(key, values)| {
+            let key: String = key.id().to_string();
+            let values: Vec<String> = values.iter().map(|value| value.id().to_string()).collect();
+            (key, values)
+        })
+        .collect::<IndexMap<_, _>>()
+}
+
 pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
     let mut errors = Vec::new();
 
@@ -38,10 +53,10 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         errors.extend(output_errors);
     }
 
-    #[cfg(feature = "datadog-pipelines")]
+    #[cfg(feature = "enterprise")]
     let version = Some(builder.sha256_hash());
 
-    #[cfg(not(feature = "datadog-pipelines"))]
+    #[cfg(not(feature = "enterprise"))]
     let version = None;
 
     let ConfigBuilder {
@@ -49,8 +64,8 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         #[cfg(feature = "api")]
         api,
         schema,
-        #[cfg(feature = "datadog-pipelines")]
-        datadog,
+        #[cfg(feature = "enterprise")]
+        enterprise,
         healthchecks,
         enrichment_tables,
         sources,
@@ -58,9 +73,11 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         transforms,
         tests,
         provider: _,
+        secret,
     } = builder;
 
-    let graph = match Graph::new(&sources, &transforms, &sinks) {
+    let str_expansions = to_string_expansions(&expansions);
+    let graph = match Graph::new(&sources, &transforms, &sinks, &str_expansions, schema) {
         Ok(graph) => graph,
         Err(graph_errors) => {
             errors.extend(graph_errors);
@@ -94,7 +111,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         .collect();
     let tests = tests
         .into_iter()
-        .map(|test| test.resolve_outputs(&graph))
+        .map(|test| test.resolve_outputs(&graph, &str_expansions))
         .collect::<Result<Vec<_>, Vec<_>>>()?;
 
     if errors.is_empty() {
@@ -103,8 +120,8 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             #[cfg(feature = "api")]
             api,
             schema,
-            #[cfg(feature = "datadog-pipelines")]
-            datadog,
+            #[cfg(feature = "enterprise")]
+            enterprise,
             version,
             healthchecks,
             enrichment_tables,
@@ -113,6 +130,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             transforms,
             tests,
             expansions,
+            secret,
         };
 
         config.propagate_acknowledgements()?;
@@ -160,14 +178,17 @@ pub(crate) fn expand_globs(config: &mut ConfigBuilder) {
         .sources
         .iter()
         .flat_map(|(key, s)| {
-            s.inner.outputs().into_iter().map(|output| OutputId {
-                component: key.clone(),
-                port: output.port,
-            })
+            s.inner
+                .outputs(config.schema.log_namespace())
+                .into_iter()
+                .map(|output| OutputId {
+                    component: key.clone(),
+                    port: output.port,
+                })
         })
         .chain(config.transforms.iter().flat_map(|(key, t)| {
             t.inner
-                .outputs(&schema::Definition::empty())
+                .outputs(&schema::Definition::any())
                 .into_iter()
                 .map(|output| OutputId {
                     component: key.clone(),
@@ -230,6 +251,7 @@ fn expand_globs_inner(inputs: &mut Vec<String>, id: &str, candidates: &IndexSet<
 mod test {
     use async_trait::async_trait;
     use serde::{Deserialize, Serialize};
+    use vector_core::config::LogNamespace;
 
     use super::*;
     use crate::{
@@ -262,7 +284,7 @@ mod test {
             "mock"
         }
 
-        fn outputs(&self) -> Vec<Output> {
+        fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
             vec![Output::default(DataType::all())]
         }
 
@@ -306,8 +328,8 @@ mod test {
             Input::all()
         }
 
-        fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-            None
+        fn acknowledgements(&self) -> &AcknowledgementsConfig {
+            &AcknowledgementsConfig::DEFAULT
         }
     }
 

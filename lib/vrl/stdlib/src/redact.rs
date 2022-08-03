@@ -4,6 +4,7 @@ use std::{
     str::FromStr,
 };
 
+use ::value::Value;
 use once_cell::sync::Lazy;
 use vrl::prelude::*;
 
@@ -59,7 +60,7 @@ impl Function for Redact {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -95,6 +96,45 @@ impl Function for Redact {
             filters,
             redactor,
         }))
+    }
+
+    fn compile_argument(
+        &self,
+        _args: &[(&'static str, Option<FunctionArgument>)],
+        _ctx: &mut FunctionCompileContext,
+        name: &str,
+        expr: Option<&expression::Expr>,
+    ) -> CompiledArgument {
+        match (name, expr) {
+            ("filters", Some(expr)) => {
+                let filters = expr.as_value().ok_or_else(|| {
+                    vrl::function::Error::ExpectedStaticExpression {
+                        keyword: "filters",
+                        expr: expr.clone(),
+                    }
+                })?;
+                let filters = filters
+                    .try_array()
+                    .map_err(|_| vrl::function::Error::ExpectedStaticExpression {
+                        keyword: "filters",
+                        expr: expr.clone(),
+                    })?
+                    .into_iter()
+                    .map(|value| {
+                        value.clone().try_into().map_err(|error| {
+                            vrl::function::Error::InvalidArgument {
+                                keyword: "filters",
+                                value,
+                                error,
+                            }
+                        })
+                    })
+                    .collect::<std::result::Result<Vec<Filter>, vrl::function::Error>>()?;
+
+                Ok(Some(Box::new(filters) as _))
+            }
+            _ => Ok(None),
+        }
     }
 }
 
@@ -137,11 +177,13 @@ fn redact(value: Value, filters: &[Filter], redactor: &Redactor) -> Value {
 impl Expression for RedactFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
+        let filters = &self.filters;
+        let redactor = &self.redactor;
 
-        Ok(redact(value, &self.filters, &self.redactor))
+        Ok(redact(value, filters, redactor))
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         self.value.type_def(state).infallible()
     }
 }
@@ -241,7 +283,7 @@ enum Redactor {
 
 impl Redactor {
     fn pattern(&self) -> &str {
-        use Redactor::*;
+        use Redactor::Full;
 
         match self {
             Full => "[REDACTED]",
@@ -259,7 +301,7 @@ impl FromStr for Redactor {
     type Err = &'static str;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        use Redactor::*;
+        use Redactor::Full;
 
         match s {
             "full" => Ok(Full),

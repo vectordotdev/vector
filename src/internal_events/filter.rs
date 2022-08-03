@@ -7,7 +7,7 @@ pub struct FilterEventDiscarded {
 }
 
 impl InternalEvent for FilterEventDiscarded {
-    fn emit_metrics(&self) {
+    fn emit(self) {
         counter!("events_discarded_total", self.total);
     }
 }

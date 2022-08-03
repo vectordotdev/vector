@@ -1,13 +1,14 @@
-use std::{collections::BTreeMap, fmt};
+use std::fmt;
 
 use lookup::LookupBuf;
-use value::{kind::remove, Kind};
+use value::{kind::remove, Kind, Value};
 
 use crate::{
-    expression::{assignment, Container, FunctionCall, Resolved, Variable},
+    expression::{Container, Resolved, Variable},
     parser::ast::Ident,
-    vm::{self, OpCode},
-    Context, Expression, State, TypeDef, Value,
+    state::{ExternalEnv, LocalEnv},
+    type_def::Details,
+    Context, Expression, TypeDef,
 };
 
 #[derive(Clone, PartialEq)]
@@ -36,6 +37,13 @@ impl Query {
         matches!(self.target, Target::External)
     }
 
+    pub fn as_variable(&self) -> Option<&Variable> {
+        match &self.target {
+            Target::Internal(variable) => Some(variable),
+            _ => None,
+        }
+    }
+
     pub fn variable_ident(&self) -> Option<&Ident> {
         match &self.target {
             Target::Internal(v) => Some(v.ident()),
@@ -51,30 +59,30 @@ impl Query {
         }
     }
 
-    pub fn delete_type_def(&self, state: &mut State) -> Result<Option<Kind>, remove::Error> {
-        if let Some(ref mut target) = state.target().as_mut() {
-            let value = target.value.clone();
-            let mut type_def = target.type_def.clone();
+    pub fn delete_type_def(
+        &self,
+        external: &mut ExternalEnv,
+    ) -> Result<Option<Kind>, remove::Error> {
+        let target = external.target_mut();
+        let value = target.value.clone();
+        let mut type_def = target.type_def.clone();
 
-            let result = type_def.remove_at_path(
-                &self.path.to_lookup(),
-                remove::Strategy {
-                    coalesced_path: remove::CoalescedPath::Reject,
-                },
-            );
+        let result = type_def.remove_at_path(
+            &self.path.to_lookup(),
+            remove::Strategy {
+                coalesced_path: remove::CoalescedPath::Reject,
+            },
+        );
 
-            state.update_target(assignment::Details { type_def, value });
+        external.update_target(Details { type_def, value });
 
-            return result;
-        }
-
-        Ok(None)
+        result
     }
 }
 
 impl Expression for Query {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        use Target::*;
+        use Target::{Container, External, FunctionCall, Internal};
 
         let value = match &self.target {
             External => {
@@ -83,6 +91,7 @@ impl Expression for Query {
                     .target_get(&self.path)
                     .ok()
                     .flatten()
+                    .cloned()
                     .unwrap_or(Value::Null))
             }
             Internal(variable) => variable.resolve(ctx)?,
@@ -90,9 +99,9 @@ impl Expression for Query {
             Container(container) => container.resolve(ctx)?,
         };
 
-        Ok(crate::Target::target_get(&value, &self.path)
-            .ok()
-            .flatten()
+        Ok(value
+            .get_by_path(&self.path)
+            .cloned()
             .unwrap_or(Value::Null))
     }
 
@@ -106,69 +115,28 @@ impl Expression for Query {
         }
     }
 
-    fn type_def(&self, state: &State) -> TypeDef {
-        use Target::*;
+    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
+        use Target::{Container, External, FunctionCall, Internal};
 
         match &self.target {
-            External => {
-                // `.` path must be an object
-                //
-                // TODO: make sure to enforce this
-                if self.path.is_root() {
-                    return TypeDef::object(BTreeMap::default()).infallible();
-                }
-
-                match state.target() {
-                    None => TypeDef::any().infallible(),
-                    Some(details) => details.clone().type_def.at_path(&self.path.to_lookup()),
-                }
-            }
-
-            Internal(variable) => variable.type_def(state).at_path(&self.path.to_lookup()),
-            FunctionCall(call) => call.type_def(state).at_path(&self.path.to_lookup()),
-            Container(container) => container.type_def(state).at_path(&self.path.to_lookup()),
+            External => state.1.target().clone().type_def.at_path(&self.path),
+            Internal(variable) => variable.type_def(state).at_path(&self.path),
+            FunctionCall(call) => call.type_def(state).at_path(&self.path),
+            Container(container) => container.type_def(state).at_path(&self.path),
         }
-    }
-
-    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
-        // Write the target depending on what target we are trying to retrieve.
-        let variable = match &self.target {
-            Target::External => {
-                vm.write_opcode(OpCode::GetPath);
-                vm::Variable::External(self.path.clone())
-            }
-            Target::Internal(variable) => {
-                vm.write_opcode(OpCode::GetPath);
-                vm::Variable::Internal(variable.ident().clone(), Some(self.path.clone()))
-            }
-            Target::FunctionCall(call) => {
-                // Write the code to call the function.
-                call.compile_to_vm(vm)?;
-
-                // Then retrieve the given path from the returned value that has been pushed on the stack
-                vm.write_opcode(OpCode::GetPath);
-                vm::Variable::Stack(self.path.clone())
-            }
-            Target::Container(container) => {
-                // Write the code to create the container onto the stack.
-                container.compile_to_vm(vm)?;
-
-                // Then retrieve the given path from the returned value that has been pushed on the stack
-                vm.write_opcode(OpCode::GetPath);
-                vm::Variable::Stack(self.path.clone())
-            }
-        };
-
-        let target = vm.get_target(&variable);
-        vm.write_primitive(target);
-
-        Ok(())
     }
 }
 
 impl fmt::Display for Query {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}{}", self.target, self.path)
+        match self.target {
+            Target::Internal(_)
+                if !self.path.is_root() && !self.path.iter().next().unwrap().is_index() =>
+            {
+                write!(f, "{}.{}", self.target, self.path)
+            }
+            _ => write!(f, "{}{}", self.target, self.path),
+        }
     }
 }
 
@@ -182,13 +150,17 @@ impl fmt::Debug for Query {
 pub enum Target {
     Internal(Variable),
     External,
-    FunctionCall(FunctionCall),
+
+    #[cfg(feature = "expr-function_call")]
+    FunctionCall(crate::expression::FunctionCall),
+    #[cfg(not(feature = "expr-function_call"))]
+    FunctionCall(crate::expression::Noop),
     Container(Container),
 }
 
 impl fmt::Display for Target {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Target::*;
+        use Target::{Container, External, FunctionCall, Internal};
 
         match self {
             Internal(v) => v.fmt(f),
@@ -201,7 +173,7 @@ impl fmt::Display for Target {
 
 impl fmt::Debug for Target {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Target::*;
+        use Target::{Container, External, FunctionCall, Internal};
 
         match self {
             Internal(v) => write!(f, "Internal({:?})", v),
@@ -209,5 +181,29 @@ impl fmt::Debug for Target {
             FunctionCall(v) => v.fmt(f),
             Container(v) => v.fmt(f),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::state;
+
+    #[test]
+    fn test_type_def() {
+        let query = Query {
+            target: Target::External,
+            path: LookupBuf::root(),
+        };
+
+        let state = (&state::LocalEnv::default(), &state::ExternalEnv::default());
+        let type_def = query.type_def(state);
+
+        assert!(type_def.is_infallible());
+        assert!(type_def.is_object());
+
+        let object = type_def.as_object().unwrap();
+
+        assert!(object.is_any());
     }
 }

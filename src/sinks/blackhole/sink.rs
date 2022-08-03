@@ -13,11 +13,10 @@ use tokio::{
     sync::watch,
     time::{interval, sleep_until},
 };
-use vector_core::{buffers::Acker, internal_event::EventsSent, ByteSizeOf};
+use vector_core::{internal_event::EventsSent, ByteSizeOf};
 
 use crate::{
     event::{EventArray, EventContainer},
-    internal_events::BlackholeEventReceived,
     sinks::{blackhole::config::BlackholeConfig, util::StreamSink},
 };
 
@@ -25,17 +24,15 @@ pub struct BlackholeSink {
     total_events: Arc<AtomicUsize>,
     total_raw_bytes: Arc<AtomicUsize>,
     config: BlackholeConfig,
-    acker: Acker,
     last: Option<Instant>,
 }
 
 impl BlackholeSink {
-    pub fn new(config: BlackholeConfig, acker: Acker) -> Self {
+    pub fn new(config: BlackholeConfig) -> Self {
         BlackholeSink {
             config,
             total_events: Arc::new(AtomicUsize::new(0)),
             total_raw_bytes: Arc::new(AtomicUsize::new(0)),
-            acker,
             last: None,
         }
     }
@@ -49,28 +46,31 @@ impl StreamSink<EventArray> for BlackholeSink {
         // the printing.
         let total_events = Arc::clone(&self.total_events);
         let total_raw_bytes = Arc::clone(&self.total_raw_bytes);
-        let interval_dur = Duration::from_secs(self.config.print_interval_secs);
         let (shutdown, mut tripwire) = watch::channel(());
 
-        tokio::spawn(async move {
-            let mut print_interval = interval(interval_dur);
-            loop {
-                select! {
-                    _ = print_interval.tick() => {
-                        info!({
-                            events = total_events.load(Ordering::Relaxed),
-                            raw_bytes_collected = total_raw_bytes.load(Ordering::Relaxed),
-                        }, "Total events collected");
-                    },
-                    _ = tripwire.changed() => break,
+        if self.config.print_interval_secs > 0 {
+            let interval_dur = Duration::from_secs(self.config.print_interval_secs);
+            tokio::spawn(async move {
+                let mut print_interval = interval(interval_dur);
+                loop {
+                    select! {
+                        _ = print_interval.tick() => {
+                            info!({
+                                events = total_events.load(Ordering::Relaxed),
+                                raw_bytes_collected = total_raw_bytes.load(Ordering::Relaxed),
+                            }, "Total events collected");
+                        },
+                        _ = tripwire.changed() => break,
+                    }
                 }
-            }
 
-            info!({
-                events = total_events.load(Ordering::Relaxed),
-                raw_bytes_collected = total_raw_bytes.load(Ordering::Relaxed)
-            }, "Total events collected");
-        });
+                info!({
+                    events = total_events.load(Ordering::Relaxed),
+                    raw_bytes_collected = total_raw_bytes.load(Ordering::Relaxed)
+                }, "Total events collected");
+            });
+        }
+
         while let Some(events) = input.next().await {
             if let Some(rate) = self.config.rate {
                 let factor: f32 = 1.0 / rate as f32;
@@ -87,16 +87,11 @@ impl StreamSink<EventArray> for BlackholeSink {
                 .total_raw_bytes
                 .fetch_add(message_len, Ordering::AcqRel);
 
-            emit!(&BlackholeEventReceived {
-                byte_size: message_len
-            });
-            emit!(&EventsSent {
+            emit!(EventsSent {
                 count: events.len(),
                 byte_size: message_len,
                 output: None,
             });
-
-            self.acker.ack(events.len());
         }
 
         // Notify the reporting task to shutdown.

@@ -27,7 +27,8 @@ components: sinks: file: {
 				enabled: true
 				codec: {
 					enabled: true
-					enum: ["ndjson", "text"]
+					framing: true
+					enum: ["json", "text"]
 				}
 			}
 			request: enabled: false
@@ -64,6 +65,7 @@ components: sinks: file: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	how_it_works: {

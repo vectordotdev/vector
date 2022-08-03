@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, sync::Arc};
 
 use async_trait::async_trait;
 use futures_util::{
@@ -8,7 +8,6 @@ use futures_util::{
 };
 use tower::Service;
 use vector_core::{
-    buffers::Acker,
     event::{Event, Metric, MetricValue},
     partition::Partitioner,
     sink::StreamSink,
@@ -20,7 +19,12 @@ use super::{
     request_builder::DatadogMetricsRequestBuilder, service::DatadogMetricsRequest,
 };
 use crate::{
-    config::SinkContext, internal_events::DatadogMetricsEncodingError, sinks::util::SinkBuilderExt,
+    internal_events::DatadogMetricsEncodingError,
+    sinks::util::{
+        buffer::metrics::sort::sort_for_compression,
+        buffer::metrics::{AggregatedSummarySplitter, MetricSplitter},
+        SinkBuilderExt,
+    },
 };
 
 /// Partitions metrics based on which Datadog API endpoint that they are sent to.
@@ -32,10 +36,10 @@ struct DatadogMetricsTypePartitioner;
 
 impl Partitioner for DatadogMetricsTypePartitioner {
     type Item = Metric;
-    type Key = DatadogMetricsEndpoint;
+    type Key = (Option<Arc<str>>, DatadogMetricsEndpoint);
 
     fn partition(&self, item: &Self::Item) -> Self::Key {
-        match item.data().value() {
+        let endpoint = match item.data().value() {
             MetricValue::Counter { .. } => DatadogMetricsEndpoint::Series,
             MetricValue::Gauge { .. } => DatadogMetricsEndpoint::Series,
             MetricValue::Set { .. } => DatadogMetricsEndpoint::Series,
@@ -43,13 +47,13 @@ impl Partitioner for DatadogMetricsTypePartitioner {
             MetricValue::AggregatedHistogram { .. } => DatadogMetricsEndpoint::Sketches,
             MetricValue::AggregatedSummary { .. } => DatadogMetricsEndpoint::Series,
             MetricValue::Sketch { .. } => DatadogMetricsEndpoint::Sketches,
-        }
+        };
+        (item.metadata().datadog_api_key(), endpoint)
     }
 }
 
 pub(crate) struct DatadogMetricsSink<S> {
     service: S,
-    acker: Acker,
     request_builder: DatadogMetricsRequestBuilder,
     batch_settings: BatcherSettings,
 }
@@ -62,36 +66,44 @@ where
     S::Response: DriverResponse,
 {
     /// Creates a new `DatadogMetricsSink`.
-    pub fn new(
-        cx: SinkContext,
+    pub const fn new(
         service: S,
         request_builder: DatadogMetricsRequestBuilder,
         batch_settings: BatcherSettings,
     ) -> Self {
         DatadogMetricsSink {
             service,
-            acker: cx.acker(),
             request_builder,
             batch_settings,
         }
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        let mut splitter: MetricSplitter<AggregatedSummarySplitter> = MetricSplitter::default();
+
         let sink = input
             // Convert `Event` to `Metric` so we don't have to deal with constant conversions.
             .filter_map(|event| ready(event.try_into_metric()))
-            // Converts "absolute" metrics to "incremental", and converts distributions and
-            // aggregated histograms into sketches so that we can send them in a more DD-native
-            // format and thus avoid needing to directly specify what quantiles to generate, etc.
+            // Split aggregated summaries into individual metrics for count, sum, and the quantiles, which lets us
+            // ensure that aggregated summaries effectively make it through normalization, as we can't actually
+            // normalize them and so they would be dropped during normalization otherwise.
+            .flat_map(|metric| stream::iter(splitter.split(metric)))
+            // Converts "absolute" metrics to "incremental", and converts distributions and aggregated histograms into
+            // sketches so that we can send them in a more DD-native format and thus avoid needing to directly specify
+            // what quantiles to generate, etc.
             .normalized_with_default::<DatadogMetricsNormalizer>()
-            // We batch metrics by their endpoint i.e. series (counter, gauge, set) vs sketch
-            // (distributions, aggregated histograms, metrics that are already sketches)
+            // We batch metrics by their endpoint: series endpoint for counters, gauge, and sets vs sketch endpoint for
+            // distributions, aggregated histograms, and sketches.
             .batched_partitioned(DatadogMetricsTypePartitioner, self.batch_settings)
-            // We build our requests "incrementally", which means that for a single batch of
-            // metrics, we might generate N requests to send them all, as Datadog has API-level
-            // limits on payload size, so we keep adding metrics to a request until we reach the
-            // limit, and then create a new request, and so on and so forth, until all metrics have
-            // been turned into a request.
+            .map(|((api_key, endpoint), mut metrics)| {
+                // Sorting significantly improves HTTP compression
+                sort_for_compression(&mut metrics);
+                ((api_key, endpoint), metrics)
+            })
+            // We build our requests "incrementally", which means that for a single batch of metrics, we might generate
+            // N requests to send them all, as Datadog has API-level limits on payload size, so we keep adding metrics
+            // to a request until we reach the limit, and then create a new request, and so on and so forth, until all
+            // metrics have been turned into a request.
             .incremental_request_builder(self.request_builder)
             // This unrolls the vector of request results that our request builder generates.
             .flat_map(stream::iter)
@@ -100,7 +112,7 @@ where
                 match request {
                     Err(e) => {
                         let (message, error_code, dropped_events) = e.into_parts();
-                        emit!(&DatadogMetricsEncodingError {
+                        emit!(DatadogMetricsEncodingError {
                             message,
                             error_code,
                             dropped_events,
@@ -110,10 +122,9 @@ where
                     Ok(req) => Some(req),
                 }
             })
-            // Finally, we generate the driver which will take our requests, send them off, and
-            // appropriately handle finalization of the events, acking for buffers, and
-            // logging/metrics, as the requests are responded to.
-            .into_driver(self.service, self.acker);
+            // Finally, we generate the driver which will take our requests, send them off, and appropriately handle
+            // finalization of the events, and logging/metrics, as the requests are responded to.
+            .into_driver(self.service);
 
         sink.run().await
     }

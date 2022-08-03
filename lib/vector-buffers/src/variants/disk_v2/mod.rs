@@ -135,23 +135,19 @@
 //! when they reach the maximum value for the data type. For record IDs, however, this would mean
 //! reaching 2^64, which will take a really, really, really long time.
 
+use core::fmt;
 use std::{
     error::Error,
     marker::PhantomData,
-    path::PathBuf,
-    pin::Pin,
+    num::NonZeroU64,
+    path::{Path, PathBuf},
     sync::Arc,
-    task::{Context, Poll},
 };
 
 use async_trait::async_trait;
-use futures::{ready, SinkExt, Stream};
-use pin_project::pin_project;
 use snafu::{ResultExt, Snafu};
-use tokio::sync::mpsc::{channel, Receiver};
-use tokio_util::sync::{PollSender, ReusableBoxFuture};
+use vector_common::finalization::Finalizable;
 
-mod acknowledgements;
 mod backed_archive;
 mod common;
 mod io;
@@ -159,26 +155,27 @@ mod ledger;
 mod reader;
 mod record;
 mod ser;
+mod v1_migration;
 mod writer;
 
 #[cfg(test)]
 mod tests;
 
-use self::{acknowledgements::create_disk_v2_acker, ledger::Ledger};
 pub use self::{
     common::{DiskBufferConfig, DiskBufferConfigBuilder},
-    io::Filesystem,
+    io::{Filesystem, ProductionFilesystem},
     ledger::LedgerLoadCreateError,
     reader::{Reader, ReaderError},
     writer::{Writer, WriterError},
 };
+use self::{ledger::Ledger, v1_migration::try_disk_v1_migration};
 use crate::{
     buffer_usage_data::BufferUsageHandle,
     topology::{
         builder::IntoBuffer,
         channel::{ReceiverAdapter, SenderAdapter},
     },
-    Acker, Bufferable,
+    Bufferable,
 };
 
 /// Error that occurred when creating/loading a disk buffer.
@@ -213,9 +210,9 @@ where
     pub(crate) async fn from_config_inner<FS>(
         config: DiskBufferConfig<FS>,
         usage_handle: BufferUsageHandle,
-    ) -> Result<(Writer<T, FS>, Reader<T, FS>, Acker, Arc<Ledger<FS>>), BufferError<T>>
+    ) -> Result<(Writer<T, FS>, Reader<T, FS>, Arc<Ledger<FS>>), BufferError<T>>
     where
-        FS: Filesystem + Clone + 'static,
+        FS: Filesystem + fmt::Debug + Clone + 'static,
         FS::File: Unpin,
     {
         let ledger = Ledger::load_or_create(config, usage_handle)
@@ -229,7 +226,9 @@ where
             .await
             .context(WriterSeekFailedSnafu)?;
 
-        let mut reader = Reader::new(Arc::clone(&ledger));
+        let finalizer = Arc::clone(&ledger).spawn_finalizer();
+
+        let mut reader = Reader::new(Arc::clone(&ledger), finalizer);
         reader
             .seek_to_next_record()
             .await
@@ -237,17 +236,14 @@ where
 
         ledger.synchronize_buffer_usage();
 
-        let acker = create_disk_v2_acker(Arc::clone(&ledger));
-
-        Ok((writer, reader, acker, ledger))
+        Ok((writer, reader, ledger))
     }
 
     /// Creates a new disk buffer from the given [`DiskBufferConfig`].
     ///
     /// If successful, a [`Writer`] and [`Reader`] value, representing the write/read sides of the
-    /// buffer, respectively, will be returned. Additionally, an [`Acker`] will be returned, which
-    /// must be used to indicate when records read from the [`Reader`] can be considered durably
-    /// processed and able to be deleted from the buffer.
+    /// buffer, respectively, will be returned. Records are considered durably processed and able
+    /// to be deleted from the buffer when they are dropped by the reader, via event finalization.
     ///
     /// # Errors
     ///
@@ -257,25 +253,25 @@ where
     pub async fn from_config<FS>(
         config: DiskBufferConfig<FS>,
         usage_handle: BufferUsageHandle,
-    ) -> Result<(Writer<T, FS>, Reader<T, FS>, Acker), BufferError<T>>
+    ) -> Result<(Writer<T, FS>, Reader<T, FS>), BufferError<T>>
     where
-        FS: Filesystem + Clone + 'static,
+        FS: Filesystem + fmt::Debug + Clone + 'static,
         FS::File: Unpin,
     {
-        let (writer, reader, acker, _) = Self::from_config_inner(config, usage_handle).await?;
+        let (writer, reader, _) = Self::from_config_inner(config, usage_handle).await?;
 
-        Ok((writer, reader, acker))
+        Ok((writer, reader))
     }
 }
 
 pub struct DiskV2Buffer {
     id: String,
     data_dir: PathBuf,
-    max_size: u64,
+    max_size: NonZeroU64,
 }
 
 impl DiskV2Buffer {
-    pub fn new(id: String, data_dir: PathBuf, max_size: u64) -> Self {
+    pub fn new(id: String, data_dir: PathBuf, max_size: NonZeroU64) -> Self {
         Self {
             id,
             data_dir,
@@ -287,7 +283,7 @@ impl DiskV2Buffer {
 #[async_trait]
 impl<T> IntoBuffer<T> for DiskV2Buffer
 where
-    T: Bufferable + Clone,
+    T: Bufferable + Clone + Finalizable,
 {
     fn provides_instrumentation(&self) -> bool {
         true
@@ -296,150 +292,50 @@ where
     async fn into_buffer_parts(
         self: Box<Self>,
         usage_handle: BufferUsageHandle,
-    ) -> Result<(SenderAdapter<T>, ReceiverAdapter<T>, Option<Acker>), Box<dyn Error + Send + Sync>>
-    {
-        usage_handle.set_buffer_limits(Some(self.max_size), None);
+    ) -> Result<(SenderAdapter<T>, ReceiverAdapter<T>), Box<dyn Error + Send + Sync>> {
+        // Attempt to migrate a disk v1 buffer based on the same data directory and buffer ID if one
+        // exists. If one doesn't exist, then this method does nothing.
+        try_disk_v1_migration::<T>(self.data_dir.as_path(), self.id.as_str()).await?;
 
-        // Create the actual buffer subcomponents.
-        let buffer_path = self.data_dir.join("buffer").join("v2").join(self.id);
-        let config = DiskBufferConfigBuilder::from_path(buffer_path)
-            .max_buffer_size(self.max_size as u64)
-            .build()?;
-        let (writer, reader, acker) = Buffer::from_config(config, usage_handle).await?;
+        // Now that we've handled any necessary migrations, go ahead and build the buffer.
+        let (writer, reader) = build_disk_v2_buffer(
+            usage_handle,
+            &self.data_dir,
+            self.id.as_str(),
+            self.max_size,
+        )
+        .await?;
 
-        let wrapped_reader = WrappedReader::new(reader);
-
-        let (input_tx, input_rx) = channel(1024);
-        tokio::spawn(drive_disk_v2_writer(writer, input_rx));
-
-        Ok((
-            SenderAdapter::opaque(PollSender::new(input_tx).sink_map_err(|_| ())),
-            ReceiverAdapter::opaque(wrapped_reader),
-            Some(acker),
-        ))
+        Ok((writer.into(), reader.into()))
     }
 }
 
-#[pin_project]
-struct WrappedReader<T, FS>
+async fn build_disk_v2_buffer<T>(
+    usage_handle: BufferUsageHandle,
+    data_dir: &Path,
+    id: &str,
+    max_size: NonZeroU64,
+) -> Result<
+    (
+        Writer<T, ProductionFilesystem>,
+        Reader<T, ProductionFilesystem>,
+    ),
+    Box<dyn Error + Send + Sync>,
+>
 where
-    FS: Filesystem,
+    T: Bufferable + Clone,
 {
-    #[pin]
-    reader: Option<Reader<T, FS>>,
-    read_future: ReusableBoxFuture<'static, (Reader<T, FS>, Option<T>)>,
+    usage_handle.set_buffer_limits(Some(max_size.get()), None);
+
+    let buffer_path = get_disk_v2_data_dir_path(data_dir, id);
+    let config = DiskBufferConfigBuilder::from_path(buffer_path)
+        .max_buffer_size(max_size.get())
+        .build()?;
+    Buffer::from_config(config, usage_handle)
+        .await
+        .map_err(Into::into)
 }
 
-impl<T, FS> WrappedReader<T, FS>
-where
-    T: Bufferable,
-    FS: Filesystem + 'static,
-    FS::File: Unpin,
-{
-    pub fn new(reader: Reader<T, FS>) -> Self {
-        Self {
-            reader: Some(reader),
-            read_future: ReusableBoxFuture::new(make_read_future(None)),
-        }
-    }
-}
-
-impl<T, FS> Stream for WrappedReader<T, FS>
-where
-    T: Bufferable,
-    FS: Filesystem + 'static,
-    FS::File: Unpin,
-{
-    type Item = T;
-
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let mut this = self.project();
-        loop {
-            match this.reader.as_mut().get_mut().take() {
-                None => {
-                    let (reader, result) = ready!(this.read_future.poll(cx));
-                    this.reader.set(Some(reader));
-                    return Poll::Ready(result);
-                }
-                Some(reader) => this.read_future.set(make_read_future(Some(reader))),
-            }
-        }
-    }
-}
-
-async fn make_read_future<T, FS>(reader: Option<Reader<T, FS>>) -> (Reader<T, FS>, Option<T>)
-where
-    T: Bufferable,
-    FS: Filesystem,
-    FS::File: Unpin,
-{
-    match reader {
-        None => unreachable!("future should not be called in this state"),
-        Some(mut reader) => {
-            let result = match reader.next().await {
-                Ok(result) => result,
-                Err(e) => {
-                    // TODO: We can _probably_ avoid having to actually kill the task here,
-                    // because the reader will recover from read errors, but, things it won't
-                    // automagically recover from:
-                    // - if it rolls to the next data file mid-data file, the writer might still be
-                    //   writing more records to the current data file, which means we might stall
-                    //   reads until the writer needs to roll to the next data file:
-                    //
-                    //   maybe there's an easy way we could propagate the rollover events to the
-                    //   writer to also get it to rollover?  again, more of a technique to minimize
-                    //   the number of records we throw away by rolling over. this could be tricky
-                    //   to accomplish, though, for in-flight readers, but it's just a thought in a
-                    //   code comment for now.
-                    //
-                    // - actual I/O errors like a failed read or permissions or whatever:
-                    //
-                    //   we haven't fully quantified what it means for the reader to get an
-                    //   I/O error during a read, since we could end up in an inconsistent state if
-                    //   the I/O error came mid-record read, after already reading some amount of
-                    //   data and then losing our place by having the "wait for the data" code break
-                    //   out with the I/O error.
-                    //
-                    //   this could be a potential enhancement to the reader where we also use the
-                    //   "bytes read" value as the position in the data file, and track error state
-                    //   internally, such that any read that was interrupted by a true I/O error
-                    //   will set the error state and inform the next call to `try_read_record` to
-                    //   seek back to the position prior to the read and to clear the read buffers,
-                    //   enabling a clean-slate attempt.
-                    //
-                    //   regardless, such an approach might only be acheivable for specific I/O
-                    //   errors and we could _potentially_ end up spamming the logs i.e. if a file
-                    //   has its permissions modified and it just keeps absolutely blasting the logs
-                    //   with the above error that we got from the reader.. maybe it's better to
-                    //   spam the logs to indicate an error if it's possible to fix it? the reader
-                    //   _could_ pick back up if permissions were fixed, etc...
-                    error!("error during disk buffer read: {}", e);
-                    None
-                }
-            };
-
-            (reader, result)
-        }
-    }
-}
-
-async fn drive_disk_v2_writer<T, FS>(mut writer: Writer<T, FS>, mut input: Receiver<T>)
-where
-    T: Bufferable,
-    FS: Filesystem + Clone,
-    FS::File: Unpin,
-{
-    // TODO: Use a control message approach so callers can send both items to write and flush
-    // requests, facilitating the ability to allow for `send_all` at the frontend.
-    while let Some(record) = input.recv().await {
-        if let Err(e) = writer.write_record(record).await {
-            error!("failed to write record to the buffer: {}", e);
-        }
-
-        if let Err(e) = writer.flush().await {
-            error!("failed to flush the buffer: {}", e);
-        }
-    }
-
-    trace!("diskv2 writer task finished");
+pub(crate) fn get_disk_v2_data_dir_path(base_dir: &Path, buffer_id: &str) -> PathBuf {
+    base_dir.join("buffer").join("v2").join(buffer_id)
 }

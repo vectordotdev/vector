@@ -1,6 +1,8 @@
 package metadata
 
 components: sinks: _humio: {
+	_humio_encoding: enabled: false
+
 	classes: {
 		commonly_used: false
 		delivery:      "at_least_once"
@@ -24,7 +26,7 @@ components: sinks: _humio: {
 				enabled:      true
 				common:       false
 				max_bytes:    10_000_000
-				timeout_secs: 1
+				timeout_secs: 1.0
 			}
 			compression: {
 				enabled: true
@@ -32,13 +34,7 @@ components: sinks: _humio: {
 				algorithms: ["gzip"]
 				levels: ["none", "fast", "default", "best", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 			}
-			encoding: {
-				enabled: true
-				codec: {
-					enabled: true
-					enum: ["json", "text"]
-				}
-			}
+			encoding: _humio_encoding
 			proxy: enabled: true
 			request: {
 				enabled:                    true
@@ -51,7 +47,6 @@ components: sinks: _humio: {
 			}
 			tls: {
 				enabled:                true
-				can_enable:             false
 				can_verify_certificate: true
 				can_verify_hostname:    true
 				enabled_default:        false
@@ -128,7 +123,7 @@ components: sinks: _humio: {
 			type: array: {
 				default: null
 				items: type: string: {
-					examples: ["#env", "#datacenter"]
+					examples: ["#env", "\"#datacenter\""]
 				}
 			}
 		}

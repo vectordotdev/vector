@@ -1,28 +1,31 @@
-use std::num::NonZeroU64;
-
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use futures::{FutureExt, SinkExt};
 use http::{Request, Uri};
 use hyper::Body;
-use serde::{Deserialize, Serialize};
+use indoc::indoc;
 use serde_json::{json, Value};
 use snafu::{ResultExt, Snafu};
+use tokio_util::codec::Encoder as _;
+use vector_config::configurable_component;
 
-use super::{GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
-    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    codecs::{Encoder, EncodingConfig, Transformer},
+    config::{
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
+        SinkDescription,
+    },
     event::Event,
+    gcp::{GcpAuthConfig, GcpAuthenticator, Scope, PUBSUB_URL},
     http::HttpClient,
     sinks::{
         gcs_common::config::healthcheck_response,
         util::{
-            encoding::{EncodingConfigWithDefault, EncodingConfiguration},
             http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
             BatchConfig, BoxedRawValue, JsonArrayBuffer, SinkBatchSettings, TowerRequestConfig,
         },
         Healthcheck, UriParseSnafu, VectorSink,
     },
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
 };
 
 #[derive(Debug, Snafu)]
@@ -40,32 +43,42 @@ pub struct PubsubDefaultBatchSettings;
 impl SinkBatchSettings for PubsubDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(1000);
     const MAX_BYTES: Option<usize> = Some(10_000_000);
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
-#[serde(deny_unknown_fields)]
+/// Configuration for the `gcp_pubsub` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug)]
 pub struct PubsubConfig {
+    /// The project name to which to publish events.
     pub project: String,
+
+    /// The topic within the project to which to publish events.
     pub topic: String,
+
+    /// The endpoint to which to publish events.
+    #[serde(default)]
     pub endpoint: Option<String>,
-    #[serde(default = "default_skip_authentication")]
-    pub skip_authentication: bool,
-    #[serde(flatten)]
+
+    #[serde(default, flatten)]
     pub auth: GcpAuthConfig,
 
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<PubsubDefaultBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
-    #[serde(
-        skip_serializing_if = "crate::serde::skip_serializing_if_default",
-        default
-    )]
-    pub encoding: EncodingConfigWithDefault<Encoding>,
 
-    pub tls: Option<TlsOptions>,
+    #[configurable(derived)]
+    encoding: EncodingConfig,
 
+    #[configurable(derived)]
+    #[serde(default)]
+    pub tls: Option<TlsConfig>,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -74,23 +87,20 @@ pub struct PubsubConfig {
     acknowledgements: AcknowledgementsConfig,
 }
 
-const fn default_skip_authentication() -> bool {
-    false
-}
-
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
-#[serde(rename_all = "snake_case")]
-#[derivative(Default)]
-pub enum Encoding {
-    #[derivative(Default)]
-    Default,
-}
-
 inventory::submit! {
     SinkDescription::new::<PubsubConfig>("gcp_pubsub")
 }
 
-impl_generate_config_from_default!(PubsubConfig);
+impl GenerateConfig for PubsubConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(indoc! {r#"
+            project = "my-project"
+            topic = "my-topic"
+            encoding.codec = "json"
+        "#})
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_pubsub")]
@@ -106,7 +116,7 @@ impl SinkConfig for PubsubConfig {
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
 
-        let healthcheck = healthcheck(client.clone(), sink.uri("")?, sink.creds.clone()).boxed();
+        let healthcheck = healthcheck(client.clone(), sink.uri("")?, sink.auth.clone()).boxed();
 
         let sink = BatchedHttpSink::new(
             sink,
@@ -114,7 +124,6 @@ impl SinkConfig for PubsubConfig {
             request_settings,
             batch_settings.timeout,
             client,
-            cx.acker(),
         )
         .sink_map_err(|error| error!(message = "Fatal gcp_pubsub sink error.", %error));
 
@@ -122,74 +131,73 @@ impl SinkConfig for PubsubConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        Input::new(self.encoding.config().input_type() & DataType::Log)
     }
 
     fn sink_type(&self) -> &'static str {
         "gcp_pubsub"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
 struct PubsubSink {
-    api_key: Option<String>,
-    creds: Option<GcpCredentials>,
+    auth: GcpAuthenticator,
     uri_base: String,
-    encoding: EncodingConfigWithDefault<Encoding>,
+    transformer: Transformer,
+    encoder: Encoder<()>,
 }
 
 impl PubsubSink {
     async fn from_config(config: &PubsubConfig) -> crate::Result<Self> {
         // We only need to load the credentials if we are not targeting an emulator.
-        let creds = if config.skip_authentication {
-            None
-        } else {
-            config.auth.make_credentials(Scope::PubSub).await?
-        };
+        let auth = config.auth.build(Scope::PubSub).await?;
 
         let uri_base = match config.endpoint.as_ref() {
             Some(host) => host.to_string(),
-            None => "https://pubsub.googleapis.com".into(),
+            None => PUBSUB_URL.into(),
         };
         let uri_base = format!(
             "{}/v1/projects/{}/topics/{}",
             uri_base, config.project, config.topic,
         );
 
+        let transformer = config.encoding.transformer();
+        let serializer = config.encoding.build()?;
+        let encoder = Encoder::<()>::new(serializer);
+
         Ok(Self {
-            api_key: config.auth.api_key.clone(),
-            encoding: config.encoding.clone(),
-            creds,
+            auth,
             uri_base,
+            transformer,
+            encoder,
         })
     }
 
     fn uri(&self, suffix: &str) -> crate::Result<Uri> {
-        let mut uri = format!("{}{}", self.uri_base, suffix);
-        if let Some(key) = &self.api_key {
-            uri = format!("{}?key={}", uri, key);
-        }
-        uri.parse::<Uri>()
-            .context(UriParseSnafu)
-            .map_err(Into::into)
+        let uri = format!("{}{}", self.uri_base, suffix);
+        let mut uri = uri.parse::<Uri>().context(UriParseSnafu)?;
+        self.auth.apply_uri(&mut uri);
+        Ok(uri)
     }
 }
 
 struct PubSubSinkEventEncoder {
-    encoding: EncodingConfigWithDefault<Encoding>,
+    transformer: Transformer,
+    encoder: Encoder<()>,
 }
 
 impl HttpEventEncoder<Value> for PubSubSinkEventEncoder {
     fn encode_event(&mut self, mut event: Event) -> Option<Value> {
-        self.encoding.apply_rules(&mut event);
+        self.transformer.transform(&mut event);
+        let mut bytes = BytesMut::new();
+        // Errors are handled by `Encoder`.
+        self.encoder.encode(event, &mut bytes).ok()?;
         // Each event needs to be base64 encoded, and put into a JSON object
         // as the `data` item.
-        let log = event.into_log();
-        let json = serde_json::to_string(&log).unwrap();
-        Some(json!({ "data": base64::encode(&json) }))
+        Some(json!({ "data": base64::encode(&bytes) }))
     }
 }
 
@@ -201,7 +209,8 @@ impl HttpSink for PubsubSink {
 
     fn build_encoder(&self) -> Self::Encoder {
         PubSubSinkEventEncoder {
-            encoding: self.encoding.clone(),
+            transformer: self.transformer.clone(),
+            encoder: self.encoder.clone(),
         }
     }
 
@@ -213,26 +222,18 @@ impl HttpSink for PubsubSink {
         let builder = Request::post(uri).header("Content-Type", "application/json");
 
         let mut request = builder.body(body).unwrap();
-        if let Some(creds) = &self.creds {
-            creds.apply(&mut request);
-        }
+        self.auth.apply(&mut request);
 
         Ok(request)
     }
 }
 
-async fn healthcheck(
-    client: HttpClient,
-    uri: Uri,
-    creds: Option<GcpCredentials>,
-) -> crate::Result<()> {
+async fn healthcheck(client: HttpClient, uri: Uri, auth: GcpAuthenticator) -> crate::Result<()> {
     let mut request = Request::get(uri).body(Body::empty()).unwrap();
-    if let Some(creds) = creds.as_ref() {
-        creds.apply(&mut request);
-    }
+    auth.apply(&mut request);
 
     let response = client.send(request).await?;
-    healthcheck_response(creds, HealthcheckError::TopicNotFound.into())(response)
+    healthcheck_response(response, auth, HealthcheckError::TopicNotFound.into())
 }
 
 #[cfg(test)]
@@ -251,6 +252,7 @@ mod tests {
         let config: PubsubConfig = toml::from_str(indoc! {r#"
                 project = "project"
                 topic = "topic"
+                encoding.codec = "json"
             "#})
         .unwrap();
         if config.build(SinkContext::new_test()).await.is_ok() {
@@ -259,32 +261,37 @@ mod tests {
     }
 }
 
-#[cfg(test)]
-#[cfg(feature = "gcp-pubsub-integration-tests")]
+#[cfg(all(test, feature = "gcp-pubsub-integration-tests"))]
 mod integration_tests {
+    use codecs::JsonSerializerConfig;
     use reqwest::{Client, Method, Response};
+    use serde::{Deserialize, Serialize};
     use serde_json::{json, Value};
     use vector_core::event::{BatchNotifier, BatchStatus};
 
     use super::*;
+    use crate::gcp;
     use crate::test_util::{
-        components::{self, HTTP_SINK_TAGS},
+        components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
         random_events_with_stream, random_string, trace_init,
     };
-
-    fn emulator_address() -> String {
-        std::env::var("EMULATOR_ADDRESS").unwrap_or_else(|_| "http://localhost:8681".into())
-    }
 
     const PROJECT: &str = "testproject";
 
     fn config(topic: &str) -> PubsubConfig {
         PubsubConfig {
-            endpoint: Some(emulator_address()),
-            skip_authentication: true,
             project: PROJECT.into(),
             topic: topic.into(),
-            ..Default::default()
+            endpoint: Some(gcp::PUBSUB_ADDRESS.clone()),
+            auth: GcpAuthConfig {
+                skip_authentication: true,
+                ..Default::default()
+            },
+            batch: Default::default(),
+            request: Default::default(),
+            encoding: JsonSerializerConfig::new().into(),
+            tls: Default::default(),
+            acknowledgements: Default::default(),
         }
     }
 
@@ -304,7 +311,7 @@ mod integration_tests {
 
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
         let (input, events) = random_events_with_stream(100, 100, Some(batch));
-        components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
+        run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         let response = pull_messages(&subscription, 1000).await;
@@ -316,7 +323,7 @@ mod integration_tests {
         for i in 0..input.len() {
             let data = messages[i].message.decode_data();
             let data = serde_json::to_value(data).unwrap();
-            let expected = serde_json::to_value(input[i].as_log().all_fields()).unwrap();
+            let expected = serde_json::to_value(input[i].as_log().all_fields().unwrap()).unwrap();
             assert_eq!(data, expected);
         }
     }
@@ -366,7 +373,7 @@ mod integration_tests {
     }
 
     async fn request(method: Method, path: &str, json: Value) -> Response {
-        let url = format!("{}/v1/projects/{}/{}", emulator_address(), PROJECT, path);
+        let url = format!("{}/v1/projects/{}/{}", *gcp::PUBSUB_ADDRESS, PROJECT, path);
         Client::new()
             .request(method.clone(), &url)
             .json(&json)

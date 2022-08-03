@@ -1,5 +1,7 @@
 #![cfg(test)]
 
+use codecs::JsonSerializerConfig;
+
 use super::*;
 use crate::{
     aws::RegionOrEndpoint,
@@ -8,11 +10,7 @@ use crate::{
         aws_kinesis_firehose::config::{
             KinesisFirehoseDefaultBatchSettings, MAX_PAYLOAD_EVENTS, MAX_PAYLOAD_SIZE,
         },
-        util::{
-            batch::BatchError,
-            encoding::{EncodingConfig, StandardEncodings},
-            BatchConfig, Compression,
-        },
+        util::{batch::BatchError, BatchConfig, Compression},
     },
 };
 
@@ -29,13 +27,12 @@ async fn check_batch_size() {
 
     let config = KinesisFirehoseSinkConfig {
         stream_name: String::from("test"),
-        region: RegionOrEndpoint::with_endpoint("http://localhost:4566"),
-        encoding: EncodingConfig::from(StandardEncodings::Json),
+        region: RegionOrEndpoint::with_both("local", "http://localhost:4566"),
+        encoding: JsonSerializerConfig::new().into(),
         compression: Compression::None,
         batch,
         request: Default::default(),
         tls: None,
-        assume_role: None,
         auth: Default::default(),
         acknowledgements: Default::default(),
     };
@@ -58,13 +55,12 @@ async fn check_batch_events() {
 
     let config = KinesisFirehoseSinkConfig {
         stream_name: String::from("test"),
-        region: RegionOrEndpoint::with_endpoint("http://localhost:4566"),
-        encoding: EncodingConfig::from(StandardEncodings::Json),
+        region: RegionOrEndpoint::with_both("local", "http://localhost:4566"),
+        encoding: JsonSerializerConfig::new().into(),
         compression: Compression::None,
         batch,
         request: Default::default(),
         tls: None,
-        assume_role: None,
         auth: Default::default(),
         acknowledgements: Default::default(),
     };

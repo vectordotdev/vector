@@ -1,4 +1,4 @@
-use std::{convert::Infallible, error::Error, future::Future, time::Duration};
+use std::{error::Error, future::Future, time::Duration};
 
 use file_source::{
     paths_provider::PathsProvider, Checkpointer, FileServer, FileServerShutdown,
@@ -6,7 +6,7 @@ use file_source::{
 };
 use futures::{
     future::{select, Either},
-    pin_mut, Sink,
+    pin_mut, FutureExt, Sink,
 };
 use tokio::task::spawn_blocking;
 
@@ -28,32 +28,15 @@ where
 {
     let span = info_span!("file_server");
     let join_handle = spawn_blocking(move || {
+        // These will need to be separated when this source is updated
+        // to support end-to-end acknowledgements.
+        let shutdown = shutdown.shared();
+        let shutdown2 = shutdown.clone();
         let _enter = span.enter();
-        let result = file_server.run(chans, shutdown, checkpointer);
+        let result = file_server.run(chans, shutdown, shutdown2, checkpointer);
         result.expect("file server exited with an error")
     });
     join_handle.await
-}
-
-/// Takes a `future` returning a result with an [`Infallible`] Ok-value and
-/// a `signal`, and returns a future that completes when the `future` errors or
-/// the `signal` completes.
-/// If `signal` is sent or cancelled, the `future` is dropped (and not polled
-/// anymore).
-pub async fn cancel_on_signal<E, F, S>(future: F, signal: S) -> Result<(), E>
-where
-    F: Future<Output = Result<Infallible, E>>,
-    S: Future<Output = ()>,
-{
-    pin_mut!(future);
-    pin_mut!(signal);
-    match select(future, signal).await {
-        Either::Left((future_result, _)) => match future_result {
-            Ok(_infallible) => unreachable!("ok value is infallible, thus impossible to reach"),
-            Err(err) => Err(err),
-        },
-        Either::Right(((), _)) => Ok(()),
-    }
 }
 
 pub async fn complete_with_deadline_on_signal<F, S>(

@@ -1,5 +1,6 @@
 use std::{iter::FromIterator, str::FromStr};
 
+use ::value::Value;
 use nom::{
     self,
     branch::alt,
@@ -12,6 +13,27 @@ use nom::{
     IResult,
 };
 use vrl::prelude::*;
+
+pub(crate) fn parse_key_value(
+    bytes: Value,
+    key_value_delimiter: Value,
+    field_delimiter: Value,
+    standalone_key: Value,
+    whitespace: Whitespace,
+) -> Resolved {
+    let bytes = bytes.try_bytes_utf8_lossy()?;
+    let key_value_delimiter = key_value_delimiter.try_bytes_utf8_lossy()?;
+    let field_delimiter = field_delimiter.try_bytes_utf8_lossy()?;
+    let standalone_key = standalone_key.try_boolean()?;
+    let values = parse(
+        &bytes,
+        &key_value_delimiter,
+        &field_delimiter,
+        whitespace,
+        standalone_key,
+    )?;
+    Ok(Value::from_iter(values))
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseKeyValue;
@@ -80,7 +102,7 @@ impl Function for ParseKeyValue {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -118,7 +140,7 @@ impl Function for ParseKeyValue {
     fn compile_argument(
         &self,
         _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         name: &str,
         expr: Option<&expression::Expr>,
     ) -> CompiledArgument {
@@ -133,47 +155,12 @@ impl Function for ParseKeyValue {
                     .map_err(|_| vrl::function::Error::InvalidEnumVariant {
                         keyword: "whitespace",
                         value,
-                        variants: Whitespace::all_value().to_vec(),
+                        variants: Whitespace::all_value(),
                     })?,
                 )),
             },
             _ => Ok(None),
         }
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let bytes = value.try_bytes_utf8_lossy()?;
-
-        let key_value_delimiter = args
-            .optional("key_value_delimiter")
-            .unwrap_or_else(|| value!("="));
-        let key_value_delimiter = key_value_delimiter.try_bytes_utf8_lossy()?;
-
-        let field_delimiter = args
-            .optional("field_delimiter")
-            .unwrap_or_else(|| value!(" "));
-        let field_delimiter = field_delimiter.try_bytes_utf8_lossy()?;
-
-        let whitespace = match args.optional_any("whitespace") {
-            Some(whitespace) => *whitespace.downcast_ref::<Whitespace>().unwrap(),
-            None => Whitespace::default(),
-        };
-
-        let standalone_key = args
-            .optional("accept_standalone_key")
-            .unwrap_or_else(|| value!(true))
-            .try_boolean()?;
-
-        let values = parse(
-            &bytes,
-            &key_value_delimiter,
-            &field_delimiter,
-            whitespace,
-            standalone_key,
-        )?;
-
-        Ok(Value::from_iter(values))
     }
 }
 
@@ -185,7 +172,7 @@ pub(crate) enum Whitespace {
 
 impl Whitespace {
     fn all_value() -> Vec<Value> {
-        use Whitespace::*;
+        use Whitespace::{Lenient, Strict};
 
         vec![Strict, Lenient]
             .into_iter()
@@ -194,7 +181,7 @@ impl Whitespace {
     }
 
     const fn as_str(self) -> &'static str {
-        use Whitespace::*;
+        use Whitespace::{Lenient, Strict};
 
         match self {
             Strict => "strict",
@@ -213,7 +200,7 @@ impl FromStr for Whitespace {
     type Err = &'static str;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        use Whitespace::*;
+        use Whitespace::{Lenient, Strict};
 
         match s {
             "strict" => Ok(Strict),
@@ -234,29 +221,22 @@ pub(crate) struct ParseKeyValueFn {
 
 impl Expression for ParseKeyValueFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
-        let bytes = value.try_bytes_utf8_lossy()?;
+        let bytes = self.value.resolve(ctx)?;
+        let key_value_delimiter = self.key_value_delimiter.resolve(ctx)?;
+        let field_delimiter = self.field_delimiter.resolve(ctx)?;
+        let standalone_key = self.standalone_key.resolve(ctx)?;
+        let whitespace = self.whitespace;
 
-        let value = self.key_value_delimiter.resolve(ctx)?;
-        let key_value_delimiter = value.try_bytes_utf8_lossy()?;
-
-        let value = self.field_delimiter.resolve(ctx)?;
-        let field_delimiter = value.try_bytes_utf8_lossy()?;
-
-        let standalone_key = self.standalone_key.resolve(ctx)?.try_boolean()?;
-
-        let values = parse(
-            &bytes,
-            &key_value_delimiter,
-            &field_delimiter,
-            self.whitespace,
+        parse_key_value(
+            bytes,
+            key_value_delimiter,
+            field_delimiter,
             standalone_key,
-        )?;
-
-        Ok(Value::from_iter(values))
+            whitespace,
+        )
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::object(Collection::any()).fallible()
     }
 }
@@ -280,7 +260,7 @@ fn parse<'a>(
             // Create a descriptive error message if possible.
             nom::error::convert_error(input, e)
         }
-        _ => e.to_string(),
+        nom::Err::Incomplete(_) => e.to_string(),
     })?;
 
     if rest.trim().is_empty() {
@@ -300,7 +280,7 @@ fn parse_line<'a>(
 ) -> IResult<&'a str, Vec<(String, Value)>, VerboseError<&'a str>> {
     separated_list1(
         parse_field_delimiter(field_delimiter),
-        parse_key_value(
+        parse_key_value_(
             key_value_delimiter,
             field_delimiter,
             whitespace,
@@ -309,9 +289,9 @@ fn parse_line<'a>(
     )(input)
 }
 
-/// Parses the field_delimiter between the key/value pairs.
-/// If the field_delimiter is a space, we parse as many as we can,
-/// If it is not a space eat any whitespace before our field_delimiter as well as the field_delimiter.
+/// Parses the `field_delimiter` between the key/value pairs.
+/// If the `field_delimiter` is a space, we parse as many as we can,
+/// If it is not a space eat any whitespace before our `field_delimiter` as well as the `field_delimiter`.
 fn parse_field_delimiter<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     field_delimiter: &'a str,
 ) -> impl Fn(&'a str) -> IResult<&'a str, &'a str, E> {
@@ -327,7 +307,7 @@ fn parse_field_delimiter<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
 /// Parse a single `key=value` tuple.
 /// Always accepts `key=`
 /// Accept standalone `key` if `standalone_key` is `true`
-fn parse_key_value<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
+fn parse_key_value_<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     key_value_delimiter: &'a str,
     field_delimiter: &'a str,
     whitespace: Whitespace,
@@ -341,7 +321,7 @@ fn parse_key_value<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
                         space0,
                         parse_key(key_value_delimiter, field_delimiter, standalone_key),
                     ),
-                    many_m_n(!standalone_key as usize, 1, tag(key_value_delimiter)),
+                    many_m_n(usize::from(!standalone_key), 1, tag(key_value_delimiter)),
                     parse_value(field_delimiter),
                 ))(input),
                 Whitespace::Lenient => tuple((
@@ -350,7 +330,7 @@ fn parse_key_value<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
                         parse_key(key_value_delimiter, field_delimiter, standalone_key),
                     ),
                     many_m_n(
-                        !standalone_key as usize,
+                        usize::from(!standalone_key),
                         1,
                         delimited(space0, tag(key_value_delimiter), space0),
                     ),
@@ -409,12 +389,12 @@ fn parse_delimited<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     }
 }
 
-/// An undelimited value is all the text until our field_delimiter, or if it is the last value in the line,
+/// An undelimited value is all the text until our `field_delimiter`, or if it is the last value in the line,
 /// just take the rest of the string.
 fn parse_undelimited<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     field_delimiter: &'a str,
 ) -> impl Fn(&'a str) -> IResult<&'a str, &'a str, E> {
-    move |input| map(alt((take_until(field_delimiter), rest)), |s: &str| s.trim())(input)
+    move |input| map(alt((take_until(field_delimiter), rest)), str::trim)(input)
 }
 
 /// Parses the value.
@@ -422,7 +402,7 @@ fn parse_undelimited<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
 ///
 /// 1. Parse as a delimited field - currently the delimiter is hardcoded to a `"`.
 /// 2. If it does not start with one of the trim values, it is not a delimited field and we parse up to
-///    the next field_delimiter or the eof.
+///    the next `field_delimiter` or the eof.
 ///
 fn parse_value<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     field_delimiter: &'a str,
@@ -439,7 +419,7 @@ fn parse_value<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
 }
 
 /// Parses the key.
-/// Overall parsing strategies are the same as parse_value, but we don't need to convert the result to a `Value`.
+/// Overall parsing strategies are the same as `parse_value`, but we don't need to convert the result to a `Value`.
 /// Standalone key are handled here so a quoted standalone key that contains a delimiter will be dealt with correctly.
 fn parse_key<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     key_value_delimiter: &'a str,
@@ -511,12 +491,14 @@ mod test {
     fn test_parse_key_value() {
         assert_eq!(
             Ok(("", ("ook".to_string(), "pook".into()))),
-            parse_key_value::<VerboseError<&str>>("=", " ", Whitespace::Lenient, false)("ook=pook")
+            parse_key_value_::<VerboseError<&str>>("=", " ", Whitespace::Lenient, false)(
+                "ook=pook"
+            )
         );
 
         assert_eq!(
             Ok(("", ("key".to_string(), "".into()))),
-            parse_key_value::<VerboseError<&str>>("=", " ", Whitespace::Strict, false)("key=")
+            parse_key_value_::<VerboseError<&str>>("=", " ", Whitespace::Strict, false)("key=")
         );
     }
 

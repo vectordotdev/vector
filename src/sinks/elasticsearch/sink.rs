@@ -1,23 +1,24 @@
-use std::num::NonZeroUsize;
+use std::{fmt, num::NonZeroUsize};
 
 use async_trait::async_trait;
 use futures::{future, stream::BoxStream, StreamExt};
-use tower::util::BoxService;
-use vector_core::{buffers::Acker, stream::BatcherSettings, ByteSizeOf};
+use tower::Service;
+use vector_core::{
+    stream::{BatcherSettings, DriverResponse},
+    ByteSizeOf,
+};
 
 use crate::{
+    codecs::Transformer,
     event::{Event, LogEvent, Value},
     sinks::{
         elasticsearch::{
-            encoder::ProcessedEvent,
-            request_builder::ElasticsearchRequestBuilder,
-            service::{ElasticsearchRequest, ElasticsearchResponse},
-            BulkAction, ElasticsearchCommonMode,
+            encoder::ProcessedEvent, request_builder::ElasticsearchRequestBuilder,
+            service::ElasticsearchRequest, BulkAction, ElasticsearchCommonMode,
         },
-        util::{Compression, SinkBuilderExt, StreamSink},
+        util::{SinkBuilderExt, StreamSink},
     },
     transforms::metric_to_log::MetricToLog,
-    Error,
 };
 
 #[derive(Clone, Eq, Hash, PartialEq)]
@@ -37,23 +38,29 @@ impl ByteSizeOf for BatchedEvents {
     }
 }
 
-pub struct ElasticsearchSink {
+pub struct ElasticsearchSink<S> {
     pub batch_settings: BatcherSettings,
     pub request_builder: ElasticsearchRequestBuilder,
-    pub compression: Compression,
-    pub service: BoxService<ElasticsearchRequest, ElasticsearchResponse, Error>,
-    pub acker: Acker,
+    pub transformer: Transformer,
+    pub service: S,
     pub metric_to_log: MetricToLog,
     pub mode: ElasticsearchCommonMode,
     pub id_key_field: Option<String>,
 }
 
-impl ElasticsearchSink {
+impl<S> ElasticsearchSink<S>
+where
+    S: Service<ElasticsearchRequest> + Send + 'static,
+    S::Future: Send + 'static,
+    S::Response: DriverResponse + Send + 'static,
+    S::Error: fmt::Debug + Into<crate::Error> + Send,
+{
     pub async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let request_builder_concurrency_limit = NonZeroUsize::new(50);
 
         let mode = self.mode;
         let id_key_field = self.id_key_field;
+        let transformer = self.transformer.clone();
 
         let sink = input
             .scan(self.metric_to_log, |metric_to_log, event| {
@@ -64,7 +71,9 @@ impl ElasticsearchSink {
                 }))
             })
             .filter_map(|x| async move { x })
-            .filter_map(move |log| future::ready(process_log(log, &mode, &id_key_field)))
+            .filter_map(move |log| {
+                future::ready(process_log(log, &mode, &id_key_field, &transformer))
+            })
             .batched(self.batch_settings.into_byte_size_config())
             .request_builder(request_builder_concurrency_limit, self.request_builder)
             .filter_map(|request| async move {
@@ -76,7 +85,7 @@ impl ElasticsearchSink {
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(self.service, self.acker);
+            .into_driver(self.service);
 
         sink.run().await
     }
@@ -86,6 +95,7 @@ pub fn process_log(
     mut log: LogEvent,
     mode: &ElasticsearchCommonMode,
     id_key_field: &Option<String>,
+    transformer: &Transformer,
 ) -> Option<ProcessedEvent> {
     let index = mode.index(&log)?;
     let bulk_action = mode.bulk_action(&log)?;
@@ -102,6 +112,11 @@ pub fn process_log(
     } else {
         None
     };
+    let log = {
+        let mut event = Event::from(log);
+        transformer.transform(&mut event);
+        event.into_log()
+    };
     Some(ProcessedEvent {
         index,
         bulk_action,
@@ -111,7 +126,13 @@ pub fn process_log(
 }
 
 #[async_trait]
-impl StreamSink<Event> for ElasticsearchSink {
+impl<S> StreamSink<Event> for ElasticsearchSink<S>
+where
+    S: Service<ElasticsearchRequest> + Send + 'static,
+    S::Future: Send + 'static,
+    S::Response: DriverResponse + Send + 'static,
+    S::Error: fmt::Debug + Into<crate::Error> + Send,
+{
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
     }

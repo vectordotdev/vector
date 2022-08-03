@@ -1,8 +1,9 @@
+use ::value::Value;
 use vector_common::conversion::Conversion;
 use vrl::prelude::*;
 
-fn to_float(value: Value) -> std::result::Result<Value, ExpressionError> {
-    use Value::*;
+fn to_float(value: Value) -> Resolved {
+    use Value::{Boolean, Bytes, Float, Integer, Null, Timestamp};
     match value {
         Float(_) => Ok(value),
         Integer(v) => Ok(Value::from_f64_or_zero(v as f64)),
@@ -104,19 +105,13 @@ impl Function for ToFloat {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
         Ok(Box::new(ToFloatFn { value }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-
-        to_float(value)
     }
 }
 
@@ -132,7 +127,7 @@ impl Expression for ToFloatFn {
         to_float(value)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         let td = self.value.type_def(state);
 
         TypeDef::float().with_fallibility(
@@ -167,7 +162,7 @@ mod tests {
 
         timestamp {
              args: func_args![value: Utc.ymd(2014, 7, 8).and_hms_milli(9, 10, 11, 12)],
-             want: Ok(1404810611.012),
+             want: Ok(1_404_810_611.012),
              tdef: TypeDef::float().infallible(),
         }
     ];
