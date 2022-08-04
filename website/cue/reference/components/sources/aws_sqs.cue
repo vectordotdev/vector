@@ -1,12 +1,17 @@
 package metadata
 
-components: sources: aws_sqs: components._aws_new_sdk & {
+components: sources: aws_sqs: components._aws & {
 	title: "AWS SQS"
 
 	features: {
 		acknowledgements: true
 		collect: {
-			tls: enabled:        false
+			tls: {
+				enabled:                true
+				can_verify_certificate: true
+				can_verify_hostname:    true
+				enabled_default:        false
+			}
 			checkpoint: enabled: false
 			proxy: enabled:      true
 			from: service:       services.aws_sqs
@@ -63,6 +68,22 @@ components: sources: aws_sqs: components._aws_new_sdk & {
 				unit:    "seconds"
 			}
 		}
+		visibility_timeout_secs: {
+			common:      false
+			description: "The visibility timeout to use for messages in secords. This controls how long a message is left unavailable when a Vector receives it. If a `vector` does not delete the message before the timeout expires, it will be made reavailable for another consumer; this can happen if, for example, the `vector` process crashes."
+			required:    false
+			warnings: ["Should be set higher than the length of time it takes to process an individual message to avoid that message being reprocessed."]
+			type: uint: {
+				default: 300
+				unit:    "seconds"
+			}
+		}
+		delete_message: {
+			common:      true
+			description: "Whether to delete the message once Vector processes it. It can be useful to set this to `false` to debug or during initial Vector setup."
+			required:    false
+			type: bool: default: true
+		}
 		client_concurrency: {
 			common:      true
 			description: "How many clients are receiving / acking SQS messages. Increasing may allow higher throughput. Note: the default is 1 / CPU core"
@@ -93,6 +114,13 @@ components: sources: aws_sqs: components._aws_new_sdk & {
 				type: string: {
 					examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
 					syntax: "literal"
+				}
+			}
+			source_type: {
+				description: "The name of the source type."
+				required:    true
+				type: string: {
+					examples: ["aws_sqs"]
 				}
 			}
 			timestamp: fields._current_timestamp & {

@@ -1,3 +1,4 @@
+use ::value::Value;
 use vector_common::conversion::Conversion;
 use vrl::prelude::*;
 
@@ -5,7 +6,7 @@ fn parse_timestamp(value: Value, format: Value, ctx: &Context) -> Resolved {
     match value {
         Value::Bytes(v) => {
             let format = format.try_bytes_utf8_lossy()?;
-            Conversion::parse(format!("timestamp|{}", format), ctx.timezone().to_owned())
+            Conversion::parse(format!("timestamp|{}", format), *ctx.timezone())
                 .map_err(|e| e.to_string())?
                 .convert(v)
                 .map_err(|e| e.to_string().into())
@@ -33,7 +34,7 @@ impl Function for ParseTimestamp {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -57,12 +58,6 @@ impl Function for ParseTimestamp {
             },
         ]
     }
-
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let format = args.required("format");
-        parse_timestamp(value, format, ctx)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -78,7 +73,7 @@ impl Expression for ParseTimestampFn {
         parse_timestamp(value, format, ctx)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::timestamp().fallible(/* always fallible because the format needs to be parsed at runtime */)
     }
 }

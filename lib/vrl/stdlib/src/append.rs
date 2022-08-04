@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 fn append(value: Value, items: Value) -> Resolved {
@@ -40,7 +41,7 @@ impl Function for Append {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -48,13 +49,6 @@ impl Function for Append {
         let items = arguments.required("items");
 
         Ok(Box::new(AppendFn { value, items }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let items = args.required("items");
-
-        append(value, items)
     }
 }
 
@@ -72,17 +66,37 @@ impl Expression for AppendFn {
         append(value, items)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.value
-            .type_def(state)
-            .merge_append(self.items.type_def(state))
+    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+        let mut self_value = self.value.type_def(state).restrict_array();
+        let items = self.items.type_def(state).restrict_array();
+
+        let self_array = self_value.as_array_mut().expect("must be an array");
+        let items_array = items.as_array().expect("must be an array");
+
+        if let Some(exact_len) = self_array.exact_length() {
+            // The exact array length is known.
+            for (i, i_kind) in items_array.known() {
+                self_array
+                    .known_mut()
+                    .insert((i.to_usize() + exact_len).into(), i_kind.clone());
+            }
+
+            // "value" can't have an unknown, so they new unknown is just that of "items".
+            self_array.set_unknown(items_array.unknown_kind());
+        } else {
+            // We don't know where the items will be inserted, so the union of all items will be added to the unknown.
+            self_array.set_unknown(self_array.unknown_kind().union(items_array.reduced_kind()));
+        }
+
+        self_value.infallible()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use vector_common::btreemap;
+
+    use super::*;
 
     test_function![
         append => Append;

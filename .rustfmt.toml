@@ -1,7 +1,9 @@
-# Using defaults.
-# Not stable yet.
-# indent_style = "Block"
-# group_imports = "StdExternalCrate"
-# imports_granularity = "Crate"
-reorder_imports = true
 edition = "2021"
+newline_style = "unix"
+reorder_imports = true
+
+# Nightly only features
+# unstable_features = true
+# imports_granularity = "Crate"
+# group_imports = "StdExternalCrate"
+# indent_style = "Block"

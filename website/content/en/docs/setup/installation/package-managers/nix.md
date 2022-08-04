@@ -4,6 +4,10 @@ short: Nix
 weight: 6
 ---
 
+{{< info title="Community Maintained" >}}
+The Vector nixpkg is supported and maintained by the open source community.
+{{< /info >}}
+
 [Nix] is a cross-platform package manager implemented on a functional deployment model where software is installed into unique directories generated through cryptographic hashes, it is also the name of the programming language. This page covers installing and managing Vector through the Nix package repository.
 
 {{< warning title="Nix releases are typically delayed" >}}

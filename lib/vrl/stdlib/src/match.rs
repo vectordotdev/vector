@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 fn match_(value: Value, pattern: Value) -> Resolved {
@@ -46,7 +47,7 @@ impl Function for Match {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -54,13 +55,6 @@ impl Function for Match {
         let pattern = arguments.required("pattern");
 
         Ok(Box::new(MatchFn { value, pattern }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let pattern = args.required("pattern");
-
-        match_(value, pattern)
     }
 }
 
@@ -78,7 +72,7 @@ impl Expression for MatchFn {
         match_(value, pattern)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::boolean().infallible()
     }
 }

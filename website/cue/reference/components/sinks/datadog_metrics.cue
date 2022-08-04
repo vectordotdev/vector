@@ -13,7 +13,7 @@ components: sinks: datadog_metrics: {
 				enabled:      true
 				common:       false
 				max_events:   100_000
-				timeout_secs: 2
+				timeout_secs: 2.0
 			}
 			compression: enabled: false
 			encoding: enabled:    false
@@ -27,7 +27,12 @@ components: sinks: datadog_metrics: {
 				timeout_secs:               60
 				headers:                    false
 			}
-			tls: enabled: false
+			tls: {
+				enabled:                true
+				can_verify_certificate: true
+				can_verify_hostname:    true
+				enabled_default:        true
+			}
 			to: {
 				service: services.datadog_metrics
 
@@ -49,21 +54,21 @@ components: sinks: datadog_metrics: {
 	support: sinks._datadog.support
 
 	configuration: {
-		api_key:  sinks._datadog.configuration.api_key
-		endpoint: sinks._datadog.configuration.endpoint
-		region:   sinks._datadog.configuration.region
-		site:     sinks._datadog.configuration.site
+		default_api_key: sinks._datadog.configuration.default_api_key
+		endpoint:        sinks._datadog.configuration.endpoint
+		region:          sinks._datadog.configuration.region
+		site:            sinks._datadog.configuration.site
 		default_namespace: {
-			common: true
+			common: false
 			description: """
 				Used as a namespace for metrics that don't have it.
-				A namespace will be prefixed to a metric's name.
+				A namespace will be prefixed to a metric's name separated by `.`.
 				"""
 			required: false
 			warnings: []
 			type: string: {
 				default: null
-				examples: ["service"]
+				examples: ["myservice"]
 			}
 		}
 	}
@@ -78,6 +83,7 @@ components: sinks: datadog_metrics: {
 			set:          false
 			summary:      false
 		}
+		traces: false
 	}
 
 	telemetry: metrics: {

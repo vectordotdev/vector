@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 fn split(value: Value, limit: Value, pattern: Value) -> Resolved {
@@ -74,27 +75,19 @@ impl Function for Split {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let pattern = arguments.required("pattern");
-        let limit = arguments.optional("limit").unwrap_or(expr!(999999999));
+        let limit = arguments.optional("limit").unwrap_or(expr!(999_999_999));
 
         Ok(Box::new(SplitFn {
             value,
             pattern,
             limit,
         }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let pattern = args.required("pattern");
-        let limit = args.optional("limit").unwrap_or(value!(999999999));
-
-        split(value, limit, pattern)
     }
 }
 
@@ -114,7 +107,7 @@ impl Expression for SplitFn {
         split(value, limit, pattern)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::array(Collection::from_unknown(Kind::bytes())).infallible()
     }
 }

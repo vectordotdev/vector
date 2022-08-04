@@ -4,8 +4,9 @@ use std::{
     task::{Context, Poll},
 };
 
-use crate::event::{Event, EventArray, EventContainer};
 use futures::{task::noop_waker_ref, Stream, StreamExt};
+
+use crate::event::{Event, EventArray, EventContainer};
 
 pub(crate) fn open_fixture(path: impl AsRef<Path>) -> crate::Result<serde_json::Value> {
     serde_json::from_reader(File::open(path)?).map_err(Into::into)

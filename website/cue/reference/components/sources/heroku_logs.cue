@@ -45,7 +45,6 @@ components: sources: heroku_logs: {
 
 			tls: {
 				enabled:                true
-				can_enable:             true
 				can_verify_certificate: true
 				enabled_default:        false
 			}
@@ -92,6 +91,13 @@ components: sources: heroku_logs: {
 				required:    true
 				type: string: {
 					examples: ["console"]
+				}
+			}
+			source_type: {
+				description: "The name of the source type."
+				required:    true
+				type: string: {
+					examples: ["heroku_logs"]
 				}
 			}
 			timestamp: fields._current_timestamp

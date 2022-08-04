@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 fn replace(value: Value, with_value: Value, count: Value, pattern: Value) -> Resolved {
@@ -98,7 +99,7 @@ impl Function for Replace {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -113,15 +114,6 @@ impl Function for Replace {
             with,
             count,
         }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let pattern = args.required("pattern");
-        let with = args.required("with");
-        let count = args.optional("count").unwrap_or(value!(-1));
-
-        replace(value, with, count, pattern)
     }
 }
 
@@ -143,7 +135,7 @@ impl Expression for ReplaceFn {
         replace(value, with_value, count, pattern)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().infallible()
     }
 }

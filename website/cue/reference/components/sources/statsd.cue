@@ -36,7 +36,11 @@ components: sources: statsd: {
 				relevant_when: "mode = `tcp` or mode = `udp`"
 			}
 			keepalive: enabled: true
-			tls: enabled:       false
+			tls: {
+				enabled:                true
+				can_verify_certificate: true
+				enabled_default:        false
+			}
 		}
 	}
 

@@ -4,19 +4,19 @@ use async_trait::async_trait;
 use futures::{future, stream::BoxStream, StreamExt};
 use tower::Service;
 use vector_core::{
-    buffers::Acker,
     stream::{BatcherSettings, DriverResponse},
     ByteSizeOf,
 };
 
 use crate::{
+    codecs::Transformer,
     event::{Event, LogEvent, Value},
     sinks::{
         elasticsearch::{
             encoder::ProcessedEvent, request_builder::ElasticsearchRequestBuilder,
             service::ElasticsearchRequest, BulkAction, ElasticsearchCommonMode,
         },
-        util::{Compression, SinkBuilderExt, StreamSink},
+        util::{SinkBuilderExt, StreamSink},
     },
     transforms::metric_to_log::MetricToLog,
 };
@@ -41,9 +41,8 @@ impl ByteSizeOf for BatchedEvents {
 pub struct ElasticsearchSink<S> {
     pub batch_settings: BatcherSettings,
     pub request_builder: ElasticsearchRequestBuilder,
-    pub compression: Compression,
+    pub transformer: Transformer,
     pub service: S,
-    pub acker: Acker,
     pub metric_to_log: MetricToLog,
     pub mode: ElasticsearchCommonMode,
     pub id_key_field: Option<String>,
@@ -61,6 +60,7 @@ where
 
         let mode = self.mode;
         let id_key_field = self.id_key_field;
+        let transformer = self.transformer.clone();
 
         let sink = input
             .scan(self.metric_to_log, |metric_to_log, event| {
@@ -71,7 +71,9 @@ where
                 }))
             })
             .filter_map(|x| async move { x })
-            .filter_map(move |log| future::ready(process_log(log, &mode, &id_key_field)))
+            .filter_map(move |log| {
+                future::ready(process_log(log, &mode, &id_key_field, &transformer))
+            })
             .batched(self.batch_settings.into_byte_size_config())
             .request_builder(request_builder_concurrency_limit, self.request_builder)
             .filter_map(|request| async move {
@@ -83,7 +85,7 @@ where
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(self.service, self.acker);
+            .into_driver(self.service);
 
         sink.run().await
     }
@@ -93,6 +95,7 @@ pub fn process_log(
     mut log: LogEvent,
     mode: &ElasticsearchCommonMode,
     id_key_field: &Option<String>,
+    transformer: &Transformer,
 ) -> Option<ProcessedEvent> {
     let index = mode.index(&log)?;
     let bulk_action = mode.bulk_action(&log)?;
@@ -108,6 +111,11 @@ pub fn process_log(
         Some(String::from_utf8_lossy(&key).into_owned())
     } else {
         None
+    };
+    let log = {
+        let mut event = Event::from(log);
+        transformer.transform(&mut event);
+        event.into_log()
     };
     Some(ProcessedEvent {
         index,

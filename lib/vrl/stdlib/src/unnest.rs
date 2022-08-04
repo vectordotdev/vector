@@ -1,41 +1,52 @@
+use ::value::Value;
 use lookup_lib::LookupBuf;
-use vrl::{prelude::*, value::kind::merge};
+use vrl::prelude::*;
 
-fn unnest(path: &expression::Query, ctx: &mut Context) -> Resolved {
-    let path_path = path.path();
-    let value: Value;
-    let target: Box<&dyn Target> = match path.target() {
-        expression::Target::External => Box::new(ctx.target()) as Box<_>,
+fn unnest(path: &expression::Query, root_lookup: &LookupBuf, ctx: &mut Context) -> Resolved {
+    let lookup_buf = path.path();
+
+    match path.target() {
+        expression::Target::External => {
+            let root = ctx
+                .target()
+                .target_get(root_lookup)
+                .expect("must never fail")
+                .expect("always a value");
+            unnest_root(root, lookup_buf)
+        }
         expression::Target::Internal(v) => {
-            let v = ctx.state().variable(v.ident()).unwrap_or(&Value::Null);
-            Box::new(v as &dyn Target) as Box<_>
+            let value = ctx.state().variable(v.ident()).unwrap_or(&Value::Null);
+            let root = value.get_by_path(root_lookup).expect("always a value");
+            unnest_root(root, lookup_buf)
         }
         expression::Target::Container(expr) => {
-            value = expr.resolve(ctx)?;
-            Box::new(&value as &dyn Target) as Box<&dyn Target>
+            let value = expr.resolve(ctx)?;
+            let root = value.get_by_path(root_lookup).expect("always a value");
+            unnest_root(root, lookup_buf)
         }
         expression::Target::FunctionCall(expr) => {
-            value = expr.resolve(ctx)?;
-            Box::new(&value as &dyn Target) as Box<&dyn Target>
+            let value = expr.resolve(ctx)?;
+            let root = value.get_by_path(root_lookup).expect("always a value");
+            unnest_root(root, lookup_buf)
         }
-    };
-    let root = target
-        .target_get(&LookupBuf::root())
-        .expect("must never fail")
-        .expect("always a value");
+    }
+}
+
+fn unnest_root(root: &Value, path: &LookupBuf) -> Resolved {
     let values = root
-        .get_by_path(path_path)
+        .get_by_path(path)
         .cloned()
         .ok_or(value::Error::Expected {
             got: Kind::null(),
             expected: Kind::array(Collection::any()),
         })?
         .try_array()?;
+
     let events = values
         .into_iter()
         .map(|value| {
             let mut event = root.clone();
-            event.insert_by_path(path_path, value);
+            event.insert_by_path(path, value);
             event
         })
         .collect::<Vec<_>>();
@@ -86,13 +97,14 @@ impl Function for Unnest {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let path = arguments.required_query("path")?;
+        let root = LookupBuf::root();
 
-        Ok(Box::new(UnnestFn { path }))
+        Ok(Box::new(UnnestFn { path, root }))
     }
 
     fn compile_argument(
@@ -120,19 +132,12 @@ impl Function for Unnest {
             _ => Ok(None),
         }
     }
-
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let path = args
-            .required_any("path")
-            .downcast_ref::<expression::Query>()
-            .unwrap();
-        unnest(path, ctx)
-    }
 }
 
 #[derive(Debug, Clone)]
 struct UnnestFn {
     path: expression::Query,
+    root: LookupBuf,
 }
 
 impl UnnestFn {
@@ -145,24 +150,24 @@ impl UnnestFn {
                 expression::Target::External,
                 FromStr::from_str(path).unwrap(),
             ),
+            root: LookupBuf::root(),
         }
     }
 }
 
 impl Expression for UnnestFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let path = &self.path;
-        unnest(path, ctx)
+        unnest(&self.path, &self.root, ctx)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         use expression::Target;
 
         match self.path.target() {
-            Target::External => match state.target_kind().cloned().map(TypeDef::from) {
-                Some(root_type_def) => invert_array_at_path(&root_type_def, self.path.path()),
-                None => self.path.type_def(state).restrict_array().add_null(),
-            },
+            Target::External => invert_array_at_path(
+                &TypeDef::from(state.1.target_kind().clone()),
+                self.path.path(),
+            ),
             Target::Internal(v) => invert_array_at_path(&v.type_def(state), self.path.path()),
             Target::FunctionCall(f) => invert_array_at_path(&f.type_def(state), self.path.path()),
             Target::Container(c) => invert_array_at_path(&c.type_def(state), self.path.path()),
@@ -174,62 +179,40 @@ impl Expression for UnnestFn {
 /// And will remove it returning a set of it's elements.
 ///
 /// For example the typedef for this object:
-/// `{ "nonk" => { "shnoog" => [ { "noog" => 2 }, { "noog" => 3 } ] } }`
+/// `{ "a" => { "b" => [ { "c" => 2 }, { "c" => 3 } ] } }`
 ///
 /// Is converted to a typedef for this array:
-/// `[ { "nonk" => { "shnoog" => { "noog" => 2 } } },
-///    { "nonk" => { "shnoog" => { "noog" => 3 } } },
+/// `[ { "a" => { "b" => { "c" => 2 } } },
+///    { "a" => { "b" => { "c" => 3 } } },
 ///  ]`
 ///
 pub(crate) fn invert_array_at_path(typedef: &TypeDef, path: &LookupBuf) -> TypeDef {
-    use self::value::kind::insert;
+    let kind = typedef.kind().at_path(path);
 
-    let type_def = typedef.at_path(&path.to_lookup());
-
-    let mut array = Kind::from(type_def)
-        .into_array()
-        .unwrap_or_else(Collection::any);
+    let mut array = if let Some(array) = kind.into_array() {
+        array
+    } else {
+        // Guaranteed fallible.
+        // This can't actually be set to "fallible", or it will cause problems due to
+        // https://github.com/vectordotdev/vector/issues/13527
+        return TypeDef::never();
+    };
 
     array.known_mut().values_mut().for_each(|kind| {
         let mut tdkind = typedef.kind().clone();
-        tdkind
-            .insert_at_path(
-                &path.to_lookup(),
-                kind.clone(),
-                insert::Strategy {
-                    inner_conflict: insert::InnerConflict::Replace,
-                    leaf_conflict: insert::LeafConflict::Replace,
-                    coalesced_path: insert::CoalescedPath::InsertAll,
-                },
-            )
-            .expect("infallible");
+        tdkind.insert(path, kind.clone());
 
         *kind = tdkind.clone();
     });
 
-    let mut tdkind = typedef.kind().clone();
+    let unknown = array.unknown_kind();
+    if unknown.contains_any_defined() {
+        let mut tdkind = typedef.kind().clone();
+        tdkind.insert(path, unknown.without_undefined());
+        array.set_unknown(tdkind);
+    }
 
-    let unknown = array.unknown().map(|unknown| {
-        tdkind
-            .insert_at_path(
-                &path.to_lookup(),
-                unknown.clone().into(),
-                insert::Strategy {
-                    inner_conflict: insert::InnerConflict::Merge(merge::Strategy {
-                        depth: merge::Depth::Deep,
-                        indices: merge::Indices::Keep,
-                    }),
-                    leaf_conflict: insert::LeafConflict::Replace,
-                    coalesced_path: insert::CoalescedPath::InsertAll,
-                },
-            )
-            .expect("infallible");
-        tdkind
-    });
-
-    array.set_unknown(unknown);
-
-    TypeDef::array(array)
+    TypeDef::array(array).infallible()
 }
 
 #[cfg(test)]
@@ -325,36 +308,6 @@ mod tests {
                     } },
                 ] },
             },
-            // Indexed any
-            TestCase {
-                old: type_def! { object {
-                    "nonk" => type_def! { array [
-                        type_def! { object {
-                            "noog" => type_def! { array [
-                                type_def! { bytes },
-                            ] },
-                            "nork" => type_def! { bytes },
-                        } },
-                    ] },
-                } },
-                path: ".nonk[0].noog",
-                new: type_def! { array [
-                    type_def! { object {
-                        "nonk" => type_def! { array {
-                            unknown => type_def! { object {
-                                "noog" => type_def! { array [
-                                    type_def! { bytes },
-                                ] },
-                                "nork" => type_def! { bytes },
-                            } },
-                            // The index is added on top of the "unknown" entry.
-                            0 => type_def! { object {
-                                "noog" => type_def! { bytes },
-                            } },
-                        } },
-                    } },
-                ] },
-            },
             // Indexed specific
             TestCase {
                 old: type_def! { object {
@@ -404,41 +357,32 @@ mod tests {
                     } },
                 ] },
             },
-            //// Coalesce with known path first
-            ////
-            //// FIXME(Jean): There's still a bug in the `InsertValid` implementation that prevents
-            //// this from working as expected.
-            ////
-            //// I'm assuming it has something to do with us _inserting_ the coalesced field, and
-            //// _then_ checking if a certain field in the list of coalesced fields can be null at
-            //// runtime. Instead, we should check so _before_ inserting the field.
-            ////
-            //// This is existing behavior though, and it's not "breaking" anything, in that the
-            //// resulting type definition is more expansive than it needs to be, requiring operators
-            //// to add more type coercing, but it'd be nice to fix this at some point.
-            //TestCase {
-            //    old: type_def! { object {
-            //        "nonk" => type_def! { object {
-            //            "shnoog" => type_def! { array [
-            //                type_def! { object {
-            //                    "noog" => type_def! { bytes },
-            //                    "nork" => type_def! { bytes },
-            //                } },
-            //            ] },
-            //        } },
-            //    } },
-            //    path: ".(nonk | nork).shnoog",
-            //    new: type_def! { array [
-            //        type_def! { object {
-            //            "nonk" => type_def! { object {
-            //                "shnoog" => type_def! { object {
-            //                    "noog" => type_def! { bytes },
-            //                    "nork" => type_def! { bytes },
-            //                } },
-            //            } },
-            //        } },
-            //    ] },
-            //},
+            // Coalesce with known path first.
+            TestCase {
+                old: type_def! { object {
+                    "nonk" => type_def! { object {
+                        "shnoog" => type_def! { array [
+                            type_def! { object {
+                                "noog" => type_def! { bytes },
+                                "nork" => type_def! { bytes },
+                            } },
+                        ] },
+                    } },
+                } },
+                path: ".(nonk | nork).shnoog",
+                new: type_def! { array [
+                    type_def! { object {
+                        "nonk" => type_def! { object {
+                            "shnoog" => {
+                                type_def! { object {
+                                    "noog" => type_def! { bytes },
+                                    "nork" => type_def! { bytes },
+                                } }
+                            },
+                        } },
+                    } },
+                ] },
+            },
             // Coalesce with known path second
             TestCase {
                 old: type_def! { object {
@@ -460,13 +404,12 @@ mod tests {
                             "shnoog" => type_def! { object {
                                 "noog" => type_def! { bytes },
                                 "nork" => type_def! { bytes },
-                            } },
-                        } },
-                        "nork" => type_def! { object {
-                            "shnoog" => type_def! { object {
+                            } }.union(type_def! { array [
+                            type_def! { object {
                                 "noog" => type_def! { bytes },
                                 "nork" => type_def! { bytes },
                             } },
+                        ] }),
                         } },
                     } },
                 ] },
@@ -477,19 +420,14 @@ mod tests {
                     "nonk" => type_def! { bytes },
                 } },
                 path: ".norg",
-                new: type_def! { array [
-                    type_def! { object {
-                        "nonk" => type_def! { bytes },
-                        "norg" => type_def! { unknown },
-                    } },
-                ] },
+                // guaranteed to fail at runtime
+                new: TypeDef::never(),
             },
         ];
 
         for case in cases {
             let path = LookupBuf::from_str(case.path).unwrap();
             let new = invert_array_at_path(&case.old, &path);
-
             assert_eq!(case.new, new, "{}", path);
         }
     }
@@ -516,41 +454,28 @@ mod tests {
                 value!({"hostname": "localhost", "events": [{"message": "hello"}, {"message": "world"}]}),
                 Err("expected array, got null".to_owned()),
                 UnnestFn::new("unknown"),
-                type_def! { array [
-                    type_def! { object {
-                        "hostname" => type_def! { bytes },
-                        "unknown" => type_def! { unknown },
-                        "events" => type_def! { array [
-                            type_def! { object {
-                                "message" => type_def! { bytes },
-                            } },
-                        ] },
-                    } },
-                ] },
+                // guaranteed to always fail
+                TypeDef::never(),
             ),
             (
                 value!({"hostname": "localhost", "events": [{"message": "hello"}, {"message": "world"}]}),
                 Err("expected array, got string".to_owned()),
                 UnnestFn::new("hostname"),
-                type_def! { array [
-                    type_def! { object {
-                        "hostname" => type_def! { unknown },
-                        "events" => type_def! { array [
-                            type_def! { object {
-                                "message" => type_def! { bytes },
-                            } },
-                        ] },
-                    } },
-                ] },
+                // guaranteed to always fail
+                TypeDef::never(),
             ),
         ];
 
-        let compiler = state::Compiler::new_with_kind(Kind::object(btreemap! {
-            "hostname" => Kind::bytes(),
-            "events" => Kind::array(Collection::from_unknown(Kind::object(btreemap! {
-                Field::from("message") => Kind::bytes(),
-            })),
-        )}));
+        let local = state::LocalEnv::default();
+        let external = state::ExternalEnv::new_with_kind(
+            Kind::object(btreemap! {
+                "hostname" => Kind::bytes(),
+                "events" => Kind::array(Collection::from_unknown(Kind::object(btreemap! {
+                    Field::from("message") => Kind::bytes(),
+                })),
+            )}),
+            Kind::object(Collection::empty()),
+        );
 
         let tz = TimeZone::default();
         for (object, expected, func, expected_typedef) in cases {
@@ -558,7 +483,7 @@ mod tests {
             let mut runtime_state = vrl::state::Runtime::default();
             let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
 
-            let got_typedef = func.type_def(&compiler);
+            let got_typedef = func.type_def((&local, &external));
 
             let got = func
                 .resolve(&mut ctx)

@@ -35,7 +35,6 @@ components: sources: splunk_hec: {
 
 			tls: {
 				enabled:                true
-				can_enable:             true
 				can_verify_certificate: true
 				enabled_default:        false
 			}
@@ -149,6 +148,13 @@ components: sources: splunk_hec: {
 				description: "The Splunk channel, value of the `X-Splunk-Request-Channel` header or `channel` query parameter, in that order of precedence."
 				required:    true
 				type: timestamp: {}
+			}
+			source_type: {
+				description: "The name of the source type."
+				required:    true
+				type: string: {
+					examples: ["splunk_hec"]
+				}
 			}
 			timestamp: fields._current_timestamp
 		}

@@ -1,35 +1,71 @@
 use bytes::Bytes;
 use chrono::Utc;
-use serde::{Deserialize, Serialize};
+use codecs::decoding::{DeserializerConfig, FramingConfig};
 use smallvec::SmallVec;
+use vector_config::configurable_component;
 
 use crate::{
-    codecs::{
-        self,
-        decoding::{DeserializerConfig, FramingConfig},
-    },
+    codecs::Decoder,
     config::log_schema,
     event::Event,
     serde::default_decoding,
     sources::util::{SocketListenAddr, TcpNullAcker, TcpSource},
     tcp::TcpKeepaliveConfig,
-    tls::TlsConfig,
+    tls::TlsSourceConfig,
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// TCP configuration for the `socket` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct TcpConfig {
+    /// The address to listen for connections on.
     address: SocketListenAddr,
+
+    #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
+
+    /// The maximum buffer size, in bytes, of incoming messages.
+    ///
+    /// Messages larger than this are truncated.
     max_length: Option<usize>,
+
+    /// The timeout, in seconds, before a connection is forcefully closed during shutdown.
     #[serde(default = "default_shutdown_timeout_secs")]
     shutdown_timeout_secs: u64,
+
+    /// Overrides the name of the log field used to add the peer host to each event.
+    ///
+    /// The value will be the peer host's address, including the port i.e. `1.2.3.4:9000`.
+    ///
+    /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
+    ///
+    /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     host_key: Option<String>,
-    tls: Option<TlsConfig>,
+
+    /// Overrides the name of the log field used to add the peer host's port to each event.
+    ///
+    /// The value will be the peer host's port i.e. `9000`.
+    ///
+    /// By default, `"port"` is used.
+    port_key: Option<String>,
+
+    #[configurable(derived)]
+    tls: Option<TlsSourceConfig>,
+
+    /// The size, in bytes, of the receive buffer used for each connection.
+    ///
+    /// This should not typically needed to be changed.
     receive_buffer_bytes: Option<usize>,
+
+    /// The maximum number of TCP connections that will be allowed at any given time.
+    pub connection_limit: Option<u32>,
+
+    #[configurable(derived)]
     framing: Option<FramingConfig>,
+
+    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
-    pub connection_limit: Option<u32>,
 }
 
 const fn default_shutdown_timeout_secs() -> u64 {
@@ -37,32 +73,6 @@ const fn default_shutdown_timeout_secs() -> u64 {
 }
 
 impl TcpConfig {
-    pub const fn new(
-        address: SocketListenAddr,
-        keepalive: Option<TcpKeepaliveConfig>,
-        max_length: Option<usize>,
-        shutdown_timeout_secs: u64,
-        host_key: Option<String>,
-        tls: Option<TlsConfig>,
-        receive_buffer_bytes: Option<usize>,
-        framing: Option<FramingConfig>,
-        decoding: DeserializerConfig,
-        connection_limit: Option<u32>,
-    ) -> Self {
-        Self {
-            address,
-            keepalive,
-            max_length,
-            shutdown_timeout_secs,
-            host_key,
-            tls,
-            receive_buffer_bytes,
-            framing,
-            decoding,
-            connection_limit,
-        }
-    }
-
     pub fn from_address(address: SocketListenAddr) -> Self {
         Self {
             address,
@@ -70,6 +80,7 @@ impl TcpConfig {
             max_length: Some(crate::serde::default_max_length()),
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
             host_key: None,
+            port_key: Some(String::from("port")),
             tls: None,
             receive_buffer_bytes: None,
             framing: None,
@@ -82,7 +93,7 @@ impl TcpConfig {
         &self.host_key
     }
 
-    pub const fn tls(&self) -> &Option<TlsConfig> {
+    pub const fn tls(&self) -> &Option<TlsSourceConfig> {
         &self.tls
     }
 
@@ -124,7 +135,7 @@ impl TcpConfig {
         self
     }
 
-    pub fn set_tls(&mut self, val: Option<TlsConfig>) -> &mut Self {
+    pub fn set_tls(&mut self, val: Option<TlsSourceConfig>) -> &mut Self {
         self.tls = val;
         self
     }
@@ -143,11 +154,11 @@ impl TcpConfig {
 #[derive(Debug, Clone)]
 pub struct RawTcpSource {
     config: TcpConfig,
-    decoder: codecs::Decoder,
+    decoder: Decoder,
 }
 
 impl RawTcpSource {
-    pub const fn new(config: TcpConfig, decoder: codecs::Decoder) -> Self {
+    pub const fn new(config: TcpConfig, decoder: Decoder) -> Self {
         Self { config, decoder }
     }
 }
@@ -155,14 +166,14 @@ impl RawTcpSource {
 impl TcpSource for RawTcpSource {
     type Error = codecs::decoding::Error;
     type Item = SmallVec<[Event; 1]>;
-    type Decoder = codecs::Decoder;
+    type Decoder = Decoder;
     type Acker = TcpNullAcker;
 
     fn decoder(&self) -> Self::Decoder {
         self.decoder.clone()
     }
 
-    fn handle_events(&self, events: &mut [Event], host: Bytes) {
+    fn handle_events(&self, events: &mut [Event], host: std::net::SocketAddr) {
         let now = Utc::now();
 
         for event in events {
@@ -176,7 +187,10 @@ impl TcpSource for RawTcpSource {
                     .as_deref()
                     .unwrap_or_else(|| log_schema().host_key());
 
-                log.try_insert(host_key, host.clone());
+                log.try_insert(host_key, host.ip().to_string());
+                if let Some(port_key) = &self.config.port_key {
+                    log.try_insert(port_key.as_str(), host.port());
+                }
             }
         }
     }

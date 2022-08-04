@@ -1,3 +1,4 @@
+use ::value::Value;
 use lookup_lib::{LookupBuf, SegmentBuf};
 use vrl::prelude::*;
 
@@ -34,7 +35,7 @@ fn get(value: Value, path: Value) -> Resolved {
             .into())
         }
     };
-    Ok(value.target_get(&path)?.unwrap_or(Value::Null))
+    Ok(value.get_by_path(&path).cloned().unwrap_or(Value::Null))
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -125,7 +126,7 @@ impl Function for Get {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -133,13 +134,6 @@ impl Function for Get {
         let path = arguments.required("path");
 
         Ok(Box::new(GetFn { value, path }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let path = args.required("path");
-
-        get(value, path)
     }
 }
 
@@ -157,7 +151,7 @@ impl Expression for GetFn {
         get(value, path)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::any().fallible()
     }
 }

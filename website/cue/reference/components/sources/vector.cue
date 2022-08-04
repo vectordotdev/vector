@@ -36,7 +36,6 @@ components: sources: vector: {
 			keepalive: enabled:            true
 			tls: {
 				enabled:                true
-				can_enable:             true
 				can_verify_certificate: true
 				enabled_default:        false
 			}
@@ -83,7 +82,7 @@ components: sources: vector: {
 					"1": "Vector source API version 1"
 					"2": "Vector source API version 2"
 				}
-				default: "1"
+				default: "2"
 			}
 		}
 	}
@@ -92,6 +91,14 @@ components: sources: vector: {
 		logs: event: {
 			description: "A Vector event"
 			fields: {
+				client_metadata: fields._client_metadata
+				source_type: {
+					description: "The name of the source type."
+					required:    true
+					type: string: {
+						examples: ["vector"]
+					}
+				}
 				"*": {
 					description: "Vector transparently forwards data from another upstream Vector instance. The `vector` source will not modify or add fields."
 					required:    true
@@ -100,11 +107,28 @@ components: sources: vector: {
 			}
 		}
 		metrics: {
-			counter:      output._passthrough_counter
-			distribution: output._passthrough_distribution
-			gauge:        output._passthrough_gauge
-			histogram:    output._passthrough_histogram
-			set:          output._passthrough_set
+			_extra_tags: {
+				"source_type": {
+					description: "The name of the source type."
+					examples: ["vector"]
+					required: true
+				}
+			}
+			counter: output._passthrough_counter & {
+				tags: _extra_tags
+			}
+			distribution: output._passthrough_distribution & {
+				tags: _extra_tags
+			}
+			gauge: output._passthrough_gauge & {
+				tags: _extra_tags
+			}
+			histogram: output._passthrough_histogram & {
+				tags: _extra_tags
+			}
+			set: output._passthrough_set & {
+				tags: _extra_tags
+			}
 		}
 	}
 

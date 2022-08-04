@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use ::value::Value;
 use url::form_urlencoded;
 use vrl::prelude::*;
 
@@ -21,7 +22,7 @@ fn parse_query_string(bytes: Value) -> Resolved {
                         v.push(value.into());
                     }
                     v => {
-                        *v = Value::Array(vec![v.to_owned(), value.into()]);
+                        *v = Value::Array(vec![v.clone(), value.into()]);
                     }
                 };
             })
@@ -53,7 +54,7 @@ impl Function for ParseQueryString {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -68,11 +69,6 @@ impl Function for ParseQueryString {
             required: true,
         }]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        parse_query_string(value)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -86,7 +82,7 @@ impl Expression for ParseQueryStringFn {
         parse_query_string(bytes)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::object(inner_kind())
     }
 }

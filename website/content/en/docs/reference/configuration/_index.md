@@ -62,7 +62,8 @@ region          = "us-east-1"
 bucket          = "my-log-archives"
 key_prefix      = "date=%Y-%m-%d"      # daily partitions, hive friendly format
 compression     = "gzip"               # compress final objects
-encoding        = "ndjson"             # new line delimited JSON
+framing.method  = "newline_delimited"  # new line delimited...
+encoding.codec  = "json"               # ...JSON
 batch.max_bytes = 10000000             # 10mb uncompressed
 ```
 
@@ -104,7 +105,10 @@ sinks:
     bucket: my-log-archives
     key_prefix: date=%Y-%m-%d
     compression: gzip
-    encoding: ndjson
+    framing:
+      method: newline_delimited
+    encoding:
+      codec: json
     batch:
       max_bytes: 10000000
 ```
@@ -158,7 +162,12 @@ sinks:
       "bucket": "my-log-archives",
       "key_prefix": "date=%Y-%m-%d",
       "compression": "gzip",
-      "encoding": "ndjson",
+      "framing": {
+        "method": "newline_delimited"
+      },
+      "encoding": {
+        "codec": "json"
+      },
       "batch": {
         "max_bytes": 10000000
       }
@@ -219,19 +228,35 @@ the following syntax:
 
 ```toml
 [transforms.add_host]
-type = "add_fields"
+type = "remap"
+source = '''
+# Basic usage. "$HOSTNAME" also works.
+.host = "${HOSTNAME}" # or "$HOSTNAME"
 
-[transforms.add_host.fields]
-host = "${HOSTNAME}" # or "$HOSTNAME"
-environment = "${ENV:-development}" # default value when not present
+# Setting a default value when not present.
+.environment = "${ENV:-development}"
+
+# Requiring an environment variable to be present.
+.tenant = "${TENANT:?tenant must be supplied}"
+'''
 ```
 
 #### Default values
 
-Default values can be supplied using `:-` syntax:
+Default values can be supplied using `:-` or `-` syntax:
 
 ```toml
-option = "${ENV_VAR:-default}"
+option = "${ENV_VAR:-default}" # default value if variable is unset or empty
+option = "${ENV_VAR-default}" # default value only if variable is unset
+```
+
+#### Required variables
+
+Environment variables that are required can be specified using `:?` or `?` syntax:
+
+```toml
+option = "${ENV_VAR:?err}" # Vector exits with 'err' message if variable is unset or empty
+option = "${ENV_VAR?err}" # Vector exits with 'err' message only if variable is unset
 ```
 
 #### Escaping
@@ -243,8 +268,8 @@ environment variable example.
 ### Formats
 
 Vector supports [TOML], [YAML], and [JSON] to ensure that Vector fits into your
-workflow. A side benefit of supporting JSON is that it enables you to use
-JSON-outputting data templating languages like [Jsonnet] and [Cue].
+workflow. A side benefit of supporting YAML and JSON is that they enable you to use
+data templating languages such as [ytt], [Jsonnet] and [Cue].
 
 #### Location
 
@@ -313,7 +338,7 @@ source = '''
 ```toml
 # Sample the data to save on cost
 inputs = ["apache_parser"]
-type   = "sampler"
+type   = "sample"
 rate   = 50                   # only keep 50%
 . = parse_apache_log(.message)
 ```
@@ -340,7 +365,8 @@ region          = "us-east-1"
 bucket          = "my-log-archives"
 key_prefix      = "date=%Y-%m-%d"      # daily partitions, hive friendly format
 compression     = "gzip"               # compress final objects
-encoding        = "ndjson"             # new line delimited JSON
+framing.method  = "newline_delimited"  # new line delimited...
+encoding.codec  = "json"               # ...JSON
 batch.max_bytes = 10000000             # 10mb uncompressed
 ```
 
@@ -394,3 +420,4 @@ inputs = ["app*", "system_logs"]
 [jsonnet]: https://jsonnet.org
 [toml]: https://github.com/toml-lang/toml
 [yaml]: https://yaml.org
+[ytt]: https://carvel.dev/ytt/

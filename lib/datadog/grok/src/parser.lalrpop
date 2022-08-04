@@ -2,7 +2,7 @@ use crate::ast::*;
 use crate::lexer::*;
 use lookup::{LookupBuf, SegmentBuf, FieldBuf};
 use ordered_float::NotNan;
-use vrl_compiler::Value;
+use value::Value;
 grammar<'err, 'input>(input: &'input str);
 
 extern {

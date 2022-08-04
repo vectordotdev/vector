@@ -21,15 +21,6 @@ pub struct ComponentLinksQuery;
 )]
 pub struct ErrorsTotalSubscription;
 
-/// Component errors totals subscription
-#[derive(GraphQLQuery, Debug, Copy, Clone)]
-#[graphql(
-    schema_path = "graphql/schema.json",
-    query_path = "tests/subscriptions/component_errors_totals.graphql",
-    response_derives = "Debug"
-)]
-pub struct ComponentErrorsTotalsSubscription;
-
 /// File source metrics query
 #[derive(GraphQLQuery, Debug, Copy, Clone)]
 #[graphql(
@@ -157,11 +148,6 @@ pub trait TestSubscriptionExt {
         &self,
         interval: i64,
     ) -> crate::BoxedSubscription<ErrorsTotalSubscription>;
-
-    fn component_errors_totals_subscription(
-        &self,
-        interval: i64,
-    ) -> crate::BoxedSubscription<ComponentErrorsTotalsSubscription>;
 }
 
 impl TestSubscriptionExt for crate::SubscriptionClient {
@@ -173,16 +159,5 @@ impl TestSubscriptionExt for crate::SubscriptionClient {
             ErrorsTotalSubscription::build_query(errors_total_subscription::Variables { interval });
 
         self.start::<ErrorsTotalSubscription>(&request_body)
-    }
-
-    fn component_errors_totals_subscription(
-        &self,
-        interval: i64,
-    ) -> BoxedSubscription<ComponentErrorsTotalsSubscription> {
-        let request_body = ComponentErrorsTotalsSubscription::build_query(
-            component_errors_totals_subscription::Variables { interval },
-        );
-
-        self.start::<ComponentErrorsTotalsSubscription>(&request_body)
     }
 }

@@ -11,18 +11,18 @@ use component::ComponentDescription;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
 use serde::{Deserialize, Serialize};
 pub use vector_core::config::{AcknowledgementsConfig, DataType, GlobalOptions, Input, Output};
-pub use vector_core::transform::{ExpandType, TransformConfig, TransformContext};
+pub use vector_core::transform::{TransformConfig, TransformContext};
 
-use crate::{conditions, event::Metric};
+use crate::{conditions, event::Metric, serde::OneOrMany};
 
 pub mod api;
 mod builder;
 mod cmd;
 mod compiler;
 pub mod component;
-#[cfg(feature = "datadog-pipelines")]
-pub mod datadog;
 mod diff;
+#[cfg(feature = "enterprise")]
+pub mod enterprise;
 pub mod format;
 mod graph;
 mod id;
@@ -43,8 +43,9 @@ pub use diff::ConfigDiff;
 pub use format::{Format, FormatHint};
 pub use id::{ComponentKey, OutputId};
 pub use loading::{
-    load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider, load_from_str,
-    load_source_from_paths, merge_path_lists, process_paths, CONFIG_PATHS,
+    load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider_and_secrets,
+    load_from_str, load_source_from_paths, merge_path_lists, process_paths, SecretBackend,
+    CONFIG_PATHS,
 };
 pub use sink::{SinkConfig, SinkContext, SinkDescription, SinkHealthcheckOptions, SinkOuter};
 pub use source::{SourceConfig, SourceContext, SourceDescription, SourceOuter};
@@ -97,16 +98,17 @@ pub struct Config {
     pub api: api::Options,
     pub schema: schema::Options,
     pub version: Option<String>,
-    #[cfg(feature = "datadog-pipelines")]
-    pub datadog: Option<datadog::Options>,
+    #[cfg(feature = "enterprise")]
+    pub enterprise: Option<enterprise::Options>,
     pub global: GlobalOptions,
     pub healthchecks: HealthcheckOptions,
-    pub sources: IndexMap<ComponentKey, SourceOuter>,
-    pub sinks: IndexMap<ComponentKey, SinkOuter<OutputId>>,
-    pub transforms: IndexMap<ComponentKey, TransformOuter<OutputId>>,
+    sources: IndexMap<ComponentKey, SourceOuter>,
+    sinks: IndexMap<ComponentKey, SinkOuter<OutputId>>,
+    transforms: IndexMap<ComponentKey, TransformOuter<OutputId>>,
     pub enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter>,
     tests: Vec<TestDefinition>,
     expansions: IndexMap<ComponentKey, Vec<ComponentKey>>,
+    secret: IndexMap<ComponentKey, Box<dyn SecretBackend>>,
 }
 
 impl Config {
@@ -114,10 +116,41 @@ impl Config {
         Default::default()
     }
 
+    pub fn sources(&self) -> impl Iterator<Item = (&ComponentKey, &SourceOuter)> {
+        self.sources.iter()
+    }
+
+    pub fn source(&self, id: &ComponentKey) -> Option<&SourceOuter> {
+        self.sources.get(id)
+    }
+
+    pub fn transforms(&self) -> impl Iterator<Item = (&ComponentKey, &TransformOuter<OutputId>)> {
+        self.transforms.iter()
+    }
+
+    pub fn transform(&self, id: &ComponentKey) -> Option<&TransformOuter<OutputId>> {
+        self.transforms.get(id)
+    }
+
+    pub fn sinks(&self) -> impl Iterator<Item = (&ComponentKey, &SinkOuter<OutputId>)> {
+        self.sinks.iter()
+    }
+
+    pub fn sink(&self, id: &ComponentKey) -> Option<&SinkOuter<OutputId>> {
+        self.sinks.get(id)
+    }
+
+    pub fn inputs_for_node(&self, id: &ComponentKey) -> Option<&[OutputId]> {
+        self.transforms
+            .get(id)
+            .map(|t| t.inputs.as_slice())
+            .or_else(|| self.sinks.get(id).map(|s| s.inputs.as_slice()))
+    }
+
     /// Expand a logical component id (i.e. from the config file) into the ids of the
     /// components it was expanded to as part of the macro process. Does not check that the
     /// identifier is otherwise valid.
-    pub fn get_inputs(&self, identifier: &ComponentKey) -> Vec<ComponentKey> {
+    pub fn expand_input(&self, identifier: &ComponentKey) -> Vec<ComponentKey> {
         self.expansions
             .get(identifier)
             .cloned()
@@ -125,24 +158,12 @@ impl Config {
     }
 
     pub fn propagate_acknowledgements(&mut self) -> Result<(), Vec<String>> {
-        if self.global.acknowledgements.enabled() {
-            for (name, sink) in &self.sinks {
-                if sink.inner.acknowledgements().is_none() {
-                    warn!(
-                        message = "Acknowledgements are globally enabled but sink does not support them.",
-                        sink = %name,
-                    );
-                }
-            }
-        }
-
         let inputs: Vec<_> = self
             .sinks
             .iter()
             .filter(|(_, sink)| {
                 sink.inner
                     .acknowledgements()
-                    .unwrap_or(&self.global.acknowledgements)
                     .merge_default(&self.global.acknowledgements)
                     .enabled()
             })
@@ -353,6 +374,7 @@ impl TestDefinition<String> {
     fn resolve_outputs(
         self,
         graph: &graph::Graph,
+        expansions: &IndexMap<String, Vec<String>>,
     ) -> Result<TestDefinition<OutputId>, Vec<String>> {
         let TestDefinition {
             name,
@@ -367,18 +389,45 @@ impl TestDefinition<String> {
 
         let outputs = outputs
             .into_iter()
-            .filter_map(|old| {
-                if let Some(output_id) = output_map.get(&old.extract_from) {
-                    Some(TestOutput {
-                        extract_from: output_id.clone(),
-                        conditions: old.conditions,
+            .map(|old| {
+                let TestOutput {
+                    extract_from,
+                    conditions,
+                } = old;
+
+                let extract_from = extract_from
+                    .into_vec()
+                    .into_iter()
+                    .flat_map(|from| {
+                        if let Some(expanded) = expansions.get(&from) {
+                            expanded.to_vec()
+                        } else {
+                            vec![from]
+                        }
                     })
-                } else {
-                    errors.push(format!(
-                        r#"Invalid extract_from target in test '{}': '{}' does not exist"#,
-                        name, old.extract_from
-                    ));
+                    .collect::<Vec<_>>();
+
+                (extract_from, conditions)
+            })
+            .filter_map(|(extract_from, conditions)| {
+                let mut outputs = Vec::new();
+                for from in extract_from {
+                    if let Some(output_id) = output_map.get(&from) {
+                        outputs.push(output_id.clone());
+                    } else {
+                        errors.push(format!(
+                            r#"Invalid extract_from target in test '{}': '{}' does not exist"#,
+                            name, from
+                        ));
+                    }
+                }
+                if outputs.is_empty() {
                     None
+                } else {
+                    Some(TestOutput {
+                        extract_from: outputs.into(),
+                        conditions,
+                    })
                 }
             })
             .collect();
@@ -425,7 +474,14 @@ impl TestDefinition<OutputId> {
         let outputs = outputs
             .into_iter()
             .map(|old| TestOutput {
-                extract_from: old.extract_from.to_string(),
+                extract_from: match old.extract_from {
+                    OneOrMany::One(value) => value.to_string().into(),
+                    OneOrMany::Many(values) => values
+                        .iter()
+                        .map(|item| item.to_string())
+                        .collect::<Vec<_>>()
+                        .into(),
+                },
                 conditions: old.conditions,
             })
             .collect();
@@ -469,35 +525,202 @@ fn default_test_input_type() -> String {
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct TestOutput<T = OutputId> {
-    pub extract_from: T,
+    pub extract_from: OneOrMany<T>,
     pub conditions: Option<Vec<conditions::AnyCondition>>,
 }
 
-#[cfg(all(
-    test,
-    feature = "sources-file",
-    feature = "sinks-console",
-    feature = "transforms-json_parser"
-))]
+#[cfg(all(test, feature = "sources-file", feature = "sinks-console"))]
 mod tests {
-    use std::path::PathBuf;
+    use std::{collections::HashMap, path::PathBuf};
 
+    use crate::{config, topology};
     use indoc::indoc;
 
-    use super::{builder::ConfigBuilder, format, load_from_str, ComponentKey, Format};
+    use super::{builder::ConfigBuilder, format, load_from_str, ComponentKey, ConfigDiff, Format};
+
+    async fn load(config: &str, format: config::Format) -> Result<Vec<String>, Vec<String>> {
+        match config::load_from_str(config, format) {
+            Ok(c) => {
+                let diff = ConfigDiff::initial(&c);
+                let c2 = config::load_from_str(config, format).unwrap();
+                match (
+                    config::warnings(&c2),
+                    topology::builder::build_pieces(&c, &diff, HashMap::new()).await,
+                ) {
+                    (warnings, Ok(_pieces)) => Ok(warnings),
+                    (_, Err(errors)) => Err(errors),
+                }
+            }
+            Err(error) => Err(error),
+        }
+    }
+
+    #[tokio::test]
+    async fn bad_inputs() {
+        let err = load(
+            r#"
+            [sources.in]
+            type = "basic_source"
+
+            [transforms.sample]
+            type = "basic_transform"
+            inputs = []
+            suffix = "foo"
+            increase = 1.25
+
+            [transforms.sample2]
+            type = "basic_transform"
+            inputs = ["qwerty"]
+            suffix = "foo"
+            increase = 1.25
+
+            [sinks.out]
+            type = "basic_sink"
+            inputs = ["asdf", "in", "in"]
+            "#,
+            Format::Toml,
+        )
+        .await
+        .unwrap_err();
+
+        assert_eq!(
+            vec![
+                "Sink \"out\" has input \"in\" duplicated 2 times",
+                "Transform \"sample\" has no inputs",
+                "Input \"qwerty\" for transform \"sample2\" doesn't match any components.",
+                "Input \"asdf\" for sink \"out\" doesn't match any components.",
+            ],
+            err,
+        );
+    }
+
+    #[tokio::test]
+    async fn duplicate_name() {
+        let err = load(
+            r#"
+            [sources.foo]
+            type = "basic_source"
+
+            [sources.bar]
+            type = "basic_source"
+
+            [transforms.foo]
+            type = "basic_transform"
+            inputs = ["bar"]
+            suffix = "foo"
+            increase = 1.25
+
+            [sinks.out]
+            type = "basic_sink"
+            inputs = ["foo"]
+            "#,
+            Format::Toml,
+        )
+        .await
+        .unwrap_err();
+
+        assert_eq!(
+            err,
+            vec!["More than one component with name \"foo\" (source, transform).",]
+        );
+    }
+
+    #[tokio::test]
+    async fn warnings() {
+        let warnings = load(
+            r#"
+            [sources.in1]
+            type = "basic_source"
+
+            [sources.in2]
+            type = "basic_source"
+
+            [transforms.sample1]
+            type = "basic_transform"
+            inputs = ["in1"]
+            suffix = "foo"
+            increase = 1.25
+
+            [transforms.sample2]
+            type = "basic_transform"
+            inputs = ["in1"]
+            suffix = "foo"
+            increase = 1.25
+
+            [sinks.out]
+            type = "basic_sink"
+            inputs = ["sample1"]
+            "#,
+            Format::Toml,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(
+            warnings,
+            vec![
+                "Transform \"sample2\" has no consumers",
+                "Source \"in2\" has no consumers",
+            ]
+        )
+    }
+
+    #[tokio::test]
+    async fn cycle() {
+        let errors = load(
+            r#"
+            [sources.in]
+            type = "basic_source"
+
+            [transforms.one]
+            type = "basic_transform"
+            inputs = ["in"]
+            suffix = "foo"
+            increase = 1.25
+
+            [transforms.two]
+            type = "basic_transform"
+            inputs = ["one", "four"]
+            suffix = "foo"
+            increase = 1.25
+
+            [transforms.three]
+            type = "basic_transform"
+            inputs = ["two"]
+            suffix = "foo"
+            increase = 1.25
+
+            [transforms.four]
+            type = "basic_transform"
+            inputs = ["three"]
+            suffix = "foo"
+            increase = 1.25
+
+            [sinks.out]
+            type = "basic_sink"
+            inputs = ["four"]
+            "#,
+            Format::Toml,
+        )
+        .await
+        .unwrap_err();
+
+        assert_eq!(
+            errors,
+            vec!["Cyclic dependency detected in the chain [ four -> two -> three -> four ]"]
+        )
+    }
 
     #[test]
     fn default_data_dir() {
         let config = load_from_str(
             indoc! {r#"
                 [sources.in]
-                  type = "file"
-                  include = ["/var/log/messages"]
+                type = "basic_source"
 
                 [sinks.out]
-                  type = "console"
-                  inputs = ["in"]
-                  encoding = "json"
+                type = "basic_sink"
+                inputs = ["in"]
             "#},
             Format::Toml,
         )
@@ -513,14 +736,12 @@ mod tests {
     fn default_schema() {
         let config = load_from_str(
             indoc! {r#"
-                [sources.in]
-                  type = "file"
-                  include = ["/var/log/messages"]
+            [sources.in]
+            type = "basic_source"
 
-                [sinks.out]
-                  type = "console"
-                  inputs = ["in"]
-                  encoding = "json"
+            [sinks.out]
+            type = "basic_sink"
+            inputs = ["in"]
             "#},
             Format::Toml,
         )
@@ -547,13 +768,11 @@ mod tests {
                   timestamp_key = "then"
 
                 [sources.in]
-                  type = "file"
-                  include = ["/var/log/messages"]
+                  type = "basic_source"
 
                 [sinks.out]
-                  type = "console"
+                  type = "basic_sink"
                   inputs = ["in"]
-                  encoding = "json"
             "#},
             Format::Toml,
         )
@@ -569,13 +788,11 @@ mod tests {
         let mut config: ConfigBuilder = format::deserialize(
             indoc! {r#"
                 [sources.in]
-                  type = "file"
-                  include = ["/var/log/messages"]
+                  type = "basic_source"
 
                 [sinks.out]
-                  type = "console"
+                  type = "basic_sink"
                   inputs = ["in"]
-                  encoding = "json"
             "#},
             Format::Toml,
         )
@@ -591,8 +808,10 @@ mod tests {
                           http = "http://proxy.inc:3128"
 
                         [transforms.foo]
-                          type = "json_parser"
+                          type = "basic_transform"
                           inputs = [ "in" ]
+                          suffix = "foo"
+                          increase = 1.25
 
                         [[tests]]
                           name = "check_simple_log"
@@ -627,13 +846,11 @@ mod tests {
         let mut config: ConfigBuilder = format::deserialize(
             indoc! {r#"
                 [sources.in]
-                  type = "file"
-                  include = ["/var/log/messages"]
+                  type = "basic_source"
 
                 [sinks.out]
-                  type = "console"
+                  type = "basic_sink"
                   inputs = ["in"]
-                  encoding = "json"
             "#},
             Format::Toml,
         )
@@ -644,17 +861,17 @@ mod tests {
                 format::deserialize(
                     indoc! {r#"
                         [sources.in]
-                          type = "file"
-                          include = ["/var/log/messages"]
+                          type = "basic_source"
 
                         [transforms.foo]
-                          type = "json_parser"
+                          type = "basic_transform"
                           inputs = [ "in" ]
+                          suffix = "foo"
+                          increase = 1.25
 
                         [sinks.out]
-                          type = "console"
+                          type = "basic_sink"
                           inputs = ["in"]
-                          encoding = "json"
                     "#},
                     Format::Toml,
                 )
@@ -686,7 +903,7 @@ mod tests {
                 [sinks.out]
                   type = "console"
                   inputs = ["in"]
-                  encoding = "json"
+                  encoding.codec = "json"
             "#},
             Format::Toml,
         )
@@ -701,7 +918,7 @@ mod tests {
     }
 
     #[test]
-    fn with_partial_proxy() {
+    fn with_partial_global_proxy() {
         let config: ConfigBuilder = format::deserialize(
             indoc! {r#"
                 [proxy]
@@ -712,14 +929,14 @@ mod tests {
                   endpoints = ["http://localhost:8000/basic_status"]
 
                 [sources.in.proxy]
-                  http = "http://server:3128"
-                  https = "http://other:3128"
+                  http = "http://server:3129"
+                  https = "http://other:3129"
                   no_proxy = ["localhost", "127.0.0.1"]
 
                 [sinks.out]
                   type = "console"
                   inputs = ["in"]
-                  encoding = "json"
+                  encoding.codec = "json"
             "#},
             Format::Toml,
         )
@@ -727,13 +944,45 @@ mod tests {
         assert_eq!(config.global.proxy.http, Some("http://server:3128".into()));
         assert_eq!(config.global.proxy.https, None);
         let source = config.sources.get(&ComponentKey::from("in")).unwrap();
-        assert_eq!(source.proxy.http, Some("http://server:3128".into()));
-        assert_eq!(source.proxy.https, Some("http://other:3128".into()));
+        assert_eq!(source.proxy.http, Some("http://server:3129".into()));
+        assert_eq!(source.proxy.https, Some("http://other:3129".into()));
         assert!(source.proxy.no_proxy.matches("localhost"));
     }
 
     #[test]
-    #[cfg(feature = "datadog-pipelines")]
+    fn with_partial_source_proxy() {
+        let config: ConfigBuilder = format::deserialize(
+            indoc! {r#"
+                [proxy]
+                  http = "http://server:3128"
+                  https = "http://other:3128"
+
+                [sources.in]
+                  type = "nginx_metrics"
+                  endpoints = ["http://localhost:8000/basic_status"]
+
+                [sources.in.proxy]
+                  http = "http://server:3129"
+                  no_proxy = ["localhost", "127.0.0.1"]
+
+                [sinks.out]
+                  type = "console"
+                  inputs = ["in"]
+                  encoding.codec = "json"
+            "#},
+            Format::Toml,
+        )
+        .unwrap();
+        assert_eq!(config.global.proxy.http, Some("http://server:3128".into()));
+        assert_eq!(config.global.proxy.https, Some("http://other:3128".into()));
+        let source = config.sources.get(&ComponentKey::from("in")).unwrap();
+        assert_eq!(source.proxy.http, Some("http://server:3129".into()));
+        assert_eq!(source.proxy.https, None);
+        assert!(source.proxy.no_proxy.matches("localhost"));
+    }
+
+    #[test]
+    #[cfg(feature = "enterprise")]
     fn order_independent_sha256_hashes() {
         let config1: ConfigBuilder = format::deserialize(
             indoc! {r#"
@@ -805,14 +1054,59 @@ mod tests {
 
         assert_eq!(config1.sha256_hash(), config2.sha256_hash())
     }
+
+    #[test]
+    #[cfg(feature = "enterprise")]
+    fn enterprise_tags_ignored_sha256_hashes() {
+        let config1: ConfigBuilder = format::deserialize(
+            indoc! {r#"
+                [enterprise]
+                api_key = "api_key"
+                application_key = "application_key"
+                configuration_key = "configuration_key"
+
+                [enterprise.tags]
+                tag = "value"
+
+                [sources.internal_metrics]
+                type = "internal_metrics"
+
+                [sinks.datadog_metrics]
+                type = "datadog_metrics"
+                inputs = ["*"]
+                default_api_key = "default_api_key"
+            "#},
+            Format::Toml,
+        )
+        .unwrap();
+
+        let config2: ConfigBuilder = format::deserialize(
+            indoc! {r#"
+                [enterprise]
+                api_key = "api_key"
+                application_key = "application_key"
+                configuration_key = "configuration_key"
+
+                [enterprise.tags]
+                another_tag = "another value"
+
+                [sources.internal_metrics]
+                type = "internal_metrics"
+
+                [sinks.datadog_metrics]
+                type = "datadog_metrics"
+                inputs = ["*"]
+                default_api_key = "default_api_key"
+            "#},
+            Format::Toml,
+        )
+        .unwrap();
+
+        assert_eq!(config1.sha256_hash(), config2.sha256_hash())
+    }
 }
 
-#[cfg(all(
-    test,
-    feature = "sources-file",
-    feature = "sinks-file",
-    feature = "transforms-json_parser"
-))]
+#[cfg(all(test, feature = "sources-file", feature = "sinks-file"))]
 mod acknowledgements_tests {
     use indoc::indoc;
 
@@ -834,23 +1128,25 @@ mod acknowledgements_tests {
                 [sources.in3]
                     type = "file"
                 [transforms.parse3]
-                    type = "json_parser"
+                    type = "basic_transform"
                     inputs = ["in3"]
+                    increase = 0.0
+                    suffix = ""
                 [sinks.out1]
                     type = "file"
                     inputs = ["in1"]
-                    encoding = "text"
+                    encoding.codec = "text"
                     path = "/path/to/out1"
                 [sinks.out2]
                     type = "file"
                     inputs = ["in2"]
-                    encoding = "text"
+                    encoding.codec = "text"
                     path = "/path/to/out2"
                     acknowledgements = true
                 [sinks.out3]
                     type = "file"
                     inputs = ["parse3"]
-                    encoding = "text"
+                    encoding.codec = "text"
                     path = "/path/to/out3"
                     acknowledgements.enabled = true
             "#},
@@ -1008,7 +1304,7 @@ mod resource_tests {
                 [sinks.out]
                   type = "console"
                   inputs = ["in0","in1"]
-                  encoding = "json"
+                  encoding.codec = "json"
             "#},
             Format::Toml,
         )
@@ -1039,23 +1335,23 @@ mod pipelines_tests {
                   inputs = ["in"]
                   type = "pipelines"
 
-                  [transforms.processing.logs.pipelines.foo]
+                  [[transforms.processing.logs]]
                     name = "foo"
 
-                    [[transforms.processing.logs.pipelines.foo.transforms]]
+                    [[transforms.processing.logs.transforms]]
                       type = "pipelines"
 
-                      [transforms.processing.logs.pipelines.foo.transforms.logs.pipelines.bar]
+                      [[transforms.processing.logs.transforms.logs]]
                         name = "bar"
 
-                          [[transforms.processing.logs.pipelines.foo.transforms.logs.pipelines.bar.transforms]]
+                          [[transforms.processing.logs.transforms.logs.transforms]]
                             type = "filter"
                             condition = ""
 
                 [sinks.out]
                   type = "console"
                   inputs = ["processing"]
-                  encoding = "json"
+                  encoding.codec = "json"
             "#},
             Format::Toml,
         );

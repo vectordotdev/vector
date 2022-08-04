@@ -2,7 +2,7 @@ version: "3"
 
 services:
   humio:
-    image: humio/humio:${HUMIO_VERSION:-1.13.1}
+    image: docker.io/humio/humio:${HUMIO_VERSION:-1.13.1}
     network_mode: host
   runner:
     build:
@@ -22,17 +22,17 @@ services:
       - "humio-integration-tests"
       - "--lib"
       - "sinks::humio::"
-      - "--"
-      - "--nocapture"
     environment:
       - HUMIO_ADDRESS=http://localhost:8080
     depends_on:
       - humio
     volumes:
       - ${PWD}:/code
-      - cargogit:/usr/local/cargo/git
-      - cargoregistry:/usr/local/cargo/registry
+      - target:/code/target
+      - cargogit:/cargo/git
+      - cargoregistry:/cargo/registry
 
 volumes:
+  target: {}
   cargogit: {}
   cargoregistry: {}

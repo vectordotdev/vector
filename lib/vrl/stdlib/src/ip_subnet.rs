@@ -1,5 +1,6 @@
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
+use ::value::Value;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use vrl::prelude::*;
@@ -72,7 +73,7 @@ impl Function for IpSubnet {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -80,13 +81,6 @@ impl Function for IpSubnet {
         let subnet = arguments.required("subnet");
 
         Ok(Box::new(IpSubnetFn { value, subnet }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let subnet = args.required("subnet");
-
-        ip_subnet(value, subnet)
     }
 }
 
@@ -104,7 +98,7 @@ impl Expression for IpSubnetFn {
         ip_subnet(value, mask)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().fallible()
     }
 }

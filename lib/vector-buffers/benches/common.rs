@@ -1,9 +1,8 @@
 use std::{error, fmt, path::PathBuf};
 
 use bytes::{Buf, BufMut};
-use futures::{Sink, SinkExt, Stream, StreamExt};
 use metrics_tracing_context::{MetricsLayer, TracingContextLayer};
-use metrics_util::{layers::Layer, DebuggingRecorder};
+use metrics_util::{debugging::DebuggingRecorder, layers::Layer};
 use tracing::Span;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use vector_buffers::{
@@ -15,6 +14,7 @@ use vector_buffers::{
     BufferType, EventCount,
 };
 use vector_common::byte_size_of::ByteSizeOf;
+use vector_common::finalization::{AddBatchNotifier, BatchNotifier, EventFinalizers, Finalizable};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Message<const N: usize> {
@@ -31,6 +31,12 @@ impl<const N: usize> Message<N> {
     }
 }
 
+impl<const N: usize> AddBatchNotifier for Message<N> {
+    fn add_batch_notifier(&mut self, batch: BatchNotifier) {
+        drop(batch); // Incorrect but fast
+    }
+}
+
 impl<const N: usize> ByteSizeOf for Message<N> {
     fn allocated_bytes(&self) -> usize {
         0
@@ -40,6 +46,12 @@ impl<const N: usize> ByteSizeOf for Message<N> {
 impl<const N: usize> EventCount for Message<N> {
     fn event_count(&self) -> usize {
         1
+    }
+}
+
+impl<const N: usize> Finalizable for Message<N> {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        Default::default() // This benchmark doesn't need finalization
     }
 }
 
@@ -117,8 +129,8 @@ pub async fn setup<const N: usize>(
     variant
         .add_to_builder(&mut builder, data_dir, id)
         .expect("should not fail to add variant to builder");
-    let (tx, rx, _acker) = builder
-        .build(Span::none())
+    let (tx, rx) = builder
+        .build(String::from("benches"), Span::none())
         .await
         .expect("should not fail to build topology");
 
@@ -145,32 +157,26 @@ pub fn init_instrumentation() {
 // reads it from the buffer.
 //
 
-pub async fn wtr_measurement<S1, S2, const N: usize>(
-    mut sink: S1,
-    mut stream: S2,
+pub async fn wtr_measurement<const N: usize>(
+    mut sender: BufferSender<Message<N>>,
+    mut receiver: BufferReceiver<Message<N>>,
     messages: Vec<Message<N>>,
-) where
-    S1: Sink<Message<N>, Error = ()> + Send + Unpin,
-    S2: Stream<Item = Message<N>> + Send + Unpin,
-{
+) {
     for msg in messages.into_iter() {
-        sink.send(msg).await.unwrap();
+        sender.send(msg).await.unwrap();
     }
-    drop(sink);
+    drop(sender);
 
-    while stream.next().await.is_some() {}
+    while receiver.next().await.is_some() {}
 }
 
-pub async fn war_measurement<S1, S2, const N: usize>(
-    mut sink: S1,
-    mut stream: S2,
+pub async fn war_measurement<const N: usize>(
+    mut sender: BufferSender<Message<N>>,
+    mut receiver: BufferReceiver<Message<N>>,
     messages: Vec<Message<N>>,
-) where
-    S1: Sink<Message<N>, Error = ()> + Send + Unpin,
-    S2: Stream<Item = Message<N>> + Send + Unpin,
-{
+) {
     for msg in messages.into_iter() {
-        sink.send(msg).await.unwrap();
-        let _ = stream.next().await.unwrap();
+        sender.send(msg).await.unwrap();
+        let _ = receiver.next().await.unwrap();
     }
 }

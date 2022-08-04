@@ -23,8 +23,7 @@ use futures::{
 use tokio::{self, net::UnixListener, task::JoinHandle};
 use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::{length_delimited, Framed};
-use tracing::field;
-use tracing_futures::Instrument;
+use tracing::{field, Instrument};
 
 use crate::{
     event::Event,
@@ -157,7 +156,7 @@ impl FrameStreamReader {
         } else {
             //data frame
             if self.state.control_state == ControlState::ReadingData {
-                emit!(&SocketEventsReceived {
+                emit!(SocketEventsReceived {
                     mode: SocketMode::Unix,
                     byte_size: frame.len(),
                     count: 1
@@ -486,7 +485,7 @@ pub fn build_framestream_unix_source(
             let frames = sock_stream
                 .take_until(shutdown.clone())
                 .map_err(move |error| {
-                    emit!(&UnixSocketError {
+                    emit!(UnixSocketError {
                         error: &error,
                         path: &listen_path,
                     });
@@ -544,7 +543,7 @@ pub fn build_framestream_unix_source(
 
         // Delete socket file
         if let Err(error) = fs::remove_file(&path) {
-            emit!(&UnixSocketFileDeleteError { path: &path, error });
+            emit!(UnixSocketFileDeleteError { path: &path, error });
         }
 
         Ok(())
@@ -615,7 +614,7 @@ mod test {
     };
     use crate::{
         config::{log_schema, ComponentKey},
-        event::Event,
+        event::{Event, LogEvent},
         shutdown::SourceShutdownCoordinator,
         test_util::{collect_n, collect_n_stream},
         SourceSender,
@@ -663,17 +662,15 @@ mod test {
         }
 
         fn handle_event(&self, received_from: Option<Bytes>, frame: Bytes) -> Option<Event> {
-            let mut event = Event::from(frame);
-            event
-                .as_mut_log()
-                .insert(log_schema().source_type_key(), "framestream");
+            let mut event = LogEvent::from(frame);
+            event.insert(log_schema().source_type_key(), "framestream");
             if let Some(host) = received_from {
-                event.as_mut_log().insert(self.host_key().as_str(), host);
+                event.insert(self.host_key().as_str(), host);
             }
 
             (self.extra_task_handling_routine.clone())();
 
-            Some(event)
+            Some(event.into())
         }
 
         fn socket_path(&self) -> PathBuf {

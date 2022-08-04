@@ -3,12 +3,13 @@ use std::{
     collections::{btree_map::Entry, BTreeMap},
 };
 
+use ::value::Value;
 use once_cell::sync::Lazy;
 use regex::{Regex, RegexBuilder};
 use roxmltree::{Document, Node, NodeType};
 use vrl::prelude::*;
 
-/// Used to keep Clippy's too_many_argument check happy.
+/// Used to keep Clippy's `too_many_argument` check happy.
 #[derive(Debug)]
 struct ParseOptions {
     trim: Option<Value>,
@@ -112,7 +113,7 @@ impl Function for ParseXml {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -189,23 +190,6 @@ impl Function for ParseXml {
             },
         ]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-
-        let options = ParseOptions {
-            trim: args.optional("trim"),
-            include_attr: args.optional("include_attr"),
-            attr_prefix: args.optional("attr_prefix"),
-            text_key: args.optional("text_key"),
-            always_use_text_key: args.optional("always_use_text_key"),
-            parse_bool: args.optional("parse_bool"),
-            parse_null: args.optional("parse_null"),
-            parse_number: args.optional("parse_number"),
-        };
-
-        parse_xml(value, options)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -279,19 +263,19 @@ impl Expression for ParseXmlFn {
         parse_xml(value, options)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         type_def()
     }
 }
 
 fn type_def() -> TypeDef {
     TypeDef::bytes()
-        .fallible()
         .add_object(Collection::from_unknown(inner_kind()))
+        .fallible()
 }
 
 fn inner_kind() -> Kind {
-    Kind::object(BTreeMap::default())
+    Kind::object(Collection::any())
 }
 
 /// Process an XML node, and return a VRL `Value`.
@@ -300,12 +284,21 @@ fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
     let recurse = |node: Node| -> BTreeMap<String, Value> {
         let mut map = BTreeMap::new();
 
+        // Expand attributes, if required.
+        if config.include_attr {
+            for attr in node.attributes() {
+                map.insert(
+                    format!("{}{}", config.attr_prefix, attr.name()),
+                    attr.value().into(),
+                );
+            }
+        }
+
         for n in node.children().into_iter().filter(|n| !n.is_comment()) {
-            // Use the default tag name if blank.
-            let name = if n.tag_name().name() == "" {
-                config.text_key.to_string()
-            } else {
-                n.tag_name().name().to_string()
+            let name = match n.node_type() {
+                NodeType::Element => n.tag_name().name().to_string(),
+                NodeType::Text => config.text_key.to_string(),
+                _ => unreachable!("shouldn't be other XML nodes"),
             };
 
             // Transform the node into a VRL `Value`.
@@ -340,24 +333,9 @@ fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
         NodeType::Root => Value::Object(recurse(node)),
 
         NodeType::Element => {
-            let mut map = BTreeMap::new();
-
-            // Expand attributes, if required.
-            if config.include_attr {
-                for attr in node.attributes() {
-                    map.insert(
-                        format!("{}{}", config.attr_prefix, attr.name()),
-                        attr.value().into(),
-                    );
-                }
-            }
-
-            match (config.always_use_text_key, map.is_empty()) {
-                // If the map isn't empty, *always* recurse to expand default keys.
-                (_, false) => {
-                    map.extend(recurse(node));
-                    Value::Object(map)
-                }
+            match (config.always_use_text_key, node.attributes().is_empty()) {
+                // If the node has attributes, *always* recurse to expand default keys.
+                (_, false) if config.include_attr => Value::Object(recurse(node)),
                 // If a text key should be used, always recurse.
                 (true, true) => Value::Object(recurse(node)),
                 // Otherwise, check the node count to determine what to do.
@@ -374,6 +352,7 @@ fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
                         // If the node is an element, treat it as an object.
                         if node.is_element() {
                             let mut map = BTreeMap::new();
+
                             map.insert(
                                 node.tag_name().name().to_string(),
                                 Value::Object(recurse(node)),
@@ -466,9 +445,23 @@ mod tests {
             tdef: type_def(),
         }
 
+        // https://github.com/vectordotdev/vector/issues/11901
+        include_attributes_if_single_node {
+            args: func_args![ value: r#"<root><node attr="value"><message>foo</message></node></root>"# ],
+            want: Ok(value!({ "root": { "node": { "@attr": "value", "message": "foo" } } })),
+            tdef: type_def(),
+        }
+
+        // https://github.com/vectordotdev/vector/issues/11901
+        include_attributes_multiple_children {
+            args: func_args![ value: r#"<root><node attr="value"><message>bar</message></node><node attr="value"><message>baz</message></node></root>"#],
+            want: Ok(value!({"root":{ "node":[ { "@attr": "value", "message": "bar" }, { "@attr": "value", "message": "baz" } ] } })),
+            tdef: type_def(),
+        }
+
         nested_object {
-            args: func_args![ value: r#"<a><b>one</b><c>two</c></a>"# ],
-            want: Ok(value!({ "a": { "b": "one", "c": "two" } })),
+            args: func_args![ value: r#"<a attr="value"><b>one</b><c>two</c></a>"# ],
+            want: Ok(value!({ "a": { "@attr": "value", "b": "one", "c": "two" } })),
             tdef: type_def(),
         }
 
@@ -685,4 +678,39 @@ mod tests {
             tdef: type_def(),
         }
     ];
+
+    #[test]
+    fn test_kind() {
+        let local = state::LocalEnv::default();
+        let external = state::ExternalEnv::default();
+
+        let func = ParseXmlFn {
+            value: value!(true).into_expression(),
+            trim: None,
+            include_attr: None,
+            attr_prefix: None,
+            text_key: None,
+            always_use_text_key: None,
+            parse_bool: None,
+            parse_null: None,
+            parse_number: None,
+        };
+
+        let type_def = func.type_def((&local, &external));
+
+        assert!(type_def.is_fallible());
+        assert!(!type_def.is_exact());
+        assert!(type_def.contains_bytes());
+        assert!(type_def.contains_object());
+
+        let object1 = type_def.as_object().unwrap();
+
+        assert!(object1.known().is_empty());
+        assert!(object1.unknown_kind().contains_object());
+
+        let object2 = object1.unknown_kind().as_object().cloned().unwrap();
+
+        assert!(object2.known().is_empty());
+        assert!(object2.unknown_kind().is_any());
+    }
 }

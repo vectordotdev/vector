@@ -1,3 +1,4 @@
+use ::value::Value;
 use regex::Regex;
 use vrl::{function::Error, prelude::*};
 
@@ -8,7 +9,7 @@ fn parse_regex_all(value: Value, numeric_groups: bool, pattern: &Regex) -> Resol
     let value = String::from_utf8_lossy(&bytes);
     Ok(pattern
         .captures_iter(&value)
-        .map(|capture| util::capture_regex_to_map(pattern, capture, numeric_groups).into())
+        .map(|capture| util::capture_regex_to_map(pattern, &capture, numeric_groups).into())
         .collect::<Vec<Value>>()
         .into())
 }
@@ -43,7 +44,7 @@ impl Function for ParseRegexAll {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -114,21 +115,6 @@ impl Function for ParseRegexAll {
             _ => Ok(None),
         }
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let pattern = args
-            .required_any("pattern")
-            .downcast_ref::<regex::Regex>()
-            .ok_or("no pattern")?;
-        let value = args.required("value");
-        let numeric_groups = args
-            .optional("numeric_groups")
-            .map(|value| value.try_boolean())
-            .transpose()?
-            .unwrap_or(false);
-
-        parse_regex_all(value, numeric_groups, pattern)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -147,7 +133,7 @@ impl Expression for ParseRegexAllFn {
         parse_regex_all(value, numeric_groups.try_boolean()?, pattern)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::array(Collection::from_unknown(
             Kind::object(util::regex_kind(&self.pattern)).or_null(),
         ))
@@ -158,8 +144,9 @@ impl Expression for ParseRegexAllFn {
 #[cfg(test)]
 #[allow(clippy::trivial_regex)]
 mod tests {
-    use super::*;
     use vector_common::btreemap;
+
+    use super::*;
 
     test_function![
         parse_regex_all => ParseRegexAll;

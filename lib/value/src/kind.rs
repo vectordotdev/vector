@@ -4,29 +4,25 @@ mod builder;
 mod collection;
 mod comparison;
 mod conversion;
-pub mod find;
-pub mod insert;
+mod crud;
+mod debug;
+
 pub mod merge;
-pub mod nest;
 pub mod remove;
 
-use crate::Value;
-pub use builder::EmptyKindError;
-pub use collection::{Collection, Field, Index, Unknown};
+pub use crud::*;
+
 use std::collections::BTreeMap;
+
+pub use collection::{Collection, Field, Index, Unknown};
+
+use crate::Value;
 
 /// The type (kind) of a given value.
 ///
 /// This struct tracks the known states a type can have. By allowing one type to have multiple
 /// states, the type definition can be progressively refined.
-///
-/// At the start, a type is in the "any" state, meaning its type can be any of the valid states, as
-/// more information becomes available, states can be removed, until one state is left.
-///
-/// A state without any type information (e.g. all fields are `None`) indicates no type information
-/// can be inferred from the value. This is usually a programming error, but it's a valid state for
-/// this library to expose.
-#[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, Eq, PartialOrd)]
 pub struct Kind {
     // NOTE: The internal API uses `Option` over `bool` for primitive types, as it makes internal
     // usage of the API easier to work with. There is no impact on the memory size of the type.
@@ -37,6 +33,7 @@ pub struct Kind {
     timestamp: Option<()>,
     regex: Option<()>,
     null: Option<()>,
+    undefined: Option<()>,
     array: Option<Collection<Index>>,
     object: Option<Collection<Field>>,
 }
@@ -45,6 +42,16 @@ impl std::fmt::Display for Kind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.is_any() {
             return f.write_str("any");
+        }
+
+        // For collections, we expand to a more descriptive representation only
+        // if the type can only be this collection.
+        if self.is_exact() {
+            if let Some(object) = &self.object {
+                return object.fmt(f);
+            } else if let Some(array) = &self.array {
+                return array.fmt(f);
+            }
         }
 
         let mut kinds = vec![];
@@ -70,6 +77,9 @@ impl std::fmt::Display for Kind {
         if self.contains_null() {
             kinds.push("null");
         }
+        if self.contains_undefined() {
+            kinds.push("undefined");
+        }
         if self.contains_array() {
             kinds.push("array");
         }
@@ -77,26 +87,78 @@ impl std::fmt::Display for Kind {
             kinds.push("object");
         }
 
-        let last = kinds.remove(0);
-
         if kinds.is_empty() {
-            return last.fmt(f);
+            return f.write_str("never");
         }
 
-        let mut kinds = kinds.into_iter().peekable();
-
-        while let Some(kind) = kinds.next() {
-            kind.fmt(f)?;
-
-            if kinds.peek().is_some() {
-                f.write_str(", ")?;
+        let len = kinds.len();
+        for (i, kind) in kinds.into_iter().enumerate() {
+            if i != 0 {
+                if i == len - 1 {
+                    f.write_str(" or ")?;
+                } else {
+                    f.write_str(", ")?;
+                }
             }
+            kind.fmt(f)?;
         }
-
-        f.write_str(" or ")?;
-        last.fmt(f)?;
 
         Ok(())
+    }
+}
+
+impl PartialEq for Kind {
+    fn eq(&self, other: &Self) -> bool {
+        let a = self.canonicalize();
+        let b = other.canonicalize();
+
+        if a.bytes != b.bytes {
+            return false;
+        }
+        if a.integer != b.integer {
+            return false;
+        }
+        if a.float != b.float {
+            return false;
+        }
+        if a.boolean != b.boolean {
+            return false;
+        }
+        if a.timestamp != b.timestamp {
+            return false;
+        }
+        if a.regex != b.regex {
+            return false;
+        }
+        if a.null != b.null {
+            return false;
+        }
+        if a.undefined != b.undefined {
+            return false;
+        }
+        if a.array != b.array {
+            return false;
+        }
+        if a.object != b.object {
+            return false;
+        }
+        true
+    }
+}
+
+impl Kind {
+    /// Returns a Kind type in a standard / simple representation.
+    #[must_use]
+    pub fn canonicalize(&self) -> Self {
+        let mut output = self.clone();
+
+        if let Some(object) = &mut output.object {
+            *object = object.canonicalize();
+        }
+        if let Some(array) = &mut output.array {
+            *array = array.canonicalize();
+        }
+        output
     }
 }
 

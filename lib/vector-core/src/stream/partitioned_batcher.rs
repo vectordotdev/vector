@@ -93,24 +93,12 @@ where
         match ready!(self.expirations.poll_expired(cx)) {
             // No expirations yet.
             None => Poll::Ready(None),
-            Some(expiration) => match expiration {
-                // We shouldn't really ever hit this error arm, as `DelayQueue`
-                // doesn't actually return ever return an error, but it's part
-                // of the type signature so we must abide.
-                Err(e) => {
-                    error!(
-                        "caught unexpected error while polling for expired batches: {}",
-                        e
-                    );
-                    Poll::Pending
-                }
-                Ok(expiration) => {
-                    // An item has expired, so remove it from the map and return
-                    // it.
-                    assert!(self.expiration_map.remove(expiration.get_ref()).is_some());
-                    Poll::Ready(Some(expiration.into_inner()))
-                }
-            },
+            Some(expiration) => {
+                // An item has expired, so remove it from the map and return
+                // it.
+                assert!(self.expiration_map.remove(expiration.get_ref()).is_some());
+                Poll::Ready(Some(expiration.into_inner()))
+            }
         }
     }
 }

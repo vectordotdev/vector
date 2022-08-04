@@ -41,7 +41,7 @@ Below is an example of how to transition your `values.yaml` file:
        inputs: ["dummy"]
 -      rawConfig: |
 -        target = "stdout"
--        encoding = "json"
+-        encoding.codec = "json"
 +      target: "stdout"
-+      encoding: "json"
++      encoding.codec: "json"
 ```

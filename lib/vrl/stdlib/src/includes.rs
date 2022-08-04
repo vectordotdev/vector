@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 fn includes(list: Value, item: Value) -> Resolved {
@@ -46,7 +47,7 @@ impl Function for Includes {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -54,13 +55,6 @@ impl Function for Includes {
         let item = arguments.required("item");
 
         Ok(Box::new(IncludesFn { value, item }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let item = args.required("item");
-
-        includes(value, item)
     }
 }
 
@@ -78,7 +72,7 @@ impl Expression for IncludesFn {
         includes(list, item)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::boolean().infallible()
     }
 }

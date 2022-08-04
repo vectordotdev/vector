@@ -1,3 +1,4 @@
+use ::value::Value;
 use vector_common::tokenize;
 use vrl::prelude::*;
 
@@ -34,7 +35,7 @@ impl Function for ParseTokens {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -50,11 +51,6 @@ impl Function for ParseTokens {
             required: true,
         }]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        parse_tokens(value)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -68,7 +64,7 @@ impl Expression for ParseTokensFn {
         parse_tokens(value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::array(Collection::from_unknown(Kind::bytes()))
     }
 }

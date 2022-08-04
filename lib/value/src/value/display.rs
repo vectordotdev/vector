@@ -1,6 +1,8 @@
-use crate::Value;
-use chrono::SecondsFormat;
 use std::{fmt, string::ToString};
+
+use chrono::SecondsFormat;
+
+use crate::Value;
 
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -36,7 +38,7 @@ impl fmt::Display for Value {
                 write!(f, "t'{}'", val.to_rfc3339_opts(SecondsFormat::AutoSi, true))
             }
             Value::Regex(regex) => write!(f, "r'{}'", **regex),
-            Value::Null => write!(f, "null"),
+            Self::Null => write!(f, "null"),
         }
     }
 }

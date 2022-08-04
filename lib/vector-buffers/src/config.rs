@@ -7,6 +7,7 @@ use std::{
 use serde::{de, ser, Deserialize, Deserializer, Serialize, Serializer};
 use snafu::{ResultExt, Snafu};
 use tracing::Span;
+use vector_common::finalization::Finalizable;
 
 use crate::{
     topology::{
@@ -14,7 +15,7 @@ use crate::{
         channel::{BufferReceiver, BufferSender},
     },
     variants::{DiskV1Buffer, DiskV2Buffer, MemoryBuffer},
-    Acker, Bufferable, WhenFull,
+    Bufferable, WhenFull,
 };
 
 #[derive(Debug, Snafu)]
@@ -31,9 +32,9 @@ pub enum BufferBuildError {
 enum BufferTypeKind {
     #[serde(rename = "memory")]
     Memory,
-    #[serde(rename = "disk")]
+    #[serde(rename = "disk_v1")]
     DiskV1,
-    #[serde(rename = "disk_v2")]
+    #[serde(rename = "disk")]
     DiskV2,
 }
 
@@ -221,14 +222,14 @@ pub enum BufferType {
         when_full: WhenFull,
     },
     /// A buffer stage backed by an on-disk database, powered by LevelDB.
-    #[serde(rename = "disk")]
+    #[serde(rename = "disk_v1")]
     DiskV1 {
         max_size: NonZeroU64,
         #[serde(default)]
         when_full: WhenFull,
     },
     /// A buffer stage backed by disk.
-    #[serde(rename = "disk_v2")]
+    #[serde(rename = "disk")]
     DiskV2 {
         max_size: NonZeroU64,
         #[serde(default)]
@@ -250,7 +251,7 @@ impl BufferType {
         id: String,
     ) -> Result<(), BufferBuildError>
     where
-        T: Bufferable + Clone,
+        T: Bufferable + Clone + Finalizable,
     {
         match *self {
             BufferType::Memory {
@@ -270,7 +271,6 @@ impl BufferType {
                 when_full,
                 max_size,
             } => {
-                warn!("!!!! The `disk_v2` buffer type is not yet stable.  Data loss may be encountered. !!!!");
                 let data_dir = data_dir.ok_or(BufferBuildError::RequiresDataDir)?;
                 builder.stage(DiskV2Buffer::new(id, data_dir, max_size), when_full);
             }
@@ -293,6 +293,11 @@ impl BufferType {
 /// component, where you could only choose which buffer type to use.  As we expand buffer
 /// functionality to allow chaining buffers together, you'll see "buffer topology" used in internal
 /// documentation to correctly reflect the internal structure.
+///
+/// TODO: We need to limit chained buffers to only allowing a single copy of each buffer type to be
+/// defined, otherwise, for example, two instances of the same disk buffer type in a single chained
+/// buffer topology would try to both open the same buffer files on disk, which wouldn't work or
+/// would go horribly wrong.
 #[derive(Clone, Debug, PartialEq)]
 pub struct BufferConfig {
     pub stages: Vec<BufferType>,
@@ -318,9 +323,7 @@ impl BufferConfig {
     /// Builds the buffer components represented by this configuration.
     ///
     /// The caller gets back a `Sink` and `Stream` implementation that represent a way to push items
-    /// into the buffer, as well as pop items out of the buffer, respectively.  The `Acker` is
-    /// provided to callers in order to update the buffer when popped items have been processed and
-    /// can be dropped or deleted, depending on the underlying buffer implementation.
+    /// into the buffer, as well as pop items out of the buffer, respectively.
     ///
     /// # Errors
     ///
@@ -335,9 +338,9 @@ impl BufferConfig {
         data_dir: Option<PathBuf>,
         buffer_id: String,
         span: Span,
-    ) -> Result<(BufferSender<T>, BufferReceiver<T>, Acker), BufferBuildError>
+    ) -> Result<(BufferSender<T>, BufferReceiver<T>), BufferBuildError>
     where
-        T: Bufferable + Clone,
+        T: Bufferable + Clone + Finalizable,
     {
         let mut builder = TopologyBuilder::default();
 
@@ -346,7 +349,7 @@ impl BufferConfig {
         }
 
         builder
-            .build(span)
+            .build(buffer_id, span)
             .await
             .context(FailedToBuildTopologySnafu)
     }
@@ -354,8 +357,9 @@ impl BufferConfig {
 
 #[cfg(test)]
 mod test {
-    use crate::{BufferConfig, BufferType, WhenFull};
     use std::num::{NonZeroU64, NonZeroUsize};
+
+    use crate::{BufferConfig, BufferType, WhenFull};
 
     fn check_single_stage(source: &str, expected: BufferType) {
         let config: BufferConfig = serde_yaml::from_str(source).unwrap();
@@ -439,7 +443,7 @@ max_events: 42
     fn ensure_field_defaults_for_all_types() {
         check_single_stage(
             r#"
-          type: disk
+          type: disk_v1
           max_size: 1024
           "#,
             BufferType::DiskV1 {
@@ -493,7 +497,7 @@ max_events: 42
 
         check_single_stage(
             r#"
-          type: disk_v2
+          type: disk
           max_size: 1024
           "#,
             BufferType::DiskV2 {

@@ -8,7 +8,7 @@ use std::{
 
 use bloom::{BloomFilter, ASMS};
 use futures::{Stream, StreamExt};
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 use crate::{
     config::{
@@ -24,13 +24,15 @@ use crate::{
     transforms::{TaskTransform, Transform},
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
-// TODO: add back when serde-rs/serde#1358 is addressed
-//#[serde(deny_unknown_fields)]
+/// Configuration for the `tag_cardinality_limit` transform.
+#[configurable_component(transform)]
+#[derive(Clone, Debug)]
 pub struct TagCardinalityLimitConfig {
+    /// How many distinct values to accept for any given key.
     #[serde(default = "default_value_limit")]
     pub value_limit: u32,
 
+    #[configurable(derived)]
     #[serde(default = "default_limit_exceeded_action")]
     pub limit_exceeded_action: LimitExceededAction,
 
@@ -38,23 +40,46 @@ pub struct TagCardinalityLimitConfig {
     pub mode: Mode,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Controls the approach taken for tracking tag cardinality.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Mode {
+    /// Tracks cardinality exactly.
+    ///
+    /// This mode has higher memory requirements than `probabilistic`, but never falsely outputs metrics with new tags
+    /// after the limit has been hit.
     Exact,
-    Probabilistic(BloomFilterConfig),
+
+    /// Tracks cardinality probabilistically.
+    ///
+    /// This mode has lower memory requirements than `exact`, but may occasionally allow metric events to pass through
+    /// the transform even when they contain new tags that exceed the configured limit. The rate at which this happens
+    /// can be controlled by changing the value of `cache_size_per_tag`.
+    Probabilistic(#[configurable(derived)] BloomFilterConfig),
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Bloom filter configuration in probabilistic mode.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct BloomFilterConfig {
+    /// The size of the cache for detecting duplicate tags, in bytes.
+    ///
+    /// The larger the cache size, the less likely it is to have a false positive, or a case where we allow a new value
+    /// for tag even after we have reached the configured limits.
     #[serde(default = "default_cache_size")]
     pub cache_size_per_key: usize,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(tag = "limit_exceeded_action", rename_all = "snake_case")]
+/// Possible actions to take when an event arrives that would exceed the cardinality limit for one or more of its tags.
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[serde(rename_all = "snake_case")]
 pub enum LimitExceededAction {
+    /// Drop the tag(s) that would exceed the configured limit.
     DropTag,
+
+    /// Drop the entire event itself.
     DropEvent,
 }
 
@@ -214,7 +239,7 @@ impl TagCardinalityLimit {
             tag_value_set.insert(value);
 
             if tag_value_set.len() == self.config.value_limit as usize {
-                emit!(&TagCardinalityValueLimitReached { key });
+                emit!(TagCardinalityValueLimitReached { key });
             }
 
             true
@@ -231,7 +256,7 @@ impl TagCardinalityLimit {
                 LimitExceededAction::DropEvent => {
                     for (key, value) in tags_map {
                         if !self.try_accept_tag(key, Cow::Borrowed(value)) {
-                            emit!(&TagCardinalityLimitRejectingEvent {
+                            emit!(TagCardinalityLimitRejectingEvent {
                                 tag_key: key,
                                 tag_value: value,
                             });
@@ -243,7 +268,7 @@ impl TagCardinalityLimit {
                     let mut to_delete = Vec::new();
                     for (key, value) in tags_map {
                         if !self.try_accept_tag(key, Cow::Borrowed(value)) {
-                            emit!(&TagCardinalityLimitRejectingTag {
+                            emit!(TagCardinalityLimitRejectingTag {
                                 tag_key: key,
                                 tag_value: value,
                             });

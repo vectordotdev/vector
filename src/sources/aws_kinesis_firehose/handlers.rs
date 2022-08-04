@@ -1,11 +1,14 @@
-use std::{io::Read, sync::Arc};
+use std::io::Read;
 
 use bytes::Bytes;
 use chrono::Utc;
+use codecs::StreamDecodingError;
 use flate2::read::MultiGzDecoder;
 use futures::StreamExt;
+use lookup::path;
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
+use vector_common::finalization::AddBatchNotifier;
 use vector_core::{event::BatchNotifier, ByteSizeOf};
 use warp::reject;
 
@@ -15,14 +18,13 @@ use super::{
     Compression,
 };
 use crate::{
-    codecs,
+    codecs::Decoder,
     config::log_schema,
     event::{BatchStatus, Event},
     internal_events::{
         AwsKinesisFirehoseAutomaticRecordDecodeError, BytesReceived, EventsReceived,
         StreamClosedError,
     },
-    sources::util::StreamDecodingError,
     SourceSender,
 };
 
@@ -32,7 +34,7 @@ pub async fn firehose(
     source_arn: String,
     request: FirehoseRequest,
     compression: Compression,
-    decoder: codecs::Decoder,
+    decoder: Decoder,
     acknowledgements: bool,
     mut out: SourceSender,
 ) -> Result<impl warp::Reply, reject::Rejection> {
@@ -42,7 +44,7 @@ pub async fn firehose(
                 request_id: request_id.clone(),
             })
             .map_err(reject::custom)?;
-        emit!(&BytesReceived {
+        emit!(BytesReceived {
             byte_size: bytes.len(),
             protocol: "http",
         });
@@ -51,7 +53,7 @@ pub async fn firehose(
         loop {
             match stream.next().await {
                 Some(Ok((mut events, _byte_size))) => {
-                    emit!(&EventsReceived {
+                    emit!(EventsReceived {
                         count: events.len(),
                         byte_size: events.size_of(),
                     });
@@ -65,7 +67,7 @@ pub async fn firehose(
 
                     for event in &mut events {
                         if let Some(batch) = &batch {
-                            event.add_batch_notifier(Arc::clone(batch));
+                            event.add_batch_notifier(batch.clone());
                         }
                         if let Event::Log(ref mut log) = event {
                             log.try_insert(
@@ -73,14 +75,14 @@ pub async fn firehose(
                                 Bytes::from("aws_kinesis_firehose"),
                             );
                             log.try_insert(log_schema().timestamp_key(), request.timestamp);
-                            log.try_insert_flat("request_id", request_id.to_string());
-                            log.try_insert_flat("source_arn", source_arn.to_string());
+                            log.try_insert(path!("request_id"), request_id.to_string());
+                            log.try_insert(path!("source_arn"), source_arn.to_string());
                         }
                     }
 
                     let count = events.len();
                     if let Err(error) = out.send_batch(events).await {
-                        emit!(&StreamClosedError {
+                        emit!(StreamClosedError {
                             error: error.clone(),
                             count,
                         });
@@ -158,7 +160,7 @@ fn decode_record(
             match infer::get(&buf) {
                 Some(filetype) => match filetype.mime_type() {
                     "application/gzip" => decode_gzip(&buf[..]).or_else(|error| {
-                        emit!(&AwsKinesisFirehoseAutomaticRecordDecodeError {
+                        emit!(AwsKinesisFirehoseAutomaticRecordDecodeError {
                             compression: Compression::Gzip,
                             error
                         });

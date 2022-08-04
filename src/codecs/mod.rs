@@ -3,22 +3,12 @@
 
 #![deny(missing_docs)]
 
-pub mod decoding;
-pub mod encoding;
+mod decoding;
+mod encoding;
 mod ready_frames;
 
-pub use decoding::{
-    BytesDecoder, BytesDecoderConfig, BytesDeserializer, BytesDeserializerConfig,
-    CharacterDelimitedDecoder, CharacterDelimitedDecoderConfig, Decoder, JsonDeserializer,
-    JsonDeserializerConfig, LengthDelimitedDecoder, LengthDelimitedDecoderConfig,
-    NewlineDelimitedDecoder, NewlineDelimitedDecoderConfig, OctetCountingDecoder,
-    OctetCountingDecoderConfig,
-};
-#[cfg(feature = "sources-syslog")]
-pub use decoding::{SyslogDeserializer, SyslogDeserializerConfig};
+pub use decoding::{Decoder, DecodingConfig};
 pub use encoding::{
-    CharacterDelimitedEncoder, CharacterDelimitedEncoderConfig, JsonSerializer,
-    JsonSerializerConfig, NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig,
-    RawMessageSerializer, RawMessageSerializerConfig,
+    Encoder, EncodingConfig, EncodingConfigWithFraming, SinkType, TimestampFormat, Transformer,
 };
 pub use ready_frames::ReadyFrames;

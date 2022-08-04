@@ -1,27 +1,27 @@
-use std::{convert::TryFrom, num::NonZeroU64, sync::Arc};
+use std::{convert::TryFrom, sync::Arc};
 
 use futures::FutureExt;
 use indoc::indoc;
-use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
+use value::Kind;
+use vector_config::configurable_component;
 use vector_core::config::proxy::ProxyConfig;
 
-use super::{
-    service::LogApiRetry,
-    sink::{DatadogLogsJsonEncoding, LogSinkBuilder},
-};
+use super::{service::LogApiRetry, sink::LogSinkBuilder};
 use crate::{
+    codecs::Transformer,
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
+    schema,
     sinks::{
         datadog::{get_api_validate_endpoint, healthcheck, logs::service::LogApiService, Region},
         util::{
-            encoding::EncodingConfigFixed, service::ServiceBuilderExt, BatchConfig, Compression,
-            SinkBatchSettings, TowerRequestConfig,
+            service::ServiceBuilderExt, BatchConfig, Compression, SinkBatchSettings,
+            TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
 // The Datadog API has a hard limit of 5MB for uncompressed payloads. Above this
@@ -34,7 +34,7 @@ use crate::{
 pub const MAX_PAYLOAD_BYTES: usize = 5_000_000;
 pub const BATCH_GOAL_BYTES: usize = 4_250_000;
 pub const BATCH_MAX_EVENTS: usize = 1_000;
-pub const BATCH_DEFAULT_TIMEOUT_SECS: u64 = 5;
+pub const BATCH_DEFAULT_TIMEOUT_SECS: f64 = 5.0;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DatadogLogsDefaultBatchSettings;
@@ -42,42 +42,69 @@ pub struct DatadogLogsDefaultBatchSettings;
 impl SinkBatchSettings for DatadogLogsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(BATCH_MAX_EVENTS);
     const MAX_BYTES: Option<usize> = Some(BATCH_GOAL_BYTES);
-    const TIMEOUT_SECS: NonZeroU64 =
-        unsafe { NonZeroU64::new_unchecked(BATCH_DEFAULT_TIMEOUT_SECS) };
+    const TIMEOUT_SECS: f64 = BATCH_DEFAULT_TIMEOUT_SECS;
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the `datadog_logs` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct DatadogLogsConfig {
+pub struct DatadogLogsConfig {
+    /// The endpoint to send logs to.
     pub(crate) endpoint: Option<String>,
-    // Deprecated, replaced by the site option
-    region: Option<Region>,
-    site: Option<String>,
-    // Deprecated name
+
+    /// The Datadog region to send logs to.
+    ///
+    /// This option is deprecated, and the `site` field should be used instead.
+    #[configurable(deprecated)]
+    pub region: Option<Region>,
+
+    /// The Datadog [site][dd_site] to send logs to.
+    ///
+    /// [dd_site]: https://docs.datadoghq.com/getting_started/site
+    pub site: Option<String>,
+
+    /// The default Datadog [API key][api_key] to send logs with.
+    ///
+    /// If a log has a Datadog [API key][api_key] set explicitly in its metadata, it will take
+    /// precedence over the default.
+    ///
+    /// [api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
     #[serde(alias = "api_key")]
-    default_api_key: String,
+    pub default_api_key: String,
+
+    #[configurable(derived)]
+    pub tls: Option<TlsEnableableConfig>,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub compression: Option<Compression>,
+
+    #[configurable(derived)]
     #[serde(
-        skip_serializing_if = "crate::serde::skip_serializing_if_default",
-        default
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    encoding: EncodingConfigFixed<DatadogLogsJsonEncoding>,
-    tls: Option<TlsConfig>,
+    pub encoding: Transformer,
 
+    #[configurable(derived)]
     #[serde(default)]
-    compression: Option<Compression>,
+    pub batch: BatchConfig<DatadogLogsDefaultBatchSettings>,
 
+    #[configurable(derived)]
     #[serde(default)]
-    batch: BatchConfig<DatadogLogsDefaultBatchSettings>,
+    pub request: TowerRequestConfig,
 
-    #[serde(default)]
-    request: TowerRequestConfig,
-
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    acknowledgements: AcknowledgementsConfig,
+    pub acknowledgements: AcknowledgementsConfig,
+
+    #[serde(skip)]
+    pub enterprise: bool,
 }
 
 impl GenerateConfig for DatadogLogsConfig {
@@ -112,11 +139,7 @@ impl DatadogLogsConfig {
 }
 
 impl DatadogLogsConfig {
-    pub fn build_processor(
-        &self,
-        client: HttpClient,
-        cx: SinkContext,
-    ) -> crate::Result<VectorSink> {
+    pub fn build_processor(&self, client: HttpClient) -> crate::Result<VectorSink> {
         let default_api_key: Arc<str> = Arc::from(self.default_api_key.clone().as_str());
         let request_limits = self.request.unwrap_with(&Default::default());
 
@@ -131,13 +154,9 @@ impl DatadogLogsConfig {
 
         let service = ServiceBuilder::new()
             .settings(request_limits, LogApiRetry)
-            .service(LogApiService::new(
-                client,
-                self.get_uri(),
-                cx.globals.enterprise,
-            ));
-        let sink = LogSinkBuilder::new(service, cx, default_api_key, batch)
-            .encoding(self.encoding.clone())
+            .service(LogApiService::new(client, self.get_uri(), self.enterprise));
+
+        let sink = LogSinkBuilder::new(self.encoding.clone(), service, default_api_key, batch)
             .compression(self.compression.unwrap_or_default())
             .build();
 
@@ -152,7 +171,11 @@ impl DatadogLogsConfig {
 
     pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
         let tls_settings = MaybeTlsSettings::from_config(
-            &Some(self.tls.clone().unwrap_or_else(TlsConfig::enabled)),
+            &Some(
+                self.tls
+                    .clone()
+                    .unwrap_or_else(TlsEnableableConfig::enabled),
+            ),
             false,
         )?;
         Ok(HttpClient::new(tls_settings, proxy)?)
@@ -165,20 +188,29 @@ impl SinkConfig for DatadogLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.create_client(&cx.proxy)?;
         let healthcheck = self.build_healthcheck(client.clone())?;
-        let sink = self.build_processor(client, cx)?;
+        let sink = self.build_processor(client)?;
         Ok((sink, healthcheck))
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        let requirement = schema::Requirement::empty()
+            .required_meaning("message", Kind::bytes())
+            .required_meaning("timestamp", Kind::timestamp())
+            .optional_meaning("host", Kind::bytes())
+            .optional_meaning("source", Kind::bytes())
+            .optional_meaning("severity", Kind::bytes())
+            .optional_meaning("service", Kind::bytes())
+            .optional_meaning("trace_id", Kind::bytes());
+
+        Input::log().with_schema_requirement(requirement)
     }
 
     fn sink_type(&self) -> &'static str {
         "datadog_logs"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 

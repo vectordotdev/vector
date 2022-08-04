@@ -1,9 +1,11 @@
 use std::{collections::BTreeMap, fmt, ops::Deref};
 
+use value::Value;
+
 use crate::{
     expression::{Expr, Resolved},
-    vm::OpCode,
-    Context, Expression, State, TypeDef, Value,
+    state::{ExternalEnv, LocalEnv},
+    Context, Expression, TypeDef,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -37,12 +39,12 @@ impl Expression for Array {
     fn as_value(&self) -> Option<Value> {
         self.inner
             .iter()
-            .map(|expr| expr.as_value())
+            .map(Expr::as_value)
             .collect::<Option<Vec<_>>>()
             .map(Value::Array)
     }
 
-    fn type_def(&self, state: &State) -> TypeDef {
+    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
         let type_defs = self
             .inner
             .iter()
@@ -61,26 +63,6 @@ impl Expression for Array {
 
         TypeDef::array(collection).with_fallibility(fallible)
     }
-
-    fn compile_to_vm(
-        &self,
-        vm: &mut crate::vm::Vm,
-        state: &mut crate::state::Compiler,
-    ) -> Result<(), String> {
-        // Evaluate each of the elements of the array, the result of each
-        // will be added to the stack.
-        for value in self.inner.iter().rev() {
-            value.compile_to_vm(vm, state)?;
-        }
-
-        vm.write_opcode(OpCode::CreateArray);
-
-        // Add the length of the array as a primitive so the VM knows how
-        // many elements to move into the array.
-        vm.write_primitive(self.inner.len());
-
-        Ok(())
-    }
 }
 
 impl fmt::Display for Array {
@@ -88,7 +70,7 @@ impl fmt::Display for Array {
         let exprs = self
             .inner
             .iter()
-            .map(|e| e.to_string())
+            .map(Expr::to_string)
             .collect::<Vec<_>>()
             .join(", ");
 
@@ -104,9 +86,10 @@ impl From<Vec<Expr>> for Array {
 
 #[cfg(test)]
 mod tests {
+    use value::kind::Collection;
+
     use super::*;
     use crate::{expr, test_type_def, value::Kind, TypeDef};
-    use value::kind::Collection;
 
     test_type_def![
         empty_array {

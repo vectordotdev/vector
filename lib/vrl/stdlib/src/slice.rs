@@ -1,5 +1,6 @@
 use std::ops::Range;
 
+use ::value::Value;
 use vrl::prelude::*;
 
 fn slice(start: i64, end: Option<i64>, value: Value) -> Resolved {
@@ -89,7 +90,7 @@ impl Function for Slice {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -98,17 +99,6 @@ impl Function for Slice {
         let end = arguments.optional("end");
 
         Ok(Box::new(SliceFn { value, start, end }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let start = args.required("start").try_integer()?;
-        let end = args
-            .optional("end")
-            .map(|value| value.try_integer())
-            .transpose()?;
-
-        slice(start, end, value)
     }
 }
 
@@ -131,12 +121,12 @@ impl Expression for SliceFn {
         slice(start, end, value)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        let td = TypeDef::from(Kind::empty()).fallible();
+    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+        let td = TypeDef::from(Kind::never()).fallible();
 
         match self.value.type_def(state) {
-            v if v.is_bytes() => td.merge_deep(v),
-            v if v.is_array() => td.merge_deep(v).collect_subtypes(),
+            v if v.is_bytes() => td.union(v),
+            v if v.is_array() => td.union(v).collect_subtypes(),
             _ => td.add_bytes().add_array(Collection::any()),
         }
     }

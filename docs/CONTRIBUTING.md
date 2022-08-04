@@ -6,34 +6,29 @@ following TOC is sorted progressively, starting with the basics and
 expanding into more specifics. Everyone from a first time contributor to a
 Vector team member will find this document useful.
 
-<!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
-
-1. [Introduction](#introduction)
-1. [Your First Contribution](#your-first-contribution)
-   1. [New sources, sinks, and transforms](#new-sources-sinks-and-transforms)
-1. [Workflow](#workflow)
-   1. [Git Branches](#git-branches)
-   1. [Git Commits](#git-commits)
-      1. [Style](#style)
-      1. [Signing-off](#signing-off)
-   1. [Github Pull Requests](#github-pull-requests)
-      1. [Title](#title)
-      1. [Reviews & Approvals](#reviews--approvals)
-      1. [Merge Style](#merge-style)
-   1. [CI](#ci)
-      1. [Releasing](#releasing)
-      1. [Testing](#testing)
-         1. [Skipping tests](#skipping-tests)
-         1. [Daily tests](#daily-tests)
-      1. [Flakey tests](#flakey-tests)
-         1. [Test harness](#test-harness)
-   1. [Deprecations](#deprecations)
-1. [Next steps](#next-steps)
-1. [Legal](#legal)
-   1. [CLA](#contributor-license-agreement)
-   1. [Granted rights and copyright assignment](#granted-rights-and-copyright-assignment)
-
-<!-- /MarkdownTOC -->
+- [Introduction](#introduction)
+- [Your First Contribution](#your-first-contribution)
+  - [New sources, sinks, and transforms](#new-sources-sinks-and-transforms)
+- [Workflow](#workflow)
+  - [Git Branches](#git-branches)
+  - [Git Commits](#git-commits)
+    - [Style](#style)
+  - [Github Pull Requests](#github-pull-requests)
+    - [Title](#title)
+    - [Reviews & Approvals](#reviews--approvals)
+    - [Merge Style](#merge-style)
+  - [CI](#ci)
+    - [Releasing](#releasing)
+    - [Testing](#testing)
+      - [Skipping tests](#skipping-tests)
+      - [Daily tests](#daily-tests)
+    - [Flakey tests](#flakey-tests)
+      - [Test harness](#test-harness)
+  - [Deprecations](#deprecations)
+- [Next steps](#next-steps)
+- [Legal](#legal)
+  - [Contributor License Agreement](#contributor-license-agreement)
+  - [Granted rights and copyright assignment](#granted-rights-and-copyright-assignment)
 
 ## Introduction
 

@@ -13,15 +13,13 @@ pub struct EventsSent<'a> {
 }
 
 impl<'a> InternalEvent for EventsSent<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         if let Some(output) = self.output {
             trace!(message = "Events sent.", count = %self.count, byte_size = %self.byte_size, output = %output);
         } else {
             trace!(message = "Events sent.", count = %self.count, byte_size = %self.byte_size);
         }
-    }
 
-    fn emit_metrics(&self) {
         if self.count > 0 {
             if let Some(output) = self.output {
                 counter!("component_sent_events_total", self.count as u64, "output" => output.to_owned());
@@ -35,7 +33,7 @@ impl<'a> InternalEvent for EventsSent<'a> {
         }
     }
 
-    fn name(&self) -> Option<&str> {
+    fn name(&self) -> Option<&'static str> {
         Some("EventsSent")
     }
 }

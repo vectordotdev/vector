@@ -5,11 +5,13 @@ use crate::Urls;
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Note {
     Hint(String),
+    Example(String),
     CoerceValue,
     SeeFunctionDocs(&'static str),
     SeeErrorDocs,
     SeeCodeDocs(usize),
     SeeLangDocs,
+    SeeRepl,
 
     #[doc(hidden)]
     SeeDocs(String, String),
@@ -34,11 +36,17 @@ impl Note {
 
 impl fmt::Display for Note {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Note::*;
+        use Note::{
+            Basic, CoerceValue, Example, Hint, SeeCodeDocs, SeeDocs, SeeErrorDocs, SeeFunctionDocs,
+            SeeLangDocs, SeeRepl, UserErrorMessage,
+        };
 
         match self {
             Hint(hint) => {
                 write!(f, "hint: {}", hint)
+            }
+            Example(example) => {
+                write!(f, "example: {}", example)
             }
             CoerceValue => {
                 Hint("coerce the value to the required type using a coercion function".to_owned())
@@ -57,8 +65,13 @@ impl fmt::Display for Note {
 
                 write!(f, "see language documentation at {}", url)
             }
+            SeeRepl => {
+                let url = Urls::example_docs();
+
+                write!(f, "try your code in the VRL REPL, learn more at {}", url)
+            }
             SeeCodeDocs(code) => {
-                let url = Urls::error_code_url(code);
+                let url = Urls::error_code_url(*code);
                 write!(f, "learn more about error code {} at {}", code, url)
             }
             SeeDocs(kind, url) => {

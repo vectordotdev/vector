@@ -53,13 +53,13 @@ df -h
 
 # Create short plain-text extended description for the package
 EXPANDED_LINK_ALIASED="$(cmark-gfm "$PROJECT_ROOT/README.md" --to commonmark)" # expand link aliases
-TEXT_BEFORE_FIRST_HEADER="$(sed '/^## /Q' <<< "$EXPANDED_LINK_ALIASED")" # select text before first header
-PLAIN_TEXT="$(cmark-gfm --to plaintext <<< "$TEXT_BEFORE_FIRST_HEADER")" # convert to plain text
-FORMATTED="$(fmt -uw 80 <<< "$PLAIN_TEXT")"
-cat <<< "$FORMATTED" > "$PROJECT_ROOT/target/debian-extended-description.txt"
+TEXT_BEFORE_FIRST_HEADER="$(sed '/^## /Q' <<<"$EXPANDED_LINK_ALIASED")"        # select text before first header
+PLAIN_TEXT="$(cmark-gfm --to plaintext <<<"$TEXT_BEFORE_FIRST_HEADER")"        # convert to plain text
+FORMATTED="$(fmt -uw 80 <<<"$PLAIN_TEXT")"
+cat <<<"$FORMATTED" >"$PROJECT_ROOT/target/debian-extended-description.txt"
 
 # Create the license file for binary distributions (LICENSE + NOTICE)
-cat LICENSE NOTICE > "$PROJECT_ROOT/target/debian-license.txt"
+cat LICENSE NOTICE >"$PROJECT_ROOT/target/debian-license.txt"
 
 #
 # Build the deb
@@ -69,7 +69,7 @@ cat LICENSE NOTICE > "$PROJECT_ROOT/target/debian-license.txt"
 #     the deb can run, including the architecture
 #
 #   --no-build
-#     because this stop should follow a build
+#     because this step should follow a build
 
 cargo deb --target "$TARGET" --deb-version "${PACKAGE_VERSION}-1" --variant "$TARGET" --no-build --no-strip
 
@@ -78,7 +78,7 @@ for file in target/"${TARGET}"/debian/*.deb; do
   base=$(basename "${file}")
   nbase=${base//-${TARGET}/}
   # the file won't have TARGET in its name if not a "variant"
-  if [[ "${file}" != target/"${TARGET}"/debian/"${nbase}" ]] ; then
+  if [[ "${file}" != target/"${TARGET}"/debian/"${nbase}" ]]; then
     mv "${file}" target/"${TARGET}"/debian/"${nbase}"
   fi
 done

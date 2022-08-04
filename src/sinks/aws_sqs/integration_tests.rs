@@ -4,17 +4,21 @@ use std::str::FromStr;
 use aws_sdk_sqs::model::QueueAttributeName;
 use aws_sdk_sqs::Client as SqsClient;
 use aws_sdk_sqs::{Endpoint, Region};
+use codecs::TextSerializerConfig;
 use http::Uri;
 use tokio::time::{sleep, Duration};
 
-use super::config::{Encoding, SqsSinkConfig};
+use super::config::SqsSinkConfig;
 use super::sink::SqsSink;
-use crate::aws::aws_sdk::create_client;
+use crate::aws::create_client;
 use crate::aws::{AwsAuthentication, RegionOrEndpoint};
 use crate::common::sqs::SqsClientBuilder;
-use crate::config::{ProxyConfig, SinkContext};
+use crate::config::ProxyConfig;
 use crate::sinks::VectorSink;
-use crate::test_util::{random_lines_with_stream, random_string};
+use crate::test_util::{
+    components::{run_and_assert_sink_compliance, AWS_SINK_TAGS},
+    random_lines_with_stream, random_string,
+};
 
 fn sqs_address() -> String {
     std::env::var("SQS_ADDRESS").unwrap_or_else(|_| "http://localhost:4566".into())
@@ -31,6 +35,7 @@ async fn create_test_client() -> SqsClient {
         Some(Endpoint::immutable(Uri::from_str(&endpoint).unwrap())),
         &proxy,
         &None,
+        true,
     )
     .await
     .unwrap()
@@ -38,8 +43,6 @@ async fn create_test_client() -> SqsClient {
 
 #[tokio::test]
 async fn sqs_send_message_batch() {
-    let cx = SinkContext::new_test();
-
     let queue_name = gen_queue_name();
     ensure_queue(queue_name.clone()).await;
     let queue_url = get_queue_url(queue_name.clone()).await;
@@ -48,8 +51,8 @@ async fn sqs_send_message_batch() {
 
     let config = SqsSinkConfig {
         queue_url: queue_url.clone(),
-        region: RegionOrEndpoint::with_endpoint(sqs_address().as_str()),
-        encoding: Encoding::Text.into(),
+        region: RegionOrEndpoint::with_both("local", sqs_address().as_str()),
+        encoding: TextSerializerConfig::new().into(),
         message_group_id: None,
         message_deduplication_id: None,
         request: Default::default(),
@@ -61,11 +64,11 @@ async fn sqs_send_message_batch() {
 
     config.clone().healthcheck(client.clone()).await.unwrap();
 
-    let sink = SqsSink::new(config, cx, client.clone()).unwrap();
+    let sink = SqsSink::new(config, client.clone()).unwrap();
     let sink = VectorSink::from_event_streamsink(sink);
 
     let (mut input_lines, events) = random_lines_with_stream(100, 10, None);
-    sink.run(events).await.unwrap();
+    run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
     sleep(Duration::from_secs(1)).await;
 
@@ -103,15 +106,13 @@ async fn ensure_queue(queue_name: String) {
         None
     };
 
-    if let Err(error) = client
+    client
         .create_queue()
         .set_attributes(attributes)
         .queue_name(queue_name)
         .send()
         .await
-    {
-        println!("Unable to check the queue {:?}", error);
-    }
+        .expect("unable to create queue");
 }
 
 async fn get_queue_url(queue_name: String) -> String {

@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::{diagnostic::Note, prelude::*};
 
 fn assert_eq(left: Value, right: Value, message: Option<Value>) -> Resolved {
@@ -70,7 +71,7 @@ impl Function for AssertEq {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -83,14 +84,6 @@ impl Function for AssertEq {
             right,
             message,
         }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let left = args.required("left");
-        let right = args.required("right");
-        let message = args.optional("message");
-
-        assert_eq(left, right, message)
     }
 }
 
@@ -110,7 +103,7 @@ impl Expression for AssertEqFn {
         assert_eq(left, right, message)
     }
 
-    fn type_def(&self, _state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::boolean().fallible()
     }
 }

@@ -21,7 +21,7 @@ components: sinks: loki: {
 				common:       false
 				max_bytes:    1_000_000
 				max_events:   100_000
-				timeout_secs: 1
+				timeout_secs: 1.0
 			}
 			compression: {
 				enabled: true
@@ -43,7 +43,6 @@ components: sinks: loki: {
 			}
 			tls: {
 				enabled:                true
-				can_enable:             false
 				can_verify_certificate: true
 				can_verify_hostname:    true
 				enabled_default:        false
@@ -83,9 +82,11 @@ components: sinks: loki: {
 		labels: {
 			description: """
 				A set of labels that are attached to each batch of events. Both keys and values are templatable, which
-				enables you to attach dynamic labels to events. Note: If the set of labels has high cardinality, this
-				can cause drastic performance issues with Loki. To prevent this from happening, reduce the number of
-				unique label keys and values.
+				enables you to attach dynamic labels to events. Labels can be suffixed with a "*" to allow the expansion
+				of objects into multiple labels, see "How it works" for more information.
+
+				Note: If the set of labels has high cardinality, this can cause drastic performance issues with Loki.
+				To prevent this from happening, reduce the number of unique label keys and values.
 				"""
 			required: true
 			type: object: {
@@ -95,6 +96,7 @@ components: sinks: loki: {
 						"event":                 "{{ event_field }}"
 						"key":                   "value"
 						"\"{{ event_field }}\"": "{{ another_event_field }}"
+						"pod_labels_*":          "{{ kubernetes.pod_labels }}"
 					},
 				]
 				options: {
@@ -104,7 +106,7 @@ components: sinks: loki: {
 						required:    false
 						type: string: {
 							default: null
-							examples: ["vector", "{{ event_field }}"]
+							examples: ["vector", "{{ event_field }}", "{{ kubernetes.pod_labels }}"]
 							syntax: "template"
 						}
 					}
@@ -163,6 +165,7 @@ components: sinks: loki: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	how_it_works: {
@@ -187,6 +190,32 @@ components: sinks: loki: {
 				accepted by Loki. If no timestamp is supplied with events
 				then the Loki sink will supply its own monotonically
 				increasing timestamp.
+				"""
+		}
+
+		label_expansion: {
+			title: "Label Expansion"
+			body: """
+				The `labels` option can be passed keys suffixed with "*" to
+				allow for setting multiple keys based on the contents of an
+				object. For example, with an object:
+
+				```json
+				{"kubernetes":{"pod_labels":{"app":"web-server","name":"unicorn"}}}
+				```
+
+				and a configuration:
+
+				```toml
+				[sinks.my_sink_id.labels]
+				pod_labels_*: "{{ kubernetes.pod_labels }}"
+				```
+
+				This would expand into two labels:
+
+				```toml
+				pod_labels_app: web-server
+				pod_labels_name: unicorn
 				"""
 		}
 	}

@@ -1,21 +1,17 @@
 # Reviewing
 
-<!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
-
-1. [Checklist](#checklist)
-1. [Expectations](#expectations)
-1. [Backward Compatibility](#backward-compatibility)
-1. [Code Of Conduct](#code-of-conduct)
-1. [Dependencies](#dependencies)
-1. [Documentation](#documentation)
-1. [Performance Testing](#performance-testing)
-1. [Single Concern](#single-concern)
-1. [Readability](#readability)
-1. [Safe Code](#safe-code)
-1. [Security](#security)
-1. [Testing](#testing)
-
-<!-- /MarkdownTOC -->
+- [Checklist](#checklist)
+- [Expectations](#expectations)
+- [Backward Compatibility](#backward-compatibility)
+- [Code Of Conduct](#code-of-conduct)
+- [Dependencies](#dependencies)
+- [Documentation](#documentation)
+- [Performance Testing](#performance-testing)
+- [Single Concern](#single-concern)
+- [Readability](#readability)
+- [Safe Code](#safe-code)
+- [Security](#security)
+- [Testing](#testing)
 
 ## Checklist
 
@@ -23,7 +19,6 @@ Pull request reviews are required before merging code into Vector. This document
 will outline Vector's pull request review requirements. The following checklist
 should be used for all pull requests:
 
-- [ ] Are you the code owner for the files that have changed? If not, please involve the appropriate code owner(s). (see [Code Owners](#code-owners))
 - [ ] Is the code addressing a single purpose? If not, the pull request should be broken up. (see [Single Purpose](#single-purpose))
 - [ ] Is the code readable and maintainable? If not, suggest ways to improve this. (see [Readability](#readability))
 - [ ] Is the code reasonably tested? If not, tests should be improved. (see [Testing](#testing))
@@ -34,9 +29,16 @@ should be used for all pull requests:
 - [ ] Is there a risk of performance regressions? If so, have run the [Vector test harness](https://github.com/vectordotdev/vector-test-harness)? (see [Performance Testing](#performance-testing))
 - [ ] Should documentation be adjusted to reflect any of these changes? (see [Documentation](#documentation))
 
+For component changes, especially pull requests introducing new components, the
+following items should also be checked:
+
+- [ ] Does it comply with the [configuration spec](specs/configuration.md)?
+- [ ] Does it comply with [component spec](specs/component.md)?
+- [ ] Does it comply with the [instrumentation spec](specs/instrumentation.md)?
+
 ## Expectations
 
-We endeavour to review all PRs within 2 working days (Monday to Friday - broadly Eastern Time) of submission.
+We endeavour to review all PRs within 2 working days (Monday to Friday) of submission.
 
 ## Backward Compatibility
 
@@ -44,6 +46,8 @@ All changes should strive to retain backward compatibility. If a change breaks
 backward compatibility, it is much less likely to be approved. It is highly
 recommended you discuss this change with a Vector team member before investing
 development time.
+
+Any deprecations should follow our [deprecation policy](DEPRECATION.md).
 
 ## Code Of Conduct
 
@@ -74,8 +78,11 @@ documentation, nor should they be merged with "TODOs" opened for documentation.
 Vector currently offers 2 methods for performance testing:
 
 1. Internal benchmarks located in the [`/benches` folder](benches).
-2. A full end-to-end [test harness](https://github.com/vectordotdev/vector-test-harness)
-   for complex integration and performance testing.
+2. A full end-to-end [soak test
+   suite](https://github.com/vectordotdev/vector/tree/master/soaks) for complex
+   integration and performance testing.
+
+For new integrations, consider whether a new soak test should be added.
 
 ## Single Concern
 
@@ -98,7 +105,7 @@ marked as `unsafe`, a detailed comment should be added explaining why.
 
 Security is incredibly important to Vector. Users rely on Vector ship
 mission-critical and sensitive data. Please review the code explicitly for
-security issues. See [Vector's Security guide for more info](SECURITY.md).
+security issues. See [Vector's Security guide for more info](/SECURITY.md).
 
 ## Testing
 
@@ -107,3 +114,5 @@ We believe this level of coverage is unnecessary. As a general rule of thumb,
 we strive for 80% coverage, beyond this returns are diminishing. Please use
 your best judgment, some code requires more testing than others depending
 on its importance.
+
+For integrations, consider whether the code could be integration tested.

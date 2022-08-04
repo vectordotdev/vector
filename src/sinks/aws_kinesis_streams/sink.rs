@@ -4,10 +4,7 @@ use async_trait::async_trait;
 use futures::{future, stream::BoxStream, StreamExt};
 use rand::random;
 use tower::Service;
-use vector_core::{
-    buffers::Acker,
-    stream::{BatcherSettings, DriverResponse},
-};
+use vector_core::stream::{BatcherSettings, DriverResponse};
 
 use crate::{
     event::{Event, LogEvent},
@@ -25,7 +22,6 @@ pub struct KinesisMetadata {
 
 pub struct KinesisSink<S> {
     pub batch_settings: BatcherSettings,
-    pub acker: Acker,
     pub service: S,
     pub request_builder: KinesisRequestBuilder,
     pub partition_key_field: Option<String>,
@@ -59,7 +55,7 @@ where
                 }
             })
             .batched(self.batch_settings.into_byte_size_config())
-            .into_driver(self.service, self.acker);
+            .into_driver(self.service);
 
         sink.run().await
     }

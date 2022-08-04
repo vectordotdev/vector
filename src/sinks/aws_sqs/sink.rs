@@ -1,15 +1,13 @@
-use std::num::{NonZeroU64, NonZeroUsize};
+use std::num::NonZeroUsize;
 
 use aws_sdk_sqs::Client as SqsClient;
 use futures::stream::BoxStream;
 use futures_util::StreamExt;
-use vector_core::buffers::Acker;
 use vector_core::sink::StreamSink;
 
 use super::config::SqsSinkConfig;
 use super::request_builder::SqsRequestBuilder;
 use super::service::SqsService;
-use crate::config::SinkContext;
 use crate::event::Event;
 use crate::sinks::util::builder::SinkBuilderExt;
 use crate::sinks::util::{ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig};
@@ -20,22 +18,20 @@ pub(crate) struct SqsSinkDefaultBatchSettings;
 impl SinkBatchSettings for SqsSinkDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(1);
     const MAX_BYTES: Option<usize> = Some(262_144);
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 #[derive(Clone)]
 pub(crate) struct SqsSink {
-    acker: Acker,
     request_builder: SqsRequestBuilder,
     service: SqsService,
     request: TowerRequestConfig,
 }
 
 impl SqsSink {
-    pub fn new(config: SqsSinkConfig, cx: SinkContext, client: SqsClient) -> crate::Result<Self> {
+    pub fn new(config: SqsSinkConfig, client: SqsClient) -> crate::Result<Self> {
         let request = config.request;
         Ok(SqsSink {
-            acker: cx.acker(),
             request_builder: SqsRequestBuilder::new(config)?,
             service: SqsService::new(client),
             request,
@@ -55,7 +51,7 @@ impl SqsSink {
         let sink = input
             .request_builder(request_builder_concurrency_limit, self.request_builder)
             .filter_map(|req| async move { req.ok() })
-            .into_driver(service, self.acker);
+            .into_driver(service);
 
         sink.run().await
     }

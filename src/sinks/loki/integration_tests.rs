@@ -2,34 +2,38 @@ use std::convert::TryFrom;
 
 use bytes::Bytes;
 use chrono::{DateTime, Duration, Utc};
+use futures::stream;
 use vector_common::encode_logfmt;
-use vector_core::event::{BatchNotifier, BatchStatus, Event};
+use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
 use super::config::{LokiConfig, OutOfOrderAction};
 use crate::{
     config::{log_schema, SinkConfig},
     sinks::{util::test::load_sink, VectorSink},
     template::Template,
-    test_util::{generate_events_with_stream, generate_lines_with_stream, random_lines},
+    test_util::{
+        components::{run_and_assert_sink_compliance, SINK_TAGS},
+        generate_events_with_stream, generate_lines_with_stream, random_lines,
+    },
 };
 
 fn loki_address() -> String {
     std::env::var("LOKI_ADDRESS").unwrap_or_else(|_| "http://localhost:3100".into())
 }
 
-async fn build_sink(encoding: &str) -> (uuid::Uuid, VectorSink) {
+async fn build_sink(codec: &str) -> (uuid::Uuid, VectorSink) {
     let stream = uuid::Uuid::new_v4();
 
     let config = format!(
         r#"
             endpoint = "{}"
             labels = {{test_name = "placeholder"}}
-            encoding = "{}"
+            encoding.codec = "{}"
             remove_timestamp = false
             tenant_id = "default"
         "#,
         loki_address(),
-        encoding
+        codec
     );
 
     let (mut config, cx) = load_sink::<LokiConfig>(&config).unwrap();
@@ -52,7 +56,7 @@ fn line_generator(index: usize) -> String {
 }
 
 fn event_generator(index: usize) -> Event {
-    Event::from(line_generator(index))
+    Event::Log(LogEvent::from(line_generator(index)))
 }
 
 #[tokio::test]
@@ -61,7 +65,7 @@ async fn text() {
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
     let (lines, events) = generate_lines_with_stream(line_generator, 10, Some(batch));
-    let _ = sink.run(events).await.unwrap();
+    run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
     tokio::time::sleep(tokio::time::Duration::new(1, 0)).await;
@@ -79,7 +83,7 @@ async fn json() {
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
     let (lines, events) = generate_events_with_stream(event_generator, 10, Some(batch));
-    let _ = sink.run(events).await.unwrap();
+    run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
     tokio::time::sleep(tokio::time::Duration::new(1, 0)).await;
@@ -105,7 +109,7 @@ async fn json_nested_fields() {
         event
     };
     let (lines, events) = generate_events_with_stream(generator, 10, Some(batch));
-    let _ = sink.run(events).await.unwrap();
+    run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
     tokio::time::sleep(tokio::time::Duration::new(1, 0)).await;
@@ -124,7 +128,7 @@ async fn logfmt() {
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
     let (lines, events) = generate_events_with_stream(event_generator, 10, Some(batch));
-    let _ = sink.run(events).await.unwrap();
+    run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
     tokio::time::sleep(tokio::time::Duration::new(1, 0)).await;
@@ -132,7 +136,7 @@ async fn logfmt() {
     let (_, outputs) = fetch_stream(stream.to_string(), "default").await;
     assert_eq!(lines.len(), outputs.len());
     for (i, output) in outputs.iter().enumerate() {
-        let expected_logfmt = encode_logfmt::to_string(lines[i].as_log().as_map()).unwrap();
+        let expected_logfmt = encode_logfmt::encode_value(lines[i].as_log().value()).unwrap();
         assert_eq!(output, &expected_logfmt);
     }
 }
@@ -145,7 +149,7 @@ async fn many_streams() {
     let config = format!("endpoint = \"{}\"", loki_address())
         + r#"
             labels = {test_name = "{{ stream_id }}"}
-            encoding = "text"
+            encoding.codec = "text"
             tenant_id = "default"
         "#;
     let (config, cx) = load_sink::<LokiConfig>(config.as_str()).unwrap();
@@ -167,7 +171,7 @@ async fn many_streams() {
     };
     let (lines, events) = generate_events_with_stream(generator, 10, Some(batch));
 
-    let _ = sink.run(events).await.unwrap();
+    run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
     tokio::time::sleep(tokio::time::Duration::new(1, 0)).await;
@@ -205,7 +209,7 @@ async fn interpolate_stream_key() {
     let config = format!("endpoint = \"{}\"", loki_address())
         + r#"
             labels = {"{{ stream_key }}" = "placeholder"}
-            encoding = "text"
+            encoding.codec = "text"
             tenant_id = "default"
         "#;
     let (mut config, cx) = load_sink::<LokiConfig>(config.as_str()).unwrap();
@@ -226,7 +230,7 @@ async fn interpolate_stream_key() {
     };
     let (lines, events) = generate_events_with_stream(generator, 10, Some(batch));
 
-    let _ = sink.run(events).await.unwrap();
+    run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
     tokio::time::sleep(tokio::time::Duration::new(1, 0)).await;
@@ -252,7 +256,7 @@ async fn many_tenants() {
     let config = format!("endpoint = \"{}\"", loki_address())
         + r#"
             labels = {test_name = "placeholder"}
-            encoding = "text"
+            encoding.codec = "text"
             tenant_id = "{{ tenant_id }}"
         "#;
     let (mut config, cx) = load_sink::<LokiConfig>(config.as_str()).unwrap();
@@ -272,7 +276,7 @@ async fn many_tenants() {
     let mut events = lines
         .clone()
         .into_iter()
-        .map(Event::from)
+        .map(|e| Event::Log(LogEvent::from(e)))
         .collect::<Vec<_>>();
 
     for (i, event) in events.iter_mut().enumerate() {
@@ -281,7 +285,7 @@ async fn many_tenants() {
         log.insert("tenant_id", if i % 2 == 0 { "tenant1" } else { "tenant2" });
     }
 
-    let _ = sink.run_events(events).await.unwrap();
+    run_and_assert_sink_compliance(sink, stream::iter(events), &SINK_TAGS).await;
 
     tokio::time::sleep(tokio::time::Duration::new(1, 0)).await;
 
@@ -308,7 +312,7 @@ async fn out_of_order_drop() {
     let mut events = lines
         .clone()
         .into_iter()
-        .map(Event::from)
+        .map(|e| Event::Log(LogEvent::from(e)))
         .collect::<Vec<_>>();
 
     let base = chrono::Utc::now() - Duration::seconds(20);
@@ -337,7 +341,7 @@ async fn out_of_order_accept() {
     let mut events = lines
         .clone()
         .into_iter()
-        .map(Event::from)
+        .map(|e| Event::Log(LogEvent::from(e)))
         .collect::<Vec<_>>();
 
     let base = chrono::Utc::now() - Duration::seconds(20);
@@ -368,7 +372,7 @@ async fn out_of_order_rewrite() {
     let mut events = lines
         .clone()
         .into_iter()
-        .map(Event::from)
+        .map(|e| Event::Log(LogEvent::from(e)))
         .collect::<Vec<_>>();
 
     let base = chrono::Utc::now() - Duration::seconds(20);
@@ -408,7 +412,7 @@ async fn out_of_order_per_partition() {
     let mut events = big_lines
         .into_iter()
         .chain(small_lines)
-        .map(Event::from)
+        .map(|e| Event::Log(LogEvent::from(e)))
         .collect::<Vec<_>>();
 
     let base = chrono::Utc::now() - Duration::seconds(30);
@@ -439,7 +443,7 @@ async fn test_out_of_order_events(
     let config = format!("endpoint = \"{}\"", loki_address())
         + r#"
             labels = {test_name = "placeholder"}
-            encoding = "text"
+            encoding.codec = "text"
             tenant_id = "default"
         "#;
     let (mut config, cx) = load_sink::<LokiConfig>(config.as_str()).unwrap();
@@ -452,7 +456,7 @@ async fn test_out_of_order_events(
     config.batch.max_bytes = Some(4_000_000);
 
     let (sink, _) = config.build(cx).await.unwrap();
-    sink.run_events(events).await.unwrap();
+    run_and_assert_sink_compliance(sink, stream::iter(events), &SINK_TAGS).await;
 
     tokio::time::sleep(tokio::time::Duration::new(1, 0)).await;
 

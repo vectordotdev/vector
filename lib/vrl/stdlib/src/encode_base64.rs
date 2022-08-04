@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use ::value::Value;
 use vrl::prelude::*;
 
 use crate::util::Base64Charset;
@@ -7,11 +8,11 @@ use crate::util::Base64Charset;
 fn encode_base64(value: Value, padding: Option<Value>, charset: Option<Value>) -> Resolved {
     let value = value.try_bytes()?;
     let padding = padding
-        .map(|v| v.try_boolean())
+        .map(VrlValueConvert::try_boolean)
         .transpose()?
         .unwrap_or(true);
     let charset = charset
-        .map(|v| v.try_bytes())
+        .map(VrlValueConvert::try_bytes)
         .transpose()?
         .map(|c| Base64Charset::from_str(&String::from_utf8_lossy(&c)))
         .transpose()?
@@ -51,7 +52,7 @@ impl Function for EncodeBase64 {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -73,14 +74,6 @@ impl Function for EncodeBase64 {
             result: Ok("c29tZSBzdHJpbmcgdmFsdWU"),
         }]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let padding = args.optional("padding");
-        let charset = args.optional("charset");
-
-        encode_base64(value, padding, charset)
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -99,7 +92,7 @@ impl Expression for EncodeBase64Fn {
         encode_base64(value, padding, charset)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().infallible()
     }
 }

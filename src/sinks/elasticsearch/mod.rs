@@ -18,37 +18,48 @@ use std::convert::TryFrom;
 pub use common::*;
 pub use config::*;
 pub use encoder::ElasticsearchEncoder;
-use http::{
-    header::{HeaderName, HeaderValue},
-    uri::InvalidUri,
-    Request,
-};
-use rusoto_credential::{CredentialsError, ProvideAwsCredentials};
-use rusoto_signature::SignedRequest;
-use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
+use http::{uri::InvalidUri, Request};
+use snafu::Snafu;
+use vector_config::configurable_component;
 
+use crate::aws::AwsAuthentication;
 use crate::{
-    aws::rusoto::{self, AwsAuthentication},
     config::SinkDescription,
     event::{EventRef, LogEvent},
     internal_events::TemplateRenderingError,
     template::{Template, TemplateParseError},
 };
-// use crate::sinks::elasticsearch::ParseError::AwsCredentialsGenerateFailed;
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+/// Authentication strategies.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
 pub enum ElasticsearchAuth {
-    Basic { user: String, password: String },
-    Aws(AwsAuthentication),
+    /// HTTP Basic Authentication.
+    Basic {
+        /// Basic authentication username.
+        user: String,
+
+        /// Basic authentication password.
+        password: String,
+    },
+
+    /// Amazon OpenSearch Service-specific authentication.
+    Aws(#[configurable(derived)] AwsAuthentication),
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
+/// Indexing mode.
+#[configurable_component]
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum ElasticsearchMode {
+    /// Ingests documents in bulk, via the bulk API `index` action.
     #[serde(alias = "normal")]
     Bulk,
+
+    /// Ingests documents in bulk, via the bulk API `create` action.
+    ///
+    /// Elasticsearch Data Streams only support the `create` action.
     DataStream,
 }
 
@@ -58,10 +69,15 @@ impl Default for ElasticsearchMode {
     }
 }
 
-#[derive(Derivative, Deserialize, Serialize, Clone, Copy, Debug, PartialEq, Eq, Hash)]
+/// Bulk API actions.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative, Eq, Hash, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum BulkAction {
+    /// The `index` action.
     Index,
+
+    /// The `create` action.
     Create,
 }
 
@@ -115,7 +131,7 @@ impl ElasticsearchCommonMode {
             Self::Bulk { index, .. } => index
                 .render_string(log)
                 .map_err(|error| {
-                    emit!(&TemplateRenderingError {
+                    emit!(TemplateRenderingError {
                         error,
                         field: Some("index"),
                         drop_event: true,
@@ -135,7 +151,7 @@ impl ElasticsearchCommonMode {
                 Some(template) => template
                     .render_string(event)
                     .map_err(|error| {
-                        emit!(&TemplateRenderingError {
+                        emit!(TemplateRenderingError {
                             error,
                             field: Some("bulk_action"),
                             drop_event: true,
@@ -165,36 +181,10 @@ pub enum ParseError {
     InvalidHost { host: String, source: InvalidUri },
     #[snafu(display("Host {:?} must include hostname", host))]
     HostMustIncludeHostname { host: String },
-    #[snafu(display("Could not generate AWS credentials: {:?}", source))]
-    AwsCredentialsGenerateFailed { source: CredentialsError },
     #[snafu(display("Index template parse error: {}", source))]
     IndexTemplate { source: TemplateParseError },
     #[snafu(display("Batch action template parse error: {}", source))]
     BatchActionTemplate { source: TemplateParseError },
-}
-
-async fn finish_signer(
-    signer: &mut SignedRequest,
-    credentials_provider: &rusoto::AwsCredentialsProvider,
-    mut builder: http::request::Builder,
-) -> crate::Result<http::request::Builder> {
-    let credentials = credentials_provider
-        .credentials()
-        .await
-        .context(AwsCredentialsGenerateFailedSnafu)?;
-
-    signer.sign(&credentials);
-
-    for (name, values) in signer.headers() {
-        let header_name = name
-            .parse::<HeaderName>()
-            .expect("Could not parse header name.");
-        for value in values {
-            let header_value =
-                HeaderValue::from_bytes(value).expect("Could not parse header value.");
-            builder = builder.header(&header_name, header_value);
-        }
-    }
-
-    Ok(builder)
+    #[snafu(display("aws.region required when AWS authentication is in use"))]
+    RegionRequired,
 }

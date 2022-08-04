@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 fn get_env_var(value: Value) -> Resolved {
@@ -33,18 +34,13 @@ impl Function for GetEnvVar {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let name = arguments.required("name");
 
         Ok(Box::new(GetEnvVarFn { name }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let name = args.required("name");
-        get_env_var(name)
     }
 }
 
@@ -59,7 +55,7 @@ impl Expression for GetEnvVarFn {
         get_env_var(value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().fallible()
     }
 }

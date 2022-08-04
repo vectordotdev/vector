@@ -46,8 +46,8 @@ def compute_throughput(captures, **kwargs):
         # finite difference, using the time value recorded to understand step
         # size between samples.
         capture.value = capture.value.div(cpus)
-        # The fetches performed by the observer are 1000 milliseconds apart with
-        # fetch_index marking each poll.
+        # The fetches performed by lading and are 1000 milliseconds apart with
+        # `fetch_index` marking each poll.
         capture['throughput'] = np.gradient(capture.value, capture.fetch_index) # bytes/second/cpu
         yield capture
 

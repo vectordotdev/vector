@@ -1,19 +1,21 @@
-#[cfg(feature = "datadog-pipelines")]
+#[cfg(feature = "enterprise")]
 use std::collections::BTreeMap;
 use std::path::Path;
 
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "enterprise")]
+use serde_json::Value;
 use vector_core::{config::GlobalOptions, default_data_dir, transform::TransformConfig};
 
 #[cfg(feature = "api")]
 use super::api;
-#[cfg(feature = "datadog-pipelines")]
-use super::datadog;
+#[cfg(feature = "enterprise")]
+use super::enterprise;
 use super::{
     compiler, provider, schema, ComponentKey, Config, EnrichmentTableConfig, EnrichmentTableOuter,
-    HealthcheckOptions, SinkConfig, SinkOuter, SourceConfig, SourceOuter, TestDefinition,
-    TransformOuter,
+    HealthcheckOptions, SecretBackend, SinkConfig, SinkOuter, SourceConfig, SourceOuter,
+    TestDefinition, TransformOuter,
 };
 
 #[derive(Deserialize, Serialize, Debug, Default)]
@@ -26,9 +28,9 @@ pub struct ConfigBuilder {
     pub api: api::Options,
     #[serde(default)]
     pub schema: schema::Options,
-    #[cfg(feature = "datadog-pipelines")]
+    #[cfg(feature = "enterprise")]
     #[serde(default)]
-    pub datadog: Option<datadog::Options>,
+    pub enterprise: Option<enterprise::Options>,
     #[serde(default)]
     pub healthchecks: HealthcheckOptions,
     #[serde(default)]
@@ -42,13 +44,16 @@ pub struct ConfigBuilder {
     #[serde(default)]
     pub tests: Vec<TestDefinition<String>>,
     pub provider: Option<Box<dyn provider::ProviderConfig>>,
+    #[serde(default)]
+    pub secret: IndexMap<ComponentKey, Box<dyn SecretBackend>>,
 }
 
-#[cfg(feature = "datadog-pipelines")]
+#[cfg(feature = "enterprise")]
 #[derive(Serialize)]
 struct ConfigBuilderHash<'a> {
     #[cfg(feature = "api")]
     api: &'a api::Options,
+    schema: &'a schema::Options,
     global: &'a GlobalOptions,
     healthchecks: &'a HealthcheckOptions,
     enrichment_tables: BTreeMap<&'a ComponentKey, &'a EnrichmentTableOuter>,
@@ -57,6 +62,87 @@ struct ConfigBuilderHash<'a> {
     transforms: BTreeMap<&'a ComponentKey, &'a TransformOuter<String>>,
     tests: &'a Vec<TestDefinition<String>>,
     provider: &'a Option<Box<dyn provider::ProviderConfig>>,
+    secret: BTreeMap<&'a ComponentKey, &'a dyn SecretBackend>,
+}
+
+#[cfg(feature = "enterprise")]
+impl ConfigBuilderHash<'_> {
+    /// Sort inner JSON values to maintain a consistent ordering. This prevents
+    /// non-deterministically serializable structures like HashMap from
+    /// affecting the resulting hash. As a consequence, ordering that does not
+    /// affect the actual semantics of a configuration is not considered when
+    /// calculating the hash.
+    fn into_hash(self) -> String {
+        use sha2::{Digest, Sha256};
+
+        let value = to_sorted_json_string(self);
+        let output = Sha256::digest(value.as_bytes());
+
+        hex::encode(output)
+    }
+}
+
+/// It may seem like converting to Value prior to serializing to JSON string is
+/// sufficient to sort our underlying keys. By default, Value::Map is backed by
+/// BTreeMap which maintains an implicit key order, so it's an enticing and
+/// simple approach. The issue however is the "by default". The underlying
+/// Value::Map structure can actually change depending on which serde features
+/// are enabled: IndexMap is the alternative and would break our intended
+/// behavior.
+///
+/// Rather than rely on the opaque underlying serde structures, we are explicit
+/// about sorting, sacrificing a bit of potential convenience for correctness.
+#[cfg(feature = "enterprise")]
+fn to_sorted_json_string<T>(value: T) -> String
+where
+    T: Serialize,
+{
+    let mut value = serde_json::to_value(value).expect("Should serialize to JSON. Please report.");
+    sort_json_value(&mut value);
+
+    serde_json::to_string(&value).expect("Should serialize Value to JSON string. Please report.")
+}
+
+#[cfg(feature = "enterprise")]
+fn sort_json_value(value: &mut Value) {
+    match value {
+        Value::Array(arr) => {
+            for v in arr.iter_mut() {
+                sort_json_value(v);
+            }
+        }
+        Value::Object(map) => {
+            let mut ordered_map: BTreeMap<String, Value> =
+                serde_json::from_value(map.to_owned().into())
+                    .expect("Converting Value to BTreeMap failed.");
+            for v in ordered_map.values_mut() {
+                sort_json_value(v);
+            }
+            *value = serde_json::to_value(ordered_map)
+                .expect("Converting BTreeMap back to Value failed.");
+        }
+        _ => {}
+    }
+}
+
+#[cfg(feature = "enterprise")]
+impl<'a> From<&'a ConfigBuilder> for ConfigBuilderHash<'a> {
+    fn from(value: &'a ConfigBuilder) -> Self {
+        ConfigBuilderHash {
+            #[cfg(feature = "api")]
+            api: &value.api,
+            schema: &value.schema,
+            global: &value.global,
+            healthchecks: &value.healthchecks,
+            enrichment_tables: value.enrichment_tables.iter().collect(),
+            sources: value.sources.iter().collect(),
+            sinks: value.sinks.iter().collect(),
+            transforms: value.transforms.iter().collect(),
+            tests: &value.tests,
+            provider: &value.provider,
+            secret: value.secret.iter().map(|(k, v)| (k, v.as_ref())).collect(),
+        }
+    }
 }
 
 impl Clone for ConfigBuilder {
@@ -78,14 +164,15 @@ impl From<Config> for ConfigBuilder {
             #[cfg(feature = "api")]
             api,
             schema,
-            #[cfg(feature = "datadog-pipelines")]
-            datadog,
+            #[cfg(feature = "enterprise")]
+            enterprise,
             healthchecks,
             enrichment_tables,
             sources,
             sinks,
             transforms,
             tests,
+            secret,
             ..
         } = config;
 
@@ -106,8 +193,8 @@ impl From<Config> for ConfigBuilder {
             #[cfg(feature = "api")]
             api,
             schema,
-            #[cfg(feature = "datadog-pipelines")]
-            datadog,
+            #[cfg(feature = "enterprise")]
+            enterprise,
             healthchecks,
             enrichment_tables,
             sources,
@@ -115,6 +202,7 @@ impl From<Config> for ConfigBuilder {
             transforms,
             provider: None,
             tests,
+            secret,
         }
     }
 }
@@ -199,15 +287,19 @@ impl ConfigBuilder {
             errors.push(error);
         }
 
-        #[cfg(feature = "datadog-pipelines")]
+        #[cfg(feature = "enterprise")]
         {
-            self.datadog = with.datadog;
-            if let Some(datadog) = &self.datadog {
-                if datadog.enabled {
-                    // enable other enterprise features
-                    self.global.enterprise = true;
+            match (self.enterprise.as_ref(), with.enterprise) {
+                (Some(_), Some(_)) => {
+                    errors.push(
+                        "duplicate 'enterprise' definition, only one definition allowed".to_owned(),
+                    );
                 }
-            }
+                (None, Some(other)) => {
+                    self.enterprise = Some(other);
+                }
+                _ => {}
+            };
         }
 
         self.provider = with.provider;
@@ -225,6 +317,10 @@ impl ConfigBuilder {
         }
 
         self.global.proxy = self.global.proxy.merge(&with.global.proxy);
+
+        self.schema.append(with.schema, &mut errors);
+
+        self.schema.log_namespace = self.schema.log_namespace.or(with.schema.log_namespace);
 
         if self.global.data_dir.is_none() || self.global.data_dir == default_data_dir() {
             self.global.data_dir = with.global.data_dir;
@@ -269,6 +365,11 @@ impl ConfigBuilder {
                 errors.push(format!("duplicate test name found: {}", wt.name));
             }
         });
+        with.secret.keys().for_each(|k| {
+            if self.secret.contains_key(k) {
+                errors.push(format!("duplicate secret id found: {}", k));
+            }
+        });
         if !errors.is_empty() {
             return Err(errors);
         }
@@ -278,33 +379,16 @@ impl ConfigBuilder {
         self.sinks.extend(with.sinks);
         self.transforms.extend(with.transforms);
         self.tests.extend(with.tests);
+        self.secret.extend(with.secret);
 
         Ok(())
     }
 
-    #[cfg(feature = "datadog-pipelines")]
+    #[cfg(feature = "enterprise")]
     /// SHA256 hexadecimal representation of a config builder. This is generated by serializing
     /// an order-stable JSON of the config builder and feeding its bytes into a SHA256 hasher.
     pub fn sha256_hash(&self) -> String {
-        use sha2::{Digest, Sha256};
-
-        let value = serde_json::to_string(&ConfigBuilderHash {
-            #[cfg(feature = "api")]
-            api: &self.api,
-            global: &self.global,
-            healthchecks: &self.healthchecks,
-            enrichment_tables: self.enrichment_tables.iter().collect(),
-            sources: self.sources.iter().collect(),
-            sinks: self.sinks.iter().collect(),
-            transforms: self.transforms.iter().collect(),
-            tests: &self.tests,
-            provider: &self.provider,
-        })
-        .expect("should serialize to JSON");
-
-        let output = Sha256::digest(value.as_bytes());
-
-        hex::encode(output)
+        ConfigBuilderHash::from(self).into_hash()
     }
 
     #[cfg(test)]
@@ -318,46 +402,51 @@ impl ConfigBuilder {
     }
 }
 
-#[cfg(all(test, feature = "datadog-pipelines", feature = "api"))]
+#[cfg(all(
+    test,
+    feature = "enterprise",
+    feature = "api",
+    feature = "sources-demo_logs",
+    feature = "sinks-loki"
+))]
 mod tests {
-    use crate::config::ConfigBuilder;
+    use indexmap::IndexMap;
+
+    use crate::config::{
+        builder::{sort_json_value, to_sorted_json_string},
+        enterprise, ConfigBuilder,
+    };
+
+    use super::ConfigBuilderHash;
 
     #[test]
-    /// We are relying on `serde_json` to serialize keys in the ordered provided. If this test
-    /// fails, it likely means an implementation detail of serialization has changed, which is
-    /// likely to impact the final hash.
+    /// If this test fails, it likely means an implementation detail has changed
+    /// which is likely to impact the final hash.
     fn version_json_order() {
         use serde_json::{json, Value};
 
         use super::{ConfigBuilder, ConfigBuilderHash};
 
-        // Expected key order of serialization. This is important for guaranteeing that a
-        // hash is reproducible across versions.
+        // Expected key order. This is important for guaranteeing that a hash is
+        // reproducible across versions.
         let expected_keys = [
             "api",
+            "enrichment_tables",
             "global",
             "healthchecks",
-            "enrichment_tables",
-            "sources",
-            "sinks",
-            "transforms",
-            "tests",
             "provider",
+            "schema",
+            "secret",
+            "sinks",
+            "sources",
+            "tests",
+            "transforms",
         ];
 
         let builder = ConfigBuilder::default();
 
-        let value = json!(ConfigBuilderHash {
-            api: &builder.api,
-            global: &builder.global,
-            healthchecks: &builder.healthchecks,
-            enrichment_tables: builder.enrichment_tables.iter().collect(),
-            sources: builder.sources.iter().collect(),
-            sinks: builder.sinks.iter().collect(),
-            transforms: builder.transforms.iter().collect(),
-            tests: &builder.tests,
-            provider: &builder.provider,
-        });
+        let mut value = json!(ConfigBuilderHash::from(&builder));
+        sort_json_value(&mut value);
 
         match value {
             // Should serialize to a map.
@@ -375,8 +464,129 @@ mod tests {
     /// should ideally be able to fix so that the original hash passes!
     fn version_hash_match() {
         assert_eq!(
-            "14def8ff43fe0255b3234a7c3d7488379a119b7dbcf311c77ad308a83173d92c",
+            "bc0825487e137ee1d1fc76c616795d041c4825b4ca5a7236455ea4515238885c",
             ConfigBuilder::default().sha256_hash()
+        );
+    }
+
+    #[test]
+    fn append_keeps_enterprise() {
+        let mut base = ConfigBuilder {
+            enterprise: Some(enterprise::Options::default()),
+            ..Default::default()
+        };
+        let other = ConfigBuilder::default();
+        base.append(other).unwrap();
+        assert!(base.enterprise.is_some());
+    }
+
+    #[test]
+    fn append_sets_enterprise() {
+        let mut base = ConfigBuilder::default();
+        let other = ConfigBuilder {
+            enterprise: Some(enterprise::Options::default()),
+            ..Default::default()
+        };
+        base.append(other).unwrap();
+        assert!(base.enterprise.is_some());
+    }
+
+    #[test]
+    fn append_overwrites_enterprise() {
+        let mut base_ent = enterprise::Options::default();
+        base_ent.application_key = "base".to_string();
+        let mut base = ConfigBuilder {
+            enterprise: Some(base_ent),
+            ..Default::default()
+        };
+        let mut other_ent = enterprise::Options::default();
+        other_ent.application_key = "other".to_string();
+        let other = ConfigBuilder {
+            enterprise: Some(other_ent),
+            ..Default::default()
+        };
+        let errors = base.append(other).unwrap_err();
+        assert_eq!(
+            errors[0],
+            "duplicate 'enterprise' definition, only one definition allowed"
+        );
+    }
+
+    #[test]
+    fn version_hash_sorted() {
+        let control_config = toml::from_str::<ConfigBuilder>(
+            r#"
+        [enterprise]
+        api_key = "apikey"
+        application_key = "appkey"
+        configuration_key = "configkey"
+
+        [sources.foo]
+        type = "internal_logs"
+
+        [sinks.loki]
+        type = "loki"
+        endpoint = "https://localhost:1111"
+        inputs = ["foo"]
+
+        [sinks.loki.labels]
+        foo = '{{ foo }}'
+        bar = '{{ bar }}'
+        baz = '{{ baz }}'
+        ingest = "hello-world"
+        level = '{{ level }}'
+        module = '{{ module }}'
+        service = '{{ service }}'
+
+        [sinks.loki.encoding]
+        codec = "json"
+        "#,
+        )
+        .unwrap();
+        let expected_hash = ConfigBuilderHash::from(&control_config).into_hash();
+        for _ in 0..100 {
+            let experiment_config = toml::from_str::<ConfigBuilder>(
+                r#"
+            [enterprise]
+            api_key = "apikey"
+            application_key = "appkey"
+            configuration_key = "configkey"
+
+            [sources.foo]
+            type = "internal_logs"
+
+            [sinks.loki]
+            type = "loki"
+            endpoint = "https://localhost:1111"
+            inputs = ["foo"]
+
+            [sinks.loki.labels]
+            foo = '{{ foo }}'
+            bar = '{{ bar }}'
+            baz = '{{ baz }}'
+            ingest = "hello-world"
+            level = '{{ level }}'
+            module = '{{ module }}'
+            service = '{{ service }}'
+
+            [sinks.loki.encoding]
+            codec = "json"
+            "#,
+            )
+            .unwrap();
+            assert_eq!(
+                expected_hash,
+                ConfigBuilderHash::from(&experiment_config).into_hash()
+            );
+        }
+    }
+
+    #[test]
+    fn test_to_sorted_json_string() {
+        let ordered_map = IndexMap::from([("z", 26), ("a", 1), ("d", 4), ("c", 3), ("b", 2)]);
+        assert_eq!(
+            r#"{"a":1,"b":2,"c":3,"d":4,"z":26}"#.to_string(),
+            to_sorted_json_string(ordered_map)
         );
     }
 }

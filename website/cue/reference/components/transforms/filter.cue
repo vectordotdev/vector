@@ -45,6 +45,7 @@ components: transforms: filter: {
 			set:          true
 			summary:      true
 		}
+		traces: true
 	}
 
 	examples: [

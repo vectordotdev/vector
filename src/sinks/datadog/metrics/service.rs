@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use bytes::{Buf, Bytes};
@@ -9,15 +10,16 @@ use http::{
 use hyper::Body;
 use snafu::ResultExt;
 use tower::Service;
+use vector_common::internal_event::BytesSent;
 use vector_core::{
-    buffers::Ackable,
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_event::EventsSent,
     stream::DriverResponse,
 };
 
 use crate::{
-    http::{BuildRequestSnafu, CallRequestSnafu, HttpClient, HttpError},
+    http::{BuildRequestSnafu, CallRequestSnafu, HttpClient},
+    sinks::datadog::DatadogApiError,
     sinks::util::retries::{RetryAction, RetryLogic},
 };
 
@@ -26,17 +28,18 @@ use crate::{
 pub struct DatadogMetricsRetryLogic;
 
 impl RetryLogic for DatadogMetricsRetryLogic {
-    type Error = HttpError;
+    type Error = DatadogApiError;
     type Response = DatadogMetricsResponse;
 
-    fn is_retriable_error(&self, _error: &Self::Error) -> bool {
-        true
+    fn is_retriable_error(&self, error: &Self::Error) -> bool {
+        error.is_retriable()
     }
 
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
         let status = response.status_code;
 
         match status {
+            StatusCode::FORBIDDEN => RetryAction::Retry("forbidden".into()),
             StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("too many requests".into()),
             StatusCode::NOT_IMPLEMENTED => {
                 RetryAction::DontRetry("endpoint not implemented".into())
@@ -53,11 +56,13 @@ impl RetryLogic for DatadogMetricsRetryLogic {
 /// Generalized request for sending metrics to the Datadog metrics endpoints.
 #[derive(Debug, Clone)]
 pub struct DatadogMetricsRequest {
+    pub api_key: Option<Arc<str>>,
     pub payload: Bytes,
     pub uri: Uri,
     pub content_type: &'static str,
     pub finalizers: EventFinalizers,
     pub batch_size: usize,
+    pub raw_bytes: usize,
 }
 
 impl DatadogMetricsRequest {
@@ -68,6 +73,13 @@ impl DatadogMetricsRequest {
     /// If any of the header names or values are invalid, or if the URI is invalid, an error variant
     /// will be returned.
     pub fn into_http_request(self, api_key: HeaderValue) -> http::Result<Request<Body>> {
+        // use the API key from the incoming event if it is provided
+        let api_key = self.api_key.map_or_else(
+            || api_key,
+            |key| {
+                HeaderValue::from_str(&key).expect("API key should be only valid ASCII characters")
+            },
+        );
         // Requests to the metrics endpoints can be compressed, and there's almost no reason to
         // _not_ compress them given tha t metric data, when encoded, is very repetitive.  Thus,
         // here and through the sink code, we always compress requests.  Datadog also only supports
@@ -93,12 +105,6 @@ impl DatadogMetricsRequest {
     }
 }
 
-impl Ackable for DatadogMetricsRequest {
-    fn ack_size(&self) -> usize {
-        self.batch_size
-    }
-}
-
 impl Finalizable for DatadogMetricsRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
         std::mem::take(&mut self.finalizers)
@@ -112,6 +118,8 @@ pub struct DatadogMetricsResponse {
     body: Bytes,
     batch_size: usize,
     byte_size: usize,
+    raw_byte_size: usize,
+    protocol: String,
 }
 
 impl DriverResponse for DatadogMetricsResponse {
@@ -131,6 +139,13 @@ impl DriverResponse for DatadogMetricsResponse {
             byte_size: self.byte_size,
             output: None,
         }
+    }
+
+    fn bytes_sent(&self) -> Option<BytesSent> {
+        Some(BytesSent {
+            byte_size: self.raw_byte_size,
+            protocol: &self.protocol,
+        })
     }
 }
 
@@ -153,11 +168,13 @@ impl DatadogMetricsService {
 
 impl Service<DatadogMetricsRequest> for DatadogMetricsService {
     type Response = DatadogMetricsResponse;
-    type Error = HttpError;
+    type Error = DatadogApiError;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
-        self.client.poll_ready(cx)
+        self.client
+            .poll_ready(cx)
+            .map_err(|error| DatadogApiError::HttpError { error })
     }
 
     fn call(&mut self, request: DatadogMetricsRequest) -> Self::Future {
@@ -167,15 +184,21 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
         Box::pin(async move {
             let byte_size = request.payload.len();
             let batch_size = request.batch_size;
+            let protocol = request.uri.scheme_str().unwrap_or("http").to_string();
+            let raw_byte_size = request.raw_bytes;
 
             let request = request
                 .into_http_request(api_key)
-                .context(BuildRequestSnafu)?;
-            let response = client.send(request).await?;
-            let (parts, body) = response.into_parts();
+                .context(BuildRequestSnafu)
+                .map_err(|error| DatadogApiError::HttpError { error })?;
+
+            let result = client.send(request).await;
+            let (parts, body) = DatadogApiError::from_result(result)?.into_parts();
+
             let mut body = hyper::body::aggregate(body)
                 .await
-                .context(CallRequestSnafu)?;
+                .context(CallRequestSnafu)
+                .map_err(|error| DatadogApiError::HttpError { error })?;
             let body = body.copy_to_bytes(body.remaining());
 
             Ok(DatadogMetricsResponse {
@@ -183,6 +206,8 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
                 body,
                 batch_size,
                 byte_size,
+                raw_byte_size,
+                protocol,
             })
         })
     }

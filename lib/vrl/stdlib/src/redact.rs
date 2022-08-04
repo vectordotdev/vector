@@ -4,6 +4,7 @@ use std::{
     str::FromStr,
 };
 
+use ::value::Value;
 use once_cell::sync::Lazy;
 use vrl::prelude::*;
 
@@ -59,7 +60,7 @@ impl Function for Redact {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -135,17 +136,6 @@ impl Function for Redact {
             _ => Ok(None),
         }
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let redactor = Redactor::Full;
-        let filters = args
-            .required_any("filters")
-            .downcast_ref::<Vec<Filter>>()
-            .unwrap();
-
-        Ok(redact(value, filters, &redactor))
-    }
 }
 
 //-----------------------------------------------------------------------------
@@ -193,7 +183,7 @@ impl Expression for RedactFn {
         Ok(redact(value, filters, redactor))
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         self.value.type_def(state).infallible()
     }
 }
@@ -293,7 +283,7 @@ enum Redactor {
 
 impl Redactor {
     fn pattern(&self) -> &str {
-        use Redactor::*;
+        use Redactor::Full;
 
         match self {
             Full => "[REDACTED]",
@@ -311,7 +301,7 @@ impl FromStr for Redactor {
     type Err = &'static str;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        use Redactor::*;
+        use Redactor::Full;
 
         match s {
             "full" => Ok(Full),

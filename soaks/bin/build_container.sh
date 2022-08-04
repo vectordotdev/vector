@@ -21,7 +21,7 @@ build_vector() {
 
     if [ ! -d "${BUILD_DIR}" ]; then
         mkdir "${BUILD_DIR}"
-        pushd "${BUILD_DIR}"
+        pushd "${BUILD_DIR}" > /dev/null
         git init
         git remote add origin https://github.com/vectordotdev/vector.git
         git fetch --depth 1 origin "${SHA}"
@@ -30,10 +30,10 @@ build_vector() {
         # ignore its own ignore file and older vectors had an overly strict
         # ignore file, meaning we can't build vector in that setup.
         cp "${ROOT}/.dockerignore" .
-        popd
+        popd > /dev/null
     fi
 
-    docker build --file "${SOAK_ROOT}/Dockerfile" --tag "${IMAGE}" "${BUILD_DIR}"
+    DOCKER_BUILDKIT=1 docker build --file "${SOAK_ROOT}/Dockerfile" --tag "${IMAGE}" "${BUILD_DIR}"
     rm -rf "${BUILD_DIR}"
 }
 

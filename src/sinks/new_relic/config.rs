@@ -1,37 +1,53 @@
+use std::{fmt::Debug, sync::Arc};
+
+use futures::FutureExt;
+use http::Uri;
+use tower::ServiceBuilder;
+use vector_config::configurable_component;
+
 use super::{
-    healthcheck, Encoding, NewRelicApiResponse, NewRelicApiService, NewRelicSink, NewRelicSinkError,
+    healthcheck, NewRelicApiResponse, NewRelicApiService, NewRelicEncoder, NewRelicSink,
+    NewRelicSinkError,
 };
 use crate::{
+    codecs::Transformer,
     config::{AcknowledgementsConfig, DataType, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::util::{
-        encoding::EncodingConfigFixed, retries::RetryLogic, service::ServiceBuilderExt,
-        BatchConfig, Compression, SinkBatchSettings, TowerRequestConfig,
+        retries::RetryLogic, service::ServiceBuilderExt, BatchConfig, Compression,
+        SinkBatchSettings, TowerRequestConfig,
     },
     tls::TlsSettings,
 };
-use futures::FutureExt;
-use http::Uri;
-use serde::{Deserialize, Serialize};
-use std::{fmt::Debug, num::NonZeroU64, sync::Arc};
-use tower::ServiceBuilder;
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Copy, Derivative)]
+/// New Relic region.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 #[derivative(Default)]
 pub enum NewRelicRegion {
+    /// US region.
     #[derivative(Default)]
     Us,
+
+    /// EU region.
     Eu,
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Copy, Derivative)]
+/// New Relic API endpoint.
+#[configurable_component]
+#[derive(Clone, Copy, Derivative, Debug, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 #[derivative(Default)]
 pub enum NewRelicApi {
+    /// Events API.
     #[derivative(Default)]
     Events,
+
+    /// Metrics API.
     Metrics,
+
+    /// Logs API.
     Logs,
 }
 
@@ -41,7 +57,7 @@ pub struct NewRelicDefaultBatchSettings;
 impl SinkBatchSettings for NewRelicDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(100);
     const MAX_BYTES: Option<usize> = Some(1_000_000);
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 #[derive(Debug, Default, Clone)]
@@ -57,30 +73,52 @@ impl RetryLogic for NewRelicApiRetry {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+/// Configuration for the `new_relic` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct NewRelicConfig {
+    /// A valid New Relic license key.
     pub license_key: String,
+
+    /// The New Relic account ID.
     pub account_id: String,
+
+    #[configurable(derived)]
     pub region: Option<NewRelicRegion>,
+
+    #[configurable(derived)]
     pub api: NewRelicApi,
+
+    #[configurable(derived)]
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
+
+    #[configurable(derived)]
     #[serde(
-        skip_serializing_if = "crate::serde::skip_serializing_if_default",
-        default
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    pub encoding: EncodingConfigFixed<Encoding>,
+    pub encoding: Transformer,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<NewRelicDefaultBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     acknowledgements: AcknowledgementsConfig,
+
+    #[serde(skip)]
+    pub override_uri: Option<Uri>,
 }
 
 impl_generate_config_from_default!(NewRelicConfig);
@@ -102,12 +140,10 @@ impl SinkConfig for NewRelicConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let encoding = self.encoding.clone();
-
         let batcher_settings = self
             .batch
             .validate()?
-            .limit_max_events(self.batch.max_events.unwrap_or(50))?
+            .limit_max_events(self.batch.max_events.unwrap_or(100))?
             .into_batcher_settings()?;
 
         let request_limits = self.request.unwrap_with(&Default::default());
@@ -123,8 +159,9 @@ impl SinkConfig for NewRelicConfig {
 
         let sink = NewRelicSink {
             service,
-            acker: cx.acker(),
-            encoding,
+
+            transformer: self.encoding.clone(),
+            encoder: NewRelicEncoder,
             credentials,
             compression: self.compression,
             batcher_settings,
@@ -141,8 +178,8 @@ impl SinkConfig for NewRelicConfig {
         "new_relic"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
@@ -152,10 +189,15 @@ pub struct NewRelicCredentials {
     pub account_id: String,
     pub api: NewRelicApi,
     pub region: NewRelicRegion,
+    pub override_uri: Option<Uri>,
 }
 
 impl NewRelicCredentials {
     pub fn get_uri(&self) -> Uri {
+        if let Some(override_uri) = self.override_uri.as_ref() {
+            return override_uri.clone();
+        }
+
         match self.api {
             NewRelicApi::Events => match self.region {
                 NewRelicRegion::Us => format!(
@@ -192,6 +234,7 @@ impl From<&NewRelicConfig> for NewRelicCredentials {
             account_id: config.account_id.clone(),
             api: config.api,
             region: config.region.unwrap_or(NewRelicRegion::Us),
+            override_uri: config.override_uri.clone(),
         }
     }
 }

@@ -2,13 +2,11 @@ use std::path::PathBuf;
 
 use bytes::Bytes;
 use chrono::Utc;
-use serde::{Deserialize, Serialize};
+use codecs::decoding::{DeserializerConfig, FramingConfig};
+use vector_config::configurable_component;
 
 use crate::{
-    codecs::{
-        decoding::{DeserializerConfig, FramingConfig},
-        Decoder,
-    },
+    codecs::Decoder,
     config::log_schema,
     event::Event,
     serde::default_decoding,
@@ -20,14 +18,41 @@ use crate::{
     SourceSender,
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Unix domain socket configuration for the `socket` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct UnixConfig {
+    /// The Unix socket path.
+    ///
+    /// This should be an absolute path.
     pub path: PathBuf,
+
+    /// Unix file mode bits to be applied to the unix socket file as its designated file permissions.
+    ///
+    /// Note that the file mode value can be specified in any numeric format supported by your configuration
+    /// language, but it is most intuitive to use an octal number.
+    pub socket_file_mode: Option<u32>,
+
+    /// The maximum buffer size, in bytes, of incoming messages.
+    ///
+    /// Messages larger than this are truncated.
     pub max_length: Option<usize>,
+
+    /// Overrides the name of the log field used to add the peer host to each event.
+    ///
+    /// The value will be the socket path itself.
+    ///
+    /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
+    ///
+    /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     pub host_key: Option<String>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub framing: Option<FramingConfig>,
+
+    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     pub decoding: DeserializerConfig,
 }
@@ -36,6 +61,7 @@ impl UnixConfig {
     pub fn new(path: PathBuf) -> Self {
         Self {
             path,
+            socket_file_mode: None,
             max_length: Some(crate::serde::default_max_length()),
             host_key: None,
             framing: None,
@@ -63,14 +89,16 @@ fn handle_events(events: &mut [Event], host_key: &str, received_from: Option<Byt
 
 pub(super) fn unix_datagram(
     path: PathBuf,
+    socket_file_mode: Option<u32>,
     max_length: usize,
     host_key: String,
     decoder: Decoder,
     shutdown: ShutdownSignal,
     out: SourceSender,
-) -> Source {
+) -> crate::Result<Source> {
     build_unix_datagram_source(
         path,
+        socket_file_mode,
         max_length,
         decoder,
         move |events, received_from| handle_events(events, &host_key, received_from),
@@ -81,13 +109,15 @@ pub(super) fn unix_datagram(
 
 pub(super) fn unix_stream(
     path: PathBuf,
+    socket_file_mode: Option<u32>,
     host_key: String,
     decoder: Decoder,
     shutdown: ShutdownSignal,
     out: SourceSender,
-) -> Source {
+) -> crate::Result<Source> {
     build_unix_stream_source(
         path,
+        socket_file_mode,
         decoder,
         move |events, received_from| handle_events(events, &host_key, received_from),
         shutdown,

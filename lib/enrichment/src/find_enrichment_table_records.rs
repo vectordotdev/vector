@@ -1,9 +1,10 @@
 use std::collections::BTreeMap;
 
+use ::value::Value;
 use vrl::prelude::*;
 
 use crate::{
-    vrl_util::{self, add_index, evaluate_condition, index_from_args, EnrichmentTableRecord},
+    vrl_util::{self, add_index, evaluate_condition, index_from_args},
     Case, Condition, IndexHandle, TableRegistry, TableSearch,
 };
 
@@ -88,13 +89,13 @@ impl Function for FindEnrichmentTableRecords {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let registry = ctx
             .get_external_context_mut::<TableRegistry>()
-            .ok_or(Box::new(vrl_util::Error::TablesNotLoaded) as Box<dyn DiagnosticError>)?;
+            .ok_or(Box::new(vrl_util::Error::TablesNotLoaded) as Box<dyn DiagnosticMessage>)?;
 
         let tables = registry
             .table_ids()
@@ -113,7 +114,8 @@ impl Function for FindEnrichmentTableRecords {
 
         let case_sensitive = arguments
             .optional_literal("case_sensitive")?
-            .map(|literal| literal.to_value().try_boolean())
+            .and_then(|literal| literal.as_value())
+            .map(|value| value.try_boolean())
             .transpose()
             .expect("case_sensitive should be boolean") // This will have been caught by the type checker.
             .map(|case_sensitive| {
@@ -149,9 +151,10 @@ impl Function for FindEnrichmentTableRecords {
     ) -> CompiledArgument {
         match (name, expr) {
             ("table", Some(expr)) => {
-                let registry = ctx
-                    .get_external_context_mut::<TableRegistry>()
-                    .ok_or(Box::new(vrl_util::Error::TablesNotLoaded) as Box<dyn DiagnosticError>)?;
+                let registry =
+                    ctx.get_external_context_mut::<TableRegistry>()
+                        .ok_or(Box::new(vrl_util::Error::TablesNotLoaded)
+                            as Box<dyn DiagnosticMessage>)?;
 
                 let tables = registry
                     .table_ids()
@@ -171,32 +174,6 @@ impl Function for FindEnrichmentTableRecords {
             }
             _ => Ok(None),
         }
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let condition = args.required("condition");
-        let condition = condition
-            .into_object()
-            .expect("condition should be an object");
-        let condition = condition
-            .iter()
-            .map(|(key, value)| evaluate_condition(key, value.clone()))
-            .collect::<Result<Vec<Condition>>>()?;
-
-        let record = args
-            .required_any("table")
-            .downcast_ref::<EnrichmentTableRecord>()
-            .unwrap();
-        let select = args.optional("select");
-
-        find_enrichment_table_records(
-            select,
-            &record.enrichment_tables,
-            &record.table,
-            record.case_sensitive,
-            &condition,
-            record.index,
-        )
     }
 }
 
@@ -242,14 +219,16 @@ impl Expression for FindEnrichmentTableRecordsFn {
         )
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::array(Collection::from_unknown(Kind::object(Collection::any()))).fallible()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use vector_common::{btreemap, TimeZone};
+    use ::value::Secrets;
+    use vector_common::TimeZone;
+    use vrl::TargetValue;
 
     use super::*;
     use crate::test_util::get_table_registry;
@@ -259,9 +238,10 @@ mod tests {
         let registry = get_table_registry();
         let func = FindEnrichmentTableRecordsFn {
             table: "dummy1".to_string(),
-            condition: btreemap! {
-                "field" =>  expression::Literal::from("value"),
-            },
+            condition: BTreeMap::from([(
+                "field".into(),
+                expression::Literal::from("value").into(),
+            )]),
             index: Some(IndexHandle(999)),
             select: None,
             case_sensitive: Case::Sensitive,
@@ -269,9 +249,14 @@ mod tests {
         };
 
         let tz = TimeZone::default();
-        let mut object: Value = BTreeMap::new().into();
+        let object: Value = BTreeMap::new().into();
+        let mut target = TargetValue {
+            value: object,
+            metadata: value!({}),
+            secrets: Secrets::new(),
+        };
         let mut runtime_state = vrl::state::Runtime::default();
-        let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
+        let mut ctx = Context::new(&mut target, &mut runtime_state, &tz);
 
         registry.finish_load();
 

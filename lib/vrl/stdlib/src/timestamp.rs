@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 fn timestamp(value: Value) -> Resolved {
@@ -42,18 +43,13 @@ impl Function for Timestamp {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
         Ok(Box::new(TimestampFn { value }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        timestamp(value)
     }
 }
 
@@ -68,7 +64,7 @@ impl Expression for TimestampFn {
         timestamp(value)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         let non_timestamp = !self.value.type_def(state).is_timestamp();
 
         TypeDef::timestamp().with_fallibility(non_timestamp)

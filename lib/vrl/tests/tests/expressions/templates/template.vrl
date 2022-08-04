@@ -1,0 +1,6 @@
+# result: This is a templated string.
+
+thing = "templated"
+thang = "string"
+
+"This is a {{ thing }} {{ thang }}."

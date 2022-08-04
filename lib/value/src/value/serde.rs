@@ -1,11 +1,13 @@
-use crate::value::{timestamp_to_string, StdError, Value};
+use std::collections::BTreeMap;
+use std::fmt;
+
 use bytes::Bytes;
 use ordered_float::NotNan;
 use serde::de::Error as SerdeError;
 use serde::de::{MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Serialize, Serializer};
-use std::collections::BTreeMap;
-use std::fmt;
+
+use crate::value::{timestamp_to_string, StdError, Value};
 
 impl Value {
     /// Converts self into a `Bytes`, using JSON for Map/Array.
@@ -23,7 +25,7 @@ impl Value {
             Value::Array(arr) => {
                 Bytes::from(serde_json::to_vec(arr).expect("Cannot serialize array"))
             }
-            Value::Null => Bytes::from("<null>"),
+            Self::Null => Bytes::from("<null>"),
         }
     }
 
@@ -39,7 +41,7 @@ impl Value {
             Value::Boolean(b) => b.to_string(),
             Value::Object(map) => serde_json::to_string(map).expect("Cannot serialize map"),
             Value::Array(arr) => serde_json::to_string(arr).expect("Cannot serialize array"),
-            Value::Null => "<null>".to_string(),
+            Self::Null => "<null>".to_string(),
         }
     }
 }
@@ -59,7 +61,7 @@ impl Serialize for Value {
             Value::Regex(regex) => serializer.serialize_str(regex.as_str()),
             Value::Object(m) => serializer.collect_map(m),
             Value::Array(a) => serializer.collect_seq(a),
-            Value::Null => serializer.serialize_none(),
+            Self::Null => serializer.serialize_none(),
         }
     }
 }
@@ -188,6 +190,12 @@ impl From<serde_json::Value> for Value {
     }
 }
 
+impl From<&serde_json::Value> for Value {
+    fn from(json_value: &serde_json::Value) -> Self {
+        json_value.clone().into()
+    }
+}
+
 impl TryInto<serde_json::Value> for Value {
     type Error = StdError;
 
@@ -200,7 +208,7 @@ impl TryInto<serde_json::Value> for Value {
             Value::Regex(regex) => Ok(serde_json::Value::from(regex.as_str().to_string())),
             Value::Object(v) => Ok(serde_json::to_value(v)?),
             Value::Array(v) => Ok(serde_json::to_value(v)?),
-            Value::Null => Ok(serde_json::Value::Null),
+            Self::Null => Ok(serde_json::Value::Null),
             Value::Timestamp(v) => Ok(serde_json::Value::from(timestamp_to_string(&v))),
         }
     }
@@ -208,10 +216,11 @@ impl TryInto<serde_json::Value> for Value {
 
 #[cfg(test)]
 mod test {
-    use crate::value::Value;
     use std::fs;
     use std::io::Read;
     use std::path::Path;
+
+    use crate::value::Value;
 
     pub fn parse_artifact(path: impl AsRef<Path>) -> std::io::Result<Vec<u8>> {
         let mut test_file = match fs::File::open(path) {

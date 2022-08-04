@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 use crate::util::round_to_precision;
@@ -47,7 +48,7 @@ impl Function for Ceil {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -63,13 +64,6 @@ impl Function for Ceil {
             source: r#"ceil(5.2)"#,
             result: Ok("6.0"),
         }]
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let precision = args.optional("precision");
-
-        ceil(value, precision)
     }
 }
 
@@ -91,7 +85,7 @@ impl Expression for CeilFn {
         ceil(value, precision)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         match Kind::from(self.value.type_def(state)) {
             v if v.is_float() || v.is_integer() => v.into(),
             _ => Kind::integer().or_float().into(),
@@ -141,10 +135,10 @@ mod tests {
         }
 
         huge_number {
-             args: func_args![value: value!(9876543210123456789098765432101234567890987654321.987654321),
+             args: func_args![value: value!(9_876_543_210_123_456_789_098_765_432_101_234_567_890_987_654_321.987_654_321),
                              precision: value!(5)
             ],
-            want: Ok(value!(9876543210123456789098765432101234567890987654321.98766)),
+            want: Ok(value!(9_876_543_210_123_456_789_098_765_432_101_234_567_890_987_654_321.987_66)),
             tdef: TypeDef::float(),
         }
     ];

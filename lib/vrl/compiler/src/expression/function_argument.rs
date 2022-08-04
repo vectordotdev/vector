@@ -3,7 +3,7 @@ use std::{fmt, ops::Deref};
 use crate::{
     expression::Expr,
     parser::{Ident, Node},
-    Parameter, Span,
+    Parameter,
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -22,12 +22,14 @@ impl FunctionArgument {
         }
     }
 
+    #[cfg(feature = "expr-function_call")]
     pub(crate) fn keyword(&self) -> Option<&str> {
         self.ident.as_ref().map(|node| node.as_ref().as_ref())
     }
 
-    pub(crate) fn keyword_span(&self) -> Option<Span> {
-        self.ident.as_ref().map(|node| node.span())
+    #[cfg(feature = "expr-function_call")]
+    pub(crate) fn keyword_span(&self) -> Option<crate::Span> {
+        self.ident.as_ref().map(Node::span)
     }
 
     pub(crate) fn parameter(&self) -> Option<Parameter> {
@@ -36,6 +38,11 @@ impl FunctionArgument {
 
     pub fn expr(&self) -> &Expr {
         self.expr.inner()
+    }
+
+    #[cfg(feature = "expr-function_call")]
+    pub(crate) fn expr_span(&self) -> crate::Span {
+        self.expr.span()
     }
 
     pub(crate) fn into_inner(self) -> Expr {

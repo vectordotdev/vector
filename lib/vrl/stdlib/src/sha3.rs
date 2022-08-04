@@ -1,3 +1,4 @@
+use ::value::Value;
 use sha_3::{Digest, Sha3_224, Sha3_256, Sha3_384, Sha3_512};
 use vrl::prelude::*;
 
@@ -62,7 +63,7 @@ impl Function for Sha3 {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -96,16 +97,6 @@ impl Function for Sha3 {
             _ => Ok(None),
         }
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let variant = args
-            .required_any("variant")
-            .downcast_ref::<Bytes>()
-            .unwrap();
-
-        sha3(value, variant)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -122,7 +113,7 @@ impl Expression for Sha3Fn {
         sha3(value, variant)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().infallible()
     }
 }

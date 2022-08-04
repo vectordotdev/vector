@@ -1,35 +1,39 @@
-// ## skip check-events ##
-
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
+
+use super::prelude::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct UdpSocketConnectionEstablished;
 
 impl InternalEvent for UdpSocketConnectionEstablished {
-    fn emit_logs(&self) {
+    fn emit(self) {
         debug!(message = "Connected.");
-    }
-
-    fn emit_metrics(&self) {
         counter!("connection_established_total", 1, "mode" => "udp");
     }
 }
 
 #[derive(Debug)]
-pub struct UdpSocketConnectionFailed<E> {
+pub struct UdpSocketConnectionError<E> {
     pub error: E,
 }
 
-impl<E> InternalEvent for UdpSocketConnectionFailed<E>
-where
-    E: std::error::Error,
-{
-    fn emit_logs(&self) {
-        error!(message = "Unable to connect.", error = %self.error);
-    }
-
-    fn emit_metrics(&self) {
+impl<E: std::error::Error> InternalEvent for UdpSocketConnectionError<E> {
+    fn emit(self) {
+        error!(
+            message = "Unable to connect.",
+            error = %self.error,
+            error_code = "connection",
+            error_type = error_type::READER_FAILED,
+            stage = error_stage::PROCESSING,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "connection",
+            "error_type" => error_type::READER_FAILED,
+            "stage" => error_stage::PROCESSING,
+        );
+        // deprecated
         counter!("connection_failed_total", 1, "mode" => "udp");
     }
 }
@@ -40,33 +44,46 @@ pub struct UdpSocketError {
 }
 
 impl InternalEvent for UdpSocketError {
-    fn emit_logs(&self) {
-        debug!(message = "UDP socket error.", error = %self.error);
-    }
-
-    fn emit_metrics(&self) {
+    fn emit(self) {
+        error!(
+            message = "UDP socket error.",
+            error = %self.error,
+            error_type = error_type::READER_FAILED,
+            stage = error_stage::PROCESSING,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => error_type::READER_FAILED,
+            "stage" => error_stage::PROCESSING,
+        );
+        // deprecated
         counter!("connection_errors_total", 1, "mode" => "udp");
     }
 }
 
 #[derive(Debug)]
-pub struct UdpSendIncomplete {
+pub struct UdpSendIncompleteError {
     pub data_size: usize,
     pub sent: usize,
 }
 
-impl InternalEvent for UdpSendIncomplete {
-    fn emit_logs(&self) {
+impl InternalEvent for UdpSendIncompleteError {
+    fn emit(self) {
         error!(
             message = "Could not send all data in one UDP packet; dropping some data.",
             data_size = self.data_size,
             sent = self.sent,
             dropped = self.data_size - self.sent,
             internal_log_rate_secs = 30,
+            error_type = error_type::WRITER_FAILED,
+            stage = error_stage::PROCESSING,
         );
-    }
-
-    fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => error_type::WRITER_FAILED,
+            "stage" => error_stage::PROCESSING,
+        );
+        // deprecated
         counter!("connection_send_errors_total", 1, "mode" => "udp");
     }
 }

@@ -1,18 +1,20 @@
-use std::num::NonZeroU64;
-
-use futures::FutureExt;
-use rusoto_core::RusotoError;
-use rusoto_firehose::{
-    DescribeDeliveryStreamError, DescribeDeliveryStreamInput, KinesisFirehose,
-    KinesisFirehoseClient, PutRecordBatchError,
+use aws_sdk_firehose::error::{
+    DescribeDeliveryStreamError, PutRecordBatchError, PutRecordBatchErrorKind,
 };
-use serde::{Deserialize, Serialize};
+use aws_sdk_firehose::types::SdkError;
+use aws_sdk_firehose::Client as KinesisFirehoseClient;
+use futures::FutureExt;
 use snafu::Snafu;
 use tower::ServiceBuilder;
+use vector_config::configurable_component;
 
 use crate::{
-    aws::{rusoto, AwsAuthentication, RegionOrEndpoint},
-    config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
+    aws::{create_client, is_retriable_error, AwsAuthentication, ClientBuilder, RegionOrEndpoint},
+    codecs::{Encoder, EncodingConfig},
+    config::{
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig,
+        SinkContext,
+    },
     sinks::{
         aws_kinesis_firehose::{
             request_builder::KinesisRequestBuilder,
@@ -20,13 +22,12 @@ use crate::{
             sink::KinesisSink,
         },
         util::{
-            encoding::{EncodingConfig, StandardEncodings},
-            retries::RetryLogic,
-            BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig,
+            retries::RetryLogic, BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings,
+            TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
-    tls::{MaybeTlsSettings, TlsOptions, TlsSettings},
+    tls::TlsConfig,
 };
 
 // AWS Kinesis Firehose API accepts payloads up to 4MB or 500 events
@@ -40,27 +41,45 @@ pub struct KinesisFirehoseDefaultBatchSettings;
 impl SinkBatchSettings for KinesisFirehoseDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(MAX_PAYLOAD_EVENTS);
     const MAX_BYTES: Option<usize> = Some(MAX_PAYLOAD_SIZE);
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the `aws_kinesis_firehose` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct KinesisFirehoseSinkConfig {
+    /// The [stream name][stream_name] of the target Kinesis Firehose delivery stream.
+    ///
+    /// [stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
     pub stream_name: String,
+
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    pub encoding: EncodingConfig<StandardEncodings>,
+
+    #[configurable(derived)]
+    pub encoding: EncodingConfig,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub compression: Compression,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<KinesisFirehoseDefaultBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
-    pub tls: Option<TlsOptions>,
-    // Deprecated name. Moved to auth.
-    pub assume_role: Option<String>,
+
+    #[configurable(derived)]
+    pub tls: Option<TlsConfig>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub auth: AwsAuthentication,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -83,11 +102,12 @@ pub enum BuildError {
     BatchMaxEvents,
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
     #[snafu(display("DescribeDeliveryStream failed: {}", source))]
     DescribeDeliveryStreamFailed {
-        source: RusotoError<DescribeDeliveryStreamError>,
+        source: SdkError<DescribeDeliveryStreamError>,
     },
     #[snafu(display("Stream name does not match, got {}, expected {}", name, stream_name))]
     StreamNamesMismatch { name: String, stream_name: String },
@@ -104,11 +124,27 @@ impl GenerateConfig for KinesisFirehoseSinkConfig {
     }
 }
 
+pub struct KinesisFirehoseClientBuilder;
+
+impl ClientBuilder for KinesisFirehoseClientBuilder {
+    type Config = aws_sdk_firehose::config::Config;
+    type Client = aws_sdk_firehose::client::Client;
+    type DefaultMiddleware = aws_sdk_firehose::middleware::DefaultMiddleware;
+
+    fn default_middleware() -> Self::DefaultMiddleware {
+        aws_sdk_firehose::middleware::DefaultMiddleware::new()
+    }
+
+    fn build(client: aws_smithy_client::Client, config: &aws_types::SdkConfig) -> Self::Client {
+        aws_sdk_firehose::client::Client::with_config(client, config.into())
+    }
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_kinesis_firehose")]
 impl SinkConfig for KinesisFirehoseSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let client = self.create_client(&cx.proxy)?;
+        let client = self.create_client(&cx.proxy).await?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
 
         let batch_settings = self
@@ -120,7 +156,7 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
 
         let request_limits = self.request.unwrap_with(&TowerRequestConfig::default());
 
-        let region = self.region.clone().try_into()?;
+        let region = self.region.region();
         let service = ServiceBuilder::new()
             .settings(request_limits, KinesisRetryLogic)
             .service(KinesisService {
@@ -129,14 +165,18 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
                 stream_name: self.stream_name.clone(),
             });
 
+        let transformer = self.encoding.transformer();
+        let serializer = self.encoding.build()?;
+        let encoder = Encoder::<()>::new(serializer);
+
         let request_builder = KinesisRequestBuilder {
             compression: self.compression,
-            encoder: self.encoding.clone(),
+            encoder: (transformer, encoder),
         };
 
         let sink = KinesisSink {
             batch_settings,
-            acker: cx.acker(),
+
             service,
             request_builder,
         };
@@ -144,15 +184,15 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        Input::new(self.encoding.config().input_type() & DataType::Log)
     }
 
     fn sink_type(&self) -> &'static str {
         "aws_kinesis_firehose"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
@@ -160,15 +200,20 @@ impl KinesisFirehoseSinkConfig {
     async fn healthcheck(self, client: KinesisFirehoseClient) -> crate::Result<()> {
         let stream_name = self.stream_name;
 
-        let req = client.describe_delivery_stream(DescribeDeliveryStreamInput {
-            delivery_stream_name: stream_name.clone(),
-            exclusive_start_destination_id: None,
-            limit: Some(1),
-        });
+        let result = client
+            .describe_delivery_stream()
+            .delivery_stream_name(stream_name.clone())
+            .set_exclusive_start_destination_id(None)
+            .limit(1)
+            .send()
+            .await;
 
-        match req.await {
+        match result {
             Ok(resp) => {
-                let name = resp.delivery_stream_description.delivery_stream_name;
+                let name = resp
+                    .delivery_stream_description
+                    .and_then(|x| x.delivery_stream_name)
+                    .unwrap_or_default();
                 if name == stream_name {
                     Ok(())
                 } else {
@@ -179,15 +224,16 @@ impl KinesisFirehoseSinkConfig {
         }
     }
 
-    pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<KinesisFirehoseClient> {
-        let region = (&self.region).try_into()?;
-        let tls_settings = MaybeTlsSettings::from(TlsSettings::from_options(&self.tls)?);
-
-        let client = rusoto::client(Some(tls_settings), proxy)?;
-        let creds = self.auth.build(&region, self.assume_role.clone())?;
-
-        let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());
-        Ok(KinesisFirehoseClient::new_with_client(client, region))
+    pub async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<KinesisFirehoseClient> {
+        create_client::<KinesisFirehoseClientBuilder>(
+            &self.auth,
+            self.region.region(),
+            self.region.endpoint()?,
+            proxy,
+            &self.tls,
+            true,
+        )
+        .await
     }
 }
 
@@ -195,13 +241,15 @@ impl KinesisFirehoseSinkConfig {
 pub struct KinesisRetryLogic;
 
 impl RetryLogic for KinesisRetryLogic {
-    type Error = RusotoError<PutRecordBatchError>;
+    type Error = SdkError<PutRecordBatchError>;
     type Response = KinesisResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        match error {
-            RusotoError::Service(PutRecordBatchError::ServiceUnavailable(_)) => true,
-            error => rusoto::is_retriable_error(error),
+        if let SdkError::ServiceError { err, raw: _ } = error {
+            if let PutRecordBatchErrorKind::ServiceUnavailableException(_) = err.kind {
+                return true;
+            }
         }
+        is_retriable_error(error)
     }
 }

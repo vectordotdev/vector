@@ -17,7 +17,7 @@ components: sources: exec: {
 		multiline: enabled: false
 		codecs: {
 			enabled:         true
-			default_framing: "newline_delimited"
+			default_framing: "`newline_delimited` for codecs other than `native`, which defaults to `length_delimited`"
 		}
 		receive: {
 			from: {
@@ -159,6 +159,13 @@ components: sources: exec: {
 					}
 				}
 			}
+			source_type: {
+				description: "The name of the source type."
+				required:    true
+				type: string: {
+					examples: ["exec"]
+				}
+			}
 		}
 	}
 
@@ -175,6 +182,7 @@ components: sources: exec: {
 				timestamp:   _timestamp
 				host:        _values.local_host
 				message:     _line
+				source_type: "exec"
 			}
 		},
 	]

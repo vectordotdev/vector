@@ -1,7 +1,6 @@
 use std::{
     cmp,
     collections::BTreeMap,
-    convert::TryInto,
     io::{self, Write},
     mem,
     sync::Arc,
@@ -22,14 +21,14 @@ use super::config::{
 };
 use crate::{
     common::datadog::{DatadogMetricType, DatadogPoint, DatadogSeriesMetric},
-    sinks::util::{encode_namespace, Compressor},
+    sinks::util::{encode_namespace, Compression, Compressor},
 };
 
 const SERIES_PAYLOAD_HEADER: &[u8] = b"{\"series\":[";
 const SERIES_PAYLOAD_FOOTER: &[u8] = b"]}";
 const SERIES_PAYLOAD_DELIMITER: &[u8] = b",";
 
-mod ddsketch_proto {
+mod ddmetric_proto {
     include!(concat!(env!("OUT_DIR"), "/datadog.agentpayload.rs"));
 }
 
@@ -204,7 +203,7 @@ impl DatadogMetricsEncoder {
                     {
                         return Ok(Some(metric));
                     }
-                    let _ = serde_json::to_writer(&mut self.state.buf, series)
+                    serde_json::to_writer(&mut self.state.buf, series)
                         .context(JsonEncodingFailedSnafu)?;
                 }
             }
@@ -268,7 +267,7 @@ impl DatadogMetricsEncoder {
         }
 
         // We should be safe to write our holding buffer to the compressor and store the metric.
-        let _ = self.state.writer.write_all(&self.state.buf)?;
+        self.state.writer.write_all(&self.state.buf)?;
         self.state.written += n;
         Ok(true)
     }
@@ -323,7 +322,7 @@ impl DatadogMetricsEncoder {
 
         // Consume of all of the "pending" metrics and try to write them out as sketches.
         let pending = mem::take(&mut self.state.pending);
-        let _ = write_sketches(
+        write_sketches(
             &pending,
             &self.default_namespace,
             self.log_schema,
@@ -347,15 +346,16 @@ impl DatadogMetricsEncoder {
         }
     }
 
-    pub fn finish(&mut self) -> Result<(Bytes, Vec<Metric>), FinishError> {
+    pub fn finish(&mut self) -> Result<(Bytes, Vec<Metric>, usize), FinishError> {
         // Try to encode any pending metrics we had stored up.
-        let _ = self.try_encode_pending()?;
+        self.try_encode_pending()?;
 
         // Write any payload footer necessary for the configured endpoint.
         let n = write_payload_footer(self.endpoint, &mut self.state.writer)
             .context(CompressionFailedSnafu)?;
         self.state.written += n;
 
+        let raw_bytes_written = self.state.written;
         // Consume the encoder state so we can do our final checks and return the necessary data.
         let state = self.reset_state();
         let payload = state
@@ -379,7 +379,7 @@ impl DatadogMetricsEncoder {
 
         if recommended_splits == 1 {
             // "One" split means no splits needed: our payload didn't exceed either of the limits.
-            Ok((payload, processed))
+            Ok((payload, processed, raw_bytes_written))
         } else {
             Err(FinishError::TooLarge {
                 metrics: processed,
@@ -432,10 +432,10 @@ fn generate_series_metrics(
     let tags = Some(encode_tags(&tags));
     let interval = last_sent
         .map(|then| then.elapsed())
-        .map(|d| d.as_secs().try_into().unwrap_or(i64::MAX));
+        .map(|d| d.as_secs() as u32);
 
-    let results = match metric.value() {
-        MetricValue::Counter { value } => vec![DatadogSeriesMetric {
+    let results = match (metric.value(), metric.interval_ms()) {
+        (MetricValue::Counter { value }, None) => vec![DatadogSeriesMetric {
             metric: name,
             r#type: DatadogMetricType::Count,
             interval,
@@ -445,7 +445,18 @@ fn generate_series_metrics(
             source_type_name,
             device,
         }],
-        MetricValue::Set { values } => vec![DatadogSeriesMetric {
+        (MetricValue::Counter { value }, Some(i)) => vec![DatadogSeriesMetric {
+            metric: name,
+            r#type: DatadogMetricType::Rate,
+            // Datadog expects interval to be in seconds and a rate metric to be per second
+            interval: Some(i.get() / 1000),
+            points: vec![DatadogPoint(ts, (*value) * 1000.0 / (i.get() as f64))],
+            tags,
+            host,
+            source_type_name,
+            device,
+        }],
+        (MetricValue::Set { values }, _) => vec![DatadogSeriesMetric {
             metric: name,
             r#type: DatadogMetricType::Gauge,
             interval: None,
@@ -455,7 +466,7 @@ fn generate_series_metrics(
             source_type_name,
             device,
         }],
-        MetricValue::Gauge { value } => vec![DatadogSeriesMetric {
+        (MetricValue::Gauge { value }, _) => vec![DatadogSeriesMetric {
             metric: name,
             r#type: DatadogMetricType::Gauge,
             interval: None,
@@ -465,49 +476,7 @@ fn generate_series_metrics(
             source_type_name,
             device,
         }],
-        MetricValue::AggregatedSummary {
-            quantiles,
-            count,
-            sum,
-        } => {
-            let mut results = vec![
-                DatadogSeriesMetric {
-                    metric: format!("{}.count", &name),
-                    r#type: DatadogMetricType::Rate,
-                    interval,
-                    points: vec![DatadogPoint(ts, f64::from(*count))],
-                    tags: tags.clone(),
-                    host: host.clone(),
-                    source_type_name: source_type_name.clone(),
-                    device: device.clone(),
-                },
-                DatadogSeriesMetric {
-                    metric: format!("{}.sum", &name),
-                    r#type: DatadogMetricType::Gauge,
-                    interval: None,
-                    points: vec![DatadogPoint(ts, *sum)],
-                    tags: tags.clone(),
-                    host: host.clone(),
-                    source_type_name: source_type_name.clone(),
-                    device: device.clone(),
-                },
-            ];
-
-            for quantile in quantiles {
-                results.push(DatadogSeriesMetric {
-                    metric: format!("{}.{}percentile", &name, quantile.as_percentile()),
-                    r#type: DatadogMetricType::Gauge,
-                    interval: None,
-                    points: vec![DatadogPoint(ts, quantile.value)],
-                    tags: tags.clone(),
-                    host: host.clone(),
-                    source_type_name: source_type_name.clone(),
-                    device: device.clone(),
-                })
-            }
-            results
-        }
-        value => {
+        (value, _) => {
             return Err(EncoderError::InvalidMetric {
                 expected: "series",
                 metric_value: value.as_name(),
@@ -561,12 +530,12 @@ where
                     let k = bins.into_iter().map(Into::into).collect();
                     let n = counts.into_iter().map(Into::into).collect();
 
-                    let sketch = ddsketch_proto::sketch_payload::Sketch {
+                    let sketch = ddmetric_proto::sketch_payload::Sketch {
                         metric: name,
                         tags,
                         host,
                         distributions: Vec::new(),
-                        dogsketches: vec![ddsketch_proto::sketch_payload::sketch::Dogsketch {
+                        dogsketches: vec![ddmetric_proto::sketch_payload::sketch::Dogsketch {
                             ts,
                             cnt,
                             min,
@@ -587,7 +556,7 @@ where
         }
     }
 
-    let sketch_payload = ddsketch_proto::SketchPayload {
+    let sketch_payload = ddmetric_proto::SketchPayload {
         // TODO: The "common metadata" fields are things that only very loosely apply to Vector, or
         // are hard to characterize -- for example, what's the API key for a sketch that didn't originate
         // from the Datadog Agent? -- so we're just omitting it here in the hopes it doesn't
@@ -601,7 +570,7 @@ where
 }
 
 fn get_compressor() -> Compressor {
-    Compressor::zlib_default()
+    Compression::zlib_default().into()
 }
 
 const fn max_uncompressed_header_len() -> usize {
@@ -719,13 +688,14 @@ mod tests {
 
     fn get_simple_counter() -> Metric {
         let value = MetricValue::Counter { value: 3.14 };
-        Metric::new("basic_counter", MetricKind::Incremental, value)
+        Metric::new("basic_counter", MetricKind::Incremental, value).with_timestamp(Some(ts()))
     }
 
     fn get_simple_sketch() -> Metric {
         let mut ddsketch = AgentDDSketch::with_agent_defaults();
         ddsketch.insert(3.14);
         Metric::new("basic_counter", MetricKind::Incremental, ddsketch.into())
+            .with_timestamp(Some(ts()))
     }
 
     fn get_compressed_empty_series_payload() -> Bytes {
@@ -814,9 +784,16 @@ mod tests {
         let result = encoder.finish();
         assert!(result.is_ok());
 
-        let (_payload, mut processed) = result.unwrap();
+        let (payload, mut processed, raw_bytes) = result.unwrap();
         assert_eq!(processed.len(), 1);
         assert_eq!(expected, processed.pop().unwrap());
+        assert_eq!(100, payload.len());
+
+        // The payload is:
+        // {"series":[{"metric":"basic_counter","type":"count","interval":null,"points":[[1651664333,3.14]],"tags":[]}]}
+        // which comes to a total of 98 bytes.
+        // There are extra bytes that make up the header and footer. These should not be included in the raw bytes.
+        assert_eq!(109, raw_bytes);
     }
 
     #[test]
@@ -837,9 +814,12 @@ mod tests {
         let result = encoder.finish();
         assert!(result.is_ok());
 
-        let (_payload, mut processed) = result.unwrap();
+        let (payload, mut processed, raw_bytes) = result.unwrap();
         assert_eq!(processed.len(), 1);
         assert_eq!(expected, processed.pop().unwrap());
+
+        assert_eq!(81, payload.len());
+        assert_eq!(70, raw_bytes);
     }
 
     #[test]
@@ -896,10 +876,13 @@ mod tests {
         let result = encoder.finish();
         assert!(result.is_ok());
 
-        let (payload, processed) = result.unwrap();
+        let (payload, processed, raw_bytes) = result.unwrap();
         let empty_payload = get_compressed_empty_series_payload();
         assert_eq!(payload, empty_payload);
         assert_eq!(processed.len(), 0);
+
+        // Just the header and footer.
+        assert_eq!(13, raw_bytes);
     }
 
     #[test]
@@ -930,10 +913,13 @@ mod tests {
         let result = encoder.finish();
         assert!(result.is_ok());
 
-        let (payload, processed) = result.unwrap();
+        let (payload, processed, raw_bytes) = result.unwrap();
         let empty_payload = get_compressed_empty_series_payload();
         assert_eq!(payload, empty_payload);
         assert_eq!(processed.len(), 0);
+
+        // Just the header and footer.
+        assert_eq!(13, raw_bytes);
     }
 
     fn arb_counter_metric() -> impl Strategy<Value = Metric> {
@@ -976,7 +962,7 @@ mod tests {
             if let Ok(mut encoder) = result {
                 let _ = encoder.try_encode(metric);
 
-                if let Ok((payload, _processed)) = encoder.finish() {
+                if let Ok((payload, _processed, _raw_bytes)) = encoder.finish() {
                     prop_assert!(payload.len() <= compressed_limit);
 
                     let result = decompress_payload(payload);

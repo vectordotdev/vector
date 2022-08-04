@@ -116,6 +116,7 @@ components: transforms: "remap": {
 			set:          true
 			summary:      true
 		}
+		traces: false
 	}
 
 	examples: [

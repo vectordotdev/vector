@@ -1,3 +1,4 @@
+use ::value::Value;
 use cidr_utils::cidr::IpCidr;
 use vrl::prelude::*;
 
@@ -68,7 +69,7 @@ impl Function for IpCidrContains {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -76,13 +77,6 @@ impl Function for IpCidrContains {
         let value = arguments.required("value");
 
         Ok(Box::new(IpCidrContainsFn { cidr, value }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let cidr = args.required("cidr");
-        let value = args.required("value");
-
-        ip_cidr_contains(value, cidr)
     }
 }
 
@@ -100,7 +94,7 @@ impl Expression for IpCidrContainsFn {
         ip_cidr_contains(value, cidr)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::boolean().fallible()
     }
 }

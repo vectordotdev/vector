@@ -1,11 +1,11 @@
-use std::{num::NonZeroU64, task};
+use std::task;
 
 use bytes::{Bytes, BytesMut};
 use futures::{future::BoxFuture, stream, FutureExt, SinkExt};
 use http::Uri;
 use prost::Message;
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use super::collector::{self, MetricCollector as _};
@@ -25,7 +25,7 @@ use crate::{
         },
     },
     template::Template,
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
 };
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -34,7 +34,7 @@ pub struct PrometheusRemoteWriteDefaultBatchSettings;
 impl SinkBatchSettings for PrometheusRemoteWriteDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(1_000);
     const MAX_BYTES: Option<usize> = None;
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 #[derive(Debug, Snafu)]
@@ -43,29 +43,66 @@ enum Errors {
     SetMetricInvalid,
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+/// Configuration for the `prometheus_remote_write` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct RemoteWriteConfig {
+    /// The endpoint to send data to.
     pub endpoint: String,
 
+    /// The default namespace for any metrics sent.
+    ///
+    /// This namespace is only used if a metric has no existing namespace. When a namespace is
+    /// present, it is used as a prefix to the metric name, and separated with an underscore (`_`).
+    ///
+    /// It should follow the Prometheus [naming conventions][prom_naming_docs].
+    ///
+    /// [prom_naming_docs]: https://prometheus.io/docs/practices/naming/#metric-names
     pub default_namespace: Option<String>,
 
+    /// Default buckets to use for aggregating [distribution][dist_metric_docs] metrics into histograms.
+    ///
+    /// [dist_metric_docs]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/metric/#distribution
     #[serde(default = "super::default_histogram_buckets")]
     pub buckets: Vec<f64>,
+
+    /// Quantiles to use for aggregating [distribution][dist_metric_docs] metrics into a summary.
+    ///
+    /// [dist_metric_docs]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/metric/#distribution
     #[serde(default = "super::default_summary_quantiles")]
     pub quantiles: Vec<f64>,
 
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<PrometheusRemoteWriteDefaultBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
+    /// The tenant ID to send.
+    ///
+    /// If set, a header named `X-Scope-OrgID` will be added to outgoing requests with the value of this setting.
+    ///
+    /// This may be used by Cortex or other remote services to identify the tenant making the request.
+    #[configurable(metadata(templateable))]
     #[serde(default)]
     pub tenant_id: Option<Template>,
 
-    pub tls: Option<TlsOptions>,
+    #[configurable(derived)]
+    pub tls: Option<TlsConfig>,
 
+    #[configurable(derived)]
     pub auth: Option<Auth>,
+
+    #[configurable(derived)]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 inventory::submit! {
@@ -107,15 +144,15 @@ impl SinkConfig for RemoteWriteConfig {
             let mut normalizer = MetricNormalizer::<PrometheusMetricNormalize>::default();
 
             request_settings
-                .partition_sink(HttpRetryLogic, service, buffer, batch.timeout, cx.acker())
+                .partition_sink(HttpRetryLogic, service, buffer, batch.timeout)
                 .with_flat_map(move |event: Event| {
                     let byte_size = event.size_of();
-                    stream::iter(normalizer.apply(event.into_metric()).map(|event| {
+                    stream::iter(normalizer.normalize(event.into_metric()).map(|event| {
                         let tenant_id = tenant_id.as_ref().and_then(|template| {
                             template
                                 .render_string(&event)
                                 .map_err(|error| {
-                                    emit!(&TemplateRenderingError {
+                                    emit!(TemplateRenderingError {
                                         error,
                                         field: Some("tenant_id"),
                                         drop_event: false,
@@ -146,8 +183,8 @@ impl SinkConfig for RemoteWriteConfig {
         "prometheus_remote_write"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        None
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
@@ -173,7 +210,7 @@ async fn healthcheck(endpoint: Uri, client: HttpClient) -> crate::Result<()> {
 pub struct PrometheusMetricNormalize;
 
 impl MetricNormalize for PrometheusMetricNormalize {
-    fn apply_state(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+    fn normalize(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         state.make_absolute(metric)
     }
 }
@@ -462,7 +499,7 @@ mod integration_tests {
         config::{SinkConfig, SinkContext},
         event::{metric::MetricValue, Event},
         sinks::influxdb::test_util::{cleanup_v1, format_timestamp, onboarding_v1, query_v1},
-        tls::{self, TlsOptions},
+        tls::{self, TlsConfig},
     };
 
     const HTTP_URL: &str = "http://localhost:8086";
@@ -487,7 +524,7 @@ mod integration_tests {
 
         let config = RemoteWriteConfig {
             endpoint: format!("{}/api/v1/prom/write?db={}", url, database),
-            tls: Some(TlsOptions {
+            tls: Some(TlsConfig {
                 ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
                 ..Default::default()
             }),

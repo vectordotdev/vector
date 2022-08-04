@@ -1,21 +1,18 @@
-use std::num::NonZeroU64;
-
+use codecs::{CharacterDelimitedEncoderConfig, JsonSerializerConfig};
 use http::Uri;
 use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use vector_config::configurable_component;
 
-use super::util::SinkBatchSettings;
 use crate::{
+    codecs::{EncodingConfigWithFraming, Transformer},
     config::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
     },
     sinks::{
         http::{HttpMethod, HttpSinkConfig},
         util::{
-            encoding::{EncodingConfig, EncodingConfigWithDefault},
-            http::RequestConfig,
-            BatchConfig, Compression, TowerRequestConfig,
+            http::RequestConfig, BatchConfig, Compression, SinkBatchSettings, TowerRequestConfig,
         },
     },
 };
@@ -31,12 +28,17 @@ enum BuildError {
     MissingAuthParam,
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
+/// New Relic region.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 #[derivative(Default)]
 pub enum NewRelicLogsRegion {
+    /// US region.
     #[derivative(Default)]
     Us,
+
+    /// EU region.
     Eu,
 }
 
@@ -46,27 +48,43 @@ pub struct NewRelicLogsDefaultBatchSettings;
 impl SinkBatchSettings for NewRelicLogsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = None;
     const MAX_BYTES: Option<usize> = Some(1_000_000);
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
-#[derive(Deserialize, Serialize, Debug, Derivative, Clone)]
+/// Configuration for the `new_relic_logs` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 pub struct NewRelicLogsConfig {
+    /// A valid New Relic license key (if applicable).
     pub license_key: Option<String>,
+
+    /// A valid New Relic insert key (if applicable).
     pub insert_key: Option<String>,
+
+    #[configurable(derived)]
     pub region: Option<NewRelicLogsRegion>,
+
+    #[configurable(derived)]
     #[serde(
-        skip_serializing_if = "crate::serde::skip_serializing_if_default",
-        default
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    pub encoding: EncodingConfigWithDefault<Encoding>,
+    pub encoding: Transformer,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub compression: Compression,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<NewRelicLogsDefaultBatchSettings>,
 
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -81,23 +99,7 @@ inventory::submit! {
 
 impl GenerateConfig for NewRelicLogsConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self::with_encoding(Encoding::Json)).unwrap()
-    }
-}
-
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
-#[serde(rename_all = "snake_case")]
-#[derivative(Default)]
-pub enum Encoding {
-    #[derivative(Default)]
-    Json,
-}
-
-impl From<Encoding> for crate::sinks::http::Encoding {
-    fn from(v: Encoding) -> crate::sinks::http::Encoding {
-        match v {
-            Encoding::Json => crate::sinks::http::Encoding::Json,
-        }
+        toml::Value::try_from(Self::default()).expect("config must serialize to valid TOML")
     }
 }
 
@@ -120,25 +122,12 @@ impl SinkConfig for NewRelicLogsConfig {
         "new_relic_logs"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
 impl NewRelicLogsConfig {
-    fn with_encoding(encoding: Encoding) -> Self {
-        Self {
-            license_key: None,
-            insert_key: None,
-            region: None,
-            encoding: encoding.into(),
-            compression: Compression::default(),
-            batch: BatchConfig::default(),
-            request: TowerRequestConfig::default(),
-            acknowledgements: Default::default(),
-        }
-    }
-
     fn create_config(&self) -> crate::Result<HttpSinkConfig> {
         let mut headers: IndexMap<String, String> = IndexMap::new();
         if let Some(license_key) = &self.license_key {
@@ -166,9 +155,11 @@ impl NewRelicLogsConfig {
             auth: None,
             headers: None,
             compression: self.compression,
-            encoding: EncodingConfig::<Encoding>::from(self.encoding.clone())
-                .into_encoding()
-                .into(),
+            encoding: EncodingConfigWithFraming::new(
+                Some(CharacterDelimitedEncoderConfig::new(b',').into()),
+                JsonSerializerConfig::new().into(),
+                self.encoding.clone(),
+            ),
             batch: batch_settings.into(),
             request,
             tls: None,
@@ -182,17 +173,21 @@ mod tests {
     use std::io::BufRead;
 
     use bytes::Buf;
+    use codecs::encoding::Serializer;
     use futures::{stream, StreamExt};
     use hyper::Method;
     use serde_json::Value;
 
     use super::*;
     use crate::{
-        codecs::encoding::Serializer,
+        codecs::SinkType,
         config::SinkConfig,
-        event::Event,
+        event::{Event, LogEvent},
         sinks::util::{service::RATE_LIMIT_NUM_DEFAULT, test::build_test_server, Concurrency},
-        test_util::{components, components::HTTP_SINK_TAGS, next_addr},
+        test_util::{
+            components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
+            next_addr,
+        },
     };
 
     #[test]
@@ -205,9 +200,7 @@ mod tests {
         assert_eq!(
             format!(
                 "{}",
-                NewRelicLogsConfig::with_encoding(Encoding::Json)
-                    .create_config()
-                    .unwrap_err()
+                NewRelicLogsConfig::default().create_config().unwrap_err()
             ),
             "Missing authentication key, must provide either 'license_key' or 'insert_key'"
                 .to_owned(),
@@ -216,8 +209,10 @@ mod tests {
 
     #[test]
     fn new_relic_logs_check_config_defaults() {
-        let mut nr_config = NewRelicLogsConfig::with_encoding(Encoding::Json);
-        nr_config.license_key = Some("foo".to_owned());
+        let nr_config = NewRelicLogsConfig {
+            license_key: Some("foo".to_owned()),
+            ..Default::default()
+        };
         let http_config = nr_config.create_config().unwrap();
 
         assert_eq!(
@@ -226,7 +221,11 @@ mod tests {
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert!(matches!(
-            http_config.encoding.encoding().1,
+            http_config
+                .encoding
+                .build(SinkType::MessageBased)
+                .unwrap()
+                .1,
             Serializer::Json(_)
         ));
         assert_eq!(http_config.batch.max_bytes, Some(MAX_PAYLOAD_SIZE));
@@ -245,12 +244,20 @@ mod tests {
 
     #[test]
     fn new_relic_logs_check_config_custom() {
-        let mut nr_config = NewRelicLogsConfig::with_encoding(Encoding::Json);
-        nr_config.insert_key = Some("foo".to_owned());
-        nr_config.region = Some(NewRelicLogsRegion::Eu);
-        nr_config.batch.max_bytes = Some(MAX_PAYLOAD_SIZE);
-        nr_config.request.concurrency = Concurrency::Fixed(12);
-        nr_config.request.rate_limit_num = Some(24);
+        let mut batch = BatchConfig::default();
+        batch.max_bytes = Some(MAX_PAYLOAD_SIZE);
+
+        let nr_config = NewRelicLogsConfig {
+            insert_key: Some("foo".to_owned()),
+            region: Some(NewRelicLogsRegion::Eu),
+            batch,
+            request: TowerRequestConfig {
+                concurrency: Concurrency::Fixed(12),
+                rate_limit_num: Some(24),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
 
         let http_config = nr_config.create_config().unwrap();
 
@@ -260,7 +267,11 @@ mod tests {
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert!(matches!(
-            http_config.encoding.encoding().1,
+            http_config
+                .encoding
+                .build(SinkType::MessageBased)
+                .unwrap()
+                .1,
             Serializer::Json(_)
         ));
         assert_eq!(http_config.batch.max_bytes, Some(MAX_PAYLOAD_SIZE));
@@ -282,7 +293,6 @@ mod tests {
         let config = r#"
         insert_key = "foo"
         region = "eu"
-        encoding = "json"
 
         [batch]
         max_bytes = 838860
@@ -301,7 +311,11 @@ mod tests {
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert!(matches!(
-            http_config.encoding.encoding().1,
+            http_config
+                .encoding
+                .build(SinkType::MessageBased)
+                .unwrap()
+                .1,
             Serializer::Json(_)
         ));
         assert_eq!(http_config.batch.max_bytes, Some(838860));
@@ -324,7 +338,6 @@ mod tests {
         let config = r#"
         insert_key = "foo"
         region = "eu"
-        encoding = "json"
 
         [batch]
         max_bytes = 8388600
@@ -342,8 +355,10 @@ mod tests {
     async fn new_relic_logs_happy_path() {
         let in_addr = next_addr();
 
-        let mut nr_config = NewRelicLogsConfig::with_encoding(Encoding::Json);
-        nr_config.license_key = Some("foo".to_owned());
+        let nr_config = NewRelicLogsConfig {
+            license_key: Some("foo".to_owned()),
+            ..Default::default()
+        };
         let mut http_config = nr_config.create_config().unwrap();
         http_config.uri = format!("http://{}/fake_nr", in_addr)
             .parse::<http::Uri>()
@@ -355,9 +370,9 @@ mod tests {
         tokio::spawn(server);
 
         let input_lines = (0..100).map(|i| format!("msg {}", i)).collect::<Vec<_>>();
-        let events = stream::iter(input_lines.clone()).map(Event::from);
+        let events = stream::iter(input_lines.clone()).map(|e| Event::Log(LogEvent::from(e)));
 
-        components::run_sink_events(sink, events, &HTTP_SINK_TAGS).await;
+        run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
         drop(trigger);
 
         let output_lines = rx

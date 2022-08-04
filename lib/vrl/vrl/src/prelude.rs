@@ -4,14 +4,14 @@ pub use compiler::{expression, state, value::kind};
 
 // commonly used top-level crate types
 pub use compiler::{
-    value::{Collection, Field, Index, Kind},
-    Context, Expression, ExpressionError, Function, Resolved, Target, TypeDef, Value,
+    function::{closure, FunctionClosure},
+    value::{Collection, Field, Index, IterItem, Kind},
+    Context, Expression, ExpressionError, Function, Resolved, Target, TypeDef,
 };
 
 pub type Result<T> = std::result::Result<T, ExpressionError>;
 
-pub use std::collections::BTreeMap;
-pub use std::fmt;
+pub use std::{collections::BTreeMap, fmt};
 
 pub use bytes::Bytes;
 // pub use crate::{Error, Expr, Expression, Function, Object, Result, TypeDef, Value};
@@ -24,13 +24,12 @@ pub use bytes::Bytes;
 pub use compiler::function::{
     ArgumentList, Compiled, CompiledArgument, Example, FunctionCompileContext, Parameter,
 };
+pub use compiler::value::{VrlValueArithmetic, VrlValueConvert};
 // commonly used macros
 pub use compiler::{
-    bench_function, expr, expression::FunctionArgument, func_args, map, test_function,
-    test_type_def, type_def, value, vm::VmArgumentList,
+    bench_function, expr, expression::FunctionArgument, func_args, test_function, test_type_def,
+    type_def, value,
 };
-pub use diagnostic::DiagnosticError;
+pub use diagnostic::DiagnosticMessage;
 pub use indoc::indoc;
 pub use ordered_float::NotNan;
-
-pub use compiler::value::{VrlValueArithmetic, VrlValueConvert};

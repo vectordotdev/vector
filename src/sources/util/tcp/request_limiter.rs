@@ -1,7 +1,9 @@
-use crate::stats::EwmaDefault;
 use std::cmp::Ordering;
 use std::sync::{Arc, Mutex};
+
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
+
+use crate::stats::EwmaDefault;
 
 const EWMA_WEIGHT: f64 = 0.1;
 const MINIMUM_PERMITS: usize = 2;
@@ -110,8 +112,9 @@ impl RequestLimiter {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use approx::assert_abs_diff_eq;
+
+    use super::*;
 
     #[tokio::test]
     async fn test_average_convergence() {

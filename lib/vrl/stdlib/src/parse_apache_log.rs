@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use ::value::Value;
 use vrl::prelude::*;
 
 use crate::log_util;
@@ -15,16 +16,21 @@ fn parse_apache_log(
         None => "%d/%b/%Y:%T %z".to_owned(),
         Some(timestamp_format) => timestamp_format.try_bytes_utf8_lossy()?.to_string(),
     };
-    let regex = match format.as_ref() {
+    let regexes = match format.as_ref() {
         b"common" => &*log_util::REGEX_APACHE_COMMON_LOG,
         b"combined" => &*log_util::REGEX_APACHE_COMBINED_LOG,
         b"error" => &*log_util::REGEX_APACHE_ERROR_LOG,
         _ => unreachable!(),
     };
-    let captures = regex
-        .captures(&message)
-        .ok_or("failed parsing common log line")?;
-    log_util::log_fields(regex, &captures, &timestamp_format, ctx.timezone()).map_err(Into::into)
+
+    log_util::parse_message(
+        regexes,
+        &message,
+        &timestamp_format,
+        ctx.timezone(),
+        std::str::from_utf8(format.as_ref()).unwrap(),
+    )
+    .map_err(Into::into)
 }
 
 fn variants() -> Vec<Value> {
@@ -61,7 +67,7 @@ impl Function for ParseApacheLog {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -124,14 +130,6 @@ impl Function for ParseApacheLog {
             },
         ]
     }
-
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let format = args.required_any("format").downcast_ref::<Bytes>().unwrap();
-        let timestamp_format = args.optional("timestamp_format");
-
-        parse_apache_log(value, timestamp_format, format, ctx)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -153,7 +151,7 @@ impl Expression for ParseApacheLogFn {
         parse_apache_log(bytes, timestamp_format, &self.format, ctx)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::object(match self.format.as_ref() {
             b"common" => kind_common(),
             b"combined" => kind_combined(),
@@ -165,55 +163,46 @@ impl Expression for ParseApacheLogFn {
 }
 
 fn kind_common() -> BTreeMap<Field, Kind> {
-    map! {
-         "host": Kind::bytes() | Kind::null(),
-         "identity": Kind::bytes() | Kind::null(),
-         "user": Kind::bytes() | Kind::null(),
-         "timestamp": Kind::timestamp() | Kind::null(),
-         "message": Kind::bytes() | Kind::null(),
-         "method": Kind::bytes() | Kind::null(),
-         "path": Kind::bytes() | Kind::null(),
-         "protocol": Kind::bytes() | Kind::null(),
-         "status": Kind::integer() | Kind::null(),
-         "size": Kind::integer() | Kind::null(),
-    }
-    .into_iter()
-    .map(|(key, kind): (&str, _)| (key.into(), kind))
-    .collect()
+    BTreeMap::from([
+        (Field::from("host"), Kind::bytes() | Kind::null()),
+        (Field::from("identity"), Kind::bytes() | Kind::null()),
+        (Field::from("user"), Kind::bytes() | Kind::null()),
+        (Field::from("timestamp"), Kind::timestamp() | Kind::null()),
+        (Field::from("message"), Kind::bytes() | Kind::null()),
+        (Field::from("method"), Kind::bytes() | Kind::null()),
+        (Field::from("path"), Kind::bytes() | Kind::null()),
+        (Field::from("protocol"), Kind::bytes() | Kind::null()),
+        (Field::from("status"), Kind::integer() | Kind::null()),
+        (Field::from("size"), Kind::integer() | Kind::null()),
+    ])
 }
 
 fn kind_combined() -> BTreeMap<Field, Kind> {
-    map! {
-        "host": Kind::bytes() | Kind::null(),
-        "identity": Kind::bytes() | Kind::null(),
-        "user": Kind::bytes() | Kind::null(),
-        "timestamp": Kind::timestamp() | Kind::null(),
-        "message": Kind::bytes() | Kind::null(),
-        "method": Kind::bytes() | Kind::null(),
-        "path": Kind::bytes() | Kind::null(),
-        "protocol": Kind::bytes() | Kind::null(),
-        "status": Kind::integer() | Kind::null(),
-        "size": Kind::integer() | Kind::null(),
-        "referrer": Kind::bytes() | Kind::null(),
-        "agent": Kind::bytes() | Kind::null(),
-    }
-    .into_iter()
-    .map(|(key, kind): (&str, _)| (key.into(), kind))
-    .collect()
+    BTreeMap::from([
+        (Field::from("host"), Kind::bytes() | Kind::null()),
+        (Field::from("identity"), Kind::bytes() | Kind::null()),
+        (Field::from("user"), Kind::bytes() | Kind::null()),
+        (Field::from("timestamp"), Kind::timestamp() | Kind::null()),
+        (Field::from("message"), Kind::bytes() | Kind::null()),
+        (Field::from("method"), Kind::bytes() | Kind::null()),
+        (Field::from("path"), Kind::bytes() | Kind::null()),
+        (Field::from("protocol"), Kind::bytes() | Kind::null()),
+        (Field::from("status"), Kind::integer() | Kind::null()),
+        (Field::from("size"), Kind::integer() | Kind::null()),
+        (Field::from("referrer"), Kind::bytes() | Kind::null()),
+        (Field::from("agent"), Kind::bytes() | Kind::null()),
+    ])
 }
 
 fn kind_error() -> BTreeMap<Field, Kind> {
-    map! {
-         "timestamp": Kind::timestamp() | Kind::null(),
-         "module": Kind::bytes() | Kind::null(),
-         "severity": Kind::bytes() | Kind::null(),
-         "thread": Kind::bytes() | Kind::null(),
-         "port": Kind::bytes() | Kind::null(),
-         "message": Kind::bytes() | Kind::null(),
-    }
-    .into_iter()
-    .map(|(key, kind): (&str, _)| (key.into(), kind))
-    .collect()
+    BTreeMap::from([
+        (Field::from("timestamp"), Kind::timestamp() | Kind::null()),
+        (Field::from("module"), Kind::bytes() | Kind::null()),
+        (Field::from("severity"), Kind::bytes() | Kind::null()),
+        (Field::from("thread"), Kind::bytes() | Kind::null()),
+        (Field::from("port"), Kind::bytes() | Kind::null()),
+        (Field::from("message"), Kind::bytes() | Kind::null()),
+    ])
 }
 
 #[cfg(test)]
@@ -344,11 +333,27 @@ mod tests {
             tz: vector_common::TimeZone::Named(chrono_tz::Tz::UTC),
         }
 
+        error_line_threaded_mpms_valid {
+            args: func_args![value: r#"[01/Mar/2021:12:00:19 +0000] [proxy:error] [pid 23964] (113)No route to host: AH00957: HTTP: attempt to connect to 10.1.0.244:9000 (hostname.domain.com) failed"#,
+                             format: "error"
+                             ],
+            want: Ok(btreemap! {
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2021-03-01T12:00:19Z").unwrap().into()),
+                "message1" => "(113)No route to host: AH00957: ",
+                "message2" => "HTTP: attempt to connect to 10.1.0.244:9000 (hostname.domain.com) failed",
+                "module" => "proxy",
+                "severity" => "error",
+                "pid" => 23964,
+            }),
+            tdef: TypeDef::object(kind_error()).fallible(),
+            tz: vector_common::TimeZone::default(),
+        }
+
         log_line_valid_empty {
             args: func_args![value: "- - - - - - -",
                              format: "common",
             ],
-            want: Ok(btreemap! {}),
+            want: Ok(BTreeMap::new()),
             tdef: TypeDef::object(kind_common()).fallible(),
             tz: vector_common::TimeZone::default(),
         }
@@ -357,7 +362,7 @@ mod tests {
             args: func_args![value: r#"- - - [-] "-" - -"#,
                              format: "common",
             ],
-            want: Ok(btreemap! {}),
+            want: Ok(BTreeMap::new()),
             tdef: TypeDef::object(kind_common()).fallible(),
             tz: vector_common::TimeZone::default(),
         }

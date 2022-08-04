@@ -1,12 +1,13 @@
 use std::collections::{BTreeMap, HashMap};
 
+use ::value::Value;
 use vrl::prelude::*;
 
 fn tally(value: Value) -> Resolved {
     let value = value.try_array()?;
     #[allow(clippy::mutable_key_type)] // false positive due to bytes::Bytes
     let mut map: HashMap<Bytes, usize> = HashMap::new();
-    for value in value.into_iter() {
+    for value in value {
         if let Value::Bytes(value) = value {
             *map.entry(value).or_insert(0) += 1;
         } else {
@@ -38,7 +39,7 @@ impl Function for Tally {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -54,11 +55,6 @@ impl Function for Tally {
             required: true,
         }]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        tally(value)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -72,7 +68,7 @@ impl Expression for TallyFn {
         tally(value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::object(Collection::from_unknown(Kind::integer())).fallible()
     }
 }

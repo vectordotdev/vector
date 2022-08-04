@@ -91,7 +91,7 @@ fn emit_received() -> impl Filter<Extract = (), Error = warp::reject::Rejection>
         .and(warp::header::optional("X-Amz-Firehose-Request-Id"))
         .and(warp::header::optional("X-Amz-Firehose-Source-Arn"))
         .map(|request_id: Option<String>, source_arn: Option<String>| {
-            emit!(&AwsKinesisFirehoseRequestReceived {
+            emit!(AwsKinesisFirehoseRequestReceived {
                 request_id: request_id.as_deref(),
                 source_arn: source_arn.as_deref(),
             });
@@ -150,7 +150,7 @@ async fn handle_firehose_rejection(err: warp::Rejection) -> Result<impl warp::Re
         request_id = None;
     }
 
-    emit!(&AwsKinesisFirehoseRequestError::new(
+    emit!(AwsKinesisFirehoseRequestError::new(
         code,
         message.as_str(),
         request_id

@@ -41,8 +41,10 @@ configuration: {
 			common:      false
 			description: """
 				Configuration options for an [enrichment table](\(urls.enrichment_tables_concept)) to be used in a
-				[`remap`](\(urls.vector_remap_transform)) transform. Currently, only [CSV](\(urls.csv)) files are
-				supported.
+				[`remap`](\(urls.vector_remap_transform)) transform. Currently supported are:
+
+				* [CSV](\(urls.csv)) files
+				* [MaxMind](\(urls.maxmind)) databases
 
 				For the lookup in the enrichment tables to be as performant as possible, the data is indexed according
 				to the fields that are used in the search. Note that indices can only be created for fields for which an
@@ -129,6 +131,57 @@ configuration: {
 								]
 
 								options: {}
+							}
+						}
+					}
+				}
+			}
+			type: object: options: {
+				geoip: {
+					required:    true
+					description: """
+						Configuration options for [MaxMind](\(urls.maxmind)) databases.
+
+						The following [MaxMind](\(urls.maxmind)) databases are currently supported:
+
+						* [GeoLite2-ASN.mmdb](\(urls.maxmind_geolite2_asn)) (free) — Determine the
+							autonomous system number and organization associated with an IP address.
+						* [GeoLite2-City.mmdb](\(urls.maxmind_geolite2_city)) (free) — Determine the
+							country, subdivisions, city, and postal code associated with IPv4 and IPv6
+							addresses worldwide.
+						* [GeoIP2-City.mmdb](\(urls.maxmind_geoip2_city)) (paid) — Determine the country,
+							subdivisions, city, and postal code associated with IPv4 and IPv6
+							addresses worldwide.
+						* [GeoIP2-ISP.mmdb](\(urls.maxmind_geoip2_isp)) (paid) — Determine the Internet
+							Service Provider (ISP), organization name, and autonomous system organization
+							and number associated with an IP address.
+
+						The database file should be in the [MaxMind DB file format](\(urls.maxmind_db_file_format)).
+
+						This enrichment table only supports lookup with IP address.
+						"""
+					type: object: options: {
+						path: {
+							description: """
+								Path to the [MaxMind GeoIP2](\(urls.maxmind_geoip2)) or [GeoLite2 binary city
+								database](\(urls.maxmind_geolite2_city)) file (`GeoLite2-City.mmdb`). Other
+								databases, such as the country database, are not supported.
+								"""
+							required:    true
+							type: string: {
+								examples: ["/path/to/GeoLite2-City.mmdb", "/path/to/GeoLite2-ISP.mmdb"]
+							}
+						}
+						locale: {
+							description: """
+								The locale to use to lookup the country name and region name for the city database.
+								See [Locations Files](https://dev.maxmind.com/geoip/docs/databases/city-and-country?lang=en)
+								"""
+							required: false
+							common:   false
+							type: string: {
+								default: "en"
+								examples: ["de", "en", "es", "fr", "ja", "pt-BR", "ru", "zh-CN"]
 							}
 						}
 					}
@@ -249,6 +302,68 @@ configuration: {
 			}
 		}
 
+		secret: {
+			common: false
+			description: """
+				Configuration options to retrieve secrets from external backend in order to avoid storing secrets in plaintext
+				in Vector config. Currently, only the exec backend is supported. Multiple backends can be configured. To signify
+				Vector that it should look for a secret to retrieve use the `SECRET[<backend_name>.<secret_key>]`. This placeholder
+				will then be replaced by the secret retrieved from the relevant backend.
+				"""
+			required: false
+			type: object: options: {
+				exec: {
+					required: true
+					description: """
+						Run a local command to retrieve secrets.
+
+						The provided command will be run and provided a list of
+						secrets to fetch, determined from the configuration file, on stdin as JSON in the format:
+
+						```json
+						{"version": "1.0", "secrets": ["secret1", "secret2"]}
+						```
+
+						The executable is expected to respond with the values of these secrets on stdout, also as JSON, in the format:
+
+						```json
+						{
+							"secret1": {"value": "secret_value", "error": null},
+							"secret2": {"value": null, "error": "could not fetch the secret"}
+						}
+						```
+
+						If an `error` is returned for any secrets, or if the command exits with a non-zero status code,
+						Vector will log the errors and exit.
+
+						Secrets will be loaded when Vector starts or if Vector receives a `SIGHUP` signal triggering its
+						configuration reload process.
+						"""
+					type: object: options: {
+						command: {
+							description: """
+								The command to be run, plus any arguments required.
+								"""
+							required: true
+							type: array: {
+								examples: [["/path/to/get-secret", "-s"], ["/path/to/vault-wrappper"]]
+								items: type: string: {}
+							}
+						}
+						timeout: {
+							description: "The amount of time Vector will wait for the command to complete."
+							required:    false
+							common:      false
+							type: uint: {
+								default: 5
+								unit:    "seconds"
+							}
+						}
+					}
+				}
+			}
+		}
+
 		timezone: {
 			common:      false
 			description: """
@@ -322,16 +437,16 @@ configuration: {
 		environment_variables: {
 			title: "Environment variables"
 			body: """
-				Vector will interpolate environment variables within your configuration file
+				Vector interpolates environment variables within your configuration file
 				with the following syntax:
 
 				```toml title="vector.toml"
 				[transforms.add_host]
-				  type = "add_fields"
-
-				  [transforms.add_host.fields]
-				    host = "${HOSTNAME}"
-				    environment = "${ENV:-development}" # default value when not present
+				  inputs = ["apache_logs"]
+				  type   = "remap"
+				  source = '''
+				  .host = get_env_var!("HOSTNAME")
+				  '''
 				```
 				"""
 
@@ -339,10 +454,22 @@ configuration: {
 				{
 					title: "Default values"
 					body: """
-						Default values can be supplied via the `:-` syntax:
+						Default values can be supplied using `:-` or `-` syntax:
 
 						```toml
-						option = "${ENV_VAR:-default}"
+						option = "${ENV_VAR:-default}" # default value if variable is unset or empty
+						option = "${ENV_VAR-default}" # default value only if variable is unset
+						```
+						"""
+				},
+				{
+					title: "Required variables"
+					body: """
+						Environment variables that are required can be specified using `:?` or `?` syntax:
+
+						```toml
+						option = "${ENV_VAR:?err}" # Vector exits with 'err' message if variable is unset or empty
+						option = "${ENV_VAR?err}" # Vector exits with 'err' message only if variable is unset
 						```
 						"""
 				},
@@ -350,8 +477,80 @@ configuration: {
 					title: "Escaping"
 					body: """
 						You can escape environment variable by preceding them with a `$` character. For
-						example `$${HOSTNAME}` will be treated _literally_ in the above environment
+						example `$${HOSTNAME}` or `$$HOSTNAME` is treated literally in the above environment
 						variable example.
+						"""
+				},
+			]
+		}
+		secrets_management: {
+			title: "Secrets management"
+			body: """
+				Vector can retrieve secrets like a password or token by querying an external system in order to
+				avoid storing sensitive information in Vector configuration files. Secret backends used to retrieve
+				sensitive token are configured in a dedicated section (`secret`). In the rest of the configuration you should use
+				the `SECRET[<backend_name>.<secret_key>]` notation to interpolate the secret. Interpolation will happen immediately after
+				environment variables interpolation. While Vector supports multiple commands to retrieve secrets, a
+				secret backend cannot use the secret interpolation feature for its own configuration. Currently the only supported
+				kind of secret backend is the the `exec` one that runs an external command to retrieve secrets.
+
+				The following example shows a simple configuration with two backends defined:
+
+				```toml title="vector.toml"
+				[secret.backend_1]
+				type = "exec"
+				command = ["/path/to/cmd1", "--some-option"]
+				[secret.backend_2]
+				type = "exec"
+				command = ["/path/to/cmd2"]
+
+				[sinks.dd_logs]
+				type = "datadog_logs"
+				default_api_key = "SECRET[backend_1.dd_api_key]"
+
+				[sinks.splunk]
+				type = "splunk_hec"
+				default_token = "SECRET[backend_2.splunk_token]"
+				```
+
+				In that example Vector will retrieve the `dd_api_key` from `backen_1` and `splunk_token` from `backend_2`.
+				"""
+
+			sub_sections: [
+				{
+					title: "The `exec` backend"
+					body:  """
+						When using the `exec` type for a secret backend Vector and the external command are communicating using
+						the standard input and output. The communication is using plain text JSON. Vector spawns the specified
+						command, writes the secret retrieval query using JSON on the standard input of the child process and
+						reads its standard output expecting a JSON object. Standard error from the child process is read and
+						logged by Vector and can be used for troubleshooting.
+
+						The JSON object used for communication between an `exec` backend and Vector shall comply with the
+						[Datadog Agent executable API](\(urls.datadog_agent_exec_api)).
+
+						For example a query would look like:
+
+						```json
+						{
+							"version": "1.0",
+							"secrets": ["dd_api_key", "another_dd_api_key"]
+						}
+						```
+
+						A possible reply from a backend could then be:
+
+						```json
+						{
+							"dd_api_key": {"value": "A_DATADOG_API_KEY", "error": null},
+							"another_dd_api_key": {"value": null, "error": "unable to retrieve secret"}
+						}
+						```
+
+						If a backend writes a JSON that does not follow the expected structure or reports an error for a
+						given secret Vector will refuse to load the configuration.
+
+						Currently Vector will always query backend with `"version": "1.0"`.
 						"""
 				},
 			]
@@ -360,8 +559,8 @@ configuration: {
 			title: "Formats"
 			body:  """
 				Vector supports [TOML](\(urls.toml)), [YAML](\(urls.yaml)), and [JSON](\(urls.json)) to
-				ensure Vector fits into your workflow. A side benefit of supporting JSON is the
-				enablement of data templating languages like [Jsonnet](\(urls.jsonnet)) and
+				ensure Vector fits into your workflow. A side benefit of supporting YAML and JSON is that they
+				enable you to use data templating languages such as [ytt](\(urls.ytt)), [Jsonnet](\(urls.jsonnet)) and
 				[Cue](\(urls.cue)).
 				"""
 		}

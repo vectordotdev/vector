@@ -420,7 +420,7 @@ releases: "0.20.0": {
 				"""
 		},
 		{
-			title: "Official release of end-to-end acknowledges feature"
+			title: "Official release of end-to-end acknowledgements feature"
 			description: """
 				We have started to add support for end-to-end acknowledgements from sources to sinks where sources will
 				not ack data until the data has been processed by all associated sinks. It is usable by some components

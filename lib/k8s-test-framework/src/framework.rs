@@ -168,6 +168,11 @@ impl Framework {
         pod::get_pod_on_node(&self.interface.kubectl_command, namespace, node, service).await
     }
 
+    /// Sets a label on all nodes.
+    pub async fn label_nodes(&self, label: &str) -> Result<String> {
+        pod::label_nodes(&self.interface.kubectl_command, label).await
+    }
+
     /// Return the Vector pod that is deployed on the same node as the given pod. We want to make
     /// sure we are scanning the Vector instance that is deployed with the test pod.
     pub async fn get_vector_pod_with_pod(

@@ -33,13 +33,12 @@ components: sinks: kafka: {
 				enabled: true
 				codec: {
 					enabled: true
-					enum: ["json", "text", "ndjson"]
+					enum: ["json", "text"]
 				}
 			}
 			request: enabled: false
 			tls: {
 				enabled:                true
-				can_enable:             true
 				can_verify_certificate: false
 				can_verify_hostname:    false
 				enabled_default:        false
@@ -145,6 +144,7 @@ components: sinks: kafka: {
 			set:          true
 			summary:      true
 		}
+		traces: false
 	}
 
 	how_it_works: components._kafka.how_it_works

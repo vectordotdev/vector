@@ -10,7 +10,6 @@ use std::{
 
 use bytes::{Buf, BufMut};
 use clap::{Arg, Command};
-use futures::{stream, SinkExt, StreamExt};
 use hdrhistogram::Histogram;
 use rand::Rng;
 use tokio::{select, sync::oneshot, task, time};
@@ -22,23 +21,37 @@ use vector_buffers::{
         builder::TopologyBuilder,
         channel::{BufferReceiver, BufferSender},
     },
-    Acker, BufferType, Bufferable, EventCount, WhenFull,
+    BufferType, Bufferable, EventCount, WhenFull,
 };
 use vector_common::byte_size_of::ByteSizeOf;
+use vector_common::finalization::{
+    AddBatchNotifier, BatchNotifier, EventFinalizer, EventFinalizers, EventStatus, Finalizable,
+};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct VariableMessage {
     id: u64,
     payload: Vec<u8>,
+    finalizers: EventFinalizers,
 }
 
 impl VariableMessage {
     pub fn new(id: u64, payload: Vec<u8>) -> Self {
-        VariableMessage { id, payload }
+        VariableMessage {
+            id,
+            payload,
+            finalizers: Default::default(),
+        }
     }
 
     pub fn id(&self) -> u64 {
         self.id
+    }
+}
+
+impl AddBatchNotifier for VariableMessage {
+    fn add_batch_notifier(&mut self, batch: BatchNotifier) {
+        self.finalizers.add(EventFinalizer::new(batch));
     }
 }
 
@@ -51,6 +64,12 @@ impl ByteSizeOf for VariableMessage {
 impl EventCount for VariableMessage {
     fn event_count(&self) -> usize {
         1
+    }
+}
+
+impl Finalizable for VariableMessage {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        std::mem::take(&mut self.finalizers)
     }
 }
 
@@ -223,9 +242,9 @@ fn generate_record_cache(min: usize, max: usize) -> Vec<VariableMessage> {
     records
 }
 
-async fn generate_buffer<T>(buffer_type: &str) -> (BufferSender<T>, BufferReceiver<T>, Acker)
+async fn generate_buffer<T>(buffer_type: &str) -> (BufferSender<T>, BufferReceiver<T>)
 where
-    T: Bufferable + Clone,
+    T: Bufferable + Clone + Finalizable,
 {
     let data_dir = PathBuf::from("/tmp/vector");
     let id = format!("{}-buffer-perf-testing", buffer_type);
@@ -277,7 +296,7 @@ where
         .expect("should not fail to to add variant to builder");
 
     builder
-        .build(Span::none())
+        .build(String::from("buffer_perf"), Span::none())
         .await
         .expect("build should not fail")
 }
@@ -319,7 +338,7 @@ async fn main() {
     );
 
     let buffer_start = Instant::now();
-    let (mut writer, mut reader, acker) = generate_buffer(config.buffer_type.as_str()).await;
+    let (mut writer, mut reader) = generate_buffer(config.buffer_type.as_str()).await;
     let buffer_delta = buffer_start.elapsed();
 
     info!(
@@ -348,12 +367,10 @@ async fn main() {
                 }
                 n => {
                     let count = cmp::min(n, remaining);
-                    let mut record_chunk = (&mut records).take(count).map(Ok);
-                    let mut record_chunk_iter = stream::iter(&mut record_chunk);
-                    writer
-                        .send_all(&mut record_chunk_iter)
-                        .await
-                        .expect("failed to write record");
+                    let record_chunk = (&mut records).take(count);
+                    for record in record_chunk {
+                        writer.send(record).await.expect("failed to write record");
+                    }
                     count
                 }
             };
@@ -389,7 +406,9 @@ async fn main() {
             let read_start = Instant::now();
 
             match reader.next().await {
-                Some(_) => acker.ack(1),
+                Some(mut record) => record
+                    .take_finalizers()
+                    .update_status(EventStatus::Delivered),
                 None => {
                     info!("[buffer-perf] reader hit end of buffer, closing...");
                     break;

@@ -4,15 +4,20 @@ use aws_sdk_sqs::Client as SqsClient;
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use vector_config::configurable_component;
 
 use crate::{
-    aws::aws_sdk::create_client,
+    aws::create_client,
     aws::{AwsAuthentication, RegionOrEndpoint},
+    codecs::EncodingConfig,
     common::sqs::SqsClientBuilder,
-    config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
-    sinks::util::{encoding::EncodingConfig, TowerRequestConfig},
+    config::{
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig,
+        SinkContext,
+    },
+    sinks::util::TowerRequestConfig,
     template::{Template, TemplateParseError},
-    tls::TlsOptions,
+    tls::TlsConfig,
 };
 
 #[derive(Debug, Snafu)]
@@ -27,22 +32,52 @@ pub(super) enum BuildError {
     MessageDeduplicationIdTemplate { source: TemplateParseError },
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the `aws_sqs` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct SqsSinkConfig {
+    /// The URL of the Amazon SQS queue to which messages are sent.
+    #[configurable(validation(format = "uri"))]
     pub queue_url: String,
+
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    pub encoding: EncodingConfig<Encoding>,
+
+    #[configurable(derived)]
+    pub encoding: EncodingConfig,
+
+    /// The tag that specifies that a message belongs to a specific message group.
+    ///
+    /// Can be applied only to FIFO queues.
     pub message_group_id: Option<String>,
+
+    /// The message deduplication ID value to allow AWS to identify duplicate messages.
+    ///
+    /// This value is a template which should result in a unique string for each event. See the [AWS
+    /// documentation][deduplication_id_docs] for more about how AWS does message deduplication.
+    ///
+    /// [deduplication_id_docs]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/using-messagededuplicationid-property.html
     pub message_deduplication_id: Option<String>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
-    pub tls: Option<TlsOptions>,
-    // Deprecated name. Moved to auth.
-    pub(super) assume_role: Option<String>,
+
+    #[configurable(derived)]
+    pub tls: Option<TlsConfig>,
+
+    /// The ARN of an [IAM role][iam_role] to assume at startup.
+    ///
+    /// [iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
+    #[configurable(deprecated)]
+    pub assume_role: Option<String>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub auth: AwsAuthentication,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -78,7 +113,7 @@ impl SinkConfig for SqsSinkConfig {
     ) -> crate::Result<(crate::sinks::VectorSink, crate::sinks::Healthcheck)> {
         let client = self.create_client(&cx.proxy).await?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
-        let sink = super::sink::SqsSink::new(self.clone(), cx, client)?;
+        let sink = super::sink::SqsSink::new(self.clone(), client)?;
         Ok((
             crate::sinks::VectorSink::from_event_streamsink(sink),
             healthcheck,
@@ -86,15 +121,15 @@ impl SinkConfig for SqsSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        Input::new(self.encoding.config().input_type() & DataType::Log)
     }
 
     fn sink_type(&self) -> &'static str {
         "aws_sqs"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
@@ -116,6 +151,7 @@ impl SqsSinkConfig {
             self.region.endpoint()?,
             proxy,
             &self.tls,
+            true,
         )
         .await
     }

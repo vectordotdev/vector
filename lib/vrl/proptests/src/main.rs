@@ -79,7 +79,7 @@ prop_compose! {
 
 prop_compose! {
     fn string_literal()(val in "[^\"\\\\\\)\\}]*") -> Literal {
-        Literal::String(val.replace('\\', "\\\\").replace('\"', "\\\""))
+        Literal::RawString(val.replace('\\', "\\\\").replace('\'', "\\\'"))
     }
 }
 
@@ -144,7 +144,8 @@ prop_compose! {
             arguments: params.into_iter().map(|p| node(FunctionArgument {
                 ident: None,
                 expr: node(Expr::Variable(node(p)))
-            })).collect()
+            })).collect(),
+            closure: None,
         }
     }
 }
@@ -262,6 +263,7 @@ fn expr() -> impl Strategy<Value = Expr> {
                                 })
                             })
                             .collect(),
+                        closure: None,
                     }))
                 }
             ),

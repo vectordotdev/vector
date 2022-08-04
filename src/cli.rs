@@ -180,6 +180,7 @@ pub enum SubCommand {
     Generate(generate::Opts),
 
     /// Output a provided Vector configuration file/dir as a single JSON object, useful for checking in to version control.
+    #[clap(hide = true)]
     Config(config::Opts),
 
     /// List available components, then exit.

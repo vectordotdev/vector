@@ -8,7 +8,7 @@ use crate::{
         builder::IntoBuffer,
         channel::{limited, ReceiverAdapter, SenderAdapter},
     },
-    Acker, Bufferable,
+    Bufferable,
 };
 
 pub struct MemoryBuffer {
@@ -29,15 +29,10 @@ where
     async fn into_buffer_parts(
         self: Box<Self>,
         usage_handle: BufferUsageHandle,
-    ) -> Result<(SenderAdapter<T>, ReceiverAdapter<T>, Option<Acker>), Box<dyn Error + Send + Sync>>
-    {
+    ) -> Result<(SenderAdapter<T>, ReceiverAdapter<T>), Box<dyn Error + Send + Sync>> {
         usage_handle.set_buffer_limits(None, Some(self.capacity.get()));
 
         let (tx, rx) = limited(self.capacity.get());
-        Ok((
-            SenderAdapter::channel(tx),
-            ReceiverAdapter::channel(rx),
-            None,
-        ))
+        Ok((tx.into(), rx.into()))
     }
 }

@@ -1,3 +1,4 @@
+use ::value::Value;
 use indexmap::IndexSet;
 use vrl::prelude::*;
 
@@ -25,7 +26,7 @@ impl Function for Unique {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -41,11 +42,6 @@ impl Function for Unique {
             required: true,
         }]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        unique(value)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -59,7 +55,7 @@ impl Expression for UniqueFn {
         unique(value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::array(Collection::any())
     }
 }

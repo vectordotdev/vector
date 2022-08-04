@@ -1,25 +1,31 @@
 use std::{fs::File, io::Read};
 
+use aws_smithy_http::body::SdkBody;
+use bytes::Bytes;
 use chrono::Utc;
 use futures::StreamExt;
+use futures::{future::ready, stream};
 use http::{Request, StatusCode};
-use hyper::Body;
 use serde_json::{json, Value};
 use vector_core::{
     config::log_schema,
-    event::{BatchNotifier, BatchStatus, LogEvent},
+    event::{BatchNotifier, BatchStatus, Event, LogEvent},
 };
 
 use super::{config::DATA_STREAM_TIMESTAMP_KEY, *};
 use crate::{
+    aws::RegionOrEndpoint,
     config::{ProxyConfig, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
         util::{BatchConfig, Compression},
         HealthcheckError,
     },
-    test_util::{random_events_with_stream, random_string, trace_init},
-    tls::{self, TlsOptions},
+    test_util::{
+        components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
+        random_events_with_stream, random_string, trace_init,
+    },
+    tls::{self, TlsConfig},
 };
 
 fn aws_server() -> String {
@@ -41,37 +47,28 @@ impl ElasticsearchCommon {
             .unwrap();
         let mut builder = Request::post(&url);
 
-        if let Some(credentials_provider) = &self.credentials {
-            let mut request = self.signed_request("POST", &url, true);
-
-            if let Some(ce) = self.compression.content_encoding() {
-                request.add_header("Content-Encoding", ce);
-            }
-
-            for (header, value) in &self.request.headers {
-                request.add_header(header, value);
-            }
-
-            builder = finish_signer(&mut request, credentials_provider, builder).await?;
-        } else {
-            if let Some(ce) = self.compression.content_encoding() {
-                builder = builder.header("Content-Encoding", ce);
-            }
-
-            for (header, value) in &self.request.headers {
-                builder = builder.header(&header[..], &value[..]);
-            }
-
-            if let Some(auth) = &self.authorization {
-                builder = auth.apply_builder(builder);
-            }
+        if let Some(ce) = self.request_builder.compression.content_encoding() {
+            builder = builder.header("Content-Encoding", ce);
         }
 
-        let request = builder.body(Body::empty())?;
+        for (header, value) in &self.request.headers {
+            builder = builder.header(&header[..], &value[..]);
+        }
+
+        if let Some(auth) = &self.http_auth {
+            builder = auth.apply_builder(builder);
+        }
+
+        let mut request = builder.body(Bytes::new())?;
+
+        if let Some(credentials_provider) = &self.aws_auth {
+            sign_request(&mut request, credentials_provider, &self.region).await?;
+        }
+
         let proxy = ProxyConfig::default();
         let client = HttpClient::new(self.tls_settings.clone(), &proxy)
             .expect("Could not build client to flush");
-        let response = client.send(request).await?;
+        let response = client.send(request.map(SdkBody::from)).await?;
 
         match response.status() {
             StatusCode::OK => Ok(()),
@@ -104,8 +101,8 @@ async fn create_template_index(common: &ElasticsearchCommon, name: &str) -> crat
     Ok(())
 }
 
-#[test]
-fn ensure_pipeline_in_params() {
+#[tokio::test]
+async fn ensure_pipeline_in_params() {
     let index = gen_index();
     let pipeline = String::from("test-pipeline");
 
@@ -118,7 +115,9 @@ fn ensure_pipeline_in_params() {
         pipeline: Some(pipeline.clone()),
         ..config()
     };
-    let common = ElasticsearchCommon::parse_config(&config).expect("Config error");
+    let common = ElasticsearchCommon::parse_config(&config)
+        .await
+        .expect("Config error");
 
     assert_eq!(common.query_params["pipeline"], pipeline);
 }
@@ -137,7 +136,9 @@ async fn structures_events_correctly() {
         compression: Compression::None,
         ..config()
     };
-    let common = ElasticsearchCommon::parse_config(&config).expect("Config error");
+    let common = ElasticsearchCommon::parse_config(&config)
+        .await
+        .expect("Config error");
     let base_url = common.base_url.clone();
 
     let cx = SinkContext::new_test();
@@ -151,7 +152,12 @@ async fn structures_events_correctly() {
 
     let timestamp = input_event[crate::config::log_schema().timestamp_key()].clone();
 
-    sink.run_events(vec![input_event.into()]).await.unwrap();
+    run_and_assert_sink_compliance(
+        sink,
+        stream::once(ready(Event::from(input_event))),
+        &HTTP_SINK_TAGS,
+    )
+    .await;
 
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
@@ -226,7 +232,7 @@ async fn insert_events_over_https() {
             endpoint: https_server(),
             doc_type: Some("log_lines".into()),
             compression: Compression::None,
-            tls: Some(TlsOptions {
+            tls: Some(TlsConfig {
                 ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
                 ..Default::default()
             }),
@@ -244,8 +250,11 @@ async fn insert_events_on_aws() {
 
     run_insert_tests(
         ElasticsearchConfig {
-            auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {})),
+            auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
+                load_timeout_secs: Some(5),
+            })),
             endpoint: aws_server(),
+            aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
             ..config()
         },
         false,
@@ -260,8 +269,11 @@ async fn insert_events_on_aws_with_compression() {
 
     run_insert_tests(
         ElasticsearchConfig {
-            auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {})),
+            auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
+                load_timeout_secs: Some(5),
+            })),
             endpoint: aws_server(),
+            aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
             compression: Compression::gzip_default(),
             ..config()
         },
@@ -303,7 +315,9 @@ async fn insert_events_in_data_stream() {
         }),
         ..config()
     };
-    let common = ElasticsearchCommon::parse_config(&cfg).expect("Config error");
+    let common = ElasticsearchCommon::parse_config(&cfg)
+        .await
+        .expect("Config error");
 
     create_template_index(&common, &template_index)
         .await
@@ -348,7 +362,9 @@ async fn run_insert_tests_with_config(
     break_events: bool,
     batch_status: BatchStatus,
 ) {
-    let common = ElasticsearchCommon::parse_config(config).expect("Config error");
+    let common = ElasticsearchCommon::parse_config(config)
+        .await
+        .expect("Config error");
     let index = match config.mode {
         // Data stream mode uses an index name generated from the event.
         ElasticsearchMode::DataStream => format!(
@@ -376,19 +392,19 @@ async fn run_insert_tests_with_config(
     if break_events {
         // Break all but the first event to simulate some kind of partial failure
         let mut doit = false;
-        sink.run(events.map(move |mut events| {
+        let events = events.map(move |mut events| {
             if doit {
-                events.for_each_log(|log| {
+                events.iter_logs_mut().for_each(|log| {
                     log.insert("_type", 1);
                 });
             }
             doit = true;
             events
-        }))
-        .await
-        .expect("Sending events failed");
+        });
+
+        run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
     } else {
-        sink.run(events).await.expect("Sending events failed");
+        run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
     }
 
     assert_eq!(receiver.try_recv(), Ok(batch_status));

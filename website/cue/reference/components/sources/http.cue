@@ -19,7 +19,7 @@ components: sources: http: {
 		multiline: enabled: false
 		codecs: {
 			enabled:         true
-			default_framing: "newline_delimited"
+			default_framing: "`newline_delimited` for codecs other than `native`, which defaults to `length_delimited`"
 		}
 		receive: {
 			from: {
@@ -37,7 +37,6 @@ components: sources: http: {
 
 			tls: {
 				enabled:                true
-				can_enable:             true
 				can_verify_certificate: true
 				enabled_default:        false
 			}
@@ -129,6 +128,22 @@ components: sources: http: {
 				examples: ["vector_http_path"]
 			}
 		}
+		method: {
+			common:      false
+			description: "Specifies the action of the HTTP request."
+			required:    false
+			type: string: {
+				default: "POST"
+				enum: {
+					"HEAD":   "HTTP HEAD method."
+					"GET":    "HTTP GET method."
+					"PUT":    "HTTP PUT method."
+					"POST":   "HTTP POST method."
+					"PATCH":  "HTTP PATCH method."
+					"DELETE": "HTTP DELETE method."
+				}
+			}
+		}
 	}
 	output: logs: {
 		text: {
@@ -147,6 +162,13 @@ components: sources: http: {
 					required:    true
 					type: string: {
 						examples: ["/", "/logs/event712"]
+					}
+				}
+				source_type: {
+					description: "The name of the source type."
+					required:    true
+					type: string: {
+						examples: ["http"]
 					}
 				}
 				timestamp: fields._current_timestamp
@@ -198,11 +220,12 @@ components: sources: http: {
 				"""
 			output: [{
 				log: {
-					host:         _values.local_host
-					message:      _line
-					timestamp:    _values.current_timestamp
-					path:         _path
-					"User-Agent": _user_agent
+					host:          _values.local_host
+					message:       _line
+					timestamp:     _values.current_timestamp
+					path:          _path
+					"User-Agent":  _user_agent
+					"source_type": "http"
 				}
 			}]
 		},
@@ -231,11 +254,12 @@ components: sources: http: {
 				"""
 			output: [{
 				log: {
-					host:         _values.local_host
-					key:          "val"
-					timestamp:    _values.current_timestamp
-					_path_key:    _path
-					"User-Agent": _user_agent
+					host:          _values.local_host
+					key:           "val"
+					timestamp:     _values.current_timestamp
+					_path_key:     _path
+					"User-Agent":  _user_agent
+					"source_type": "http"
 				}
 			}]
 		},

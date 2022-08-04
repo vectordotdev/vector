@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 fn match_array(list: Value, pattern: Value, all: Option<Value>) -> Resolved {
@@ -44,7 +45,7 @@ impl Function for MatchArray {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -78,14 +79,6 @@ impl Function for MatchArray {
             },
         ]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let pattern = args.required("pattern");
-        let all = args.optional("all");
-
-        match_array(value, pattern, all)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -108,7 +101,7 @@ impl Expression for MatchArrayFn {
         match_array(list, pattern, all)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::boolean().infallible()
     }
 }
