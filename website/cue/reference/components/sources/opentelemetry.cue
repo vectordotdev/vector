@@ -28,15 +28,13 @@ components: sources: opentelemetry: {
 
 				interface: socket: {
 					direction: "incoming"
-					port:      _port
+					port:      _grpc_port
 					protocols: ["tcp"]
 					ssl: "optional"
 				}
 			}
 			tls: {
-				enabled:                true
-				can_verify_certificate: true
-				enabled_default:        false
+				enabled:                false
 			}
 		}
 	}
@@ -53,13 +51,170 @@ components: sources: opentelemetry: {
 
 	configuration: {
 		acknowledgements: configuration._source_acknowledgements
-		address: {
-			description: """
-				The gRPC address to listen for connections on. It _must_ include a port.
-				"""
+		grpc: {
+			description: "Configuration options for the gRPC server."
 			required: true
-			type: string: {
-				examples: ["0.0.0.0:\(_grpc_port)"]
+			type: object: {
+				options: {
+					address: {
+						description: """
+						The gRPC address to listen for connections on. It _must_ include a port.
+						"""
+						required: true
+						type: string: {
+							examples: ["0.0.0.0:\(_grpc_port)"]
+						}
+					}
+					tls: {
+						common:      false
+						description: "Configures the TLS options for outgoing connections."
+						required:    false
+						type: object: options: {
+							enabled: {
+								common:      true
+								description: "Enable TLS during connections to the remote."
+								required:    false
+								type: bool: default: false
+							}
+
+							ca_file: {
+								common:      false
+								description: "Absolute path to an additional CA certificate file, in DER or PEM format (X.509), or an inline CA certificate in PEM format."
+								required:    false
+								type: string: {
+									default: null
+									examples: ["/path/to/certificate_authority.crt"]
+								}
+							}
+							client_metadata_key: {
+								common:      false
+								description: "The key name added to each event with the client certificate's metadata."
+								required:    false
+								type: string: {
+									default: null
+									examples: ["client_cert"]
+								}
+							}
+							crt_file: {
+								common:      true
+								description: "Absolute path to a certificate file used to identify this connection, in DER or PEM format (X.509) or PKCS#12, or an inline certificate in PEM format. If this is set and is not a PKCS#12 archive, `key_file` must also be set."
+								required:    false
+								type: string: {
+									default: null
+									examples: ["/path/to/host_certificate.crt"]
+								}
+							}
+							key_file: {
+								common:      true
+								description: "Absolute path to a private key file used to identify this connection, in DER or PEM format (PKCS#8), or an inline private key in PEM format. If this is set, `crt_file` must also be set."
+								required:    false
+								type: string: {
+									default: null
+									examples: ["/path/to/host_certificate.key"]
+								}
+							}
+							key_pass: {
+								common:      false
+								description: "Pass phrase used to unlock the encrypted key file. This has no effect unless `key_file` is set."
+								required:    false
+								type: string: {
+									default: null
+									examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
+								}
+							}
+
+							verify_certificate: {
+								common:      false
+								description: "If `true` (the default), Vector will validate the TLS certificate of the remote host. Specifically the issuer is checked but not CRLs (Certificate Revocation Lists)."
+								required:    false
+								type: bool: default: true
+							}
+						}
+					}
+				}
+			}
+		}
+		http: {
+			description: "Configuration options for the HTTP server."
+			required: true
+			type: object: {
+				options: {
+					address: {
+						description: """
+							The HTTP address to listen for connections on. It _must_ include a port.
+							"""
+						required: true
+						type: string: {
+							examples: ["0.0.0.0:\(_http_port)"]
+						}
+					}
+					tls: {
+						common:      false
+						description: "Configures the TLS options for outgoing connections."
+						required:    false
+						type: object: options: {
+							enabled: {
+								common:      true
+								description: "Enable TLS during connections to the remote."
+								required:    false
+								type: bool: default: false
+							}
+
+							ca_file: {
+								common:      false
+								description: "Absolute path to an additional CA certificate file, in DER or PEM format (X.509), or an inline CA certificate in PEM format."
+								required:    false
+								type: string: {
+									default: null
+									examples: ["/path/to/certificate_authority.crt"]
+								}
+							}
+							client_metadata_key: {
+								common:      false
+								description: "The key name added to each event with the client certificate's metadata."
+								required:    false
+								type: string: {
+									default: null
+									examples: ["client_cert"]
+								}
+							}
+							crt_file: {
+								common:      true
+								description: "Absolute path to a certificate file used to identify this connection, in DER or PEM format (X.509) or PKCS#12, or an inline certificate in PEM format. If this is set and is not a PKCS#12 archive, `key_file` must also be set."
+								required:    false
+								type: string: {
+									default: null
+									examples: ["/path/to/host_certificate.crt"]
+								}
+							}
+							key_file: {
+								common:      true
+								description: "Absolute path to a private key file used to identify this connection, in DER or PEM format (PKCS#8), or an inline private key in PEM format. If this is set, `crt_file` must also be set."
+								required:    false
+								type: string: {
+									default: null
+									examples: ["/path/to/host_certificate.key"]
+								}
+							}
+							key_pass: {
+								common:      false
+								description: "Pass phrase used to unlock the encrypted key file. This has no effect unless `key_file` is set."
+								required:    false
+								type: string: {
+									default: null
+									examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
+								}
+							}
+
+							verify_certificate: {
+								common:      false
+								description: "If `true` (the default), Vector will validate the TLS certificate of the remote host. Specifically the issuer is checked but not CRLs (Certificate Revocation Lists)."
+								required:    false
+								type: bool: default: true
+							}
+						}
+					}
+				}
 			}
 		}
 	}
@@ -181,5 +336,15 @@ components: sources: opentelemetry: {
 		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
 		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
 		protobuf_decode_errors_total:         components.sources.internal_metrics.output.metrics.protobuf_decode_errors_total
+	}
+
+	how_it_works: {
+		tls: {
+			title: "Transport Layer Security (TLS)"
+			body:  """
+				  Vector uses [OpenSSL](\(urls.openssl)) for TLS protocols. You can
+				  adjust TLS behavior via the `grpc.tls.*` and `http.tls.*` options.
+				  """
+		}
 	}
 }
