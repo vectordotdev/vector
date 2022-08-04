@@ -142,15 +142,15 @@ impl InternalEvent for ExecCommandExecuted<'_> {
     }
 }
 
-pub enum ExecFailedToSignalChildError {
+pub enum ExecFailedToSignalChild {
     SignalError(nix::errno::Errno),
     FailedToMarshalPid(std::num::TryFromIntError),
     NoPid,
 }
 
-impl ExecFailedToSignalChildError {
+impl ExecFailedToSignalChild {
     fn to_error_code(&self) -> String {
-        use ExecFailedToSignalChildError::*;
+        use ExecFailedToSignalChild::*;
 
         match self {
             SignalError(err) => format!("errno_{}", err),
@@ -160,9 +160,9 @@ impl ExecFailedToSignalChildError {
     }
 }
 
-impl std::fmt::Display for ExecFailedToSignalChildError {
+impl std::fmt::Display for ExecFailedToSignalChild {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        use ExecFailedToSignalChildError::*;
+        use ExecFailedToSignalChild::*;
 
         match self {
             SignalError(err) => write!(f, "errno: {}", err),
@@ -172,12 +172,12 @@ impl std::fmt::Display for ExecFailedToSignalChildError {
     }
 }
 
-pub struct ExecFailedToSignalChild<'a> {
+pub struct ExecFailedToSignalChildError<'a> {
     pub command: &'a tokio::process::Command,
-    pub error: ExecFailedToSignalChildError,
+    pub error: ExecFailedToSignalChild,
 }
 
-impl InternalEvent for ExecFailedToSignalChild<'_> {
+impl InternalEvent for ExecFailedToSignalChildError<'_> {
     fn emit(self) {
         error!(
             message = %format!("Failed to send SIGTERM to child, aborting early: {}", self.error),

@@ -401,7 +401,6 @@ async fn run_command(
         })?;
 
         // Create stderr async reader
-        //let stderr = stderr.allow_read_until(shutdown.clone().map(|_| ()));
         let stderr_reader = BufReader::new(stderr);
 
         spawn_reader_thread(stderr_reader, decoder.clone(), STDERR, sender.clone());
@@ -413,7 +412,6 @@ async fn run_command(
         .ok_or_else(|| Error::new(ErrorKind::Other, "Unable to take stdout of spawned process"))?;
 
     // Create stdout async reader
-    //let stdout = stdout.allow_read_until(shutdown.clone().map(|_| ()));
     let stdout_reader = BufReader::new(stdout);
 
     let pid = child.id();
@@ -427,16 +425,16 @@ async fn run_command(
                     Some(Ok(pid)) => {
                         // shutting down, send a SIGTERM to the child
                         if let Err(error) = signal::kill(Pid::from_raw(pid), Signal::SIGTERM) {
-                            emit!(ExecFailedToSignalChild{command: &command, error: ExecFailedToSignalChildError::SignalError(error)});
+                            emit!(ExecFailedToSignalChildError{command: &command, error: ExecFailedToSignalChild::SignalError(error)});
                             break 'outer; // couldn't signal, exit early
                         }
                     },
                     Some(Err(err)) => {
-                        emit!(ExecFailedToSignalChild{command: &command, error: ExecFailedToSignalChildError::FailedToMarshalPid(err)});
+                        emit!(ExecFailedToSignalChildError{command: &command, error: ExecFailedToSignalChild::FailedToMarshalPid(err)});
                         break 'outer; // couldn't signal, exit early
                     }
                     None => {
-                        emit!(ExecFailedToSignalChild{command: &command, error: ExecFailedToSignalChildError::NoPid});
+                        emit!(ExecFailedToSignalChildError{command: &command, error: ExecFailedToSignalChild::NoPid});
                         break 'outer; // couldn't signal, exit early
                     },
                 }
