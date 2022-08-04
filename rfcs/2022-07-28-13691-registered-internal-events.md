@@ -34,6 +34,17 @@ solving that problem that can then be applied incrementally to the most expensiv
 
 ## Proposal
 
+One of the largest, if not _the_ largest, performance cost of emitting internal metrics is creating
+the metric identifier from scratch each time, and then looking it up in the global registry of
+metrics in order to then adjust its value. This identifier, or key, consists of both the metric
+name, which is a simple constant string, along with a set of labels, which will vary for each
+emitting task. The two steps of this process thus involves numerous memory allocations, memory
+copies, hashing, and at least one mutex locked operation.
+
+This proposal provides a mechanism for registering a metric handle such that this computation can be
+done once at task setup time, leaving only the relatively simple task of adjusting the metric to
+happen in the hot path.
+
 ### User Experience
 
 As an internal event mechanism, this should have no user impact besides making Vector more efficient
