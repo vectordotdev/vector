@@ -34,7 +34,7 @@ components: sources: opentelemetry: {
 				}
 			}
 			tls: {
-				enabled:                false
+				enabled: false
 			}
 		}
 	}
@@ -53,7 +53,7 @@ components: sources: opentelemetry: {
 		acknowledgements: configuration._source_acknowledgements
 		grpc: {
 			description: "Configuration options for the gRPC server."
-			required: true
+			required:    true
 			type: object: {
 				examples: [{address: "0.0.0.0:\(_grpc_port)"}]
 				options: {
@@ -128,7 +128,7 @@ components: sources: opentelemetry: {
 		}
 		http: {
 			description: "Configuration options for the HTTP server."
-			required: true
+			required:    true
 			type: object: {
 				examples: [{address: "0.0.0.0:\(_http_port)"}]
 				options: {
