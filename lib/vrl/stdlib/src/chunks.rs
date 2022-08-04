@@ -3,45 +3,49 @@ use vrl::prelude::*;
 
 const MAX_UTF8_CODE_POINT_LENGTH_IN_BYTES: usize = 4;
 
-fn chunks(value: Value, chunk_size: Value) -> Resolved {
+fn chunks(value: Value, chunk_size: Value, utf8: Value) -> Resolved {
     let chunk_size = chunk_size.try_integer()? as usize;
     let bytes = value.try_bytes()?;
+    let utf8 = utf8.try_boolean()?;
 
-    let data_length = bytes.len();
-    let mut chunked_data: Vec<&[u8]> = Vec::new();
+    if utf8 {
+        let mut chunked_data: Vec<&[u8]> = Vec::new();
+        let data_length = bytes.len();
 
-    let mut backtrack = 0;
-    let mut start = 0;
-    let mut end;
+        let mut backtrack = 0;
+        let mut start = 0;
+        let mut end;
 
-    if chunk_size < MAX_UTF8_CODE_POINT_LENGTH_IN_BYTES {
-        return Err(r#""chunk_size" must be greater than or equal to 4 bytes"#.into());
-    }
-
-    loop {
-        let is_last_chunk = (start < data_length) && (start + chunk_size >= data_length);
-
-        if is_last_chunk {
-            chunked_data.push(&bytes[start..]);
-            break;
+        if chunk_size < MAX_UTF8_CODE_POINT_LENGTH_IN_BYTES {
+            return Err(r#""chunk_size" must be greater than or equal to 4 bytes"#.into());
         }
 
-        end = start + chunk_size - backtrack;
+        loop {
+            let is_last_chunk = (start < data_length) && (start + chunk_size >= data_length);
 
-        if is_root_utf8_byte(&bytes[end]) {
-            chunked_data.push(&bytes[start..end]);
-            backtrack = 0;
-            start = end;
-        } else {
-            backtrack += 1;
+            if is_last_chunk {
+                chunked_data.push(&bytes[start..]);
+                break;
+            }
 
-            if backtrack >= MAX_UTF8_CODE_POINT_LENGTH_IN_BYTES {
-                return Err("Bytes are not valid UTF-8".into());
+            end = start + chunk_size - backtrack;
+
+            if is_root_utf8_byte(&bytes[end]) {
+                chunked_data.push(&bytes[start..end]);
+                backtrack = 0;
+                start = end;
+            } else {
+                backtrack += 1;
+
+                if backtrack >= MAX_UTF8_CODE_POINT_LENGTH_IN_BYTES {
+                    return Err("Bytes are not valid UTF-8".into());
+                }
             }
         }
+        Ok(chunked_data.into_iter().collect::<Vec<_>>().into())
+    } else {
+        Ok(bytes.chunks(chunk_size).collect::<Vec<_>>().into())
     }
-
-    Ok(chunked_data.into_iter().collect::<Vec<_>>().into())
 }
 
 fn is_root_utf8_byte(byte: &u8) -> bool {
@@ -68,27 +72,42 @@ impl Function for Chunks {
                 kind: kind::INTEGER,
                 required: true,
             },
+            Parameter {
+                keyword: "utf8",
+                kind: kind::BOOLEAN,
+                required: true,
+            },
         ]
     }
 
     fn examples(&self) -> &'static [Example] {
         &[
             Example {
-                title: "chunks by byte",
-                source: r#"chunks("abcdefgh", 4)"#,
+                title: "chunks by byte when utf8=true",
+                source: r#"chunks("abcdefgh", 4, true)"#,
                 result: Ok(r#"["abcd", "efgh"]"#),
             },
             Example {
-                title: "chunk sizes respect unicode code point boundaries",
-                source: r#"chunks("ab你好", 4)"#,
+                title: "chunk sizes respect unicode code point boundaries when utf8=true",
+                source: r#"chunks("ab你好", 4, true)"#,
                 result: Ok(r#"["ab", "你", "好"]"#),
             },
             Example {
-                title: "chunk size cannot be less than 4 bytes in length",
-                source: r#"chunks("hello world", 3)"#,
+                title: "chunk size cannot be less than 4 bytes in length when utf8=true",
+                source: r#"chunks("hello world", 3, true)"#,
                 result: Err(
-                    r#"function call error for "chunks" at (0:24): "chunk_size" must be greater than or equal to 4 bytes"#,
+                    r#"function call error for "chunks" at (0:30): "chunk_size" must be greater than or equal to 4 bytes"#,
                 ),
+            },
+            Example {
+                title: "chunk size can be less than 4 bytes in length when utf8=false",
+                source: r#"chunks("hello world", 3, false)"#,
+                result: Ok(r#"["hel","lo ","wor","ld"]"#),
+            },
+            Example {
+                title: "chunk sizes do not respect unicode code point boundaries when utf8=false",
+                source: r#"chunks("ab你好", 4, false)"#,
+                result: Ok(r#"["ab�","�好"]"#),
             },
         ]
     }
@@ -101,8 +120,13 @@ impl Function for Chunks {
     ) -> Compiled {
         let value = arguments.required("value");
         let chunk_size = arguments.required("chunk_size");
+        let utf8 = arguments.required("utf8");
 
-        Ok(Box::new(ChunksFn { value, chunk_size }))
+        Ok(Box::new(ChunksFn {
+            value,
+            chunk_size,
+            utf8,
+        }))
     }
 }
 
@@ -110,14 +134,16 @@ impl Function for Chunks {
 struct ChunksFn {
     value: Box<dyn Expression>,
     chunk_size: Box<dyn Expression>,
+    utf8: Box<dyn Expression>,
 }
 
 impl Expression for ChunksFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let chunk_size = self.chunk_size.resolve(ctx)?;
+        let utf8 = self.utf8.resolve(ctx)?;
 
-        chunks(value, chunk_size)
+        chunks(value, chunk_size, utf8)
     }
 
     fn type_def(&self, _state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
@@ -132,33 +158,46 @@ mod tests {
     test_function![
         chunks => Chunks;
 
-        unicode {
-            args: func_args![value: "你好",
-                             chunk_size: 4
+        chunks_data {
+            args: func_args![value: "abcdefgh",
+                             chunk_size: 4,
+                             utf8: true,
             ],
-            want: Ok(value!(["你", "好"])),
+            want: Ok(value!(["abcd", "efgh"])),
             tdef: TypeDef::array(Collection::from_unknown(Kind::bytes())),
         }
 
         minimum_chunk_size {
             args: func_args![value: "",
-            chunk_size: 2
+                             chunk_size: 2,
+                             utf8: true,
             ],
             want: Err(r#""chunk_size" must be greater than or equal to 4 bytes"#),
             tdef: TypeDef::array(Collection::from_unknown(Kind::bytes())),
         }
 
-        mixed_ascii_unicode {
+        mixed_ascii_unicode_with_utf8_true {
             args: func_args![value: "ab你好",
-                             chunk_size: 4
+                             chunk_size: 4,
+                             utf8: true
             ],
             want: Ok(value!(["ab", "你", "好"])),
             tdef: TypeDef::array(Collection::from_unknown(Kind::bytes())),
         }
 
+        mixed_ascii_unicode_with_utf8_false {
+            args: func_args![value: "ab你好",
+                             chunk_size: 4,
+                             utf8: false
+            ],
+            want: Ok(value!([b"ab\xe4\xbd", b"\xa0\xe5\xa5\xbd"])),
+            tdef: TypeDef::array(Collection::from_unknown(Kind::bytes())),
+        }
+
         invalid_utf8 {
             args: func_args![value: b"\xa0\xa1\xa2\xa3\xa4\xa5\xa6\xa7\xa8\xa9\xaa\xab\xac\xad\xae\xaf\xb0",
-                             chunk_size: 8
+                             chunk_size: 8,
+                             utf8: true
             ],
             want: Err("Bytes are not valid UTF-8"),
             tdef: TypeDef::array(Collection::from_unknown(Kind::bytes())),
