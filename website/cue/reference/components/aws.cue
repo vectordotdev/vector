@@ -42,7 +42,7 @@ components: _aws: {
 					region: {
 						category:    "Auth",
 						common: 	 false
-						description: "The [AWS region](\(urls.aws_regions)) to call STS against"
+						description: "The [AWS region](\(urls.aws_regions)) to send STS requests to. If not set, this will default to the configured region for the service itself."
 						required: 	 false
 						type: string: {
 							default: null
