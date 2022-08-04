@@ -199,7 +199,7 @@ mod tests {
             AwsAuthentication::Role {
                 assume_role,
                 load_timeout_secs,
-                region
+                region,
             } => {
                 assert_eq!(&assume_role, "auth.root");
                 assert_eq!(load_timeout_secs, Some(10));
