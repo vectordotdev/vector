@@ -117,6 +117,8 @@ default = [
     "is_empty",
     "is_float",
     "is_integer",
+    "is_ipv4",
+    "is_ipv6",
     "is_json",
     "is_null",
     "is_nullish",
@@ -254,6 +256,8 @@ is_boolean = []
 is_empty = []
 is_float = []
 is_integer = []
+is_ipv4 = []
+is_ipv6 = []
 is_json = ["dep:serde", "dep:serde_json", "value/json"]
 is_null = []
 is_nullish = []
