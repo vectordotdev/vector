@@ -44,7 +44,10 @@ pub enum AwsAuthentication {
         /// Timeout for assuming the role, in seconds.
         load_timeout_secs: Option<u64>,
 
-        /// Region to send STS requests through
+        /// The AWS region to send STS requests to.
+        ///
+        /// If not set, this will default to the configured region
+        /// for the service itself.
         region: Option<String>,
     },
 
