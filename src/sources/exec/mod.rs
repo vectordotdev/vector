@@ -11,8 +11,6 @@ use codecs::{
     StreamDecodingError,
 };
 use futures::StreamExt;
-use nix::sys::signal::{self, Signal};
-use nix::unistd::Pid;
 use smallvec::SmallVec;
 use snafu::Snafu;
 use tokio::{
@@ -421,22 +419,8 @@ async fn run_command(
     'outer: loop {
         tokio::select! {
             _ = &mut shutdown => {
-                match pid.map(|pid| i32::try_from(pid)) {
-                    Some(Ok(pid)) => {
-                        // shutting down, send a SIGTERM to the child
-                        if let Err(error) = signal::kill(Pid::from_raw(pid), Signal::SIGTERM) {
-                            emit!(ExecFailedToSignalChildError{command: &command, error: ExecFailedToSignalChild::SignalError(error)});
-                            break 'outer; // couldn't signal, exit early
-                        }
-                    },
-                    Some(Err(err)) => {
-                        emit!(ExecFailedToSignalChildError{command: &command, error: ExecFailedToSignalChild::FailedToMarshalPid(err)});
+                if !shutdown_child(pid, &child, &command) {
                         break 'outer; // couldn't signal, exit early
-                    }
-                    None => {
-                        emit!(ExecFailedToSignalChildError{command: &command, error: ExecFailedToSignalChild::NoPid});
-                        break 'outer; // couldn't signal, exit early
-                    },
                 }
             }
             v = receiver.recv() => {
@@ -498,6 +482,63 @@ fn handle_exit_status(config: &ExecConfig, exit_status: Option<i32>, exec_durati
         exit_status,
         exec_duration,
     });
+}
+
+#[cfg(unix)]
+fn shutdown_child(
+    pid: Option<u32>,
+    _child: &tokio::process::Child,
+    command: &tokio::process::Command,
+) -> bool {
+    match pid.map(|pid| i32::try_from(pid)) {
+        Some(Ok(pid)) => {
+            // shutting down, send a SIGTERM to the child
+            if let Err(error) = nix::sys::signal::kill(
+                nix::unistd::Pid::from_raw(pid),
+                nix::sys::signal::Signal::SIGTERM,
+            ) {
+                emit!(ExecFailedToSignalChildError {
+                    command: &command,
+                    error: ExecFailedToSignalChild::SignalError(error)
+                });
+                false
+            } else {
+                true
+            }
+        }
+        Some(Err(err)) => {
+            emit!(ExecFailedToSignalChildError {
+                command: &command,
+                error: ExecFailedToSignalChild::FailedToMarshalPid(err)
+            });
+            false
+        }
+        None => {
+            emit!(ExecFailedToSignalChildError {
+                command: &command,
+                error: ExecFailedToSignalChild::NoPid
+            });
+            false
+        }
+    }
+}
+
+#[cfg(windows)]
+fn shutdown_child(
+    _pid: Option<u32>,
+    child: &tokio::process::Child,
+    command: &tokio::process::Command,
+) -> bool {
+    match child.kill() {
+        Ok(()) => true,
+        Err(err) => {
+            emit!(ExecFailedToSignalChildError {
+                command: &command,
+                error: ExecFailedToSignalChild::IoError(err)
+            });
+            false
+        }
+    }
 }
 
 fn build_command(config: &ExecConfig) -> Command {

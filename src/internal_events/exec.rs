@@ -143,9 +143,14 @@ impl InternalEvent for ExecCommandExecuted<'_> {
 }
 
 pub enum ExecFailedToSignalChild {
+    #[cfg(unix)]
     SignalError(nix::errno::Errno),
+    #[cfg(unix)]
     FailedToMarshalPid(std::num::TryFromIntError),
+    #[cfg(unix)]
     NoPid,
+    #[cfg(windows)]
+    IoError(std::io::Error),
 }
 
 impl ExecFailedToSignalChild {
@@ -153,9 +158,14 @@ impl ExecFailedToSignalChild {
         use ExecFailedToSignalChild::*;
 
         match self {
+            #[cfg(unix)]
             SignalError(err) => format!("errno_{}", err),
+            #[cfg(unix)]
             FailedToMarshalPid(_) => String::from("failed_to_marshal_pid"),
+            #[cfg(unix)]
             NoPid => String::from("no_pid"),
+            #[cfg(windows)]
+            IoError(err) => err.to_string(),
         }
     }
 }
@@ -165,9 +175,14 @@ impl std::fmt::Display for ExecFailedToSignalChild {
         use ExecFailedToSignalChild::*;
 
         match self {
+            #[cfg(unix)]
             SignalError(err) => write!(f, "errno: {}", err),
+            #[cfg(unix)]
             FailedToMarshalPid(err) => write!(f, "failed to marshal pid to i32: {}", err),
+            #[cfg(unix)]
             NoPid => write!(f, "child had no pid"),
+            #[cfg(windows)]
+            IoError(err) => write!(f, "io error: {}"),
         }
     }
 }
