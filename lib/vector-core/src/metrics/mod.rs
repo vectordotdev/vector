@@ -172,7 +172,7 @@ impl Controller {
             }
         }
 
-        let cardinality = MetricValue::Counter {
+        let cardinality = MetricValue::Gauge {
             value: (metrics.len() + 1) as f64,
         };
         metrics.push(Metric::from_metric_kv(
