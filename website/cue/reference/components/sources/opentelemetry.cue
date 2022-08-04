@@ -87,15 +87,6 @@ components: sources: opentelemetry: {
 									examples: ["/path/to/certificate_authority.crt"]
 								}
 							}
-							client_metadata_key: {
-								common:      false
-								description: "The key name added to each event with the client certificate's metadata."
-								required:    false
-								type: string: {
-									default: null
-									examples: ["client_cert"]
-								}
-							}
 							crt_file: {
 								common:      true
 								description: "Absolute path to a certificate file used to identify this connection, in DER or PEM format (X.509) or PKCS#12, or an inline certificate in PEM format. If this is set and is not a PKCS#12 archive, `key_file` must also be set."
@@ -169,15 +160,6 @@ components: sources: opentelemetry: {
 								type: string: {
 									default: null
 									examples: ["/path/to/certificate_authority.crt"]
-								}
-							}
-							client_metadata_key: {
-								common:      false
-								description: "The key name added to each event with the client certificate's metadata."
-								required:    false
-								type: string: {
-									default: null
-									examples: ["client_cert"]
 								}
 							}
 							crt_file: {
