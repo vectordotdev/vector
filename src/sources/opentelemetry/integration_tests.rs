@@ -9,7 +9,7 @@ use crate::{
     event::{into_event_stream, Event, EventStatus},
     test_util::{
         collect_n,
-        components::{assert_source_compliance, HTTP_PUSH_SOURCE_TAGS},
+        components::{assert_source_compliance, SOURCE_TAGS},
         retry_until, wait_for_tcp,
     },
     SourceSender,
@@ -35,7 +35,7 @@ fn source_http_address() -> String {
 
 #[tokio::test]
 async fn receive_logs() {
-    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+    assert_source_compliance(&SOURCE_TAGS, async {
         wait_ready(otel_health_url()).await;
 
         let config = OpentelemetryConfig {
