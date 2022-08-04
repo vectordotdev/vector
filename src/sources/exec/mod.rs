@@ -647,7 +647,7 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
 mod tests {
     use std::io::Cursor;
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(unix)]
     use futures::task::Poll;
 
     use super::*;
@@ -769,7 +769,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(unix)]
     async fn test_run_command_linux() {
         let config = standard_scheduled_test_config();
         let hostname = Some("Some.Machine".to_string());
@@ -808,7 +808,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(unix)]
     async fn test_graceful_shutdown() {
         trace_init();
         let mut config = standard_streaming_test_config();
