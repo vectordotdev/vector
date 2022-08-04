@@ -55,6 +55,7 @@ components: sources: opentelemetry: {
 			description: "Configuration options for the gRPC server."
 			required: true
 			type: object: {
+				examples: [{address: "0.0.0.0:\(_grpc_port)"}]
 				options: {
 					address: {
 						description: """
@@ -138,6 +139,7 @@ components: sources: opentelemetry: {
 			description: "Configuration options for the HTTP server."
 			required: true
 			type: object: {
+				examples: [{address: "0.0.0.0:\(_http_port)"}]
 				options: {
 					address: {
 						description: """
