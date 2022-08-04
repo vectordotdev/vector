@@ -57,7 +57,7 @@ services:
       - "--features"
       - "http-scrape-integration-tests"
       - "--lib"
-      - "sources::http_scrape::scrape::"
+      - "sources::http_scrape::"
     depends_on:
       - dufs
       - dufs-auth
