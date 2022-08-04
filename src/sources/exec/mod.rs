@@ -529,6 +529,7 @@ fn shutdown_child(
     child: &tokio::process::Child,
     command: &tokio::process::Command,
 ) -> bool {
+    // TODO Graceful shutdown of Windows processes
     match child.kill() {
         Ok(()) => true,
         Err(err) => {
