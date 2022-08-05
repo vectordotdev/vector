@@ -22,30 +22,30 @@ use super::{
 #[serde(deny_unknown_fields)]
 pub struct ConfigBuilder {
     #[serde(flatten)]
-    pub(super) global: GlobalOptions,
+    pub global: GlobalOptions,
     #[cfg(feature = "api")]
     #[serde(default)]
-    pub(super) api: api::Options,
+    pub api: api::Options,
     #[serde(default)]
-    pub(super) schema: schema::Options,
+    pub schema: schema::Options,
     #[cfg(feature = "enterprise")]
     #[serde(default)]
-    pub(super) enterprise: Option<enterprise::Options>,
+    pub enterprise: Option<enterprise::Options>,
     #[serde(default)]
-    pub(super) healthchecks: HealthcheckOptions,
+    pub healthchecks: HealthcheckOptions,
     #[serde(default)]
-    pub(super) enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter>,
+    pub enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter>,
     #[serde(default)]
-    pub(super) sources: IndexMap<ComponentKey, SourceOuter>,
+    pub sources: IndexMap<ComponentKey, SourceOuter>,
     #[serde(default)]
-    pub(super) sinks: IndexMap<ComponentKey, SinkOuter<String>>,
+    pub sinks: IndexMap<ComponentKey, SinkOuter<String>>,
     #[serde(default)]
-    pub(super) transforms: IndexMap<ComponentKey, TransformOuter<String>>,
+    pub transforms: IndexMap<ComponentKey, TransformOuter<String>>,
     #[serde(default)]
-    pub(super) tests: Vec<TestDefinition<String>>,
-    pub(super) provider: Option<Box<dyn provider::ProviderConfig>>,
+    pub tests: Vec<TestDefinition<String>>,
+    pub provider: Option<Box<dyn provider::ProviderConfig>>,
     #[serde(default)]
-    pub(super) secret: IndexMap<ComponentKey, Box<dyn SecretBackend>>,
+    pub secret: IndexMap<ComponentKey, Box<dyn SecretBackend>>,
 }
 
 #[cfg(feature = "enterprise")]
