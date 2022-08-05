@@ -11,10 +11,7 @@ use vector_core::event::Event;
 
 use super::HttpScrapeConfig;
 use crate::test_util::{
-    components::{
-        run_and_assert_source_compliance, run_and_assert_source_error, HTTP_PULL_SOURCE_TAGS,
-        SOURCE_ERROR_TAGS,
-    },
+    components::{run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS},
     next_addr, test_generate_config,
 };
 
@@ -29,16 +26,6 @@ pub(crate) async fn run_compliance(config: HttpScrapeConfig) -> Vec<Event> {
     assert!(!events.is_empty());
 
     events
-}
-
-/// The error path should not yield any events and must emit the required error internal events.
-/// Consider extracting this function into test_util , if it is always true that if the error
-/// internal event metric is fired that no events would be outputed by the source.
-pub(crate) async fn run_error(config: HttpScrapeConfig) {
-    let events =
-        run_and_assert_source_error(config, Duration::from_secs(1), &SOURCE_ERROR_TAGS).await;
-
-    assert!(events.is_empty());
 }
 
 #[test]

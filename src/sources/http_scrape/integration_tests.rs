@@ -18,9 +18,11 @@ use codecs::decoding::DeserializerConfig;
 use vector_core::config::log_schema;
 
 use super::{
-    tests::{run_compliance, run_error, INTERVAL_SECS},
+    tests::{run_compliance, INTERVAL_SECS},
     HttpScrapeConfig,
 };
+
+use crate::test_util::components::{run_and_assert_source_error, SOURCE_ERROR_TAGS};
 
 fn dufs_address() -> String {
     std::env::var("DUFS_ADDRESS").unwrap_or_else(|_| "http://localhost:5000".into())
@@ -32,6 +34,16 @@ fn dufs_auth_address() -> String {
 
 fn dufs_https_address() -> String {
     std::env::var("DUFS_HTTPS_ADDRESS").unwrap_or_else(|_| "https://localhost:5000".into())
+}
+
+/// The error path should not yield any events and must emit the required error internal events.
+/// Consider extracting this function into test_util , if it is always true that if the error
+/// internal event metric is fired that no events would be outputed by the source.
+pub(crate) async fn run_error(config: HttpScrapeConfig) {
+    let events =
+        run_and_assert_source_error(config, Duration::from_secs(1), &SOURCE_ERROR_TAGS).await;
+
+    assert!(events.is_empty());
 }
 
 /// An endpoint in the config that is not reachable should generate errors.
