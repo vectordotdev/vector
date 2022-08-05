@@ -627,7 +627,10 @@ pub(crate) fn report_configuration(
 
         // Get the machine hostname to avoid reporting the same configuration several time
         // for a given instance of vector.
-        let hostname = crate::get_hostname().expect("Couldn't read the current hostname.");
+        // If running on kubernetes, we take the pod name instead.
+        let hostname = env::var("VECTOR_SELF_POD_NAME").unwrap_or_else(|_| {
+            crate::get_hostname().expect("Couldn't read the current hostname.")
+        });
 
         // Get the Vector version. This is reported to Pipelines along with a config hash.
         let vector_version = crate::get_version();
