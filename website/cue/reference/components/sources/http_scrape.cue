@@ -81,7 +81,7 @@ components: sources: http_scrape: {
 				"""
 			required: false
 			type: object: {
-				examples: [{"match[]": [#"{job="somejob"}"#, #"{__name__=~"job:.*"}"#]}]
+				examples: [{"key1": ["value1", "value2"]}]
 				options: {
 					"*": {
 						common:      false
@@ -90,13 +90,11 @@ components: sources: http_scrape: {
 						type: array: {
 							default: null
 							examples: [[
-								#"{job="somejob"}"#,
-								#"{__name__=~"job:.*"}"#,
+								"value1", "value2",
 							]]
 							items: type: string: {
 								examples: [
-									#"{job="somejob"}"#,
-									#"{__name__=~"job:.*"}"#,
+									"key1", "key2",
 								]
 								syntax: "literal"
 							}
