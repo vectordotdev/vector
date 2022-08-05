@@ -1200,6 +1200,7 @@ dependencies = [
  "base64",
  "bollard-stubs",
  "bytes 1.2.1",
+ "chrono",
  "dirs-next",
  "futures-core",
  "futures-util",
@@ -1232,6 +1233,7 @@ version = "1.42.0-rc.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed59b5c00048f48d7af971b71f800fdf23e858844a6f9e4d32ca72e9399e7864"
 dependencies = [
+ "chrono",
  "serde",
  "serde_with 1.14.0",
 ]
