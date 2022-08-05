@@ -384,10 +384,9 @@ mod tests {
     use serde_json::Value as JsonValue;
     use tokio::time::timeout;
     use tokio_tungstenite::{
-        accept_async,
-        accept_hdr_async,
-        tungstenite::handshake::server::{Request, Response},
+        accept_async, accept_hdr_async,
         tungstenite::error::{Error as WsError, ProtocolError},
+        tungstenite::handshake::server::{Request, Response},
     };
 
     use super::*;
@@ -561,18 +560,27 @@ mod tests {
                                     let hdr = req.headers().get("Authorization");
                                     if let Some(h) = hdr {
                                         match a {
-                                            Auth::Bearer{token} => {
-                                                if format!("Bearer {}", token) != h.to_str().unwrap() {
-                                                    return Err(http::Response::<Option<String>>::new(None));
+                                            Auth::Bearer { token } => {
+                                                if format!("Bearer {}", token)
+                                                    != h.to_str().unwrap()
+                                                {
+                                                    return Err(
+                                                        http::Response::<Option<String>>::new(None),
+                                                    );
                                                 }
-                                            },
-                                            Auth::Basic{user: _user, password: _password} => {/* Not needed for tests at the moment */},
+                                            }
+                                            Auth::Basic {
+                                                user: _user,
+                                                password: _password,
+                                            } => { /* Not needed for tests at the moment */ }
                                         }
                                     }
                                     Ok(res)
                                 };
-                                accept_hdr_async(maybe_tls_stream, auth_callback).await.unwrap()
-                            },
+                                accept_hdr_async(maybe_tls_stream, auth_callback)
+                                    .await
+                                    .unwrap()
+                            }
                             None => accept_async(maybe_tls_stream).await.unwrap(),
                         };
 
@@ -582,7 +590,7 @@ mod tests {
                                     future::ready(match msg {
                                         Ok(msg) if msg.is_text() => {
                                             Some(Ok(msg.into_text().unwrap()))
-                                        },
+                                        }
                                         Err(WsError::Protocol(
                                             ProtocolError::ResetWithoutClosingHandshake,
                                         )) => None,
