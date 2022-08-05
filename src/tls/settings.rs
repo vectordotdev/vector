@@ -26,13 +26,7 @@ const PEM_START_MARKER: &str = "-----BEGIN ";
 
 #[cfg(test)]
 pub const TEST_PEM_CA_PATH: &str = "tests/data/ca/certs/ca.cert.pem";
-#[cfg(all(
-    test,
-    any(
-        feature = "kafka-integration-tests",
-        feature = "http-scrape-integration-tests"
-    )
-))]
+#[cfg(all(test, feature = "kafka-integration-tests"))]
 pub const TEST_PEM_INTERMEDIATE_CA_PATH: &str =
     "tests/data/ca/intermediate_server/certs/ca-chain.cert.pem";
 #[cfg(test)]

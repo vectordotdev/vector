@@ -1,6 +1,6 @@
 ---
 title: HTTP
-description: Collect observability data emitted by an [HTTP](https://en.wikipedia.org/wiki/Hypertext_Transfer_Protocol#Client_request) server
+description: Pull observability data emitted by an [HTTP](https://en.wikipedia.org/wiki/Hypertext_Transfer_Protocol#Client_request) server at a configured interval.
 kind: source
 layout: component
 tags: ["http", "scrape", "component", "source", "logs", "metrics", traces"]

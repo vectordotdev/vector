@@ -167,7 +167,7 @@ pub(crate) async fn http_scrape<H: HttpScraper + std::marker::Send + Clone>(
                                 emit!(HttpScrapeEventsReceived {
                                     byte_size: events.size_of(),
                                     count: events.len(),
-                                    uri: url.clone()
+                                    url: url.to_string()
                                 });
                                 Some(stream::iter(events))
                             }
@@ -178,14 +178,14 @@ pub(crate) async fn http_scrape<H: HttpScraper + std::marker::Send + Clone>(
                         context.on_http_response_error(&url, &header);
                         emit!(HttpScrapeHttpResponseError {
                             code: header.status,
-                            url: url.clone(),
+                            url: url.to_string(),
                         });
                         None
                     }
                     Err(error) => {
                         emit!(HttpScrapeHttpError {
                             error,
-                            url: url.clone(),
+                            url: url.to_string()
                         });
                         None
                     }

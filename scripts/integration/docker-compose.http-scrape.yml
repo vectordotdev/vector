@@ -10,7 +10,7 @@ services:
     command:
       - "/data"
     volumes:
-      - ${PWD}/tests/data/http-scrape/:/data
+      - ${PWD}/tests/data/http-scrape/serve:/data
   # To validate Basic HTTP authentication option
   dufs-auth:
     image: docker.io/sigoden/dufs:latest
@@ -23,7 +23,7 @@ services:
       - "basic"
       - "/data"
     volumes:
-      - ${PWD}/tests/data/http-scrape/:/data
+      - ${PWD}/tests/data/http-scrape/serve:/data
   # To validate TLS options
   dufs-https:
     image: docker.io/sigoden/dufs:latest
@@ -36,7 +36,7 @@ services:
       - "/certs/ca.key.pem"
       - "/data"
     volumes:
-      - ${PWD}/tests/data/http-scrape/:/data
+      - ${PWD}/tests/data/http-scrape/serve:/data
       - ${PWD}/tests/data/ca/intermediate_server/certs/dufs-https-chain.cert.pem:/certs/ca.cert.pem
       - ${PWD}/tests/data/ca/intermediate_server/private/dufs-https.key.pem:/certs/ca.key.pem
   runner:
@@ -62,6 +62,10 @@ services:
       - dufs
       - dufs-auth
       - dufs-https
+    environment:
+      - DUFS_ADDRESS=http://dufs:5000
+      - DUFS_AUTH_ADDRESS=http://dufs-auth:5000
+      - DUFS_HTTPS_ADDRESS=https://dufs-https:5000
     volumes:
       - ${PWD}:/code
       - target:/code/target

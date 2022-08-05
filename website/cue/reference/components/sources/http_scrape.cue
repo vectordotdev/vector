@@ -145,7 +145,7 @@ components: sources: http_scrape: {
 					"*": {
 						common:        false
 						description:   "Any field contained in your JSON payload"
-						relevant_when: "encoding != \"text\""
+						relevant_when: "encoding == \"json\""
 						required:      false
 						type: "*": {}
 					}

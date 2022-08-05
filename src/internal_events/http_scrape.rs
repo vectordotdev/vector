@@ -7,7 +7,7 @@ use super::prelude::{error_stage, error_type, http_error_code};
 pub struct HttpScrapeEventsReceived {
     pub byte_size: usize,
     pub count: usize,
-    pub uri: http::Uri,
+    pub url: String,
 }
 
 impl InternalEvent for HttpScrapeEventsReceived {
@@ -16,20 +16,20 @@ impl InternalEvent for HttpScrapeEventsReceived {
             message = "Events received.",
             count = %self.count,
             byte_size = %self.byte_size,
-            uri = %self.uri,
+            url = %self.url,
         );
         counter!(
             "component_received_events_total", self.count as u64,
-            "uri" => self.uri.to_string(),
+            "uri" => self.url.clone(),
         );
         counter!(
             "component_received_event_bytes_total", self.byte_size as u64,
-            "uri" => self.uri.to_string(),
+            "uri" => self.url.clone(),
         );
         // deprecated
         counter!(
             "events_in_total", self.count as u64,
-            "uri" => self.uri.to_string(),
+            "uri" => self.url,
         );
     }
 }
@@ -37,7 +37,7 @@ impl InternalEvent for HttpScrapeEventsReceived {
 #[derive(Debug)]
 pub struct HttpScrapeHttpResponseError {
     pub code: hyper::StatusCode,
-    pub url: http::Uri,
+    pub url: String,
 }
 
 impl InternalEvent for HttpScrapeHttpResponseError {
@@ -52,7 +52,7 @@ impl InternalEvent for HttpScrapeHttpResponseError {
         );
         counter!(
             "component_errors_total", 1,
-            "url" => self.url.to_string(),
+            "url" => self.url,
             "stage" => error_stage::RECEIVING,
             "error_type" => error_type::REQUEST_FAILED,
             "error_code" => http_error_code(self.code.as_u16()),
@@ -65,7 +65,7 @@ impl InternalEvent for HttpScrapeHttpResponseError {
 #[derive(Debug)]
 pub struct HttpScrapeHttpError {
     pub error: crate::Error,
-    pub url: http::Uri,
+    pub url: String,
 }
 
 impl InternalEvent for HttpScrapeHttpError {
@@ -80,7 +80,7 @@ impl InternalEvent for HttpScrapeHttpError {
         );
         counter!(
             "component_errors_total", 1,
-            "url" => self.url.to_string(),
+            "url" => self.url,
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,
         );

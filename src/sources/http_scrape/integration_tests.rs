@@ -21,11 +21,23 @@ use super::{
     HttpScrapeConfig,
 };
 
+fn dufs_address() -> String {
+    std::env::var("DUFS_ADDRESS").unwrap_or_else(|_| "http://localhost:5000".into())
+}
+
+fn dufs_auth_address() -> String {
+    std::env::var("DUFS_AUTH_ADDRESS").unwrap_or_else(|_| "http://localhost:5000".into())
+}
+
+fn dufs_https_address() -> String {
+    std::env::var("DUFS_HTTPS_ADDRESS").unwrap_or_else(|_| "https://localhost:5000".into())
+}
+
 /// Logs (raw bytes) should be scraped and decoded successfully.
 #[tokio::test]
 async fn scraped_logs_bytes() {
     let events = run_compliance(HttpScrapeConfig::new(
-        "http://dufs:5000/logs/bytes".to_string(),
+        format!("{}/logs/bytes", dufs_address()),
         INTERVAL_SECS,
         None,
         DeserializerConfig::Bytes,
@@ -35,6 +47,7 @@ async fn scraped_logs_bytes() {
         None,
     ))
     .await;
+    // panics if not log event
     let log = events[0].as_log();
     assert_eq!(log[log_schema().source_type_key()], NAME.into());
 }
@@ -43,7 +56,7 @@ async fn scraped_logs_bytes() {
 #[tokio::test]
 async fn scraped_logs_json() {
     let events = run_compliance(HttpScrapeConfig::new(
-        "http://dufs:5000/logs/json.json".to_string(),
+        format!("{}/logs/json.json", dufs_address()),
         INTERVAL_SECS,
         None,
         DeserializerConfig::Json,
@@ -53,6 +66,7 @@ async fn scraped_logs_json() {
         None,
     ))
     .await;
+    // panics if not log event
     let log = events[0].as_log();
     assert_eq!(log[log_schema().source_type_key()], NAME.into());
 }
@@ -61,7 +75,7 @@ async fn scraped_logs_json() {
 #[tokio::test]
 async fn scraped_metrics_native_json() {
     let events = run_compliance(HttpScrapeConfig::new(
-        "http://dufs:5000/metrics/native.json".to_string(),
+        format!("{}/metrics/native.json", dufs_address()),
         INTERVAL_SECS,
         None,
         DeserializerConfig::NativeJson,
@@ -72,6 +86,7 @@ async fn scraped_metrics_native_json() {
     ))
     .await;
 
+    // panics if not metric event
     let metric = events[0].as_metric();
     assert_eq!(
         metric.tags().unwrap()[log_schema().source_type_key()],
@@ -83,7 +98,7 @@ async fn scraped_metrics_native_json() {
 #[tokio::test]
 async fn scraped_trace_native_json() {
     let events = run_compliance(HttpScrapeConfig::new(
-        "http://dufs:5000/traces/native.json".to_string(),
+        format!("{}/traces/native.json", dufs_address()),
         INTERVAL_SECS,
         None,
         DeserializerConfig::NativeJson,
@@ -102,7 +117,7 @@ async fn scraped_trace_native_json() {
 #[tokio::test]
 async fn unauthorized_no_auth() {
     run_error(HttpScrapeConfig::new(
-        "http://dufs-auth:5000/logs/json.json".to_string(),
+        format!("{}/logs/json.json", dufs_auth_address()),
         INTERVAL_SECS,
         None,
         DeserializerConfig::Json,
@@ -118,7 +133,7 @@ async fn unauthorized_no_auth() {
 #[tokio::test]
 async fn unauthorized_wrong_auth() {
     run_error(HttpScrapeConfig::new(
-        "http://dufs-auth:5000/logs/json.json".to_string(),
+        format!("{}/logs/json.json", dufs_auth_address()),
         INTERVAL_SECS,
         None,
         DeserializerConfig::Json,
@@ -137,7 +152,7 @@ async fn unauthorized_wrong_auth() {
 #[tokio::test]
 async fn authorized() {
     run_compliance(HttpScrapeConfig::new(
-        "http://dufs-auth:5000/logs/json.json".to_string(),
+        format!("{}/logs/json.json", dufs_auth_address()),
         INTERVAL_SECS,
         None,
         DeserializerConfig::Json,
@@ -152,18 +167,18 @@ async fn authorized() {
     .await;
 }
 
-/// Passing the CA file for TLS should yield errors.
+/// Passing an incorrect CA file for TLS should yield errors.
 #[tokio::test]
 async fn tls_invalid_ca() {
-    run_compliance(HttpScrapeConfig::new(
-        "https://dufs-https:5000/logs/json.json".to_string(),
+    run_error(HttpScrapeConfig::new(
+        format!("{}/logs/json.json", dufs_https_address()),
         INTERVAL_SECS,
         None,
         DeserializerConfig::Json,
         default_framing_message_based(),
         None,
         Some(TlsConfig {
-            ca_file: Some(tls::TEST_PEM_INTERMEDIATE_CA_PATH.into()),
+            ca_file: Some("tests/data/http-scrape/certs/invalid-ca-cert.pem".into()),
             ..Default::default()
         }),
         None,
@@ -175,7 +190,7 @@ async fn tls_invalid_ca() {
 #[tokio::test]
 async fn tls_valid() {
     run_compliance(HttpScrapeConfig::new(
-        "https://dufs-https:5000/logs/json.json".to_string(),
+        format!("{}/logs/json.json", dufs_https_address()),
         INTERVAL_SECS,
         None,
         DeserializerConfig::Json,
@@ -197,7 +212,7 @@ async fn tls_valid() {
 async fn shutdown() {
     let source_id = ComponentKey::from("http_scrape_shutdown");
     let source = HttpScrapeConfig::new(
-        "http://dufs:5000/logs/json.json".to_string(),
+        format!("{}/logs/json.json", dufs_address()),
         INTERVAL_SECS,
         None,
         DeserializerConfig::Json,

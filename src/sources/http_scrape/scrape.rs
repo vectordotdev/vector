@@ -36,7 +36,8 @@ pub(crate) const NAME: &str = "http_scrape";
 #[configurable_component(source)]
 #[derive(Clone, Debug)]
 pub struct HttpScrapeConfig {
-    /// Endpoint to scrape events from.
+    /// Endpoint to scrape events from. The full path must be specified.
+    /// Example: "http://127.0.0.1:9898/logs"
     endpoint: String,
 
     /// The interval between scrapes, in seconds.

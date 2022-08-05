@@ -19,13 +19,7 @@ mod settings;
 #[cfg(all(feature = "sources-utils-tls", feature = "listenfd"))]
 pub(crate) use incoming::{CertificateMetadata, MaybeTlsIncomingStream, MaybeTlsListener};
 pub(crate) use maybe_tls::MaybeTls;
-#[cfg(all(
-    test,
-    any(
-        feature = "kafka-integration-tests",
-        feature = "http-scrape-integration-tests"
-    )
-))]
+#[cfg(all(test, feature = "kafka-integration-tests"))]
 pub use settings::TEST_PEM_INTERMEDIATE_CA_PATH;
 pub use settings::{
     MaybeTlsSettings, TlsConfig, TlsEnableableConfig, TlsSettings, TlsSourceConfig,
