@@ -10,7 +10,9 @@ use vector_core::event::{into_event_stream, EventStatus};
 use vector_core::{
     config::{log_schema, Output},
     event::{array, Event, EventArray, EventContainer, EventRef},
-    internal_event::{EventsSent, DEFAULT_OUTPUT},
+    internal_event::{
+        self, CountByteSize, EventsSent, InternalEventHandle as _, Registered, DEFAULT_OUTPUT,
+    },
     ByteSizeOf,
 };
 
@@ -223,6 +225,7 @@ struct Inner {
     inner: LimitedSender<EventArray>,
     output: String,
     lag_time: Option<Histogram>,
+    events_sent: Registered<EventsSent>,
 }
 
 impl fmt::Debug for Inner {
@@ -245,8 +248,11 @@ impl Inner {
         (
             Self {
                 inner: tx,
-                output,
+                output: output.clone(),
                 lag_time,
+                events_sent: register!(EventsSent::from(internal_event::Output(Some(
+                    output.into()
+                )))),
             },
             rx,
         )
@@ -260,11 +266,7 @@ impl Inner {
         let byte_size = events.size_of();
         let count = events.len();
         self.inner.send(events).await.map_err(|_| ClosedError)?;
-        emit!(EventsSent {
-            count,
-            byte_size,
-            output: Some(self.output.as_ref()),
-        });
+        self.events_sent.emit(CountByteSize(count, byte_size));
         Ok(())
     }
 
@@ -306,21 +308,13 @@ impl Inner {
                     byte_size += this_size;
                 }
                 Err(error) => {
-                    emit!(EventsSent {
-                        count,
-                        byte_size,
-                        output: Some(self.output.as_ref()),
-                    });
+                    self.events_sent.emit(CountByteSize(count, byte_size));
                     return Err(error.into());
                 }
             }
         }
 
-        emit!(EventsSent {
-            count,
-            byte_size,
-            output: Some(self.output.as_ref()),
-        });
+        self.events_sent.emit(CountByteSize(count, byte_size));
 
         Ok(())
     }

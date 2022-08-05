@@ -22,7 +22,8 @@ use tracing::{Instrument, Span};
 use vector_config::configurable_component;
 use vector_core::{
     internal_event::{
-        ByteSize, BytesSent, EventsSent, InternalEventHandle as _, Protocol, Registered,
+        ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
+        Registered,
     },
     ByteSizeOf,
 };
@@ -430,8 +431,6 @@ impl PrometheusExporter {
             return;
         }
 
-        let bytes_sent = register!(BytesSent::from(Protocol::HTTP));
-
         let span = Span::current();
         let metrics = Arc::clone(&self.metrics);
         let default_namespace = self.config.default_namespace.clone();
@@ -445,8 +444,10 @@ impl PrometheusExporter {
             let default_namespace = default_namespace.clone();
             let buckets = buckets.clone();
             let quantiles = quantiles.clone();
-            let bytes_sent = bytes_sent.clone();
             let auth = auth.clone();
+
+            let bytes_sent = register!(BytesSent::from(Protocol::HTTP));
+            let events_sent = register!(EventsSent::from(Output(None)));
 
             async move {
                 Ok::<_, Infallible>(service_fn(move |req| {
@@ -469,11 +470,7 @@ impl PrometheusExporter {
                             &bytes_sent,
                         );
 
-                        emit!(EventsSent {
-                            count,
-                            byte_size,
-                            output: None
-                        });
+                        events_sent.emit(CountByteSize(count, byte_size));
 
                         emit!(PrometheusServerRequestComplete {
                             status_code: response.status(),

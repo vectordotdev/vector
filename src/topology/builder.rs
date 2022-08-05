@@ -16,6 +16,7 @@ use tokio::{
     time::{timeout, Duration},
 };
 use tracing::Instrument;
+use vector_common::internal_event::{self, CountByteSize, EventsSent, InternalEventHandle as _};
 use vector_config::NamedComponent;
 use vector_core::{
     buffers::{
@@ -25,7 +26,6 @@ use vector_core::{
         },
         BufferType, WhenFull,
     },
-    internal_event::EventsSent,
     schema::Definition,
     ByteSizeOf,
 };
@@ -822,14 +822,12 @@ fn build_task_transform(
                 byte_size: events.size_of(),
             })
         });
+    // FIXME: Does this get the tags right (span)?
+    let events_sent = register!(EventsSent::from(internal_event::Output(None)));
     let stream = t
         .transform(Box::pin(filtered))
-        .inspect(|events: &EventArray| {
-            emit!(EventsSent {
-                count: events.len(),
-                byte_size: events.size_of(),
-                output: None,
-            });
+        .inspect(move |events: &EventArray| {
+            events_sent.emit(CountByteSize(events.len(), events.size_of()));
         });
     let transform = async move {
         debug!("Task transform starting.");

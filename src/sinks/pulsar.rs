@@ -25,7 +25,8 @@ use tokio_util::codec::Encoder as _;
 use value::Value;
 use vector_common::{
     internal_event::{
-        ByteSize, BytesSent, EventsSent, InternalEventHandle as _, Protocol, Registered,
+        ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
+        Registered,
     },
     sensitive_string::SensitiveString,
 };
@@ -141,6 +142,7 @@ struct PulsarSink {
         >,
     >,
     bytes_sent: Registered<BytesSent>,
+    events_sent: Registered<EventsSent>,
 }
 
 impl GenerateConfig for PulsarSinkConfig {
@@ -263,6 +265,7 @@ impl PulsarSink {
             state: PulsarSinkState::Ready(Box::new(producer)),
             in_flight: FuturesUnordered::new(),
             bytes_sent: register!(BytesSent::from(Protocol::TCP)),
+            events_sent: register!(EventsSent::from(Output(None))),
             partition_key_field,
         })
     }
@@ -368,12 +371,10 @@ impl Sink<Event> for PulsarSink {
 
                     finalizers.update_status(EventStatus::Delivered);
 
-                    emit!(EventsSent {
-                        count: metadata.event_count(),
-                        byte_size: metadata.events_byte_size(),
-                        output: None,
-                    });
-
+                    this.events_sent.emit(CountByteSize(
+                        metadata.event_count(),
+                        metadata.events_byte_size(),
+                    ));
                     this.bytes_sent
                         .emit(ByteSize(metadata.request_encoded_size()));
                 }
