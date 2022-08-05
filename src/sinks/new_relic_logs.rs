@@ -1,19 +1,18 @@
 use codecs::{CharacterDelimitedEncoderConfig, JsonSerializerConfig};
 use http::Uri;
 use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use vector_config::configurable_component;
 
 use crate::{
+    codecs::{EncodingConfigWithFraming, Transformer},
     config::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
     },
     sinks::{
         http::{HttpMethod, HttpSinkConfig},
         util::{
-            encoding::{EncodingConfigWithFramingAdapter, Transformer},
-            http::RequestConfig,
-            BatchConfig, Compression, SinkBatchSettings, TowerRequestConfig,
+            http::RequestConfig, BatchConfig, Compression, SinkBatchSettings, TowerRequestConfig,
         },
     },
 };
@@ -29,12 +28,17 @@ enum BuildError {
     MissingAuthParam,
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
+/// New Relic region.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 #[derivative(Default)]
 pub enum NewRelicLogsRegion {
+    /// US region.
     #[derivative(Default)]
     Us,
+
+    /// EU region.
     Eu,
 }
 
@@ -47,24 +51,40 @@ impl SinkBatchSettings for NewRelicLogsDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 1.0;
 }
 
-#[derive(Deserialize, Serialize, Debug, Derivative, Clone)]
+/// Configuration for the `new_relic_logs` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 pub struct NewRelicLogsConfig {
+    /// A valid New Relic license key (if applicable).
     pub license_key: Option<String>,
+
+    /// A valid New Relic insert key (if applicable).
     pub insert_key: Option<String>,
+
+    #[configurable(derived)]
     pub region: Option<NewRelicLogsRegion>,
+
+    #[configurable(derived)]
     #[serde(
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub encoding: Transformer,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub compression: Compression,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<NewRelicLogsDefaultBatchSettings>,
 
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -102,8 +122,8 @@ impl SinkConfig for NewRelicLogsConfig {
         "new_relic_logs"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
@@ -135,7 +155,7 @@ impl NewRelicLogsConfig {
             auth: None,
             headers: None,
             compression: self.compression,
-            encoding: EncodingConfigWithFramingAdapter::with_transformer(
+            encoding: EncodingConfigWithFraming::new(
                 Some(CharacterDelimitedEncoderConfig::new(b',').into()),
                 JsonSerializerConfig::new().into(),
                 self.encoding.clone(),
@@ -160,6 +180,7 @@ mod tests {
 
     use super::*;
     use crate::{
+        codecs::SinkType,
         config::SinkConfig,
         event::{Event, LogEvent},
         sinks::util::{service::RATE_LIMIT_NUM_DEFAULT, test::build_test_server, Concurrency},
@@ -200,7 +221,11 @@ mod tests {
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert!(matches!(
-            http_config.encoding.encoding().unwrap().1,
+            http_config
+                .encoding
+                .build(SinkType::MessageBased)
+                .unwrap()
+                .1,
             Serializer::Json(_)
         ));
         assert_eq!(http_config.batch.max_bytes, Some(MAX_PAYLOAD_SIZE));
@@ -242,7 +267,11 @@ mod tests {
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert!(matches!(
-            http_config.encoding.encoding().unwrap().1,
+            http_config
+                .encoding
+                .build(SinkType::MessageBased)
+                .unwrap()
+                .1,
             Serializer::Json(_)
         ));
         assert_eq!(http_config.batch.max_bytes, Some(MAX_PAYLOAD_SIZE));
@@ -282,7 +311,11 @@ mod tests {
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert!(matches!(
-            http_config.encoding.encoding().unwrap().1,
+            http_config
+                .encoding
+                .build(SinkType::MessageBased)
+                .unwrap()
+                .1,
             Serializer::Json(_)
         ));
         assert_eq!(http_config.batch.max_bytes, Some(838860));

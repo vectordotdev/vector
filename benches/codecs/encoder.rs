@@ -49,17 +49,6 @@ fn encoder(c: &mut Criterion) {
     }));
 
     group.throughput(Throughput::Bytes(input.size_of() as u64));
-    group.bench_with_input("vector::sinks::util::encode_log", &(), |b, ()| {
-        b.iter_batched(
-            || vector::sinks::util::Encoding::Json.into(),
-            |encoding| {
-                vector::sinks::util::encode_log(input.clone(), &encoding).unwrap();
-            },
-            BatchSize::SmallInput,
-        )
-    });
-
-    group.throughput(Throughput::Bytes(input.size_of() as u64));
     group.bench_with_input("JsonLogVecSerializer::encode", &(), |b, ()| {
         b.iter_batched(
             || JsonLogVecSerializer,

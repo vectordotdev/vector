@@ -56,14 +56,18 @@ pub mod gcp;
 pub(crate) mod graph;
 pub mod heartbeat;
 pub mod http;
+#[allow(unreachable_pub)]
 #[cfg(any(feature = "sources-kafka", feature = "sinks-kafka"))]
-pub(crate) mod kafka;
+pub mod kafka;
 #[allow(unreachable_pub)]
 pub mod kubernetes;
 pub mod line_agg;
 pub mod list;
 #[cfg(any(feature = "sources-nats", feature = "sinks-nats"))]
 pub(crate) mod nats;
+#[cfg(feature = "opentelemetry")]
+#[allow(unreachable_pub)]
+pub mod opentelemetry;
 #[allow(unreachable_pub)]
 pub(crate) mod proto;
 pub mod providers;

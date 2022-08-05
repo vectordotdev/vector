@@ -44,8 +44,8 @@ impl SinkConfig for PanicSinkConfig {
         "panic_sink"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        None
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &AcknowledgementsConfig::DEFAULT
     }
 }
 

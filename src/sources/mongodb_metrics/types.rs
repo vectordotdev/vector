@@ -326,7 +326,7 @@ pub struct CommandServerStatusWiredTigerCache {
     #[serde(rename = "bytes read into cache")]
     pub bytes_read_into: i32,
     #[serde(rename = "bytes written from cache")]
-    pub bytes_written_from: i32,
+    pub bytes_written_from: i64,
     #[serde(rename = "maximum bytes configured")]
     pub max_bytes: f64,
     #[serde(rename = "modified pages evicted")]

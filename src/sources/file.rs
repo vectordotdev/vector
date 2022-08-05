@@ -15,6 +15,7 @@ use tokio::{sync::oneshot, task::spawn_blocking};
 use tracing::{Instrument, Span};
 use vector_common::finalizer::OrderedFinalizer;
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 
 use super::util::{EncodingConfig, MultilineConfig};
 use crate::{
@@ -103,7 +104,7 @@ pub struct FileConfig {
     #[serde(alias = "ignore_older")]
     pub ignore_older_secs: Option<u64>,
 
-    /// The maximum number of a bytes a line can contain before being discarded.
+    /// The maximum number of bytes a line can contain before being discarded.
     ///
     /// This protects against malformed lines or tailing incorrect files.
     #[serde(default = "default_max_line_bytes")]
@@ -113,7 +114,9 @@ pub struct FileConfig {
     ///
     /// The value will be the current hostname for wherever Vector is running.
     ///
-    /// By default, the [global `host_key` option](https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key) is used.
+    /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
+    ///
+    /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     pub host_key: Option<String>,
 
     /// The directory used to persist file checkpoint positions.
@@ -349,7 +352,7 @@ impl SourceConfig for FileConfig {
         ))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -624,7 +627,7 @@ fn create_event(
         byte_size: line.len(),
     });
 
-    let mut event = LogEvent::from(line);
+    let mut event = LogEvent::from_bytes_legacy(&line);
 
     // Add source type
     event.insert(log_schema().source_type_key(), Bytes::from("file"));

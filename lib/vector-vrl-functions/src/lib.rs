@@ -43,15 +43,16 @@ pub fn vrl_functions() -> Vec<Box<dyn vrl::Function>> {
 fn get_metadata_key(
     arguments: &mut ArgumentList,
 ) -> std::result::Result<MetadataKey, Box<dyn DiagnosticMessage>> {
-    let key = if let Ok(Some(query)) = arguments.optional_query("key") {
-        MetadataKey::Query(query)
-    } else {
-        let key = arguments.required_enum("key", &legacy_keys())?;
-        MetadataKey::Legacy(
-            key.try_bytes_utf8_lossy()
-                .expect("key not bytes")
-                .to_string(),
-        )
-    };
-    Ok(key)
+    if let Ok(Some(query)) = arguments.optional_query("key") {
+        if let vrl::query::Target::External = query.target() {
+            return Ok(MetadataKey::Query(query));
+        }
+    }
+
+    let key = arguments.required_enum("key", &legacy_keys())?;
+    Ok(MetadataKey::Legacy(
+        key.try_bytes_utf8_lossy()
+            .expect("key not bytes")
+            .to_string(),
+    ))
 }

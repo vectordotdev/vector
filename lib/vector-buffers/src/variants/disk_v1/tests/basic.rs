@@ -1,11 +1,12 @@
 use std::{sync::atomic::Ordering, time::Duration};
 
 use futures::FutureExt;
+use vector_common::finalization::Finalizable;
 
 use super::{create_default_buffer_v1, create_default_buffer_v1_with_usage};
 use crate::{
     assert_buffer_usage_metrics, assert_reader_writer_v1_positions,
-    test::{with_temp_dir, MultiEventRecord, PoisonPillMultiEventRecord, SizedRecord},
+    test::{acknowledge, with_temp_dir, MultiEventRecord, PoisonPillMultiEventRecord, SizedRecord},
     variants::disk_v1::{reader::FLUSH_INTERVAL, tests::drive_reader_to_flush},
     EventCount,
 };
@@ -17,7 +18,7 @@ async fn basic_read_write_loop() {
 
         async move {
             // Create a regular buffer, no customizations required.
-            let (mut writer, mut reader, acker) = create_default_buffer_v1(data_dir);
+            let (mut writer, mut reader) = create_default_buffer_v1(data_dir);
             assert_reader_writer_v1_positions!(reader, writer, 0, 0);
 
             let expected_items = (512..768)
@@ -44,11 +45,9 @@ async fn basic_read_write_loop() {
 
             let read_task = tokio::spawn(async move {
                 let mut items = Vec::new();
-                while let Some(record) = reader.next().await {
-                    let events_len = record.event_count();
-
+                while let Some(mut record) = reader.next().await {
+                    acknowledge(record.take_finalizers()).await;
                     items.push(record);
-                    acker.ack(events_len);
                 }
                 (reader, items)
             });
@@ -94,13 +93,13 @@ async fn basic_read_write_loop_multievents() {
 
         async move {
             // Create a regular buffer, no customizations required.
-            let (mut writer, mut reader, acker) = create_default_buffer_v1(data_dir);
+            let (mut writer, mut reader) = create_default_buffer_v1(data_dir);
 
             let expected_items = (512..768)
                 .into_iter()
                 .cycle()
                 .take(2000)
-                .map(MultiEventRecord)
+                .map(MultiEventRecord::new)
                 .collect::<Vec<_>>();
             let input_items = expected_items.clone();
             let expected_position = expected_items
@@ -120,10 +119,9 @@ async fn basic_read_write_loop_multievents() {
 
             let read_task = tokio::spawn(async move {
                 let mut items = Vec::new();
-                while let Some(record) = reader.next().await {
-                    let events_len = record.event_count();
+                while let Some(mut record) = reader.next().await {
+                    acknowledge(record.take_finalizers()).await;
                     items.push(record);
-                    acker.ack(events_len);
                 }
                 (reader, items)
             });
@@ -169,19 +167,22 @@ async fn initial_size_correct_with_multievents() {
 
         async move {
             // Create a regular buffer, no customizations required.
-            let (mut writer, _, _) = create_default_buffer_v1(data_dir.clone());
+            let (mut writer, _) = create_default_buffer_v1(data_dir.clone());
 
             let input_items = (512..768)
                 .into_iter()
                 .cycle()
                 .take(2000)
-                .map(MultiEventRecord)
+                .map(MultiEventRecord::new)
                 .collect::<Vec<_>>();
             let expected_events = input_items
                 .iter()
                 .map(EventCount::event_count)
                 .sum::<usize>();
-            let expected_bytes = input_items.iter().map(|e| e.encoded_size()).sum::<usize>();
+            let expected_bytes = input_items
+                .iter()
+                .map(MultiEventRecord::encoded_size)
+                .sum::<usize>();
 
             // Write a bunch of records so the buffer has events when we reload it.
             for item in input_items {
@@ -191,7 +192,7 @@ async fn initial_size_correct_with_multievents() {
 
             // Now drop our buffer and reopen it.
             drop(writer);
-            let (_, _, _, usage) =
+            let (_, _, usage) =
                 create_default_buffer_v1_with_usage::<_, MultiEventRecord>(data_dir);
 
             // Make sure our usage data agrees with our expected event count and byte size:
@@ -215,8 +216,7 @@ async fn ensure_buffer_metrics_accurate_with_poisoned_multievents() {
 
         async move {
             // Create a regular buffer, no customizations required, and ensure everything is zeroed out:
-            let (mut writer, reader, _, usage) =
-                create_default_buffer_v1_with_usage(data_dir.clone());
+            let (mut writer, reader, usage) = create_default_buffer_v1_with_usage(data_dir.clone());
             assert_reader_writer_v1_positions!(reader, writer, 0, 0);
             assert_buffer_usage_metrics!(usage, empty);
 
@@ -230,7 +230,7 @@ async fn ensure_buffer_metrics_accurate_with_poisoned_multievents() {
                 total_write_offset += count as usize;
                 assert_reader_writer_v1_positions!(reader, writer, 0, last_write_offset);
 
-                let record = PoisonPillMultiEventRecord(count);
+                let record = PoisonPillMultiEventRecord::new(count);
 
                 writer.send(record).await;
                 writer.flush();
@@ -285,7 +285,7 @@ async fn ensure_buffer_metrics_accurate_with_poisoned_multievents() {
             drop(reader);
             drop(usage);
 
-            let (writer, mut reader, acker, usage) =
+            let (writer, mut reader, usage) =
                 create_default_buffer_v1_with_usage::<_, PoisonPillMultiEventRecord>(data_dir);
 
             let expected_write_offset = last_write_offset;
@@ -310,7 +310,7 @@ async fn ensure_buffer_metrics_accurate_with_poisoned_multievents() {
                 let actual_event_count = record.event_count();
                 assert_eq!(expected_event_count, actual_event_count);
 
-                acker.ack(actual_event_count);
+                acknowledge(record).await;
             }
             info!("Read four valid records.");
 

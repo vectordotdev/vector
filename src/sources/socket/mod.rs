@@ -5,6 +5,7 @@ mod unix;
 
 use codecs::NewlineDelimitedDecoderConfig;
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 
 #[cfg(unix)]
 use crate::serde::default_framing_message_based;
@@ -126,7 +127,7 @@ impl SourceConfig for SocketConfig {
                     }
                 };
 
-                let decoder = DecodingConfig::new(framing, decoding).build();
+                let decoder = DecodingConfig::new(framing, decoding, LogNamespace::Legacy).build();
 
                 let tcp = tcp::RawTcpSource::new(config.clone(), decoder);
                 let tls_config = config.tls().as_ref().map(|tls| tls.tls_config.clone());
@@ -152,9 +153,12 @@ impl SourceConfig for SocketConfig {
                     .host_key()
                     .clone()
                     .unwrap_or_else(|| log_schema().host_key().to_string());
-                let decoder =
-                    DecodingConfig::new(config.framing().clone(), config.decoding().clone())
-                        .build();
+                let decoder = DecodingConfig::new(
+                    config.framing().clone(),
+                    config.decoding().clone(),
+                    LogNamespace::Legacy,
+                )
+                .build();
                 Ok(udp::udp(config, host_key, decoder, cx.shutdown, cx.out))
             }
             #[cfg(unix)]
@@ -165,6 +169,7 @@ impl SourceConfig for SocketConfig {
                 let decoder = DecodingConfig::new(
                     config.framing.unwrap_or_else(default_framing_message_based),
                     config.decoding.clone(),
+                    LogNamespace::Legacy,
                 )
                 .build();
                 unix::unix_datagram(
@@ -202,7 +207,7 @@ impl SourceConfig for SocketConfig {
                     }
                 };
 
-                let decoder = DecodingConfig::new(framing, decoding).build();
+                let decoder = DecodingConfig::new(framing, decoding, LogNamespace::Legacy).build();
 
                 let host_key = config
                     .host_key
@@ -219,7 +224,7 @@ impl SourceConfig for SocketConfig {
         }
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(self.output_type())]
     }
 
@@ -284,9 +289,7 @@ mod test {
 
     use super::{tcp::TcpConfig, udp::UdpConfig, SocketConfig};
     use crate::{
-        config::{
-            log_schema, ComponentKey, GlobalOptions, SinkContext, SourceConfig, SourceContext,
-        },
+        config::{log_schema, ComponentKey, GlobalOptions, SourceConfig, SourceContext},
         event::{Event, LogEvent},
         shutdown::{ShutdownSignal, SourceShutdownCoordinator},
         sinks::util::tcp::TcpSinkConfig,
@@ -550,7 +553,6 @@ mod test {
             let message = random_string(512);
             let message_bytes = Bytes::from(message.clone());
 
-            let cx = SinkContext::new_test();
             #[derive(Clone, Debug)]
             struct Serializer {
                 bytes: Bytes,
@@ -568,7 +570,7 @@ mod test {
             let encoder = Serializer {
                 bytes: message_bytes,
             };
-            let (sink, _healthcheck) = sink_config.build(cx, Default::default(), encoder).unwrap();
+            let (sink, _healthcheck) = sink_config.build(Default::default(), encoder).unwrap();
 
             tokio::spawn(async move {
                 let input = stream::repeat_with(|| LogEvent::default().into()).boxed();
@@ -686,6 +688,7 @@ mod test {
                 out: sender,
                 proxy: Default::default(),
                 acknowledgements: false,
+                schema: Default::default(),
                 schema_definitions: HashMap::default(),
             })
             .await

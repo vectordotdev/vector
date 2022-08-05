@@ -86,7 +86,7 @@ components: sinks: [Name=string]: {
 					}
 					max_size: {
 						description: """
-							The maximum size of the buffer on the disk. Must be at least 256 megabytes (268435456 bytes).
+							The maximum size of the buffer on the disk. Must be at least ~256 megabytes (268435488 bytes).
 							"""
 						required:      true
 						relevant_when: "type = \"disk\""
@@ -171,10 +171,8 @@ components: sinks: [Name=string]: {
 				encoding: {
 					description: """
 						Configures the encoding specific sink behavior.
-
-						Note: When data in `encoding` is malformed, currently only a very generic error "data did not match any variant of untagged enum EncodingConfig" is reported. Follow this [issue](\(urls.vector_encoding_config_improve_error_message)) to track progress on improving these error messages.
 						"""
-					required:    features.send.encoding.codec.enabled
+					required: features.send.encoding.codec.enabled
 					if !features.send.encoding.codec.enabled {common: true}
 					type: object: {
 						if features.send.encoding.codec.enabled {
@@ -287,7 +285,7 @@ components: sinks: [Name=string]: {
 										enum: {
 											bytes:               "Byte frames are concatenated."
 											character_delimited: "Byte frames are delimited by a chosen character."
-											length_delimited:    "Byte frames are encoded by adding a length header."
+											length_delimited:    "Byte frames are prefixed by an unsigned big-endian 32-bit integer indicating the length."
 											newline_delimited:   "Byte frames are delimited by a newline character."
 										}
 									}

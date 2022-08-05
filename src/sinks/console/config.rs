@@ -1,43 +1,44 @@
 use codecs::{
-    encoding::{Framer, Serializer},
-    LengthDelimitedEncoder, NewlineDelimitedEncoder,
+    encoding::{Framer, FramingConfig},
+    JsonSerializerConfig,
 };
 use futures::{future, FutureExt};
-use serde::{Deserialize, Serialize};
 use tokio::io;
+use vector_config::configurable_component;
 
 use crate::{
-    codecs::Encoder,
+    codecs::{Encoder, EncodingConfigWithFraming, SinkType},
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
-    sinks::{
-        console::sink::WriterSink,
-        util::encoding::{
-            EncodingConfig, EncodingConfigWithFramingAdapter, StandardEncodings,
-            StandardEncodingsWithFramingMigrator,
-        },
-        Healthcheck, VectorSink,
-    },
+    sinks::{console::sink::WriterSink, Healthcheck, VectorSink},
 };
 
-#[derive(Debug, Derivative, Deserialize, Serialize)]
+/// Output target.
+#[configurable_component]
+#[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Target {
+    /// Standard output.
     #[derivative(Default)]
     Stdout,
+
+    /// Standard error.
     Stderr,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+/// Configuration for the `console` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct ConsoleSinkConfig {
+    #[configurable(derived)]
     #[serde(default)]
     pub target: Target,
+
     #[serde(flatten)]
-    pub encoding: EncodingConfigWithFramingAdapter<
-        EncodingConfig<StandardEncodings>,
-        StandardEncodingsWithFramingMigrator,
-    >,
+    pub encoding: EncodingConfigWithFraming,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -50,7 +51,7 @@ impl GenerateConfig for ConsoleSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             target: Target::Stdout,
-            encoding: EncodingConfig::from(StandardEncodings::Json).into(),
+            encoding: (None::<FramingConfig>, JsonSerializerConfig::new()).into(),
             acknowledgements: Default::default(),
         })
         .unwrap()
@@ -60,34 +61,18 @@ impl GenerateConfig for ConsoleSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "console")]
 impl SinkConfig for ConsoleSinkConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let transformer = self.encoding.transformer();
-        let (framer, serializer) = self.encoding.encoding()?;
-        let framer = match (framer, &serializer) {
-            (Some(framer), _) => framer,
-            (
-                None,
-                Serializer::Text(_)
-                | Serializer::Json(_)
-                | Serializer::Logfmt(_)
-                | Serializer::NativeJson(_)
-                | Serializer::RawMessage(_),
-            ) => NewlineDelimitedEncoder::new().into(),
-            (None, Serializer::Avro(_) | Serializer::Native(_)) => {
-                LengthDelimitedEncoder::new().into()
-            }
-        };
+        let (framer, serializer) = self.encoding.build(SinkType::StreamBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
 
         let sink: VectorSink = match self.target {
             Target::Stdout => VectorSink::from_event_streamsink(WriterSink {
-                acker: cx.acker(),
                 output: io::stdout(),
                 transformer,
                 encoder,
             }),
             Target::Stderr => VectorSink::from_event_streamsink(WriterSink {
-                acker: cx.acker(),
                 output: io::stderr(),
                 transformer,
                 encoder,
@@ -105,8 +90,8 @@ impl SinkConfig for ConsoleSinkConfig {
         "console"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 

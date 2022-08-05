@@ -22,6 +22,8 @@ pub use self::split::*;
 /// incremental metrics are summed into the output buffer. Any conversion of metrics is handled by the normalization
 /// type `N: MetricNormalize`. Further, distribution metrics have their their samples compressed with
 /// `compress_distribution` below.
+///
+/// Note: This has been deprecated, please do not use when creating new Sinks.
 pub struct MetricsBuffer {
     metrics: Option<MetricSet>,
     max_events: usize,
@@ -45,7 +47,7 @@ impl Batch for MetricsBuffer {
     type Input = Metric;
     type Output = Vec<Metric>;
 
-    fn get_settings_defaults<D: SinkBatchSettings>(
+    fn get_settings_defaults<D: SinkBatchSettings + Clone>(
         config: BatchConfig<D, Merged>,
     ) -> Result<BatchConfig<D, Merged>, BatchError> {
         config.disallow_max_bytes()

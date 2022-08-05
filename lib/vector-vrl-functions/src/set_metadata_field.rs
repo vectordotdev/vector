@@ -1,6 +1,8 @@
 use crate::{get_metadata_key, MetadataKey};
 use ::value::Value;
 use vrl::prelude::*;
+use vrl::query::Target as QueryTarget;
+use vrl::state::{ExternalEnv, LocalEnv};
 
 fn set_metadata_field(
     ctx: &mut Context,
@@ -100,5 +102,26 @@ impl Expression for SetMetadataFieldFn {
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::null().infallible()
+    }
+
+    fn update_state(
+        &mut self,
+        local: &mut LocalEnv,
+        external: &mut ExternalEnv,
+    ) -> std::result::Result<(), ExpressionError> {
+        if let MetadataKey::Query(query) = &self.key {
+            let insert_type = self.value.type_def((local, external)).kind().clone();
+            match query.target() {
+                QueryTarget::External => {
+                    let mut new_type = external.metadata_kind().clone();
+                    new_type.insert(query.path(), insert_type);
+                    external.update_metadata(new_type);
+                }
+                QueryTarget::Container(_)
+                | QueryTarget::FunctionCall(_)
+                | QueryTarget::Internal(_) => unreachable!("only external queries are allowed"),
+            }
+        }
+        Ok(())
     }
 }

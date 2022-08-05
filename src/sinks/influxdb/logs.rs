@@ -4,9 +4,10 @@ use bytes::{Bytes, BytesMut};
 use futures::SinkExt;
 use http::{Request, Uri};
 use indoc::indoc;
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 use crate::{
+    codecs::Transformer,
     config::{
         log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
         SinkDescription,
@@ -19,7 +20,6 @@ use crate::{
             InfluxDb1Settings, InfluxDb2Settings, ProtocolVersion,
         },
         util::{
-            encoding::Transformer,
             http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
             BatchConfig, Buffer, Compression, SinkBatchSettings, TowerRequestConfig,
         },
@@ -37,28 +37,54 @@ impl SinkBatchSettings for InfluxDbLogsDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 1.0;
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+/// Configuration for the `influxdb_logs` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct InfluxDbLogsConfig {
+    /// The namespace of the measurement name to use.
+    ///
+    /// When specified, the measurement name will be `<namespace>.vector`.
+    ///
+    /// This field is deprecated, and `measurement` should be used instead.
+    #[configurable(deprecated)]
     pub namespace: Option<String>,
+
+    /// The name of the InfluxDB measurement that will be written to.
     pub measurement: Option<String>,
+
+    /// The endpoint to send data to.
     pub endpoint: String,
+
+    /// The list of names of log fields that should be added as tags to each measurement.
     #[serde(default)]
     pub tags: Vec<String>,
+
     #[serde(flatten)]
     pub influxdb1_settings: Option<InfluxDb1Settings>,
+
     #[serde(flatten)]
     pub influxdb2_settings: Option<InfluxDb2Settings>,
+
+    #[configurable(derived)]
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
     )]
     pub encoding: Transformer,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<InfluxDbLogsDefaultBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -142,7 +168,6 @@ impl SinkConfig for InfluxDbLogsConfig {
             request,
             batch.timeout,
             client,
-            cx.acker(),
         )
         .sink_map_err(|error| error!(message = "Fatal influxdb_logs sink error.", %error));
 
@@ -157,8 +182,8 @@ impl SinkConfig for InfluxDbLogsConfig {
         "influxdb_logs"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
