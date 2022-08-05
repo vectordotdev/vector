@@ -46,22 +46,6 @@ fn http_scrape_generate_config() {
     test_generate_config::<HttpScrapeConfig>();
 }
 
-/// An endpoint in the config that is not reachable should generate errors.
-#[tokio::test]
-async fn invalid_endpoint() {
-    run_error(HttpScrapeConfig::new(
-        "http://nope".to_string(),
-        INTERVAL_SECS,
-        None,
-        default_decoding(),
-        default_framing_message_based(),
-        None,
-        None,
-        None,
-    ))
-    .await;
-}
-
 /// Bytes should be decoded and HTTP header set to text/plain.
 #[tokio::test]
 async fn bytes_decoding() {

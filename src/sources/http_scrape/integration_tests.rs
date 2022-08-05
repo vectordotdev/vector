@@ -7,6 +7,7 @@ use tokio::time::{Duration, Instant};
 use crate::{
     config::{ComponentKey, SourceConfig, SourceContext},
     http::Auth,
+    serde::default_decoding,
     serde::default_framing_message_based,
     sources::http_scrape::scrape::NAME,
     tls,
@@ -31,6 +32,22 @@ fn dufs_auth_address() -> String {
 
 fn dufs_https_address() -> String {
     std::env::var("DUFS_HTTPS_ADDRESS").unwrap_or_else(|_| "https://localhost:5000".into())
+}
+
+/// An endpoint in the config that is not reachable should generate errors.
+#[tokio::test]
+async fn invalid_endpoint() {
+    run_error(HttpScrapeConfig::new(
+        "http://nope".to_string(),
+        INTERVAL_SECS,
+        None,
+        default_decoding(),
+        default_framing_message_based(),
+        None,
+        None,
+        None,
+    ))
+    .await;
 }
 
 /// Logs (raw bytes) should be scraped and decoded successfully.
