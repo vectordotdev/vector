@@ -96,8 +96,8 @@ fn init(recorder: VectorRecorder) -> Result<()> {
 /// # Errors
 ///
 /// This function will error if it is called multiple times.
-pub fn init_global(idle_timeout: Option<Duration>) -> Result<()> {
-    init(VectorRecorder::new_global(idle_timeout))
+pub fn init_global() -> Result<()> {
+    init(VectorRecorder::new_global())
 }
 
 /// Initialize the thread-local metrics sub-system
@@ -105,8 +105,8 @@ pub fn init_global(idle_timeout: Option<Duration>) -> Result<()> {
 /// # Errors
 ///
 /// This function will error if it is called multiple times.
-pub fn init_test(idle_timeout: Option<Duration>) -> Result<()> {
-    init(VectorRecorder::new_test(idle_timeout))
+pub fn init_test() -> Result<()> {
+    init(VectorRecorder::new_test())
 }
 
 impl Controller {
@@ -123,6 +123,13 @@ impl Controller {
     /// initialized.
     pub fn get() -> Result<&'static Self> {
         CONTROLLER.get().ok_or(Error::NotInitialized)
+    }
+
+    /// Set or clear the expiry time after which idle metrics are dropped from the set of captured
+    /// metrics.
+    pub fn set_expiry(&self, timeout: Option<Duration>) {
+        self.recorder
+            .with_registry(|registry| registry.set_expiry(timeout));
     }
 
     /// Take a snapshot of all gathered metrics and expose them as metric
@@ -217,7 +224,11 @@ mod tests {
     const IDLE_TIMEOUT: Duration = Duration::from_millis(500);
 
     fn init_metrics() -> &'static Controller {
-        let _ = init_test(Some(IDLE_TIMEOUT));
+        if let Err(error) = init_test() {
+            if error != Error::AlreadyInitialized {
+                panic!("Failed to initialize metrics recorder: {:?}", error);
+            }
+        }
         Controller::get().expect("Could not get global metrics controller")
     }
 
@@ -246,6 +257,7 @@ mod tests {
     #[test]
     fn expires_metrics() {
         let controller = init_metrics();
+        controller.set_expiry(Some(IDLE_TIMEOUT));
 
         metrics::counter!("test2", 1);
         metrics::counter!("test3", 2);

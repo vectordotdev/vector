@@ -14,7 +14,7 @@ pub type IncrementalMetricState = MetricState<IncrementalMetricNormalizer>;
 
 pub fn init() {
     // Handle multiple initializations.
-    if let Err(error) = metrics::init_test(None) {
+    if let Err(error) = metrics::init_test() {
         if error != metrics::Error::AlreadyInitialized {
             panic!("Failed to initialize metrics recorder: {:?}", error);
         }

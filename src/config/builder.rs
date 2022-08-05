@@ -22,30 +22,30 @@ use super::{
 #[serde(deny_unknown_fields)]
 pub struct ConfigBuilder {
     #[serde(flatten)]
-    pub global: GlobalOptions,
+    pub(super) global: GlobalOptions,
     #[cfg(feature = "api")]
     #[serde(default)]
-    pub api: api::Options,
+    pub(super) api: api::Options,
     #[serde(default)]
-    pub schema: schema::Options,
+    pub(super) schema: schema::Options,
     #[cfg(feature = "enterprise")]
     #[serde(default)]
-    pub enterprise: Option<enterprise::Options>,
+    pub(super) enterprise: Option<enterprise::Options>,
     #[serde(default)]
-    pub healthchecks: HealthcheckOptions,
+    pub(super) healthchecks: HealthcheckOptions,
     #[serde(default)]
-    pub enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter>,
+    pub(super) enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter>,
     #[serde(default)]
-    pub sources: IndexMap<ComponentKey, SourceOuter>,
+    pub(super) sources: IndexMap<ComponentKey, SourceOuter>,
     #[serde(default)]
-    pub sinks: IndexMap<ComponentKey, SinkOuter<String>>,
+    pub(super) sinks: IndexMap<ComponentKey, SinkOuter<String>>,
     #[serde(default)]
-    pub transforms: IndexMap<ComponentKey, TransformOuter<String>>,
+    pub(super) transforms: IndexMap<ComponentKey, TransformOuter<String>>,
     #[serde(default)]
-    pub tests: Vec<TestDefinition<String>>,
-    pub provider: Option<Box<dyn provider::ProviderConfig>>,
+    pub(super) tests: Vec<TestDefinition<String>>,
+    pub(super) provider: Option<Box<dyn provider::ProviderConfig>>,
     #[serde(default)]
-    pub secret: IndexMap<ComponentKey, Box<dyn SecretBackend>>,
+    pub(super) secret: IndexMap<ComponentKey, Box<dyn SecretBackend>>,
 }
 
 #[cfg(feature = "enterprise")]
@@ -173,7 +173,8 @@ impl From<Config> for ConfigBuilder {
             transforms,
             tests,
             secret,
-            ..
+            version: _,
+            expansions: _,
         } = config;
 
         let transforms = transforms
@@ -317,6 +318,8 @@ impl ConfigBuilder {
         }
 
         self.global.proxy = self.global.proxy.merge(&with.global.proxy);
+
+        self.global.expire_metrics = self.global.expire_metrics.or(with.global.expire_metrics);
 
         self.schema.append(with.schema, &mut errors);
 

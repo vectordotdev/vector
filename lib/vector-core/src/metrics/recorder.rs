@@ -1,4 +1,4 @@
-use std::sync::{atomic::Ordering, Arc};
+use std::sync::{atomic::Ordering, Arc, RwLock};
 use std::time::Duration;
 
 use chrono::Utc;
@@ -18,26 +18,35 @@ thread_local!(static LOCAL_REGISTRY: OnceCell<Registry> = OnceCell::new());
 #[allow(dead_code)]
 pub(super) struct Registry {
     registry: MetricsRegistry<Key, GenerationalStorage<VectorStorage>>,
-    recency: Option<Recency<Key>>,
+    recency: RwLock<Option<Recency<Key>>>,
 }
 
 impl Registry {
-    fn new(idle_timeout: Option<Duration>) -> Self {
-        let registry = MetricsRegistry::new(GenerationalStorage::new(VectorStorage));
-        let recency =
-            idle_timeout.map(|_| Recency::new(Clock::new(), MetricKindMask::ALL, idle_timeout));
-        Self { registry, recency }
+    fn new() -> Self {
+        Self {
+            registry: MetricsRegistry::new(GenerationalStorage::new(VectorStorage)),
+            recency: RwLock::new(None),
+        }
     }
 
     pub(super) fn clear(&self) {
         self.registry.clear();
     }
 
+    pub(super) fn set_expiry(&self, timeout: Option<Duration>) {
+        let recency = timeout.map(|_| Recency::new(Clock::new(), MetricKindMask::ALL, timeout));
+        *(self.recency.write()).expect("Failed to acquire write lock on recency map") = recency;
+    }
+
     pub(super) fn visit_metrics(&self) -> Vec<Metric> {
         let timestamp = Utc::now();
 
         let mut metrics = Vec::new();
-        let recency = self.recency.as_ref();
+        let recency = self
+            .recency
+            .read()
+            .expect("Failed to acquire read lock on recency map");
+        let recency = recency.as_ref();
 
         for (key, counter) in self.registry.get_counter_handles() {
             if recency.map_or(true, |recency| {
@@ -94,13 +103,12 @@ pub(super) enum VectorRecorder {
 }
 
 impl VectorRecorder {
-    pub(super) fn new_global(idle_timeout: Option<Duration>) -> Self {
-        let registry = Arc::new(Registry::new(idle_timeout));
-        Self::Global(registry)
+    pub(super) fn new_global() -> Self {
+        Self::Global(Arc::new(Registry::new()))
     }
 
-    pub(super) fn new_test(idle_timeout: Option<Duration>) -> Self {
-        Self::with_thread_local(Registry::clear, idle_timeout);
+    pub(super) fn new_test() -> Self {
+        Self::with_thread_local(Registry::clear);
         Self::ThreadLocal
     }
 
@@ -109,15 +117,12 @@ impl VectorRecorder {
             Self::Global(registry) => doit(registry),
             // This is only called after the registry is created, so we can just use a dummy
             // idle_timeout parameter.
-            Self::ThreadLocal => Self::with_thread_local(doit, None),
+            Self::ThreadLocal => Self::with_thread_local(doit),
         }
     }
 
-    fn with_thread_local<T>(
-        doit: impl FnOnce(&Registry) -> T,
-        idle_timeout: Option<Duration>,
-    ) -> T {
-        LOCAL_REGISTRY.with(|oc| doit(oc.get_or_init(|| Registry::new(idle_timeout))))
+    fn with_thread_local<T>(doit: impl FnOnce(&Registry) -> T) -> T {
+        LOCAL_REGISTRY.with(|oc| doit(oc.get_or_init(Registry::new)))
     }
 }
 
