@@ -4,6 +4,7 @@ use futures::StreamExt;
 #[cfg(target_os = "linux")]
 use heim::cpu::os::linux::CpuTimeExt;
 use heim::units::time::second;
+use vector_common::btreemap;
 
 use super::{filter_result, HostMetrics};
 
@@ -11,6 +12,7 @@ const NAME: &str = "cpu_seconds_total";
 
 impl HostMetrics {
     pub async fn cpu_metrics(&self, output: &mut super::MetricsBuffer) {
+        // adds the metrics from cpu time for each cpu
         match heim::cpu::times().await {
             Ok(times) => {
                 let times: Vec<_> = times
@@ -36,6 +38,38 @@ impl HostMetrics {
             }
             Err(error) => {
                 error!(message = "Failed to load CPU times.", %error, internal_log_rate_secs = 60);
+            }
+        }
+        // adds the logical cpu count metric
+        match heim::cpu::logical_count().await {
+            Ok(count) => output.counter(
+                NAME,
+                count as f64,
+                btreemap! {
+                    "mode" => "logical_cpus"
+                },
+            ),
+            Err(error) => {
+                error!(message = "Failed to load logical CPU count.", %error, internal_log_rate_secs = 60);
+            }
+        }
+        // adds the physical cpu count metric
+        match heim::cpu::physical_count().await {
+            Ok(Some(count)) => output.counter(
+                NAME,
+                count as f64,
+                btreemap! {
+                    "mode" => "physical_cpus"
+                },
+            ),
+            Ok(None) => {
+                error!(
+                    message = "Unable to determine physical CPU count.",
+                    internal_log_rate_secs = 60
+                );
+            }
+            Err(error) => {
+                error!(message = "Failed to load physical CPU count.", %error, internal_log_rate_secs = 60);
             }
         }
     }
