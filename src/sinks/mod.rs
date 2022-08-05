@@ -122,6 +122,7 @@ pub enum HealthcheckError {
 /// Configurable sinks in Vector.
 #[configurable_component]
 #[derive(Clone, Debug)]
+#[allow(clippy::large_enum_variant)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Sinks {
     /// Apex Logs.
