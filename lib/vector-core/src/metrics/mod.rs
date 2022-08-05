@@ -225,9 +225,11 @@ mod tests {
 
     fn init_metrics() -> &'static Controller {
         if let Err(error) = init_test() {
-            if error != Error::AlreadyInitialized {
-                panic!("Failed to initialize metrics recorder: {:?}", error);
-            }
+            assert!(
+                error == Error::AlreadyInitialized,
+                "Failed to initialize metrics recorder: {:?}",
+                error
+            );
         }
         Controller::get().expect("Could not get global metrics controller")
     }
