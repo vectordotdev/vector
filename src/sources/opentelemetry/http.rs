@@ -42,21 +42,7 @@ pub(crate) async fn run_http_server(
     let listener = tls_settings.bind(&address).await?;
     let routes = filters
         .with(warp::trace(move |_info| span.clone()))
-        .recover(|r: Rejection| async move {
-            if let Some(e_msg) = r.find::<ErrorMessage>() {
-                let reply = protobuf(Status {
-                    code: 2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
-                    message: e_msg.message().into(),
-                    ..Default::default()
-                });
-
-                Ok(warp::reply::with_status(reply, e_msg.status_code()))
-            } else {
-                // other internal error - will return 500 internal server error
-                error!(message = "Unhandled rejection.", rejection = ?r);
-                Err(r)
-            }
-        });
+        .recover(handle_rejection);
 
     info!(message = "Building HTTP server.", address = %address);
 
@@ -141,10 +127,12 @@ async fn handle_request(
                         Ok(protobuf(ExportLogsServiceResponse {}).into_response())
                     }
                     BatchStatus::Errored => Err(warp::reject::custom(Status {
+                        code: 2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
                         message: "Error delivering contents to sink".into(),
                         ..Default::default()
                     })),
                     BatchStatus::Rejected => Err(warp::reject::custom(Status {
+                        code: 2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
                         message: "Contents failed to deliver to sink".into(),
                         ..Default::default()
                     })),
@@ -152,5 +140,28 @@ async fn handle_request(
             }
         }
         Err(err) => Err(warp::reject::custom(err)),
+    }
+}
+
+async fn handle_rejection(err: Rejection) -> Result<impl Reply, std::convert::Infallible> {
+    if let Some(err_msg) = err.find::<ErrorMessage>() {
+        let reply = protobuf(Status {
+            code: 2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
+            message: err_msg.message().into(),
+            ..Default::default()
+        });
+
+        Ok(warp::reply::with_status(reply, err_msg.status_code()))
+    } else {
+        let reply = protobuf(Status {
+            code: 2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
+            message: format!("{:?}", err),
+            ..Default::default()
+        });
+
+        Ok(warp::reply::with_status(
+            reply,
+            StatusCode::INTERNAL_SERVER_ERROR,
+        ))
     }
 }
