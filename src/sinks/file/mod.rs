@@ -18,7 +18,10 @@ use tokio::{
 };
 use tokio_util::codec::Encoder as _;
 use vector_config::configurable_component;
-use vector_core::{internal_event::EventsSent, ByteSizeOf};
+use vector_core::{
+    internal_event::{CountByteSize, EventsSent, InternalEventHandle as _, Registered},
+    ByteSizeOf,
+};
 
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
@@ -171,7 +174,6 @@ impl SinkConfig for FileSinkConfig {
     }
 }
 
-#[derive(Debug)]
 pub struct FileSink {
     path: Template,
     transformer: Transformer,
@@ -179,6 +181,7 @@ pub struct FileSink {
     idle_timeout: Duration,
     files: ExpiringHashMap<Bytes, OutFile>,
     compression: Compression,
+    events_sent: Registered<EventsSent>,
 }
 
 impl FileSink {
@@ -194,6 +197,7 @@ impl FileSink {
             idle_timeout: Duration::from_secs(config.idle_timeout_secs.unwrap_or(30)),
             files: ExpiringHashMap::default(),
             compression: config.compression,
+            events_sent: register!(EventsSent::from(None)),
         })
     }
 
@@ -339,11 +343,7 @@ impl FileSink {
         match write_event_to_file(file, event, &self.transformer, &mut self.encoder).await {
             Ok(byte_size) => {
                 finalizers.update_status(EventStatus::Delivered);
-                emit!(EventsSent {
-                    count: 1,
-                    byte_size: event_size,
-                    output: None,
-                });
+                self.events_sent.emit(CountByteSize(1, event_size));
                 emit!(FileBytesSent {
                     byte_size,
                     file: String::from_utf8_lossy(&path),
