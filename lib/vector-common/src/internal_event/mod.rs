@@ -2,6 +2,8 @@ mod bytes_sent;
 mod events_received;
 mod events_sent;
 
+pub use metrics::SharedString;
+
 pub use bytes_sent::BytesSent;
 pub use events_received::{EventsReceived, OldEventsReceived};
 pub use events_sent::{EventsSent, DEFAULT_OUTPUT};
@@ -86,12 +88,16 @@ pub fn register<E: RegisterInternalEvent>(event: E) -> E::Handle {
     event.register()
 }
 
-pub fn emit_registered<E, H, D>(event: E, data: D)
-where
-    E: RegisterInternalEvent<Handle = H>,
-    H: InternalEventHandle<Data = D>,
-{
-    event.register().emit(data);
-}
-
 pub type Registered<T> = <T as RegisterInternalEvent>::Handle;
+
+pub struct ByteSize(pub usize);
+
+pub struct Protocol(pub SharedString);
+
+impl Protocol {
+    pub const HTTP: Protocol = Protocol(SharedString::const_str("http"));
+    pub const HTTPS: Protocol = Protocol(SharedString::const_str("https"));
+    pub const NONE: Protocol = Protocol(SharedString::const_str("none"));
+    pub const TCP: Protocol = Protocol(SharedString::const_str("tcp"));
+    pub const UDP: Protocol = Protocol(SharedString::const_str("udp"));
+}

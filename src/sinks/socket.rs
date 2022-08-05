@@ -190,7 +190,7 @@ mod test {
         config::SinkContext,
         event::{Event, LogEvent},
         test_util::{
-            components::{run_and_assert_sink_compliance, SINK_TAGS},
+            components::{assert_sink_compliance, run_and_assert_sink_compliance, SINK_TAGS},
             next_addr, next_addr_v6, random_lines_with_stream, trace_init, CountReceiver,
         },
     };
@@ -210,11 +210,16 @@ mod test {
             }),
             acknowledgements: Default::default(),
         };
-        let context = SinkContext::new_test();
-        let (sink, _healthcheck) = config.build(context).await.unwrap();
 
-        let event = Event::Log(LogEvent::from("raw log line"));
-        run_and_assert_sink_compliance(sink, stream::once(ready(event)), &SINK_TAGS).await;
+        let context = SinkContext::new_test();
+        assert_sink_compliance(&SINK_TAGS, async move {
+            let (sink, _healthcheck) = config.build(context).await.unwrap();
+
+            let event = Event::Log(LogEvent::from("raw log line"));
+            sink.run(stream::once(ready(event.into()))).await
+        })
+        .await
+        .expect("Running sink failed");
 
         let mut buf = [0; 256];
         let (size, _src_addr) = receiver
@@ -256,13 +261,18 @@ mod test {
             acknowledgements: Default::default(),
         };
 
-        let context = SinkContext::new_test();
-        let (sink, _healthcheck) = config.build(context).await.unwrap();
-
         let mut receiver = CountReceiver::receive_lines(addr);
 
         let (lines, events) = random_lines_with_stream(10, 100, None);
-        run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
+
+        assert_sink_compliance(&SINK_TAGS, async move {
+            let context = SinkContext::new_test();
+            let (sink, _healthcheck) = config.build(context).await.unwrap();
+
+            sink.run(events).await
+        })
+        .await
+        .expect("Running sink failed");
 
         // Wait for output to connect
         receiver.connected().await;
