@@ -255,6 +255,7 @@ mod tests {
             let metrics = controller.capture_metrics();
             assert_eq!(metrics.len(), cardinality + 2);
 
+            #[allow(clippy::cast_precision_loss)]
             let value = metrics.len() as f64;
             for metric in metrics {
                 match metric.name() {
