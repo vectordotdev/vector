@@ -1,6 +1,7 @@
 package metadata
 
 urls: {
+	apex:                                       "https://apex.sh/logs/"
 	azure_blob_storage:                         "https://azure.microsoft.com/en-us/services/storage/blobs/"
 	affine_type_system:                         "\(wikipedia)/wiki/Substructural_type_system#Affine_type_systems"
 	adaptive_request_concurrency_post:          "/blog/adaptive-request-concurrency/"
