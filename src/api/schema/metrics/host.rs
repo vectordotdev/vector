@@ -274,23 +274,31 @@ impl HostMetrics {
 impl HostMetrics {
     /// Memory metrics
     async fn memory(&self) -> MemoryMetrics {
-        MemoryMetrics(self.0.memory_metrics().await)
+        let mut buffer = self.0.buffer();
+        self.0.memory_metrics(&mut buffer).await;
+        MemoryMetrics(buffer.metrics)
     }
 
     /// Swap metrics
     async fn swap(&self) -> SwapMetrics {
-        SwapMetrics(self.0.swap_metrics().await)
+        let mut buffer = self.0.buffer();
+        self.0.swap_metrics(&mut buffer).await;
+        SwapMetrics(buffer.metrics)
     }
 
     /// CPU metrics
     async fn cpu(&self) -> CpuMetrics {
-        CpuMetrics(self.0.cpu_metrics().await)
+        let mut buffer = self.0.buffer();
+        self.0.cpu_metrics(&mut buffer).await;
+        CpuMetrics(buffer.metrics)
     }
 
     /// Load average metrics (*nix only)
     async fn load_average(&self) -> Option<LoadAverageMetrics> {
         if cfg!(unix) {
-            Some(LoadAverageMetrics(self.0.loadavg_metrics().await))
+            let mut buffer = self.0.buffer();
+            self.0.loadavg_metrics(&mut buffer).await;
+            Some(LoadAverageMetrics(buffer.metrics))
         } else {
             None
         }
@@ -298,17 +306,23 @@ impl HostMetrics {
 
     /// Network metrics
     async fn network(&self) -> NetworkMetrics {
-        NetworkMetrics(self.0.network_metrics().await)
+        let mut buffer = self.0.buffer();
+        self.0.network_metrics(&mut buffer).await;
+        NetworkMetrics(buffer.metrics)
     }
 
     /// Filesystem metrics
     async fn filesystem(&self) -> FileSystemMetrics {
-        FileSystemMetrics(self.0.filesystem_metrics().await)
+        let mut buffer = self.0.buffer();
+        self.0.filesystem_metrics(&mut buffer).await;
+        FileSystemMetrics(buffer.metrics)
     }
 
     /// Disk metrics
     async fn disk(&self) -> DiskMetrics {
-        DiskMetrics(self.0.disk_metrics().await)
+        let mut buffer = self.0.buffer();
+        self.0.disk_metrics(&mut buffer).await;
+        DiskMetrics(buffer.metrics)
     }
 }
 

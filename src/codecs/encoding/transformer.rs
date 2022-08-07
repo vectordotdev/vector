@@ -36,6 +36,7 @@ impl<'de> Deserialize<'de> for Transformer {
         D: Deserializer<'de>,
     {
         #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
         struct TransformerInner {
             #[serde(default)]
             only_fields: Option<Vec<OwnedPath>>,
@@ -353,6 +354,18 @@ mod tests {
         let config: std::result::Result<Transformer, _> = toml::from_str(indoc! {r#"
             except_fields = ["Doop"]
             only_fields = ["Doop"]
+        "#});
+        assert!(config.is_err())
+    }
+
+    #[test]
+    fn deny_unknown_fields() {
+        // We're only checking this explicitly because of our custom deserializer arrangement to
+        // make it possible to throw the exclusivity error during deserialization, to ensure that we
+        // enforce this on the top-level `Transformer` type even though it has to be applied at the
+        // intermediate deserialization stage, on `TransformerInner`.
+        let config: std::result::Result<Transformer, _> = toml::from_str(indoc! {r#"
+            onlyfields = ["Doop"]
         "#});
         assert!(config.is_err())
     }

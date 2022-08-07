@@ -7,14 +7,14 @@ mkfile_dir := $(dir $(mkfile_path))
 # Begin OS detection
 ifeq ($(OS),Windows_NT) # is Windows_NT on XP, 2000, 7, Vista, 10...
     export OPERATING_SYSTEM := Windows
-	export RUST_TARGET ?= "x86_64-unknown-windows-msvc"
+    export RUST_TARGET ?= "x86_64-unknown-windows-msvc"
     export FEATURES ?= default-msvc
-	undefine DNSTAP_BENCHES
+    undefine DNSTAP_BENCHES
 else
     export OPERATING_SYSTEM := $(shell uname)  # same as "uname -s"
-	export RUST_TARGET ?= "x86_64-unknown-linux-gnu"
+    export RUST_TARGET ?= "x86_64-unknown-linux-gnu"
     export FEATURES ?= default
-	export DNSTAP_BENCHES := dnstap-benches
+    export DNSTAP_BENCHES := dnstap-benches
 endif
 
 # Override this with any scopes for testing/benching.
@@ -332,7 +332,7 @@ test-enterprise: ## Runs enterprise related behavioral tests
 
 .PHONY: test-integration
 test-integration: ## Runs all integration tests
-test-integration: test-integration-aws test-integration-axiom test-integration-azure test-integration-clickhouse test-integration-docker-logs test-integration-elasticsearch
+test-integration: test-integration-apex test-integration-aws test-integration-axiom test-integration-azure test-integration-clickhouse test-integration-docker-logs test-integration-elasticsearch
 test-integration: test-integration-azure test-integration-clickhouse test-integration-docker-logs test-integration-elasticsearch
 test-integration: test-integration-eventstoredb test-integration-fluent test-integration-gcp test-integration-humio test-integration-influxdb
 test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb test-integration-nats
@@ -427,7 +427,7 @@ bench-all: bench-remap-functions
 
 .PHONY: check
 check: ## Run prerequisite code checks
-	${MAYBE_ENVIRONMENT_EXEC} cargo check --all --no-default-features --features ${FEATURES}
+	${MAYBE_ENVIRONMENT_EXEC} cargo check --workspace --all-targets --features all-integration-tests
 
 .PHONY: check-all
 check-all: ## Check everything

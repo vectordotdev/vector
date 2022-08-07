@@ -191,8 +191,8 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
         "aws_kinesis_firehose"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 

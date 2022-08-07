@@ -21,6 +21,8 @@ const ERR_MISSING_DESC: &str = "all structs/enums must have a description i.e. `
 const ERR_ASYMMETRIC_SERDE_TYPE_CONVERSION: &str = "any container using `from`/`try_from`/`into` via `#[serde(...)]` must do so symmetrically i.e. the from/into types must match";
 const ERR_SERDE_TYPE_CONVERSION_FROM_TRY_FROM: &str = "`#[serde(from)]` and `#[serde(try_from)]` cannot be identical, as it is impossible for an infallible conversion from T to also be fallible";
 
+/// A source data structure annotated with `#[derive(Configurable)]`, parsed into an internal
+/// representation.
 pub struct Container<'a> {
     original: &'a DeriveInput,
     name: String,
@@ -31,6 +33,7 @@ pub struct Container<'a> {
 }
 
 impl<'a> Container<'a> {
+    /// Creates a new `Container<'a>` from the raw derive macro input.
     pub fn from_derive_input(input: &'a DeriveInput) -> darling::Result<Container<'a>> {
         // We can't do anything unless `serde` can also handle this container. We specifically only care about
         // deserialization here, because the schema tells us what we can _give_ to Vector.
@@ -223,42 +226,120 @@ impl<'a> Container<'a> {
             })
     }
 
+    /// Ident of the container.
+    ///
+    /// This is simply the name or type of a struct/enum, but is not parsed directly as a type via
+    /// `syn`, only an `Ident`.
     pub fn ident(&self) -> &Ident {
         &self.original.ident
     }
 
+    /// Generics for the container, if any.
     pub fn generics(&self) -> &Generics {
         &self.original.generics
     }
 
+    /// Data for the container.
+    ///
+    /// This would be the fields of a struct, or the variants for an enum.
     pub fn data(&self) -> &Data {
         &self.data
     }
 
+    /// Name of the container when deserializing.
+    ///
+    /// This may be different than the name of the container itself depending on whether it has been
+    /// altered with `serde` helper attributes i.e. `#[serde(rename = "...")]`.
     pub fn name(&self) -> &str {
         self.name.as_str()
     }
 
+    /// Title of the container, if any.
+    ///
+    /// The title specifically refers to the headline portion of a doc comment. For example, if a
+    /// struct has the following doc comment:
+    ///
+    /// ```text
+    /// /// My special struct.
+    /// ///
+    /// /// Here's why it's special:
+    /// /// ...
+    /// struct Wrapper(u64);
+    /// ```
+    ///
+    /// then the title would be `My special struct`. If the doc comment only contained `My special
+    /// struct.`, then we would consider the title _empty_. See `description` for more details on
+    /// detecting titles vs descriptions.
     pub fn title(&self) -> Option<&String> {
         self.attrs.title.as_ref()
     }
 
+    /// Description of the struct, if any.
+    ///
+    /// The description specifically refers to the body portion of a doc comment, or the headline if
+    /// only a headline exists.. For example, if a struct has the following doc comment:
+    ///
+    /// ```text
+    /// /// My special struct.
+    /// ///
+    /// /// Here's why it's special:
+    /// /// ...
+    /// struct Wrapper(u64);
+    /// ```
+    ///
+    /// then the title would be everything that comes after `My special struct`. If the doc comment
+    /// only contained `My special struct.`, then the description would be `My special struct.`, and
+    /// the title would be empty. In this way, the description will always be some port of a doc
+    /// comment, depending on the formatting applied.
+    ///
+    /// This logic was chosen to mimic how Rust's own `rustdoc` tool works, where it will use the
+    /// "title" portion as a high-level description for an item, only showing the title and
+    /// description together when drilling down to the documentation for that specific item. JSON
+    /// Schema supports both title and description for a schema, and so we expose both.
     pub fn description(&self) -> Option<&String> {
         self.attrs.description.as_ref()
     }
 
+    /// Virtual type of this container, if any.
+    ///
+    /// In some cases, a type may be representable by an entirely different type, and then converted
+    /// to the desired type using the common `TryFrom`/`From`/`Into` conversion traits. This is a
+    /// common pattern with `serde` to re-use existing conversion logic (such as taking a raw string
+    /// and parsing it to see if it's a valid regular expression, and so on) but represents a
+    /// divergence between the type we're generating a schema for and the actual type that will be
+    /// getting (de)serialized.
+    ///
+    /// When we detect a container with the right `serde` helper attributes (see the code in
+    /// `from_derive_input` for details), we switch to treating this container as, for the purpose
+    /// of schema generation, having the type specified by those helper attributes.
     pub fn virtual_newtype(&self) -> Option<Type> {
         self.virtual_newtype.clone()
     }
 
+    /// Path to a function to call to generate a default value for the container, if any.
+    ///
+    /// This will boil down to something like `std::default::Default::default` or
+    /// `name_of_in_scope_method_to_call`, where we generate code to actually call that path as a
+    /// function to generate the default value we include in the schema for this container.
     pub fn default_value(&self) -> Option<ExprPath> {
         self.default_value.clone()
     }
 
+    /// Whether or not the container is deprecated.
+    ///
+    /// Applying the `#[configurable(deprecated)]` helper attribute will mark this container as
+    /// deprecated from the perspective of the resulting schema. It does not interact with Rust's
+    /// standard `#[deprecated]` attribute, neither automatically applying it nor deriving the
+    /// deprecation status of a field when it is present.
     pub fn deprecated(&self) -> bool {
         self.attrs.deprecated.is_some()
     }
 
+    /// Metadata (custom attributes) for the container, if any.
+    ///
+    /// Attributes can take the shape of flags (`#[configurable(metadata(im_a_teapot))]`) or
+    /// key/value pairs (`#[configurable(metadata(status = "beta"))]`) to allow rich, semantic
+    /// metadata to be attached directly to containers.
     pub fn metadata(&self) -> impl Iterator<Item = CustomAttribute> {
         self.attrs
             .metadata

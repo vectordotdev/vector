@@ -78,6 +78,8 @@ use crate::event::EventStatus;
 /// batches have been acked. This means if sequential requests r1, r2,
 /// and r3 are dispatched and r2 and r3 complete, all events contained
 /// in all requests will not be acked until r1 has completed.
+///
+/// Note: This has been deprecated, please do not use when creating new Sinks.
 #[pin_project]
 #[derive(Debug)]
 pub struct BatchSink<S, B>
@@ -176,6 +178,8 @@ where
 /// Per partition ordering can be achived by holding onto future of a request
 /// until it finishes. Until then all further requests in that partition are
 /// delayed.
+///
+/// Note: This has been deprecated, please do not use when creating new Sinks.
 #[pin_project]
 pub struct PartitionBatchSink<S, B, K>
 where

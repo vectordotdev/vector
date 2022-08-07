@@ -107,15 +107,15 @@
 // rules, or ... so on and so forth. and by concating the existing description on the shared type,
 // we can continue to include high-quality doc comments with contextual links, examples, etc and
 // avoid duplication.
-
+//
+// TODO: Should we always apply the transparent marker to fields when they're the only field in a
+// tuple struct/tuple variant? There's also some potential interplay with using the `derived` helper
+// attribute on the tuple struct/tuple variant itself to signal that we want to pull the
+// title/description from the field instead, which coluld be useful when using newtype wrappers
+// around existing/remote types for the purpose of making them `Configurable`.
 #![deny(warnings)]
 
 use core::fmt;
-
-use num::ConfigurableNumber;
-
-pub mod schema;
-
 // Re-export of the various public dependencies required by the generated code to simplify the import requirements for
 // crates actually using the macros/derives.
 pub mod indexmap {
@@ -127,9 +127,15 @@ pub mod schemars {
 
 mod external;
 mod num;
+pub use self::num::ConfigurableNumber;
+pub mod schema;
+pub mod ser;
 mod stdlib;
+mod str;
+pub use self::str::ConfigurableString;
 
 use vector_config_common::attributes::CustomAttribute;
+
 // Re-export of the `#[configurable_component]` and `#[derive(Configurable)]` proc macros.
 pub use vector_config_macros::*;
 

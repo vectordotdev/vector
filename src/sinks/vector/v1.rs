@@ -6,7 +6,7 @@ use vector_config::configurable_component;
 use vector_core::event::{proto, Event};
 
 use crate::{
-    config::GenerateConfig,
+    config::{AcknowledgementsConfig, GenerateConfig},
     sinks::{util::tcp::TcpSinkConfig, Healthcheck, VectorSink},
     tcp::TcpKeepaliveConfig,
     tls::TlsEnableableConfig,
@@ -32,6 +32,14 @@ pub struct VectorConfig {
     ///
     /// If set, the value of the setting is passed via the `SO_SNDBUF` option.
     send_buffer_bytes: Option<usize>,
+
+    #[configurable(derived)]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub(super) acknowledgements: AcknowledgementsConfig,
 }
 
 impl VectorConfig {
@@ -44,17 +52,19 @@ impl VectorConfig {
         keepalive: Option<TcpKeepaliveConfig>,
         tls: Option<TlsEnableableConfig>,
         send_buffer_bytes: Option<usize>,
+        acknowledgements: AcknowledgementsConfig,
     ) -> Self {
         Self {
             address,
             keepalive,
             tls,
             send_buffer_bytes,
+            acknowledgements,
         }
     }
 
-    pub const fn from_address(address: String) -> Self {
-        Self::new(address, None, None, None)
+    pub const fn from_address(address: String, acknowledgements: AcknowledgementsConfig) -> Self {
+        Self::new(address, None, None, None, acknowledgements)
     }
 }
 
@@ -68,7 +78,14 @@ enum BuildError {
 
 impl GenerateConfig for VectorConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self::new("127.0.0.1:5000".to_string(), None, None, None)).unwrap()
+        toml::Value::try_from(Self::new(
+            "127.0.0.1:5000".to_string(),
+            None,
+            None,
+            None,
+            Default::default(),
+        ))
+        .unwrap()
     }
 }
 

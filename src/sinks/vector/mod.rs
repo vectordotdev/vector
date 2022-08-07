@@ -97,10 +97,10 @@ impl SinkConfig for VectorConfig {
         "vector"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
         match self {
-            Self::V1(_) => None,
-            Self::V2(v2) => Some(&v2.config.acknowledgements),
+            Self::V1(v1) => &v1.config.acknowledgements,
+            Self::V2(v2) => &v2.config.acknowledgements,
         }
     }
 }

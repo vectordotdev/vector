@@ -92,3 +92,44 @@ impl tokio_util::codec::Decoder for Decoder {
         self.handle_framing_result(frame)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::Decoder;
+    use bytes::Bytes;
+    use codecs::{
+        decoding::{Deserializer, Framer},
+        JsonDeserializer, NewlineDelimitedDecoder, StreamDecodingError,
+    };
+    use futures::{stream, StreamExt};
+    use tokio_util::{codec::FramedRead, io::StreamReader};
+    use value::Value;
+
+    #[tokio::test]
+    async fn framed_read_recover_from_error() {
+        let iter = stream::iter(
+            ["{ \"foo\": 1 }\n", "invalid\n", "{ \"bar\": 2 }\n"]
+                .into_iter()
+                .map(Bytes::from),
+        );
+        let stream = iter.map(Ok::<_, std::io::Error>);
+        let reader = StreamReader::new(stream);
+        let decoder = Decoder::new(
+            Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
+            Deserializer::Json(JsonDeserializer::new()),
+        );
+        let mut stream = FramedRead::new(reader, decoder);
+
+        let next = stream.next().await.unwrap();
+        let event = next.unwrap().0.pop().unwrap().into_log();
+        assert_eq!(event.get("foo").unwrap(), &Value::from(1));
+
+        let next = stream.next().await.unwrap();
+        let error = next.unwrap_err();
+        assert!(error.can_continue());
+
+        let next = stream.next().await.unwrap();
+        let event = next.unwrap().0.pop().unwrap().into_log();
+        assert_eq!(event.get("bar").unwrap(), &Value::from(2));
+    }
+}

@@ -3,6 +3,8 @@ use snafu::Snafu;
 
 pub mod util;
 
+#[cfg(feature = "sinks-apex")]
+pub mod apex;
 #[cfg(feature = "sinks-aws_cloudwatch_logs")]
 pub mod aws_cloudwatch_logs;
 #[cfg(feature = "sinks-aws_cloudwatch_metrics")]
@@ -122,6 +124,10 @@ pub enum HealthcheckError {
 #[derive(Clone, Debug)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Sinks {
+    /// Apex Logs.
+    #[cfg(feature = "sinks-apex")]
+    Apex(#[configurable(derived)] apex::ApexSinkConfig),
+
     /// AWS CloudWatch Logs.
     #[cfg(feature = "sinks-aws_cloudwatch_logs")]
     AwsCloudwatchLogs(#[configurable(derived)] aws_cloudwatch_logs::CloudwatchLogsSinkConfig),
@@ -196,6 +202,12 @@ pub enum Sinks {
     #[cfg(feature = "sinks-file")]
     File(#[configurable(derived)] file::FileSinkConfig),
 
+    /// Google Chronicle (unstructured).
+    #[cfg(feature = "sinks-gcp")]
+    GcpChronicleUnstructured(
+        #[configurable(derived)] gcp::chronicle_unstructured::ChronicleUnstructuredConfig,
+    ),
+
     /// GCP Stackdriver Logs.
     #[cfg(feature = "sinks-gcp")]
     GcpStackdriverLogs(#[configurable(derived)] gcp::stackdriver_logs::StackdriverConfig),
@@ -244,11 +256,10 @@ pub enum Sinks {
     #[cfg(feature = "sinks-logdna")]
     Logdna(#[configurable(derived)] logdna::LogdnaConfig),
 
-    /*
     /// Loki.
     #[cfg(feature = "sinks-loki")]
     Loki(#[configurable(derived)] loki::LokiConfig),
-    */
+
     /// NATS.
     #[cfg(feature = "sinks-nats")]
     Nats(#[configurable(derived)] self::nats::NatsSinkConfig),
@@ -265,11 +276,10 @@ pub enum Sinks {
     #[cfg(feature = "sinks-papertrail")]
     Papertrail(#[configurable(derived)] papertrail::PapertrailConfig),
 
-    /*
     /// Prometheus Exporter.
     #[cfg(feature = "sinks-prometheus")]
     PrometheusExporter(#[configurable(derived)] prometheus::exporter::PrometheusExporterConfig),
-    */
+
     /// Prometheus Remote Write.
     #[cfg(feature = "sinks-prometheus")]
     PrometheusRemoteWrite(#[configurable(derived)] prometheus::remote_write::RemoteWriteConfig),
