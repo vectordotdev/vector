@@ -8,11 +8,14 @@ use schemars::{
         SchemaObject, SingleOrVec, SubschemaValidation,
     },
 };
+use serde::Serialize;
 use serde_json::{Map, Value};
 
-use crate::{num::ConfigurableNumber, Configurable, Metadata};
+use crate::{num::ConfigurableNumber, Configurable, ConfigurableString, CustomAttribute, Metadata};
 
-/// Finalizes the schema by ensuring all metadata is applied and registering it in the generator.
+/// Finalizes the schema.
+///
+/// This ensures all metadata is applied and registers `T` in the generator if possible.
 ///
 /// As many configuration types are reused often, such as nearly all sinks allowing configuration of batching
 /// behavior via `BatchConfig`, we utilize JSONSchema's ability to define a named schema and then
@@ -21,19 +24,19 @@ use crate::{num::ConfigurableNumber, Configurable, Metadata};
 /// types such that they can be surfaced by tools using the schema.
 ///
 /// Since we don't utilize the typical flow of generating schemas via `schemars`, we're forced to
-/// manually determine when we should register a schema as a referencable schema within the schema
+/// manually determine when we should register a schema as a referenceable schema within the schema
 /// generator. As well, we need to handle applying metadata to these schemas such that we preserve
 /// the intended behavior.
-pub fn finalize_schema<'de, T>(
+pub fn finalize_schema<T>(
     gen: &mut SchemaGenerator,
     schema: &mut SchemaObject,
-    metadata: Metadata<'de, T>,
+    metadata: Metadata<T>,
 ) where
-    T: Configurable<'de>,
+    T: Configurable + Serialize,
 {
-    // If the type that this schema represents is referencable, check to see if it's been defined
+    // If the type that this schema represents is referenceable, check to see if it's been defined
     // before, and if not, then go ahead and define it.
-    if let Some(ref_name) = T::referencable_name() {
+    if let Some(ref_name) = T::referenceable_name() {
         if !gen.definitions().contains_key(ref_name) {
             // We specifically apply the metadata of `T` itself, and not the `metadata` we've been
             // given, as we do not want to apply field-level metadata e.g. field-specific default
@@ -57,16 +60,10 @@ pub fn finalize_schema<'de, T>(
 ///
 /// Metadata can include semantic information (title, description, etc), validation (min/max, allowable
 /// patterns, etc), as well as actual arbitrary key/value data.
-pub fn apply_metadata<'de, T>(schema: &mut SchemaObject, metadata: Metadata<'de, T>)
+pub fn apply_metadata<T>(schema: &mut SchemaObject, metadata: Metadata<T>)
 where
-    T: Configurable<'de>,
+    T: Serialize,
 {
-    // Figure out if we're applying metadata to a schema reference or the actual schema itself.
-    // Some things only makes sense to add to the reference (like a default value to use), while
-    // some things only make sense to add to the schema itself (like custom metadata, validation,
-    // etc), and some things make sense being added to both. (like the description)
-    let is_schema_ref = schema.reference.is_some();
-
     // Set the title/description of this schema.
     //
     // By default, we want to populate `description` because most things don't need a title: their property name or type
@@ -92,11 +89,18 @@ where
 
     // Set any custom attributes as extensions on the schema.
     let mut custom_map = Map::new();
-    for (key, value) in metadata.custom_attributes() {
-        custom_map.insert(key.to_string(), Value::String(value.to_string()));
+    for attribute in metadata.custom_attributes() {
+        match attribute {
+            CustomAttribute::Flag(key) => {
+                custom_map.insert(key.to_string(), Value::Bool(true));
+            }
+            CustomAttribute::KeyValue { key, value } => {
+                custom_map.insert(key.to_string(), Value::String(value.to_string()));
+            }
+        }
     }
 
-    if !custom_map.is_empty() && !is_schema_ref {
+    if !custom_map.is_empty() {
         schema
             .extensions
             .insert("_metadata".to_string(), Value::Object(custom_map));
@@ -151,9 +155,9 @@ pub fn generate_string_schema() -> SchemaObject {
     }
 }
 
-pub fn generate_number_schema<'de, N>() -> SchemaObject
+pub fn generate_number_schema<N>() -> SchemaObject
 where
-    N: Configurable<'de> + ConfigurableNumber,
+    N: Configurable + ConfigurableNumber,
 {
     let minimum = N::get_enforced_min_bound();
     let maximum = N::get_enforced_max_bound();
@@ -186,12 +190,9 @@ where
     schema
 }
 
-pub fn generate_array_schema<'de, T>(
-    gen: &mut SchemaGenerator,
-    metadata: Metadata<'de, T>,
-) -> SchemaObject
+pub fn generate_array_schema<T>(gen: &mut SchemaGenerator, metadata: Metadata<T>) -> SchemaObject
 where
-    T: Configurable<'de>,
+    T: Configurable,
 {
     // We generate the schema for `T` itself, and then apply any of `T`'s metadata to the given schema.
     let element_schema = T::generate_schema(gen, metadata);
@@ -206,12 +207,9 @@ where
     }
 }
 
-pub fn generate_set_schema<'de, T>(
-    gen: &mut SchemaGenerator,
-    metadata: Metadata<'de, T>,
-) -> SchemaObject
+pub fn generate_set_schema<T>(gen: &mut SchemaGenerator, metadata: Metadata<T>) -> SchemaObject
 where
-    T: Configurable<'de>,
+    T: Configurable,
 {
     // We generate the schema for `T` itself, and then apply any of `T`'s metadata to the given schema.
     let element_schema = T::generate_schema(gen, metadata);
@@ -227,12 +225,9 @@ where
     }
 }
 
-pub fn generate_map_schema<'de, V>(
-    gen: &mut SchemaGenerator,
-    metadata: Metadata<'de, V>,
-) -> SchemaObject
+pub fn generate_map_schema<V>(gen: &mut SchemaGenerator, metadata: Metadata<V>) -> SchemaObject
 where
-    V: Configurable<'de>,
+    V: Configurable,
 {
     // We generate the schema for `V` itself, and then apply any of `V`'s metadata to the given schema.
     let element_schema = V::generate_schema(gen, metadata);
@@ -268,12 +263,9 @@ pub fn generate_struct_schema(
     }
 }
 
-pub fn generate_optional_schema<'de, T>(
-    gen: &mut SchemaGenerator,
-    metadata: Metadata<'de, T>,
-) -> SchemaObject
+pub fn generate_optional_schema<T>(gen: &mut SchemaGenerator, metadata: Metadata<T>) -> SchemaObject
 where
-    T: Configurable<'de>,
+    T: Configurable,
 {
     // We generate the schema for `T` itself, and then apply any of `T`'s metadata to the given schema.
     let mut schema = T::generate_schema(gen, metadata);
@@ -284,7 +276,7 @@ where
         // If this schema has no instance type, see if it's a reference schema.  If so, then we'd simply switch to
         // generating a composite schema with this schema reference and a generic null schema.
         None => match schema.is_ref() {
-            false => panic!("tried to generate optional schema, but `T` had no instance type and was not a referencable schema"),
+            false => panic!("tried to generate optional schema, but `T` had no instance type and was not a referenceable schema"),
             true => {
                 let null = generate_null_schema();
 
@@ -360,9 +352,9 @@ pub fn generate_internal_tagged_variant_schema(tag: String, value: String) -> Sc
     generate_struct_schema(properties, required, None)
 }
 
-pub fn generate_root_schema<'de, T>() -> RootSchema
+pub fn generate_root_schema<T>() -> RootSchema
 where
-    T: Configurable<'de>,
+    T: Configurable,
 {
     let mut schema_gen = SchemaSettings::draft2019_09().into_generator();
 
@@ -371,5 +363,63 @@ where
         meta_schema: None,
         schema,
         definitions: schema_gen.take_definitions(),
+    }
+}
+
+/// Asserts that the key type `K` generates a string-like schema, suitable for use in maps.
+///
+/// This function generates a schema for `K` and ensures that the resulting schema is explicitly,
+/// but only, represented as a `string` data type. This is necessary to ensure that `K` can be used
+/// as the key type for maps, as maps are represented by the `object` data type in JSON Schema,
+/// which must have fields with valid string identifiers.
+///
+/// ## Panics
+///
+/// If the schema is not a valid, string-like schema, this function will panic with an error message
+/// indicating as such, and will include the key type, `K`, which represents the input schema, and
+/// the container type, `C`, that the key type is attempting to be used with.
+pub fn assert_string_schema_for_map<K: ConfigurableString, C>(gen: &mut SchemaGenerator) {
+    // We need to force the schema to be treated as transparent so that when the schema generation
+    // finalizes the schema, we don't throw an error due to a lack of title/description.
+    let mut key_metadata = K::metadata();
+    key_metadata.set_transparent();
+
+    let key_schema = K::generate_schema(gen, key_metadata);
+    let wrapped_schema = Schema::Object(key_schema);
+
+    // Get a reference to the underlying schema if we're dealing with a reference, or just use what
+    // we have if it's the actual definition.
+    let underlying_schema = if wrapped_schema.is_ref() {
+        gen.dereference(&wrapped_schema)
+    } else {
+        Some(&wrapped_schema)
+    };
+
+    let is_string_like = match underlying_schema {
+        Some(Schema::Object(schema_object)) => match schema_object.instance_type.as_ref() {
+            Some(sov) => match sov {
+                // Has to be a string.
+                SingleOrVec::Single(it) => **it == InstanceType::String,
+                // As long as there's only one instance type, and it's string, we're fine
+                // with that, too.
+                SingleOrVec::Vec(its) => {
+                    its.len() == 1
+                        && its
+                            .get(0)
+                            .filter(|it| *it == &InstanceType::String)
+                            .is_some()
+                }
+            },
+            // We match explicitly, so a lack of declared instance types is not considered
+            // valid here.
+            None => false,
+        },
+        // We match explicitly, so boolean schemas aren't considered valid here.
+        _ => false,
+    };
+
+    if !is_string_like {
+        panic!("Tried to use key type `{}` with `{}`, but actual schema for `{}` is not string-like! This is a violation of the implementation of `ConfigurableString`.",
+            std::any::type_name::<K>(), std::any::type_name::<C>(), std::any::type_name::<K>());
     }
 }

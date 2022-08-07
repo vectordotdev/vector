@@ -7,7 +7,7 @@
 # 4 │ sha3(result.message)
 #   │      ^^^^^^^^^^^^^^
 #   │      │
-#   │      this expression resolves to one of string, integer, float, boolean, null, array or object
+#   │      this expression resolves to one of string, integer, float, boolean, null, undefined, array or object
 #   │      but the parameter "value" expects the exact type string
 #   │
 #   = try: ensuring an appropriate type at runtime
@@ -23,6 +23,7 @@
 #   = see documentation about error handling at https://errors.vrl.dev/#handling
 #   = learn more about error code 110 at https://errors.vrl.dev/110
 #   = see language documentation at https://vrl.dev
+#   = try your code in the VRL REPL, learn more at https://vrl.dev/examples
 
 .message = to_string!(.message)
 result = parse_json!(.message)

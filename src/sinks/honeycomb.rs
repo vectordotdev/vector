@@ -1,10 +1,11 @@
 use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
-use serde::{Deserialize, Serialize};
 use serde_json::json;
+use vector_config::configurable_component;
 
 use crate::{
+    codecs::Transformer,
     config::{
         log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
         SinkDescription,
@@ -17,23 +18,37 @@ use crate::{
     },
 };
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub(super) struct HoneycombConfig {
+/// Configuration for the `honeycomb` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug)]
+pub struct HoneycombConfig {
     #[serde(skip, default = "default_endpoint")]
     endpoint: String,
 
+    /// The team key that will be used to authenticate against Honeycomb.
     api_key: String,
 
+    /// The dataset that Vector will send logs to.
     // TODO: we probably want to make this a template
     // but this limits us in how we can do our healthcheck.
     dataset: String,
 
+    #[configurable(derived)]
     #[serde(default)]
     batch: BatchConfig<HoneycombDefaultBatchSettings>,
 
+    #[configurable(derived)]
     #[serde(default)]
     request: TowerRequestConfig,
 
+    #[configurable(derived)]
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    encoding: Transformer,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -89,7 +104,6 @@ impl SinkConfig for HoneycombConfig {
             request_settings,
             batch_settings.timeout,
             client.clone(),
-            cx.acker(),
         )
         .sink_map_err(|error| error!(message = "Fatal honeycomb sink error.", %error));
 
@@ -106,15 +120,18 @@ impl SinkConfig for HoneycombConfig {
         "honeycomb"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
-pub struct HoneycombEventEncoder;
+pub struct HoneycombEventEncoder {
+    transformer: Transformer,
+}
 
 impl HttpEventEncoder<serde_json::Value> for HoneycombEventEncoder {
-    fn encode_event(&mut self, event: Event) -> Option<serde_json::Value> {
+    fn encode_event(&mut self, mut event: Event) -> Option<serde_json::Value> {
+        self.transformer.transform(&mut event);
         let mut log = event.into_log();
 
         let timestamp = if let Some(Value::Timestamp(ts)) = log.remove(log_schema().timestamp_key())
@@ -140,7 +157,9 @@ impl HttpSink for HoneycombConfig {
     type Encoder = HoneycombEventEncoder;
 
     fn build_encoder(&self) -> Self::Encoder {
-        HoneycombEventEncoder
+        HoneycombEventEncoder {
+            transformer: self.encoding.clone(),
+        }
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Bytes>> {
@@ -201,7 +220,7 @@ async fn healthcheck(config: HoneycombConfig, client: HttpClient) -> crate::Resu
 #[cfg(test)]
 mod test {
     use futures::{future::ready, stream};
-    use vector_core::event::Event;
+    use vector_core::event::{Event, LogEvent};
 
     use crate::{
         config::{GenerateConfig, SinkConfig, SinkContext},
@@ -230,7 +249,7 @@ mod test {
         let context = SinkContext::new_test();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
 
-        let event = Event::from("simple message");
+        let event = Event::Log(LogEvent::from("simple message"));
         run_and_assert_sink_compliance(sink, stream::once(ready(event)), &SINK_TAGS).await;
     }
 }

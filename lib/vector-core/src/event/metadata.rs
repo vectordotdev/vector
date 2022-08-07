@@ -4,10 +4,11 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
-use value::{Secrets, Value};
+use value::{Kind, Secrets, Value};
 use vector_common::EventDataEq;
 
 use super::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus};
+use crate::config::LogNamespace;
 use crate::{schema, ByteSizeOf};
 
 const DATADOG_API_KEY: &str = "datadog_api_key";
@@ -95,7 +96,10 @@ impl Default for EventMetadata {
 }
 
 fn default_schema_definition() -> Arc<schema::Definition> {
-    Arc::new(schema::Definition::empty())
+    Arc::new(schema::Definition::new_with_default_metadata(
+        Kind::any(),
+        [LogNamespace::Legacy, LogNamespace::Vector],
+    ))
 }
 
 impl ByteSizeOf for EventMetadata {
@@ -124,15 +128,15 @@ impl EventMetadata {
 
     /// Replace the finalizer with a new one created from the given batch notifier.
     #[must_use]
-    pub fn with_batch_notifier(self, batch: &Arc<BatchNotifier>) -> Self {
-        self.with_finalizer(EventFinalizer::new(Arc::clone(batch)))
+    pub fn with_batch_notifier(self, batch: &BatchNotifier) -> Self {
+        self.with_finalizer(EventFinalizer::new(batch.clone()))
     }
 
     /// Replace the finalizer with a new one created from the given optional batch notifier.
     #[must_use]
-    pub fn with_batch_notifier_option(self, batch: &Option<Arc<BatchNotifier>>) -> Self {
+    pub fn with_batch_notifier_option(self, batch: &Option<BatchNotifier>) -> Self {
         match batch {
-            Some(batch) => self.with_finalizer(EventFinalizer::new(Arc::clone(batch))),
+            Some(batch) => self.with_finalizer(EventFinalizer::new(batch.clone())),
             None => self,
         }
     }

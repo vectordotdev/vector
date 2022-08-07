@@ -125,8 +125,8 @@ impl Expression for SliceFn {
         let td = TypeDef::from(Kind::never()).fallible();
 
         match self.value.type_def(state) {
-            v if v.is_bytes() => td.merge_deep(v),
-            v if v.is_array() => td.merge_deep(v).collect_subtypes(),
+            v if v.is_bytes() => td.union(v),
+            v if v.is_array() => td.union(v).collect_subtypes(),
             _ => td.add_bytes().add_array(Collection::any()),
         }
     }

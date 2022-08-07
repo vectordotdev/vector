@@ -22,8 +22,6 @@ services:
       - "humio-integration-tests"
       - "--lib"
       - "sinks::humio::"
-      - "--"
-      - "--nocapture"
     environment:
       - HUMIO_ADDRESS=http://localhost:8080
     depends_on:

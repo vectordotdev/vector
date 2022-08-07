@@ -3,11 +3,11 @@ use std::fmt;
 use diagnostic::{DiagnosticMessage, Label, Note, Span, Urls};
 use value::Value;
 
-use crate::state::{ExternalEnv, LocalEnv};
-use crate::value::VrlValueArithmetic;
 use crate::{
     expression::{self, Expr, Resolved},
     parser::{ast, Node},
+    state::{ExternalEnv, LocalEnv},
+    value::VrlValueArithmetic,
     Context, Expression, TypeDef,
 };
 
@@ -79,22 +79,25 @@ impl Op {
 
 impl Expression for Op {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        use ast::Opcode::*;
-        use value::Value::*;
+        use ast::Opcode::{Add, And, Div, Eq, Err, Ge, Gt, Le, Lt, Merge, Mul, Ne, Or, Rem, Sub};
+        use value::Value::{Boolean, Null};
 
-        if let Err = self.opcode {
-            return self.lhs.resolve(ctx).or_else(|_| self.rhs.resolve(ctx));
-        } else if let Or = self.opcode {
-            return self
-                .lhs
-                .resolve(ctx)?
-                .try_or(|| self.rhs.resolve(ctx))
-                .map_err(Into::into);
-        } else if let And = self.opcode {
-            return match self.lhs.resolve(ctx)? {
-                Null | Boolean(false) => Ok(false.into()),
-                v => v.try_and(self.rhs.resolve(ctx)?).map_err(Into::into),
-            };
+        match self.opcode {
+            Err => return self.lhs.resolve(ctx).or_else(|_| self.rhs.resolve(ctx)),
+            Or => {
+                return self
+                    .lhs
+                    .resolve(ctx)?
+                    .try_or(|| self.rhs.resolve(ctx))
+                    .map_err(Into::into);
+            }
+            And => {
+                return match self.lhs.resolve(ctx)? {
+                    Null | Boolean(false) => Ok(false.into()),
+                    v => v.try_and(self.rhs.resolve(ctx)?).map_err(Into::into),
+                };
+            }
+            _ => (),
         };
 
         let lhs = self.lhs.resolve(ctx)?;
@@ -119,7 +122,7 @@ impl Expression for Op {
     }
 
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
-        use ast::Opcode::*;
+        use ast::Opcode::{Add, And, Div, Eq, Err, Ge, Gt, Le, Lt, Merge, Mul, Ne, Or, Rem, Sub};
         use value::Kind as K;
 
         let mut lhs_def = self.lhs.type_def(state);
@@ -127,10 +130,10 @@ impl Expression for Op {
 
         match self.opcode {
             // ok/err ?? ok
-            Err if rhs_def.is_infallible() => lhs_def.merge_deep(rhs_def).infallible(),
+            Err if rhs_def.is_infallible() => lhs_def.union(rhs_def).infallible(),
 
             // ... ?? ...
-            Err => lhs_def.merge_deep(rhs_def),
+            Err => lhs_def.union(rhs_def),
 
             // null || ...
             Or if lhs_def.is_null() => rhs_def,
@@ -146,10 +149,10 @@ impl Expression for Op {
                 // we will be taking the rhs and only the rhs type_def will then be relevant.
                 lhs_def.remove_null();
 
-                lhs_def.merge_deep(rhs_def)
+                lhs_def.union(rhs_def)
             }
 
-            Or => lhs_def.merge_deep(rhs_def),
+            Or => lhs_def.union(rhs_def),
 
             // ... | ...
             Merge => lhs_def.merge_overwrite(rhs_def),
@@ -162,19 +165,19 @@ impl Expression for Op {
             // ... && ...
             And => lhs_def
                 .fallible_unless(K::null().or_boolean())
-                .merge_deep(rhs_def.fallible_unless(K::null().or_boolean()))
+                .union(rhs_def.fallible_unless(K::null().or_boolean()))
                 .with_kind(K::boolean()),
 
             // ... == ...
             // ... != ...
-            Eq | Ne => lhs_def.merge_deep(rhs_def).with_kind(K::boolean()),
+            Eq | Ne => lhs_def.union(rhs_def).with_kind(K::boolean()),
 
             // "b" >  "a"
             // "a" >= "a"
             // "a" <  "b"
             // "b" <= "b"
             Gt | Ge | Lt | Le if lhs_def.is_bytes() && rhs_def.is_bytes() => {
-                lhs_def.merge_deep(rhs_def).with_kind(K::boolean())
+                lhs_def.union(rhs_def).with_kind(K::boolean())
             }
 
             // ... >  ...
@@ -183,7 +186,7 @@ impl Expression for Op {
             // ... <= ...
             Gt | Ge | Lt | Le => lhs_def
                 .fallible_unless(K::integer().or_float())
-                .merge_deep(rhs_def.fallible_unless(K::integer().or_float()))
+                .union(rhs_def.fallible_unless(K::integer().or_float()))
                 .with_kind(K::boolean()),
 
             // ... / ...
@@ -220,7 +223,7 @@ impl Expression for Op {
             // ... + "bar"
             Add if lhs_def.is_bytes() || rhs_def.is_bytes() => lhs_def
                 .fallible_unless(K::bytes().or_null())
-                .merge_deep(rhs_def.fallible_unless(K::bytes().or_null()))
+                .union(rhs_def.fallible_unless(K::bytes().or_null()))
                 .with_kind(K::bytes()),
 
             // ... + 1.0
@@ -233,7 +236,7 @@ impl Expression for Op {
             // 1.0 % ...
             Add | Sub | Mul if lhs_def.is_float() || rhs_def.is_float() => lhs_def
                 .fallible_unless(K::integer().or_float())
-                .merge_deep(rhs_def.fallible_unless(K::integer().or_float()))
+                .union(rhs_def.fallible_unless(K::integer().or_float()))
                 .with_kind(K::float()),
 
             // 1 + 1
@@ -241,29 +244,29 @@ impl Expression for Op {
             // 1 * 1
             // 1 % 1
             Add | Sub | Mul if lhs_def.is_integer() && rhs_def.is_integer() => {
-                lhs_def.merge_deep(rhs_def).with_kind(K::integer())
+                lhs_def.union(rhs_def).with_kind(K::integer())
             }
 
             // "bar" * 1
             Mul if lhs_def.is_bytes() && rhs_def.is_integer() => {
-                lhs_def.merge_deep(rhs_def).with_kind(K::bytes())
+                lhs_def.union(rhs_def).with_kind(K::bytes())
             }
 
             // 1 * "bar"
             Mul if lhs_def.is_integer() && rhs_def.is_bytes() => {
-                lhs_def.merge_deep(rhs_def).with_kind(K::bytes())
+                lhs_def.union(rhs_def).with_kind(K::bytes())
             }
 
             // ... + ...
             // ... * ...
             Add | Mul => lhs_def
-                .merge_deep(rhs_def)
+                .union(rhs_def)
                 .fallible()
                 .with_kind(K::bytes().or_integer().or_float()),
 
             // ... - ...
             Sub => lhs_def
-                .merge_deep(rhs_def)
+                .union(rhs_def)
                 .fallible()
                 .with_kind(K::integer().or_float()),
         }
@@ -308,7 +311,7 @@ pub enum Error {
 
 impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
-        use Error::*;
+        use Error::{ChainedComparison, Expr, MergeNonObjects, UnnecessaryCoalesce};
 
         match self {
             ChainedComparison { .. } => 650,
@@ -319,7 +322,7 @@ impl DiagnosticMessage for Error {
     }
 
     fn message(&self) -> String {
-        use Error::*;
+        use Error::Expr;
 
         match self {
             Expr(err) => err.message(),
@@ -328,7 +331,7 @@ impl DiagnosticMessage for Error {
     }
 
     fn labels(&self) -> Vec<Label> {
-        use Error::*;
+        use Error::{ChainedComparison, Expr, MergeNonObjects, UnnecessaryCoalesce};
 
         match self {
             ChainedComparison { span } => vec![Label::primary("", span)],
@@ -363,7 +366,7 @@ impl DiagnosticMessage for Error {
     }
 
     fn notes(&self) -> Vec<Note> {
-        use Error::*;
+        use Error::{ChainedComparison, Expr};
 
         match self {
             ChainedComparison { .. } => vec![Note::SeeDocs(
@@ -382,8 +385,10 @@ impl DiagnosticMessage for Error {
 mod tests {
     use std::convert::TryInto;
 
-    use ast::Ident;
-    use ast::Opcode::*;
+    use ast::{
+        Ident,
+        Opcode::{Add, And, Div, Eq, Err, Ge, Gt, Le, Lt, Mul, Ne, Or, Rem, Sub},
+    };
     use ordered_float::NotNan;
 
     use super::*;

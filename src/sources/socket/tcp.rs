@@ -11,7 +11,7 @@ use crate::{
     serde::default_decoding,
     sources::util::{SocketListenAddr, TcpNullAcker, TcpSource},
     tcp::TcpKeepaliveConfig,
-    tls::TlsEnableableConfig,
+    tls::TlsSourceConfig,
 };
 
 /// TCP configuration for the `socket` source.
@@ -37,7 +37,9 @@ pub struct TcpConfig {
     ///
     /// The value will be the peer host's address, including the port i.e. `1.2.3.4:9000`.
     ///
-    /// By default, the [global `host_key` option](https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key) is used.
+    /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
+    ///
+    /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     host_key: Option<String>,
 
     /// Overrides the name of the log field used to add the peer host's port to each event.
@@ -48,7 +50,7 @@ pub struct TcpConfig {
     port_key: Option<String>,
 
     #[configurable(derived)]
-    tls: Option<TlsEnableableConfig>,
+    tls: Option<TlsSourceConfig>,
 
     /// The size, in bytes, of the receive buffer used for each connection.
     ///
@@ -91,7 +93,7 @@ impl TcpConfig {
         &self.host_key
     }
 
-    pub const fn tls(&self) -> &Option<TlsEnableableConfig> {
+    pub const fn tls(&self) -> &Option<TlsSourceConfig> {
         &self.tls
     }
 
@@ -133,7 +135,7 @@ impl TcpConfig {
         self
     }
 
-    pub fn set_tls(&mut self, val: Option<TlsEnableableConfig>) -> &mut Self {
+    pub fn set_tls(&mut self, val: Option<TlsSourceConfig>) -> &mut Self {
         self.tls = val;
         self
     }

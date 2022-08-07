@@ -1,5 +1,4 @@
-use chrono::Utc;
-use futures::{stream, StreamExt};
+use futures::StreamExt;
 use heim::units::information::byte;
 #[cfg(not(target_os = "windows"))]
 use heim::units::ratio::ratio;
@@ -7,7 +6,6 @@ use vector_common::btreemap;
 use vector_config::configurable_component;
 
 use super::{filter_result, FilterList, HostMetrics};
-use crate::event::metric::Metric;
 
 /// Options for the “filesystem” metrics collector.
 #[configurable_component]
@@ -27,10 +25,11 @@ pub struct FilesystemConfig {
 }
 
 impl HostMetrics {
-    pub async fn filesystem_metrics(&self) -> Vec<Metric> {
+    pub async fn filesystem_metrics(&self, output: &mut super::MetricsBuffer) {
+        output.name = "filesystem";
         match heim::disk::partitions().await {
             Ok(partitions) => {
-                partitions
+                for (partition, usage) in partitions
                     .filter_map(|result| {
                         filter_result(result, "Failed to load/parse partition data.")
                     })
@@ -76,54 +75,42 @@ impl HostMetrics {
                             .map(|usage| (partition, usage))
                             .ok()
                     })
-                    .map(|(partition, usage)| {
-                        let timestamp = Utc::now();
-                        let fs = partition.file_system();
-                        let mut tags = btreemap! {
-                            "filesystem" => fs.as_str(),
-                            "mountpoint" => partition.mount_point().to_string_lossy()
-                        };
-                        if let Some(device) = partition.device() {
-                            tags.insert("device".into(), device.to_string_lossy().into());
-                        }
-                        stream::iter(
-                            vec![
-                                self.gauge(
-                                    "filesystem_free_bytes",
-                                    timestamp,
-                                    usage.free().get::<byte>() as f64,
-                                    tags.clone(),
-                                ),
-                                self.gauge(
-                                    "filesystem_total_bytes",
-                                    timestamp,
-                                    usage.total().get::<byte>() as f64,
-                                    tags.clone(),
-                                ),
-                                self.gauge(
-                                    "filesystem_used_bytes",
-                                    timestamp,
-                                    usage.used().get::<byte>() as f64,
-                                    tags.clone(),
-                                ),
-                                #[cfg(not(target_os = "windows"))]
-                                self.gauge(
-                                    "filesystem_used_ratio",
-                                    timestamp,
-                                    usage.ratio().get::<ratio>() as f64,
-                                    tags,
-                                ),
-                            ]
-                            .into_iter(),
-                        )
-                    })
-                    .flatten()
                     .collect::<Vec<_>>()
                     .await
+                {
+                    let fs = partition.file_system();
+                    let mut tags = btreemap! {
+                        "filesystem" => fs.as_str(),
+                        "mountpoint" => partition.mount_point().to_string_lossy()
+                    };
+                    if let Some(device) = partition.device() {
+                        tags.insert("device".into(), device.to_string_lossy().into());
+                    }
+                    output.gauge(
+                        "filesystem_free_bytes",
+                        usage.free().get::<byte>() as f64,
+                        tags.clone(),
+                    );
+                    output.gauge(
+                        "filesystem_total_bytes",
+                        usage.total().get::<byte>() as f64,
+                        tags.clone(),
+                    );
+                    output.gauge(
+                        "filesystem_used_bytes",
+                        usage.used().get::<byte>() as f64,
+                        tags.clone(),
+                    );
+                    #[cfg(not(target_os = "windows"))]
+                    output.gauge(
+                        "filesystem_used_ratio",
+                        usage.ratio().get::<ratio>() as f64,
+                        tags,
+                    );
+                }
             }
             Err(error) => {
                 error!(message = "Failed to load partitions info.", %error, internal_log_rate_secs = 60);
-                vec![]
             }
         }
     }
@@ -134,7 +121,7 @@ mod tests {
     use super::{
         super::{
             tests::{all_gauges, assert_filtered_metrics, count_name, count_tag},
-            HostMetrics, HostMetricsConfig,
+            HostMetrics, HostMetricsConfig, MetricsBuffer,
         },
         FilesystemConfig,
     };
@@ -142,9 +129,11 @@ mod tests {
     #[cfg(not(target_os = "windows"))]
     #[tokio::test]
     async fn generates_filesystem_metrics() {
-        let metrics = HostMetrics::new(HostMetricsConfig::default())
-            .filesystem_metrics()
+        let mut buffer = MetricsBuffer::new(None);
+        HostMetrics::new(HostMetricsConfig::default())
+            .filesystem_metrics(&mut buffer)
             .await;
+        let metrics = buffer.metrics;
         assert!(!metrics.is_empty());
         assert!(metrics.len() % 4 == 0);
         assert!(all_gauges(&metrics));
@@ -172,9 +161,11 @@ mod tests {
     #[cfg(target_os = "windows")]
     #[tokio::test]
     async fn generates_filesystem_metrics() {
-        let metrics = HostMetrics::new(HostMetricsConfig::default())
-            .filesystem_metrics()
+        let mut buffer = MetricsBuffer::new(None);
+        HostMetrics::new(HostMetricsConfig::default())
+            .filesystem_metrics(&mut buffer)
             .await;
+        let metrics = buffer.metrics;
         assert!(!metrics.is_empty());
         assert!(metrics.len() % 3 == 0);
         assert!(all_gauges(&metrics));
@@ -200,7 +191,8 @@ mod tests {
 
     #[tokio::test]
     async fn filesystem_metrics_filters_on_device() {
-        assert_filtered_metrics("device", |devices| async {
+        assert_filtered_metrics("device", |devices| async move {
+            let mut buffer = MetricsBuffer::new(None);
             HostMetrics::new(HostMetricsConfig {
                 filesystem: FilesystemConfig {
                     devices,
@@ -208,15 +200,17 @@ mod tests {
                 },
                 ..Default::default()
             })
-            .filesystem_metrics()
-            .await
+            .filesystem_metrics(&mut buffer)
+            .await;
+            buffer.metrics
         })
         .await;
     }
 
     #[tokio::test]
     async fn filesystem_metrics_filters_on_filesystem() {
-        assert_filtered_metrics("filesystem", |filesystems| async {
+        assert_filtered_metrics("filesystem", |filesystems| async move {
+            let mut buffer = MetricsBuffer::new(None);
             HostMetrics::new(HostMetricsConfig {
                 filesystem: FilesystemConfig {
                     filesystems,
@@ -224,15 +218,17 @@ mod tests {
                 },
                 ..Default::default()
             })
-            .filesystem_metrics()
-            .await
+            .filesystem_metrics(&mut buffer)
+            .await;
+            buffer.metrics
         })
         .await;
     }
 
     #[tokio::test]
     async fn filesystem_metrics_filters_on_mountpoint() {
-        assert_filtered_metrics("mountpoint", |mountpoints| async {
+        assert_filtered_metrics("mountpoint", |mountpoints| async move {
+            let mut buffer = MetricsBuffer::new(None);
             HostMetrics::new(HostMetricsConfig {
                 filesystem: FilesystemConfig {
                     mountpoints,
@@ -240,8 +236,9 @@ mod tests {
                 },
                 ..Default::default()
             })
-            .filesystem_metrics()
-            .await
+            .filesystem_metrics(&mut buffer)
+            .await;
+            buffer.metrics
         })
         .await;
     }

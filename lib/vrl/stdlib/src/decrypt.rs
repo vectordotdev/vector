@@ -1,8 +1,9 @@
 use ::value::Value;
-use aes::cipher::block_padding::{AnsiX923, Iso10126, Iso7816, Pkcs7};
-use aes::cipher::generic_array::GenericArray;
-use aes::cipher::KeyIvInit;
-use aes::cipher::{AsyncStreamCipher, BlockDecryptMut, StreamCipher};
+use aes::cipher::{
+    block_padding::{AnsiX923, Iso10126, Iso7816, Pkcs7},
+    generic_array::GenericArray,
+    AsyncStreamCipher, BlockDecryptMut, KeyIvInit, StreamCipher,
+};
 use cfb_mode::Decryptor as Cfb;
 use ctr::Ctr64LE;
 use ofb::Ofb;

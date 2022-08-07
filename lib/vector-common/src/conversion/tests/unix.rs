@@ -55,6 +55,7 @@ fn dateref() -> DateTime<Utc> {
     Utc.from_utc_datetime(&NaiveDateTime::from_timestamp(981_173_106, 0))
 }
 
+#[allow(clippy::trait_duplication_in_bounds)] // appears to be a false positive
 fn convert<T>(fmt: &str, value: &'static str) -> Result<T, Error>
 where
     T: From<Bytes> + From<i64> + From<NotNan<f64>> + From<bool> + From<DateTime<Utc>>,

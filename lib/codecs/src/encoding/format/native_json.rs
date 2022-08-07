@@ -35,8 +35,8 @@ impl NativeJsonSerializer {
     }
 
     /// Encode event and represent it as native JSON value.
-    pub fn to_json_value(&self, event: Event) -> Result<serde_json::Value, serde_json::Error> {
-        serde_json::to_value(&event)
+    pub fn to_json_value(&self, event: Event) -> Result<serde_json::Value, vector_core::Error> {
+        serde_json::to_value(&event).map_err(|e| e.to_string().into())
     }
 }
 
@@ -53,15 +53,15 @@ impl Encoder<Event> for NativeJsonSerializer {
 mod tests {
     use bytes::BytesMut;
     use vector_common::btreemap;
-    use vector_core::event::Value;
+    use vector_core::event::{LogEvent, Value};
 
     use super::*;
 
     #[test]
     fn serialize_json() {
-        let event = Event::from(btreemap! {
+        let event = Event::Log(LogEvent::from(btreemap! {
             "foo" => Value::from("bar")
-        });
+        }));
         let mut serializer = NativeJsonSerializer::new();
         let mut bytes = BytesMut::new();
 
@@ -72,9 +72,9 @@ mod tests {
 
     #[test]
     fn serialize_equals_to_json_value() {
-        let event = Event::from(btreemap! {
+        let event = Event::Log(LogEvent::from(btreemap! {
             "foo" => Value::from("bar")
-        });
+        }));
         let mut serializer = NativeJsonSerializer::new();
         let mut bytes = BytesMut::new();
 

@@ -9,6 +9,20 @@ use std::{
     time::Duration,
 };
 
+use crate::{
+    config::{
+        log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext,
+        SourceDescription,
+    },
+    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, LogEvent, Value},
+    internal_events::{
+        BytesReceived, JournaldInvalidRecordError, JournaldNegativeAcknowledgmentError,
+        OldEventsReceived,
+    },
+    serde::bool_or_struct,
+    shutdown::ShutdownSignal,
+    SourceSender,
+};
 use bytes::Bytes;
 use chrono::TimeZone;
 use codecs::{decoding::BoxedFramingError, CharacterDelimitedDecoder};
@@ -30,23 +44,9 @@ use tokio::{
     time::sleep,
 };
 use tokio_util::codec::FramedRead;
+use vector_common::{byte_size_of::ByteSizeOf, finalizer::OrderedFinalizer};
 use vector_config::configurable_component;
-use vector_core::{finalizer::OrderedFinalizer, ByteSizeOf};
-
-use crate::{
-    config::{
-        log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext,
-        SourceDescription,
-    },
-    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, LogEvent, Value},
-    internal_events::{
-        BytesReceived, JournaldInvalidRecordError, JournaldNegativeAcknowledgmentError,
-        OldEventsReceived,
-    },
-    serde::bool_or_struct,
-    shutdown::ShutdownSignal,
-    SourceSender,
-};
+use vector_core::config::LogNamespace;
 
 const DEFAULT_BATCH_SIZE: usize = 16;
 const BATCH_TIMEOUT: Duration = Duration::from_millis(10);
@@ -250,7 +250,7 @@ impl SourceConfig for JournaldConfig {
         ))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -379,7 +379,7 @@ struct Batch<'a> {
     events: Vec<LogEvent>,
     record_size: usize,
     exiting: Option<bool>,
-    batch: Option<Arc<BatchNotifier>>,
+    batch: Option<BatchNotifier>,
     receiver: Option<BatchStatusReceiver>,
     source: &'a mut JournaldSource,
     cursor: Option<String>,
@@ -555,7 +555,7 @@ impl Drop for RunningJournalctl {
     }
 }
 
-fn create_event(record: Record, batch: &Option<Arc<BatchNotifier>>) -> LogEvent {
+fn create_event(record: Record, batch: &Option<BatchNotifier>) -> LogEvent {
     let mut log = LogEvent::from_iter(record).with_batch_notifier_option(batch);
 
     // Convert some journald-specific field names into Vector standard ones.

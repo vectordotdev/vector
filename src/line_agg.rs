@@ -145,7 +145,7 @@ where
 {
     /// Create a new `LineAgg` using the specified `inner` stream and
     /// preconfigured `logic`.
-    pub fn new(inner: T, logic: Logic<K, C>) -> Self {
+    pub const fn new(inner: T, logic: Logic<K, C>) -> Self {
         Self {
             inner,
             logic,
@@ -395,6 +395,7 @@ mod tests {
     use bytes::Bytes;
     use futures::SinkExt;
     use pretty_assertions::assert_eq;
+    use std::fmt::Write as _;
 
     use super::*;
 
@@ -699,7 +700,7 @@ mod tests {
 
         let mut expected = "START msg 1".to_string();
         for i in 0..n {
-            expected.push_str(&format!("\nline {}", i));
+            write!(expected, "\nline {}", i).expect("write to String never fails");
         }
 
         let (mut send, recv) = futures::channel::mpsc::unbounded();

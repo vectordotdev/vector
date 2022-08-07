@@ -13,7 +13,7 @@ components: sinks: nats: {
 	}
 
 	features: {
-		acknowledgements: false
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			compression: enabled: false

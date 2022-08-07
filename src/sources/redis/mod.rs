@@ -8,6 +8,7 @@ use futures::StreamExt;
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -154,7 +155,12 @@ impl SourceConfig for RedisSourceConfig {
 
         let client = redis::Client::open(self.url.as_str()).context(ClientSnafu {})?;
         let connection_info = client.get_connection_info().into();
-        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
+        let decoder = DecodingConfig::new(
+            self.framing.clone(),
+            self.decoding.clone(),
+            LogNamespace::Legacy,
+        )
+        .build();
 
         match self.data_type {
             DataTypeConfig::List => {
@@ -184,7 +190,7 @@ impl SourceConfig for RedisSourceConfig {
         }
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(self.decoding.output_type())]
     }
 

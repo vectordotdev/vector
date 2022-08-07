@@ -1,6 +1,8 @@
 use crate::{get_metadata_key, MetadataKey};
 use ::value::Value;
 use vrl::prelude::*;
+use vrl::query::Target as QueryTarget;
+use vrl::state::{ExternalEnv, LocalEnv};
 
 fn set_metadata_field(
     ctx: &mut Context,
@@ -14,7 +16,7 @@ fn set_metadata_field(
             Value::Null
         }
         MetadataKey::Query(query) => {
-            ctx.target_mut().remove_metadata(query.path())?;
+            ctx.target_mut().set_metadata(query.path(), value)?;
             Value::Null
         }
     })
@@ -32,7 +34,7 @@ impl Function for SetMetadataField {
         &[
             Parameter {
                 keyword: "key",
-                kind: kind::BYTES,
+                kind: kind::ANY,
                 required: true,
             },
             Parameter {
@@ -53,15 +55,24 @@ impl Function for SetMetadataField {
 
     fn compile(
         &self,
-        state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        (local, external): (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let key = get_metadata_key(&mut arguments)?;
         let value = arguments.required_expr("value");
 
+        if let MetadataKey::Query(query) = &key {
+            if external.is_read_only_metadata_path(query.path()) {
+                return Err(vrl::function::Error::ReadOnlyMutation {
+                    context: format!("{} is read-only, and cannot be modified", query),
+                }
+                .into());
+            }
+        }
+
         // for backwards compatibility, make sure value is a string when using legacy.
-        if matches!(key, MetadataKey::Legacy(_)) && !value.type_def((state.0, state.1)).is_bytes() {
+        if matches!(key, MetadataKey::Legacy(_)) && !value.type_def((local, external)).is_bytes() {
             return Err(vrl::function::Error::UnexpectedExpression {
                 keyword: "value",
                 expected: "string",
@@ -91,5 +102,26 @@ impl Expression for SetMetadataFieldFn {
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::null().infallible()
+    }
+
+    fn update_state(
+        &mut self,
+        local: &mut LocalEnv,
+        external: &mut ExternalEnv,
+    ) -> std::result::Result<(), ExpressionError> {
+        if let MetadataKey::Query(query) = &self.key {
+            let insert_type = self.value.type_def((local, external)).kind().clone();
+            match query.target() {
+                QueryTarget::External => {
+                    let mut new_type = external.metadata_kind().clone();
+                    new_type.insert(query.path(), insert_type);
+                    external.update_metadata(new_type);
+                }
+                QueryTarget::Container(_)
+                | QueryTarget::FunctionCall(_)
+                | QueryTarget::Internal(_) => unreachable!("only external queries are allowed"),
+            }
+        }
+        Ok(())
     }
 }

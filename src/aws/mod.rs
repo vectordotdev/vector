@@ -227,7 +227,6 @@ where
         });
 
         let region = self.region.clone();
-        let endpoint = req.http().uri().to_string();
         let fut = self.inner.call(req);
 
         Box::pin(async move {
@@ -245,7 +244,6 @@ where
                     emit!(AwsBytesSent {
                         byte_size,
                         region: Some(region),
-                        endpoint: endpoint.as_str(),
                     });
                 }
             }

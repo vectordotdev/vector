@@ -1,7 +1,6 @@
-use std::cmp;
-
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 
 use crate::aws::create_client;
 use crate::codecs::DecodingConfig;
@@ -93,7 +92,12 @@ pub struct AwsSqsConfig {
 impl SourceConfig for AwsSqsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
         let client = self.build_client(&cx).await?;
-        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
+        let decoder = DecodingConfig::new(
+            self.framing.clone(),
+            self.decoding.clone(),
+            LogNamespace::Legacy,
+        )
+        .build();
         let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
 
         Ok(Box::pin(
@@ -111,7 +115,7 @@ impl SourceConfig for AwsSqsConfig {
         ))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(self.decoding.output_type())]
     }
 
@@ -143,7 +147,7 @@ const fn default_poll_secs() -> u32 {
 }
 
 fn default_client_concurrency() -> u32 {
-    cmp::max(1, num_cpus::get() as u32)
+    crate::num_threads() as u32
 }
 
 const fn default_visibility_timeout_secs() -> u32 {

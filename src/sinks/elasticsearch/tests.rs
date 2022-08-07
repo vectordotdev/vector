@@ -1,15 +1,14 @@
 use std::{collections::BTreeMap, convert::TryFrom};
 
-use super::BulkAction;
-use crate::sinks::elasticsearch::BulkConfig;
 use crate::{
+    codecs::Transformer,
     event::{LogEvent, Metric, MetricKind, MetricValue, Value},
     sinks::{
         elasticsearch::{
-            sink::process_log, DataStreamConfig, ElasticsearchCommon, ElasticsearchConfig,
-            ElasticsearchMode,
+            sink::process_log, BulkAction, BulkConfig, DataStreamConfig, ElasticsearchCommon,
+            ElasticsearchConfig, ElasticsearchMode,
         },
-        util::encoding::{Encoder, EncodingConfigFixed},
+        util::encoding::Encoder,
     },
     template::Template,
 };
@@ -39,14 +38,15 @@ async fn sets_create_action_when_configured() {
 
     let mut encoded = vec![];
     let encoded_size = es
-        .encoding
+        .request_builder
+        .encoder
         .encode_input(
-            vec![process_log(log, &es.mode, &None).unwrap()],
+            vec![process_log(log, &es.mode, &None, &config.encoding).unwrap()],
             &mut encoded,
         )
         .unwrap();
 
-    let expected = r#"{"create":{"_index":"vector","_type":""}}
+    let expected = r#"{"create":{"_index":"vector","_type":"_doc"}}
 {"action":"crea","message":"hello there","timestamp":"2020-12-01T01:02:03Z"}
 "#;
     assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
@@ -86,14 +86,15 @@ async fn encode_datastream_mode() {
 
     let mut encoded = vec![];
     let encoded_size = es
-        .encoding
+        .request_builder
+        .encoder
         .encode_input(
-            vec![process_log(log, &es.mode, &None).unwrap()],
+            vec![process_log(log, &es.mode, &None, &config.encoding).unwrap()],
             &mut encoded,
         )
         .unwrap();
 
-    let expected = r#"{"create":{"_index":"synthetics-testing-default","_type":""}}
+    let expected = r#"{"create":{"_index":"synthetics-testing-default","_type":"_doc"}}
 {"@timestamp":"2020-12-01T01:02:03Z","data_stream":{"dataset":"testing","namespace":"default","type":"synthetics"},"message":"hello there"}
 "#;
     assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
@@ -130,14 +131,15 @@ async fn encode_datastream_mode_no_routing() {
     );
     let mut encoded = vec![];
     let encoded_size = es
-        .encoding
+        .request_builder
+        .encoder
         .encode_input(
-            vec![process_log(log, &es.mode, &None).unwrap()],
+            vec![process_log(log, &es.mode, &None, &config.encoding).unwrap()],
             &mut encoded,
         )
         .unwrap();
 
-    let expected = r#"{"create":{"_index":"logs-generic-something","_type":""}}
+    let expected = r#"{"create":{"_index":"logs-generic-something","_type":"_doc"}}
 {"@timestamp":"2020-12-01T01:02:03Z","data_stream":{"dataset":"testing","namespace":"something","type":"synthetics"},"message":"hello there"}
 "#;
     assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
@@ -164,9 +166,10 @@ async fn handle_metrics() {
     let log = es.metric_to_log.transform_one(metric).unwrap();
 
     let mut encoded = vec![];
-    es.encoding
+    es.request_builder
+        .encoder
         .encode_input(
-            vec![process_log(log, &es.mode, &None).unwrap()],
+            vec![process_log(log, &es.mode, &None, &config.encoding).unwrap()],
             &mut encoded,
         )
         .unwrap();
@@ -176,7 +179,7 @@ async fn handle_metrics() {
     assert_eq!(encoded_lines.len(), 3); // there's an empty line at the end
     assert_eq!(
         encoded_lines.get(0).unwrap(),
-        r#"{"create":{"_index":"vector","_type":""}}"#
+        r#"{"create":{"_index":"vector","_type":"_doc"}}"#
     );
     assert!(encoded_lines
         .get(1)
@@ -252,14 +255,15 @@ async fn encode_datastream_mode_no_sync() {
 
     let mut encoded = vec![];
     let encoded_size = es
-        .encoding
+        .request_builder
+        .encoder
         .encode_input(
-            vec![process_log(log, &es.mode, &None).unwrap()],
+            vec![process_log(log, &es.mode, &None, &config.encoding).unwrap()],
             &mut encoded,
         )
         .unwrap();
 
-    let expected = r#"{"create":{"_index":"synthetics-testing-something","_type":""}}
+    let expected = r#"{"create":{"_index":"synthetics-testing-something","_type":"_doc"}}
 {"@timestamp":"2020-12-01T01:02:03Z","data_stream":{"dataset":"testing","type":"synthetics"},"message":"hello there"}
 "#;
     assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
@@ -267,16 +271,18 @@ async fn encode_datastream_mode_no_sync() {
 }
 
 #[tokio::test]
-async fn allows_using_excepted_fields() {
+async fn allows_using_except_fields() {
     let config = ElasticsearchConfig {
         bulk: Some(BulkConfig {
             action: None,
             index: Some(String::from("{{ idx }}")),
         }),
-        encoding: EncodingConfigFixed {
-            except_fields: Some(vec!["idx".to_string(), "timestamp".to_string()]),
-            ..Default::default()
-        },
+        encoding: Transformer::new(
+            None,
+            Some(vec!["idx".to_string(), "timestamp".to_string()]),
+            None,
+        )
+        .unwrap(),
         endpoint: String::from("https://example.com"),
         ..Default::default()
     };
@@ -288,15 +294,50 @@ async fn allows_using_excepted_fields() {
 
     let mut encoded = vec![];
     let encoded_size = es
-        .encoding
+        .request_builder
+        .encoder
         .encode_input(
-            vec![process_log(log, &es.mode, &None).unwrap()],
+            vec![process_log(log, &es.mode, &None, &config.encoding).unwrap()],
             &mut encoded,
         )
         .unwrap();
 
-    let expected = r#"{"index":{"_index":"purple","_type":""}}
+    let expected = r#"{"index":{"_index":"purple","_type":"_doc"}}
 {"foo":"bar","message":"hello there"}
+"#;
+    assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
+    assert_eq!(encoded.len(), encoded_size);
+}
+
+#[tokio::test]
+async fn allows_using_only_fields() {
+    let config = ElasticsearchConfig {
+        bulk: Some(BulkConfig {
+            action: None,
+            index: Some(String::from("{{ idx }}")),
+        }),
+        encoding: Transformer::new(Some(vec!["foo".to_string().into()]), None, None).unwrap(),
+        endpoint: String::from("https://example.com"),
+        ..Default::default()
+    };
+    let es = ElasticsearchCommon::parse_config(&config).await.unwrap();
+
+    let mut log = LogEvent::from("hello there");
+    log.insert("foo", "bar");
+    log.insert("idx", "purple");
+
+    let mut encoded = vec![];
+    let encoded_size = es
+        .request_builder
+        .encoder
+        .encode_input(
+            vec![process_log(log, &es.mode, &None, &config.encoding).unwrap()],
+            &mut encoded,
+        )
+        .unwrap();
+
+    let expected = r#"{"index":{"_index":"purple","_type":"_doc"}}
+{"foo":"bar"}
 "#;
     assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
     assert_eq!(encoded.len(), encoded_size);

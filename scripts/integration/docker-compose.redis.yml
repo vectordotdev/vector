@@ -22,8 +22,6 @@ services:
       - "redis-integration-tests"
       - "--lib"
       - "::redis::"
-      - "--"
-      - "--nocapture"
     depends_on:
       - redis
     environment:

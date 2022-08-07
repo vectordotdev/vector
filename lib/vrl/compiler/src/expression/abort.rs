@@ -7,8 +7,7 @@ use super::Expr;
 use crate::{
     expression::{ExpressionError, Resolved},
     state::{ExternalEnv, LocalEnv},
-    value::Kind,
-    value::VrlValueConvert,
+    value::{Kind, VrlValueConvert},
     Context, Expression, Span, TypeDef,
 };
 
@@ -19,6 +18,10 @@ pub struct Abort {
 }
 
 impl Abort {
+    /// # Errors
+    ///
+    /// * The optional message is fallible.
+    /// * The optional message does not resolve to a string.
     pub fn new(
         span: Span,
         message: Option<Node<Expr>>,
@@ -106,7 +109,7 @@ impl std::error::Error for Error {
 
 impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
-        use ErrorVariant::*;
+        use ErrorVariant::{FallibleExpr, NonString};
 
         match self.variant {
             FallibleExpr => 631,

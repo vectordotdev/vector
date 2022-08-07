@@ -1,3 +1,4 @@
+#![deny(warnings)]
 #![deny(clippy::all)]
 #![deny(unused_allocation)]
 #![deny(unused_extern_crates)]

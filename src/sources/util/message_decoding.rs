@@ -1,4 +1,4 @@
-use std::{iter, sync::Arc};
+use std::iter;
 
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
@@ -13,7 +13,7 @@ pub fn decode_message<'a>(
     source_type: &'static str,
     message: &[u8],
     timestamp: Option<DateTime<Utc>>,
-    batch: &'a Option<Arc<BatchNotifier>>,
+    batch: &'a Option<BatchNotifier>,
 ) -> impl Iterator<Item = Event> + 'a {
     let schema = log_schema();
 

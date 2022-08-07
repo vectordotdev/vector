@@ -72,6 +72,8 @@ impl Expression for MergeFn {
     }
 
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+        // TODO: this has a known bug when deep is true
+        // see: https://github.com/vectordotdev/vector/issues/13597
         self.to
             .type_def(state)
             .restrict_object()
@@ -79,7 +81,7 @@ impl Expression for MergeFn {
     }
 }
 
-/// Merges two BTreeMaps of Symbol’s value as variable is void: Values. The
+/// Merges two `BTreeMaps` of Symbol’s value as variable is void: Values. The
 /// second map is merged into the first one.
 ///
 /// If Symbol’s value as variable is void: deep is true, only the top level

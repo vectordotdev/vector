@@ -82,7 +82,7 @@ impl Query {
 
 impl Expression for Query {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        use Target::*;
+        use Target::{Container, External, FunctionCall, Internal};
 
         let value = match &self.target {
             External => {
@@ -116,18 +116,13 @@ impl Expression for Query {
     }
 
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
-        use Target::*;
+        use Target::{Container, External, FunctionCall, Internal};
 
         match &self.target {
-            External => state
-                .1
-                .target()
-                .clone()
-                .type_def
-                .at_path(&self.path.to_lookup()),
-            Internal(variable) => variable.type_def(state).at_path(&self.path.to_lookup()),
-            FunctionCall(call) => call.type_def(state).at_path(&self.path.to_lookup()),
-            Container(container) => container.type_def(state).at_path(&self.path.to_lookup()),
+            External => state.1.target().clone().type_def.at_path(&self.path),
+            Internal(variable) => variable.type_def(state).at_path(&self.path),
+            FunctionCall(call) => call.type_def(state).at_path(&self.path),
+            Container(container) => container.type_def(state).at_path(&self.path),
         }
     }
 }
@@ -165,7 +160,7 @@ pub enum Target {
 
 impl fmt::Display for Target {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Target::*;
+        use Target::{Container, External, FunctionCall, Internal};
 
         match self {
             Internal(v) => v.fmt(f),
@@ -178,7 +173,7 @@ impl fmt::Display for Target {
 
 impl fmt::Debug for Target {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Target::*;
+        use Target::{Container, External, FunctionCall, Internal};
 
         match self {
             Internal(v) => write!(f, "Internal({:?})", v),

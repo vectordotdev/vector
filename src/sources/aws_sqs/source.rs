@@ -7,7 +7,7 @@ use aws_sdk_sqs::{
 use chrono::{DateTime, TimeZone, Utc};
 use futures::{FutureExt, StreamExt};
 use tokio::{pin, select, time::Duration};
-use vector_core::finalizer::UnorderedFinalizer;
+use vector_common::finalizer::UnorderedFinalizer;
 
 use crate::{
     codecs::Decoder,

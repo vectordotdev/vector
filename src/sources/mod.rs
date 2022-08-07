@@ -11,7 +11,7 @@ pub mod aws_s3;
 #[cfg(feature = "sources-aws_sqs")]
 pub mod aws_sqs;
 #[cfg(any(feature = "sources-datadog_agent"))]
-pub mod datadog;
+pub mod datadog_agent;
 #[cfg(feature = "sources-demo_logs")]
 pub mod demo_logs;
 #[cfg(all(unix, feature = "sources-dnstap"))]
@@ -40,7 +40,7 @@ pub mod internal_logs;
 pub mod internal_metrics;
 #[cfg(all(unix, feature = "sources-journald"))]
 pub mod journald;
-#[cfg(all(feature = "sources-kafka", feature = "rdkafka"))]
+#[cfg(feature = "sources-kafka")]
 pub mod kafka;
 #[cfg(feature = "sources-kubernetes_logs")]
 pub mod kubernetes_logs;
@@ -52,6 +52,8 @@ pub mod mongodb_metrics;
 pub mod nats;
 #[cfg(feature = "sources-nginx_metrics")]
 pub mod nginx_metrics;
+#[cfg(feature = "sources-opentelemetry")]
+pub mod opentelemetry;
 #[cfg(feature = "sources-postgresql_metrics")]
 pub mod postgresql_metrics;
 #[cfg(feature = "sources-prometheus")]
@@ -110,7 +112,7 @@ pub enum Sources {
 
     /// Datadog Agent.
     #[cfg(feature = "sources-datadog_agent")]
-    DatadogAgent(#[configurable(derived)] datadog::agent::DatadogAgentConfig),
+    DatadogAgent(#[configurable(derived)] datadog_agent::DatadogAgentConfig),
 
     /// Demo logs.
     #[cfg(feature = "sources-demo_logs")]
@@ -173,7 +175,7 @@ pub enum Sources {
     Journald(#[configurable(derived)] journald::JournaldConfig),
 
     /// Kafka.
-    #[cfg(all(feature = "sources-kafka", feature = "rdkafka"))]
+    #[cfg(feature = "sources-kafka")]
     Kafka(#[configurable(derived)] kafka::KafkaSourceConfig),
 
     /// Kubernetes Logs.
@@ -257,6 +259,7 @@ mod tests {
 
     #[test]
     #[ignore]
+    #[allow(clippy::print_stdout)]
     fn vector_config() {
         let root_schema = generate_root_schema::<MockRootConfig>();
         let json = serde_json::to_string_pretty(&root_schema)

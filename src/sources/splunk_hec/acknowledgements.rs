@@ -12,8 +12,8 @@ use futures::StreamExt;
 use roaring::RoaringTreemap;
 use serde::{Deserialize, Serialize};
 use tokio::time::interval;
+use vector_common::{finalization::BatchStatusReceiver, finalizer::UnorderedFinalizer};
 use vector_config::configurable_component;
-use vector_core::{event::BatchStatusReceiver, finalizer::UnorderedFinalizer};
 use warp::Rejection;
 
 use super::ApiError;

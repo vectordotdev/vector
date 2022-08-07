@@ -47,7 +47,7 @@ where
     }
 
     /// Returns a reference to the underlying stream.
-    pub fn get_ref(&self) -> &T {
+    pub const fn get_ref(&self) -> &T {
         &self.inner
     }
 

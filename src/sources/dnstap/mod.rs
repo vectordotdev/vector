@@ -7,7 +7,7 @@ use vector_core::ByteSizeOf;
 use super::util::framestream::{build_framestream_unix_source, FrameHandler};
 use crate::{
     config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
-    event::Event,
+    event::{Event, LogEvent},
     internal_events::{BytesReceived, DnstapParseError, EventsReceived},
     Result,
 };
@@ -18,6 +18,7 @@ pub use parser::{parse_dnstap_data, DnstapParser};
 pub mod schema;
 use dnsmsg_parser::{dns_message, dns_message_parser};
 pub use schema::DnstapEventSchema;
+use vector_core::config::LogNamespace;
 
 /// Configuration for the `dnstap` source.
 #[configurable_component(source)]
@@ -31,8 +32,9 @@ pub struct DnstapConfig {
     ///
     /// The value will be the socket path itself.
     ///
-    /// By default, the [global `host_key` option](https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key) is
-    /// used.
+    /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
+    ///
+    /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     pub host_key: Option<String>,
 
     /// Absolute path to the socket file to read DNSTAP data from.
@@ -118,7 +120,7 @@ impl SourceConfig for DnstapConfig {
         build_framestream_unix_source(frame_handler, cx.shutdown, cx.out)
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -196,9 +198,7 @@ impl FrameHandler for DnstapFrameHandler {
             byte_size: frame.len(),
             protocol: "protobuf",
         });
-        let mut event = Event::new_empty_log();
-
-        let log_event = event.as_mut_log();
+        let mut log_event = LogEvent::default();
 
         if let Some(host) = received_from {
             log_event.insert(self.host_key().as_str(), host);
@@ -209,13 +209,14 @@ impl FrameHandler for DnstapFrameHandler {
                 self.schema.dnstap_root_data_schema().raw_data(),
                 base64::encode(&frame),
             );
+            let event = Event::from(log_event);
             emit!(EventsReceived {
                 count: 1,
                 byte_size: event.size_of(),
             });
             Some(event)
         } else {
-            match parse_dnstap_data(&self.schema, log_event, frame) {
+            match parse_dnstap_data(&self.schema, &mut log_event, frame) {
                 Err(err) => {
                     emit!(DnstapParseError {
                         error: format!("Dnstap protobuf decode error {:?}.", err).as_str()
@@ -223,6 +224,7 @@ impl FrameHandler for DnstapFrameHandler {
                     None
                 }
                 Ok(_) => {
+                    let event = Event::from(log_event);
                     emit!(EventsReceived {
                         count: 1,
                         byte_size: event.size_of(),

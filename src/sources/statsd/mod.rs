@@ -26,7 +26,7 @@ use crate::{
     },
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
-    tls::{MaybeTlsSettings, TlsEnableableConfig},
+    tls::{MaybeTlsSettings, TlsSourceConfig},
     udp, SourceSender,
 };
 
@@ -37,6 +37,7 @@ mod unix;
 use parser::parse;
 #[cfg(unix)]
 use unix::{statsd_unix, UnixConfig};
+use vector_core::config::LogNamespace;
 
 /// Configuration for the `statsd` source.
 #[configurable_component(source)]
@@ -88,7 +89,7 @@ pub struct TcpConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    tls: Option<TlsEnableableConfig>,
+    tls: Option<TlsSourceConfig>,
 
     /// The timeout before a connection is forcefully closed during shutdown.
     #[serde(default = "default_shutdown_timeout_secs")]
@@ -144,12 +145,18 @@ impl SourceConfig for StatsdConfig {
                 Ok(Box::pin(statsd_udp(config.clone(), cx.shutdown, cx.out)))
             }
             StatsdConfig::Tcp(config) => {
-                let tls = MaybeTlsSettings::from_config(&config.tls, true)?;
+                let tls_config = config.tls.as_ref().map(|tls| tls.tls_config.clone());
+                let tls_client_metadata_key = config
+                    .tls
+                    .as_ref()
+                    .and_then(|tls| tls.client_metadata_key.clone());
+                let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
                 StatsdTcpSource.run(
                     config.address,
                     config.keepalive,
                     config.shutdown_timeout_secs,
                     tls,
+                    tls_client_metadata_key,
                     config.receive_buffer_bytes,
                     cx,
                     false.into(),
@@ -161,7 +168,7 @@ impl SourceConfig for StatsdConfig {
         }
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(config::DataType::Metric)]
     }
 
@@ -204,7 +211,11 @@ impl StatsdDeserializer {
 }
 
 impl decoding::format::Deserializer for StatsdDeserializer {
-    fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
+    fn parse(
+        &self,
+        bytes: Bytes,
+        _log_namespace: LogNamespace,
+    ) -> crate::Result<SmallVec<[Event; 1]>> {
         if let Some(mode) = self.socket_mode {
             emit!(SocketBytesReceived {
                 mode,

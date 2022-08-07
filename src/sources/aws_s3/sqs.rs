@@ -1,4 +1,4 @@
-use std::{cmp, future::ready, panic, sync::Arc};
+use std::{future::ready, panic, sync::Arc};
 
 use aws_sdk_s3::error::GetObjectError;
 use aws_sdk_s3::Client as S3Client;
@@ -110,7 +110,7 @@ const fn default_true() -> bool {
 }
 
 fn default_client_concurrency() -> u32 {
-    cmp::max(1, num_cpus::get() as u32)
+    crate::num_threads() as u32
 }
 
 #[derive(Debug, Snafu)]
@@ -499,7 +499,7 @@ impl IngestorProcess {
         let aws_region = Bytes::from(s3_event.aws_region.as_str().as_bytes().to_vec());
 
         let mut stream = lines.filter_map(move |line| {
-            let mut log = LogEvent::from(line).with_batch_notifier_option(&batch);
+            let mut log = LogEvent::from_bytes_legacy(&line).with_batch_notifier_option(&batch);
 
             log.insert(path!("bucket"), bucket_name.clone());
             log.insert(path!("object"), object_key.clone());

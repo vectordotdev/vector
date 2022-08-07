@@ -23,8 +23,6 @@ services:
       - "gcp-integration-tests"
       - "--lib"
       - "::gcp::"
-      - "--"
-      - "--nocapture"
     environment:
       - EMULATOR_ADDRESS=http://gcloud-pubsub:8681
     depends_on:

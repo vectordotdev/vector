@@ -159,6 +159,13 @@ components: sources: exec: {
 					}
 				}
 			}
+			source_type: {
+				description: "The name of the source type."
+				required:    true
+				type: string: {
+					examples: ["exec"]
+				}
+			}
 		}
 	}
 
@@ -175,6 +182,7 @@ components: sources: exec: {
 				timestamp:   _timestamp
 				host:        _values.local_host
 				message:     _line
+				source_type: "exec"
 			}
 		},
 	]

@@ -376,6 +376,22 @@ kind = "absolute"
 counter = { value = 1 }
 ```
 
+Aggregated metrics are a little different:
+
+```yaml
+tests:
+  inputs:
+    insert_at: my_aggregate_metrics_transform
+    type: metric
+    metric:
+      name: http_rtt
+      kind: incremental
+      aggregated_histogram:
+        buckets: []
+        sum: 0
+        count: 0
+```
+
 Here's a full end-to-end example of unit testing a metric through a transform:
 
 ```toml

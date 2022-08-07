@@ -38,7 +38,7 @@ impl fmt::Display for Value {
                 write!(f, "t'{}'", val.to_rfc3339_opts(SecondsFormat::AutoSi, true))
             }
             Value::Regex(regex) => write!(f, "r'{}'", **regex),
-            Value::Null => write!(f, "null"),
+            Self::Null => write!(f, "null"),
         }
     }
 }

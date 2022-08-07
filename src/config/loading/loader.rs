@@ -1,8 +1,6 @@
 use std::path::{Path, PathBuf};
 
 use serde_toml_merge::merge_into_table;
-use strum::IntoEnumIterator;
-use strum_macros::EnumIter;
 use toml::value::{Table, Value};
 
 use super::{component_name, open_file, read_dir, Format};
@@ -10,7 +8,7 @@ use crate::config::format;
 
 /// Provides a hint to the loading system of the type of components that should be found
 /// when traversing an explicitly named directory.
-#[derive(Debug, Copy, Clone, EnumIter)]
+#[derive(Debug, Copy, Clone)]
 pub enum ComponentHint {
     Source,
     Transform,
@@ -244,7 +242,17 @@ where
     /// Returns a vector of non-fatal warnings on success, or a vector of error strings on failure.
     fn load_from_dir(&mut self, path: &Path) -> Result<Vec<String>, Vec<String>> {
         // Iterator containing component-specific sub-folders to attempt traversing into.
-        let paths = ComponentHint::iter().map(|hint| (hint.join_path(path), hint));
+        let hints = [
+            ComponentHint::Source,
+            ComponentHint::Transform,
+            ComponentHint::Sink,
+            ComponentHint::Test,
+            ComponentHint::EnrichmentTable,
+        ];
+        let paths = hints
+            .iter()
+            .copied()
+            .map(|hint| (hint.join_path(path), hint));
 
         // Get files from the root of the folder. These represent top-level config settings,
         // and need to merged down first to represent a more 'complete' config.

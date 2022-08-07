@@ -62,7 +62,7 @@ pub const FILE_SINK_TAGS: [&str; 2] = ["file", "protocol"];
 pub const HTTP_SINK_TAGS: [&str; 2] = ["endpoint", "protocol"];
 
 /// The standard set of tags for all `AWS`-based sinks.
-pub const AWS_SINK_TAGS: [&str; 3] = ["endpoint", "protocol", "region"];
+pub const AWS_SINK_TAGS: [&str; 2] = ["protocol", "region"];
 
 /// This struct is used to describe a set of component tests.
 pub struct ComponentTests {

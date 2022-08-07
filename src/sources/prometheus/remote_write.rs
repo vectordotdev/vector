@@ -4,6 +4,7 @@ use bytes::Bytes;
 use prometheus_parser::proto;
 use prost::Message;
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 use warp::http::{HeaderMap, StatusCode};
 
 use super::parser;
@@ -45,6 +46,18 @@ pub struct PrometheusRemoteWriteConfig {
     acknowledgements: AcknowledgementsConfig,
 }
 
+impl PrometheusRemoteWriteConfig {
+    #[cfg(test)]
+    pub fn from_address(address: SocketAddr) -> Self {
+        Self {
+            address,
+            tls: None,
+            auth: None,
+            acknowledgements: false.into(),
+        }
+    }
+}
+
 inventory::submit! {
     SourceDescription::new::<PrometheusRemoteWriteConfig>(SOURCE_NAME)
 }
@@ -78,7 +91,7 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
         )
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(config::DataType::Metric)]
     }
 

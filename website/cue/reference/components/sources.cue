@@ -86,7 +86,7 @@ components: sources: [Name=string]: {
 								enum: {
 									bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (e.g. split between messages or stream segments)."
 									character_delimited: "Byte frames which are delimited by a chosen character."
-									length_delimited:    "Byte frames whose length is encoded in a header."
+									length_delimited:    "Byte frames which are prefixed by an unsigned big-endian 32-bit integer indicating the length."
 									newline_delimited:   "Byte frames which are delimited by a newline character."
 									octet_counting:      "Byte frames according to the [octet counting](\(urls.rfc_6587_3_4_1)) format."
 								}
@@ -290,6 +290,25 @@ components: sources: [Name=string]: {
 						examples: ["2019-02-13T19:48:34+00:00 [info] Started GET \"/\" for 127.0.0.1"]
 					}
 				}
+
+				_client_metadata: {
+					common:      false
+					description: "Client TLS metadata."
+					required:    false
+					type: object: {
+						options: {
+							subject: {
+								common:      true
+								description: "The subject from the client TLS certificate. Only added if `tls.client_metadata_key` is set. Key name depends on configured `client_metadata_key`"
+								required:    false
+								type: string: {
+									default: null
+									examples: [ "CN=localhost,OU=Vector,O=Datadog,L=New York,ST=New York,C=US"]
+								}
+							}
+						}
+					}
+				}
 			}
 		}
 	}
@@ -346,5 +365,6 @@ components: sources: [Name=string]: {
 		events_out_total:                 components.sources.internal_metrics.output.metrics.events_out_total
 		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
 		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
+		lag_time_seconds:                 components.sources.internal_metrics.output.metrics.lag_time_seconds
 	}
 }

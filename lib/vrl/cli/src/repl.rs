@@ -1,8 +1,9 @@
+use core::TargetValue;
 use std::borrow::Cow::{self, Borrowed, Owned};
 
 use ::value::Value;
-use core::TargetValue;
 use indoc::indoc;
+use lookup::LookupBuf;
 use once_cell::sync::Lazy;
 use prettytable::{format, Cell, Row, Table};
 use regex::Regex;
@@ -16,10 +17,8 @@ use rustyline::{
 };
 use value::Secrets;
 use vector_common::TimeZone;
-
 use vector_vrl_functions::vrl_functions;
-use vrl::prelude::BTreeMap;
-use vrl::{diagnostic::Formatter, state, Runtime, Target, VrlRuntime};
+use vrl::{diagnostic::Formatter, prelude::BTreeMap, state, Runtime, Target, VrlRuntime};
 
 // Create a list of all possible error values for potential docs lookup
 static ERRORS: Lazy<Vec<String>> = Lazy::new(|| {
@@ -29,7 +28,7 @@ static ERRORS: Lazy<Vec<String>> = Lazy::new(|| {
         601, 620, 630, 640, 650, 651, 652, 660, 701,
     ]
     .iter()
-    .map(|i| i.to_string())
+    .map(std::string::ToString::to_string)
     .collect()
 });
 
@@ -47,7 +46,11 @@ const RESERVED_TERMS: &[&str] = &[
     "help docs",
 ];
 
-pub(crate) fn run(mut objects: Vec<TargetValue>, timezone: &TimeZone, vrl_runtime: VrlRuntime) {
+pub(crate) fn run(
+    mut objects: Vec<TargetValue>,
+    timezone: TimeZone,
+    vrl_runtime: VrlRuntime,
+) -> Result<(), rustyline::error::ReadlineError> {
     let mut index = 0;
     let func_docs_regex = Regex::new(r"^help\sdocs\s(\w{1,})$").unwrap();
     let error_docs_regex = Regex::new(r"^help\serror\s(\w{1,})$").unwrap();
@@ -55,7 +58,7 @@ pub(crate) fn run(mut objects: Vec<TargetValue>, timezone: &TimeZone, vrl_runtim
     let mut external_state = state::ExternalEnv::default();
     let mut local_state = state::LocalEnv::default();
     let mut rt = Runtime::new(state::Runtime::default());
-    let mut rl = Editor::<Repl>::new();
+    let mut rl = Editor::<Repl>::new()?;
     rl.set_helper(Some(Repl::new()));
 
     #[allow(clippy::print_stdout)]
@@ -104,7 +107,7 @@ pub(crate) fn run(mut objects: Vec<TargetValue>, timezone: &TimeZone, vrl_runtim
 
                         // remove empty last object
                         if objects.last().map(|x| &x.value) == Some(&Value::Null) {
-                            let _ = objects.pop();
+                            let _last = objects.pop();
                         }
 
                         "."
@@ -123,7 +126,7 @@ pub(crate) fn run(mut objects: Vec<TargetValue>, timezone: &TimeZone, vrl_runtim
                     vrl_runtime,
                 );
 
-                let _ = std::mem::replace(&mut local_state, local);
+                let _v = std::mem::replace(&mut local_state, local);
 
                 let string = match result {
                     Ok(v) => v.to_string(),
@@ -135,8 +138,7 @@ pub(crate) fn run(mut objects: Vec<TargetValue>, timezone: &TimeZone, vrl_runtim
                     println!("{}\n", string);
                 }
             }
-            Err(ReadlineError::Interrupted) => break,
-            Err(ReadlineError::Eof) => break,
+            Err(ReadlineError::Interrupted | ReadlineError::Eof) => break,
             Err(err) => {
                 #[allow(clippy::print_stdout)]
                 {
@@ -146,6 +148,7 @@ pub(crate) fn run(mut objects: Vec<TargetValue>, timezone: &TimeZone, vrl_runtim
             }
         }
     }
+    Ok(())
 }
 
 fn resolve(
@@ -154,13 +157,17 @@ fn resolve(
     program: &str,
     external: &mut state::ExternalEnv,
     local: state::LocalEnv,
-    timezone: &TimeZone,
+    timezone: TimeZone,
     vrl_runtime: VrlRuntime,
 ) -> (state::LocalEnv, Result<Value, String>) {
     let mut functions = stdlib::all();
     functions.extend(vector_vrl_functions::vrl_functions());
-    let program = match vrl::compile_for_repl(program, &functions, external, local.clone()) {
-        Ok(result) => result,
+
+    // The CLI should be moved out of the "vrl" module, and then it can use the `vector-core::compile_vrl` function which includes this automatically
+    external.set_read_only_metadata_path(LookupBuf::from("vector"), true);
+
+    let program = match vrl::compile_with_state(program, &functions, external, local.clone()) {
+        Ok((program, _)) => program,
         Err(diagnostics) => {
             return (
                 local,
@@ -171,20 +178,20 @@ fn resolve(
 
     (
         program.local_env().clone(),
-        execute(runtime, program, target, timezone, vrl_runtime),
+        execute(runtime, &program, target, timezone, vrl_runtime),
     )
 }
 
 fn execute(
     runtime: &mut Runtime,
-    program: vrl::Program,
+    program: &vrl::Program,
     object: &mut dyn Target,
-    timezone: &TimeZone,
+    timezone: TimeZone,
     vrl_runtime: VrlRuntime,
 ) -> Result<Value, String> {
     match vrl_runtime {
         VrlRuntime::Ast => runtime
-            .resolve(object, &program, timezone)
+            .resolve(object, program, &timezone)
             .map_err(|err| err.to_string()),
     }
 }
@@ -302,7 +309,7 @@ impl Validator for Repl {
             ctx.input(),
             &mut external_state,
             local_state,
-            &timezone,
+            timezone,
             VrlRuntime::Ast,
         );
 

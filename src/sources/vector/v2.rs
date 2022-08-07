@@ -46,7 +46,7 @@ impl proto::Service for Service {
 
         emit!(EventsReceived { count, byte_size });
 
-        let receiver = BatchNotifier::maybe_apply_to_events(self.acknowledgements, &mut events);
+        let receiver = BatchNotifier::maybe_apply_to(self.acknowledgements, &mut events);
 
         self.pipeline
             .clone()

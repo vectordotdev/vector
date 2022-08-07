@@ -11,8 +11,7 @@ pub use compiler::{
 
 pub type Result<T> = std::result::Result<T, ExpressionError>;
 
-pub use std::collections::BTreeMap;
-pub use std::fmt;
+pub use std::{collections::BTreeMap, fmt};
 
 pub use bytes::Bytes;
 // pub use crate::{Error, Expr, Expression, Function, Object, Result, TypeDef, Value};

@@ -32,15 +32,15 @@ impl Literal {
     /// the case of `Literal` means it always returns `Some(Value)`, requiring
     /// an extra `unwrap()`.
     pub fn to_value(&self) -> Value {
-        use Literal::*;
+        use Literal::{Boolean, Float, Integer, Null, Regex, String, Timestamp};
 
         match self {
             String(v) => Value::Bytes(v.clone()),
             Integer(v) => Value::Integer(*v),
-            Float(v) => Value::Float(v.to_owned()),
+            Float(v) => Value::Float(*v),
             Boolean(v) => Value::Boolean(*v),
             Regex(v) => Value::Regex(v.clone()),
-            Timestamp(v) => Value::Timestamp(v.to_owned()),
+            Timestamp(v) => Value::Timestamp(*v),
             Null => Value::Null,
         }
     }
@@ -56,7 +56,7 @@ impl Expression for Literal {
     }
 
     fn type_def(&self, _: (&LocalEnv, &ExternalEnv)) -> TypeDef {
-        use Literal::*;
+        use Literal::{Boolean, Float, Integer, Null, Regex, String, Timestamp};
 
         let type_def = match self {
             String(_) => TypeDef::bytes(),
@@ -74,7 +74,7 @@ impl Expression for Literal {
 
 impl fmt::Display for Literal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Literal::*;
+        use Literal::{Boolean, Float, Integer, Null, Regex, String, Timestamp};
 
         match self {
             String(v) => write!(f, r#""{}""#, std::string::String::from_utf8_lossy(v)),
@@ -130,19 +130,19 @@ impl From<&str> for Literal {
 
 impl From<i8> for Literal {
     fn from(v: i8) -> Self {
-        Literal::Integer(v as i64)
+        Literal::Integer(i64::from(v))
     }
 }
 
 impl From<i16> for Literal {
     fn from(v: i16) -> Self {
-        Literal::Integer(v as i64)
+        Literal::Integer(i64::from(v))
     }
 }
 
 impl From<i32> for Literal {
     fn from(v: i32) -> Self {
-        Literal::Integer(v as i64)
+        Literal::Integer(i64::from(v))
     }
 }
 
@@ -154,13 +154,13 @@ impl From<i64> for Literal {
 
 impl From<u16> for Literal {
     fn from(v: u16) -> Self {
-        Literal::Integer(v as i64)
+        Literal::Integer(i64::from(v))
     }
 }
 
 impl From<u32> for Literal {
     fn from(v: u32) -> Self {
-        Literal::Integer(v as i64)
+        Literal::Integer(i64::from(v))
     }
 }
 
@@ -276,7 +276,7 @@ impl std::error::Error for Error {
 
 impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
-        use ErrorVariant::*;
+        use ErrorVariant::{InvalidRegex, InvalidTimestamp, NanFloat};
 
         match &self.variant {
             InvalidRegex(..) => 101,
@@ -286,7 +286,7 @@ impl DiagnosticMessage for Error {
     }
 
     fn labels(&self) -> Vec<Label> {
-        use ErrorVariant::*;
+        use ErrorVariant::{InvalidRegex, InvalidTimestamp, NanFloat};
 
         match &self.variant {
             InvalidRegex(err) => {
@@ -319,7 +319,7 @@ impl DiagnosticMessage for Error {
     }
 
     fn notes(&self) -> Vec<Note> {
-        use ErrorVariant::*;
+        use ErrorVariant::{InvalidRegex, InvalidTimestamp, NanFloat};
 
         match &self.variant {
             InvalidRegex(_) => vec![Note::SeeDocs(

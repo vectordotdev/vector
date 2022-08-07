@@ -21,8 +21,6 @@ services:
       - "loki-integration-tests"
       - "--lib"
       - "::loki::"
-      - "--"
-      - "--nocapture"
     depends_on:
       - loki
     environment:

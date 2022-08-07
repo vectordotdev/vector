@@ -165,6 +165,13 @@ components: sources: socket: {
 			}
 			message:   fields._raw_line
 			timestamp: fields._current_timestamp
+			source_type: {
+				description: "The name of the source type."
+				required:    true
+				type: string: {
+					examples: ["socket"]
+				}
+			}
 			port: {
 				description: "The peer source port."
 				required:    false
@@ -175,6 +182,7 @@ components: sources: socket: {
 					examples: [2838]
 				}
 			}
+			client_metadata: fields._client_metadata
 		}
 	}
 
@@ -189,9 +197,10 @@ components: sources: socket: {
 
 			input: "\( _line )"
 			output: log: {
-				timestamp: _values.current_timestamp
-				message:   _line
-				host:      _values.local_host
+				timestamp:   _values.current_timestamp
+				message:     _line
+				host:        _values.local_host
+				source_type: "socket"
 			}
 		},
 	]

@@ -9,7 +9,7 @@ fn parse_regex(value: Value, numeric_groups: bool, pattern: &Regex) -> Resolved 
     let value = String::from_utf8_lossy(&bytes);
     let parsed = pattern
         .captures(&value)
-        .map(|capture| util::capture_regex_to_map(pattern, capture, numeric_groups))
+        .map(|capture| util::capture_regex_to_map(pattern, &capture, numeric_groups))
         .ok_or("could not find any pattern matches")?;
     Ok(parsed.into())
 }

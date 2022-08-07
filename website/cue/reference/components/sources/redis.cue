@@ -133,6 +133,13 @@ components: sources: redis: {
 			host:      fields._local_host
 			message:   fields._raw_line
 			timestamp: fields._current_timestamp
+			source_type: {
+				description: "The name of the source type."
+				required:    true
+				type: string: {
+					examples: ["redis"]
+				}
+			}
 			redis_key: {
 				description: "The Redis key the event came from"
 				required:    false

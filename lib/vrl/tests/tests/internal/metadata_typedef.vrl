@@ -1,0 +1,29 @@
+# result: {
+#   "foo": {
+#     "object": {
+#       "a": {
+#         "bytes": true
+#       },
+#       "b": {
+#         "integer": true
+#       }
+#     }
+#   },
+#   "foo2": {
+#     "object": {
+#       "b": {
+#         "integer": true
+#       }
+#     }
+#   }
+# }
+
+set_metadata_field(., {})
+set_metadata_field(.a, "string")
+set_metadata_field(.b, 5)
+.foo = type_def(get_metadata_field(.))
+remove_metadata_field(.a)
+.foo2 = type_def(get_metadata_field(.))
+.
+
+
