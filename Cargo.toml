@@ -510,7 +510,7 @@ sources-logstash = ["listenfd", "tokio-util/net", "sources-utils-tcp-keepalive",
 sources-mongodb_metrics = ["dep:mongodb"]
 sources-nats = ["dep:nats", "dep:nkeys"]
 sources-nginx_metrics = ["dep:nom"]
-sources-opentelemetry = ["sources-vector", "opentelemetry"]
+sources-opentelemetry = ["dep:prost-types", "sources-http", "sources-utils-http", "sources-vector", "opentelemetry"]
 sources-postgresql_metrics = ["dep:postgres-openssl", "dep:tokio-postgres"]
 sources-prometheus = ["dep:prometheus-parser", "sinks-prometheus", "sources-http", "sources-utils-http"]
 sources-redis= ["dep:redis"]
@@ -721,6 +721,7 @@ all-integration-tests = [
   "mongodb_metrics-integration-tests",
   "nats-integration-tests",
   "nginx-integration-tests",
+  "opentelemetry-integration-tests",
   "postgresql_metrics-integration-tests",
   "prometheus-integration-tests",
   "pulsar-integration-tests",
@@ -776,6 +777,7 @@ loki-integration-tests = ["sinks-loki"]
 mongodb_metrics-integration-tests = ["sources-mongodb_metrics"]
 nats-integration-tests = ["sinks-nats", "sources-nats"]
 nginx-integration-tests = ["sources-nginx_metrics"]
+opentelemetry-integration-tests = ["sources-opentelemetry"]
 postgresql_metrics-integration-tests = ["sources-postgresql_metrics"]
 prometheus-integration-tests = ["sinks-prometheus", "sources-prometheus"]
 pulsar-integration-tests = ["sinks-pulsar"]
