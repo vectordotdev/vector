@@ -8,7 +8,7 @@ use tower::{
     layer::{util::Stack, Layer},
     limit::RateLimit,
     retry::Retry,
-    timeout::{Timeout, TimeoutLayer},
+    timeout::Timeout,
     Service, ServiceBuilder,
 };
 use vector_config::configurable_component;
@@ -35,19 +35,26 @@ mod concurrency;
 mod health;
 mod map;
 
-pub type InnerSvc<S, L> = RateLimit<AdaptiveConcurrencyLimit<Retry<FixedRetryPolicy<L>, S>, L>>;
-pub type Svc<S, L> = InnerSvc<Timeout<S>, L>;
+pub type Svc<S, L> = RateLimit<AdaptiveConcurrencyLimit<Retry<FixedRetryPolicy<L>, Timeout<S>>, L>>;
 pub type TowerBatchedSink<S, B, RL> = BatchSink<Svc<S, RL>, B>;
 pub type TowerPartitionSink<S, B, RL, K> = PartitionBatchSink<Svc<S, RL>, B, K>;
-pub type DistributedService<S, RL, K, Req> = InnerSvc<
-    Buffer<
-        Balance<
-            BoxStream<'static, Result<Change<K, HealthService<Timeout<S>, RL>>, crate::Error>>,
+pub type DistributedService<S, RL, K, Req> = RateLimit<
+    Retry<
+        FixedRetryPolicy<RL>,
+        Buffer<
+            Balance<
+                BoxStream<
+                    'static,
+                    Result<
+                        Change<K, AdaptiveConcurrencyLimit<HealthService<Timeout<S>, RL>, RL>>,
+                        crate::Error,
+                    >,
+                >,
+                Req,
+            >,
             Req,
         >,
-        Req,
     >,
-    RL,
 >;
 
 pub trait ServiceBuilderExt<L> {
@@ -59,7 +66,7 @@ pub trait ServiceBuilderExt<L> {
         self,
         settings: TowerRequestSettings,
         retry_logic: RL,
-    ) -> ServiceBuilder<Stack<TimeoutLayer, Stack<TowerRequestLayer<RL, Request>, L>>>;
+    ) -> ServiceBuilder<Stack<TowerRequestLayer<RL, Request>, L>>;
 }
 
 impl<L> ServiceBuilderExt<L> for ServiceBuilder<L> {
@@ -74,14 +81,12 @@ impl<L> ServiceBuilderExt<L> for ServiceBuilder<L> {
         self,
         settings: TowerRequestSettings,
         retry_logic: RL,
-    ) -> ServiceBuilder<Stack<TimeoutLayer, Stack<TowerRequestLayer<RL, Request>, L>>> {
-        let timeout = settings.timeout;
+    ) -> ServiceBuilder<Stack<TowerRequestLayer<RL, Request>, L>> {
         self.layer(TowerRequestLayer {
             settings,
             retry_logic,
             _pd: std::marker::PhantomData,
         })
-        .timeout(timeout)
     }
 }
 
@@ -309,30 +314,40 @@ impl TowerRequestSettings {
         K: Eq + Hash + Clone + Copy + Send + 'static,
         D: TryStream<Ok = Change<K, (S, H)>, Error = crate::Error> + Send + 'static,
     {
-        let service_layer = ServiceBuilder::new().timeout(self.timeout);
-
+        let policy = self.retry_policy(retry_logic.clone());
         let logic = retry_logic.clone();
+        let settings = self.clone();
+
+        // Build services
         let open = OpenGauge::new();
         let services = services.map_ok(move |change| match change {
-            Change::Insert(key, (service, healthcheck)) => Change::Insert(
-                key,
-                HealthService::new(
-                    service_layer.service(service),
-                    healthcheck,
-                    logic.clone(),
-                    reactivate_delay,
-                    open.clone(),
-                ),
-            ),
+            Change::Insert(key, (inner, healthcheck)) => {
+                // Build individual service
+                let service = ServiceBuilder::new()
+                    .layer(AdaptiveConcurrencyLimitLayer::new(
+                        settings.concurrency,
+                        settings.adaptive_concurrency,
+                        retry_logic.clone(),
+                    ))
+                    .service(HealthService::new(
+                        ServiceBuilder::new()
+                            .timeout(settings.timeout)
+                            .service(inner),
+                        healthcheck,
+                        logic.clone(),
+                        reactivate_delay,
+                        open.clone(),
+                    ));
+
+                Change::Insert(key, service)
+            }
             Change::Remove(key) => Change::Remove(key),
         });
 
+        // Build sink service
         ServiceBuilder::new()
-            .layer(TowerRequestLayer {
-                settings: self,
-                retry_logic,
-                _pd: std::marker::PhantomData,
-            })
+            .rate_limit(self.rate_limit_num, self.rate_limit_duration)
+            .retry(policy)
             // There are other mechanisms limiting the number of concurrent requests/poll_ready
             // so we don't need to do that here, hence usize::MAX. But underlying library supports less
             // so >>3 is used as per tokio semaphore documentation.
@@ -357,7 +372,7 @@ where
     RL: RetryLogic<Response = S::Response> + Send + 'static,
     Request: Clone + Send + 'static,
 {
-    type Service = InnerSvc<S, RL>;
+    type Service = Svc<S, RL>;
 
     fn layer(&self, inner: S) -> Self::Service {
         let policy = self.settings.retry_policy(self.retry_logic.clone());
@@ -372,6 +387,7 @@ where
                 self.retry_logic.clone(),
             ))
             .retry(policy)
+            .timeout(self.settings.timeout)
             .service(inner)
     }
 }
