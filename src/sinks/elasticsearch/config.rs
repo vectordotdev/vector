@@ -1,7 +1,6 @@
 use std::{
     collections::{BTreeMap, HashMap},
     convert::TryFrom,
-    time::Duration,
 };
 
 use futures::{stream, FutureExt};
@@ -19,6 +18,7 @@ use crate::{
     serde::OneOrMany,
     sinks::{
         elasticsearch::{
+            health::ElasticsearchHealthLogic,
             retry::ElasticsearchRetryLogic,
             service::{ElasticsearchService, HttpRequestBuilder},
             sink::ElasticsearchSink,
@@ -26,8 +26,8 @@ use crate::{
             ElasticsearchCommonMode, ElasticsearchMode, IndexTemplateSnafu,
         },
         util::{
-            http::RequestConfig, BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings,
-            ServiceBuilderExt, TowerRequestConfig,
+            http::RequestConfig, service::HealthConfig, BatchConfig, Compression,
+            RealtimeSizeBasedDefaultBatchSettings, ServiceBuilderExt, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -196,8 +196,10 @@ impl BulkConfig {
 #[derive(Clone, Debug, Default)]
 #[serde(rename_all = "snake_case")]
 pub struct DistributionConfig {
-    /// Timeout between attempts to reactivate endpoints once they become unhealty.
-    pub endpoint_retry_timeout_secs: Option<u64>,
+    #[configurable(derived)]
+    #[serde(default)]
+    #[serde(flatten)]
+    pub health: HealthConfig,
 }
 
 /// Data stream mode configuration.
@@ -398,12 +400,11 @@ impl SinkConfig for ElasticsearchConfig {
         let stream = if commons.len() > 1 {
             // Distributed services
 
-            let reactivate_delay = Duration::from_secs(
-                self.distribution
-                    .as_ref()
-                    .and_then(|d| d.endpoint_retry_timeout_secs)
-                    .unwrap_or(ENDPOINT_RETRY_TIMEOUT_SECONDS_DEFAULT),
-            );
+            let health_config = self
+                .distribution
+                .as_ref()
+                .map(|d| d.health.clone())
+                .unwrap_or_default();
 
             let services = commons
                 .into_iter()
@@ -429,7 +430,8 @@ impl SinkConfig for ElasticsearchConfig {
             let service = request_limits.distributed_service(
                 ElasticsearchRetryLogic,
                 stream::iter(services),
-                reactivate_delay,
+                health_config,
+                ElasticsearchHealthLogic,
             );
 
             let sink = ElasticsearchSink::new(&common, self, service)?;

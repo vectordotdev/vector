@@ -221,13 +221,22 @@ components: sinks: elasticsearch: {
 			required:    false
 			type: object: {
 				examples: []
-				options: {					
-					endpoint_retry_timeout_secs: {
+				options: {	
+					retry_initial_backoff_secs: {
 						common:      false
-						description: "Timeout between attempts to reactivate endpoints once they become unhealty."
+						description: "Initial timeout, in seconds, between attempts to reactivate endpoints once they become unhealthy."
 						required:    false
 						type: uint: {
-							default: 5
+							default: 1
+							unit:    "seconds"
+						}
+					}
+					retry_max_duration_secs: {
+						common:      false
+						description: "Maximum timeout, in seconds, between attempts to reactivate endpoints once they become unhealthy."
+						required:    false
+						type: uint: {
+							default: 3600
 							unit:    "seconds"
 						}
 					}

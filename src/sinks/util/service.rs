@@ -15,7 +15,7 @@ use vector_config::configurable_component;
 
 pub use crate::sinks::util::service::{
     concurrency::{concurrency_is_none, Concurrency},
-    health::HealthService,
+    health::{HealthConfig, HealthLogic, HealthService},
     map::Map,
 };
 use crate::{
@@ -38,7 +38,7 @@ mod map;
 pub type Svc<S, L> = RateLimit<AdaptiveConcurrencyLimit<Retry<FixedRetryPolicy<L>, Timeout<S>>, L>>;
 pub type TowerBatchedSink<S, B, RL> = BatchSink<Svc<S, RL>, B>;
 pub type TowerPartitionSink<S, B, RL, K> = PartitionBatchSink<Svc<S, RL>, B, K>;
-pub type DistributedService<S, RL, K, Req> = RateLimit<
+pub type DistributedService<S, RL, HL, K, Req> = RateLimit<
     Retry<
         FixedRetryPolicy<RL>,
         Buffer<
@@ -46,7 +46,7 @@ pub type DistributedService<S, RL, K, Req> = RateLimit<
                 BoxStream<
                     'static,
                     Result<
-                        Change<K, AdaptiveConcurrencyLimit<HealthService<Timeout<S>, RL>, RL>>,
+                        Change<K, AdaptiveConcurrencyLimit<HealthService<Timeout<S>, HL>, RL>>,
                         crate::Error,
                     >,
                 >,
@@ -297,15 +297,17 @@ impl TowerRequestSettings {
         BatchSink::new(service, batch, batch_timeout)
     }
 
-    pub fn distributed_service<Req, RL, S, H, K, D>(
+    pub fn distributed_service<Req, RL, HL, S, H, K, D>(
         self,
         retry_logic: RL,
         services: D,
-        reactivate_delay: Duration,
-    ) -> DistributedService<S, RL, K, Req>
+        health_config: HealthConfig,
+        health_logic: HL,
+    ) -> DistributedService<S, RL, HL, K, Req>
     where
         Req: Clone + Send + 'static,
         RL: RetryLogic<Response = S::Response>,
+        HL: HealthLogic<Response = S::Response, Error = crate::Error>,
         S: Service<Req> + Clone + Send + 'static,
         S::Error: Into<crate::Error> + Send + Sync + 'static,
         S::Response: Send,
@@ -315,7 +317,6 @@ impl TowerRequestSettings {
         D: TryStream<Ok = Change<K, (S, H)>, Error = crate::Error> + Send + 'static,
     {
         let policy = self.retry_policy(retry_logic.clone());
-        let logic = retry_logic.clone();
         let settings = self.clone();
 
         // Build services
@@ -329,15 +330,16 @@ impl TowerRequestSettings {
                         settings.adaptive_concurrency,
                         retry_logic.clone(),
                     ))
-                    .service(HealthService::new(
-                        ServiceBuilder::new()
-                            .timeout(settings.timeout)
-                            .service(inner),
-                        healthcheck,
-                        logic.clone(),
-                        reactivate_delay,
-                        open.clone(),
-                    ));
+                    .service(
+                        health_config.build(
+                            health_logic.clone(),
+                            ServiceBuilder::new()
+                                .timeout(settings.timeout)
+                                .service(inner),
+                            healthcheck,
+                            open.clone(),
+                        ),
+                    );
 
                 Change::Insert(key, service)
             }

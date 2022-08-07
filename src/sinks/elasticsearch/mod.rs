@@ -5,6 +5,7 @@ mod request_builder;
 mod retry;
 mod service;
 mod sink;
+mod health;
 
 #[cfg(test)]
 mod tests;
