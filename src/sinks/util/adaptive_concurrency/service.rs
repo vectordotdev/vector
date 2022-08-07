@@ -91,7 +91,7 @@ impl<S, L> Load for AdaptiveConcurrencyLimit<S, L> {
     type Metric = f64;
 
     fn load(&self) -> Self::Metric {
-        unimplemented!()
+        self.controller.load()
     }
 }
 
