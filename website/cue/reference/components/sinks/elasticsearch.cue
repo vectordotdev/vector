@@ -219,26 +219,12 @@ components: sinks: elasticsearch: {
 			common:      false
 			description: "Options for distributing events to multiple endpoints."
 			required:    false
-			warnings: ["By default, ARC is enabled which can cause issues when Elasticsearch hosts are spread over larger distances."]
 			type: object: {
 				examples: []
-				options: {
-					endpoints: {
-						common: false
-						description: """
-							Additional Elasticsearch endpoints to send logs to. They should be a full URL as shown in the example.
-							All options that apply to regular [`endpoint`](#endpoint), like [`auth`](#auth), also apply to these endpoints.
-							"""
-						required: false
-						type: array: {
-							default: []
-							examples: [["http://10.24.32.122:9000", "https://example.com", "https://user:password@example.com"]]
-							items: type: string: {}
-						}
-					}
-					reactivate_delay_secs: {
+				options: {					
+					endpoint_retry_timeout_secs: {
 						common:      false
-						description: "Delay between trying to reactivate inactive endpoints."
+						description: "Timeout between attempts to reactivate endpoints once they become unhealty."
 						required:    false
 						type: uint: {
 							default: 5
@@ -257,7 +243,7 @@ components: sinks: elasticsearch: {
 			}
 		}
 		endpoint: {
-			description: "The Elasticsearch endpoint to send logs to. This should be the full URL as shown in the example."
+			description: "The Elasticsearch endpoint/endpoints to send logs to. This should be the full URL as shown in the example."
 			required:    true
 			type: string: {
 				examples: ["http://10.24.32.122:9000", "https://example.com", "https://user:password@example.com"]
@@ -374,17 +360,13 @@ components: sinks: elasticsearch: {
 		distribution: {
 			title: "Distribution"
 			body: """
-				By default, Vector sends events to a single Elasticsearch endpoint.
-				If `distribution` is used, events will be distributed to multiple endpoints
+				If multiple endpoints are specified in `endpoint` option, events will be distributed among them
 				according to their estimated load with failover.
 
-				Rate limit and concurrency are applied to the sink as a whole. As such [ARC](#adaptive-request-concurrency-arc)
-				will manage aggregated concurrency for all endpoints, but only to a certain point:
+				Rate limit is applied to the sink as a whole, while concurrency settings manage each endpoint individually.
 
-				* If all Elasticsearch instances are in the same data center, ARC should work.
-				* If all Elasticsearch instances are in the same region, ARC will probably work, but some tweaking of its parameters may be needed.
-				* Else, ARC probably won't work without heavy tweaking and even then may not work. So it may be better to turn it off.
-
+				Health of endpoints is actively monitored and if an endpoint is deemed unhealthy, Vector will stop sending events to it
+				until it is healthy again.
 				"""
 		}
 

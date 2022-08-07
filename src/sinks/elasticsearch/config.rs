@@ -16,6 +16,7 @@ use crate::{
     event::{EventRef, LogEvent, Value},
     http::HttpClient,
     internal_events::TemplateRenderingError,
+    serde::OneOrMany,
     sinks::{
         elasticsearch::{
             retry::ElasticsearchRetryLogic,
@@ -38,17 +39,18 @@ use lookup::path;
 
 /// The field name for the timestamp required by data stream mode
 pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
-pub const REACTIVATE_DELAY_SECONDS_DEFAULT: u64 = 5; // 5 seconds
+pub const ENDPOINT_RETRY_TIMEOUT_SECONDS_DEFAULT: u64 = 5; // 5 seconds
 
 /// Configuration for the `elasticsearch` sink.
 #[configurable_component(sink)]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ElasticsearchConfig {
-    /// The Elasticsearch endpoint to send logs to.
+    /// The Elasticsearch endpoint/endpoints to send logs to.
     ///
     /// This should be the full URL as shown in the example.
-    pub endpoint: String,
+    #[configurable(derived)]
+    pub endpoint: OneOrMany<String>,
 
     /// The `doc_type` for your index data.
     ///
@@ -189,16 +191,13 @@ impl BulkConfig {
     }
 }
 
-/// Distribution configuration.
+/// Options for distributing events to multiple endpoints.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 #[serde(rename_all = "snake_case")]
 pub struct DistributionConfig {
-    /// Endpoints to which to distribute data.
-    pub endpoints: Vec<String>,
-
-    /// Time between reactivation attempts.
-    pub reactivate_delay_secs: Option<u64>,
+    /// Timeout between attempts to reactivate endpoints once they become unhealty.
+    pub endpoint_retry_timeout_secs: Option<u64>,
 }
 
 /// Data stream mode configuration.
@@ -386,7 +385,9 @@ impl DataStreamConfig {
 #[typetag::serde(name = "elasticsearch")]
 impl SinkConfig for ElasticsearchConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let common = ElasticsearchCommon::parse_config(self).await?;
+        let commons = ElasticsearchCommon::parse_endpoints(self).await?;
+        let common = commons[0].clone();
+
         let client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
 
         let request_limits = self
@@ -394,19 +395,15 @@ impl SinkConfig for ElasticsearchConfig {
             .tower
             .unwrap_with(&TowerRequestConfig::default());
 
-        let stream = if let Some(distribution) = self.distribution.as_ref() {
+        let stream = if commons.len() > 1 {
             // Distributed services
 
             let reactivate_delay = Duration::from_secs(
-                distribution
-                    .reactivate_delay_secs
-                    .unwrap_or(REACTIVATE_DELAY_SECONDS_DEFAULT),
+                self.distribution
+                    .as_ref()
+                    .and_then(|d| d.endpoint_retry_timeout_secs)
+                    .unwrap_or(ENDPOINT_RETRY_TIMEOUT_SECONDS_DEFAULT),
             );
-
-            // Multiply configuration, one for each endpoint
-            let commons = Some(common.clone())
-                .into_iter()
-                .chain(ElasticsearchCommon::parse_endpoints(self).await?);
 
             let services = commons
                 .into_iter()

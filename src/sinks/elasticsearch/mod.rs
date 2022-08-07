@@ -187,4 +187,6 @@ pub enum ParseError {
     BatchActionTemplate { source: TemplateParseError },
     #[snafu(display("aws.region required when AWS authentication is in use"))]
     RegionRequired,
+    #[snafu(display("Endpoint option must be specified"))]
+    EndpointRequired,
 }
