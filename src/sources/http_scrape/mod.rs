@@ -46,7 +46,7 @@ pub(crate) struct GenericHttpScrapeInputs {
     /// Interval to scrape on in seconds
     pub interval_secs: u64,
     /// Map of Header+Value to apply to HTTP request
-    pub headers: Option<HashMap<String, String>>,
+    pub headers: Option<HashMap<String, Vec<String>>>,
     /// Content type of the HTTP request, determined by the source
     pub content_type: String,
     pub auth: Option<Auth>,
@@ -128,8 +128,10 @@ pub(crate) async fn http_scrape<H: HttpScraper + std::marker::Send + Clone>(
 
         // add user supplied headers
         if let Some(headers) = &inputs.headers {
-            for header in headers {
-                builder = builder.header(header.0, header.1);
+            for (header, values) in headers {
+                for value in values {
+                    builder = builder.header(header, value);
+                }
             }
         }
 

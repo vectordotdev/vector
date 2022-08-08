@@ -61,8 +61,9 @@ pub struct HttpScrapeConfig {
     framing: FramingConfig,
 
     /// Headers to apply to the HTTP requests.
+    /// One or more values for the same header can be provided.
     #[serde(default)]
-    headers: Option<HashMap<String, String>>,
+    headers: Option<HashMap<String, Vec<String>>>,
 
     /// TLS configuration.
     #[configurable(derived)]
@@ -96,7 +97,7 @@ impl HttpScrapeConfig {
         query: Option<HashMap<String, Vec<String>>>,
         decoding: DeserializerConfig,
         framing: FramingConfig,
-        headers: Option<HashMap<String, String>>,
+        headers: Option<HashMap<String, Vec<String>>>,
         tls: Option<TlsConfig>,
         auth: Option<Auth>,
     ) -> Self {

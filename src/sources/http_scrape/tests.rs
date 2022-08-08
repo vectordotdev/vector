@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use tokio::time::Duration;
-use warp::Filter;
+use warp::{http::HeaderMap, Filter};
 
 use crate::{serde::default_decoding, serde::default_framing_message_based};
 use codecs::decoding::{
@@ -15,7 +15,7 @@ use crate::test_util::{
     next_addr, test_generate_config,
 };
 
-pub(crate) const INTERVAL_SECS: u64 = 1;
+pub(crate) const INTERVAL_SECS: u64 = 3;
 
 /// The happy path should yield at least one event and must emit the required internal events for sources.
 pub(crate) async fn run_compliance(config: HttpScrapeConfig) -> Vec<Event> {
@@ -178,13 +178,16 @@ async fn request_query_applied() {
 #[tokio::test]
 async fn headers_applied() {
     let in_addr = next_addr();
-    let header_key = "f00";
-    let header_val = "bazz";
 
     let dummy_endpoint = warp::path!("endpoint")
         .and(warp::header::exact("Accept", "text/plain"))
-        .and(warp::header::exact(header_key, header_val))
-        .map(|| r#"{"data" : "foo"}"#);
+        .and(warp::header::headers_cloned().map(|headers: HeaderMap| {
+            let view = headers.get_all("f00");
+            let mut iter = view.iter();
+            assert_eq!(&"bazz", iter.next().unwrap());
+            assert_eq!(&"bizz", iter.next().unwrap());
+        }))
+        .map(|_| r#"{"data" : "foo"}"#);
 
     tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
 
@@ -195,8 +198,8 @@ async fn headers_applied() {
         default_decoding(),
         default_framing_message_based(),
         Some(HashMap::from([(
-            header_key.to_string(),
-            header_val.to_string(),
+            "f00".to_string(),
+            vec!["bazz".to_string(), "bizz".to_string()],
         )])),
         None,
         None,

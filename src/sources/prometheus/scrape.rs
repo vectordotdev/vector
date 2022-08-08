@@ -381,7 +381,7 @@ mod test {
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics", in_addr)],
-            scrape_interval_secs: 1,
+            scrape_interval_secs: 3,
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: true,
@@ -392,7 +392,7 @@ mod test {
 
         let events = run_and_assert_source_compliance(
             config,
-            Duration::from_secs(1),
+            Duration::from_secs(3),
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
@@ -413,7 +413,7 @@ mod test {
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics", in_addr)],
-            scrape_interval_secs: 1,
+            scrape_interval_secs: 3,
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: true,
@@ -424,7 +424,7 @@ mod test {
 
         let events = run_and_assert_source_compliance(
             config,
-            Duration::from_secs(1),
+            Duration::from_secs(3),
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
@@ -463,7 +463,7 @@ mod test {
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics", in_addr)],
-            scrape_interval_secs: 1,
+            scrape_interval_secs: 3,
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
@@ -474,7 +474,7 @@ mod test {
 
         let events = run_and_assert_source_compliance(
             config,
-            Duration::from_secs(1),
+            Duration::from_secs(3),
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
@@ -526,7 +526,7 @@ mod test {
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics?key1=val1", in_addr)],
-            scrape_interval_secs: 1,
+            scrape_interval_secs: 3,
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
@@ -543,7 +543,7 @@ mod test {
 
         let events = run_and_assert_source_compliance(
             config,
-            Duration::from_secs(1),
+            Duration::from_secs(3),
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
@@ -635,7 +635,7 @@ mod test {
                 endpoint_tag: None,
                 honor_labels: false,
                 query: None,
-                scrape_interval_secs: 1,
+                scrape_interval_secs: 3,
                 tls: None,
                 auth: None,
             },
@@ -650,7 +650,7 @@ mod test {
                 buckets: vec![1.0, 2.0, 4.0],
                 quantiles: vec![],
                 distributions_as_summaries: false,
-                flush_period_secs: Duration::from_secs(1),
+                flush_period_secs: Duration::from_secs(3),
                 suppress_timestamp: false,
                 acknowledgements: Default::default(),
             },
@@ -658,7 +658,7 @@ mod test {
 
         assert_source_compliance(&HTTP_PULL_SOURCE_TAGS, async move {
             let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
-            sleep(Duration::from_secs(1)).await;
+            sleep(Duration::from_secs(3)).await;
 
             let response = Client::new()
                 .get(format!("http://{}/metrics", out_addr).parse().unwrap())
@@ -721,7 +721,7 @@ mod integration_tests {
     async fn scrapes_metrics() {
         let config = PrometheusScrapeConfig {
             endpoints: vec!["http://localhost:9090/metrics".into()],
-            scrape_interval_secs: 1,
+            scrape_interval_secs: 3,
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
@@ -732,7 +732,7 @@ mod integration_tests {
 
         let events = run_and_assert_source_compliance(
             config,
-            Duration::from_secs(1),
+            Duration::from_secs(3),
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
