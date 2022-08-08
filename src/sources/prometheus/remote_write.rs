@@ -161,7 +161,6 @@ mod test {
         test_util::{
             self,
             components::{assert_source_compliance, HTTP_PUSH_SOURCE_TAGS},
-            wait_for_tcp,
         },
         tls::MaybeTlsSettings,
         SourceSender,
@@ -201,7 +200,6 @@ mod test {
                 .await
                 .unwrap();
             tokio::spawn(source);
-            wait_for_tcp(address).await;
 
             let sink = RemoteWriteConfig {
                 endpoint: format!("{}://localhost:{}/", proto, address.port()),
