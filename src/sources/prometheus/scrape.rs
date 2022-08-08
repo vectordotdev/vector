@@ -357,7 +357,7 @@ mod test {
             components::{
                 assert_source_compliance, run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS,
             },
-            next_addr, start_topology,
+            next_addr, start_topology, wait_for_tcp,
         },
         Error,
     };
@@ -378,10 +378,11 @@ mod test {
         });
 
         tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+        wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics", in_addr)],
-            scrape_interval_secs: 3,
+            scrape_interval_secs: 1,
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: true,
@@ -392,7 +393,7 @@ mod test {
 
         let events = run_and_assert_source_compliance(
             config,
-            Duration::from_secs(4),
+            Duration::from_secs(3),
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
@@ -410,10 +411,11 @@ mod test {
         });
 
         tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+        wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics", in_addr)],
-            scrape_interval_secs: 3,
+            scrape_interval_secs: 1,
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: true,
@@ -424,7 +426,7 @@ mod test {
 
         let events = run_and_assert_source_compliance(
             config,
-            Duration::from_secs(4),
+            Duration::from_secs(3),
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
@@ -460,10 +462,11 @@ mod test {
         });
 
         tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+        wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics", in_addr)],
-            scrape_interval_secs: 3,
+            scrape_interval_secs: 1,
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
@@ -474,7 +477,7 @@ mod test {
 
         let events = run_and_assert_source_compliance(
             config,
-            Duration::from_secs(4),
+            Duration::from_secs(3),
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
@@ -523,10 +526,11 @@ mod test {
         });
 
         tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+        wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics?key1=val1", in_addr)],
-            scrape_interval_secs: 3,
+            scrape_interval_secs: 1,
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
@@ -543,7 +547,7 @@ mod test {
 
         let events = run_and_assert_source_compliance(
             config,
-            Duration::from_secs(4),
+            Duration::from_secs(3),
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
@@ -625,6 +629,7 @@ mod test {
                 error!(message = "Server error.", %error);
             }
         });
+        wait_for_tcp(in_addr).await;
 
         let mut config = config::Config::builder();
         config.add_source(
@@ -635,7 +640,7 @@ mod test {
                 endpoint_tag: None,
                 honor_labels: false,
                 query: None,
-                scrape_interval_secs: 3,
+                scrape_interval_secs: 1,
                 tls: None,
                 auth: None,
             },
@@ -658,7 +663,7 @@ mod test {
 
         assert_source_compliance(&HTTP_PULL_SOURCE_TAGS, async move {
             let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
-            sleep(Duration::from_secs(4)).await;
+            sleep(Duration::from_secs(1)).await;
 
             let response = Client::new()
                 .get(format!("http://{}/metrics", out_addr).parse().unwrap())
@@ -721,7 +726,7 @@ mod integration_tests {
     async fn scrapes_metrics() {
         let config = PrometheusScrapeConfig {
             endpoints: vec!["http://localhost:9090/metrics".into()],
-            scrape_interval_secs: 3,
+            scrape_interval_secs: 1,
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
@@ -732,7 +737,7 @@ mod integration_tests {
 
         let events = run_and_assert_source_compliance(
             config,
-            Duration::from_secs(4),
+            Duration::from_secs(3),
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;

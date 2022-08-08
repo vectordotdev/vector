@@ -15,16 +15,13 @@ use crate::test_util::{
     next_addr, test_generate_config, wait_for_tcp,
 };
 
-pub(crate) const INTERVAL_SECS: u64 = 3;
+pub(crate) const INTERVAL_SECS: u64 = 1;
 
 /// The happy path should yield at least one event and must emit the required internal events for sources.
 pub(crate) async fn run_compliance(config: HttpScrapeConfig) -> Vec<Event> {
-    let events = run_and_assert_source_compliance(
-        config,
-        Duration::from_secs(INTERVAL_SECS + 1),
-        &HTTP_PULL_SOURCE_TAGS,
-    )
-    .await;
+    let events =
+        run_and_assert_source_compliance(config, Duration::from_secs(3), &HTTP_PULL_SOURCE_TAGS)
+            .await;
 
     assert!(!events.is_empty());
 

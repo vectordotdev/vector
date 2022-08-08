@@ -41,7 +41,7 @@ fn dufs_https_address() -> String {
 /// internal event metric is fired that no events would be outputed by the source.
 pub(crate) async fn run_error(config: HttpScrapeConfig) {
     let events =
-        run_and_assert_source_error(config, Duration::from_secs(1), &SOURCE_ERROR_TAGS).await;
+        run_and_assert_source_error(config, Duration::from_secs(3), &SOURCE_ERROR_TAGS).await;
 
     assert!(events.is_empty());
 }
