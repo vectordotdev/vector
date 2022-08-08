@@ -7,10 +7,11 @@ use crate::{
         Logs::{LogRecord, ResourceLogs, ScopeLogs},
         Resource as OtelResource,
     },
-    sources::opentelemetry::{OpentelemetryConfig, LOGS},
+    sources::opentelemetry::{GrpcConfig, HttpConfig, OpentelemetryConfig, LOGS},
     test_util::{
         self,
         components::{assert_source_compliance, SOURCE_TAGS},
+        next_addr,
     },
     SourceSender,
 };
@@ -26,21 +27,32 @@ fn generate_config() {
 }
 
 #[tokio::test]
-async fn receive_message() {
+async fn receive_grpc_logs() {
     assert_source_compliance(&SOURCE_TAGS, async {
-        let addr = test_util::next_addr();
-        let config = format!(r#"address = "{}""#, addr);
-        let source: OpentelemetryConfig = toml::from_str(&config).unwrap();
+        let grpc_addr = next_addr();
+        let http_addr = next_addr();
+
+        let source = OpentelemetryConfig {
+            grpc: GrpcConfig {
+                address: grpc_addr,
+                tls: Default::default(),
+            },
+            http: HttpConfig {
+                address: http_addr,
+                tls: Default::default(),
+            },
+            acknowledgements: Default::default(),
+        };
         let (sender, logs_output, _) = new_source(EventStatus::Delivered);
         let server = source
             .build(SourceContext::new_test(sender, None))
             .await
             .unwrap();
         tokio::spawn(server);
-        test_util::wait_for_tcp(addr).await;
+        test_util::wait_for_tcp(grpc_addr).await;
 
         // send request via grpc client
-        let mut client = LogsServiceClient::connect(format!("http://{}", addr))
+        let mut client = LogsServiceClient::connect(format!("http://{}", grpc_addr))
             .await
             .unwrap();
         let req = Request::new(ExportLogsServiceRequest {

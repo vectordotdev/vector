@@ -12,7 +12,7 @@ no-proxy = { version  = "0.3.1", default-features = false, features = ["serializ
 num-traits = { version = "0.2.15", default-features = false }
 schemars = { version = "0.8.10", default-features = true, features = ["preserve_order"] }
 serde = { version = "1.0", default-features = false }
-serde_json = { version = "1.0.82", default-features = false }
+serde_json = { version = "1.0.83", default-features = false }
 serde_with = { version = "2.0.0", default-features = false, features = ["std"] }
 toml = { version = "0.5.9", default-features = false }
 vector_config_common = { path = "../vector-config-common" }

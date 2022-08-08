@@ -59,8 +59,6 @@ jobs:
       - name: Bootstrap runner environment (generic)
         run: bash scripts/environment/prepare.sh
       - name: Build Vector
-        env:
-          PASS_FEATURES: "default-cmake"
         run: make package-x86_64-unknown-linux-musl-all
       - name: Stage package artifacts for publish
         uses: actions/upload-artifact@v3
@@ -86,8 +84,6 @@ jobs:
       - name: Bootstrap runner environment (generic)
         run: bash scripts/environment/prepare.sh
       - name: Build Vector
-        env:
-          PASS_FEATURES: "default"
         run: make package-x86_64-unknown-linux-gnu-all
       - name: Stage package artifacts for publish
         uses: actions/upload-artifact@v3
@@ -114,7 +110,6 @@ jobs:
         run: bash scripts/environment/prepare.sh
       - name: Build Vector
         env:
-          PASS_FEATURES: "default"
           CARGO_PROFILE_RELEASE_DEBUG: 2 # https://doc.rust-lang.org/cargo/reference/profiles.html#debug
         run: make package-x86_64-unknown-linux-gnu
       - name: Rename tarball with the correct debug suffix
@@ -147,7 +142,6 @@ jobs:
       - name: Build Vector
         env:
           DOCKER_PRIVILEGED: "true"
-          PASS_FEATURES: "default-cmake"
         run: make package-aarch64-unknown-linux-musl-all
       - name: Stage package artifacts for publish
         uses: actions/upload-artifact@v3
@@ -175,7 +169,6 @@ jobs:
       - name: Build Vector
         env:
           DOCKER_PRIVILEGED: "true"
-          PASS_FEATURES: "default"
         run: make package-aarch64-unknown-linux-gnu-all
       - name: Stage package artifacts for publish
         uses: actions/upload-artifact@v3
