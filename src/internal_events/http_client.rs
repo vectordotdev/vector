@@ -66,14 +66,14 @@ impl<'a, T: HttpBody> InternalEvent for GotHttpResponse<'a, T> {
 }
 
 #[derive(Debug)]
-pub struct GotHttpError<'a> {
+pub struct GotHttpWarning<'a> {
     pub error: &'a Error,
     pub roundtrip: Duration,
 }
 
-impl<'a> InternalEvent for GotHttpError<'a> {
+impl<'a> InternalEvent for GotHttpWarning<'a> {
     fn emit(self) {
-        error!(
+        warn!(
             message = "HTTP error.",
             error = %self.error,
             error_type = error_type::REQUEST_FAILED,
