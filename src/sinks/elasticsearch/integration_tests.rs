@@ -107,7 +107,7 @@ async fn ensure_pipeline_in_params() {
     let pipeline = String::from("test-pipeline");
 
     let config = ElasticsearchConfig {
-        endpoint: "http://localhost:9200".into(),
+        endpoint: "http://localhost:9200".to_string().into(),
         bulk: Some(BulkConfig {
             index: Some(index),
             action: None,
@@ -115,9 +115,10 @@ async fn ensure_pipeline_in_params() {
         pipeline: Some(pipeline.clone()),
         ..config()
     };
-    let common = ElasticsearchCommon::parse_config(&config)
+    let common = ElasticsearchCommon::parse_endpoints(&config)
         .await
-        .expect("Config error");
+        .expect("Config error")
+        .remove(0);
 
     assert_eq!(common.query_params["pipeline"], pipeline);
 }
@@ -126,7 +127,7 @@ async fn ensure_pipeline_in_params() {
 async fn structures_events_correctly() {
     let index = gen_index();
     let config = ElasticsearchConfig {
-        endpoint: http_server(),
+        endpoint: http_server().into(),
         bulk: Some(BulkConfig {
             index: Some(index.clone()),
             action: None,
@@ -136,9 +137,10 @@ async fn structures_events_correctly() {
         compression: Compression::None,
         ..config()
     };
-    let common = ElasticsearchCommon::parse_config(&config)
+    let common = ElasticsearchCommon::parse_endpoints(&config)
         .await
-        .expect("Config error");
+        .expect("Config error")
+        .remove(0);
     let base_url = common.base_url.clone();
 
     let cx = SinkContext::new_test();
@@ -208,7 +210,7 @@ async fn insert_events_over_http() {
 
     run_insert_tests(
         ElasticsearchConfig {
-            endpoint: http_server(),
+            endpoint: http_server().into(),
             doc_type: Some("log_lines".into()),
             compression: Compression::None,
             ..config()
@@ -229,7 +231,7 @@ async fn insert_events_over_https() {
                 user: "elastic".into(),
                 password: "vector".into(),
             }),
-            endpoint: https_server(),
+            endpoint: https_server().into(),
             doc_type: Some("log_lines".into()),
             compression: Compression::None,
             tls: Some(TlsConfig {
@@ -253,7 +255,7 @@ async fn insert_events_on_aws() {
             auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
                 load_timeout_secs: Some(5),
             })),
-            endpoint: aws_server(),
+            endpoint: aws_server().into(),
             aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
             ..config()
         },
@@ -272,7 +274,7 @@ async fn insert_events_on_aws_with_compression() {
             auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
                 load_timeout_secs: Some(5),
             })),
-            endpoint: aws_server(),
+            endpoint: aws_server().into(),
             aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
             compression: Compression::gzip_default(),
             ..config()
@@ -289,7 +291,7 @@ async fn insert_events_with_failure() {
 
     run_insert_tests(
         ElasticsearchConfig {
-            endpoint: http_server(),
+            endpoint: http_server().into(),
             doc_type: Some("log_lines".into()),
             compression: Compression::None,
             ..config()
@@ -307,7 +309,7 @@ async fn insert_events_in_data_stream() {
     let stream_index = format!("my-stream-{}", gen_index());
 
     let cfg = ElasticsearchConfig {
-        endpoint: http_server(),
+        endpoint: http_server().into(),
         mode: ElasticsearchMode::DataStream,
         bulk: Some(BulkConfig {
             index: Some(stream_index.clone()),
@@ -315,9 +317,10 @@ async fn insert_events_in_data_stream() {
         }),
         ..config()
     };
-    let common = ElasticsearchCommon::parse_config(&cfg)
+    let common = ElasticsearchCommon::parse_endpoints(&cfg)
         .await
-        .expect("Config error");
+        .expect("Config error")
+        .remove(0);
 
     create_template_index(&common, &template_index)
         .await
@@ -340,7 +343,7 @@ async fn distributed_insert_events() {
             user: "elastic".into(),
             password: "vector".into(),
         }),
-        endpoint: https_server(),
+        endpoint: vec![https_server(), http_server()].into(),
         doc_type: Some("log_lines".into()),
         compression: Compression::None,
         tls: Some(TlsConfig {
@@ -348,7 +351,6 @@ async fn distributed_insert_events() {
             ..Default::default()
         }),
         distribution: Some(DistributionConfig {
-            endpoints: vec![http_server()],
             ..Default::default()
         }),
         ..config()
@@ -366,12 +368,11 @@ async fn distributed_insert_events_failover() {
 
     run_insert_tests(
         ElasticsearchConfig {
-            endpoint: http_server(),
+            // A valid endpoint and some random non elasticsearch endpoint
+            endpoint: vec![http_server(), "http://localhost:2347".into()].into(),
             doc_type: Some("log_lines".into()),
             compression: Compression::None,
             distribution: Some(DistributionConfig {
-                // Some random non elasticsearch endpoint
-                endpoints: vec!["http://localhost:2347".into()],
                 ..Default::default()
             }),
             ..config()
@@ -414,9 +415,10 @@ async fn run_insert_tests_with_config(
     break_events: bool,
     batch_status: BatchStatus,
 ) {
-    let common = ElasticsearchCommon::parse_config(config)
+    let common = ElasticsearchCommon::parse_endpoints(config)
         .await
-        .expect("Config error");
+        .expect("Config error")
+        .remove(0);
     let index = match config.mode {
         // Data stream mode uses an index name generated from the event.
         ElasticsearchMode::DataStream => format!(
@@ -515,7 +517,7 @@ async fn run_insert_tests_with_config(
 }
 
 async fn run_insert_tests_with_multiple_endpoints(config: &ElasticsearchConfig) {
-    let common = ElasticsearchCommon::parse_config(config)
+    let commons = ElasticsearchCommon::parse_endpoints(config)
         .await
         .expect("Config error");
     let index = match config.mode {
@@ -544,15 +546,6 @@ async fn run_insert_tests_with_multiple_endpoints(config: &ElasticsearchConfig) 
     run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
 
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered,));
-
-    let commons = Some(common)
-        .into_iter()
-        .chain(
-            ElasticsearchCommon::parse_endpoints(config)
-                .await
-                .expect("Config error"),
-        )
-        .collect::<Vec<_>>();
 
     let base_urls = commons
         .iter()

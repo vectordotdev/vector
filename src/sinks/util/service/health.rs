@@ -170,7 +170,7 @@ where
         HealthFuture {
             inner: self.inner.call(req),
             logic: self.logic.clone(),
-            counters: self.counters.clone(),
+            counters: Arc::clone(&self.counters),
         }
     }
 }
@@ -213,7 +213,7 @@ struct HealthCounters {
 }
 
 impl HealthCounters {
-    fn new() -> Self {
+    const fn new() -> Self {
         HealthCounters {
             healthy: AtomicUsize::new(0),
             unhealthy: AtomicUsize::new(0),
@@ -324,8 +324,9 @@ mod tests {
 
         counters.inc_unhealthy();
         counters.inc_unhealthy();
-        snapshot = counters.healthy(snapshot).err().unwrap();
-        counters.inc_unhealthy();
+        assert!(counters.healthy(snapshot).is_err());
+
+        counters.inc_healthy();
         snapshot = counters.probation(snapshot, 1);
         assert!(counters.healthy(snapshot).is_ok());
     }

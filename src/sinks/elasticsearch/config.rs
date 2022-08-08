@@ -222,7 +222,7 @@ pub enum ClusterStatus {
 }
 
 impl ClusterStatus {
-    pub fn as_str(&self) -> &'static str {
+    pub const fn as_str(&self) -> &'static str {
         match self {
             ClusterStatus::Green => "green",
             ClusterStatus::Yellow => "yellow",
