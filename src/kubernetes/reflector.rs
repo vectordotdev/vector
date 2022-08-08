@@ -31,8 +31,8 @@ pub async fn custom_reflector<K, W>(
                         match event {
                             // Immediately reoncile `Applied` event
                             watcher::Event::Applied(_) => {
-                                trace!(message = "Processing Applied event.", ?event);
-                                store.apply_watcher_event(&event);
+                                trace!(message = "Queuing Applied event.", ?event);
+                                delay_queue.insert(event.to_owned(), Duration::from_secs(delay_deletion.as_secs() + 1));
                             }
                             // Delay reconciling any `Deleted` events
                             watcher::Event::Deleted(_) => {
@@ -60,7 +60,7 @@ pub async fn custom_reflector<K, W>(
             result = delay_queue.next(), if !delay_queue.is_empty() => {
                 match result {
                     Some(event) => {
-                        trace!(message = "Processing Deleted event.", ?event);
+                        trace!(message = "Processing delayed event.", ?event);
                         store.apply_watcher_event(&event.into_inner());
                     },
                     // DelayQueue returns None if the queue is exhausted,
