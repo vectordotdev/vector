@@ -172,7 +172,7 @@ components: sources: file: {
 		}
 		max_line_bytes: {
 			common:      false
-			description: "The maximum number of a bytes a line can contain before being discarded. This protects against malformed lines or tailing incorrect files."
+			description: "The maximum number of bytes a line can contain before being discarded. This protects against malformed lines or tailing incorrect files."
 			required:    false
 			type: uint: {
 				default: 102_400
@@ -246,6 +246,13 @@ components: sources: file: {
 					examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
 				}
 			}
+			source_type: {
+				description: "The name of the source type."
+				required:    true
+				type: string: {
+					examples: ["file"]
+				}
+			}
 			timestamp: fields._current_timestamp
 		}
 	}
@@ -261,10 +268,11 @@ components: sources: file: {
 			}
 			input: _line
 			output: log: {
-				file:      _file
-				host:      _values.local_host
-				message:   _line
-				timestamp: _values.current_timestamp
+				file:        _file
+				host:        _values.local_host
+				message:     _line
+				source_type: "file"
+				timestamp:   _values.current_timestamp
 			}
 		},
 	]

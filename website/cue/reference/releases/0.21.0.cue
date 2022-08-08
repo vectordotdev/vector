@@ -17,6 +17,7 @@ releases: "0.21.0": {
 		"Vector docker images require a volume to be mounted at `/var/lib/vector` to start correctly when the default `data_dir` of is used. [#12413](https://github.com/vectordotdev/vector/issues/12413). Fixed in `0.21.2`.",
 		"For AWS components, the timeout for loading credentials was dropped from 30 seconds to 5 seconds. [#12421](https://github.com/vectordotdev/vector/issues/12421). `0.21.2` adds a new option, `load_timeout_secs` that can be configured to a higher value.",
 		"`vector generate` works again with the `datadog_agent` source. [#12469](https://github.com/vectordotdev/vector/issues/12469). Fixed in `0.21.2`.",
+		"Using `assume_role` configuration for AWS components doesn't cache the credentials, resulting in a high number of calls to `AssumeRole`. This was fixed in `0.22.0` via [awslabs/smithy-rs#1296](https://github.com/awslabs/smithy-rs/pull/1296).",
 	]
 
 	whats_next: [

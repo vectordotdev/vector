@@ -20,7 +20,7 @@ Generic event sources like the `http` source or `exec` source can now directly
 receive metrics rather than needing to pass them through a `log_to_metric`
 transform.
 
-For example, an `exec` source can now be configured to receieve events via the
+For example, an `exec` source can now be configured to receive events via the
 `native_json` codec:
 
 ```toml
@@ -90,12 +90,13 @@ topics = ["vector"]
 decoding.codec = "native"
 ```
 
-This would allow an instance of Vector to receieve events from another Vector
+This would allow an instance of Vector to receive events from another Vector
 instance that has a `kafka` sink configured like:
 
 ```toml
-[sources.in]
+[sinks.out]
 type = "kafka"
+inputs = ["..."]
 bootstrap_servers = "localhost:9092"
 topic = "vector"
 encoding.codec = "native"

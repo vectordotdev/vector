@@ -122,8 +122,7 @@ pub fn interpolate(input: &str, secrets: &HashMap<String, String>) -> Result<Str
         .replace_all(input, |caps: &Captures<'_>| {
             caps.get(1)
                 .and_then(|b| caps.get(2).map(|k| (b, k)))
-                .map(|(b, k)| secrets.get(&format!("{}.{}", b.as_str(), k.as_str())))
-                .flatten()
+                .and_then(|(b, k)| secrets.get(&format!("{}.{}", b.as_str(), k.as_str())))
                 .cloned()
                 .unwrap_or_else(|| {
                     errors.push(format!(

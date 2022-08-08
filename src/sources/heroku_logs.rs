@@ -11,9 +11,9 @@ use codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     StreamDecodingError,
 };
-use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use tokio_util::codec::Decoder as _;
+use vector_config::configurable_component;
 use warp::http::{HeaderMap, StatusCode};
 
 use crate::{
@@ -22,7 +22,7 @@ use crate::{
         log_schema, AcknowledgementsConfig, GenerateConfig, Output, Resource, SourceConfig,
         SourceContext, SourceDescription,
     },
-    event::Event,
+    event::{Event, LogEvent},
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     sources::http::HttpMethod,
@@ -30,18 +30,36 @@ use crate::{
     tls::TlsEnableableConfig,
 };
 use lookup::path;
+use vector_core::config::LogNamespace;
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
-pub(crate) struct LogplexConfig {
+/// Configuration for `heroku_logs` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
+pub struct LogplexConfig {
+    /// The address to listen for connections on.
     address: SocketAddr,
+
+    /// A list of URL query parameters to include in the log event.
+    ///
+    /// These will override any values included in the body with conflicting names.
     #[serde(default)]
     query_parameters: Vec<String>,
+
+    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
+
+    #[configurable(derived)]
     auth: Option<HttpSourceAuthConfig>,
+
+    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     framing: FramingConfig,
+
+    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
+
+    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
 }
@@ -93,7 +111,12 @@ impl HttpSource for LogplexSource {
 #[typetag::serde(name = "heroku_logs")]
 impl SourceConfig for LogplexConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
+        let decoder = DecodingConfig::new(
+            self.framing.clone(),
+            self.decoding.clone(),
+            LogNamespace::Legacy,
+        )
+        .build();
         let source = LogplexSource {
             query_parameters: self.query_parameters.clone(),
             decoder,
@@ -110,7 +133,7 @@ impl SourceConfig for LogplexConfig {
         )
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(self.decoding.output_type())]
     }
 
@@ -128,8 +151,11 @@ impl SourceConfig for LogplexConfig {
 }
 
 // Add a compatibility alias to avoid breaking existing configs
-#[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct LogplexCompatConfig(LogplexConfig);
+
+/// Configuration for the `logplex` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
+pub struct LogplexCompatConfig(#[configurable(transparent)] LogplexConfig);
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "logplex")]
@@ -138,8 +164,8 @@ impl SourceConfig for LogplexCompatConfig {
         self.0.build(cx).await
     }
 
-    fn outputs(&self) -> Vec<Output> {
-        self.0.outputs()
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        self.0.outputs(global_log_namespace)
     }
 
     fn source_type(&self) -> &'static str {
@@ -270,7 +296,7 @@ fn line_to_events(mut decoder: Decoder, line: String) -> SmallVec<[Event; 1]> {
             internal_log_rate_secs = 10
         );
 
-        events.push(Event::from(line))
+        events.push(LogEvent::from_str_legacy(line).into())
     };
 
     let now = Utc::now();
@@ -315,7 +341,7 @@ mod tests {
         query_parameters: Vec<String>,
         status: EventStatus,
         acknowledgements: bool,
-    ) -> (impl Stream<Item = Event>, SocketAddr) {
+    ) -> (impl Stream<Item = Event> + Unpin, SocketAddr) {
         let (sender, recv) = SourceSender::new_test_finalize(status);
         let address = next_addr();
         let context = SourceContext::new_test(sender, None);

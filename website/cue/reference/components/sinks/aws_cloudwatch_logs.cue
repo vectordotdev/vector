@@ -33,13 +33,13 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 				enabled: true
 				codec: {
 					enabled: true
-					enum: ["json", "text", "ndjson"]
+					enum: ["json", "text"]
 				}
 			}
 			proxy: enabled: true
 			request: {
 				enabled: true
-				headers: false
+				headers: true
 			}
 			tls: {
 				enabled:                true

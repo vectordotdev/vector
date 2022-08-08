@@ -1,15 +1,41 @@
+use serde::Serializer;
 use std::fmt;
+use vector_config::configurable_component;
 
 use serde::{
     de::{self, Unexpected, Visitor},
     Deserialize, Deserializer, Serialize,
 };
 
-#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq, Serialize)]
+/// Configuration for outbound request concurrency.
+#[configurable_component(no_ser, no_deser)]
+#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
 pub enum Concurrency {
+    /// A fixed concurrency of 1.
+    ///
+    /// In other words, only one request can be outstanding at any given time.
     None,
+
+    /// Concurrency will be managed by Vector's [adaptive concurrency][arc] feature.
+    ///
+    /// [arc]: https://vector.dev/docs/about/under-the-hood/networking/arc/
     Adaptive,
-    Fixed(usize),
+
+    /// A fixed amount of concurrency will be allowed.
+    Fixed(#[configurable(transparent)] usize),
+}
+
+impl Serialize for Concurrency {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match &self {
+            Concurrency::None => serializer.serialize_str("none"),
+            Concurrency::Adaptive => serializer.serialize_str("adaptive"),
+            Concurrency::Fixed(i) => serializer.serialize_u64(*i as u64),
+        }
+    }
 }
 
 impl Default for Concurrency {
@@ -50,12 +76,14 @@ impl<'de> Deserialize<'de> for Concurrency {
             type Value = Concurrency;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str(r#"positive integer or "adaptive""#)
+                formatter.write_str(r#"positive integer, "adaptive", or "none" "#)
             }
 
             fn visit_str<E: de::Error>(self, value: &str) -> Result<Concurrency, E> {
                 if value == "adaptive" {
                     Ok(Concurrency::Adaptive)
+                } else if value == "none" {
+                    Ok(Concurrency::None)
                 } else {
                     Err(de::Error::unknown_variant(value, &["adaptive"]))
                 }
@@ -85,5 +113,22 @@ impl<'de> Deserialize<'de> for Concurrency {
         }
 
         deserializer.deserialize_any(UsizeOrAdaptive)
+    }
+}
+
+#[test]
+fn is_serialization_reversible() {
+    let variants = [
+        Concurrency::None,
+        Concurrency::Adaptive,
+        Concurrency::Fixed(8),
+    ];
+
+    for v in variants {
+        let value = serde_json::to_value(v).unwrap();
+        let deserialized = serde_json::from_value::<Concurrency>(value)
+            .expect("Failed to deserialize a previously serialized Concurrency value");
+
+        assert_eq!(v, deserialized)
     }
 }

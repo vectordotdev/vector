@@ -19,7 +19,7 @@ impl LogfmtSerializerConfig {
         LogfmtSerializer
     }
 
-    /// The data type of events that are accepted by `JsonSerializer`.
+    /// The data type of events that are accepted by `LogfmtSerializer`.
     pub fn input_type(&self) -> DataType {
         DataType::Log
     }
@@ -60,13 +60,13 @@ mod tests {
     use super::*;
     use bytes::BytesMut;
     use vector_common::btreemap;
-    use vector_core::event::Value;
+    use vector_core::event::{LogEvent, Value};
 
     #[test]
     fn serialize_logfmt() {
-        let event = Event::from(btreemap! {
+        let event = Event::Log(LogEvent::from(btreemap! {
             "foo" => Value::from("bar")
-        });
+        }));
         let mut serializer = LogfmtSerializer::new();
         let mut bytes = BytesMut::new();
 

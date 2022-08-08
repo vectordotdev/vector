@@ -44,9 +44,9 @@ pub enum Error {
 impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::RootPath => f.write_str("root path removal unsupported"),
-            Error::NegativeIndexPath => f.write_str("negative indexing unsupported"),
-            Error::CoalescedPath => f.write_str("coalesced path segment rejected"),
+            Self::RootPath => f.write_str("root path removal unsupported"),
+            Self::NegativeIndexPath => f.write_str("negative indexing unsupported"),
+            Self::CoalescedPath => f.write_str("coalesced path segment rejected"),
         }
     }
 }

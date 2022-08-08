@@ -8,25 +8,24 @@ use std::{
 use async_trait::async_trait;
 use bytes::BytesMut;
 use futures::{future::BoxFuture, ready, stream::BoxStream, FutureExt, StreamExt};
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::{net::UdpSocket, sync::oneshot, time::sleep};
 use tokio_util::codec::Encoder;
-use vector_buffers::Acker;
 use vector_common::internal_event::BytesSent;
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use super::SinkBuildError;
 use crate::{
-    config::SinkContext,
+    codecs::Transformer,
     dns,
-    event::Event,
+    event::{Event, EventStatus, Finalizable},
     internal_events::{
         SocketEventsSent, SocketMode, UdpSendIncompleteError, UdpSocketConnectionError,
         UdpSocketConnectionEstablished, UdpSocketError,
     },
     sinks::{
-        util::{encoding::Transformer, retries::ExponentialBackoff, StreamSink},
+        util::{retries::ExponentialBackoff, StreamSink},
         Healthcheck, VectorSink,
     },
     udp,
@@ -48,9 +47,18 @@ pub enum UdpError {
     ServiceChannelRecvError { source: oneshot::error::RecvError },
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+/// A UDP sink.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct UdpSinkConfig {
+    /// The address to connect to.
+    ///
+    /// The address _must_ include a port.
     address: String,
+
+    /// The size, in bytes, of the socket's send buffer.
+    ///
+    /// If set, the value of the setting is passed via the `SO_SNDBUF` option.
     send_buffer_bytes: Option<usize>,
 }
 
@@ -62,15 +70,15 @@ impl UdpSinkConfig {
         }
     }
 
-    fn build_connector(&self, _cx: SinkContext) -> crate::Result<UdpConnector> {
+    fn build_connector(&self) -> crate::Result<UdpConnector> {
         let uri = self.address.parse::<http::Uri>()?;
         let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
         let port = uri.port_u16().ok_or(SinkBuildError::MissingPort)?;
         Ok(UdpConnector::new(host, port, self.send_buffer_bytes))
     }
 
-    pub fn build_service(&self, cx: SinkContext) -> crate::Result<(UdpService, Healthcheck)> {
-        let connector = self.build_connector(cx)?;
+    pub fn build_service(&self) -> crate::Result<(UdpService, Healthcheck)> {
+        let connector = self.build_connector()?;
         Ok((
             UdpService::new(connector.clone()),
             async move { connector.healthcheck().await }.boxed(),
@@ -79,12 +87,11 @@ impl UdpSinkConfig {
 
     pub fn build(
         &self,
-        cx: SinkContext,
         transformer: Transformer,
         encoder: impl Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync + 'static,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let connector = self.build_connector(cx.clone())?;
-        let sink = UdpSink::new(connector.clone(), cx.acker(), transformer, encoder);
+        let connector = self.build_connector()?;
+        let sink = UdpSink::new(connector.clone(), transformer, encoder);
         Ok((
             VectorSink::from_event_streamsink(sink),
             async move { connector.healthcheck().await }.boxed(),
@@ -249,7 +256,6 @@ where
     E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync,
 {
     connector: UdpConnector,
-    acker: Acker,
     transformer: Transformer,
     encoder: E,
 }
@@ -258,10 +264,9 @@ impl<E> UdpSink<E>
 where
     E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync,
 {
-    fn new(connector: UdpConnector, acker: Acker, transformer: Transformer, encoder: E) -> Self {
+    const fn new(connector: UdpConnector, transformer: Transformer, encoder: E) -> Self {
         Self {
             connector,
-            acker,
             transformer,
             encoder,
         }
@@ -282,10 +287,9 @@ where
             while let Some(mut event) = input.next().await {
                 let byte_size = event.size_of();
 
-                self.acker.ack(1);
-
                 self.transformer.transform(&mut event);
 
+                let finalizers = event.take_finalizers();
                 let mut bytes = BytesMut::new();
                 if encoder.encode(event, &mut bytes).is_err() {
                     continue;
@@ -303,12 +307,14 @@ where
                             byte_size: bytes.len(),
                             protocol: "udp",
                         });
+                        finalizers.update_status(EventStatus::Delivered);
                     }
                     Err(error) => {
                         emit!(UdpSocketError { error });
+                        finalizers.update_status(EventStatus::Errored);
                         break;
                     }
-                };
+                }
             }
         }
 

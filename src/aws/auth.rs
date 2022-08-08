@@ -4,40 +4,65 @@ use aws_config::{
     default_provider::credentials::DefaultCredentialsChain, sts::AssumeRoleProviderBuilder,
 };
 use aws_types::{credentials::SharedCredentialsProvider, region::Region, Credentials};
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 // matches default load timeout from the SDK as of 0.10.1, but lets us confidently document the
 // default rather than relying on the SDK default to not change
 const DEFAULT_LOAD_TIMEOUT: Duration = Duration::from_secs(5);
 
-/// Configuration for configuring authentication strategy for AWS.
-#[derive(Serialize, Deserialize, Clone, Debug, Derivative)]
+/// Configuration of the authentication strategy for interacting with AWS services.
+#[configurable_component]
+#[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
-#[serde(untagged)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, untagged)]
 pub enum AwsAuthentication {
+    /// Authenticate using a fixed access key and secret pair.
     Static {
+        /// The AWS access key ID.
         access_key_id: String,
+
+        /// The AWS secret access key.
         secret_access_key: String,
     },
+
+    /// Authenticate using credentials stored in a file.
+    ///
+    /// Additionally, the specific credential profile to use can be set.
     File {
+        /// Path to the credentials file.
         credentials_file: String,
+
+        /// The credentials profile to use.
         profile: Option<String>,
     },
+
+    /// Assume the given role ARN.
     Role {
+        /// The ARN of the role to assume.
         assume_role: String,
+
+        /// Timeout for assuming the role, in seconds.
+        load_timeout_secs: Option<u64>,
+
+        /// The AWS region to send STS requests to.
+        ///
+        /// If not set, this will default to the configured region
+        /// for the service itself.
+        region: Option<String>,
+    },
+
+    /// Default authentication strategy which tries a variety of substrategies in a one-after-the-other fashion.
+    #[derivative(Default)]
+    Default {
+        /// Timeout for successfully loading any credentials, in seconds.
         load_timeout_secs: Option<u64>,
     },
-    // Default variant is used instead of Option<AWSAuthentication> since even for
-    // None we need to build `AwsCredentialsProvider`.
-    #[derivative(Default)]
-    Default { load_timeout_secs: Option<u64> },
 }
 
 impl AwsAuthentication {
     pub async fn credentials_provider(
         &self,
-        region: Region,
+        service_region: Region,
     ) -> crate::Result<SharedCredentialsProvider> {
         match self {
             Self::Static {
@@ -54,15 +79,17 @@ impl AwsAuthentication {
             AwsAuthentication::Role {
                 assume_role,
                 load_timeout_secs,
+                region,
             } => {
+                let auth_region = region.clone().map(Region::new).unwrap_or(service_region);
                 let provider = AssumeRoleProviderBuilder::new(assume_role)
-                    .region(region.clone())
-                    .build(default_credentials_provider(region, *load_timeout_secs).await);
+                    .region(auth_region.clone())
+                    .build(default_credentials_provider(auth_region, *load_timeout_secs).await);
 
                 Ok(SharedCredentialsProvider::new(provider))
             }
             AwsAuthentication::Default { load_timeout_secs } => Ok(SharedCredentialsProvider::new(
-                default_credentials_provider(region, *load_timeout_secs).await,
+                default_credentials_provider(service_region, *load_timeout_secs).await,
             )),
         }
     }
@@ -94,6 +121,7 @@ async fn default_credentials_provider(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde::{Deserialize, Serialize};
 
     #[derive(Serialize, Deserialize, Clone, Debug)]
     struct ComponentConfig {
@@ -162,6 +190,7 @@ mod tests {
             assume_role = "root"
             auth.assume_role = "auth.root"
             auth.load_timeout_secs = 10
+            auth.region = "us-west-2"
         "#,
         )
         .unwrap();
@@ -170,9 +199,11 @@ mod tests {
             AwsAuthentication::Role {
                 assume_role,
                 load_timeout_secs,
+                region,
             } => {
                 assert_eq!(&assume_role, "auth.root");
                 assert_eq!(load_timeout_secs, Some(10));
+                assert_eq!(region.unwrap(), "us-west-2");
             }
             _ => panic!(),
         }

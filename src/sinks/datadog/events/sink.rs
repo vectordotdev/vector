@@ -3,12 +3,11 @@ use std::{fmt, num::NonZeroUsize};
 use async_trait::async_trait;
 use futures::{stream::BoxStream, StreamExt};
 use tower::Service;
-use vector_buffers::Acker;
 use vector_core::stream::DriverResponse;
 
 use crate::{
     config::log_schema,
-    event::{Event, LogEvent},
+    event::Event,
     internal_events::ParserMissingFieldError,
     sinks::{
         datadog::events::request_builder::{DatadogEventsRequest, DatadogEventsRequestBuilder},
@@ -18,7 +17,6 @@ use crate::{
 
 pub struct DatadogEventsSink<S> {
     pub(super) service: S,
-    pub acker: Acker,
 }
 
 impl<S> DatadogEventsSink<S>
@@ -32,10 +30,6 @@ where
         let concurrency_limit = NonZeroUsize::new(50);
 
         let driver = input
-            .map(|event| {
-                // Panic: This sink only accepts Logs, so this should never panic
-                event.into_log()
-            })
             .filter_map(ensure_required_fields)
             .request_builder(concurrency_limit, DatadogEventsRequestBuilder::new())
             .filter_map(|request| async move {
@@ -47,12 +41,14 @@ where
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(self.service, self.acker);
+            .into_driver(self.service);
         driver.run().await
     }
 }
 
-async fn ensure_required_fields(mut log: LogEvent) -> Option<LogEvent> {
+async fn ensure_required_fields(event: Event) -> Option<Event> {
+    let mut log = event.into_log();
+
     if !log.contains("title") {
         emit!(ParserMissingFieldError { field: "title" });
         return None;
@@ -88,7 +84,8 @@ async fn ensure_required_fields(mut log: LogEvent) -> Option<LogEvent> {
             log.insert("source_type_name", name);
         }
     }
-    Some(log)
+
+    Some(Event::from(log))
 }
 
 #[async_trait]

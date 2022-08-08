@@ -9,7 +9,7 @@ use regex::{Regex, RegexBuilder};
 use roxmltree::{Document, Node, NodeType};
 use vrl::prelude::*;
 
-/// Used to keep Clippy's too_many_argument check happy.
+/// Used to keep Clippy's `too_many_argument` check happy.
 #[derive(Debug)]
 struct ParseOptions {
     trim: Option<Value>,
@@ -189,23 +189,6 @@ impl Function for ParseXml {
                 required: false,
             },
         ]
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-
-        let options = ParseOptions {
-            trim: args.optional("trim"),
-            include_attr: args.optional("include_attr"),
-            attr_prefix: args.optional("attr_prefix"),
-            text_key: args.optional("text_key"),
-            always_use_text_key: args.optional("always_use_text_key"),
-            parse_bool: args.optional("parse_bool"),
-            parse_null: args.optional("parse_null"),
-            parse_number: args.optional("parse_number"),
-        };
-
-        parse_xml(value, options)
     }
 }
 
@@ -723,17 +706,11 @@ mod tests {
         let object1 = type_def.as_object().unwrap();
 
         assert!(object1.known().is_empty());
-        assert!(object1.unknown().unwrap().as_exact().unwrap().is_object());
+        assert!(object1.unknown_kind().contains_object());
 
-        let object2 = object1
-            .unknown()
-            .unwrap()
-            .as_exact()
-            .unwrap()
-            .as_object()
-            .unwrap();
+        let object2 = object1.unknown_kind().as_object().cloned().unwrap();
 
         assert!(object2.known().is_empty());
-        assert!(object2.unknown().unwrap().is_any());
+        assert!(object2.unknown_kind().is_any());
     }
 }

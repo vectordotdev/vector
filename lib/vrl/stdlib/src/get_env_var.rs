@@ -42,11 +42,6 @@ impl Function for GetEnvVar {
 
         Ok(Box::new(GetEnvVarFn { name }))
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let name = args.required("name");
-        get_env_var(name)
-    }
 }
 
 #[derive(Debug, Clone)]

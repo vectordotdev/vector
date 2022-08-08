@@ -149,7 +149,7 @@ mod tests {
             type = "socket"
             mode = "tcp"
             inputs = ["sample"]
-            encoding = "text"
+            encoding.codec = "text"
             address = "127.0.0.1:9999"
         "#;
 
@@ -192,7 +192,8 @@ mod tests {
                     r#"    type: "socket""#,
                     r#"    mode: "tcp""#,
                     r#"    inputs: ["sample"]"#,
-                    r#"    encoding: "text""#,
+                    r#"    encoding:"#,
+                    r#"      codec: "text""#,
                     r#"    address: "127.0.0.1:9999""#,
                 ),
                 Format::Yaml,
@@ -231,7 +232,9 @@ mod tests {
                             "type": "socket",
                             "mode": "tcp",
                             "inputs": ["sample"],
-                            "encoding": "text",
+                            "encoding": {
+                                "codec": "text"
+                            },
                             "address": "127.0.0.1:9999"
                         }
                     }

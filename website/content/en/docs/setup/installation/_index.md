@@ -6,7 +6,7 @@ short: Installation
 
 Vector compiles to a single static binary, which makes it easy to install.
 
-On *nix systems Vector's only dependency is [`libc`][libc]. Your operating system should generally provide this
+On \*nix systems Vector's only dependency is [`libc`][libc]. Your operating system should generally provide this
 dependency.
 
 ## Using static musl builds
@@ -18,16 +18,24 @@ artifacts can be useful in stripped-down environments that don't provide a built
 {{< warning title="musl performance issues" >}}
 Please note that musl, as of this writing, has a significantly worse performance profile than [glibc] when Vector is
 running in multiple threads (Vector defaults to the number of available cores). We recommend that you use [glibc] when
-available *unless* you're running Vector on a single CPU.
+available _unless_ you're running Vector on a single CPU.
 
 [glibc]: https://www.gnu.org/software/libc
+
 {{< /warning >}}
 
 ## Installation script
 
-These light-weight scripts detect your platform and determine the best method for installing Vector:
+This light-weight script detects your platform and determine the best method for installing Vector:
 
 {{< easy-install-scripts >}}
+
+You can use the `--prefix` option to specify a custom installation directory. This is
+especially useful in automated environments (for example Dockerfiles).
+
+The following command adds the required binaries to `$PATH` without modifying your profiles.
+
+{{< docker-example-install-scripts >}}
 
 ## Other installation methods
 

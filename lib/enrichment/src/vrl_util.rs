@@ -111,6 +111,7 @@ fn arg_to_case(arg: &FunctionArgument) -> std::result::Result<Case, Box<dyn Diag
     }
 }
 
+#[allow(unused)] // will be used by LLVM runtime
 #[derive(Debug)]
 pub(crate) struct EnrichmentTableRecord {
     pub(crate) table: String,

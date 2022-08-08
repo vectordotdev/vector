@@ -209,19 +209,9 @@ impl Function for ParseUserAgent {
             _ => Ok(None),
         }
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let string = value.try_bytes_utf8_lossy()?;
-        let parser = args
-            .required_any("mode")
-            .downcast_ref::<ParserMode>()
-            .ok_or("no parser mode")?;
-
-        Ok((parser.fun)(&string))
-    }
 }
 
+#[allow(dead_code)] // will be used by LLVM runtime
 struct ParserMode {
     fun: Box<dyn Fn(&str) -> Value + Send + Sync>,
 }
@@ -265,7 +255,7 @@ pub(crate) enum Mode {
 
 impl Mode {
     fn all_value() -> Vec<Value> {
-        use Mode::*;
+        use Mode::{Enriched, Fast, Reliable};
 
         vec![Fast, Reliable, Enriched]
             .into_iter()
@@ -274,7 +264,7 @@ impl Mode {
     }
 
     const fn as_str(self) -> &'static str {
-        use Mode::*;
+        use Mode::{Enriched, Fast, Reliable};
 
         match self {
             Fast => "fast",
@@ -354,7 +344,7 @@ impl FromStr for Mode {
     type Err = &'static str;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        use Mode::*;
+        use Mode::{Enriched, Fast, Reliable};
 
         match s {
             "fast" => Ok(Fast),
@@ -558,7 +548,7 @@ fn into_value<'a>(iter: impl IntoIterator<Item = (&'a str, Option<String>)>) -> 
         .map(|(name, value)| {
             (
                 name.to_string(),
-                value.map(|s| s.into()).unwrap_or(Value::Null),
+                value.map_or(Value::Null, std::convert::Into::into),
             )
         })
         .collect()

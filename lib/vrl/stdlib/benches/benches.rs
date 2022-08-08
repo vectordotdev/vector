@@ -57,6 +57,8 @@ criterion_group!(
               is_empty,
               is_float,
               is_integer,
+              is_ipv4,
+              is_ipv6,
               is_json,
               is_null,
               is_nullish,
@@ -754,6 +756,54 @@ bench_function! {
 }
 
 bench_function! {
+    is_ipv4 => vrl_stdlib::IsIpv4;
+
+    not_string {
+        args: func_args![value: 42],
+        want: Ok(false),
+    }
+
+    ipv4 {
+        args: func_args![value: "192.168.0.1"],
+        want: Ok(true),
+    }
+
+    invalid_ipv4 {
+        args: func_args![value: "192.168.0.299"],
+        want: Ok(false),
+    }
+
+    ipv6 {
+        args: func_args![value: "2404:6800:4003:c02::64"],
+        want: Ok(false),
+    }
+}
+
+bench_function! {
+    is_ipv6 => vrl_stdlib::IsIpv6;
+
+    not_string {
+        args: func_args![value: 42],
+        want: Ok(false),
+    }
+
+    ipv4 {
+        args: func_args![value: "192.168.0.1"],
+        want: Ok(false),
+    }
+
+    ipv6 {
+        args: func_args![value: "2404:6800:4003:c02::64"],
+        want: Ok(true),
+    }
+
+    invalid_ipv6 {
+        args: func_args![value: "2404:6800:goat:c02::64"],
+        want: Ok(false),
+    }
+}
+
+bench_function! {
     is_json => vrl_stdlib::IsJson;
 
     map {
@@ -1377,7 +1427,6 @@ bench_function! {
         args: func_args![
             value: "2020-10-02T23:22:12.223222Z info Hello world",
             pattern: "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}",
-            remove_empty: false,
         ],
         want: Ok(value!({
             "timestamp": "2020-10-02T23:22:12.223222Z",
@@ -1676,9 +1725,11 @@ bench_function! {
             "appname": "non",
             "procid": 2426,
             "msgid": "ID931",
-            "exampleSDID@32473.iut": "3",
-            "exampleSDID@32473.eventSource": "Application",
-            "exampleSDID@32473.eventID": "1011",
+            "exampleSDID@32473": {
+                "iut": "3",
+                "eventSource": "Application",
+                "eventID": "1011",
+            },
             "message": "Try to override the THX port, maybe it will reboot the neural interface!",
             "version": 1,
         }))

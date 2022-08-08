@@ -79,14 +79,6 @@ impl Function for MatchArray {
             },
         ]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let pattern = args.required("pattern");
-        let all = args.optional("all");
-
-        match_array(value, pattern, all)
-    }
 }
 
 #[derive(Debug, Clone)]

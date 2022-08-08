@@ -140,15 +140,6 @@ impl Function for FormatNumber {
             result: Ok("4_672,4"),
         }]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let scale = args.optional("scale");
-        let decimal_separator = args.optional("decimal_separator");
-        let grouping_separator = args.optional("grouping_separator");
-
-        format_number(value, scale, grouping_separator, decimal_separator)
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -225,7 +216,7 @@ mod tests {
         }
 
         big_number {
-            args: func_args![value: 11222333444.56789,
+            args: func_args![value: 11_222_333_444.567_89,
                              scale: 3,
                              decimal_separator: ",",
                              grouping_separator: "."],

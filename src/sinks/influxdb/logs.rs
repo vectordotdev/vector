@@ -4,9 +4,10 @@ use bytes::{Bytes, BytesMut};
 use futures::SinkExt;
 use http::{Request, Uri};
 use indoc::indoc;
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 use crate::{
+    codecs::Transformer,
     config::{
         log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
         SinkDescription,
@@ -19,7 +20,6 @@ use crate::{
             InfluxDb1Settings, InfluxDb2Settings, ProtocolVersion,
         },
         util::{
-            encoding::Transformer,
             http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
             BatchConfig, Buffer, Compression, SinkBatchSettings, TowerRequestConfig,
         },
@@ -37,28 +37,54 @@ impl SinkBatchSettings for InfluxDbLogsDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 1.0;
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+/// Configuration for the `influxdb_logs` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct InfluxDbLogsConfig {
+    /// The namespace of the measurement name to use.
+    ///
+    /// When specified, the measurement name will be `<namespace>.vector`.
+    ///
+    /// This field is deprecated, and `measurement` should be used instead.
+    #[configurable(deprecated)]
     pub namespace: Option<String>,
+
+    /// The name of the InfluxDB measurement that will be written to.
     pub measurement: Option<String>,
+
+    /// The endpoint to send data to.
     pub endpoint: String,
+
+    /// The list of names of log fields that should be added as tags to each measurement.
     #[serde(default)]
     pub tags: Vec<String>,
+
     #[serde(flatten)]
     pub influxdb1_settings: Option<InfluxDb1Settings>,
+
     #[serde(flatten)]
     pub influxdb2_settings: Option<InfluxDb2Settings>,
+
+    #[configurable(derived)]
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
     )]
     pub encoding: Transformer,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<InfluxDbLogsDefaultBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -142,7 +168,6 @@ impl SinkConfig for InfluxDbLogsConfig {
             request,
             batch.timeout,
             client,
-            cx.acker(),
         )
         .sink_map_err(|error| error!(message = "Fatal influxdb_logs sink error.", %error));
 
@@ -157,8 +182,8 @@ impl SinkConfig for InfluxDbLogsConfig {
         "influxdb_logs"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
@@ -330,7 +355,7 @@ mod tests {
 
     #[test]
     fn test_encode_event_apply_rules() {
-        let mut event = Event::from("hello");
+        let mut event = Event::Log(LogEvent::from("hello"));
         event.as_mut_log().insert("host", "aws.cloud.eur");
         event.as_mut_log().insert("timestamp", ts());
 
@@ -371,7 +396,7 @@ mod tests {
 
     #[test]
     fn test_encode_event_v1() {
-        let mut event = Event::from("hello");
+        let mut event = Event::Log(LogEvent::from("hello"));
         event.as_mut_log().insert("host", "aws.cloud.eur");
         event.as_mut_log().insert("source_type", "file");
 
@@ -416,7 +441,7 @@ mod tests {
 
     #[test]
     fn test_encode_event() {
-        let mut event = Event::from("hello");
+        let mut event = Event::Log(LogEvent::from("hello"));
         event.as_mut_log().insert("host", "aws.cloud.eur");
         event.as_mut_log().insert("source_type", "file");
 
@@ -461,7 +486,7 @@ mod tests {
 
     #[test]
     fn test_encode_event_without_tags() {
-        let mut event = Event::from("hello");
+        let mut event = Event::Log(LogEvent::from("hello"));
 
         event.as_mut_log().insert("value", 100);
         event.as_mut_log().insert("timestamp", ts());
@@ -491,18 +516,14 @@ mod tests {
 
     #[test]
     fn test_encode_nested_fields() {
-        let mut event = Event::new_empty_log();
+        let mut event = LogEvent::default();
 
-        event.as_mut_log().insert("a", 1);
-        event.as_mut_log().insert("nested.field", "2");
-        event.as_mut_log().insert("nested.bool", true);
-        event
-            .as_mut_log()
-            .insert("nested.array[0]", "example-value");
-        event
-            .as_mut_log()
-            .insert("nested.array[2]", "another-value");
-        event.as_mut_log().insert("nested.array[3]", 15);
+        event.insert("a", 1);
+        event.insert("nested.field", "2");
+        event.insert("nested.bool", true);
+        event.insert("nested.array[0]", "example-value");
+        event.insert("nested.array[2]", "another-value");
+        event.insert("nested.array[3]", 15);
 
         let sink = create_sink(
             "http://localhost:9999",
@@ -513,7 +534,7 @@ mod tests {
         );
         let mut encoder = sink.build_encoder();
 
-        let bytes = encoder.encode_event(event).unwrap();
+        let bytes = encoder.encode_event(event.into()).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
 
         let line_protocol = split_line_protocol(string);
@@ -536,7 +557,7 @@ mod tests {
 
     #[test]
     fn test_add_tag() {
-        let mut event = Event::from("hello");
+        let mut event = Event::Log(LogEvent::from("hello"));
         event.as_mut_log().insert("source_type", "file");
 
         event.as_mut_log().insert("as_a_tag", 10);

@@ -51,11 +51,6 @@ impl Function for Integer {
 
         Ok(Box::new(IntegerFn { value }))
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        int(value)
-    }
 }
 
 #[derive(Debug, Clone)]

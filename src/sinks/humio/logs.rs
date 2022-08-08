@@ -1,18 +1,22 @@
-use serde::{Deserialize, Serialize};
+use codecs::JsonSerializerConfig;
+use vector_config::configurable_component;
 
-use super::{host_key, Encoding};
+use super::host_key;
 use crate::{
+    codecs::EncodingConfig,
     config::{
-        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
+        SinkDescription,
     },
     sinks::{
         splunk_hec::{
             common::{
-                acknowledgements::HecClientAcknowledgementsConfig, SplunkHecDefaultBatchSettings,
+                acknowledgements::HecClientAcknowledgementsConfig, timestamp_key, EndpointTarget,
+                SplunkHecDefaultBatchSettings,
             },
             logs::config::HecLogsSinkConfig,
         },
-        util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
+        util::{BatchConfig, Compression, TowerRequestConfig},
         Healthcheck, VectorSink,
     },
     template::Template,
@@ -21,36 +25,100 @@ use crate::{
 
 const HOST: &str = "https://cloud.humio.com";
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+/// Configuration for the `humio_logs` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct HumioLogsConfig {
+    /// The Humio ingestion token.
     pub(super) token: String,
-    // Deprecated name
+
+    /// The base URL of the Humio instance.
     #[serde(alias = "host")]
     pub(super) endpoint: Option<String>,
+
+    /// The source of events sent to this sink.
+    ///
+    /// Typically the filename the logs originated from. Maps to `@source` in Humio.
+    #[configurable(metadata(templateable))]
     pub(super) source: Option<Template>,
-    pub(super) encoding: EncodingConfig<Encoding>,
+
+    #[configurable(derived)]
+    pub(super) encoding: EncodingConfig,
+
+    /// The type of events sent to this sink. Humio uses this as the name of the parser to use to ingest the data.
+    ///
+    /// If unset, Humio will default it to none.
+    #[configurable(metadata(templateable))]
     pub(super) event_type: Option<Template>,
+
+    /// Overrides the name of the log field used to grab the hostname to send to Humio.
+    ///
+    /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
+    ///
+    /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     #[serde(default = "host_key")]
     pub(super) host_key: String,
+
+    /// Event fields to be added to Humio’s extra fields.
+    ///
+    /// Can be used to tag events by specifying fields starting with `#`.
+    ///
+    /// For more information, see [Humio’s Format of Data][humio_data_format].
+    ///
+    /// [humio_data_format]: https://docs.humio.com/integrations/data-shippers/hec/#format-of-data
     #[serde(default)]
     pub(super) indexed_fields: Vec<String>,
+
+    /// Optional name of the repository to ingest into.
+    ///
+    /// In public-facing APIs, this must (if present) be equal to the repository used to create the ingest token used for authentication.
+    ///
+    /// In private cluster setups, Humio can be configured to allow these to be different.
+    ///
+    /// For more information, see [Humio’s Format of Data][humio_data_format].
+    ///
+    /// [humio_data_format]: https://docs.humio.com/integrations/data-shippers/hec/#format-of-data
+    #[configurable(metadata(templateable))]
     #[serde(default)]
     pub(super) index: Option<Template>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub(super) compression: Compression,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub(super) request: TowerRequestConfig,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub(super) batch: BatchConfig<SplunkHecDefaultBatchSettings>,
+
+    #[configurable(derived)]
     pub(super) tls: Option<TlsConfig>,
+
+    /// Overrides the name of the log field used to grab the nanosecond-enabled timestamp to send to Humio.
+    ///
+    /// By default, `@timestamp.nanos` is used.
     #[serde(default = "timestamp_nanos_key")]
     pub(super) timestamp_nanos_key: Option<String>,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+
+    /// Overrides the name of the log field used to grab the timestamp to send to Humio.
+    ///
+    /// By default, the [global `log_schema.timestamp_key` option][global_timestamp_key] is used.
+    ///
+    /// [global_timestamp_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.timestamp_key
+    #[serde(default = "timestamp_key")]
+    pub(super) timestamp_key: String,
 }
 
 inventory::submit! {
@@ -67,7 +135,7 @@ impl GenerateConfig for HumioLogsConfig {
             token: "${HUMIO_TOKEN}".to_owned(),
             endpoint: None,
             source: None,
-            encoding: Encoding::Json.into(),
+            encoding: JsonSerializerConfig::new().into(),
             event_type: None,
             indexed_fields: vec![],
             index: None,
@@ -78,6 +146,7 @@ impl GenerateConfig for HumioLogsConfig {
             tls: None,
             timestamp_nanos_key: None,
             acknowledgements: Default::default(),
+            timestamp_key: timestamp_key(),
         })
         .unwrap()
     }
@@ -91,15 +160,15 @@ impl SinkConfig for HumioLogsConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        Input::new(self.encoding.config().input_type() & DataType::Log)
     }
 
     fn sink_type(&self) -> &'static str {
         "humio_logs"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
@@ -116,7 +185,7 @@ impl HumioLogsConfig {
             sourcetype: self.event_type.clone(),
             source: self.source.clone(),
             timestamp_nanos_key: self.timestamp_nanos_key.clone(),
-            encoding: self.encoding.clone().into_encoding(),
+            encoding: self.encoding.clone(),
             compression: self.compression,
             batch: self.batch,
             request: self.request,
@@ -125,6 +194,8 @@ impl HumioLogsConfig {
                 indexer_acknowledgements_enabled: false,
                 ..Default::default()
             },
+            timestamp_key: timestamp_key(),
+            endpoint_target: EndpointTarget::Event,
         }
     }
 }
@@ -147,6 +218,7 @@ mod integration_tests {
     use chrono::{TimeZone, Utc};
     use futures::{future::ready, stream};
     use indoc::indoc;
+    use serde::Deserialize;
     use serde_json::{json, Value as JsonValue};
     use tokio::time::Duration;
 
@@ -297,7 +369,7 @@ mod integration_tests {
             token: token.to_string(),
             endpoint: Some(humio_address()),
             source: None,
-            encoding: Encoding::Json.into(),
+            encoding: JsonSerializerConfig::new().into(),
             event_type: None,
             host_key: log_schema().host_key().to_string(),
             indexed_fields: vec![],
@@ -308,6 +380,7 @@ mod integration_tests {
             tls: None,
             timestamp_nanos_key: timestamp_nanos_key(),
             acknowledgements: Default::default(),
+            timestamp_key: Default::default(),
         }
     }
 
@@ -394,8 +467,8 @@ mod integration_tests {
         let search_query = format!(r#"message="{}""#, message);
 
         // events are not available to search API immediately
-        // poll up 20 times for event to show up
-        for _ in 0..20usize {
+        // poll up 200 times for event to show up
+        for _ in 0..200usize {
             let res = client
                 .post(&search_url)
                 .json(&json!({

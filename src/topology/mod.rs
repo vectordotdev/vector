@@ -7,11 +7,11 @@
 //! each type of component.
 
 pub(super) use vector_core::fanout;
+pub mod schema;
 
 pub mod builder;
 mod ready_arrays;
 mod running;
-mod schema;
 mod task;
 
 #[cfg(test)]
@@ -26,10 +26,7 @@ use std::{
 use futures::{Future, FutureExt};
 pub(super) use running::RunningTopology;
 use tokio::sync::{mpsc, watch};
-use vector_buffers::{
-    topology::channel::{BufferReceiverStream, BufferSender},
-    Acker,
-};
+use vector_buffers::topology::channel::{BufferReceiverStream, BufferSender};
 
 use crate::{
     config::{ComponentKey, Config, ConfigDiff, OutputId},
@@ -45,7 +42,6 @@ type TaskHandle = tokio::task::JoinHandle<Result<TaskOutput, ()>>;
 type BuiltBuffer = (
     BufferSender<EventArray>,
     Arc<Mutex<Option<BufferReceiverStream<EventArray>>>>,
-    Acker,
 );
 
 /// A tappable output consisting of an output ID and associated metadata

@@ -1,3 +1,5 @@
+#![deny(warnings)]
+
 extern crate vector;
 use vector::app::Application;
 

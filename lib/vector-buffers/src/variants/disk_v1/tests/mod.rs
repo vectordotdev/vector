@@ -5,8 +5,8 @@ use tracing::{Metadata, Span};
 
 use super::{open, Reader, Writer};
 use crate::{
-    buffer_usage_data::BufferUsageHandle, test::common::install_tracing_helpers,
-    variants::disk_v1::reader::FLUSH_INTERVAL, Acker, Bufferable, WhenFull,
+    buffer_usage_data::BufferUsageHandle, test::install_tracing_helpers,
+    variants::disk_v1::reader::FLUSH_INTERVAL, Bufferable,
 };
 
 mod acknowledgements;
@@ -19,12 +19,12 @@ mod size_limits;
 const DEFAULT_DISK_BUFFER_V1_SIZE_BYTES: NonZeroU64 =
     unsafe { NonZeroU64::new_unchecked(1024 * 1024 * 1024) };
 
-pub(crate) fn create_default_buffer_v1<P, R>(data_dir: P) -> (Writer<R>, Reader<R>, Acker)
+pub(crate) fn create_default_buffer_v1<P, R>(data_dir: P) -> (Writer<R>, Reader<R>)
 where
     P: AsRef<Path>,
     R: Bufferable + Clone,
 {
-    let usage_handle = BufferUsageHandle::noop(WhenFull::Block);
+    let usage_handle = BufferUsageHandle::noop();
     open(
         data_dir.as_ref(),
         "disk_buffer_v1",
@@ -37,13 +37,13 @@ where
 
 pub(crate) fn create_default_buffer_v1_with_usage<P, R>(
     data_dir: P,
-) -> (Writer<R>, Reader<R>, Acker, BufferUsageHandle)
+) -> (Writer<R>, Reader<R>, BufferUsageHandle)
 where
     P: AsRef<Path>,
     R: Bufferable + Clone,
 {
-    let usage_handle = BufferUsageHandle::noop(WhenFull::Block);
-    let (writer, reader, acker) = open(
+    let usage_handle = BufferUsageHandle::noop();
+    let (writer, reader) = open(
         data_dir.as_ref(),
         "disk_buffer_v1",
         DEFAULT_DISK_BUFFER_V1_SIZE_BYTES,
@@ -52,21 +52,21 @@ where
     )
     .expect("should not fail to create buffer");
 
-    (writer, reader, acker, usage_handle)
+    (writer, reader, usage_handle)
 }
 
 pub(crate) fn create_default_buffer_v1_with_max_buffer_size<P, R>(
     data_dir: P,
     max_buffer_size: u64,
-) -> (Writer<R>, Reader<R>, Acker)
+) -> (Writer<R>, Reader<R>)
 where
     P: AsRef<Path>,
     R: Bufferable + Clone,
 {
     let max_buffer_size =
         NonZeroU64::new(max_buffer_size).expect("max buffer size must be non-zero");
-    let usage_handle = BufferUsageHandle::noop(WhenFull::Block);
-    let (writer, reader, acker) = open(
+    let usage_handle = BufferUsageHandle::noop();
+    let (writer, reader) = open(
         data_dir.as_ref(),
         "disk_buffer_v1",
         max_buffer_size,
@@ -75,7 +75,7 @@ where
     )
     .expect("should not fail to create buffer");
 
-    (writer, reader, acker)
+    (writer, reader)
 }
 
 async fn drive_reader_to_flush<T: Bufferable>(reader: &mut Reader<T>) {
@@ -192,4 +192,11 @@ macro_rules! assert_buffer_usage_metrics {
     ($usage:expr, $($tail:tt)*) => {{
         assert_buffer_usage_metrics!($usage, @asserts (), $($tail)*);
     }};
+}
+
+pub(crate) async fn read_next<T>(reader: &mut Reader<T>) -> T
+where
+    T: Bufferable,
+{
+    reader.next().await.expect("read should not fail")
 }

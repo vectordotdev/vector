@@ -11,14 +11,13 @@ fn parse_common_log(bytes: Value, timestamp_format: Option<Value>, ctx: &Context
         None => "%d/%b/%Y:%T %z".to_owned(),
         Some(timestamp_format) => timestamp_format.try_bytes_utf8_lossy()?.to_string(),
     };
-    let captures = log_util::REGEX_APACHE_COMMON_LOG
-        .captures(&message)
-        .ok_or("failed parsing common log line")?;
-    log_util::log_fields(
-        &log_util::REGEX_APACHE_COMMON_LOG,
-        &captures,
+
+    log_util::parse_message(
+        &*log_util::REGEX_APACHE_COMMON_LOG,
+        &message,
         &timestamp_format,
         ctx.timezone(),
+        "common",
     )
     .map_err(Into::into)
 }
@@ -80,13 +79,6 @@ impl Function for ParseCommonLog {
                 }"#
             }),
         }]
-    }
-
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let timestamp_format = args.optional("timestamp_format");
-
-        parse_common_log(value, timestamp_format, ctx)
     }
 }
 

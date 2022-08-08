@@ -53,8 +53,6 @@ services:
       - "mongodb_metrics-integration-tests"
       - "--lib"
       - "::mongodb_metrics::"
-      - "--"
-      - "--nocapture"
     depends_on:
       - mongodb-primary
       - mongodb-secondary
@@ -66,6 +64,7 @@ services:
       - backend
     volumes:
       - ${PWD}:/code
+      - target:/code/target
       - cargogit:/usr/local/cargo/git
       - cargoregistry:/usr/local/cargo/registry
 
@@ -73,5 +72,6 @@ networks:
   backend: {}
 
 volumes:
+  target: {}
   cargogit: {}
   cargoregistry: {}

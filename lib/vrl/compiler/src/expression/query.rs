@@ -1,17 +1,13 @@
 use std::fmt;
 
 use lookup::LookupBuf;
-use value::{
-    kind::{remove, Collection},
-    Kind, Value,
-};
+use value::{kind::remove, Kind, Value};
 
 use crate::{
     expression::{Container, Resolved, Variable},
     parser::ast::Ident,
     state::{ExternalEnv, LocalEnv},
     type_def::Details,
-    vm::{self, OpCode},
     Context, Expression, TypeDef,
 };
 
@@ -67,29 +63,26 @@ impl Query {
         &self,
         external: &mut ExternalEnv,
     ) -> Result<Option<Kind>, remove::Error> {
-        if let Some(ref mut target) = external.target().as_mut() {
-            let value = target.value.clone();
-            let mut type_def = target.type_def.clone();
+        let target = external.target_mut();
+        let value = target.value.clone();
+        let mut type_def = target.type_def.clone();
 
-            let result = type_def.remove_at_path(
-                &self.path.to_lookup(),
-                remove::Strategy {
-                    coalesced_path: remove::CoalescedPath::Reject,
-                },
-            );
+        let result = type_def.remove_at_path(
+            &self.path.to_lookup(),
+            remove::Strategy {
+                coalesced_path: remove::CoalescedPath::Reject,
+            },
+        );
 
-            external.update_target(Details { type_def, value });
+        external.update_target(Details { type_def, value });
 
-            return result;
-        }
-
-        Ok(None)
+        result
     }
 }
 
 impl Expression for Query {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        use Target::*;
+        use Target::{Container, External, FunctionCall, Internal};
 
         let value = match &self.target {
             External => {
@@ -106,9 +99,8 @@ impl Expression for Query {
             Container(container) => container.resolve(ctx)?,
         };
 
-        Ok(crate::Target::target_get(&value, &self.path)
-            .ok()
-            .flatten()
+        Ok(value
+            .get_by_path(&self.path)
             .cloned()
             .unwrap_or(Value::Null))
     }
@@ -124,64 +116,27 @@ impl Expression for Query {
     }
 
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
-        use Target::*;
+        use Target::{Container, External, FunctionCall, Internal};
 
         match &self.target {
-            External => match state.1.target() {
-                None if self.path().is_root() => TypeDef::object(Collection::any()).infallible(),
-                None => TypeDef::any().infallible(),
-                Some(details) => details.clone().type_def.at_path(&self.path.to_lookup()),
-            },
-
-            Internal(variable) => variable.type_def(state).at_path(&self.path.to_lookup()),
-            FunctionCall(call) => call.type_def(state).at_path(&self.path.to_lookup()),
-            Container(container) => container.type_def(state).at_path(&self.path.to_lookup()),
+            External => state.1.target().clone().type_def.at_path(&self.path),
+            Internal(variable) => variable.type_def(state).at_path(&self.path),
+            FunctionCall(call) => call.type_def(state).at_path(&self.path),
+            Container(container) => container.type_def(state).at_path(&self.path),
         }
-    }
-
-    fn compile_to_vm(
-        &self,
-        vm: &mut crate::vm::Vm,
-        state: (&mut LocalEnv, &mut ExternalEnv),
-    ) -> Result<(), String> {
-        // Write the target depending on what target we are trying to retrieve.
-        let variable = match &self.target {
-            Target::External => {
-                vm.write_opcode(OpCode::GetPath);
-                vm::Variable::External(self.path.clone())
-            }
-            Target::Internal(variable) => {
-                vm.write_opcode(OpCode::GetPath);
-                vm::Variable::Internal(variable.ident().clone(), self.path.clone())
-            }
-            Target::FunctionCall(call) => {
-                // Write the code to call the function.
-                call.compile_to_vm(vm, state)?;
-
-                // Then retrieve the given path from the returned value that has been pushed on the stack
-                vm.write_opcode(OpCode::GetPath);
-                vm::Variable::Stack(self.path.clone())
-            }
-            Target::Container(container) => {
-                // Write the code to create the container onto the stack.
-                container.compile_to_vm(vm, state)?;
-
-                // Then retrieve the given path from the returned value that has been pushed on the stack
-                vm.write_opcode(OpCode::GetPath);
-                vm::Variable::Stack(self.path.clone())
-            }
-        };
-
-        let target = vm.get_target(&variable);
-        vm.write_primitive(target);
-
-        Ok(())
     }
 }
 
 impl fmt::Display for Query {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}{}", self.target, self.path)
+        match self.target {
+            Target::Internal(_)
+                if !self.path.is_root() && !self.path.iter().next().unwrap().is_index() =>
+            {
+                write!(f, "{}.{}", self.target, self.path)
+            }
+            _ => write!(f, "{}{}", self.target, self.path),
+        }
     }
 }
 
@@ -205,7 +160,7 @@ pub enum Target {
 
 impl fmt::Display for Target {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Target::*;
+        use Target::{Container, External, FunctionCall, Internal};
 
         match self {
             Internal(v) => v.fmt(f),
@@ -218,7 +173,7 @@ impl fmt::Display for Target {
 
 impl fmt::Debug for Target {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Target::*;
+        use Target::{Container, External, FunctionCall, Internal};
 
         match self {
             Internal(v) => write!(f, "Internal({:?})", v),

@@ -1,7 +1,8 @@
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{stream, StreamExt};
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -13,10 +14,25 @@ use crate::{
     SourceSender,
 };
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+/// Configuration for the `internal_logs` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct InternalLogsConfig {
+    /// Overrides the name of the log field used to add the current hostname to each event.
+    ///
+    /// The value will be the current hostname for wherever Vector is running.
+    ///
+    /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
+    ///
+    /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     pub host_key: Option<String>,
+
+    /// Overrides the name of the log field used to add the current process ID to each event.
+    ///
+    /// The value will be the current process ID for Vector itself.
+    ///
+    /// By default, `"pid"` is used.
     pub pid_key: Option<String>,
 }
 
@@ -48,7 +64,7 @@ impl SourceConfig for InternalLogsConfig {
         )))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -214,7 +230,7 @@ mod tests {
         }
     }
 
-    async fn start_source() -> impl Stream<Item = Event> {
+    async fn start_source() -> impl Stream<Item = Event> + Unpin {
         let (tx, rx) = SourceSender::new_test();
 
         let source = InternalLogsConfig::default()

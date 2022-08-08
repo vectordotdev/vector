@@ -8,11 +8,11 @@ use crate::util::Base64Charset;
 fn encode_base64(value: Value, padding: Option<Value>, charset: Option<Value>) -> Resolved {
     let value = value.try_bytes()?;
     let padding = padding
-        .map(|v| v.try_boolean())
+        .map(VrlValueConvert::try_boolean)
         .transpose()?
         .unwrap_or(true);
     let charset = charset
-        .map(|v| v.try_bytes())
+        .map(VrlValueConvert::try_bytes)
         .transpose()?
         .map(|c| Base64Charset::from_str(&String::from_utf8_lossy(&c)))
         .transpose()?
@@ -73,14 +73,6 @@ impl Function for EncodeBase64 {
             source: r#"encode_base64("some string value", padding: false, charset: "url_safe")"#,
             result: Ok("c29tZSBzdHJpbmcgdmFsdWU"),
         }]
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let padding = args.optional("padding");
-        let charset = args.optional("charset");
-
-        encode_base64(value, padding, charset)
     }
 }
 

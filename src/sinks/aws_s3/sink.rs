@@ -7,14 +7,14 @@ use uuid::Uuid;
 use vector_core::{event::Finalizable, ByteSizeOf};
 
 use crate::{
-    codecs::Encoder,
+    codecs::{Encoder, Transformer},
     event::Event,
     sinks::{
         s3_common::{
             config::S3Options,
             service::{S3Metadata, S3Request},
         },
-        util::{encoding::Transformer, request_builder::EncodeResult, Compression, RequestBuilder},
+        util::{request_builder::EncodeResult, Compression, RequestBuilder},
     },
 };
 

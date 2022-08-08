@@ -520,8 +520,8 @@ mod tests {
             MetricValue::Counter { value: 1.0 },
         );
 
-        let _ = fanout.send(vec![metric_event].into()).await;
-        let _ = fanout.send(vec![log_event].into()).await;
+        fanout.send(vec![metric_event].into()).await;
+        fanout.send(vec![log_event].into()).await;
 
         // 3rd payload should be the metric event
         assert!(matches!(

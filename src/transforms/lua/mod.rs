@@ -1,7 +1,7 @@
 pub mod v1;
 pub mod v2;
 
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 use crate::{
     config::{
@@ -11,39 +11,56 @@ use crate::{
     transforms::Transform,
 };
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+/// Marker type for the version one of the configuration for the `lua` transform.
+#[configurable_component]
+#[derive(Clone, Debug)]
 enum V1 {
+    /// Marker value for version one.
     #[serde(rename = "1")]
     V1,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(deny_unknown_fields)]
+/// Configuration for the version one of the `lua` transform.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct LuaConfigV1 {
+    /// Version of the configuration.
     version: Option<V1>,
+
     #[serde(flatten)]
     config: v1::LuaConfig,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+/// Marker type for the version two of the configuration for the `lua` transform.
+#[configurable_component]
+#[derive(Clone, Debug)]
 enum V2 {
+    /// Marker value for version two.
     #[serde(rename = "2")]
     V2,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(deny_unknown_fields)]
+/// Configuration for the version two of the `lua` transform.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct LuaConfigV2 {
+    /// Version of the configuration.
     version: V2,
+
     #[serde(flatten)]
     config: v2::LuaConfig,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+/// Configuration for the `lua` transform.
+#[configurable_component(transform)]
+#[derive(Clone, Debug)]
 #[serde(untagged)]
 pub enum LuaConfig {
-    V1(LuaConfigV1),
-    V2(LuaConfigV2),
+    /// Configuration for version one.
+    V1(#[configurable(derived)] LuaConfigV1),
+
+    /// Configuration for version two.
+    V2(#[configurable(derived)] LuaConfigV2),
 }
 
 inventory::submit! {

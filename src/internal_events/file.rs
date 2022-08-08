@@ -445,4 +445,26 @@ mod source {
             emit!(PathGlobbingError { path, error });
         }
     }
+
+    pub struct FileNegativeAcknowledgementError<'a> {
+        pub filename: &'a str,
+    }
+
+    impl InternalEvent for FileNegativeAcknowledgementError<'_> {
+        fn emit(self) {
+            error!(
+                message = "Event received a negative acknowledgment, file has been stopped.",
+                error_code = "negative_acknowledgement",
+                error_type = error_type::ACKNOWLEDGMENT_FAILED,
+                stage = error_stage::SENDING,
+                filename = self.filename,
+            );
+            counter!(
+                "component_errors_total", 1,
+                "error_code" => "negative_acknowledgment",
+                "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
+                "stage" => error_stage::SENDING,
+            );
+        }
+    }
 }

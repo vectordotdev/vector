@@ -18,7 +18,10 @@ use tower::Service;
 use uuid::Uuid;
 use vector_core::event::EventStatus;
 
-use super::acknowledgements::{run_acknowledgements, HecClientAcknowledgementsConfig};
+use super::{
+    acknowledgements::{run_acknowledgements, HecClientAcknowledgementsConfig},
+    EndpointTarget,
+};
 use crate::{
     http::HttpClient,
     internal_events::{SplunkIndexerAcknowledgementUnavailableError, SplunkResponseParseError},
@@ -177,6 +180,7 @@ impl ResponseExt for http::Response<Bytes> {
 }
 
 pub struct HttpRequestBuilder {
+    pub endpoint_target: EndpointTarget,
     pub endpoint: String,
     pub default_token: String,
     pub compression: Compression,
@@ -185,24 +189,54 @@ pub struct HttpRequestBuilder {
     pub channel: String,
 }
 
+#[derive(Default)]
+pub(super) struct MetadataFields {
+    pub(super) source: Option<String>,
+    pub(super) sourcetype: Option<String>,
+    pub(super) index: Option<String>,
+    pub(super) host: Option<String>,
+}
+
 impl HttpRequestBuilder {
-    pub fn new(endpoint: String, default_token: String, compression: Compression) -> Self {
+    pub fn new(
+        endpoint: String,
+        endpoint_target: EndpointTarget,
+        default_token: String,
+        compression: Compression,
+    ) -> Self {
         let channel = Uuid::new_v4().hyphenated().to_string();
         Self {
             endpoint,
+            endpoint_target,
             default_token,
             compression,
             channel,
         }
     }
 
-    pub fn build_request(
+    pub(super) fn build_request(
         &self,
         body: Bytes,
         path: &str,
         passthrough_token: Option<Arc<str>>,
+        metadata_fields: MetadataFields,
     ) -> Result<Request<Bytes>, crate::Error> {
-        let uri = build_uri(self.endpoint.as_str(), path).context(UriParseSnafu)?;
+        let uri = match self.endpoint_target {
+            EndpointTarget::Raw => {
+                let metadata = [
+                    (super::SOURCE_FIELD, metadata_fields.source),
+                    (super::SOURCETYPE_FIELD, metadata_fields.sourcetype),
+                    (super::INDEX_FIELD, metadata_fields.index),
+                    (super::HOST_FIELD, metadata_fields.host),
+                ]
+                .into_iter()
+                .filter_map(|(key, value)| value.map(|value| (key, value)));
+                build_uri(self.endpoint.as_str(), path, metadata).context(UriParseSnafu)?
+            }
+            EndpointTarget::Event => {
+                build_uri(self.endpoint.as_str(), path, None).context(UriParseSnafu)?
+            }
+        };
 
         let mut builder = Request::post(uri)
             .header("Content-Type", "application/json")
@@ -257,6 +291,7 @@ mod tests {
                 build_http_batch_service,
                 request::HecRequest,
                 service::{HecAckResponseBody, HecService, HttpRequestBuilder},
+                EndpointTarget,
             },
             util::Compression,
         },
@@ -272,11 +307,15 @@ mod tests {
         let client = HttpClient::new(None, &ProxyConfig::default()).unwrap();
         let http_request_builder = Arc::new(HttpRequestBuilder::new(
             endpoint,
+            EndpointTarget::default(),
             String::from(TOKEN),
             Compression::default(),
         ));
-        let http_service =
-            build_http_batch_service(client.clone(), Arc::clone(&http_request_builder));
+        let http_service = build_http_batch_service(
+            client.clone(),
+            Arc::clone(&http_request_builder),
+            EndpointTarget::Event,
+        );
         HecService::new(
             BoxService::new(http_service),
             Some(client),
@@ -294,6 +333,10 @@ mod tests {
             events_byte_size,
             finalizers: EventFinalizers::default(),
             passthrough_token: None,
+            index: None,
+            source: None,
+            sourcetype: None,
+            host: None,
         }
     }
 

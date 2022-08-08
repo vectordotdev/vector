@@ -1,8 +1,8 @@
 use chrono::Utc;
 use lookup::path;
-use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use vector_common::TimeZone;
+use vector_config::configurable_component;
 
 use crate::{
     config::{
@@ -16,10 +16,23 @@ use crate::{
     types::Conversion,
 };
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+/// Configuration for the `metric_to_log` transform.
+#[configurable_component(transform)]
+#[derive(Clone, Debug, Default)]
 #[serde(default, deny_unknown_fields)]
 pub struct MetricToLogConfig {
+    /// Name of the tag in the metric to use for the source host.
+    ///
+    /// If present, the value of the tag is set on the generated log event in the "host" field, where the field key will
+    /// use the [global `host_key` option](https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key).
     pub host_tag: Option<String>,
+
+    /// The name of the timezone to apply to timestamp conversions that do not contain an explicit time zone.
+    ///
+    /// This overrides the [global `timezone`](https://vector.dev/docs/reference/configuration//global-options#timezone)
+    /// option. The time zone name may be any name in the [TZ
+    /// database](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones), or `local` to indicate system local
+    /// time.
     pub timezone: Option<TimeZone>,
 }
 

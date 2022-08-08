@@ -5,10 +5,10 @@ use chrono::Utc;
 use futures::{future::join_all, StreamExt, TryFutureExt};
 use http::{Request, StatusCode};
 use hyper::{body::to_bytes as body_to_bytes, Body, Uri};
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -24,6 +24,7 @@ use crate::{
 
 pub mod parser;
 use parser::NginxStubStatus;
+use vector_core::config::LogNamespace;
 
 macro_rules! counter {
     ($value:expr) => {
@@ -53,15 +54,33 @@ enum NginxError {
     InvalidResponseStatus { status: StatusCode },
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default)]
+/// Configuration for the `nginx_metrics` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
-struct NginxMetricsConfig {
+pub struct NginxMetricsConfig {
+    /// A list of NGINX instances to scrape.
+    ///
+    /// Each endpoint must be a valid HTTP/HTTPS URI pointing to an NGINX instance that has the
+    /// `ngx_http_stub_status_module` module enabled.
     endpoints: Vec<String>,
+
+    /// The interval between scrapes, in seconds.
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
+
+    /// Overrides the default namespace for the metrics emitted by the source.
+    ///
+    /// If set to an empty string, no namespace is added to the metrics.
+    ///
+    /// By default, `nginx` is used.
     #[serde(default = "default_namespace")]
     namespace: String,
+
+    #[configurable(derived)]
     tls: Option<TlsConfig>,
+
+    #[configurable(derived)]
     auth: Option<Auth>,
 }
 
@@ -122,7 +141,7 @@ impl SourceConfig for NginxMetricsConfig {
         }))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Metric)]
     }
 

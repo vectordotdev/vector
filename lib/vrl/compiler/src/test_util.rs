@@ -104,39 +104,10 @@ macro_rules! test_function {
                         let got_value = expression.resolve(&mut ctx)
                             .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
 
-                        assert_eq!(got_value, want);
+                        assert!(got_value == want, "assertion failed for `{}` case:\n  got:    {:?}\n  wanted: {:?}", stringify!($case), got_value, want);
                         let got_tdef = expression.type_def((&local, &external));
 
                         assert_eq!(got_tdef, $tdef);
-                    }
-                    err@Err(_) => {
-                        // Allow tests against compiler errors.
-                        assert_eq!(err
-                                   // We have to map to a value just to make sure the types match even though
-                                   // it will never be used.
-                                   .map(|_| ::value::Value::Null)
-                                   .map_err(|e| format!("{:#}", e.message())), want);
-                    }
-                }
-
-                // Test the VM response.
-                let mut args: $crate::function::ArgumentList = $args.into();
-                let anys = $crate::vm::function_compile_arguments(&$func, &args);
-                match anys {
-                    Ok(mut anys) => {
-                        let mut args = $crate::vm::compile_arguments(&$func, &mut args, &anys);
-                        let mut runtime_state = $crate::state::Runtime::default();
-                        let mut target: ::value::Value = ::std::collections::BTreeMap::default().into();
-                        let tz = $tz;
-                        let mut ctx = $crate::Context::new(&mut target, &mut runtime_state, &tz);
-                        let got_value_vm = $func.call_by_vm(&mut ctx, &mut args)
-                            .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
-
-                        // Don't assert results against unimplemented functions.
-                        // This needs to be removed when we implement all the functions.
-                        if got_value_vm != Err("unimplemented".to_string()) {
-                            assert_eq!(got_value_vm, want);
-                        }
                     }
                     err@Err(_) => {
                         // Allow tests against compiler errors.

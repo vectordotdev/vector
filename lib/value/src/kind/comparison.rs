@@ -13,6 +13,7 @@ impl Kind {
             && self.contains_timestamp()
             && self.contains_regex()
             && self.contains_null()
+            && self.contains_undefined()
             && self.contains_array()
             && self.contains_object()
     }
@@ -27,14 +28,9 @@ impl Kind {
             && !self.contains_timestamp()
             && !self.contains_regex()
             && self.contains_null()
+            && self.contains_undefined()
             && self.contains_array()
             && self.contains_object()
-    }
-
-    /// Returns `true` if only primitive type states are valid.
-    #[must_use]
-    pub const fn is_primitive(&self) -> bool {
-        !self.is_empty() && !self.is_collection()
     }
 
     /// Returns `true` if only collection type states are valid.
@@ -51,18 +47,19 @@ impl Kind {
             && !self.contains_timestamp()
             && !self.contains_regex()
             && !self.contains_null()
+            && !self.contains_undefined()
     }
 
     /// Returns `true` if the type is `bytes`.
     #[must_use]
     pub const fn is_bytes(&self) -> bool {
-        self.bytes.is_some()
-            && self.integer.is_none()
+        self.integer.is_none()
             && self.float.is_none()
             && self.boolean.is_none()
             && self.timestamp.is_none()
             && self.regex.is_none()
             && self.null.is_none()
+            && self.undefined.is_none()
             && self.array.is_none()
             && self.object.is_none()
     }
@@ -71,12 +68,27 @@ impl Kind {
     #[must_use]
     pub const fn is_integer(&self) -> bool {
         self.bytes.is_none()
-            && self.integer.is_some()
             && self.float.is_none()
             && self.boolean.is_none()
             && self.timestamp.is_none()
             && self.regex.is_none()
             && self.null.is_none()
+            && self.undefined.is_none()
+            && self.array.is_none()
+            && self.object.is_none()
+    }
+
+    /// Returns `true` if the type is `never`.
+    #[must_use]
+    pub const fn is_never(&self) -> bool {
+        self.bytes.is_none()
+            && self.integer.is_none()
+            && self.float.is_none()
+            && self.boolean.is_none()
+            && self.timestamp.is_none()
+            && self.regex.is_none()
+            && self.null.is_none()
+            && self.undefined.is_none()
             && self.array.is_none()
             && self.object.is_none()
     }
@@ -86,11 +98,11 @@ impl Kind {
     pub const fn is_float(&self) -> bool {
         self.bytes.is_none()
             && self.integer.is_none()
-            && self.float.is_some()
             && self.boolean.is_none()
             && self.timestamp.is_none()
             && self.regex.is_none()
             && self.null.is_none()
+            && self.undefined.is_none()
             && self.array.is_none()
             && self.object.is_none()
     }
@@ -101,10 +113,10 @@ impl Kind {
         self.bytes.is_none()
             && self.integer.is_none()
             && self.float.is_none()
-            && self.boolean.is_some()
             && self.timestamp.is_none()
             && self.regex.is_none()
             && self.null.is_none()
+            && self.undefined.is_none()
             && self.array.is_none()
             && self.object.is_none()
     }
@@ -116,9 +128,9 @@ impl Kind {
             && self.integer.is_none()
             && self.float.is_none()
             && self.boolean.is_none()
-            && self.timestamp.is_some()
             && self.regex.is_none()
             && self.null.is_none()
+            && self.undefined.is_none()
             && self.array.is_none()
             && self.object.is_none()
     }
@@ -131,8 +143,8 @@ impl Kind {
             && self.float.is_none()
             && self.boolean.is_none()
             && self.timestamp.is_none()
-            && self.regex.is_some()
             && self.null.is_none()
+            && self.undefined.is_none()
             && self.array.is_none()
             && self.object.is_none()
     }
@@ -146,7 +158,21 @@ impl Kind {
             && self.boolean.is_none()
             && self.timestamp.is_none()
             && self.regex.is_none()
-            && self.null.is_some()
+            && self.undefined.is_none()
+            && self.array.is_none()
+            && self.object.is_none()
+    }
+
+    /// Returns `true` if the type is `undefined`.
+    #[must_use]
+    pub const fn is_undefined(&self) -> bool {
+        self.bytes.is_none()
+            && self.integer.is_none()
+            && self.float.is_none()
+            && self.boolean.is_none()
+            && self.timestamp.is_none()
+            && self.regex.is_none()
+            && self.null.is_none()
             && self.array.is_none()
             && self.object.is_none()
     }
@@ -161,7 +187,7 @@ impl Kind {
             && self.timestamp.is_none()
             && self.regex.is_none()
             && self.null.is_none()
-            && self.array.is_some()
+            && self.undefined.is_none()
             && self.object.is_none()
     }
 
@@ -175,11 +201,11 @@ impl Kind {
             && self.timestamp.is_none()
             && self.regex.is_none()
             && self.null.is_none()
+            && self.undefined.is_none()
             && self.array.is_none()
-            && self.object.is_some()
     }
 
-    /// Returns `true` if exactly one type is set.
+    /// Returns `true` if at most one type is set.
     #[must_use]
     #[allow(clippy::many_single_char_names)]
     pub const fn is_exact(&self) -> bool {
@@ -190,8 +216,10 @@ impl Kind {
             || self.is_timestamp()
             || self.is_regex()
             || self.is_null()
+            || self.is_undefined()
             || self.is_array()
             || self.is_object()
+            || self.is_never()
     }
 
     /// Check if `self` is a superset of `other`.
@@ -231,6 +259,10 @@ impl Kind {
             return false;
         };
 
+        if let (None, Some(_)) = (self.undefined, other.undefined) {
+            return false;
+        };
+
         match (self.array.as_ref(), other.array.as_ref()) {
             (None, Some(_)) => return false,
             (Some(lhs), Some(rhs)) if !lhs.is_superset(rhs) => return false,
@@ -251,6 +283,11 @@ impl Kind {
     /// Returns `true` if there are type states common to both `self` and `other`.
     #[must_use]
     pub const fn intersects(&self, other: &Self) -> bool {
+        // a "never" type can be treated as any type
+        if self.is_never() || other.is_never() {
+            return true;
+        }
+
         if self.contains_bytes() && other.contains_bytes() {
             return true;
         }
@@ -279,6 +316,10 @@ impl Kind {
             return true;
         }
 
+        if self.contains_undefined() && other.contains_undefined() {
+            return true;
+        }
+
         if self.contains_array() && other.contains_array() {
             return true;
         }
@@ -289,20 +330,6 @@ impl Kind {
 
         false
     }
-
-    /// Check for the "empty" state of a type.
-    #[must_use]
-    pub const fn is_empty(&self) -> bool {
-        !self.contains_bytes()
-            && !self.contains_integer()
-            && !self.contains_float()
-            && !self.contains_boolean()
-            && !self.contains_timestamp()
-            && !self.contains_regex()
-            && !self.contains_null()
-            && !self.contains_array()
-            && !self.contains_object()
-    }
 }
 
 // contains_*
@@ -310,55 +337,67 @@ impl Kind {
     /// Returns `true` if the type is _at least_ `bytes`.
     #[must_use]
     pub const fn contains_bytes(&self) -> bool {
-        self.bytes.is_some()
+        self.bytes.is_some() || self.is_never()
     }
 
     /// Returns `true` if the type is _at least_ `integer`.
     #[must_use]
     pub const fn contains_integer(&self) -> bool {
-        self.integer.is_some()
+        self.integer.is_some() || self.is_never()
     }
 
     /// Returns `true` if the type is _at least_ `float`.
     #[must_use]
     pub const fn contains_float(&self) -> bool {
-        self.float.is_some()
+        self.float.is_some() || self.is_never()
     }
 
     /// Returns `true` if the type is _at least_ `boolean`.
     #[must_use]
     pub const fn contains_boolean(&self) -> bool {
-        self.boolean.is_some()
+        self.boolean.is_some() || self.is_never()
     }
 
     /// Returns `true` if the type is _at least_ `timestamp`.
     #[must_use]
     pub const fn contains_timestamp(&self) -> bool {
-        self.timestamp.is_some()
+        self.timestamp.is_some() || self.is_never()
     }
 
     /// Returns `true` if the type is _at least_ `regex`.
     #[must_use]
     pub const fn contains_regex(&self) -> bool {
-        self.regex.is_some()
+        self.regex.is_some() || self.is_never()
     }
 
     /// Returns `true` if the type is _at least_ `null`.
     #[must_use]
     pub const fn contains_null(&self) -> bool {
-        self.null.is_some()
+        self.null.is_some() || self.is_never()
+    }
+
+    /// Returns `true` if the type is _at least_ `undefined`.
+    #[must_use]
+    pub const fn contains_undefined(&self) -> bool {
+        self.undefined.is_some() || self.is_never()
+    }
+
+    /// Returns `true` if the type can be _any_ type other than `undefined`
+    #[must_use]
+    pub const fn contains_any_defined(&self) -> bool {
+        !self.is_undefined()
     }
 
     /// Returns `true` if the type is _at least_ `array`.
     #[must_use]
     pub const fn contains_array(&self) -> bool {
-        self.array.is_some()
+        self.array.is_some() || self.is_never()
     }
 
     /// Returns `true` if the type is _at least_ `object`.
     #[must_use]
     pub const fn contains_object(&self) -> bool {
-        self.object.is_some()
+        self.object.is_some() || self.is_never()
     }
 }
 
