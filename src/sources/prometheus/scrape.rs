@@ -456,7 +456,7 @@ mod test {
             components::{
                 assert_source_compliance, run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS,
             },
-            next_addr, start_topology,
+            next_addr, start_topology, wait_for_tcp,
         },
         Error,
     };
@@ -477,6 +477,7 @@ mod test {
         });
 
         tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+        wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics", in_addr)],
@@ -509,6 +510,7 @@ mod test {
         });
 
         tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+        wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics", in_addr)],
@@ -559,6 +561,7 @@ mod test {
         });
 
         tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+        wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics", in_addr)],
@@ -622,6 +625,7 @@ mod test {
         });
 
         tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+        wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics?key1=val1", in_addr)],
@@ -724,6 +728,8 @@ mod test {
                 error!(message = "Server error.", %error);
             }
         });
+
+        wait_for_tcp(in_addr).await;
 
         let mut config = config::Config::builder();
         config.add_source(
