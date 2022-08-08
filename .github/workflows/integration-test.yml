@@ -78,6 +78,7 @@ jobs:
           - test: 'mongodb'
           - test: 'nats'
           - test: 'nginx'
+          - test: 'opentelemetry'
           - test: 'postgres'
           - test: 'prometheus'
           - test: 'pulsar'
