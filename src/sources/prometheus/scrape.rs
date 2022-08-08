@@ -492,7 +492,7 @@ mod test {
 
         let events = run_and_assert_source_compliance(
             config,
-            Duration::from_secs(1),
+            Duration::from_secs(3),
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
@@ -525,7 +525,7 @@ mod test {
 
         let events = run_and_assert_source_compliance(
             config,
-            Duration::from_secs(1),
+            Duration::from_secs(3),
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
@@ -576,7 +576,7 @@ mod test {
 
         let events = run_and_assert_source_compliance(
             config,
-            Duration::from_secs(1),
+            Duration::from_secs(3),
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
@@ -646,7 +646,7 @@ mod test {
 
         let events = run_and_assert_source_compliance(
             config,
-            Duration::from_secs(1),
+            Duration::from_secs(3),
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
@@ -836,7 +836,7 @@ mod integration_tests {
 
         let events = run_and_assert_source_compliance(
             config,
-            Duration::from_secs(1),
+            Duration::from_secs(3),
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
