@@ -12,7 +12,7 @@ use vector_core::event::Event;
 use super::HttpScrapeConfig;
 use crate::test_util::{
     components::{run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS},
-    next_addr, test_generate_config,
+    next_addr, test_generate_config, wait_for_tcp,
 };
 
 pub(crate) const INTERVAL_SECS: u64 = 3;
@@ -72,6 +72,7 @@ async fn json_decoding_newline_delimited() {
         .map(|| r#"{"data" : "foo"}"#);
 
     tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+    wait_for_tcp(in_addr).await;
 
     run_compliance(HttpScrapeConfig::new(
         format!("http://{}/endpoint", in_addr),
@@ -99,6 +100,7 @@ async fn json_decoding_character_delimited() {
         .map(|| r#"{"data" : "foo"}"#);
 
     tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+    wait_for_tcp(in_addr).await;
 
     run_compliance(HttpScrapeConfig::new(
         format!("http://{}/endpoint", in_addr),
@@ -128,6 +130,7 @@ async fn request_query_applied() {
         .map(|query| format!(r#"{{"data" : "{}"}}"#, query));
 
     tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+    wait_for_tcp(in_addr).await;
 
     let events = run_compliance(HttpScrapeConfig::new(
         format!("http://{}/endpoint?key1=val1", in_addr),
@@ -193,6 +196,7 @@ async fn headers_applied() {
         .map(|_| r#"{"data" : "foo"}"#);
 
     tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+    wait_for_tcp(in_addr).await;
 
     run_compliance(HttpScrapeConfig::new(
         format!("http://{}/endpoint", in_addr),
