@@ -596,6 +596,7 @@ impl EventStreamBuilder {
                 if let Some(duration) = backoff {
                     tokio::time::sleep(duration).await;
                 }
+
                 match this
                     .core
                     .docker
