@@ -2,6 +2,7 @@ use lapin::tcp::{OwnedIdentity, OwnedTLSConfig};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use tokio_amqp::*;
+use vector_config::configurable_component;
 
 /// Client certificate for rabbit authentication
 #[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
@@ -13,10 +14,14 @@ pub(crate) enum ClientCertDer {
     Path(PathBuf),
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+/// Connection options for AMQP.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub(crate) struct AmqpConfig {
-    /// Format: amqp://user:password@host:port/vhost?timeout=seconds
+    /// Connection string format: amqp://user:password@host:port/vhost?timeout=seconds
     pub(crate) connection_string: String,
+
+    #[configurable(derived)]
     pub(crate) tls: Option<crate::tls::TlsConfig>,
 }
 
@@ -37,17 +42,16 @@ impl AmqpConfig {
         let addr = self.connection_string.clone();
         let conn = match &self.tls {
             Some(tls) => {
-                let cert_chain = if let Some(ca) = &tls.options.ca_file {
+                let cert_chain = if let Some(ca) = &tls.ca_file {
                     Some(tokio::fs::read_to_string(ca.to_owned()).await?)
                 } else {
                     None
                 };
-                let identity = if let Some(identity) = &tls.options.key_file {
+                let identity = if let Some(identity) = &tls.key_file {
                     let der = tokio::fs::read(identity.to_owned()).await?;
                     Some(OwnedIdentity {
                         der,
                         password: tls
-                            .options
                             .key_pass
                             .as_ref()
                             .map(|s| s.to_string())
