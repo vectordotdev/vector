@@ -1,12 +1,13 @@
 package metadata
 
 components: sources: opentelemetry: {
-	_port: 4317
+	_grpc_port: 4317
+	_http_port: 4318
 
 	title: "OpenTelemetry"
 
 	description: """
-		Collect OpenTelemetry data over gRPC (currently, only logs are supported).
+		Collect OpenTelemetry data over gRPC and HTTP (currently, only logs are supported).
 		"""
 
 	classes: {
@@ -27,15 +28,14 @@ components: sources: opentelemetry: {
 
 				interface: socket: {
 					direction: "incoming"
-					port:      _port
+					port:      _grpc_port
 					protocols: ["tcp"]
 					ssl: "optional"
 				}
 			}
 			tls: {
-				enabled:                true
-				can_verify_certificate: true
-				enabled_default:        false
+				// enabled per listener below
+				enabled: false
 			}
 		}
 	}
@@ -52,13 +52,48 @@ components: sources: opentelemetry: {
 
 	configuration: {
 		acknowledgements: configuration._source_acknowledgements
-		address: {
-			description: """
-				The gRPC address to listen for connections on. It _must_ include a port.
-				"""
-			required: true
-			type: string: {
-				examples: ["0.0.0.0:\(_port)"]
+		grpc: {
+			description: "Configuration options for the gRPC server."
+			required:    true
+			type: object: {
+				examples: [{address: "0.0.0.0:\(_grpc_port)"}]
+				options: {
+					address: {
+						description: """
+						The gRPC address to listen for connections on. It _must_ include a port.
+						"""
+						required: true
+						type: string: {
+							examples: ["0.0.0.0:\(_grpc_port)"]
+						}
+					}
+					tls: configuration._tls_accept & {_args: {
+						can_verify_certificate: true
+						enabled_default:        false
+					}}
+				}
+			}
+		}
+		http: {
+			description: "Configuration options for the HTTP server."
+			required:    true
+			type: object: {
+				examples: [{address: "0.0.0.0:\(_http_port)"}]
+				options: {
+					address: {
+						description: """
+							The HTTP address to listen for connections on. It _must_ include a port.
+							"""
+						required: true
+						type: string: {
+							examples: ["0.0.0.0:\(_http_port)"]
+						}
+					}
+					tls: configuration._tls_accept & {_args: {
+						can_verify_certificate: true
+						enabled_default:        false
+					}}
+				}
 			}
 		}
 	}
@@ -180,5 +215,15 @@ components: sources: opentelemetry: {
 		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
 		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
 		protobuf_decode_errors_total:         components.sources.internal_metrics.output.metrics.protobuf_decode_errors_total
+	}
+
+	how_it_works: {
+		tls: {
+			title: "Transport Layer Security (TLS)"
+			body:  """
+				  Vector uses [OpenSSL](\(urls.openssl)) for TLS protocols. You can
+				  adjust TLS behavior via the `grpc.tls.*` and `http.tls.*` options.
+				  """
+		}
 	}
 }

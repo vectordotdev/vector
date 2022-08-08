@@ -114,7 +114,7 @@ where
             let response = response_result
                 .map_err(|error| {
                     // Emit the error into the internal events system.
-                    emit!(http_client::GotHttpError {
+                    emit!(http_client::GotHttpWarning {
                         error: &error,
                         roundtrip
                     });
