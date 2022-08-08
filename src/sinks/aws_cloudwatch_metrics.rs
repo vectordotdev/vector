@@ -9,8 +9,8 @@ use aws_sdk_cloudwatch::types::DateTime as AwsDateTime;
 use aws_sdk_cloudwatch::types::SdkError;
 use aws_sdk_cloudwatch::{Client as CloudwatchClient, Region};
 use futures::{future, future::BoxFuture, stream, FutureExt, SinkExt};
-use serde::{Deserialize, Serialize};
 use tower::Service;
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use super::util::SinkBatchSettings;
@@ -48,24 +48,50 @@ impl SinkBatchSettings for CloudWatchMetricsDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 1.0;
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+/// Configuration for the `aws_cloudwatch_metrics` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct CloudWatchMetricsSinkConfig {
+    /// The default namespace to use for metrics that do not have one.
+    ///
+    /// Metrics with the same name can only be differentiated by their namespace, and not all
+    /// metrics have their own namespace.
     #[serde(alias = "namespace")]
     pub default_namespace: String,
+
+    /// The [AWS region][aws_region] of the target service.
+    ///
+    /// [aws_region]: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.RegionsAndAvailabilityZones.html
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub compression: Compression,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<CloudWatchMetricsDefaultBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
-    // Deprecated name. Moved to auth.
+
+    /// The ARN of an [IAM role][iam_role] to assume at startup.
+    ///
+    /// [iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
+    #[configurable(deprecated)]
     assume_role: Option<String>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub auth: AwsAuthentication,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -105,7 +131,7 @@ impl SinkConfig for CloudWatchMetricsSinkConfig {
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let client = self.create_client(&cx.proxy).await?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
-        let sink = CloudWatchMetricsSvc::new(self.clone(), client, cx)?;
+        let sink = CloudWatchMetricsSvc::new(self.clone(), client)?;
         Ok((sink, healthcheck))
     }
 
@@ -117,8 +143,8 @@ impl SinkConfig for CloudWatchMetricsSinkConfig {
         "aws_cloudwatch_metrics"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
@@ -163,7 +189,6 @@ impl CloudWatchMetricsSvc {
     pub fn new(
         config: CloudWatchMetricsSinkConfig,
         client: CloudwatchClient,
-        cx: SinkContext,
     ) -> crate::Result<super::VectorSink> {
         let default_namespace = config.default_namespace.clone();
         let batch = config.batch.into_batch_settings()?;
@@ -178,13 +203,7 @@ impl CloudWatchMetricsSvc {
         let mut normalizer = MetricNormalizer::<AwsCloudwatchMetricNormalize>::default();
 
         let sink = request_settings
-            .partition_sink(
-                CloudWatchMetricsRetryLogic,
-                service,
-                buffer,
-                batch.timeout,
-                cx.acker(),
-            )
+            .partition_sink(CloudWatchMetricsRetryLogic, service, buffer, batch.timeout)
             .sink_map_err(|error| error!(message = "Fatal CloudwatchMetrics sink error.", %error))
             .with_flat_map(move |event: Event| {
                 stream::iter({
@@ -516,7 +535,7 @@ mod integration_tests {
         let cx = SinkContext::new_test();
         let config = config();
         let client = config.create_client(&cx.globals.proxy).await.unwrap();
-        let sink = CloudWatchMetricsSvc::new(config, client, cx).unwrap();
+        let sink = CloudWatchMetricsSvc::new(config, client).unwrap();
 
         let mut events = Vec::new();
 
@@ -576,7 +595,7 @@ mod integration_tests {
         let cx = SinkContext::new_test();
         let config = config();
         let client = config.create_client(&cx.globals.proxy).await.unwrap();
-        let sink = CloudWatchMetricsSvc::new(config, client, cx).unwrap();
+        let sink = CloudWatchMetricsSvc::new(config, client).unwrap();
 
         let mut events = Vec::new();
 

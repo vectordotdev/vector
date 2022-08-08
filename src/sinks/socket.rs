@@ -1,60 +1,84 @@
 use codecs::{
-    encoding::{Framer, FramingConfig, SerializerConfig},
-    BytesEncoder, JsonSerializerConfig, NewlineDelimitedEncoder, TextSerializerConfig,
+    encoding::{Framer, FramingConfig},
+    TextSerializerConfig,
 };
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 #[cfg(unix)]
 use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
-    codecs::Encoder,
+    codecs::{Encoder, EncodingConfig, EncodingConfigWithFraming, SinkType},
     config::{
         AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
         SinkDescription,
     },
-    sinks::util::{
-        encoding::{
-            EncodingConfig, EncodingConfigWithFramingAdapter, EncodingConfigWithFramingMigrator,
-        },
-        tcp::TcpSinkConfig,
-        udp::UdpSinkConfig,
-        Encoding,
-    },
+    sinks::util::{tcp::TcpSinkConfig, udp::UdpSinkConfig},
 };
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Migrator;
-
-impl EncodingConfigWithFramingMigrator for Migrator {
-    type Codec = Encoding;
-
-    fn migrate(codec: &Self::Codec) -> (Option<FramingConfig>, SerializerConfig) {
-        let framing = None;
-        let serializer = match codec {
-            Encoding::Text => TextSerializerConfig::new().into(),
-            Encoding::Json => JsonSerializerConfig::new().into(),
-        };
-        (framing, serializer)
-    }
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-// `#[serde(deny_unknown_fields)]` doesn't work when flattening internally tagged enums, see
-// https://github.com/serde-rs/serde/issues/1358.
+/// Configuration for the `socket` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug)]
 pub struct SocketSinkConfig {
     #[serde(flatten)]
     pub mode: Mode,
-    #[serde(flatten)]
-    pub encoding: EncodingConfigWithFramingAdapter<EncodingConfig<Encoding>, Migrator>,
+
+    #[configurable(derived)]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Socket mode.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum Mode {
-    Tcp(TcpSinkConfig),
-    Udp(UdpSinkConfig),
+    /// TCP.
+    Tcp(#[configurable(transparent)] TcpMode),
+
+    /// UDP.
+    Udp(#[configurable(transparent)] UdpMode),
+
+    /// Unix Domain Socket.
     #[cfg(unix)]
-    Unix(UnixSinkConfig),
+    Unix(#[configurable(transparent)] UnixMode),
+}
+
+/// TCP configuration.
+#[configurable_component]
+#[derive(Clone, Debug)]
+pub struct TcpMode {
+    #[serde(flatten)]
+    config: TcpSinkConfig,
+
+    #[serde(flatten)]
+    encoding: EncodingConfigWithFraming,
+}
+
+/// UDP configuration.
+#[configurable_component]
+#[derive(Clone, Debug)]
+pub struct UdpMode {
+    #[serde(flatten)]
+    config: UdpSinkConfig,
+
+    #[configurable(derived)]
+    encoding: EncodingConfig,
+}
+
+/// Unix Domain Socket configuration.
+#[cfg(unix)]
+#[configurable_component]
+#[derive(Clone, Debug)]
+pub struct UnixMode {
+    #[serde(flatten)]
+    config: UnixSinkConfig,
+
+    #[serde(flatten)]
+    encoding: EncodingConfigWithFraming,
 }
 
 inventory::submit! {
@@ -73,17 +97,23 @@ impl GenerateConfig for SocketSinkConfig {
 }
 
 impl SocketSinkConfig {
-    pub fn new(mode: Mode, encoding: EncodingConfig<Encoding>) -> Self {
+    pub const fn new(mode: Mode, acknowledgements: AcknowledgementsConfig) -> Self {
         SocketSinkConfig {
             mode,
-            encoding: EncodingConfigWithFramingAdapter::legacy(encoding),
+            acknowledgements,
         }
     }
 
-    pub fn make_basic_tcp_config(address: String) -> Self {
+    pub fn make_basic_tcp_config(
+        address: String,
+        acknowledgements: AcknowledgementsConfig,
+    ) -> Self {
         Self::new(
-            Mode::Tcp(TcpSinkConfig::from_address(address)),
-            EncodingConfig::from(Encoding::Text),
+            Mode::Tcp(TcpMode {
+                config: TcpSinkConfig::from_address(address),
+                encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
+            }),
+            acknowledgements,
         )
     }
 }
@@ -93,35 +123,47 @@ impl SocketSinkConfig {
 impl SinkConfig for SocketSinkConfig {
     async fn build(
         &self,
-        cx: SinkContext,
+        _cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let transformer = self.encoding.transformer();
-        let (framer, serializer) = self.encoding.encoding()?;
-        let framer = framer.unwrap_or_else(|| match self.mode {
-            Mode::Tcp(_) => NewlineDelimitedEncoder::new().into(),
-            Mode::Udp(_) => BytesEncoder::new().into(),
-            #[cfg(unix)]
-            Mode::Unix(_) => NewlineDelimitedEncoder::new().into(),
-        });
-        let encoder = Encoder::<Framer>::new(framer, serializer);
         match &self.mode {
-            Mode::Tcp(config) => config.build(cx, transformer, encoder),
-            Mode::Udp(config) => config.build(cx, transformer, encoder),
+            Mode::Tcp(TcpMode { config, encoding }) => {
+                let transformer = encoding.transformer();
+                let (framer, serializer) = encoding.build(SinkType::StreamBased)?;
+                let encoder = Encoder::<Framer>::new(framer, serializer);
+                config.build(transformer, encoder)
+            }
+            Mode::Udp(UdpMode { config, encoding }) => {
+                let transformer = encoding.transformer();
+                let serializer = encoding.build()?;
+                let encoder = Encoder::<()>::new(serializer);
+                config.build(transformer, encoder)
+            }
             #[cfg(unix)]
-            Mode::Unix(config) => config.build(cx, transformer, encoder),
+            Mode::Unix(UnixMode { config, encoding }) => {
+                let transformer = encoding.transformer();
+                let (framer, serializer) = encoding.build(SinkType::StreamBased)?;
+                let encoder = Encoder::<Framer>::new(framer, serializer);
+                config.build(transformer, encoder)
+            }
         }
     }
 
     fn input(&self) -> Input {
-        Input::new(self.encoding.config().1.input_type() & DataType::Log)
+        let encoder_input_type = match &self.mode {
+            Mode::Tcp(TcpMode { encoding, .. }) => encoding.config().1.input_type(),
+            Mode::Udp(UdpMode { encoding, .. }) => encoding.config().input_type(),
+            #[cfg(unix)]
+            Mode::Unix(UnixMode { encoding, .. }) => encoding.config().1.input_type(),
+        };
+        Input::new(encoder_input_type & DataType::Log)
     }
 
     fn sink_type(&self) -> &'static str {
         "socket"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        None
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
@@ -132,6 +174,7 @@ mod test {
         net::{SocketAddr, UdpSocket},
     };
 
+    use codecs::JsonSerializerConfig;
     use futures::stream::StreamExt;
     use futures_util::stream;
     use serde_json::Value;
@@ -161,11 +204,11 @@ mod test {
         let receiver = UdpSocket::bind(addr).unwrap();
 
         let config = SocketSinkConfig {
-            mode: Mode::Udp(UdpSinkConfig::from_address(addr.to_string())),
-            encoding: EncodingConfigWithFramingAdapter::new(
-                None,
-                JsonSerializerConfig::new().into(),
-            ),
+            mode: Mode::Udp(UdpMode {
+                config: UdpSinkConfig::from_address(addr.to_string()),
+                encoding: JsonSerializerConfig::new().into(),
+            }),
+            acknowledgements: Default::default(),
         };
         let context = SinkContext::new_test();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
@@ -206,11 +249,11 @@ mod test {
 
         let addr = next_addr();
         let config = SocketSinkConfig {
-            mode: Mode::Tcp(TcpSinkConfig::from_address(addr.to_string())),
-            encoding: EncodingConfigWithFramingAdapter::new(
-                None,
-                JsonSerializerConfig::new().into(),
-            ),
+            mode: Mode::Tcp(TcpMode {
+                config: TcpSinkConfig::from_address(addr.to_string()),
+                encoding: (None::<FramingConfig>, JsonSerializerConfig::new()).into(),
+            }),
+            acknowledgements: Default::default(),
         };
 
         let context = SinkContext::new_test();
@@ -272,24 +315,24 @@ mod test {
 
         let addr = next_addr();
         let config = SocketSinkConfig {
-            mode: Mode::Tcp(TcpSinkConfig::new(
-                addr.to_string(),
-                None,
-                Some(TlsEnableableConfig {
-                    enabled: Some(true),
-                    options: TlsConfig {
-                        verify_certificate: Some(false),
-                        verify_hostname: Some(false),
-                        ca_file: Some(tls::TEST_PEM_CRT_PATH.into()),
-                        ..Default::default()
-                    },
-                }),
-                None,
-            )),
-            encoding: EncodingConfigWithFramingAdapter::new(
-                None,
-                TextSerializerConfig::new().into(),
-            ),
+            mode: Mode::Tcp(TcpMode {
+                config: TcpSinkConfig::new(
+                    addr.to_string(),
+                    None,
+                    Some(TlsEnableableConfig {
+                        enabled: Some(true),
+                        options: TlsConfig {
+                            verify_certificate: Some(false),
+                            verify_hostname: Some(false),
+                            ca_file: Some(tls::TEST_PEM_CRT_PATH.into()),
+                            ..Default::default()
+                        },
+                    }),
+                    None,
+                ),
+                encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
+            }),
+            acknowledgements: Default::default(),
         };
         let context = SinkContext::new_test();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
@@ -362,7 +405,7 @@ mod test {
 
         let (_, mut events) = random_lines_with_stream(10, 10, None);
         while let Some(event) = events.next().await {
-            let _ = sender.send(Some(event)).await.unwrap();
+            sender.send(Some(event)).await.unwrap();
         }
 
         // Loop and check for 10 events, we should always get 10 events. Once,
@@ -384,13 +427,13 @@ mod test {
         // Send another 10 events
         let (_, mut events) = random_lines_with_stream(10, 10, None);
         while let Some(event) = events.next().await {
-            let _ = sender.send(Some(event)).await.unwrap();
+            sender.send(Some(event)).await.unwrap();
         }
 
         // Wait for server task to be complete.
-        let _ = sender.send(None).await.unwrap();
-        let _ = jh1.await.unwrap();
-        let _ = jh2.await.unwrap();
+        sender.send(None).await.unwrap();
+        jh1.await.unwrap();
+        jh2.await.unwrap();
 
         // Check that there are exactly 20 events.
         assert_eq!(msg_counter.load(Ordering::SeqCst), 20);
@@ -404,11 +447,11 @@ mod test {
 
         let addr = next_addr();
         let config = SocketSinkConfig {
-            mode: Mode::Tcp(TcpSinkConfig::from_address(addr.to_string())),
-            encoding: EncodingConfigWithFramingAdapter::new(
-                None,
-                TextSerializerConfig::new().into(),
-            ),
+            mode: Mode::Tcp(TcpMode {
+                config: TcpSinkConfig::from_address(addr.to_string()),
+                encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
+            }),
+            acknowledgements: Default::default(),
         };
 
         let context = SinkContext::new_test();

@@ -1,12 +1,13 @@
 use std::{convert::TryFrom, iter, num::NonZeroU8};
 
+use codecs::{JsonSerializerConfig, TextSerializerConfig};
 use futures::{future::ready, stream};
-
 use serde_json::Value as JsonValue;
 use tokio::time::{sleep, Duration};
 use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
 use crate::{
+    codecs::EncodingConfig,
     config::{SinkConfig, SinkContext},
     sinks::{
         splunk_hec::{
@@ -15,9 +16,9 @@ use crate::{
                 integration_test_helpers::{get_token, splunk_api_address, splunk_hec_address},
                 EndpointTarget, SOURCE_FIELD,
             },
-            logs::config::{HecEncoding, HecLogsSinkConfig},
+            logs::config::HecLogsSinkConfig,
         },
-        util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
+        util::{BatchConfig, Compression, TowerRequestConfig},
     },
     template::Template,
     test_util::{
@@ -96,10 +97,7 @@ async fn find_entries(messages: &[String]) -> bool {
     found_all
 }
 
-async fn config(
-    encoding: impl Into<EncodingConfig<HecEncoding>>,
-    indexed_fields: Vec<String>,
-) -> HecLogsSinkConfig {
+async fn config(encoding: EncodingConfig, indexed_fields: Vec<String>) -> HecLogsSinkConfig {
     let mut batch = BatchConfig::default();
     batch.max_events = Some(5);
 
@@ -111,7 +109,7 @@ async fn config(
         index: None,
         sourcetype: None,
         source: None,
-        encoding: encoding.into().into(),
+        encoding,
         compression: Compression::None,
         batch,
         request: TowerRequestConfig::default(),
@@ -127,7 +125,7 @@ async fn config(
 async fn splunk_insert_message() {
     let cx = SinkContext::new_test();
 
-    let config = config(HecEncoding::Text, vec![]).await;
+    let config = config(TextSerializerConfig::new().into(), vec![]).await;
     let (sink, _) = config.build(cx).await.unwrap();
 
     let message = random_string(100);
@@ -150,7 +148,7 @@ async fn splunk_insert_raw_message() {
     let config = HecLogsSinkConfig {
         endpoint_target: EndpointTarget::Raw,
         source: Some(Template::try_from("zork").unwrap()),
-        ..config(HecEncoding::Text, vec![]).await
+        ..config(TextSerializerConfig::new().into(), vec![]).await
     };
     let (sink, _) = config.build(cx).await.unwrap();
 
@@ -172,7 +170,7 @@ async fn splunk_insert_raw_message() {
 async fn splunk_insert_broken_token() {
     let cx = SinkContext::new_test();
 
-    let mut config = config(HecEncoding::Text, vec![]).await;
+    let mut config = config(TextSerializerConfig::new().into(), vec![]).await;
     config.default_token = "BROKEN_TOKEN".into();
     let (sink, _) = config.build(cx).await.unwrap();
 
@@ -188,7 +186,7 @@ async fn splunk_insert_broken_token() {
 async fn splunk_insert_source() {
     let cx = SinkContext::new_test();
 
-    let mut config = config(HecEncoding::Text, vec![]).await;
+    let mut config = config(TextSerializerConfig::new().into(), vec![]).await;
     config.source = Template::try_from("/var/log/syslog".to_string()).ok();
 
     let (sink, _) = config.build(cx).await.unwrap();
@@ -206,7 +204,7 @@ async fn splunk_insert_source() {
 async fn splunk_insert_index() {
     let cx = SinkContext::new_test();
 
-    let mut config = config(HecEncoding::Text, vec![]).await;
+    let mut config = config(TextSerializerConfig::new().into(), vec![]).await;
     config.index = Template::try_from("custom_index".to_string()).ok();
     let (sink, _) = config.build(cx).await.unwrap();
 
@@ -224,7 +222,7 @@ async fn splunk_index_is_interpolated() {
     let cx = SinkContext::new_test();
 
     let indexed_fields = vec!["asdf".to_string()];
-    let mut config = config(HecEncoding::Json, indexed_fields).await;
+    let mut config = config(JsonSerializerConfig::new().into(), indexed_fields).await;
     config.index = Template::try_from("{{ index_name }}".to_string()).ok();
 
     let (sink, _) = config.build(cx).await.unwrap();
@@ -244,7 +242,7 @@ async fn splunk_index_is_interpolated() {
 async fn splunk_insert_many() {
     let cx = SinkContext::new_test();
 
-    let config = config(HecEncoding::Text, vec![]).await;
+    let config = config(TextSerializerConfig::new().into(), vec![]).await;
     let (sink, _) = config.build(cx).await.unwrap();
 
     let (messages, events) = random_lines_with_stream(100, 10, None);
@@ -258,7 +256,7 @@ async fn splunk_custom_fields() {
     let cx = SinkContext::new_test();
 
     let indexed_fields = vec!["asdf".into()];
-    let config = config(HecEncoding::Json, indexed_fields).await;
+    let config = config(JsonSerializerConfig::new().into(), indexed_fields).await;
     let (sink, _) = config.build(cx).await.unwrap();
 
     let message = random_string(100);
@@ -278,7 +276,7 @@ async fn splunk_hostname() {
     let cx = SinkContext::new_test();
 
     let indexed_fields = vec!["asdf".into()];
-    let config = config(HecEncoding::Json, indexed_fields).await;
+    let config = config(JsonSerializerConfig::new().into(), indexed_fields).await;
     let (sink, _) = config.build(cx).await.unwrap();
 
     let message = random_string(100);
@@ -301,7 +299,7 @@ async fn splunk_sourcetype() {
     let cx = SinkContext::new_test();
 
     let indexed_fields = vec!["asdf".to_string()];
-    let mut config = config(HecEncoding::Json, indexed_fields).await;
+    let mut config = config(JsonSerializerConfig::new().into(), indexed_fields).await;
     config.sourcetype = Template::try_from("_json".to_string()).ok();
 
     let (sink, _) = config.build(cx).await.unwrap();
@@ -326,7 +324,7 @@ async fn splunk_configure_hostname() {
 
     let config = HecLogsSinkConfig {
         host_key: "roast".into(),
-        ..config(HecEncoding::Json, vec!["asdf".to_string()]).await
+        ..config(JsonSerializerConfig::new().into(), vec!["asdf".to_string()]).await
     };
 
     let (sink, _) = config.build(cx).await.unwrap();
@@ -360,7 +358,7 @@ async fn splunk_indexer_acknowledgements() {
     let config = HecLogsSinkConfig {
         default_token: String::from(ACK_TOKEN),
         acknowledgements: acknowledgements_config,
-        ..config(HecEncoding::Json, vec!["asdf".to_string()]).await
+        ..config(JsonSerializerConfig::new().into(), vec!["asdf".to_string()]).await
     };
     let (sink, _) = config.build(cx).await.unwrap();
 
@@ -377,7 +375,7 @@ async fn splunk_indexer_acknowledgements() {
 async fn splunk_indexer_acknowledgements_disabled_on_server() {
     let cx = SinkContext::new_test();
 
-    let config = config(HecEncoding::Json, vec!["asdf".to_string()]).await;
+    let config = config(JsonSerializerConfig::new().into(), vec!["asdf".to_string()]).await;
     let (sink, _) = config.build(cx).await.unwrap();
 
     let (tx, mut rx) = BatchNotifier::new_with_receiver();

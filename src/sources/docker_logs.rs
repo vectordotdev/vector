@@ -17,6 +17,7 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
 use super::util::MultilineConfig;
@@ -56,7 +57,9 @@ pub struct DockerLogsConfig {
     ///
     /// The value will be the current hostname for wherever Vector is running.
     ///
-    /// By default, the [global `host_key` option](https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key) is used.
+    /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
+    ///
+    /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     #[serde(default = "host_key")]
     host_key: String,
 
@@ -221,7 +224,7 @@ impl SourceConfig for DockerLogsConfig {
         }))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -249,8 +252,8 @@ impl SourceConfig for DockerCompatConfig {
         self.config.build(cx).await
     }
 
-    fn outputs(&self) -> Vec<Output> {
-        self.config.outputs()
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        self.config.outputs(global_log_namespace)
     }
 
     fn source_type(&self) -> &'static str {

@@ -1,14 +1,15 @@
 use std::sync::Arc;
 
-use codecs::{encoding::SerializerConfig, JsonSerializerConfig, TextSerializerConfig};
+use codecs::TextSerializerConfig;
 use futures_util::FutureExt;
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
+use vector_config::configurable_component;
 use vector_core::sink::VectorSink;
 
 use super::{encoder::HecLogsEncoder, request_builder::HecLogsRequestBuilder, sink::HecLogsSink};
 use crate::{
-    codecs::Encoder,
+    codecs::{Encoder, EncodingConfig},
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
@@ -19,9 +20,7 @@ use crate::{
             timestamp_key, EndpointTarget, SplunkHecDefaultBatchSettings,
         },
         util::{
-            encoding::{EncodingConfig, EncodingConfigAdapter, EncodingConfigMigrator},
-            http::HttpRetryLogic,
-            BatchConfig, Compression, ServiceBuilderExt, TowerRequestConfig,
+            http::HttpRetryLogic, BatchConfig, Compression, ServiceBuilderExt, TowerRequestConfig,
         },
         Healthcheck,
     },
@@ -29,55 +28,90 @@ use crate::{
     tls::TlsConfig,
 };
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum HecEncoding {
-    Json,
-    Text,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct HecEncodingMigrator;
-
-impl EncodingConfigMigrator for HecEncodingMigrator {
-    type Codec = HecEncoding;
-
-    fn migrate(codec: &Self::Codec) -> SerializerConfig {
-        match codec {
-            HecEncoding::Text => TextSerializerConfig::new().into(),
-            HecEncoding::Json => JsonSerializerConfig::new().into(),
-        }
-    }
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the `splunk_hec_logs` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct HecLogsSinkConfig {
-    // Deprecated name
+    /// Default Splunk HEC token.
+    ///
+    /// If an event has a token set in its metadata, it will prevail over the one set here.
     #[serde(alias = "token")]
     pub default_token: String,
+
+    /// The base URL of the Splunk instance.
     pub endpoint: String,
+
+    /// Overrides the name of the log field used to grab the hostname to send to Splunk HEC.
+    ///
+    /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
+    ///
+    /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     #[serde(default = "host_key")]
     pub host_key: String,
+
+    /// Fields to be [added to Splunk index][splunk_field_index_docs].
+    ///
+    /// [splunk_field_index_docs]: https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/IFXandHEC
     #[serde(default)]
     pub indexed_fields: Vec<String>,
+
+    /// The name of the index where to send the events to.
+    ///
+    /// If not specified, the default index is used.
+    #[configurable(metadata(templateable))]
     pub index: Option<Template>,
+
+    /// The sourcetype of events sent to this sink.
+    ///
+    /// If unset, Splunk will default to `httpevent`.
+    #[configurable(metadata(templateable))]
     pub sourcetype: Option<Template>,
+
+    /// The source of events sent to this sink.
+    ///
+    /// This is typically the filename the logs originated from.
+    ///
+    /// If unset, the Splunk collector will set it.
+    #[configurable(metadata(templateable))]
     pub source: Option<Template>,
-    pub encoding: EncodingConfigAdapter<EncodingConfig<HecEncoding>, HecEncodingMigrator>,
+
+    #[configurable(derived)]
+    pub encoding: EncodingConfig,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub compression: Compression,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<SplunkHecDefaultBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub acknowledgements: HecClientAcknowledgementsConfig,
-    // This settings is relevant only for the `humio_logs` sink and should be left to None everywhere else
+
+    // This settings is relevant only for the `humio_logs` sink and should be left as `None`
+    // everywhere else.
+    #[serde(skip)]
     pub timestamp_nanos_key: Option<String>,
+
+    /// Overrides the name of the log field used to grab the timestamp to send to Splunk HEC.
+    ///
+    /// By default, the [global `log_schema.timestamp_key` option][global_timestamp_key] is used.
+    ///
+    /// [global_timestamp_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.timestamp_key
     #[serde(default = "crate::sinks::splunk_hec::common::timestamp_key")]
     pub timestamp_key: String,
+
+    #[configurable(derived)]
     #[serde(default = "default_endpoint_target")]
     pub endpoint_target: EndpointTarget,
 }
@@ -96,7 +130,7 @@ impl GenerateConfig for HecLogsSinkConfig {
             index: None,
             sourcetype: None,
             source: None,
-            encoding: EncodingConfig::from(HecEncoding::Text).into(),
+            encoding: TextSerializerConfig::new().into(),
             compression: Compression::default(),
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
@@ -134,8 +168,8 @@ impl SinkConfig for HecLogsSinkConfig {
         "splunk_hec_logs"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements.inner)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements.inner
     }
 }
 
@@ -152,7 +186,7 @@ impl HecLogsSinkConfig {
         };
 
         let transformer = self.encoding.transformer();
-        let serializer = self.encoding.clone().encoding()?;
+        let serializer = self.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
         let encoder = HecLogsEncoder {
             transformer,
@@ -228,7 +262,7 @@ impl SinkConfig for HecSinkCompatConfig {
         "splunk_hec"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
         self.config.acknowledgements()
     }
 }

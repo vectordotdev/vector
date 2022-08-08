@@ -4,6 +4,7 @@ use std::{
     collections::{btree_map, BTreeMap},
     convert::AsRef,
     fmt::{self, Display, Formatter},
+    num::NonZeroU32,
 };
 
 use chrono::{DateTime, Utc};
@@ -15,7 +16,6 @@ use vrl_lib::prelude::VrlValueConvert;
 
 use crate::{
     event::{BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable},
-    metrics::Handle,
     ByteSizeOf,
 };
 
@@ -64,7 +64,10 @@ impl Metric {
                 tags: None,
             },
             data: MetricData {
-                timestamp: None,
+                time: MetricTime {
+                    timestamp: None,
+                    interval_ms: None,
+                },
                 kind,
                 value,
             },
@@ -92,7 +95,15 @@ impl Metric {
     #[inline]
     #[must_use]
     pub fn with_timestamp(mut self, timestamp: Option<DateTime<Utc>>) -> Self {
-        self.data.timestamp = timestamp;
+        self.data.time.timestamp = timestamp;
+        self
+    }
+
+    /// Consumes this metric, returning it with an updated interval.
+    #[inline]
+    #[must_use]
+    pub fn with_interval_ms(mut self, interval_ms: Option<NonZeroU32>) -> Self {
+        self.data.time.interval_ms = interval_ms;
         self
     }
 
@@ -188,7 +199,13 @@ impl Metric {
     /// Gets a reference to the timestamp of this metric, if it exists.
     #[inline]
     pub fn timestamp(&self) -> Option<DateTime<Utc>> {
-        self.data.timestamp
+        self.data.time.timestamp
+    }
+
+    /// Gets a reference to the interval (in milliseconds) coverred by this metric, if it exists.
+    #[inline]
+    pub fn interval_ms(&self) -> Option<NonZeroU32> {
+        self.data.time.interval_ms
     }
 
     /// Gets a reference to the value of this metric.
@@ -201,6 +218,12 @@ impl Metric {
     #[inline]
     pub fn kind(&self) -> MetricKind {
         self.data.kind
+    }
+
+    /// Gets the time information of this metric.
+    #[inline]
+    pub fn time(&self) -> MetricTime {
+        self.data.time
     }
 
     /// Decomposes a `Metric` into its individual parts.
@@ -245,33 +268,11 @@ impl Metric {
 
     /// Creates a new metric from components specific to a metric emitted by `metrics`.
     #[allow(clippy::cast_precision_loss)]
-    pub fn from_metric_kv(key: &metrics::Key, handle: &Handle) -> Self {
-        let value = match handle {
-            Handle::Counter(counter) => MetricValue::Counter {
-                // NOTE this will truncate if `counter.count()` is a value
-                // greater than 2**52.
-                value: counter.count() as f64,
-            },
-            Handle::Gauge(gauge) => MetricValue::Gauge {
-                value: gauge.gauge(),
-            },
-            Handle::Histogram(histogram) => {
-                let buckets: Vec<Bucket> = histogram
-                    .buckets()
-                    .map(|(upper_limit, count)| Bucket {
-                        upper_limit,
-                        count: count.into(),
-                    })
-                    .collect();
-
-                MetricValue::AggregatedHistogram {
-                    buckets,
-                    sum: histogram.sum() as f64,
-                    count: histogram.count(),
-                }
-            }
-        };
-
+    pub(crate) fn from_metric_kv(
+        key: &metrics::Key,
+        value: MetricValue,
+        timestamp: DateTime<Utc>,
+    ) -> Self {
         let labels = key
             .labels()
             .map(|label| (String::from(label.key()), String::from(label.value())))
@@ -279,12 +280,8 @@ impl Metric {
 
         Self::new(key.name().to_string(), MetricKind::Absolute, value)
             .with_namespace(Some("vector"))
-            .with_timestamp(Some(Utc::now()))
-            .with_tags(if labels.is_empty() {
-                None
-            } else {
-                Some(labels)
-            })
+            .with_timestamp(Some(timestamp))
+            .with_tags((!labels.is_empty()).then(|| labels))
     }
 
     /// Removes a tag from this metric, returning the value of the tag if the tag was previously in the metric.
@@ -384,7 +381,7 @@ impl Display for Metric {
     /// 2020-08-12T20:23:37.248661343Z vector_processed_bytes_total{component_kind="sink",component_type="blackhole"} = 6391
     /// ```
     fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), fmt::Error> {
-        if let Some(timestamp) = &self.data.timestamp {
+        if let Some(timestamp) = &self.data.time.timestamp {
             write!(fmt, "{:?} ", timestamp)?;
         }
         let kind = match self.data.kind {
@@ -469,21 +466,21 @@ impl From<MetricKind> for ::value::Value {
 #[macro_export]
 macro_rules! samples {
     ( $( $value:expr => $rate:expr ),* ) => {
-        vec![ $( crate::event::metric::Sample { value: $value, rate: $rate }, )* ]
+        vec![ $( $crate::event::metric::Sample { value: $value, rate: $rate }, )* ]
     }
 }
 
 #[macro_export]
 macro_rules! buckets {
     ( $( $limit:expr => $count:expr ),* ) => {
-        vec![ $( crate::event::metric::Bucket { upper_limit: $limit, count: $count }, )* ]
+        vec![ $( $crate::event::metric::Bucket { upper_limit: $limit, count: $count }, )* ]
     }
 }
 
 #[macro_export]
 macro_rules! quantiles {
     ( $( $q:expr => $value:expr ),* ) => {
-        vec![ $( crate::event::metric::Quantile { quantile: $q, value: $value }, )* ]
+        vec![ $( $crate::event::metric::Quantile { quantile: $q, value: $value }, )* ]
     }
 }
 
@@ -1022,5 +1019,61 @@ mod test {
         };
         let converted = distrib_value.distribution_to_sketch();
         assert!(matches!(converted, Some(MetricValue::Sketch { .. })));
+    }
+
+    #[test]
+    fn merge_non_contiguous_interval() {
+        let mut gauge = Metric::new(
+            "gauge",
+            MetricKind::Incremental,
+            MetricValue::Gauge { value: 12.0 },
+        )
+        .with_timestamp(Some(ts()))
+        .with_interval_ms(std::num::NonZeroU32::new(10));
+
+        let delta = Metric::new(
+            "gauge",
+            MetricKind::Incremental,
+            MetricValue::Gauge { value: -5.0 },
+        )
+        .with_timestamp(Some(ts() + chrono::Duration::milliseconds(20)))
+        .with_interval_ms(std::num::NonZeroU32::new(15));
+
+        let expected = gauge
+            .clone()
+            .with_value(MetricValue::Gauge { value: 7.0 })
+            .with_timestamp(Some(ts()))
+            .with_interval_ms(std::num::NonZeroU32::new(35));
+
+        assert!(gauge.data.add(&delta.data));
+        assert_eq!(gauge, expected);
+    }
+
+    #[test]
+    fn merge_contiguous_interval() {
+        let mut gauge = Metric::new(
+            "gauge",
+            MetricKind::Incremental,
+            MetricValue::Gauge { value: 12.0 },
+        )
+        .with_timestamp(Some(ts()))
+        .with_interval_ms(std::num::NonZeroU32::new(10));
+
+        let delta = Metric::new(
+            "gauge",
+            MetricKind::Incremental,
+            MetricValue::Gauge { value: -5.0 },
+        )
+        .with_timestamp(Some(ts() + chrono::Duration::milliseconds(5)))
+        .with_interval_ms(std::num::NonZeroU32::new(15));
+
+        let expected = gauge
+            .clone()
+            .with_value(MetricValue::Gauge { value: 7.0 })
+            .with_timestamp(Some(ts()))
+            .with_interval_ms(std::num::NonZeroU32::new(20));
+
+        assert!(gauge.data.add(&delta.data));
+        assert_eq!(gauge, expected);
     }
 }

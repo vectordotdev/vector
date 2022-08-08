@@ -1,62 +1,87 @@
 use std::collections::HashMap;
 
-use codecs::encoding::SerializerConfig;
-use codecs::{JsonSerializerConfig, LogfmtSerializerConfig, TextSerializerConfig};
 use futures::future::FutureExt;
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 use super::{healthcheck::healthcheck, sink::LokiSink};
-use crate::sinks::util::encoding::{EncodingConfigAdapter, EncodingConfigMigrator};
-use crate::sinks::util::Compression;
 use crate::{
+    codecs::EncodingConfig,
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
-        util::{
-            encoding::EncodingConfig, BatchConfig, SinkBatchSettings, TowerRequestConfig, UriSerde,
-        },
+        util::{BatchConfig, Compression, SinkBatchSettings, TowerRequestConfig, UriSerde},
         VectorSink,
     },
     template::Template,
     tls::{TlsConfig, TlsSettings},
 };
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EncodingMigrator;
-
-impl EncodingConfigMigrator for EncodingMigrator {
-    type Codec = Encoding;
-
-    fn migrate(codec: &Self::Codec) -> SerializerConfig {
-        match codec {
-            Encoding::Json => JsonSerializerConfig::new().into(),
-            Encoding::Text => TextSerializerConfig::new().into(),
-            Encoding::Logfmt => LogfmtSerializerConfig::new().into(),
-        }
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
+/// Configuration for the `loki` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct LokiConfig {
+    /// The base URL of the Loki instance.
+    ///
+    /// Vector will append `/loki/api/v1/push` to this.
     pub endpoint: UriSerde,
-    pub encoding: EncodingConfigAdapter<EncodingConfig<Encoding>, EncodingMigrator>,
+
+    #[configurable(derived)]
+    pub encoding: EncodingConfig,
+
+    /// The tenant ID to send.
+    ///
+    /// By default, this is not required since a proxy should set this header.
+    ///
+    /// When running Loki locally, a tenant ID is not required.
     pub tenant_id: Option<Template>,
+
+    /// A set of labels that are attached to each batch of events.
+    ///
+    /// Both keys and values are templatable, which enables you to attach dynamic labels to events
+    ///
+    /// Labels can be suffixed with a “*” to allow the expansion of objects into multiple labels,
+    /// see “How it works” for more information.
+    ///
+    /// Note: If the set of labels has high cardinality, this can cause drastic performance issues
+    /// with Loki. To prevent this from happening, reduce the number of unique label keys and
+    /// values.
+    #[configurable(metadata(templateable))]
     pub labels: HashMap<Template, Template>,
+
+    /// Whether or not to delete fields from the event when they are used as labels.
     #[serde(default = "crate::serde::default_false")]
     pub remove_label_fields: bool,
+
+    /// Whether or not to remove the timestamp from the event payload.
+    ///
+    /// The timestamp will still be sent as event metadata for Loki to use for indexing.
     #[serde(default = "crate::serde::default_true")]
     pub remove_timestamp: bool,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub compression: Compression,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub out_of_order_action: OutOfOrderAction,
+
+    #[configurable(derived)]
     pub auth: Option<Auth>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<LokiDefaultBatchSettings>,
+
+    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -74,22 +99,34 @@ impl SinkBatchSettings for LokiDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 1.0;
 }
 
-#[derive(Copy, Clone, Debug, Derivative, Deserialize, Serialize)]
+/// Out-of-order event behavior.
+///
+/// Some sources may generate events with timestamps that aren’t in chronological order. While the
+/// sink will sort events before sending them to Loki, there is the chance another event comes in
+/// that is out-of-order with respective the latest events sent to Loki. Prior to Loki 2.4.0, this
+/// was not supported and would result in an error during the push request.
+///
+/// If you're using Loki 2.4.0 or newer, `Accept` is the preferred action, which lets Loki handle
+/// any necessary sorting/reordering. If you're using an earlier version, then you must use `Drop`
+/// or `RewriteTimestamp` depending on which option makes the most sense for your use case.
+#[configurable_component]
+#[derive(Copy, Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(rename_all = "snake_case")]
 pub enum OutOfOrderAction {
+    /// Drop the event.
     #[derivative(Default)]
     Drop,
-    RewriteTimestamp,
-    Accept,
-}
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum Encoding {
-    Json,
-    Text,
-    Logfmt,
+    /// Rewrite the timestamp of the event to the timestamp of the latest event seen by the sink.
+    RewriteTimestamp,
+
+    /// Accept the event.
+    ///
+    /// The event is not dropped and is sent without modification.
+    ///
+    /// Requires Loki 2.4.0 or newer.
+    Accept,
 }
 
 impl GenerateConfig for LokiConfig {
@@ -128,14 +165,14 @@ impl SinkConfig for LokiConfig {
             }
         }
 
-        let client = self.build_client(cx.clone())?;
+        let client = self.build_client(cx)?;
 
         let config = LokiConfig {
             auth: self.auth.choose_one(&self.endpoint.auth)?,
             ..self.clone()
         };
 
-        let sink = LokiSink::new(config.clone(), client.clone(), cx)?;
+        let sink = LokiSink::new(config.clone(), client.clone())?;
 
         let healthcheck = healthcheck(config, client).boxed();
 
@@ -150,8 +187,8 @@ impl SinkConfig for LokiConfig {
         "loki"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 

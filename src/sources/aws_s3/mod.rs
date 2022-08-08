@@ -8,6 +8,7 @@ use futures::{stream::StreamExt, TryStreamExt};
 use snafu::Snafu;
 use tokio_util::io::StreamReader;
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 
 use super::util::MultilineConfig;
 use crate::aws::create_client;
@@ -84,8 +85,10 @@ pub struct AwsS3Config {
     /// Only relevant when `strategy = "sqs"`.
     sqs: Option<sqs::Config>,
 
-    /// The ARN of an [IAM role](\(urls.aws_iam_role)) to assume at startup.
-    #[deprecated]
+    /// The ARN of an [IAM role][iam_role] to assume at startup.
+    ///
+    /// [iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
+    #[configurable(deprecated)]
     assume_role: Option<String>,
 
     #[configurable(derived)]
@@ -130,7 +133,7 @@ impl SourceConfig for AwsS3Config {
         }
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 

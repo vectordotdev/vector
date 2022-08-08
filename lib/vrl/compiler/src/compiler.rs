@@ -16,7 +16,7 @@ use crate::{
 
 pub(crate) type Diagnostics = Vec<Box<dyn DiagnosticMessage>>;
 
-pub(crate) struct Compiler<'a> {
+pub struct Compiler<'a> {
     fns: &'a [Box<dyn Function>],
     diagnostics: Diagnostics,
     fallible: bool,
@@ -41,38 +41,27 @@ pub(crate) struct Compiler<'a> {
 }
 
 impl<'a> Compiler<'a> {
-    pub(super) fn new(fns: &'a [Box<dyn Function>]) -> Self {
-        Self {
+    pub fn compile(
+        fns: &'a [Box<dyn Function>],
+        ast: parser::Program,
+        external: &mut ExternalEnv,
+        local: LocalEnv,
+    ) -> Result<(Program, DiagnosticList), DiagnosticList> {
+        let mut compiler = Self {
             fns,
             diagnostics: vec![],
             fallible: false,
             abortable: false,
-            local: LocalEnv::default(),
+            local,
             external_queries: vec![],
             external_assignments: vec![],
             skip_missing_query_target: vec![],
             fallible_expression_error: None,
-        }
-    }
-
-    /// An intenal function used by `compile_for_repl`.
-    ///
-    /// This should only be used for its intended purpose.
-    pub(super) fn new_with_local_state(fns: &'a [Box<dyn Function>], local: LocalEnv) -> Self {
-        let mut compiler = Self::new(fns);
-        compiler.local = local;
-        compiler
-    }
-
-    pub(super) fn compile(
-        mut self,
-        ast: parser::Program,
-        external: &mut ExternalEnv,
-    ) -> Result<(Program, DiagnosticList), DiagnosticList> {
-        let expressions = self.compile_root_exprs(ast, external);
+        };
+        let expressions = compiler.compile_root_exprs(ast, external);
 
         let (errors, warnings): (Vec<_>, Vec<_>) =
-            self.diagnostics.into_iter().partition(|diagnostic| {
+            compiler.diagnostics.into_iter().partition(|diagnostic| {
                 matches!(diagnostic.severity(), Severity::Bug | Severity::Error)
             });
 
@@ -81,13 +70,13 @@ impl<'a> Compiler<'a> {
         }
 
         let info = ProgramInfo {
-            fallible: self.fallible,
-            abortable: self.abortable,
-            target_queries: self.external_queries,
-            target_assignments: self.external_assignments,
+            fallible: compiler.fallible,
+            abortable: compiler.abortable,
+            target_queries: compiler.external_queries,
+            target_assignments: compiler.external_assignments,
         };
 
-        let expressions = Block::new(expressions, self.local);
+        let expressions = Block::new(expressions, compiler.local);
 
         Ok((Program { expressions, info }, warnings.into()))
     }

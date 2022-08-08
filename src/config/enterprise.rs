@@ -118,9 +118,9 @@ const fn default_enable_logs_reporting() -> bool {
     true
 }
 
-/// By default, report to Datadog every 5 seconds.
+/// By default, scrape internal metrics and report to Datadog every 1 seconds.
 const fn default_reporting_interval_secs() -> f64 {
-    5.0
+    1.0
 }
 
 /// By default, keep retrying (recoverable) failed reporting
@@ -783,6 +783,7 @@ mod test {
     use value::Kind;
     use vector_common::btreemap;
     use vector_core::config::proxy::ProxyConfig;
+    use vrl::prelude::Collection;
     use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
 
     use super::{
@@ -952,11 +953,15 @@ mod test {
         // We need to set up some state here to inform the VRL compiler that
         // .tags is an object and merge() is thus a safe operation (mimicking
         // the environment this code will actually run in).
-        let mut state = vrl::state::ExternalEnv::new_with_kind(Kind::object(btreemap! {
-            "tags" => Kind::object(BTreeMap::new()),
-        }));
+        let mut state = vrl::state::ExternalEnv::new_with_kind(
+            Kind::object(btreemap! {
+                "tags" => Kind::object(BTreeMap::new()),
+            }),
+            Kind::object(Collection::empty()),
+        );
         assert!(
-            vrl::compile_with_state(vrl.as_str(), vrl_stdlib::all().as_ref(), &mut state).is_ok()
+            vrl::compile_with_external(vrl.as_str(), vrl_stdlib::all().as_ref(), &mut state)
+                .is_ok()
         );
     }
 

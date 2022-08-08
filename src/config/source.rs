@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use async_trait::async_trait;
 use component::ComponentDescription;
 use serde::{Deserialize, Serialize};
-use vector_core::config::{AcknowledgementsConfig, GlobalOptions, Output};
+use vector_core::config::{AcknowledgementsConfig, GlobalOptions, LogNamespace, Output};
 
 use super::{component, schema, ComponentKey, ProxyConfig, Resource};
 use crate::{shutdown::ShutdownSignal, sources, SourceSender};
@@ -36,7 +36,7 @@ impl SourceOuter {
 pub trait SourceConfig: core::fmt::Debug + Send + Sync {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source>;
 
-    fn outputs(&self) -> Vec<Output>;
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output>;
 
     fn source_type(&self) -> &'static str;
 
@@ -55,6 +55,7 @@ pub struct SourceContext {
     pub out: SourceSender,
     pub proxy: ProxyConfig,
     pub acknowledgements: bool,
+    pub schema: schema::Options,
 
     /// Tracks the schema IDs assigned to schemas exposed by the source.
     ///
@@ -80,6 +81,7 @@ impl SourceContext {
                 proxy: Default::default(),
                 acknowledgements: false,
                 schema_definitions: HashMap::default(),
+                schema: Default::default(),
             },
             shutdown,
         )
@@ -98,6 +100,7 @@ impl SourceContext {
             proxy: Default::default(),
             acknowledgements: false,
             schema_definitions: schema_definitions.unwrap_or_default(),
+            schema: Default::default(),
         }
     }
 
@@ -113,6 +116,15 @@ impl SourceContext {
             .merge_default(&self.globals.acknowledgements)
             .merge_default(&self.acknowledgements.into())
             .enabled()
+    }
+
+    /// Gets the log namespacing to use. The passed in value is from the source itself
+    /// and will override any global default if it's set.
+    pub fn log_namespace(&self, namespace: Option<bool>) -> LogNamespace {
+        namespace
+            .or(self.schema.log_namespace)
+            .unwrap_or(false)
+            .into()
     }
 }
 

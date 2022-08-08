@@ -20,6 +20,7 @@ use tonic::{
 };
 use vector_common::{byte_size_of::ByteSizeOf, finalizer::UnorderedFinalizer};
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
@@ -267,7 +268,12 @@ impl SourceConfig for PubsubConfig {
                 "projects/{}/subscriptions/{}",
                 self.project, self.subscription
             ),
-            decoder: DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build(),
+            decoder: DecodingConfig::new(
+                self.framing.clone(),
+                self.decoding.clone(),
+                LogNamespace::Legacy,
+            )
+            .build(),
             acknowledgements: cx.do_acknowledgements(&self.acknowledgements),
             shutdown: cx.shutdown,
             out: cx.out,
@@ -285,7 +291,7 @@ impl SourceConfig for PubsubConfig {
         Ok(Box::pin(source))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 

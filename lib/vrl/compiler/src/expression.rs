@@ -38,7 +38,7 @@ pub(crate) mod literal;
 #[cfg(feature = "expr-if_statement")]
 pub(crate) mod predicate;
 #[cfg(feature = "expr-query")]
-pub(crate) mod query;
+pub mod query;
 
 pub use core::{ExpressionError, Resolved};
 

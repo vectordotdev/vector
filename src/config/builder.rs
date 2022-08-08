@@ -287,8 +287,6 @@ impl ConfigBuilder {
             errors.push(error);
         }
 
-        self.schema = with.schema;
-
         #[cfg(feature = "enterprise")]
         {
             match (self.enterprise.as_ref(), with.enterprise) {
@@ -319,6 +317,10 @@ impl ConfigBuilder {
         }
 
         self.global.proxy = self.global.proxy.merge(&with.global.proxy);
+
+        self.schema.append(with.schema, &mut errors);
+
+        self.schema.log_namespace = self.schema.log_namespace.or(with.schema.log_namespace);
 
         if self.global.data_dir.is_none() || self.global.data_dir == default_data_dir() {
             self.global.data_dir = with.global.data_dir;
@@ -462,7 +464,7 @@ mod tests {
     /// should ideally be able to fix so that the original hash passes!
     fn version_hash_match() {
         assert_eq!(
-            "84112522217c90260692863950365f9149f87b723ceea7930eec863653d697c8",
+            "bc0825487e137ee1d1fc76c616795d041c4825b4ca5a7236455ea4515238885c",
             ConfigBuilder::default().sha256_hash()
         );
     }

@@ -3,6 +3,7 @@ use std::borrow::Cow::{self, Borrowed, Owned};
 
 use ::value::Value;
 use indoc::indoc;
+use lookup::LookupBuf;
 use once_cell::sync::Lazy;
 use prettytable::{format, Cell, Row, Table};
 use regex::Regex;
@@ -45,7 +46,11 @@ const RESERVED_TERMS: &[&str] = &[
     "help docs",
 ];
 
-pub(crate) fn run(mut objects: Vec<TargetValue>, timezone: TimeZone, vrl_runtime: VrlRuntime) {
+pub(crate) fn run(
+    mut objects: Vec<TargetValue>,
+    timezone: TimeZone,
+    vrl_runtime: VrlRuntime,
+) -> Result<(), rustyline::error::ReadlineError> {
     let mut index = 0;
     let func_docs_regex = Regex::new(r"^help\sdocs\s(\w{1,})$").unwrap();
     let error_docs_regex = Regex::new(r"^help\serror\s(\w{1,})$").unwrap();
@@ -53,7 +58,7 @@ pub(crate) fn run(mut objects: Vec<TargetValue>, timezone: TimeZone, vrl_runtime
     let mut external_state = state::ExternalEnv::default();
     let mut local_state = state::LocalEnv::default();
     let mut rt = Runtime::new(state::Runtime::default());
-    let mut rl = Editor::<Repl>::new();
+    let mut rl = Editor::<Repl>::new()?;
     rl.set_helper(Some(Repl::new()));
 
     #[allow(clippy::print_stdout)]
@@ -143,6 +148,7 @@ pub(crate) fn run(mut objects: Vec<TargetValue>, timezone: TimeZone, vrl_runtime
             }
         }
     }
+    Ok(())
 }
 
 fn resolve(
@@ -156,8 +162,12 @@ fn resolve(
 ) -> (state::LocalEnv, Result<Value, String>) {
     let mut functions = stdlib::all();
     functions.extend(vector_vrl_functions::vrl_functions());
-    let program = match vrl::compile_for_repl(program, &functions, external, local.clone()) {
-        Ok(result) => result,
+
+    // The CLI should be moved out of the "vrl" module, and then it can use the `vector-core::compile_vrl` function which includes this automatically
+    external.set_read_only_metadata_path(LookupBuf::from("vector"), true);
+
+    let program = match vrl::compile_with_state(program, &functions, external, local.clone()) {
+        Ok((program, _)) => program,
         Err(diagnostics) => {
             return (
                 local,

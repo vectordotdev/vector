@@ -5,11 +5,11 @@ use uuid::Uuid;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    codecs::Encoder,
+    codecs::{Encoder, Transformer},
     event::{Event, Finalizable},
     sinks::{
         azure_common::config::{AzureBlobMetadata, AzureBlobRequest},
-        util::{encoding::Transformer, request_builder::EncodeResult, Compression, RequestBuilder},
+        util::{request_builder::EncodeResult, Compression, RequestBuilder},
     },
 };
 

@@ -4,6 +4,7 @@ use codecs::decoding::{
     NewlineDelimitedDecoder,
 };
 use smallvec::SmallVec;
+use vector_core::config::LogNamespace;
 
 use crate::{
     event::Event,
@@ -16,6 +17,7 @@ use crate::{
 pub struct Decoder {
     framer: Framer,
     deserializer: Deserializer,
+    log_namespace: LogNamespace,
 }
 
 impl Default for Decoder {
@@ -23,6 +25,7 @@ impl Default for Decoder {
         Self {
             framer: Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
             deserializer: Deserializer::Bytes(BytesDeserializer::new()),
+            log_namespace: LogNamespace::Legacy,
         }
     }
 }
@@ -35,7 +38,14 @@ impl Decoder {
         Self {
             framer,
             deserializer,
+            log_namespace: LogNamespace::Legacy,
         }
+    }
+
+    /// Sets the log namespace that will be used when decoding.
+    pub const fn with_log_namespace(mut self, log_namespace: LogNamespace) -> Self {
+        self.log_namespace = log_namespace;
+        self
     }
 
     /// Handles the framing result and parses it into a structured event, if
@@ -57,11 +67,10 @@ impl Decoder {
         };
 
         let byte_size = frame.len();
-
         // Parse structured events from the byte frame.
         self.deserializer
-            .parse(frame)
-            .map(|event| Some((event, byte_size)))
+            .parse(frame, self.log_namespace)
+            .map(|events| Some((events, byte_size)))
             .map_err(|error| {
                 emit!(DecoderDeserializeFailed { error: &error });
                 Error::ParsingError(error)
@@ -81,5 +90,46 @@ impl tokio_util::codec::Decoder for Decoder {
     fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         let frame = self.framer.decode_eof(buf);
         self.handle_framing_result(frame)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Decoder;
+    use bytes::Bytes;
+    use codecs::{
+        decoding::{Deserializer, Framer},
+        JsonDeserializer, NewlineDelimitedDecoder, StreamDecodingError,
+    };
+    use futures::{stream, StreamExt};
+    use tokio_util::{codec::FramedRead, io::StreamReader};
+    use value::Value;
+
+    #[tokio::test]
+    async fn framed_read_recover_from_error() {
+        let iter = stream::iter(
+            ["{ \"foo\": 1 }\n", "invalid\n", "{ \"bar\": 2 }\n"]
+                .into_iter()
+                .map(Bytes::from),
+        );
+        let stream = iter.map(Ok::<_, std::io::Error>);
+        let reader = StreamReader::new(stream);
+        let decoder = Decoder::new(
+            Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
+            Deserializer::Json(JsonDeserializer::new()),
+        );
+        let mut stream = FramedRead::new(reader, decoder);
+
+        let next = stream.next().await.unwrap();
+        let event = next.unwrap().0.pop().unwrap().into_log();
+        assert_eq!(event.get("foo").unwrap(), &Value::from(1));
+
+        let next = stream.next().await.unwrap();
+        let error = next.unwrap_err();
+        assert!(error.can_continue());
+
+        let next = stream.next().await.unwrap();
+        let event = next.unwrap().0.pop().unwrap().into_log();
+        assert_eq!(event.get("bar").unwrap(), &Value::from(2));
     }
 }

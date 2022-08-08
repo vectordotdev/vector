@@ -4,6 +4,7 @@ use super::{log::Log, metric::Metric, notification::EventNotification, trace::Tr
 use crate::api::tap::TapPayload;
 
 #[derive(Union, Debug, Clone)]
+#[allow(clippy::large_enum_variant)]
 /// An event or a notification
 pub enum OutputEventsPayload {
     /// Log event
