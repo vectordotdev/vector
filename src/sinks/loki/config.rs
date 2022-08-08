@@ -23,6 +23,7 @@ pub enum ExtendedCompression {
     /// Snappy compression.
     ///
     /// This implies sending push requests as Protocol Buffers.
+    #[serde(rename = "snappy")]
     Snappy,
 }
 
