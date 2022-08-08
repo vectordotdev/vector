@@ -14,7 +14,6 @@ RUN mkdir -p \
   rootfs/var/lib/vector
 
 COPY docker-entrypoint.sh rootfs/usr/bin/docker-entrypoint.sh
-COPY --from=docker.io/tianon/gosu:latest gosu rootfs/usr/bin/gosu
 
 # Copy and unpack Vector distribution
 COPY vector-*-unknown-linux-gnu*.tar.gz .
