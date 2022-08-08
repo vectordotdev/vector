@@ -95,8 +95,15 @@ where
             // We batch metrics by their endpoint: series endpoint for counters, gauge, and sets vs sketch endpoint for
             // distributions, aggregated histograms, and sketches.
             .batched_partitioned(DatadogMetricsTypePartitioner, self.batch_settings)
+            // Aggregate counters with identical timestamps, otherwise identical counters (same
+            // series and same timestamp, when rounded to whole seconds) will be dropped in a
+            // last-write-wins situation when they hit the DD metrics intake.
             .map(|((api_key, endpoint), mut metrics)| {
-                // Sorting significantly improves HTTP compression
+                todo!()
+                ((api_key, endpoint), metrics)
+            })
+            // Sort metrics by name, which significantly improves HTTP compression.
+            .map(|((api_key, endpoint), mut metrics)| {
                 sort_for_compression(&mut metrics);
                 ((api_key, endpoint), metrics)
             })
