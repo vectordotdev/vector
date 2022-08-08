@@ -121,18 +121,46 @@ mod tests {
             ..ConfigMap::default()
         };
         let (mut tx, rx) = mpsc::channel::<_>(5);
+        tokio::spawn(custom_reflector(store_w, rx, Duration::from_secs(2)));
         tx.send(Ok(watcher::Event::Applied(cm.clone())))
             .await
             .unwrap();
+        tokio::time::sleep(Duration::from_secs(4)).await;
+        // Ensure the Resource is available
+        assert_eq!(store.get(&ObjectRef::from_obj(&cm)).as_deref(), Some(&cm));
+
         tx.send(Ok(watcher::Event::Deleted(cm.clone())))
             .await
             .unwrap();
-        tokio::spawn(custom_reflector(store_w, rx, Duration::from_secs(2)));
         // Ensure the Resource is still available after deletion
         tokio::time::sleep(Duration::from_secs(1)).await;
         assert_eq!(store.get(&ObjectRef::from_obj(&cm)).as_deref(), Some(&cm));
         // Ensure the Resource is removed once the `delay_deletion` has elapsed
         tokio::time::sleep(Duration::from_secs(5)).await;
         assert_eq!(store.get(&ObjectRef::from_obj(&cm)), None);
+    }
+
+    #[tokio::test]
+    async fn applied_should_apply_with_delay() {
+        let store_w = store::Writer::default();
+        let store = store_w.as_reader();
+        let cm = ConfigMap {
+            metadata: ObjectMeta {
+                name: Some("a".to_string()),
+                ..ObjectMeta::default()
+            },
+            ..ConfigMap::default()
+        };
+        let (mut tx, rx) = mpsc::channel::<_>(5);
+        tokio::spawn(custom_reflector(store_w, rx, Duration::from_secs(2)));
+        tx.send(Ok(watcher::Event::Applied(cm.clone())))
+            .await
+            .unwrap();
+        // Ensure the Resource is not available instantly
+        assert_eq!(store.get(&ObjectRef::from_obj(&cm)), None);
+
+        tokio::time::sleep(Duration::from_secs(4)).await;
+        // Ensure the Resourse is available
+        assert_eq!(store.get(&ObjectRef::from_obj(&cm)).as_deref(), Some(&cm));
     }
 }
