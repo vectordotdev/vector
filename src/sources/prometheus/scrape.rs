@@ -392,7 +392,7 @@ mod test {
 
         let events = run_and_assert_source_compliance(
             config,
-            Duration::from_secs(3),
+            Duration::from_secs(4),
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
@@ -424,7 +424,7 @@ mod test {
 
         let events = run_and_assert_source_compliance(
             config,
-            Duration::from_secs(3),
+            Duration::from_secs(4),
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
@@ -474,7 +474,7 @@ mod test {
 
         let events = run_and_assert_source_compliance(
             config,
-            Duration::from_secs(3),
+            Duration::from_secs(4),
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
@@ -543,7 +543,7 @@ mod test {
 
         let events = run_and_assert_source_compliance(
             config,
-            Duration::from_secs(3),
+            Duration::from_secs(4),
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
@@ -658,7 +658,7 @@ mod test {
 
         assert_source_compliance(&HTTP_PULL_SOURCE_TAGS, async move {
             let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
-            sleep(Duration::from_secs(3)).await;
+            sleep(Duration::from_secs(4)).await;
 
             let response = Client::new()
                 .get(format!("http://{}/metrics", out_addr).parse().unwrap())
@@ -732,7 +732,7 @@ mod integration_tests {
 
         let events = run_and_assert_source_compliance(
             config,
-            Duration::from_secs(3),
+            Duration::from_secs(4),
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;

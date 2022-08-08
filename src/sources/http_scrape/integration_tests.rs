@@ -1,5 +1,5 @@
 //! Integration tests for http_scrape source.
-//! The container configuration file is `docker-compose-.http_scrape.yml`
+//! The container configuration file is `docker-compose.http_scrape.yml`
 //! It leverages a static file server which serves the files in tests/data/http-scrape
 
 use tokio::time::{Duration, Instant};
