@@ -132,6 +132,7 @@ where
                             self.snapshot,
                             UNHEALTHY_AMOUNT_OF_ERRORS - PROBATION_AMOUNT,
                         );
+                        debug!("Service is maybe healthy.");
                         ServiceState::Healthy(self.open.clone().open(emit_active_endpoints))
                     } else {
                         ServiceState::Unhealthy(
@@ -150,6 +151,7 @@ where
                         }
                         Err(errors) if errors >= UNHEALTHY_AMOUNT_OF_ERRORS => {
                             // Unhealthy
+                            debug!("Service is unhealthy.");
                             ServiceState::Unhealthy(
                                 sleep(self.backoff.next().expect("Should never end")).boxed(),
                             )

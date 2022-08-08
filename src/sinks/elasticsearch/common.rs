@@ -159,8 +159,9 @@ impl ElasticsearchCommon {
         })
     }
 
-    pub async fn healthcheck(self, client: HttpClient) -> crate::Result<()> {
-        let mut builder = Request::get(format!("{}/_cluster/health", self.base_url));
+    pub async fn healthcheck(self, client: HttpClient, query: Option<String>) -> crate::Result<()> {
+        let query = query.map(|query| format!("?{}", query)).unwrap_or_default();
+        let mut builder = Request::get(format!("{}/_cluster/health{}", self.base_url, query));
 
         if let Some(authorization) = &self.http_auth {
             builder = authorization.apply_builder(builder);

@@ -200,6 +200,41 @@ pub struct DistributionConfig {
     #[serde(default)]
     #[serde(flatten)]
     pub health: HealthConfig,
+
+    /// Vector will wait for cluster status to be as configured or better
+    /// before sending events to endpoints.
+    #[configurable(derived)]
+    #[serde(default)]
+    pub minimal_cluster_status: ClusterStatus,
+}
+
+/// Status of Elasticsearch cluster.
+#[configurable_component]
+#[derive(Clone, Copy, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum ClusterStatus {
+    /// All shards are assigned.
+    Green,
+    /// All primary shards are assigned, but one or more replica shards are unassigned.
+    Yellow,
+    /// One or more primary shards are unassigned, so some data is unavailable.
+    Red,
+}
+
+impl ClusterStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ClusterStatus::Green => "green",
+            ClusterStatus::Yellow => "yellow",
+            ClusterStatus::Red => "red",
+        }
+    }
+}
+
+impl Default for ClusterStatus {
+    fn default() -> Self {
+        ClusterStatus::Yellow
+    }
 }
 
 /// Data stream mode configuration.
@@ -397,8 +432,17 @@ impl SinkConfig for ElasticsearchConfig {
             .tower
             .unwrap_with(&TowerRequestConfig::default());
 
-        let stream = if commons.len() > 1 {
+        let (stream, healthcheck_query) = if commons.len() > 1 {
             // Distributed services
+
+            let query = format!(
+                "wait_for_status={}",
+                self.distribution
+                    .as_ref()
+                    .map(|d| d.minimal_cluster_status)
+                    .unwrap_or_default()
+                    .as_str()
+            );
 
             let health_config = self
                 .distribution
@@ -413,11 +457,22 @@ impl SinkConfig for ElasticsearchConfig {
                     let service = ElasticsearchService::new(client.clone(), http_request_builder);
 
                     let client = client.clone();
+                    let query = query.clone();
+                    let endpoint = common.base_url.clone();
                     let healthcheck = move || {
+                        let endpoint = endpoint.clone();
                         common
                             .clone()
-                            .healthcheck(client.clone())
-                            .map(|result| result.is_ok())
+                            .healthcheck(client.clone(), Some(query.clone()))
+                            .map(move |result| {
+                                if result.is_ok() {
+                                    info!(message = "Healthcheck succeeded.", %endpoint);
+                                    true
+                                } else {
+                                    warn!(message = "Healthcheck failed.",%endpoint);
+                                    false
+                                }
+                            })
                             .boxed()
                     };
 
@@ -435,7 +490,8 @@ impl SinkConfig for ElasticsearchConfig {
             );
 
             let sink = ElasticsearchSink::new(&common, self, service)?;
-            VectorSink::from_event_streamsink(sink)
+
+            (VectorSink::from_event_streamsink(sink), Some(query))
         } else {
             // Single service
 
@@ -447,10 +503,10 @@ impl SinkConfig for ElasticsearchConfig {
                 .service(service);
 
             let sink = ElasticsearchSink::new(&common, self, service)?;
-            VectorSink::from_event_streamsink(sink)
+            (VectorSink::from_event_streamsink(sink), None)
         };
 
-        let healthcheck = common.healthcheck(client).boxed();
+        let healthcheck = common.healthcheck(client, healthcheck_query).boxed();
         Ok((stream, healthcheck))
     }
 

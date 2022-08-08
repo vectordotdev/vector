@@ -222,6 +222,19 @@ components: sinks: elasticsearch: {
 			type: object: {
 				examples: []
 				options: {	
+					minimal_cluster_status: {
+						common:      false
+						description: "Vector will wait for cluster status to be as configured or better before sending events to endpoints."
+						required:    false
+						type: string: {
+							default: "yellow"
+							enum: {
+								"green":  "All shards are assigned."
+								"yellow": "All primary shards are assigned, but one or more replica shards are unassigned."
+								"red":    "One or more primary shards are unassigned."
+							}
+						}
+					}
 					retry_initial_backoff_secs: {
 						common:      false
 						description: "Initial timeout, in seconds, between attempts to reactivate endpoints once they become unhealthy."
