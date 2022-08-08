@@ -1,11 +1,11 @@
 mod common;
 mod config;
 mod encoder;
+mod health;
 mod request_builder;
 mod retry;
 mod service;
 mod sink;
-mod health;
 
 #[cfg(test)]
 mod tests;
