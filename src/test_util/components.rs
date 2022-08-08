@@ -151,7 +151,7 @@ impl ComponentTests {
 pub fn init_test() {
     super::trace_init();
     event_test_util::clear_recorded_events();
-    super::metrics::init();
+    super::trace_init();
 }
 
 /// Tests if the given metric contains all the given tag names

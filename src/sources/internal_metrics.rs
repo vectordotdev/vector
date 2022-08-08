@@ -189,7 +189,7 @@ mod tests {
 
     #[test]
     fn captures_internal_metrics() {
-        test_util::metrics::init();
+        test_util::trace_init();
 
         // There *seems* to be a race condition here (CI was flaky), so add a slight delay.
         std::thread::sleep(std::time::Duration::from_millis(300));
@@ -258,7 +258,7 @@ mod tests {
     }
 
     async fn event_from_config(config: InternalMetricsConfig) -> Event {
-        test_util::metrics::init();
+        test_util::trace_init();
 
         let (sender, mut recv) = SourceSender::new_test();
 

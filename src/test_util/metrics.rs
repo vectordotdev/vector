@@ -4,22 +4,12 @@ use vector_core::event::{
     metric::{MetricData, MetricSeries, Sample},
     Event, EventMetadata, Metric, MetricValue,
 };
-use vector_core::metrics;
 
 use crate::sinks::util::buffer::metrics::{MetricNormalize, MetricSet};
 
 type SplitMetrics = HashMap<MetricSeries, (MetricData, EventMetadata)>;
 pub type AbsoluteMetricState = MetricState<AbsoluteMetricNormalizer>;
 pub type IncrementalMetricState = MetricState<IncrementalMetricNormalizer>;
-
-pub fn init() {
-    // Handle multiple initializations.
-    if let Err(error) = metrics::init_test() {
-        if error != metrics::Error::AlreadyInitialized {
-            panic!("Failed to initialize metrics recorder: {:?}", error);
-        }
-    }
-}
 
 #[derive(Default)]
 pub struct AbsoluteMetricNormalizer;

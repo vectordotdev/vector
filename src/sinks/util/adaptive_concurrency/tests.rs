@@ -397,7 +397,7 @@ struct TestResults {
 }
 
 async fn run_test(params: TestParams) -> TestResults {
-    test_util::metrics::init();
+    test_util::trace_init();
     let (send_done, is_done) = oneshot::channel();
 
     let test_config = TestConfig {
