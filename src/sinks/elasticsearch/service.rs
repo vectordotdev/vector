@@ -89,8 +89,9 @@ impl HttpRequestBuilder {
         &self,
         es_req: ElasticsearchRequest,
     ) -> Result<Request<Bytes>, crate::Error> {
-        let mut builder = Request::post(&self.bulk_uri)
-            .header("Content-Type", "application/vnd.elasticsearch+json;compatible-with=7");
+        let mut builder = Request::post(&self.bulk_uri);
+
+        builder = builder.header("Content-Type", "application/vnd.elasticsearch+json;compatible-with=7");
 
         if let Some(ce) = self.compression.content_encoding() {
             builder = builder.header("Content-Encoding", ce);
