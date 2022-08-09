@@ -419,7 +419,7 @@ async fn run_command(
     'outer: loop {
         tokio::select! {
             _ = &mut shutdown => {
-                if !shutdown_child(pid, &child, &command) {
+                if !shutdown_child(&child, &command) {
                         break 'outer; // couldn't signal, exit early
                 }
             }
@@ -485,12 +485,8 @@ fn handle_exit_status(config: &ExecConfig, exit_status: Option<i32>, exec_durati
 }
 
 #[cfg(unix)]
-fn shutdown_child(
-    pid: Option<u32>,
-    _child: &tokio::process::Child,
-    command: &tokio::process::Command,
-) -> bool {
-    match pid.map(|pid| i32::try_from(pid)) {
+fn shutdown_child(child: &tokio::process::Child, command: &tokio::process::Command) -> bool {
+    match child.id().map(|pid| i32::try_from(pid)) {
         Some(Ok(pid)) => {
             // shutting down, send a SIGTERM to the child
             if let Err(error) = nix::sys::signal::kill(
@@ -524,11 +520,7 @@ fn shutdown_child(
 }
 
 #[cfg(windows)]
-fn shutdown_child(
-    _pid: Option<u32>,
-    child: &tokio::process::Child,
-    command: &tokio::process::Command,
-) -> bool {
+fn shutdown_child(child: &tokio::process::Child, command: &tokio::process::Command) -> bool {
     // TODO Graceful shutdown of Windows processes
     match child.kill() {
         Ok(()) => true,
