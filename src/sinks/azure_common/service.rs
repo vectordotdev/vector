@@ -10,7 +10,7 @@ use futures::{future::BoxFuture, TryFutureExt};
 use tower::Service;
 use tracing::Instrument;
 use vector_common::internal_event::{
-    ByteSize, InternalEventHandle, Registered, RegisteredBytesSent,
+    ByteSize, BytesSent, InternalEventHandle, Protocol, Registered,
 };
 
 use crate::{
@@ -21,14 +21,12 @@ use crate::{
 #[derive(Clone)]
 pub(crate) struct AzureBlobService {
     client: Arc<ContainerClient>,
-    bytes_sent: Registered<RegisteredBytesSent>,
+    bytes_sent: Registered<BytesSent>,
 }
 
 impl AzureBlobService {
     pub fn new(client: Arc<ContainerClient>) -> AzureBlobService {
-        let bytes_sent = register!(RegisteredBytesSent {
-            protocol: "https".into()
-        });
+        let bytes_sent = register!(BytesSent::from(Protocol("https".into())));
         AzureBlobService { client, bytes_sent }
     }
 }

@@ -12,7 +12,7 @@ use snafu::{ResultExt, Snafu};
 use tokio::{net::UdpSocket, sync::oneshot, time::sleep};
 use tokio_util::codec::Encoder;
 use vector_common::internal_event::{
-    ByteSize, InternalEventHandle, Registered, RegisteredBytesSent,
+    ByteSize, BytesSent, InternalEventHandle, Protocol, Registered,
 };
 use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
@@ -179,7 +179,7 @@ enum UdpServiceState {
 pub struct UdpService {
     connector: UdpConnector,
     state: UdpServiceState,
-    bytes_sent: Registered<RegisteredBytesSent>,
+    bytes_sent: Registered<BytesSent>,
 }
 
 impl UdpService {
@@ -187,9 +187,7 @@ impl UdpService {
         Self {
             connector,
             state: UdpServiceState::Disconnected,
-            bytes_sent: register!(RegisteredBytesSent {
-                protocol: "udp".into()
-            }),
+            bytes_sent: register!(BytesSent::from(Protocol("udp".into()))),
         }
     }
 }
@@ -262,7 +260,7 @@ where
     connector: UdpConnector,
     transformer: Transformer,
     encoder: E,
-    bytes_sent: Registered<RegisteredBytesSent>,
+    bytes_sent: Registered<BytesSent>,
 }
 
 impl<E> UdpSink<E>
@@ -274,9 +272,7 @@ where
             connector,
             transformer,
             encoder,
-            bytes_sent: register!(RegisteredBytesSent {
-                protocol: "udp".into()
-            }),
+            bytes_sent: register!(BytesSent::from(Protocol("udp".into()))),
         }
     }
 }

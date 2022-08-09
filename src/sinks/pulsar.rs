@@ -16,7 +16,7 @@ use pulsar::{
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
 use vector_common::internal_event::{
-    ByteSize, EventsSent, InternalEventHandle, Registered, RegisteredBytesSent,
+    ByteSize, BytesSent, EventsSent, InternalEventHandle as _, Protocol, Registered,
 };
 use vector_config::configurable_component;
 use vector_core::config::log_schema;
@@ -134,7 +134,7 @@ struct PulsarSink {
             ),
         >,
     >,
-    bytes_sent: Registered<RegisteredBytesSent>,
+    bytes_sent: Registered<BytesSent>,
 }
 
 inventory::submit! {
@@ -258,9 +258,7 @@ impl PulsarSink {
             encoder,
             state: PulsarSinkState::Ready(Box::new(producer)),
             in_flight: FuturesUnordered::new(),
-            bytes_sent: register!(RegisteredBytesSent {
-                protocol: "tcp".into(),
-            }),
+            bytes_sent: register!(BytesSent::from(Protocol("tcp".into()))),
         })
     }
 

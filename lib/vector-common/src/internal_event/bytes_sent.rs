@@ -1,21 +1,20 @@
-use std::borrow::Cow;
-
-use metrics::{counter, register_counter, Counter};
+use metrics::{register_counter, Counter};
 use tracing::trace;
 
-use super::{ByteSize, InternalEvent, InternalEventHandle, RegisterInternalEvent};
+use super::{
+    ByteSize, InternalEvent, InternalEventHandle, Protocol, RegisterInternalEvent, SharedString,
+};
 
 #[derive(Debug)]
-pub struct BytesSent<'a> {
+pub struct BytesSent {
     pub byte_size: usize,
-    pub protocol: &'a str,
+    pub protocol: SharedString,
 }
 
-impl<'a> InternalEvent for BytesSent<'a> {
+impl InternalEvent for BytesSent {
     fn emit(self) {
-        trace!(message = "Bytes sent.", byte_size = %self.byte_size, protocol = %self.protocol);
-        counter!("component_sent_bytes_total", self.byte_size as u64,
-                 "protocol" => self.protocol.to_string());
+        let bytes = self.byte_size;
+        super::register(self).emit(ByteSize(bytes));
     }
 
     fn name(&self) -> Option<&'static str> {
@@ -23,12 +22,16 @@ impl<'a> InternalEvent for BytesSent<'a> {
     }
 }
 
-#[allow(clippy::module_name_repetitions)]
-pub struct RegisteredBytesSent {
-    pub protocol: Cow<'static, str>,
+impl From<Protocol> for BytesSent {
+    fn from(protocol: Protocol) -> Self {
+        Self {
+            byte_size: 0,
+            protocol: protocol.0,
+        }
+    }
 }
 
-impl RegisterInternalEvent for RegisteredBytesSent {
+impl RegisterInternalEvent for BytesSent {
     type Handle = BytesSentHandle;
     fn register(self) -> Self::Handle {
         let bytes_sent =
@@ -38,17 +41,22 @@ impl RegisterInternalEvent for RegisteredBytesSent {
             protocol: self.protocol,
         }
     }
+
+    fn name(&self) -> Option<&'static str> {
+        Some("BytesSent")
+    }
 }
 
 #[derive(Clone)]
 #[allow(clippy::module_name_repetitions)]
 pub struct BytesSentHandle {
     bytes_sent: Counter,
-    protocol: Cow<'static, str>,
+    protocol: SharedString,
 }
 
 impl InternalEventHandle for BytesSentHandle {
     type Data = ByteSize;
+
     fn emit(&self, byte_size: ByteSize) {
         trace!(message = "Bytes sent.", byte_size = %byte_size.0, protocol = %self.protocol);
         self.bytes_sent.increment(byte_size.0 as u64);

@@ -178,7 +178,7 @@ where
                     if let Some((byte_size, protocol)) = response.bytes_sent() {
                         emit(BytesSent {
                             byte_size,
-                            protocol,
+                            protocol: protocol.to_string().into(),
                         });
                     }
                     emit(response.events_sent());

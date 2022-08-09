@@ -10,7 +10,9 @@ use rdkafka::{
 };
 use tower::Service;
 use vector_core::{
-    internal_event::{ByteSize, EventsSent, InternalEventHandle, Registered, RegisteredBytesSent},
+    internal_event::{
+        ByteSize, BytesSent, EventsSent, InternalEventHandle as _, Protocol, Registered,
+    },
     stream::DriverResponse,
 };
 
@@ -60,16 +62,14 @@ impl Finalizable for KafkaRequest {
 #[derive(Clone)]
 pub struct KafkaService {
     kafka_producer: FutureProducer<KafkaStatisticsContext>,
-    bytes_sent: Registered<RegisteredBytesSent>,
+    bytes_sent: Registered<BytesSent>,
 }
 
 impl KafkaService {
     pub(crate) fn new(kafka_producer: FutureProducer<KafkaStatisticsContext>) -> KafkaService {
         KafkaService {
             kafka_producer,
-            bytes_sent: register!(RegisteredBytesSent {
-                protocol: "kafka".into()
-            }),
+            bytes_sent: register!(BytesSent::from(Protocol("kafka".into()))),
         }
     }
 }

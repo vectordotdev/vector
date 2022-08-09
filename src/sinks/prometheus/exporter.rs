@@ -22,7 +22,9 @@ use stream_cancel::{Trigger, Tripwire};
 use tracing::{Instrument, Span};
 use vector_config::configurable_component;
 use vector_core::{
-    internal_event::{ByteSize, EventsSent, InternalEventHandle, Registered, RegisteredBytesSent},
+    internal_event::{
+        ByteSize, BytesSent, EventsSent, InternalEventHandle as _, Protocol, Registered,
+    },
     ByteSizeOf,
 };
 
@@ -386,7 +388,7 @@ fn handle(
     buckets: &[f64],
     quantiles: &[f64],
     metrics: &IndexMap<MetricRef, (Metric, MetricMetadata)>,
-    bytes_sent: &Registered<RegisteredBytesSent>,
+    bytes_sent: &Registered<BytesSent>,
 ) -> Response<Body> {
     let mut response = Response::new(Body::empty());
 
@@ -432,9 +434,7 @@ impl PrometheusExporter {
             return;
         }
 
-        let bytes_sent = register!(RegisteredBytesSent {
-            protocol: "http".into()
-        });
+        let bytes_sent = register!(BytesSent::from(Protocol("http".into())));
 
         let span = Span::current();
         let metrics = Arc::clone(&self.metrics);

@@ -30,7 +30,7 @@ use tokio_tungstenite::{
 };
 use tokio_util::codec::Encoder as _;
 use vector_core::{
-    internal_event::{ByteSize, EventsSent, InternalEventHandle, RegisteredBytesSent},
+    internal_event::{ByteSize, BytesSent, EventsSent, InternalEventHandle as _, Protocol},
     ByteSizeOf,
 };
 
@@ -248,9 +248,7 @@ impl WebSocketSink {
         }
         let mut last_pong = Instant::now();
 
-        let bytes_sent = register!(RegisteredBytesSent {
-            protocol: "websocket".into(),
-        });
+        let bytes_sent = register!(BytesSent::from(Protocol("websocket".into(),)));
 
         loop {
             let result = tokio::select! {

@@ -7,7 +7,7 @@ use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
 use tower::{Service, ServiceBuilder};
 use vector_common::internal_event::{
-    ByteSize, InternalEventHandle, Registered, RegisteredBytesSent,
+    ByteSize, BytesSent, InternalEventHandle, Protocol, Registered,
 };
 use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
@@ -231,9 +231,7 @@ impl RedisSinkConfig {
         let redis = RedisSink {
             conn,
             data_type,
-            bytes_sent: register!(RegisteredBytesSent {
-                protocol: "tcp".into(),
-            }),
+            bytes_sent: register!(BytesSent::from(Protocol("tcp".into(),))),
         };
 
         let svc = ServiceBuilder::new()
@@ -345,7 +343,7 @@ impl RetryLogic for RedisRetryLogic {
 pub struct RedisSink {
     conn: ConnectionManager,
     data_type: DataType,
-    bytes_sent: Registered<RegisteredBytesSent>,
+    bytes_sent: Registered<BytesSent>,
 }
 
 impl Service<Vec<RedisKvEntry>> for RedisSink {
