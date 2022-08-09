@@ -78,6 +78,7 @@ pub struct PrometheusScrapeConfig {
     /// One or more values for the same parameter key can be provided. The parameters provided in this option are
     /// appended to any parameters manually provided in the `endpoints` option. This option is especially useful when
     /// scraping the `/federate` endpoint.
+    #[serde(default)]
     query: HashMap<String, Vec<String>>,
 
     #[configurable(derived)]
