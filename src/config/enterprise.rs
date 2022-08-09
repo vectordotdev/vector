@@ -65,23 +65,23 @@ pub struct Options {
     pub enabled: bool,
 
     #[serde(default = "default_enable_logs_reporting")]
-    /// Enables reporting of internal component logs to DataDog.
+    /// Enables reporting of internal component logs to Datadog.
     pub enable_logs_reporting: bool,
 
     #[serde(default)]
-    /// DataDog site (e.g. datadoghq.eu).
+    /// Datadog site (e.g. datadoghq.eu).
     site: Option<String>,
-    /// DataDog region, used to derive a default site for a given region.
+    /// Datadog region, used to derive a default site for a given region.
     region: Option<Region>,
     #[configurable(derived)]
-    /// DataDog endpoint, takes precedence over the region and the site, used mainly for dev environments.
+    /// Datadog endpoint, takes precedence over the region and the site. Used mainly for dev environments.
     endpoint: Option<String>,
 
     #[serde(default)]
-    /// DataDog API key.
+    /// Datadog API key.
     pub api_key: Option<String>,
     #[configurable(deprecated)]
-    /// DataDog Application key(deprecated).
+    /// Datadog application key (deprecated).
     pub application_key: Option<String>,
     /// Observability Pipeline's configuration key.
     pub configuration_key: String,
@@ -101,7 +101,7 @@ pub struct Options {
     #[configurable(derived)]
     proxy: ProxyConfig,
 
-    /// Additional tags, added to generated DataDog metrics
+    /// Additional tags, added to generated Datadog metrics.
     tags: Option<IndexMap<String, String>>,
 }
 
