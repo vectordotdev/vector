@@ -51,6 +51,7 @@ pub struct HttpScrapeConfig {
     ///
     /// One or more values for the same parameter key can be provided. The parameters provided in this option are
     /// appended to any parameters manually provided in the `endpoint` option.
+    #[serde(default)]
     query: HashMap<String, Vec<String>>,
 
     /// Decoder to use on the HTTP responses.
