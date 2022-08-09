@@ -324,7 +324,7 @@ impl DockerLogsSourceCore {
         );
         filters.insert("type".to_owned(), vec!["container".to_owned()]);
 
-        // Apply include filters
+        // Apply include filters.
         if let Some(include_labels) = &self.config.include_labels {
             filters.insert("label".to_owned(), include_labels.clone());
         }
@@ -334,7 +334,7 @@ impl DockerLogsSourceCore {
         }
 
         self.docker.events(Some(EventsOptions {
-            since: Some(self.now_timestamp.to_string()),
+            since: Some(self.now_timestamp),
             until: None,
             filters,
         }))
