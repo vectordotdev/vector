@@ -43,6 +43,8 @@ pub struct WebSocketSinkConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+
+    #[configurable(derived)]
     pub auth: Option<Auth>,
 }
 
