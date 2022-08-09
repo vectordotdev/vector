@@ -2,14 +2,14 @@ use ::value::Value;
 use vrl::prelude::*;
 
 fn chunks(value: Value, chunk_size: Value) -> Resolved {
-    let chunk_size = chunk_size.try_integer()? as usize;
+    let chunk_size = chunk_size.try_integer()?;
     let bytes = value.try_bytes()?;
 
     if chunk_size < 1 {
         return Err(r#""chunk_size" must be at least 1 byte"#.into());
     }
 
-    Ok(bytes.chunks(chunk_size).collect::<Vec<_>>().into())
+    Ok(bytes.chunks(chunk_size as usize).collect::<Vec<_>>().into())
 }
 
 #[derive(Clone, Copy, Debug)]
