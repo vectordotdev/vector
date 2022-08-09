@@ -31,8 +31,12 @@ static CONTROLLER: OnceCell<Controller> = OnceCell::new();
 // Cardinality counter parameters, expose the internal metrics registry
 // cardinality. Useful for the end users to help understand the characteristics
 // of their environment and how vectors acts in it.
-const CARDINALITY_KEY_NAME: &str = "internal_metrics_cardinality_total";
+const CARDINALITY_KEY_NAME: &str = "internal_metrics_cardinality";
 static CARDINALITY_KEY: Key = Key::from_static_name(CARDINALITY_KEY_NAME);
+
+// Older deprecated counter key name
+const CARDINALITY_COUNTER_KEY_NAME: &str = "internal_metrics_cardinality_total";
+static CARDINALITY_COUNTER_KEY: Key = Key::from_static_name(CARDINALITY_COUNTER_KEY_NAME);
 
 /// Controller allows capturing metric snapshots.
 pub struct Controller {
@@ -165,6 +169,11 @@ impl Controller {
         let value = (metrics.len() + 1) as f64;
         metrics.push(Metric::from_metric_kv(
             &CARDINALITY_KEY,
+            MetricValue::Gauge { value },
+            timestamp,
+        ));
+        metrics.push(Metric::from_metric_kv(
+            &CARDINALITY_COUNTER_KEY,
             MetricValue::Counter { value },
             timestamp,
         ));
@@ -221,6 +230,8 @@ macro_rules! update_counter {
 mod tests {
     use super::*;
 
+    use crate::event::MetricKind;
+
     const IDLE_TIMEOUT: Duration = Duration::from_millis(500);
 
     fn init_metrics() -> &'static Controller {
@@ -249,10 +260,33 @@ mod tests {
 
     #[test]
     fn cardinality_matches() {
-        for cardinality in &[0, 1, 10, 100, 1000, 10000] {
-            let controller = prepare_metrics(*cardinality);
-            let list = controller.capture_metrics();
-            assert_eq!(list.len(), cardinality + 1);
+        for cardinality in [0, 1, 10, 100, 1000, 10000] {
+            let _ = init_test();
+            let controller = Controller::get().unwrap();
+            controller.reset();
+
+            for idx in 0..cardinality {
+                metrics::counter!("test", 1, "idx" => idx.to_string());
+            }
+
+            let metrics = controller.capture_metrics();
+            assert_eq!(metrics.len(), cardinality + 2);
+
+            #[allow(clippy::cast_precision_loss)]
+            let value = metrics.len() as f64;
+            for metric in metrics {
+                match metric.name() {
+                    CARDINALITY_KEY_NAME => {
+                        assert_eq!(metric.value(), &MetricValue::Gauge { value });
+                        assert_eq!(metric.kind(), MetricKind::Absolute);
+                    }
+                    CARDINALITY_COUNTER_KEY_NAME => {
+                        assert_eq!(metric.value(), &MetricValue::Counter { value });
+                        assert_eq!(metric.kind(), MetricKind::Absolute);
+                    }
+                    _ => {}
+                }
+            }
         }
     }
 
