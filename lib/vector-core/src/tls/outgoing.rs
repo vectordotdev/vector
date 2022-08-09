@@ -9,7 +9,7 @@ use super::{
 };
 
 impl MaybeTlsSettings {
-    pub(crate) async fn connect(
+    pub async fn connect(
         &self,
         host: &str,
         addr: &SocketAddr,
