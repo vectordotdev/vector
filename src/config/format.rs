@@ -158,8 +158,8 @@ mod tests {
             ("", Format::Toml, Ok("")),
             ("{}", Format::Yaml, Ok("")),
             ("{}", Format::Json, Ok("")),
+            ("", Format::Yaml, Ok("")),
             // Invalid "empty" inputs should resolve to an error.
-            ("", Format::Yaml, Err(vec!["EOF while parsing a value"])),
             (
                 "",
                 Format::Json,
