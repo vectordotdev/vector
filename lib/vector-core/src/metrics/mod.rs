@@ -245,19 +245,6 @@ mod tests {
         Controller::get().expect("Could not get global metrics controller")
     }
 
-    fn prepare_metrics(cardinality: usize) -> &'static Controller {
-        let controller = init_metrics();
-        controller.reset();
-
-        for idx in 0..cardinality {
-            metrics::counter!("test", 1, "idx" => idx.to_string());
-        }
-
-        assert_eq!(controller.capture_metrics().len(), cardinality + 1);
-
-        controller
-    }
-
     #[test]
     fn cardinality_matches() {
         for cardinality in [0, 1, 10, 100, 1000, 10000] {
