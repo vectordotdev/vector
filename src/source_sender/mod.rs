@@ -437,7 +437,12 @@ mod tests {
                     }
                 }
                 assert_eq!(*count, 1);
-                assert!((*sum - expected).abs() <= 0.001);
+                assert!(
+                    (*sum - expected).abs() <= 0.002,
+                    "Histogram sum does not match expected sum: {} vs {}",
+                    *sum,
+                    expected,
+                );
             }
             _ => panic!("source_lag_time_seconds has invalid type"),
         }
