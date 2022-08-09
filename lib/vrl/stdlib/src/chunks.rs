@@ -85,7 +85,7 @@ impl Expression for ChunksFn {
     }
 
     fn type_def(&self, _state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
-        TypeDef::array(Collection::from_unknown(Kind::bytes())).infallible()
+        TypeDef::array(Collection::from_unknown(Kind::bytes())).fallible()
     }
 }
 
