@@ -154,7 +154,7 @@ mod tests {
         "#;
 
         let cases = vec![
-            // Valid empty inputs should resolve to default.
+            // Valid empty inputs should resolve to an empty, default value.
             ("", Format::Toml, Ok("")),
             ("{}", Format::Yaml, Ok("")),
             ("{}", Format::Json, Ok("")),
