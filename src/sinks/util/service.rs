@@ -1,7 +1,7 @@
-use std::{hash::Hash, marker::PhantomData, pin::Pin, sync::Arc, time::Duration};
+use std::{future::Future, hash::Hash, marker::PhantomData, pin::Pin, sync::Arc, time::Duration};
 
 use futures_util::{
-    future::BoxFuture,
+    future::FutureExt,
     stream::{self, BoxStream},
 };
 use tower::{
@@ -41,24 +41,15 @@ mod map;
 pub type Svc<S, L> = RateLimit<AdaptiveConcurrencyLimit<Retry<FixedRetryPolicy<L>, Timeout<S>>, L>>;
 pub type TowerBatchedSink<S, B, RL> = BatchSink<Svc<S, RL>, B>;
 pub type TowerPartitionSink<S, B, RL, K> = PartitionBatchSink<Svc<S, RL>, B, K>;
+
+// Distributed service types
 pub type DistributedService<S, RL, HL, K, Req> = RateLimit<
-    Retry<
-        FixedRetryPolicy<RL>,
-        Buffer<
-            Balance<
-                BoxStream<
-                    'static,
-                    Result<
-                        Change<K, AdaptiveConcurrencyLimit<HealthService<Timeout<S>, HL>, RL>>,
-                        crate::Error,
-                    >,
-                >,
-                Req,
-            >,
-            Req,
-        >,
-    >,
+    Retry<FixedRetryPolicy<RL>, Buffer<Balance<DiscoveryService<S, RL, HL, K>, Req>, Req>>,
 >;
+pub type DiscoveryService<S, RL, HL, K> =
+    BoxStream<'static, Result<Change<K, SingleDistributedService<S, RL, HL>>, crate::Error>>;
+pub type SingleDistributedService<S, RL, HL> =
+    AdaptiveConcurrencyLimit<HealthService<Timeout<S>, HL>, RL>;
 
 pub trait ServiceBuilderExt<L> {
     fn map<R1, R2, F>(self, f: F) -> ServiceBuilder<Stack<MapLayer<R1, R2>, L>>
@@ -300,10 +291,11 @@ impl TowerRequestSettings {
         BatchSink::new(service, batch, batch_timeout)
     }
 
-    pub fn distributed_service<Req, RL, HL, S, H>(
+    /// Distributes requests to services [(Endpoint, service, healthcheck)]
+    pub fn distributed_service<Req, RL, HL, S, H, F>(
         self,
         retry_logic: RL,
-        services: Vec<(S, H)>,
+        services: Vec<(String, S, H)>,
         health_config: HealthConfig,
         health_logic: HL,
     ) -> DistributedService<S, RL, HL, usize, Req>
@@ -315,7 +307,8 @@ impl TowerRequestSettings {
         S::Error: Into<crate::Error> + Send + Sync + 'static,
         S::Response: Send,
         S::Future: Send + 'static,
-        H: Fn() -> BoxFuture<'static, bool> + Send + 'static,
+        H: Fn() -> F + Send + 'static,
+        F: Future<Output = bool> + Send + 'static,
     {
         let policy = self.retry_policy(retry_logic.clone());
         let settings = self.clone();
@@ -325,8 +318,23 @@ impl TowerRequestSettings {
         let max_concurrency = services.len() * AdaptiveConcurrencySettings::max_concurrency();
         let services = services
             .into_iter()
-            .map(|(inner, healthcheck)| {
+            .map(|(endpoint, inner, healthcheck)| {
                 // Build individual service
+                let endpoint_h = endpoint.clone();
+                let healthcheck = move || {
+                    let endpoint = endpoint_h.clone();
+                    (healthcheck)()
+                        .map(move |success| {
+                            if success {
+                                debug!(message = "Healthcheck succeeded.",%endpoint);
+                            } else {
+                                warn!(message = "Healthcheck failed.",%endpoint);
+                            }
+                            success
+                        })
+                        .boxed()
+                };
+
                 ServiceBuilder::new()
                     .layer(AdaptiveConcurrencyLimitLayer::new(
                         settings.concurrency,
@@ -341,7 +349,10 @@ impl TowerRequestSettings {
                                 .service(inner),
                             healthcheck,
                             open.clone(),
-                        ),
+                            endpoint,
+                        ), // NOTE: there is a version conflict for crate `tracing` between `tracing_tower` crate
+                           // and Vector. Once that is resolved, this can be used instead of passing endpoint everywhere.
+                           // .trace_service(|_| info_span!("endpoint", %endpoint)),
                     )
             })
             .enumerate()

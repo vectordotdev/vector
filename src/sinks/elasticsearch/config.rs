@@ -453,30 +453,21 @@ impl SinkConfig for ElasticsearchConfig {
             let services = commons
                 .into_iter()
                 .map(|common| {
+                    let endpoint = common.base_url.clone();
+
                     let http_request_builder = HttpRequestBuilder::new(&common, self);
                     let service = ElasticsearchService::new(client.clone(), http_request_builder);
 
                     let client = client.clone();
                     let query = query.clone();
-                    let endpoint = common.base_url.clone();
                     let healthcheck = move || {
-                        let endpoint = endpoint.clone();
                         common
                             .clone()
                             .healthcheck(client.clone(), Some(query.clone()))
-                            .map(move |result| {
-                                if result.is_ok() {
-                                    info!(message = "Healthcheck succeeded.", %endpoint);
-                                    true
-                                } else {
-                                    warn!(message = "Healthcheck failed.",%endpoint);
-                                    false
-                                }
-                            })
-                            .boxed()
+                            .map(move |result| result.is_ok())
                     };
 
-                    (service, healthcheck)
+                    (endpoint, service, healthcheck)
                 })
                 .collect::<Vec<_>>();
 

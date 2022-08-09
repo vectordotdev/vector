@@ -47,6 +47,7 @@ impl HealthConfig {
         inner: S,
         healthcheck: impl Fn() -> BoxFuture<'static, bool> + Send + 'static,
         open: OpenGauge,
+        endpoint: String,
     ) -> HealthService<S, L> {
         let counters = Arc::new(HealthCounters::new());
         let snapshot = counters.snapshot();
@@ -57,6 +58,7 @@ impl HealthConfig {
             counters,
             snapshot,
             open,
+            endpoint,
             state: ServiceState::Healthcheck(healthcheck()),
             healthcheck: Box::new(healthcheck) as Box<_>,
             // An exponential backoff starting from retry_initial_backoff_sec and doubling every time
@@ -93,7 +95,10 @@ enum ServiceState {
     /// Healthcheck in progress.
     Healthcheck(BoxFuture<'static, bool>),
     /// Service is healthy.
-    Healthy(OpenToken<fn(usize)>),
+    Healthy {
+        probation: bool,
+        _token: OpenToken<fn(usize)>,
+    },
 }
 
 /// A service which monitors the health of a service.
@@ -106,6 +111,7 @@ pub struct HealthService<S, L> {
     backoff: ExponentialBackoff,
     state: ServiceState,
     open: OpenGauge,
+    endpoint: String,
 }
 
 impl<S, L, Req> Service<Req> for HealthService<S, L>
@@ -132,26 +138,35 @@ where
                             self.snapshot,
                             UNHEALTHY_AMOUNT_OF_ERRORS - PROBATION_AMOUNT,
                         );
-                        debug!("Service is maybe healthy.");
-                        ServiceState::Healthy(self.open.clone().open(emit_active_endpoints))
+                        info!(message="Endpoint is on probation.", endpoint = %&self.endpoint);
+                        ServiceState::Healthy {
+                            probation: true,
+                            _token: self.open.clone().open(emit_active_endpoints),
+                        }
                     } else {
                         ServiceState::Unhealthy(
                             sleep(self.backoff.next().expect("Should never end")).boxed(),
                         )
                     }
                 }
-                ServiceState::Healthy(_) => {
+                ServiceState::Healthy {
+                    ref mut probation, ..
+                } => {
                     // Check for errors
                     match self.counters.healthy(self.snapshot) {
                         Ok(snapshot) => {
                             // Healthy
+                            if *probation {
+                                *probation = false;
+                                info!(message="Endpoint is healthy.", endpoint = %&self.endpoint);
+                            }
                             self.snapshot = snapshot;
                             self.backoff.reset();
                             return self.inner.poll_ready(cx).map_err(Into::into);
                         }
                         Err(errors) if errors >= UNHEALTHY_AMOUNT_OF_ERRORS => {
                             // Unhealthy
-                            debug!("Service is unhealthy.");
+                            warn!(message="Endpoint is unhealthy.", endpoint = %&self.endpoint);
                             ServiceState::Unhealthy(
                                 sleep(self.backoff.next().expect("Should never end")).boxed(),
                             )
