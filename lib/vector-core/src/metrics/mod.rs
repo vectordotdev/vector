@@ -1,26 +1,20 @@
 mod ddsketch;
-mod handle;
 mod label_filter;
 mod recorder;
+mod storage;
 
-use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
+use chrono::Utc;
 use metrics::Key;
 use metrics_tracing_context::TracingContextLayer;
-use metrics_util::{layers::Layer, Generational, NotTracked};
+use metrics_util::layers::Layer;
 use once_cell::sync::OnceCell;
 use snafu::Snafu;
 
-pub use crate::metrics::{
-    ddsketch::{AgentDDSketch, BinMap, Config},
-    handle::{Counter, Handle},
-};
-use crate::{
-    event::Metric,
-    metrics::{label_filter::VectorLabelFilter, recorder::VectorRecorder},
-};
-
-pub(self) type Registry = metrics_util::Registry<Key, Handle, NotTracked<Handle>>;
+pub use self::ddsketch::{AgentDDSketch, BinMap, Config};
+use self::{label_filter::VectorLabelFilter, recorder::Registry, recorder::VectorRecorder};
+use crate::event::{Metric, MetricValue};
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -37,8 +31,12 @@ static CONTROLLER: OnceCell<Controller> = OnceCell::new();
 // Cardinality counter parameters, expose the internal metrics registry
 // cardinality. Useful for the end users to help understand the characteristics
 // of their environment and how vectors acts in it.
-const CARDINALITY_KEY_NAME: &str = "internal_metrics_cardinality_total";
+const CARDINALITY_KEY_NAME: &str = "internal_metrics_cardinality";
 static CARDINALITY_KEY: Key = Key::from_static_name(CARDINALITY_KEY_NAME);
+
+// Older deprecated counter key name
+const CARDINALITY_COUNTER_KEY_NAME: &str = "internal_metrics_cardinality_total";
+static CARDINALITY_COUNTER_KEY: Key = Key::from_static_name(CARDINALITY_COUNTER_KEY_NAME);
 
 /// Controller allows capturing metric snapshots.
 pub struct Controller {
@@ -133,11 +131,26 @@ impl Controller {
 
     /// Take a snapshot of all gathered metrics and expose them as metric
     /// [`Event`](crate::event::Event)s.
+    #[allow(clippy::cast_precision_loss)]
     pub fn capture_metrics(&self) -> Vec<Metric> {
-        let mut metrics: Vec<Metric> = Vec::new();
+        let timestamp = Utc::now();
+        let mut metrics = Vec::<Metric>::new();
+
         self.recorder.with_registry(|registry| {
-            registry.visit(|_kind, (key, handle)| {
-                metrics.push(Metric::from_metric_kv(key, handle.get_inner()));
+            registry.visit_counters(|key, counter| {
+                // NOTE this will truncate if the value is greater than 2**52.
+                let value = counter.load(Ordering::Relaxed) as f64;
+                let value = MetricValue::Counter { value };
+                metrics.push(Metric::from_metric_kv(key, value, timestamp));
+            });
+            registry.visit_gauges(|key, gauge| {
+                let value = gauge.load(Ordering::Relaxed);
+                let value = MetricValue::Gauge { value };
+                metrics.push(Metric::from_metric_kv(key, value, timestamp));
+            });
+            registry.visit_histograms(|key, histogram| {
+                let value = histogram.make_metric();
+                metrics.push(Metric::from_metric_kv(key, value, timestamp));
             });
         });
 
@@ -163,8 +176,17 @@ impl Controller {
             }
         }
 
-        let handle = Handle::Counter(Arc::new(Counter::with_count(metrics.len() as u64 + 1)));
-        metrics.push(Metric::from_metric_kv(&CARDINALITY_KEY, &handle));
+        let value = (metrics.len() + 2) as f64;
+        metrics.push(Metric::from_metric_kv(
+            &CARDINALITY_KEY,
+            MetricValue::Gauge { value },
+            timestamp,
+        ));
+        metrics.push(Metric::from_metric_kv(
+            &CARDINALITY_COUNTER_KEY,
+            MetricValue::Counter { value },
+            timestamp,
+        ));
 
         metrics
     }
@@ -217,27 +239,37 @@ macro_rules! update_counter {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn prepare_metrics(cardinality: usize) -> &'static Controller {
-        let _ = init_test();
-        let controller = Controller::get().unwrap();
-        controller.reset();
-
-        for idx in 0..cardinality {
-            metrics::counter!("test", 1, "idx" => idx.to_string());
-        }
-
-        assert_eq!(controller.capture_metrics().len(), cardinality + 1);
-
-        controller
-    }
+    use crate::event::MetricKind;
 
     #[test]
     fn cardinality_matches() {
-        for cardinality in &[0, 1, 10, 100, 1000, 10000] {
-            let controller = prepare_metrics(*cardinality);
-            let list = controller.capture_metrics();
-            assert_eq!(list.len(), cardinality + 1);
+        for cardinality in [0, 1, 10, 100, 1000, 10000] {
+            let _ = init_test();
+            let controller = Controller::get().unwrap();
+            controller.reset();
+
+            for idx in 0..cardinality {
+                metrics::counter!("test", 1, "idx" => idx.to_string());
+            }
+
+            let metrics = controller.capture_metrics();
+            assert_eq!(metrics.len(), cardinality + 2);
+
+            #[allow(clippy::cast_precision_loss)]
+            let value = metrics.len() as f64;
+            for metric in metrics {
+                match metric.name() {
+                    CARDINALITY_KEY_NAME => {
+                        assert_eq!(metric.value(), &MetricValue::Gauge { value });
+                        assert_eq!(metric.kind(), MetricKind::Absolute);
+                    }
+                    CARDINALITY_COUNTER_KEY_NAME => {
+                        assert_eq!(metric.value(), &MetricValue::Counter { value });
+                        assert_eq!(metric.kind(), MetricKind::Absolute);
+                    }
+                    _ => {}
+                }
+            }
         }
     }
 }

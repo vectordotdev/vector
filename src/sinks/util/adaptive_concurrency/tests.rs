@@ -197,8 +197,8 @@ impl SinkConfig for TestConfig {
         unimplemented!("not intended for use in real configs")
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        None
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &AcknowledgementsConfig::DEFAULT
     }
 }
 
@@ -416,7 +416,12 @@ async fn run_test(params: TestParams) -> TestResults {
     let cstats = Arc::clone(&test_config.controller_stats);
 
     let mut config = config::Config::builder();
-    let demo_logs = DemoLogsConfig::repeat(vec!["line 1".into()], params.requests, params.interval);
+    let demo_logs = DemoLogsConfig::repeat(
+        vec!["line 1".into()],
+        params.requests,
+        params.interval,
+        None,
+    );
     config.add_source("in", demo_logs);
     config.add_sink("out", &["in"], test_config);
 

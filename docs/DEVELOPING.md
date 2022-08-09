@@ -322,9 +322,8 @@ to run. A few rules when setting up integration tests:
       an environment variable.
 - [ ] Add a `test-integration-<name>` to Vector's [`Makefile`](/Makefile) and
       ensure that it starts the service before running the integration test.
-- [ ] Add a `test-integration-<name>` job to Vector's
-      [`.github/workflows/test.yml`](.github/workflows/test.yml) workflow and
-      call your make target accordingly.
+- [ ] Add the name of your integration to the include matrix of the `test-integration` job to Vector's
+      [`.github/workflows/integration-test.yml`](.github/workflows/integration-test.yml) workflow.
 
 Once complete, you can run your integration tests with:
 

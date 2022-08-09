@@ -16,16 +16,21 @@ fn parse_apache_log(
         None => "%d/%b/%Y:%T %z".to_owned(),
         Some(timestamp_format) => timestamp_format.try_bytes_utf8_lossy()?.to_string(),
     };
-    let regex = match format.as_ref() {
+    let regexes = match format.as_ref() {
         b"common" => &*log_util::REGEX_APACHE_COMMON_LOG,
         b"combined" => &*log_util::REGEX_APACHE_COMBINED_LOG,
         b"error" => &*log_util::REGEX_APACHE_ERROR_LOG,
         _ => unreachable!(),
     };
-    let captures = regex
-        .captures(&message)
-        .ok_or("failed parsing common log line")?;
-    log_util::log_fields(regex, &captures, &timestamp_format, ctx.timezone()).map_err(Into::into)
+
+    log_util::parse_message(
+        regexes,
+        &message,
+        &timestamp_format,
+        ctx.timezone(),
+        std::str::from_utf8(format.as_ref()).unwrap(),
+    )
+    .map_err(Into::into)
 }
 
 fn variants() -> Vec<Value> {
@@ -326,6 +331,22 @@ mod tests {
             }),
             tdef: TypeDef::object(kind_error()).fallible(),
             tz: vector_common::TimeZone::Named(chrono_tz::Tz::UTC),
+        }
+
+        error_line_threaded_mpms_valid {
+            args: func_args![value: r#"[01/Mar/2021:12:00:19 +0000] [proxy:error] [pid 23964] (113)No route to host: AH00957: HTTP: attempt to connect to 10.1.0.244:9000 (hostname.domain.com) failed"#,
+                             format: "error"
+                             ],
+            want: Ok(btreemap! {
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2021-03-01T12:00:19Z").unwrap().into()),
+                "message1" => "(113)No route to host: AH00957: ",
+                "message2" => "HTTP: attempt to connect to 10.1.0.244:9000 (hostname.domain.com) failed",
+                "module" => "proxy",
+                "severity" => "error",
+                "pid" => 23964,
+            }),
+            tdef: TypeDef::object(kind_error()).fallible(),
+            tz: vector_common::TimeZone::default(),
         }
 
         log_line_valid_empty {

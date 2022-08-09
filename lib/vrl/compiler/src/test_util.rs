@@ -104,7 +104,7 @@ macro_rules! test_function {
                         let got_value = expression.resolve(&mut ctx)
                             .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
 
-                        assert_eq!(got_value, want);
+                        assert!(got_value == want, "assertion failed for `{}` case:\n  got:    {:?}\n  wanted: {:?}", stringify!($case), got_value, want);
                         let got_tdef = expression.type_def((&local, &external));
 
                         assert_eq!(got_tdef, $tdef);

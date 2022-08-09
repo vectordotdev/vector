@@ -1,6 +1,7 @@
 package metadata
 
 urls: {
+	apex:                                       "https://apex.sh/logs/"
 	azure_blob_storage:                         "https://azure.microsoft.com/en-us/services/storage/blobs/"
 	affine_type_system:                         "\(wikipedia)/wiki/Substructural_type_system#Affine_type_systems"
 	adaptive_request_concurrency_post:          "/blog/adaptive-request-concurrency/"
@@ -195,6 +196,7 @@ urls: {
 	gcp_authentication_server_to_server:        "\(gcp)/docs/authentication/production"
 	gcp_authentication_service_account:         "\(gcp)/docs/authentication/production#obtaining_and_providing_service_account_credentials_manually"
 	gcp_cloud_storage:                          "\(gcp)/storage"
+	gcp_chronicle:                              "https://chronicle.security"
 	gcp_folders:                                "\(gcp)/resource-manager/docs/creating-managing-folders"
 	gcp_pubsub:                                 "\(gcp)/pubsub/"
 	gcp_pubsub_rest:                            "\(gcp)/pubsub/docs/reference/rest/"

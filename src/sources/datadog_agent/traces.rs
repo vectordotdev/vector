@@ -13,9 +13,7 @@ use crate::{
     event::{Event, TraceEvent, Value},
     internal_events::EventsReceived,
     sources::{
-        datadog::agent::{
-            self, ddtrace_proto, handle_request, ApiKeyQueryParams, DatadogAgentSource,
-        },
+        datadog_agent::{ddtrace_proto, handle_request, ApiKeyQueryParams, DatadogAgentSource},
         util::ErrorMessage,
     },
     SourceSender,
@@ -77,7 +75,7 @@ fn build_trace_filter(
                         })
                     });
                 if multiple_outputs {
-                    handle_request(events, acknowledgements, out.clone(), Some(agent::TRACES))
+                    handle_request(events, acknowledgements, out.clone(), Some(super::TRACES))
                 } else {
                     handle_request(events, acknowledgements, out.clone(), None)
                 }

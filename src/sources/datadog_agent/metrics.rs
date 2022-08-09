@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, sync::Arc};
+use std::{collections::BTreeMap, num::NonZeroU32, sync::Arc};
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
@@ -18,8 +18,7 @@ use crate::{
     internal_events::EventsReceived,
     schema,
     sources::{
-        datadog::agent::{
-            self,
+        datadog_agent::{
             ddmetric_proto::{metric_payload, MetricPayload, SketchPayload},
             handle_request, ApiKeyQueryParams, DatadogAgentSource,
         },
@@ -93,7 +92,7 @@ fn sketches_service(
                         )
                     });
                 if multiple_outputs {
-                    handle_request(events, acknowledgements, out.clone(), Some(agent::METRICS))
+                    handle_request(events, acknowledgements, out.clone(), Some(super::METRICS))
                 } else {
                     handle_request(events, acknowledgements, out.clone(), None)
                 }
@@ -135,7 +134,7 @@ fn series_v1_service(
                         )
                     });
                 if multiple_outputs {
-                    handle_request(events, acknowledgements, out.clone(), Some(agent::METRICS))
+                    handle_request(events, acknowledgements, out.clone(), Some(super::METRICS))
                 } else {
                     handle_request(events, acknowledgements, out.clone(), None)
                 }
@@ -177,7 +176,7 @@ fn series_v2_service(
                         )
                     });
                 if multiple_outputs {
-                    handle_request(events, acknowledgements, out.clone(), Some(agent::METRICS))
+                    handle_request(events, acknowledgements, out.clone(), Some(super::METRICS))
                 } else {
                     handle_request(events, acknowledgements, out.clone(), None)
                 }
@@ -315,15 +314,20 @@ pub(crate) fn decode_ddseries_v2(
                     .points
                     .iter()
                     .map(|dd_point| {
-                        let i = Some(serie.interval).filter(|v| *v != 0).unwrap_or(1) as f64;
+                        let i = Some(serie.interval)
+                            .filter(|v| *v != 0)
+                            .map(|v| v as u32)
+                            .unwrap_or(1);
                         Metric::new(
                             name.to_string(),
                             MetricKind::Incremental,
                             MetricValue::Counter {
-                                value: dd_point.value * i,
+                                value: dd_point.value * (i as f64),
                             },
                         )
                         .with_timestamp(Some(Utc.timestamp(dd_point.timestamp, 0)))
+                        // serie.interval is in seconds, convert to ms
+                        .with_interval_ms(NonZeroU32::new(i * 1000))
                         .with_tags(Some(tags.clone()))
                         .with_namespace(namespace)
                     })
@@ -451,15 +455,17 @@ fn into_vector_metric(
             .points
             .iter()
             .map(|dd_point| {
-                let i = dd_metric.interval.filter(|v| *v != 0).unwrap_or(1) as f64;
+                let i = dd_metric.interval.filter(|v| *v != 0).unwrap_or(1);
                 Metric::new(
                     name.to_string(),
                     MetricKind::Incremental,
                     MetricValue::Counter {
-                        value: dd_point.1 * i,
+                        value: dd_point.1 * (i as f64),
                     },
                 )
                 .with_timestamp(Some(Utc.timestamp(dd_point.0, 0)))
+                // dd_metric.interval is in seconds, convert to ms
+                .with_interval_ms(NonZeroU32::new(i * 1000))
                 .with_tags(Some(tags.clone()))
                 .with_namespace(namespace)
             })

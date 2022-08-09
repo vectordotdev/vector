@@ -3,7 +3,6 @@ use codecs::{
     encoding::{Framer, FramingConfig, Serializer, SerializerConfig},
     CharacterDelimitedEncoder, LengthDelimitedEncoder, NewlineDelimitedEncoder,
 };
-use serde::{Deserialize, Serialize};
 use vector_config::configurable_component;
 
 /// Encoding configuration.
@@ -54,13 +53,15 @@ where
     }
 }
 
-/// Config used to build an `Encoder`.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+/// Encoding configuration.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct EncodingConfigWithFraming {
-    /// The framing config.
+    #[configurable(derived)]
     framing: Option<FramingConfig>,
-    /// The encoding config.
+
+    #[configurable(derived)]
     encoding: EncodingConfig,
 }
 

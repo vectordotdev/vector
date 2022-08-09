@@ -3,6 +3,8 @@ use snafu::Snafu;
 
 pub mod util;
 
+#[cfg(feature = "sinks-apex")]
+pub mod apex;
 #[cfg(feature = "sinks-aws_cloudwatch_logs")]
 pub mod aws_cloudwatch_logs;
 #[cfg(feature = "sinks-aws_cloudwatch_metrics")]
@@ -92,6 +94,7 @@ pub mod vector;
 #[cfg(feature = "sinks-websocket")]
 pub mod websocket;
 
+use vector_config::configurable_component;
 pub use vector_core::sink::VectorSink;
 
 pub type Healthcheck = BoxFuture<'static, crate::Result<()>>;
@@ -116,12 +119,15 @@ pub enum HealthcheckError {
     UnexpectedStatus { status: ::http::StatusCode },
 }
 
-/*
 /// Configurable sinks in Vector.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Sinks {
+    /// Apex Logs.
+    #[cfg(feature = "sinks-apex")]
+    Apex(#[configurable(derived)] apex::ApexSinkConfig),
+
     /// AWS CloudWatch Logs.
     #[cfg(feature = "sinks-aws_cloudwatch_logs")]
     AwsCloudwatchLogs(#[configurable(derived)] aws_cloudwatch_logs::CloudwatchLogsSinkConfig),
@@ -196,6 +202,12 @@ pub enum Sinks {
     #[cfg(feature = "sinks-file")]
     File(#[configurable(derived)] file::FileSinkConfig),
 
+    /// Google Chronicle (unstructured).
+    #[cfg(feature = "sinks-gcp")]
+    GcpChronicleUnstructured(
+        #[configurable(derived)] gcp::chronicle_unstructured::ChronicleUnstructuredConfig,
+    ),
+
     /// GCP Stackdriver Logs.
     #[cfg(feature = "sinks-gcp")]
     GcpStackdriverLogs(#[configurable(derived)] gcp::stackdriver_logs::StackdriverConfig),
@@ -250,7 +262,7 @@ pub enum Sinks {
 
     /// NATS.
     #[cfg(feature = "sinks-nats")]
-    Nats(#[configurable(derived)] nats::NatsSinkConfig),
+    Nats(#[configurable(derived)] self::nats::NatsSinkConfig),
 
     /// New Relic.
     #[cfg(feature = "sinks-new_relic")]
@@ -312,4 +324,3 @@ pub enum Sinks {
     #[cfg(feature = "sinks-websocket")]
     Websocket(#[configurable(derived)] websocket::WebSocketSinkConfig),
 }
-*/
