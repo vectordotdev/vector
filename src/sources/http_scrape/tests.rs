@@ -48,10 +48,10 @@ async fn bytes_decoding() {
     run_compliance(HttpScrapeConfig::new(
         format!("http://{}/endpoint", in_addr),
         INTERVAL_SECS,
-        None,
+        HashMap::new(),
         default_decoding(),
         default_framing_message_based(),
-        None,
+        HashMap::new(),
         None,
         None,
     ))
@@ -74,12 +74,12 @@ async fn json_decoding_newline_delimited() {
     run_compliance(HttpScrapeConfig::new(
         format!("http://{}/endpoint", in_addr),
         INTERVAL_SECS,
-        None,
+        HashMap::new(),
         DeserializerConfig::Json,
         FramingConfig::NewlineDelimited {
             newline_delimited: NewlineDelimitedDecoderOptions::default(),
         },
-        None,
+        HashMap::new(),
         None,
         None,
     ))
@@ -102,7 +102,7 @@ async fn json_decoding_character_delimited() {
     run_compliance(HttpScrapeConfig::new(
         format!("http://{}/endpoint", in_addr),
         INTERVAL_SECS,
-        None,
+        HashMap::new(),
         DeserializerConfig::Json,
         FramingConfig::CharacterDelimited {
             character_delimited: CharacterDelimitedDecoderOptions {
@@ -110,7 +110,7 @@ async fn json_decoding_character_delimited() {
                 max_length: Some(usize::MAX),
             },
         },
-        None,
+        HashMap::new(),
         None,
         None,
     ))
@@ -132,16 +132,16 @@ async fn request_query_applied() {
     let events = run_compliance(HttpScrapeConfig::new(
         format!("http://{}/endpoint?key1=val1", in_addr),
         INTERVAL_SECS,
-        Some(HashMap::from([
+        HashMap::from([
             ("key1".to_string(), vec!["val2".to_string()]),
             (
                 "key2".to_string(),
                 vec!["val1".to_string(), "val2".to_string()],
             ),
-        ])),
+        ]),
         DeserializerConfig::Json,
         default_framing_message_based(),
-        None,
+        HashMap::new(),
         None,
         None,
     ))
@@ -198,13 +198,13 @@ async fn headers_applied() {
     run_compliance(HttpScrapeConfig::new(
         format!("http://{}/endpoint", in_addr),
         INTERVAL_SECS,
-        None,
+        HashMap::new(),
         default_decoding(),
         default_framing_message_based(),
-        Some(HashMap::from([(
+        HashMap::from([(
             "f00".to_string(),
             vec!["bazz".to_string(), "bizz".to_string()],
-        )])),
+        )]),
         None,
         None,
     ))

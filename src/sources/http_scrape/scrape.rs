@@ -48,7 +48,7 @@ pub struct HttpScrapeConfig {
     ///
     /// One or more values for the same parameter key can be provided. The parameters provided in this option are
     /// appended to any parameters manually provided in the `endpoint` option.
-    query: Option<HashMap<String, Vec<String>>>,
+    query: HashMap<String, Vec<String>>,
 
     /// Decoder to use on the HTTP responses.
     #[configurable(derived)]
@@ -63,7 +63,7 @@ pub struct HttpScrapeConfig {
     /// Headers to apply to the HTTP requests.
     /// One or more values for the same header can be provided.
     #[serde(default)]
-    headers: Option<HashMap<String, Vec<String>>>,
+    headers: HashMap<String, Vec<String>>,
 
     /// TLS configuration.
     #[configurable(derived)]
@@ -78,11 +78,11 @@ impl Default for HttpScrapeConfig {
     fn default() -> Self {
         Self {
             endpoint: "http://localhost:9898/logs".to_string(),
-            query: None,
+            query: HashMap::new(),
             scrape_interval_secs: super::default_scrape_interval_secs(),
             decoding: default_decoding(),
             framing: default_framing_message_based(),
-            headers: None,
+            headers: HashMap::new(),
             tls: None,
             auth: None,
         }
@@ -94,10 +94,10 @@ impl HttpScrapeConfig {
     pub const fn new(
         endpoint: String,
         scrape_interval_secs: u64,
-        query: Option<HashMap<String, Vec<String>>>,
+        query: HashMap<String, Vec<String>>,
         decoding: DeserializerConfig,
         framing: FramingConfig,
-        headers: Option<HashMap<String, Vec<String>>>,
+        headers: HashMap<String, Vec<String>>,
         tls: Option<TlsConfig>,
         auth: Option<Auth>,
     ) -> Self {
@@ -201,21 +201,21 @@ impl HttpScrapeContext {
         }
         events
     }
+}
 
-    /// Enriches events with source_type, timestamp
-    fn enrich_events(&self, events: &mut Vec<Event>) {
-        for event in events {
-            match event {
-                Event::Log(ref mut log) => {
-                    log.try_insert(log_schema().source_type_key(), Bytes::from(NAME));
-                    log.try_insert(log_schema().timestamp_key(), Utc::now());
-                }
-                Event::Metric(ref mut metric) => {
-                    metric.insert_tag(log_schema().source_type_key().to_string(), NAME.to_string());
-                }
-                Event::Trace(ref mut trace) => {
-                    trace.insert(log_schema().source_type_key(), Bytes::from(NAME));
-                }
+/// Enriches events with source_type, timestamp
+fn enrich_events(events: &mut Vec<Event>) {
+    for event in events {
+        match event {
+            Event::Log(ref mut log) => {
+                log.try_insert(log_schema().source_type_key(), Bytes::from(NAME));
+                log.try_insert(log_schema().timestamp_key(), Utc::now());
+            }
+            Event::Metric(ref mut metric) => {
+                metric.insert_tag(log_schema().source_type_key().to_string(), NAME.to_string());
+            }
+            Event::Trace(ref mut trace) => {
+                trace.insert(log_schema().source_type_key(), Bytes::from(NAME));
             }
         }
     }
@@ -236,7 +236,7 @@ impl super::HttpScraper for HttpScrapeContext {
 
         // decode and enrich
         let mut events = self.decode_events(&mut buf);
-        self.enrich_events(&mut events);
+        enrich_events(&mut events);
 
         Some(events)
     }

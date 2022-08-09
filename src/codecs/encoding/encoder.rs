@@ -104,7 +104,7 @@ impl Encoder<Framer> {
     }
 
     /// Get the HTTP content type.
-    pub const fn content_type(&self) -> &str {
+    pub const fn content_type(&self) -> &'static str {
         match (&self.serializer, &self.framer) {
             (Serializer::Json(_) | Serializer::NativeJson(_), Framer::NewlineDelimited(_)) => {
                 "application/x-ndjson"

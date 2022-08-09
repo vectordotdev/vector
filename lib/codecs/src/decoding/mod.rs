@@ -326,7 +326,7 @@ impl DeserializerConfig {
     }
 
     /// Get the HTTP content type.
-    pub const fn content_type(&self, framer: &FramingConfig) -> &str {
+    pub const fn content_type(&self, framer: &FramingConfig) -> &'static str {
         match (&self, framer) {
             (
                 DeserializerConfig::Json | DeserializerConfig::NativeJson,

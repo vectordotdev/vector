@@ -78,7 +78,7 @@ pub struct PrometheusScrapeConfig {
     /// One or more values for the same parameter key can be provided. The parameters provided in this option are
     /// appended to any parameters manually provided in the `endpoints` option. This option is especially useful when
     /// scraping the `/federate` endpoint.
-    query: Option<HashMap<String, Vec<String>>>,
+    query: HashMap<String, Vec<String>>,
 
     #[configurable(derived)]
     tls: Option<TlsConfig>,
@@ -103,7 +103,7 @@ impl GenerateConfig for PrometheusScrapeConfig {
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
-            query: None,
+            query: HashMap::new(),
             tls: None,
             auth: None,
         })
@@ -134,7 +134,7 @@ impl SourceConfig for PrometheusScrapeConfig {
         let inputs = GenericHttpScrapeInputs {
             urls,
             interval_secs: self.scrape_interval_secs,
-            headers: None,
+            headers: HashMap::new(),
             content_type: "text/plain".to_string(),
             auth: self.auth.clone(),
             tls,
@@ -170,7 +170,7 @@ struct PrometheusCompatConfig {
     endpoint_tag: Option<String>,
     #[serde(default = "crate::serde::default_false")]
     honor_labels: bool,
-    query: Option<HashMap<String, Vec<String>>>,
+    query: HashMap<String, Vec<String>>,
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
     tls: Option<TlsConfig>,
@@ -386,7 +386,7 @@ mod test {
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: true,
-            query: None,
+            query: HashMap::new(),
             auth: None,
             tls: None,
         };
@@ -419,7 +419,7 @@ mod test {
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: true,
-            query: None,
+            query: HashMap::new(),
             auth: None,
             tls: None,
         };
@@ -470,7 +470,7 @@ mod test {
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
-            query: None,
+            query: HashMap::new(),
             auth: None,
             tls: None,
         };
@@ -534,13 +534,13 @@ mod test {
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
-            query: Some(HashMap::from([
+            query: HashMap::from([
                 ("key1".to_string(), vec!["val2".to_string()]),
                 (
                     "key2".to_string(),
                     vec!["val1".to_string(), "val2".to_string()],
                 ),
-            ])),
+            ]),
             auth: None,
             tls: None,
         };
@@ -639,7 +639,7 @@ mod test {
                 instance_tag: None,
                 endpoint_tag: None,
                 honor_labels: false,
-                query: None,
+                query: HashMap::new(),
                 scrape_interval_secs: 1,
                 tls: None,
                 auth: None,
@@ -730,7 +730,7 @@ mod integration_tests {
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
-            query: None,
+            query: HashMap::new(),
             auth: None,
             tls: None,
         };

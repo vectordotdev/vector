@@ -46,7 +46,7 @@ pub(crate) struct GenericHttpScrapeInputs {
     /// Interval to scrape on in seconds
     pub interval_secs: u64,
     /// Map of Header+Value to apply to HTTP request
-    pub headers: Option<HashMap<String, Vec<String>>>,
+    pub headers: HashMap<String, Vec<String>>,
     /// Content type of the HTTP request, determined by the source
     pub content_type: String,
     pub auth: Option<Auth>,
@@ -73,18 +73,16 @@ pub(crate) trait HttpScraper {
 }
 
 /// Builds a url for the HTTP requests.
-pub(crate) fn get_url(uri: &Uri, query: &Option<HashMap<String, Vec<String>>>) -> Uri {
+pub(crate) fn get_url(uri: &Uri, query: &HashMap<String, Vec<String>>) -> Uri {
     let mut serializer = url::form_urlencoded::Serializer::new(String::new());
     if let Some(query) = uri.query() {
         serializer.extend_pairs(url::form_urlencoded::parse(query.as_bytes()));
     };
-    if let Some(query) = &query {
-        for (k, l) in query {
-            for v in l {
-                serializer.append_pair(k, v);
-            }
+    for (k, l) in query {
+        for v in l {
+            serializer.append_pair(k, v);
         }
-    };
+    }
     let mut builder = Uri::builder();
     if let Some(scheme) = uri.scheme() {
         builder = builder.scheme(scheme.clone());
@@ -96,7 +94,9 @@ pub(crate) fn get_url(uri: &Uri, query: &Option<HashMap<String, Vec<String>>>) -
         query if !query.is_empty() => format!("{}?{}", uri.path(), query),
         _ => uri.path().to_string(),
     });
-    builder.build().expect("error building URI")
+    builder
+        .build()
+        .expect("Failed to build URI from parsed arguments")
 }
 
 /// Scrapes one or more urls at an interval.
@@ -127,11 +127,9 @@ pub(crate) async fn http_scrape<H: HttpScraper + std::marker::Send + Clone>(
         let mut builder = Request::get(&url).header(http::header::ACCEPT, &inputs.content_type);
 
         // add user supplied headers
-        if let Some(headers) = &inputs.headers {
-            for (header, values) in headers {
-                for value in values {
-                    builder = builder.header(header, value);
-                }
+        for (header, values) in &inputs.headers {
+            for value in values {
+                builder = builder.header(header, value);
             }
         }
 

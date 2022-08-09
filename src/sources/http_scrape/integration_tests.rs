@@ -1,7 +1,8 @@
 //! Integration tests for http_scrape source.
 //! The container configuration file is `docker-compose.http_scrape.yml`
-//! It leverages a static file server which serves the files in tests/data/http-scrape
+//! It leverages a static file server ("dufs"), which serves the files in tests/data/http-scrape
 
+use std::collections::HashMap;
 use tokio::time::{Duration, Instant};
 
 use crate::{
@@ -52,10 +53,10 @@ async fn invalid_endpoint() {
     run_error(HttpScrapeConfig::new(
         "http://nope".to_string(),
         INTERVAL_SECS,
-        None,
+        HashMap::new(),
         default_decoding(),
         default_framing_message_based(),
-        None,
+        HashMap::new(),
         None,
         None,
     ))
@@ -68,10 +69,10 @@ async fn scraped_logs_bytes() {
     let events = run_compliance(HttpScrapeConfig::new(
         format!("{}/logs/bytes", dufs_address()),
         INTERVAL_SECS,
-        None,
+        HashMap::new(),
         DeserializerConfig::Bytes,
         default_framing_message_based(),
-        None,
+        HashMap::new(),
         None,
         None,
     ))
@@ -87,10 +88,10 @@ async fn scraped_logs_json() {
     let events = run_compliance(HttpScrapeConfig::new(
         format!("{}/logs/json.json", dufs_address()),
         INTERVAL_SECS,
-        None,
+        HashMap::new(),
         DeserializerConfig::Json,
         default_framing_message_based(),
-        None,
+        HashMap::new(),
         None,
         None,
     ))
@@ -106,10 +107,10 @@ async fn scraped_metrics_native_json() {
     let events = run_compliance(HttpScrapeConfig::new(
         format!("{}/metrics/native.json", dufs_address()),
         INTERVAL_SECS,
-        None,
+        HashMap::new(),
         DeserializerConfig::NativeJson,
         default_framing_message_based(),
-        None,
+        HashMap::new(),
         None,
         None,
     ))
@@ -129,10 +130,10 @@ async fn scraped_trace_native_json() {
     let events = run_compliance(HttpScrapeConfig::new(
         format!("{}/traces/native.json", dufs_address()),
         INTERVAL_SECS,
-        None,
+        HashMap::new(),
         DeserializerConfig::NativeJson,
         default_framing_message_based(),
-        None,
+        HashMap::new(),
         None,
         None,
     ))
@@ -148,10 +149,10 @@ async fn unauthorized_no_auth() {
     run_error(HttpScrapeConfig::new(
         format!("{}/logs/json.json", dufs_auth_address()),
         INTERVAL_SECS,
-        None,
+        HashMap::new(),
         DeserializerConfig::Json,
         default_framing_message_based(),
-        None,
+        HashMap::new(),
         None,
         None,
     ))
@@ -164,10 +165,10 @@ async fn unauthorized_wrong_auth() {
     run_error(HttpScrapeConfig::new(
         format!("{}/logs/json.json", dufs_auth_address()),
         INTERVAL_SECS,
-        None,
+        HashMap::new(),
         DeserializerConfig::Json,
         default_framing_message_based(),
-        None,
+        HashMap::new(),
         None,
         Some(Auth::Basic {
             user: "white_rabbit".to_string(),
@@ -183,10 +184,10 @@ async fn authorized() {
     run_compliance(HttpScrapeConfig::new(
         format!("{}/logs/json.json", dufs_auth_address()),
         INTERVAL_SECS,
-        None,
+        HashMap::new(),
         DeserializerConfig::Json,
         default_framing_message_based(),
-        None,
+        HashMap::new(),
         None,
         Some(Auth::Basic {
             user: "user".to_string(),
@@ -202,10 +203,10 @@ async fn tls_invalid_ca() {
     run_error(HttpScrapeConfig::new(
         format!("{}/logs/json.json", dufs_https_address()),
         INTERVAL_SECS,
-        None,
+        HashMap::new(),
         DeserializerConfig::Json,
         default_framing_message_based(),
-        None,
+        HashMap::new(),
         Some(TlsConfig {
             ca_file: Some("tests/data/http-scrape/certs/invalid-ca-cert.pem".into()),
             ..Default::default()
@@ -221,10 +222,10 @@ async fn tls_valid() {
     run_compliance(HttpScrapeConfig::new(
         format!("{}/logs/json.json", dufs_https_address()),
         INTERVAL_SECS,
-        None,
+        HashMap::new(),
         DeserializerConfig::Json,
         default_framing_message_based(),
-        None,
+        HashMap::new(),
         Some(TlsConfig {
             ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
             ..Default::default()
@@ -235,18 +236,16 @@ async fn tls_valid() {
 }
 
 /// The source should shutdown cleanly when the shutdown signal is received.
-/// TODO this can probably be extracted into the test_utils and generalized for other sources to
-/// use.
 #[tokio::test]
 async fn shutdown() {
     let source_id = ComponentKey::from("http_scrape_shutdown");
     let source = HttpScrapeConfig::new(
         format!("{}/logs/json.json", dufs_address()),
         INTERVAL_SECS,
-        None,
+        HashMap::new(),
         DeserializerConfig::Json,
         default_framing_message_based(),
-        None,
+        HashMap::new(),
         None,
         None,
     );
