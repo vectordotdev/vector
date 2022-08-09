@@ -44,6 +44,8 @@ fn splunk_source_config(addr: SocketAddr) -> SplunkConfig {
 
 #[tokio::test]
 async fn topology_reuse_old_port() {
+    test_util::trace_init();
+
     let address = next_addr();
 
     let mut old_config = Config::builder();
@@ -63,6 +65,8 @@ async fn topology_reuse_old_port() {
 
 #[tokio::test]
 async fn topology_rebuild_old() {
+    test_util::trace_init();
+
     let address_0 = next_addr();
     let address_1 = next_addr();
 
@@ -86,6 +90,8 @@ async fn topology_rebuild_old() {
 
 #[tokio::test]
 async fn topology_old() {
+    test_util::trace_init();
+
     let address = next_addr();
 
     let mut old_config = Config::builder();
