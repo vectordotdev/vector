@@ -429,13 +429,15 @@ pub fn file_source(
         handle: tokio::runtime::Handle::current(),
     };
 
-    let file_key = config.file_key.clone();
-    let offset_key = config.offset_key.clone();
-    let host_key = config
-        .host_key
-        .clone()
-        .unwrap_or_else(|| log_schema().host_key().to_string());
-    let hostname = crate::get_hostname().ok();
+    let event_metadata = EventMetadata {
+        host_key: config
+            .host_key
+            .clone()
+            .unwrap_or_else(|| log_schema().host_key().to_string()),
+        hostname: crate::get_hostname().ok(),
+        file_key: config.file_key.clone(),
+        offset_key: config.offset_key.clone(),
+    };
 
     let include = config.include.clone();
     let exclude = config.exclude.clone();
@@ -544,15 +546,12 @@ pub fn file_source(
         let span2 = span.clone();
         let mut messages = messages.map(move |line| {
             let _enter = span2.enter();
-            let meta = LogEventMetadata {
-                file: &line.filename,
-                offset: line.start_offset,
-                host_key: &host_key,
-                hostname: &hostname,
-                file_key: &file_key,
-                offset_key: &offset_key,
-            };
-            let mut event = create_event(line.text, meta);
+            let mut event = create_event(
+                line.text,
+                line.start_offset,
+                &line.filename,
+                &event_metadata,
+            );
 
             if let Some(finalizer) = &finalizer {
                 let (batch, receiver) = BatchNotifier::new_with_receiver();
@@ -640,19 +639,17 @@ fn wrap_with_line_agg(
     )
 }
 
-struct LogEventMetadata<'a> {
-    file: &'a str,
-    offset: u64,
-    host_key: &'a str,
-    hostname: &'a Option<String>,
-    file_key: &'a Option<String>,
-    offset_key: &'a Option<String>,
+struct EventMetadata {
+    host_key: String,
+    hostname: Option<String>,
+    file_key: Option<String>,
+    offset_key: Option<String>,
 }
 
-fn create_event(line: Bytes, meta: LogEventMetadata) -> LogEvent {
+fn create_event(line: Bytes, offset: u64, file: &str, meta: &EventMetadata) -> LogEvent {
     emit!(FileEventsReceived {
         count: 1,
-        file: meta.file,
+        file,
         byte_size: line.len(),
     });
 
@@ -662,15 +659,15 @@ fn create_event(line: Bytes, meta: LogEventMetadata) -> LogEvent {
     event.insert(log_schema().source_type_key(), Bytes::from("file"));
 
     if let Some(offset_key) = &meta.offset_key {
-        event.insert(offset_key.as_str(), meta.offset.to_string());
+        event.insert(offset_key.as_str(), offset.to_string());
     }
 
     if let Some(file_key) = &meta.file_key {
-        event.insert(file_key.as_str(), meta.file);
+        event.insert(file_key.as_str(), file);
     }
 
     if let Some(hostname) = &meta.hostname {
-        event.insert(meta.host_key, hostname.clone());
+        event.insert(meta.host_key.as_str(), hostname.clone());
     }
 
     event
@@ -825,15 +822,13 @@ mod tests {
         let offset_key = Some("offset".to_string());
         let offset: u64 = 0;
 
-        let meta = LogEventMetadata {
-            file: file,
-            offset: offset,
-            host_key: &host_key,
-            hostname: &hostname,
-            file_key: &file_key,
-            offset_key: &offset_key,
+        let meta = EventMetadata {
+            host_key: host_key,
+            hostname: hostname,
+            file_key: file_key,
+            offset_key: offset_key,
         };
-        let log = create_event(line, meta);
+        let log = create_event(line, offset, &file, &meta);
 
         assert_eq!(log["file"], file.into());
         assert_eq!(log["host"], "Some.Machine".into());
