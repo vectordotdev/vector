@@ -105,7 +105,8 @@ mod tests {
             .await
             .unwrap();
         tokio::spawn(custom_reflector(store_w, rx, Duration::from_secs(1)));
-        tokio::time::sleep(Duration::from_secs(1)).await;
+        // Wait until the resource is added
+        tokio::time::sleep(Duration::from_secs(3)).await;
         assert_eq!(store.get(&ObjectRef::from_obj(&cm)).as_deref(), Some(&cm));
     }
 
