@@ -21,6 +21,7 @@ use tokio::{
 };
 use tokio_stream::wrappers::IntervalStream;
 use tokio_util::codec::FramedRead;
+use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
@@ -30,7 +31,7 @@ use crate::{
     config::{log_schema, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     internal_events::{
-        BytesReceived, ExecCommandExecuted, ExecEventsReceived, ExecFailedError, ExecTimeoutError,
+        ExecCommandExecuted, ExecEventsReceived, ExecFailedError, ExecTimeoutError,
         StreamClosedError,
     },
     serde::default_decoding,
@@ -426,11 +427,10 @@ async fn run_command(
 
     spawn_reader_thread(stdout_reader, decoder.clone(), STDOUT, sender);
 
+    let bytes_received = register!(BytesReceived::from(Protocol::from("exec")));
+
     while let Some(((mut events, byte_size), stream)) = receiver.recv().await {
-        emit!(BytesReceived {
-            byte_size,
-            protocol: "exec",
-        });
+        bytes_received.emit(ByteSize(byte_size));
 
         let count = events.len();
         emit!(ExecEventsReceived {

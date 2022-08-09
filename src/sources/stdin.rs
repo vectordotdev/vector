@@ -9,6 +9,7 @@ use codecs::{
 };
 use futures::{channel::mpsc, executor, SinkExt, StreamExt};
 use tokio_util::{codec::FramedRead, io::StreamReader};
+use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
@@ -16,7 +17,7 @@ use vector_core::ByteSizeOf;
 use crate::{
     codecs::DecodingConfig,
     config::{log_schema, Output, Resource, SourceConfig, SourceContext, SourceDescription},
-    internal_events::{BytesReceived, OldEventsReceived, StreamClosedError},
+    internal_events::{OldEventsReceived, StreamClosedError},
     serde::default_decoding,
     shutdown::ShutdownSignal,
     SourceSender,
@@ -145,10 +146,11 @@ where
         let stream = StreamReader::new(receiver);
         let mut stream = FramedRead::new(stream, decoder).take_until(shutdown);
         let mut stream = stream! {
+            let bytes_received = register!(BytesReceived::from(Protocol::NONE));
             while let Some(result) = stream.next().await {
                 match result {
                     Ok((events, byte_size)) => {
-                        emit!(BytesReceived { byte_size, protocol: "none" });
+                        bytes_received.emit(ByteSize(byte_size));
 
                         emit!(OldEventsReceived {
                             byte_size: events.size_of(),

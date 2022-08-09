@@ -9,6 +9,7 @@ use lookup::path;
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 use vector_common::finalization::AddBatchNotifier;
+use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_core::{event::BatchNotifier, ByteSizeOf};
 use warp::reject;
 
@@ -22,8 +23,7 @@ use crate::{
     config::log_schema,
     event::{BatchStatus, Event},
     internal_events::{
-        AwsKinesisFirehoseAutomaticRecordDecodeError, BytesReceived, EventsReceived,
-        StreamClosedError,
+        AwsKinesisFirehoseAutomaticRecordDecodeError, EventsReceived, StreamClosedError,
     },
     SourceSender,
 };
@@ -38,16 +38,15 @@ pub async fn firehose(
     acknowledgements: bool,
     mut out: SourceSender,
 ) -> Result<impl warp::Reply, reject::Rejection> {
+    // TODO: Move this up into the caller
+    let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
     for record in request.records {
         let bytes = decode_record(&record, compression)
             .with_context(|_| ParseRecordsSnafu {
                 request_id: request_id.clone(),
             })
             .map_err(reject::custom)?;
-        emit!(BytesReceived {
-            byte_size: bytes.len(),
-            protocol: "http",
-        });
+        bytes_received.emit(ByteSize(bytes.len()));
 
         let mut stream = FramedRead::new(bytes.as_ref(), decoder.clone());
         loop {

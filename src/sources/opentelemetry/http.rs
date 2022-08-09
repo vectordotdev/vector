@@ -6,6 +6,9 @@ use http::StatusCode;
 use prost::Message;
 use snafu::Snafu;
 use tracing::Span;
+use vector_common::internal_event::{
+    ByteSize, BytesReceived, InternalEventHandle as _, Registered,
+};
 use vector_core::{
     event::{BatchNotifier, BatchStatus},
     ByteSizeOf,
@@ -14,7 +17,7 @@ use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Rep
 
 use crate::{
     event::Event,
-    internal_events::{BytesReceived, EventsReceived, StreamClosedError},
+    internal_events::{EventsReceived, StreamClosedError},
     opentelemetry::LogService::{ExportLogsServiceRequest, ExportLogsServiceResponse},
     shutdown::ShutdownSignal,
     sources::util::{decode, ErrorMessage},
@@ -56,7 +59,7 @@ pub(crate) async fn run_http_server(
 pub(crate) fn build_warp_filter(
     acknowledgements: bool,
     out: SourceSender,
-    protocol: &'static str,
+    bytes_received: Registered<BytesReceived>,
 ) -> BoxedFilter<(Response,)> {
     warp::post()
         .and(warp::path!("v1" / "logs"))
@@ -68,10 +71,7 @@ pub(crate) fn build_warp_filter(
         .and(warp::body::bytes())
         .and_then(move |encoding_header: Option<String>, body: Bytes| {
             let events = decode(&encoding_header, body).and_then(|body| {
-                emit!(BytesReceived {
-                    byte_size: body.len(),
-                    protocol,
-                });
+                bytes_received.emit(ByteSize(body.len()));
                 decode_body(body)
             });
 

@@ -1,12 +1,10 @@
 use redis::{aio::ConnectionManager, AsyncCommands, RedisResult};
 use snafu::{ResultExt, Snafu};
+use vector_common::internal_event::{BytesReceived, Registered};
 
 use super::{handle_line, Method};
 use crate::{
-    codecs,
-    config::SourceContext,
-    internal_events::RedisReceiveEventError,
-    sources::{redis::ConnectionInfo, Source},
+    codecs, config::SourceContext, internal_events::RedisReceiveEventError, sources::Source,
 };
 
 #[derive(Debug, Snafu)]
@@ -17,7 +15,7 @@ enum BuildError {
 
 pub async fn watch(
     client: redis::Client,
-    connection_info: ConnectionInfo,
+    bytes_received: Registered<BytesReceived>,
     key: String,
     redis_key: Option<String>,
     method: Method,
@@ -48,11 +46,11 @@ pub async fn watch(
                 Err(error) => emit!(RedisReceiveEventError::from(error)),
                 Ok(line) => {
                     if let Err(()) = handle_line(
-                        &connection_info,
                         line,
                         &key,
                         redis_key.as_deref(),
                         decoder.clone(),
+                        &bytes_received,
                         &mut tx,
                     )
                     .await
