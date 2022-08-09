@@ -8,7 +8,10 @@ use vector_common::btreemap;
 
 use super::{filter_result, HostMetrics};
 
+const MODE: &str = "mode";
 const NAME: &str = "cpu_seconds_total";
+const LOGICAL_CPUS: &str = "logical_cpus";
+const PHYSICAL_CPUS: &str = "physical_cpus";
 
 impl HostMetrics {
     pub async fn cpu_metrics(&self, output: &mut super::MetricsBuffer) {
@@ -23,7 +26,7 @@ impl HostMetrics {
                 for (index, times) in times.into_iter().enumerate() {
                     let tags = |name: &str| {
                         BTreeMap::from([
-                            (String::from("mode"), String::from(name)),
+                            (String::from(MODE), String::from(name)),
                             (String::from("cpu"), index.to_string()),
                         ])
                     };
@@ -40,26 +43,26 @@ impl HostMetrics {
                 error!(message = "Failed to load CPU times.", %error, internal_log_rate_secs = 60);
             }
         }
-        // adds the logical cpu count metric
+        // adds the logical cpu count gauge
         match heim::cpu::logical_count().await {
-            Ok(count) => output.counter(
+            Ok(count) => output.gauge(
                 NAME,
                 count as f64,
                 btreemap! {
-                    "mode" => "logical_cpus"
+                    MODE => LOGICAL_CPUS,
                 },
             ),
             Err(error) => {
                 error!(message = "Failed to load logical CPU count.", %error, internal_log_rate_secs = 60);
             }
         }
-        // adds the physical cpu count metric
+        // adds the physical cpu count gauge
         match heim::cpu::physical_count().await {
-            Ok(Some(count)) => output.counter(
+            Ok(Some(count)) => output.gauge(
                 NAME,
                 count as f64,
                 btreemap! {
-                    "mode" => "physical_cpus"
+                    MODE => PHYSICAL_CPUS
                 },
             ),
             Ok(None) => {
@@ -78,9 +81,10 @@ impl HostMetrics {
 #[cfg(test)]
 mod tests {
     use super::super::{
-        tests::{all_counters, count_name, count_tag},
+        tests::{count_name, count_tag},
         HostMetrics, HostMetricsConfig, MetricsBuffer,
     };
+    use super::{LOGICAL_CPUS, MODE, NAME, PHYSICAL_CPUS};
 
     #[tokio::test]
     async fn generates_cpu_metrics() {
@@ -91,12 +95,16 @@ mod tests {
         let metrics = buffer.metrics;
 
         assert!(!metrics.is_empty());
-        assert!(all_counters(&metrics));
 
         // They should all be named cpu_seconds_total
-        assert_eq!(metrics.len(), count_name(&metrics, "cpu_seconds_total"));
+        assert_eq!(metrics.len(), count_name(&metrics, NAME));
 
         // They should all have a "mode" tag
-        assert_eq!(count_tag(&metrics, "mode"), metrics.len());
+        assert_eq!(count_tag(&metrics, MODE), metrics.len());
+
+        // cpu count metrics should be present
+        let mut iter = metrics.iter();
+        assert!(iter.any(|metric| { metric.tag_matches(MODE, LOGICAL_CPUS) }));
+        assert!(iter.any(|metric| { metric.tag_matches(MODE, PHYSICAL_CPUS) }));
     }
 }
