@@ -3,9 +3,9 @@ use std::{
     convert::TryFrom,
 };
 
-use futures::{stream, FutureExt};
+use futures::FutureExt;
 use snafu::ResultExt;
-use tower::{discover::Change, ServiceBuilder};
+use tower::ServiceBuilder;
 use vector_config::configurable_component;
 
 use crate::{
@@ -478,13 +478,11 @@ impl SinkConfig for ElasticsearchConfig {
 
                     (service, healthcheck)
                 })
-                .enumerate()
-                .map(|(i, service)| Ok(Change::Insert(i, service)))
                 .collect::<Vec<_>>();
 
             let service = request_limits.distributed_service(
                 ElasticsearchRetryLogic,
-                stream::iter(services),
+                services,
                 health_config,
                 ElasticsearchHealthLogic,
             );

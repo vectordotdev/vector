@@ -1,6 +1,9 @@
 use std::{hash::Hash, marker::PhantomData, pin::Pin, sync::Arc, time::Duration};
 
-use futures_util::{future::BoxFuture, stream::BoxStream, TryStream, TryStreamExt};
+use futures_util::{
+    future::BoxFuture,
+    stream::{self, BoxStream},
+};
 use tower::{
     balance::p2c::Balance,
     buffer::{Buffer, BufferLayer},
@@ -297,13 +300,13 @@ impl TowerRequestSettings {
         BatchSink::new(service, batch, batch_timeout)
     }
 
-    pub fn distributed_service<Req, RL, HL, S, H, K, D>(
+    pub fn distributed_service<Req, RL, HL, S, H>(
         self,
         retry_logic: RL,
-        services: D,
+        services: Vec<(S, H)>,
         health_config: HealthConfig,
         health_logic: HL,
-    ) -> DistributedService<S, RL, HL, K, Req>
+    ) -> DistributedService<S, RL, HL, usize, Req>
     where
         Req: Clone + Send + 'static,
         RL: RetryLogic<Response = S::Response>,
@@ -313,18 +316,18 @@ impl TowerRequestSettings {
         S::Response: Send,
         S::Future: Send + 'static,
         H: Fn() -> BoxFuture<'static, bool> + Send + 'static,
-        K: Eq + Hash + Clone + Copy + Send + 'static,
-        D: TryStream<Ok = Change<K, (S, H)>, Error = crate::Error> + Send + 'static,
     {
         let policy = self.retry_policy(retry_logic.clone());
         let settings = self.clone();
 
         // Build services
         let open = OpenGauge::new();
-        let services = services.map_ok(move |change| match change {
-            Change::Insert(key, (inner, healthcheck)) => {
+        let max_concurrency = services.len() * AdaptiveConcurrencySettings::max_concurrency();
+        let services = services
+            .into_iter()
+            .map(|(inner, healthcheck)| {
                 // Build individual service
-                let service = ServiceBuilder::new()
+                ServiceBuilder::new()
                     .layer(AdaptiveConcurrencyLimitLayer::new(
                         settings.concurrency,
                         settings.adaptive_concurrency,
@@ -339,22 +342,18 @@ impl TowerRequestSettings {
                             healthcheck,
                             open.clone(),
                         ),
-                    );
-
-                Change::Insert(key, service)
-            }
-            Change::Remove(key) => Change::Remove(key),
-        });
+                    )
+            })
+            .enumerate()
+            .map(|(i, service)| Ok(Change::Insert(i, service)))
+            .collect::<Vec<_>>();
 
         // Build sink service
         ServiceBuilder::new()
             .rate_limit(self.rate_limit_num, self.rate_limit_duration)
             .retry(policy)
-            // There are other mechanisms limiting the number of concurrent requests/poll_ready
-            // so we don't need to do that here, hence usize::MAX. But underlying library supports less
-            // so >>3 is used as per tokio semaphore documentation.
-            .layer(BufferLayer::new(usize::MAX >> 3))
-            .service(Balance::new(Box::pin(services) as Pin<Box<_>>))
+            .layer(BufferLayer::new(max_concurrency))
+            .service(Balance::new(Box::pin(stream::iter(services)) as Pin<Box<_>>))
     }
 }
 
