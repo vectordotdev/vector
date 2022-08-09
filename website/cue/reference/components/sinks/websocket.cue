@@ -61,6 +61,10 @@ components: sinks: websocket: {
 	}
 
 	configuration: {
+		auth: configuration._http_auth & {_args: {
+			password_example: "${HTTP_PASSWORD}"
+			username_example: "${HTTP_USERNAME}"
+		}}
 		uri: {
 			description: """
 				The WebSocket URI to connect to. This should include the protocol and host,
