@@ -16,6 +16,9 @@ use crate::{
     serde::default_decoding,
     serde::default_framing_message_based,
     sources,
+    sources::util::http_scrape::{
+        default_scrape_interval_secs, get_url, http_scrape, GenericHttpScrapeInputs, HttpScraper,
+    },
     tls::{TlsConfig, TlsSettings},
     Result,
 };
@@ -41,7 +44,7 @@ pub struct HttpScrapeConfig {
     endpoint: String,
 
     /// The interval between scrapes, in seconds.
-    #[serde(default = "super::default_scrape_interval_secs")]
+    #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
 
     /// Custom parameters for the scrape request query string.
@@ -79,7 +82,7 @@ impl Default for HttpScrapeConfig {
         Self {
             endpoint: "http://localhost:9898/logs".to_string(),
             query: HashMap::new(),
-            scrape_interval_secs: super::default_scrape_interval_secs(),
+            scrape_interval_secs: default_scrape_interval_secs(),
             decoding: default_decoding(),
             framing: default_framing_message_based(),
             headers: HashMap::new(),
@@ -129,7 +132,7 @@ impl SourceConfig for HttpScrapeConfig {
         let urls = endpoints
             .iter()
             .map(|s| s.parse::<Uri>().context(sources::UriParseSnafu))
-            .map(|r| r.map(|uri| super::get_url(&uri, &self.query)))
+            .map(|r| r.map(|uri| get_url(&uri, &self.query)))
             .collect::<std::result::Result<Vec<Uri>, sources::BuildError>>()?;
 
         let tls = TlsSettings::from_options(&self.tls)?;
@@ -147,7 +150,7 @@ impl SourceConfig for HttpScrapeConfig {
         // the only specific context needed is the codec decoding
         let context = HttpScrapeContext { decoder };
 
-        let inputs = super::GenericHttpScrapeInputs {
+        let inputs = GenericHttpScrapeInputs {
             urls,
             interval_secs: self.scrape_interval_secs,
             headers: self.headers.clone(),
@@ -158,7 +161,7 @@ impl SourceConfig for HttpScrapeConfig {
             shutdown: cx.shutdown,
         };
 
-        Ok(super::http_scrape(inputs, context, cx.out).boxed())
+        Ok(http_scrape(inputs, context, cx.out).boxed())
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
@@ -221,7 +224,7 @@ fn enrich_events(events: &mut Vec<Event>) {
     }
 }
 
-impl super::HttpScraper for HttpScrapeContext {
+impl HttpScraper for HttpScrapeContext {
     /// Decodes the HTTP response body into events per the decoder configured.
     fn on_response(
         &mut self,

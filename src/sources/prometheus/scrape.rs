@@ -15,7 +15,7 @@ use crate::{
     internal_events::PrometheusParseError,
     sources::{
         self,
-        http_scrape::{
+        util::http_scrape::{
             default_scrape_interval_secs, get_url, http_scrape, GenericHttpScrapeInputs,
             HttpScraper,
         },
