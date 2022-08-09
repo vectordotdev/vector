@@ -22,7 +22,7 @@ mod tests;
 /// The offset field contains the byte offset of the beginning of the line within
 /// the file that it was read from.
 #[derive(Debug)]
-pub struct RawLine {
+pub(super) struct RawLine {
     pub offset: u64,
     pub bytes: Bytes,
 }
@@ -199,7 +199,7 @@ impl FileWatcher {
     /// This function will attempt to read a new line from its file, blocking,
     /// up to some maximum but unspecified amount of time. `read_line` will open
     /// a new file handler as needed, transparently to the caller.
-    pub fn read_line(&mut self) -> io::Result<Option<RawLine>> {
+    pub(super) fn read_line(&mut self) -> io::Result<Option<RawLine>> {
         self.track_read_attempt();
 
         let reader = &mut self.reader;
