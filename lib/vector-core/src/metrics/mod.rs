@@ -166,7 +166,7 @@ impl Controller {
         }
 
         #[allow(clippy::cast_precision_loss)]
-        let value = (metrics.len() + 1) as f64;
+        let value = (metrics.len() + 2) as f64;
         metrics.push(Metric::from_metric_kv(
             &CARDINALITY_KEY,
             MetricValue::Gauge { value },
@@ -284,10 +284,10 @@ mod tests {
 
         metrics::counter!("test2", 1);
         metrics::counter!("test3", 2);
-        assert_eq!(controller.capture_metrics().len(), 3);
+        assert_eq!(controller.capture_metrics().len(), 4);
 
         std::thread::sleep(IDLE_TIMEOUT * 2);
         metrics::counter!("test2", 3);
-        assert_eq!(controller.capture_metrics().len(), 2);
+        assert_eq!(controller.capture_metrics().len(), 3);
     }
 }
