@@ -413,6 +413,7 @@ components: {
 			can_verify_certificate: bool
 			if Args.mode == "connect" {
 				can_verify_hostname: bool
+				enabled_by_scheme:   bool
 			}
 			enabled_default: bool
 		}
@@ -671,6 +672,7 @@ components: {
 					can_verify_certificate: bool | *true
 					can_verify_hostname:    bool | *false
 					enabled_default:        bool
+					enabled_by_scheme:      bool
 				}
 				let Args = _args
 
@@ -678,11 +680,15 @@ components: {
 				description: "Configures the TLS options for outgoing connections."
 				required:    false
 				type: object: options: {
-					enabled: {
-						common:      true
-						description: "Enable TLS during connections to the remote."
-						required:    false
-						type: bool: default: Args.enabled_default
+					if Args.enabled_by_scheme != _|_ {
+						if !Args.enabled_by_scheme {
+							enabled: {
+								common:      true
+								description: "Enable TLS during connections to the remote."
+								required:    false
+								type: bool: default: Args.enabled_default
+							}
+						}
 					}
 
 					ca_file: {
