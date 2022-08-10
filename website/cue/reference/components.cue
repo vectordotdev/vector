@@ -66,17 +66,23 @@ components: {
 		// `classes` represent the various classifications for this component
 		classes: #Classes & {_args: kind: Kind}
 
-		// `examples` demonstrates various ways to use the component using an
-		// input, output, and example configuration.
+		#Config: {
+			...
+			for k, v in configuration {
+				"\( k )"?: _ | *null
+			}
+		}
+
 		#ExampleConfig: {
-			title:           string
-			context?:        string
-			"configuration": {
-				...
-				for k, v in configuration {
-					"\( k )"?: _ | *null
-				}
-			} | string
+			title:         string
+			configuration: #Config
+			notes?:        string
+		}
+
+		#Example: {
+			title:         string
+			configuration: #Config
+			notes?:        string
 
 			if Kind == "source" {
 				input: string
@@ -93,11 +99,19 @@ components: {
 			if Kind != "sink" {
 				output: #Event | [#Event, ...#Event] | null
 			}
-
-			notes?: string
 		}
 
-		examples?: [#ExampleConfig, ...#ExampleConfig]
+		// `examples` demonstrates various ways to use the component using an
+		// input, output, and example configuration.
+		examples?: [#Example, ...#Example]
+
+		// `configuration_examples` demonstrates various ways configure the components. This differs
+		// from `examples` in that the list should be representative examples of how the component
+		// can be configured.
+		//
+		// This will be used to drive the config examples at the top of each component page in the
+		// future.
+		configuration_examples?: [#ExampleConfig, ...#ExampleConfig]
 
 		// `features` describes the various supported features of the component.
 		// Setting these helps to reduce boilerplate.
