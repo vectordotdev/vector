@@ -63,6 +63,12 @@ vector_config_macros = { path = "../vector-config-macros" }
 # https://doc.rust-lang.org/cargo/reference/unstable.html#namespaced-features
 vrl-lib = { package = "vrl", path = "../vrl/vrl", optional = true }
 
+[target.'cfg(target_os = "macos")'.dependencies]
+security-framework = "2.6.1"
+
+[target.'cfg(windows)'.dependencies]
+schannel = "0.1.20"
+
 [build-dependencies]
 prost-build = "0.10.4"
 
