@@ -231,7 +231,7 @@ impl RedisSinkConfig {
         let redis = RedisSink {
             conn,
             data_type,
-            bytes_sent: register!(BytesSent::from(Protocol("tcp".into(),))),
+            bytes_sent: register!(BytesSent::from(Protocol::TCP)),
         };
 
         let svc = ServiceBuilder::new()

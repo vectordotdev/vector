@@ -26,7 +26,7 @@ pub(crate) struct AzureBlobService {
 
 impl AzureBlobService {
     pub fn new(client: Arc<ContainerClient>) -> AzureBlobService {
-        let bytes_sent = register!(BytesSent::from(Protocol("https".into())));
+        let bytes_sent = register!(BytesSent::from(Protocol::HTTPS));
         AzureBlobService { client, bytes_sent }
     }
 }

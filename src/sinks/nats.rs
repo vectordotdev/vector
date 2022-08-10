@@ -174,7 +174,7 @@ impl NatsSink {
 #[async_trait]
 impl StreamSink<Event> for NatsSink {
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let bytes_sent = register!(BytesSent::from(Protocol("tcp".into())));
+        let bytes_sent = register!(BytesSent::from(Protocol::TCP));
 
         while let Some(mut event) = input.next().await {
             let finalizers = event.take_finalizers();

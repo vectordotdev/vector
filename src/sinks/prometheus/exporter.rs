@@ -434,7 +434,7 @@ impl PrometheusExporter {
             return;
         }
 
-        let bytes_sent = register!(BytesSent::from(Protocol("http".into())));
+        let bytes_sent = register!(BytesSent::from(Protocol::HTTP));
 
         let span = Span::current();
         let metrics = Arc::clone(&self.metrics);

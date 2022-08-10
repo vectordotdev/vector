@@ -93,3 +93,11 @@ pub type Registered<T> = <T as RegisterInternalEvent>::Handle;
 pub struct ByteSize(pub usize);
 
 pub struct Protocol(pub SharedString);
+
+impl Protocol {
+    pub const HTTP: Protocol = Protocol(SharedString::const_str("http"));
+    pub const HTTPS: Protocol = Protocol(SharedString::const_str("https"));
+    pub const NONE: Protocol = Protocol(SharedString::const_str("none"));
+    pub const TCP: Protocol = Protocol(SharedString::const_str("tcp"));
+    pub const UDP: Protocol = Protocol(SharedString::const_str("udp"));
+}

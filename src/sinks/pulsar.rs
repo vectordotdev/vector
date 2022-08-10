@@ -258,7 +258,7 @@ impl PulsarSink {
             encoder,
             state: PulsarSinkState::Ready(Box::new(producer)),
             in_flight: FuturesUnordered::new(),
-            bytes_sent: register!(BytesSent::from(Protocol("tcp".into()))),
+            bytes_sent: register!(BytesSent::from(Protocol::TCP)),
         })
     }
 

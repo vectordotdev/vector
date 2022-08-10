@@ -187,7 +187,7 @@ impl UdpService {
         Self {
             connector,
             state: UdpServiceState::Disconnected,
-            bytes_sent: register!(BytesSent::from(Protocol("udp".into()))),
+            bytes_sent: register!(BytesSent::from(Protocol::UDP)),
         }
     }
 }
@@ -272,7 +272,7 @@ where
             connector,
             transformer,
             encoder,
-            bytes_sent: register!(BytesSent::from(Protocol("udp".into()))),
+            bytes_sent: register!(BytesSent::from(Protocol::UDP)),
         }
     }
 }
