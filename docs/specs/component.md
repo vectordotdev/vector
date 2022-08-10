@@ -205,7 +205,7 @@ ingress of *raw network bytes*.
     filtering, etc.).
     - This includes pull-based sources that issue requests to ingest bytes.
 - Properties
-  - `byte_size` - REQUIRED, number of raw network bytes received before
+  - `byte_size` - The number of raw network bytes received before
     processing (decryption, decompression, filtering, etc.).
     - SHOULD be the closest representation possible of raw network bytes based
       on the source's capabilities. For example, if the source uses a HTTP
