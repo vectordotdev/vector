@@ -118,10 +118,10 @@ components: sources: opentelemetry: {
 					type: object: {
 						examples: [
 							{
-								"http.status.code": 500,
-								"http.url": "http://example.com",
+								"http.status.code":          500
+								"http.url":                  "http://example.com"
 								"my.custom.application.tag": "hello"
-							}
+							},
 						]
 					}
 				}
@@ -132,10 +132,10 @@ components: sources: opentelemetry: {
 					type: object: {
 						examples: [
 							{
-								"service.name": "donut_shop",
-								"service.version": "2.0.0",
-								"k8s.pod.uid": "1138528c-c36e-11e9-a1a7-42010a800198"
-							}
+								"service.name":    "donut_shop"
+								"service.version": "2.0.0"
+								"k8s.pod.uid":     "1138528c-c36e-11e9-a1a7-42010a800198"
+							},
 						]
 					}
 				}
@@ -172,8 +172,8 @@ components: sources: opentelemetry: {
 						
 						Smaller numerical values correspond to less severe events (such as debug events), larger numerical values correspond to more severe events (such as errors and critical events).
 						"""
-					required:    false
-					common:      true
+					required: false
+					common:   true
 					type: uint: {
 						default: null
 						unit:    null
