@@ -259,8 +259,9 @@ components: sources: [Name=string]: {
 
 			if features.receive.tls.enabled {
 				tls: configuration._tls_accept & {_args: {
-					can_verify_certificate: features.receive.tls.can_verify_certificate
-					enabled_default:        features.receive.tls.enabled_default
+					can_verify_certificate:  features.receive.tls.can_verify_certificate
+					can_add_client_metadata: features.receive.tls.can_add_client_metadata
+					enabled_default:         features.receive.tls.enabled_default
 				}}
 			}
 		}

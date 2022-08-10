@@ -37,9 +37,10 @@ components: sources: socket: {
 			}
 			keepalive: enabled: true
 			tls: {
-				enabled:                true
-				can_verify_certificate: true
-				enabled_default:        false
+				enabled:                 true
+				can_verify_certificate:  true
+				can_add_client_metadata: true
+				enabled_default:         false
 			}
 		}
 	}
