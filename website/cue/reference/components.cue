@@ -414,6 +414,9 @@ components: {
 			if Args.mode == "connect" {
 				can_verify_hostname: bool
 			}
+			if Args.mode == "accept" {
+				can_add_client_metadata: bool | *false
+			}
 			enabled_default: bool
 		}
 	}
@@ -593,8 +596,9 @@ components: {
 
 			_tls_accept: {
 				_args: {
-					can_verify_certificate: bool | *true
-					enabled_default:        bool
+					can_verify_certificate:  bool | *true
+					can_add_client_metadata: bool | *false
+					enabled_default:         bool
 				}
 				let Args = _args
 
@@ -618,13 +622,15 @@ components: {
 							examples: ["/path/to/certificate_authority.crt"]
 						}
 					}
-					client_metadata_key: {
-						common:      false
-						description: "The key name added to each event with the client certificate's metadata."
-						required:    false
-						type: string: {
-							default: null
-							examples: ["client_cert"]
+					if Args.can_add_client_metadata {
+						client_metadata_key: {
+							common:      false
+							description: "The key name added to each event with the client certificate's metadata."
+							required:    false
+							type: string: {
+								default: null
+								examples: ["client_cert"]
+							}
 						}
 					}
 					crt_file: {

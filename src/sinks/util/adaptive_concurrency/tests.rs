@@ -40,7 +40,7 @@ use crate::{
     },
     sources::demo_logs::DemoLogsConfig,
     test_util::{
-        start_topology,
+        self, start_topology,
         stats::{HistogramStats, LevelTimeHistogram, TimeHistogram, WeightedSumStats},
     },
 };
@@ -397,7 +397,7 @@ struct TestResults {
 }
 
 async fn run_test(params: TestParams) -> TestResults {
-    let _ = metrics::init_test();
+    test_util::trace_init();
     let (send_done, is_done) = oneshot::channel();
 
     let test_config = TestConfig {
