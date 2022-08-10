@@ -3,7 +3,7 @@ use vector_config::configurable_component;
 
 /// A lookup path.
 #[configurable_component]
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Hash)]
 #[serde(from = "String", into = "String")]
 pub struct OwnedPath {
     pub segments: Vec<OwnedSegment>,
@@ -141,7 +141,7 @@ impl<'a, const N: usize> From<[BorrowedSegment<'a>; N]> for OwnedPath {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum OwnedSegment {
     Field(String),
     Index(isize),

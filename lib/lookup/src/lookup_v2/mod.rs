@@ -5,6 +5,7 @@ mod jit;
 mod owned;
 
 use self::jit::{JitLookup, JitPath};
+use std::fmt::{Display, Formatter};
 
 pub use borrowed::BorrowedSegment;
 pub use concat::PathConcat;
@@ -68,5 +69,39 @@ impl<'a> Path<'a> for &'a str {
 
     fn segment_iter(&self) -> Self::Iter {
         JitPath::new(self).segment_iter()
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum PathPrefix {
+    Event,
+    Metadata,
+}
+
+#[derive(Hash, Eq, PartialEq, Clone)]
+pub struct TargetPath {
+    pub prefix: PathPrefix,
+    pub path: OwnedPath,
+}
+
+impl TargetPath {
+    pub fn event_root() -> Self {
+        Self {
+            prefix: PathPrefix::Event,
+            path: OwnedPath::root(),
+        }
+    }
+    pub fn metadata_root() -> Self {
+        Self {
+            prefix: PathPrefix::Metadata,
+            path: OwnedPath::root(),
+        }
+    }
+}
+
+impl Display for TargetPath {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        //TODO: implement
+        write!(f, "<TODO: Display impl for TargetPath")
     }
 }

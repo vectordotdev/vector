@@ -269,6 +269,7 @@ pub enum Token<S> {
     Underscore,
     Escape,
     Arrow,
+    Ampersand,
 
     Equals,
     MergeEquals,
@@ -312,11 +313,11 @@ pub enum Token<S> {
 impl<S> Token<S> {
     pub(crate) fn map<R>(self, f: impl Fn(S) -> R) -> Token<R> {
         use self::Token::{
-            Abort, Arrow, Bang, Colon, Comma, Dot, Else, Equals, Escape, False, FloatLiteral,
-            FunctionCall, Identifier, If, IntegerLiteral, InvalidToken, LBrace, LBracket, LParen,
-            LQuery, MergeEquals, Newline, Null, Operator, PathField, Question, RBrace, RBracket,
-            RParen, RQuery, RawStringLiteral, RegexLiteral, ReservedIdentifier, SemiColon,
-            StringLiteral, TimestampLiteral, True, Underscore,
+            Abort, Ampersand, Arrow, Bang, Colon, Comma, Dot, Else, Equals, Escape, False,
+            FloatLiteral, FunctionCall, Identifier, If, IntegerLiteral, InvalidToken, LBrace,
+            LBracket, LParen, LQuery, MergeEquals, Newline, Null, Operator, PathField, Question,
+            RBrace, RBracket, RParen, RQuery, RawStringLiteral, RegexLiteral, ReservedIdentifier,
+            SemiColon, StringLiteral, TimestampLiteral, True, Underscore,
         };
 
         match self {
@@ -361,6 +362,7 @@ impl<S> Token<S> {
             Underscore => Underscore,
             Escape => Escape,
             Arrow => Arrow,
+            Ampersand => Ampersand,
 
             Equals => Equals,
             MergeEquals => MergeEquals,
@@ -379,11 +381,11 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use self::Token::{
-            Abort, Arrow, Bang, Colon, Comma, Dot, Else, Equals, Escape, False, FloatLiteral,
-            FunctionCall, Identifier, If, IntegerLiteral, InvalidToken, LBrace, LBracket, LParen,
-            LQuery, MergeEquals, Newline, Null, Operator, PathField, Question, RBrace, RBracket,
-            RParen, RQuery, RawStringLiteral, RegexLiteral, ReservedIdentifier, SemiColon,
-            StringLiteral, TimestampLiteral, True, Underscore,
+            Abort, Ampersand, Arrow, Bang, Colon, Comma, Dot, Else, Equals, Escape, False,
+            FloatLiteral, FunctionCall, Identifier, If, IntegerLiteral, InvalidToken, LBrace,
+            LBracket, LParen, LQuery, MergeEquals, Newline, Null, Operator, PathField, Question,
+            RBrace, RBracket, RParen, RQuery, RawStringLiteral, RegexLiteral, ReservedIdentifier,
+            SemiColon, StringLiteral, TimestampLiteral, True, Underscore,
         };
 
         let s = match *self {
@@ -422,6 +424,7 @@ where
             Underscore => "Underscore",
             Escape => "Escape",
             Arrow => "Arrow",
+            Ampersand => "Ampersand",
 
             Equals => "Equals",
             MergeEquals => "MergeEquals",

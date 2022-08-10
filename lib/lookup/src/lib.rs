@@ -6,7 +6,8 @@ use std::{
 };
 
 pub use error::LookupError;
-pub use lookup_buf::{FieldBuf, LookupBuf, SegmentBuf};
+pub use lookup_buf::{FieldBuf, LookupBuf, PrefixedLookupBuf, SegmentBuf};
+pub use lookup_v2::PathPrefix;
 pub use lookup_view::{Field, Lookup, Segment};
 
 mod error;

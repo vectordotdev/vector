@@ -1,6 +1,6 @@
 use std::fmt;
 
-use lookup::LookupBuf;
+use lookup::{LookupBuf, PathPrefix, PrefixedLookupBuf};
 use value::{kind::remove, Kind, Value};
 
 use crate::{
@@ -85,14 +85,19 @@ impl Expression for Query {
         use Target::{Container, External, FunctionCall, Internal};
 
         let value = match &self.target {
-            External => {
+            External(prefix) => {
+                let path = PrefixedLookupBuf {
+                    prefix: *prefix,
+                    path: self.path.clone(),
+                };
+                // TODO: fix
                 return Ok(ctx
                     .target()
-                    .target_get(&self.path)
+                    .target_get(&path.into())
                     .ok()
                     .flatten()
                     .cloned()
-                    .unwrap_or(Value::Null))
+                    .unwrap_or(Value::Null));
             }
             Internal(variable) => variable.resolve(ctx)?,
             FunctionCall(call) => call.resolve(ctx)?,
@@ -149,7 +154,7 @@ impl fmt::Debug for Query {
 #[derive(Clone, PartialEq)]
 pub enum Target {
     Internal(Variable),
-    External,
+    External(PathPrefix),
 
     #[cfg(feature = "expr-function_call")]
     FunctionCall(crate::expression::FunctionCall),
@@ -164,7 +169,10 @@ impl fmt::Display for Target {
 
         match self {
             Internal(v) => v.fmt(f),
-            External => write!(f, "."),
+            External(prefix) => match prefix {
+                PathPrefix::Event => write!(f, "."),
+                PathPrefix::Metadata => write!(f, "&"),
+            },
             FunctionCall(v) => v.fmt(f),
             Container(v) => v.fmt(f),
         }

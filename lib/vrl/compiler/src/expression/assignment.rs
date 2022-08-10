@@ -1,7 +1,8 @@
 use std::{convert::TryFrom, fmt};
 
 use diagnostic::{DiagnosticMessage, Label, Note};
-use lookup::{LookupBuf, SegmentBuf};
+use lookup::lookup_v2::TargetPath;
+use lookup::{LookupBuf, PrefixedLookupBuf, SegmentBuf};
 use value::{Kind, Value};
 
 use crate::{
@@ -336,7 +337,7 @@ impl fmt::Debug for Assignment {
 pub(crate) enum Target {
     Noop,
     Internal(Ident, LookupBuf),
-    External(LookupBuf),
+    External(TargetPath),
 }
 
 impl Target {
@@ -398,7 +399,7 @@ impl Target {
             }
 
             External(path) => {
-                let _ = ctx.target_mut().target_insert(path, value);
+                let _ = ctx.target_mut().target_insert(&path, value);
             }
         }
     }
@@ -407,7 +408,7 @@ impl Target {
         match self {
             Self::Noop => LookupBuf::root(),
             Self::Internal(_, path) => path.clone(),
-            Self::External(path) => path.clone(),
+            Self::External(prefixed_path) => prefixed_path.path.clone(),
         }
     }
 }
@@ -420,8 +421,7 @@ impl fmt::Display for Target {
             Noop => f.write_str("_"),
             Internal(ident, path) if path.is_root() => ident.fmt(f),
             Internal(ident, path) => write!(f, "{}{}", ident, path),
-            External(path) if path.is_root() => f.write_str("."),
-            External(path) => write!(f, ".{}", path),
+            External(path) => write!(f, "{}", path),
         }
     }
 }
@@ -432,9 +432,13 @@ impl fmt::Debug for Target {
 
         match self {
             Noop => f.write_str("Noop"),
-            Internal(ident, path) if path.is_root() => write!(f, "Internal({})", ident),
-            Internal(ident, path) => write!(f, "Internal({}{})", ident, path),
-            External(path) if path.is_root() => f.write_str("External(.)"),
+            Internal(ident, path) => {
+                if path.is_root() {
+                    write!(f, "Internal({})", ident)
+                } else {
+                    write!(f, "Internal({}{})", ident, path)
+                }
+            }
             External(path) => write!(f, "External({})", path),
         }
     }
@@ -458,7 +462,9 @@ impl TryFrom<ast::AssignmentTarget> for Target {
 
                 match target {
                     ast::QueryTarget::Internal(ident) => Internal(ident, path),
-                    ast::QueryTarget::External => External(path),
+                    ast::QueryTarget::External(prefix) => {
+                        External(PrefixedLookupBuf { prefix, path })
+                    }
                     _ => {
                         return Err(Error {
                             variant: ErrorVariant::InvalidTarget(span),
@@ -471,7 +477,9 @@ impl TryFrom<ast::AssignmentTarget> for Target {
             ast::AssignmentTarget::Internal(ident, path) => {
                 Internal(ident, path.unwrap_or_else(LookupBuf::root))
             }
-            ast::AssignmentTarget::External(path) => External(path.unwrap_or_else(LookupBuf::root)),
+            ast::AssignmentTarget::External(path) => {
+                External(path.unwrap_or_else(PrefixedLookupBuf::event_root))
+            }
         };
 
         Ok(target)

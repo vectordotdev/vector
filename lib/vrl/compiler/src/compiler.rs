@@ -624,7 +624,7 @@ impl<'a> Compiler<'a> {
         let span = node.span();
 
         let target = match node.into_inner() {
-            External => Target::External,
+            External(prefix) => Target::External,
             Internal(ident) => {
                 let variable = self.compile_variable(Node::new(span, ident), external)?;
                 Target::Internal(variable)

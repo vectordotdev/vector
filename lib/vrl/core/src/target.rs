@@ -1,6 +1,7 @@
 use std::convert::AsRef;
 
-use lookup::LookupBuf;
+use lookup::lookup_v2::TargetPath;
+use lookup::{LookupBuf, PathPrefix};
 use value::{Secrets, Value};
 
 /// Any target object you want to remap using VRL has to implement this trait.
@@ -39,18 +40,18 @@ pub trait Target: std::fmt::Debug + MetadataTarget + SecretTarget {
     /// When inserting into a coalesced path, the implementor is encouraged to
     /// insert into the right-most segment if none exists, but can return an
     /// error if needed.
-    fn target_insert(&mut self, path: &LookupBuf, value: Value) -> Result<(), String>;
+    fn target_insert(&mut self, path: &TargetPath, value: Value) -> Result<(), String>;
 
     /// Get a value for a given path, or `None` if no value is found.
     ///
     /// See [`Target::insert`] for more details.
-    fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String>;
+    fn target_get(&self, path: &TargetPath) -> Result<Option<&Value>, String>;
 
     /// Get a mutable reference to the value for a given path, or `None` if no
     /// value is found.
     ///
     /// See [`Target::insert`] for more details.
-    fn target_get_mut(&mut self, path: &LookupBuf) -> Result<Option<&mut Value>, String>;
+    fn target_get_mut(&mut self, path: &TargetPath) -> Result<Option<&mut Value>, String>;
 
     /// Remove the given path from the object.
     ///
@@ -58,7 +59,7 @@ pub trait Target: std::fmt::Debug + MetadataTarget + SecretTarget {
     ///
     /// If `compact` is true, after deletion, if an empty object or array is
     /// left behind, it should be removed as well, cascading up to the root.
-    fn target_remove(&mut self, path: &LookupBuf, compact: bool) -> Result<Option<Value>, String>;
+    fn target_remove(&mut self, path: &TargetPath, compact: bool) -> Result<Option<Value>, String>;
 }
 
 pub trait MetadataTarget {
@@ -85,21 +86,40 @@ pub struct TargetValueRef<'a> {
 }
 
 impl Target for TargetValueRef<'_> {
-    fn target_insert(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
-        self.value.insert_by_path(path, value);
+    fn target_insert(&mut self, target_path: &TargetPath, value: Value) -> Result<(), String> {
+        match target_path.prefix {
+            PathPrefix::Event => self.value.insert(&target_path.path, value),
+            PathPrefix::Metadata => self.metadata.insert(&target_path.path, value),
+        };
         Ok(())
     }
 
-    fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String> {
-        Ok(self.value.get_by_path(path))
+    fn target_get(&self, target_path: &TargetPath) -> Result<Option<&Value>, String> {
+        let value = match target_path.prefix {
+            PathPrefix::Event => self.value.get(&target_path.path),
+            PathPrefix::Metadata => self.metadata.get(&target_path.path),
+        };
+        Ok(value)
     }
 
-    fn target_get_mut(&mut self, path: &LookupBuf) -> Result<Option<&mut Value>, String> {
-        Ok(self.value.get_by_path_mut(path))
+    fn target_get_mut(&mut self, target_path: &TargetPath) -> Result<Option<&mut Value>, String> {
+        let value = match target_path.prefix {
+            PathPrefix::Event => self.value.get_mut(&target_path.path),
+            PathPrefix::Metadata => self.metadata.get_mut(&target_path.path),
+        };
+        Ok(value)
     }
 
-    fn target_remove(&mut self, path: &LookupBuf, compact: bool) -> Result<Option<Value>, String> {
-        Ok(self.value.remove_by_path(path, compact))
+    fn target_remove(
+        &mut self,
+        target_path: &TargetPath,
+        compact: bool,
+    ) -> Result<Option<Value>, String> {
+        let prev_value = match target_path.prefix {
+            PathPrefix::Event => self.value.remove(&target_path.path, compact),
+            PathPrefix::Metadata => self.metadata.remove(&target_path.path, compact),
+        };
+        Ok(prev_value)
     }
 }
 
@@ -141,21 +161,40 @@ pub struct TargetValue {
 }
 
 impl Target for TargetValue {
-    fn target_insert(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
-        self.value.insert_by_path(path, value);
+    fn target_insert(&mut self, target_path: &TargetPath, value: Value) -> Result<(), String> {
+        match target_path.prefix {
+            PathPrefix::Event => self.value.insert(&target_path.path, value),
+            PathPrefix::Metadata => self.metadata.insert(&target_path.path, value),
+        };
         Ok(())
     }
 
-    fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String> {
-        Ok(self.value.get_by_path(path))
+    fn target_get(&self, target_path: &TargetPath) -> Result<Option<&Value>, String> {
+        let value = match target_path.prefix {
+            PathPrefix::Event => self.value.get(&target_path.path),
+            PathPrefix::Metadata => self.metadata.get(&target_path.path),
+        };
+        Ok(value)
     }
 
-    fn target_get_mut(&mut self, path: &LookupBuf) -> Result<Option<&mut Value>, String> {
-        Ok(self.value.get_by_path_mut(path))
+    fn target_get_mut(&mut self, target_path: &TargetPath) -> Result<Option<&mut Value>, String> {
+        let value = match target_path.prefix {
+            PathPrefix::Event => self.value.get_mut(&target_path.path),
+            PathPrefix::Metadata => self.metadata.get_mut(&target_path.path),
+        };
+        Ok(value)
     }
 
-    fn target_remove(&mut self, path: &LookupBuf, compact: bool) -> Result<Option<Value>, String> {
-        Ok(self.value.remove_by_path(path, compact))
+    fn target_remove(
+        &mut self,
+        target_path: &TargetPath,
+        compact: bool,
+    ) -> Result<Option<Value>, String> {
+        let prev_value = match target_path.prefix {
+            PathPrefix::Event => self.value.remove(&target_path.path, compact),
+            PathPrefix::Metadata => self.metadata.remove(&target_path.path, compact),
+        };
+        Ok(prev_value)
     }
 }
 
