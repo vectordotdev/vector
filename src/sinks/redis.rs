@@ -6,7 +6,9 @@ use redis::{aio::ConnectionManager, RedisError, RedisResult};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
 use tower::{Service, ServiceBuilder};
-use vector_common::internal_event::BytesSent;
+use vector_common::internal_event::{
+    ByteSize, BytesSent, InternalEventHandle, Protocol, Registered,
+};
 use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
@@ -226,7 +228,11 @@ impl RedisSinkConfig {
 
         let buffer = VecBuffer::new(batch.size);
 
-        let redis = RedisSink { conn, data_type };
+        let redis = RedisSink {
+            conn,
+            data_type,
+            bytes_sent: register!(BytesSent::from(Protocol::TCP)),
+        };
 
         let svc = ServiceBuilder::new()
             .settings(request, RedisRetryLogic)
@@ -337,6 +343,7 @@ impl RetryLogic for RedisRetryLogic {
 pub struct RedisSink {
     conn: ConnectionManager,
     data_type: DataType,
+    bytes_sent: Registered<BytesSent>,
 }
 
 impl Service<Vec<RedisKvEntry>> for RedisSink {
@@ -384,15 +391,13 @@ impl Service<Vec<RedisKvEntry>> for RedisSink {
             }
         }
 
+        let bytes_sent = self.bytes_sent.clone();
         Box::pin(async move {
             let result: RedisPipeResult = pipe.query_async(&mut conn).await;
             match &result {
                 Ok(res) => {
                     if res.is_successful() {
-                        emit!(BytesSent {
-                            byte_size,
-                            protocol: "tcp",
-                        });
+                        bytes_sent.emit(ByteSize(byte_size));
                     } else {
                         warn!("Batch sending was not all successful and will be retried.")
                     }
