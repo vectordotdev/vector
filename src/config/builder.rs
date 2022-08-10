@@ -491,14 +491,12 @@ mod tests {
 
     #[test]
     fn append_overwrites_enterprise() {
-        let mut base_ent = enterprise::Options::default();
-        base_ent.application_key = "base".to_string();
+        let base_ent = enterprise::Options::default();
         let mut base = ConfigBuilder {
             enterprise: Some(base_ent),
             ..Default::default()
         };
-        let mut other_ent = enterprise::Options::default();
-        other_ent.application_key = "other".to_string();
+        let other_ent = enterprise::Options::default();
         let other = ConfigBuilder {
             enterprise: Some(other_ent),
             ..Default::default()
@@ -516,7 +514,6 @@ mod tests {
             r#"
         [enterprise]
         api_key = "apikey"
-        application_key = "appkey"
         configuration_key = "configkey"
 
         [sources.foo]
@@ -547,7 +544,6 @@ mod tests {
                 r#"
             [enterprise]
             api_key = "apikey"
-            application_key = "appkey"
             configuration_key = "configkey"
 
             [sources.foo]
