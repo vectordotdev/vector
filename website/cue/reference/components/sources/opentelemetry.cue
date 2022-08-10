@@ -122,6 +122,15 @@ components: sources: opentelemetry: {
 								"http.url":                  "http://example.com"
 								"my.custom.application.tag": "hello"
 							},
+							{
+								"http.scheme":      "https"
+								"http.host":        "donut.mycie.com"
+								"http.target":      "/order"
+								"http.method":      "post"
+								"http.status_code": 500
+								"http.flavor":      "1.1"
+								"http.user_agent":  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.149 Safari/537.36"
+							},
 						]
 					}
 				}
@@ -135,6 +144,9 @@ components: sources: opentelemetry: {
 								"service.name":    "donut_shop"
 								"service.version": "2.0.0"
 								"k8s.pod.uid":     "1138528c-c36e-11e9-a1a7-42010a800198"
+							},
+							{
+								"container.name": "vector"
 							},
 						]
 					}
