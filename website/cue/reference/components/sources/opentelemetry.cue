@@ -98,6 +98,28 @@ components: sources: opentelemetry: {
 		}
 	}
 
+	configuration_examples: [
+		{
+			title: "OTLP Defaults"
+			configuration: {
+				opentelemetry: {
+					grpc: {
+						address: "0.0.0.0:4317"
+						tls: {
+							enabled: true
+						}
+					}
+					http: {
+						address: "0.0.0.0:4318"
+						tls: {
+							enabled: true
+						}
+					}
+				}
+			}
+		},
+	]
+
 	outputs: [
 		{
 			name: "logs"
