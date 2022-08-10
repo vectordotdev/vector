@@ -181,7 +181,7 @@ event in accordance with the [EventsDropped event] requirements.
   - MUST emit *after* processing of the bytes (encryption, compression,
     filtering, etc.)
 - Properties
-  - `byte_size` - REQUIRED, number of raw network bytes sent after processing.
+  - `byte_size` - The number of raw network bytes sent after processing.
     - SHOULD be the closest representation possible of raw network bytes based
       on the sink's capabilities. For example, if the sink uses a HTTP
       client that does not provide access to the total request byte size, then
