@@ -450,6 +450,7 @@ sources-logs = [
   "sources-datadog_agent",
   "sources-demo_logs",
   "sources-docker_logs",
+  "sources-dnstap",
   "sources-exec",
   "sources-file",
   "sources-fluent",
