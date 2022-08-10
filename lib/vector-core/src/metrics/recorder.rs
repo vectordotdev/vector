@@ -11,7 +11,7 @@ use once_cell::unsync::OnceCell;
 use quanta::Clock;
 
 use super::storage::VectorStorage;
-use crate::event::{Metric, MetricValue};
+use crate::event::{Metric, MetricKind, MetricValue};
 
 thread_local!(static LOCAL_REGISTRY: OnceCell<Registry> = OnceCell::new());
 
@@ -54,9 +54,13 @@ impl Registry {
             }) {
                 // NOTE this will truncate if the value is greater than 2**52.
                 #[allow(clippy::cast_precision_loss)]
-                let value = counter.get_inner().load(Ordering::Relaxed) as f64;
-                let value = MetricValue::Counter { value };
-                metrics.push(Metric::from_metric_kv(&key, value, timestamp));
+                let value = counter.get_inner().swap(0, Ordering::Relaxed) as f64;
+                metrics.push(Metric::from_metric_kv(
+                    &key,
+                    MetricKind::Incremental,
+                    MetricValue::Counter { value },
+                    timestamp,
+                ));
             }
         }
         for (key, gauge) in self.registry.get_gauge_handles() {
@@ -64,8 +68,12 @@ impl Registry {
                 recency.should_store_gauge(&key, gauge.get_generation(), &self.registry)
             }) {
                 let value = gauge.get_inner().load(Ordering::Relaxed);
-                let value = MetricValue::Gauge { value };
-                metrics.push(Metric::from_metric_kv(&key, value, timestamp));
+                metrics.push(Metric::from_metric_kv(
+                    &key,
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value },
+                    timestamp,
+                ));
             }
         }
         for (key, histogram) in self.registry.get_histogram_handles() {
@@ -73,7 +81,12 @@ impl Registry {
                 recency.should_store_histogram(&key, histogram.get_generation(), &self.registry)
             }) {
                 let value = histogram.get_inner().make_metric();
-                metrics.push(Metric::from_metric_kv(&key, value, timestamp));
+                metrics.push(Metric::from_metric_kv(
+                    &key,
+                    MetricKind::Absolute,
+                    value,
+                    timestamp,
+                ));
             }
         }
         metrics
