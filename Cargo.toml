@@ -106,6 +106,7 @@ members = [
   "lib/datadog/grok",
   "lib/datadog/search-syntax",
   "lib/datadog/filter",
+  "lib/datadog/remote-config",
 ]
 
 [dependencies]
@@ -212,6 +213,7 @@ datadog-filter = { path = "lib/datadog/filter" }
 datadog-search-syntax = { path = "lib/datadog/search-syntax" }
 hex = { version = "0.4.3", default-features = false, optional = true }
 sha2 = { version = "0.10.2", default-features = false, optional = true }
+remote-config = { path = "lib/datadog/remote-config" }
 
 # VRL Lang
 vrl = { path = "lib/vrl/vrl" }
@@ -688,6 +690,7 @@ enterprise = [
   "transforms-remap",
   "transforms-filter",
 ]
+remote-config = []
 
 # Identifies that the build is a nightly build
 nightly = []

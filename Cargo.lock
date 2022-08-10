@@ -5994,6 +5994,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a3f87b73ce11b1619a3c6332f45341e0047173771e8b8b73f87bfeefb7b56244"
 
 [[package]]
+name = "remote-config"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "hyper",
+ "hyper-openssl",
+ "indexmap",
+ "prost",
+ "prost-build",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "remove_dir_all"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8409,6 +8424,7 @@ dependencies = [
  "rdkafka",
  "redis",
  "regex",
+ "remote-config",
  "reqwest",
  "rmp-serde",
  "rmpv",

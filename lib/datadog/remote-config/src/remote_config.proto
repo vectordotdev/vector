@@ -1,0 +1,101 @@
+syntax = "proto3";
+
+package datadog.config;
+
+// Backend definitions
+
+message ConfigMetas {
+  repeated TopMeta roots = 1;
+  TopMeta timestamp = 2;
+  TopMeta snapshot = 3;
+  TopMeta topTargets = 4;
+  repeated DelegatedMeta delegatedTargets = 5;
+}
+
+message DirectorMetas {
+  repeated TopMeta roots = 1;
+  TopMeta timestamp = 2;
+  TopMeta snapshot = 3;
+  TopMeta targets = 4;
+}
+
+message DelegatedMeta {
+  uint64 version = 1;
+  string role = 2;
+  bytes raw = 3;
+}
+
+message TopMeta {
+  uint64 version = 1;
+  bytes raw = 2;
+}
+
+message File {
+  string path = 1;
+  bytes raw = 2;
+}
+
+// Backend queries
+
+message LatestConfigsRequest {
+  string hostname = 1;
+  string agentVersion = 2;
+  // timestamp and snapshot versions move in tandem so they are the same.
+  uint64 current_config_snapshot_version = 3;
+  uint64 current_config_root_version = 9;
+  uint64 current_director_root_version = 8;
+  repeated string products = 4;
+  repeated string new_products = 5;
+  repeated Client active_clients = 6;
+  bytes backend_client_state = 10;
+}
+
+message LatestConfigsResponse {
+  ConfigMetas config_metas = 1;
+  DirectorMetas director_metas = 2;
+  repeated File target_files = 3;
+}
+
+// Client definitions
+
+message Client {
+  ClientState state = 1;
+  string id = 2;
+  repeated string products = 3;
+  reserved 4, 5;
+  bool is_tracer = 6;
+  ClientTracer client_tracer = 7;
+  bool is_agent = 8;
+  ClientAgent client_agent = 9;
+  uint64 last_seen = 10;
+}
+
+message ClientTracer {
+  string runtime_id = 1;
+  string language = 2;
+  string tracer_version = 3;
+  string service = 4;
+  string env = 5;
+  string app_version = 6;
+  repeated string tags = 7;
+}
+
+message ClientAgent {
+  string name = 1;
+  string version = 2;
+}
+
+message ConfigState {
+  string id = 1;
+  uint64 version = 2;
+  string product = 3;
+}
+
+message ClientState {
+  uint64 root_version = 1;
+  uint64 targets_version = 2;
+  repeated ConfigState config_states = 3;
+  bool has_error = 4;
+  string error = 5;
+  bytes backend_client_state = 6;
+}

@@ -63,8 +63,11 @@ pub struct Options {
     #[serde(default = "default_enable_logs_reporting")]
     pub enable_logs_reporting: bool,
 
+    #[cfg(feature = "remote-config")]
+    pub enable_remote_config: bool,
+
     #[serde(default)]
-    site: Option<String>,
+    pub(super) site: Option<String>,
     region: Option<Region>,
     endpoint: Option<String>,
 
@@ -94,6 +97,8 @@ impl Default for Options {
         Self {
             enabled: default_enabled(),
             enable_logs_reporting: default_enable_logs_reporting(),
+            #[cfg(feature = "remote-config")]
+            enable_remote_config: false,
             site: None,
             region: None,
             endpoint: None,
