@@ -37,6 +37,20 @@ configuration: {
 			}
 		}
 
+		expire_metrics: {
+			common: false
+			description: """
+				If set, Vector will configure the internal metrics system to automatically
+				remove all metrics that have not been updated in the given number of seconds.
+				"""
+			required: false
+			type: uint: {
+				default: null
+				examples: [60]
+				unit: "seconds"
+			}
+		}
+
 		enrichment_tables: {
 			common:      false
 			description: """

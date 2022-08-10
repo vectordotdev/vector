@@ -429,7 +429,7 @@ mod tests {
     use crate::event::{LogEvent, Metric, MetricKind, MetricValue};
     use crate::sinks::blackhole::BlackholeConfig;
     use crate::sources::demo_logs::{DemoLogsConfig, OutputFormat};
-    use crate::test_util::start_topology;
+    use crate::test_util::{start_topology, trace_init};
     use crate::transforms::log_to_metric::{GaugeConfig, LogToMetricConfig, MetricConfig};
     use crate::transforms::remap::RemapConfig;
 
@@ -562,6 +562,8 @@ mod tests {
 
     #[tokio::test]
     async fn integration_test_source_log() {
+        trace_init();
+
         let mut config = Config::builder();
         config.add_source(
             "in",
@@ -602,6 +604,8 @@ mod tests {
 
     #[tokio::test]
     async fn integration_test_source_metric() {
+        trace_init();
+
         let mut config = Config::builder();
         config.add_source(
             "in",
@@ -657,6 +661,8 @@ mod tests {
 
     #[tokio::test]
     async fn integration_test_transform() {
+        trace_init();
+
         let mut config = Config::builder();
         config.add_source(
             "in",
@@ -705,6 +711,8 @@ mod tests {
 
     #[tokio::test]
     async fn integration_test_transform_input() {
+        trace_init();
+
         let mut config = Config::builder();
         config.add_source(
             "in",
@@ -777,6 +785,8 @@ mod tests {
 
     #[tokio::test]
     async fn integration_test_sink() {
+        trace_init();
+
         let mut config = Config::builder();
         config.add_source(
             "in",
@@ -833,6 +843,8 @@ mod tests {
 
     #[tokio::test]
     async fn integration_test_tap_non_default_output() {
+        trace_init();
+
         let mut config = Config::builder();
         config.add_source(
             "in",
@@ -895,6 +907,8 @@ mod tests {
 
     #[tokio::test]
     async fn integration_test_tap_multiple_outputs() {
+        trace_init();
+
         let mut config = Config::builder();
         config.add_source(
             "in-test1",

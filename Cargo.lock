@@ -925,9 +925,9 @@ dependencies = [
 
 [[package]]
 name = "axum"
-version = "0.5.14"
+version = "0.5.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c943a505c17b494638a38a9af129067f760c9c06794b9f57d499266909be8e72"
+checksum = "9de18bc5f2e9df8f52da03856bf40e29b747de5a84e43aefff90e3dc4a21529b"
 dependencies = [
  "async-trait",
  "axum-core",
@@ -3942,9 +3942,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.127"
+version = "0.2.129"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "505e71a4706fa491e9b1b55f51b95d4037d0821ee40131190475f692b35b009b"
+checksum = "64de3cc433455c14174d42e554d4027ee631c4d046d43e3ecc6efc4636cdc7a7"
 
 [[package]]
 name = "libflate"
@@ -4907,21 +4907,21 @@ checksum = "18a6dbe30758c9f83eb00cbea4ac95966305f5a7772f3f42ebfc7fc7eddbd8e1"
 
 [[package]]
 name = "onig"
-version = "6.3.2"
+version = "6.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1eb3502504c9c8b06634b38bfdda86a9a8cef6277f3dec4d8b17c115110dd2a3"
+checksum = "8c4b31c8722ad9171c6d77d3557db078cab2bd50afcc9d09c8b315c59df8ca4f"
 dependencies = [
  "bitflags",
- "lazy_static",
  "libc",
+ "once_cell",
  "onig_sys",
 ]
 
 [[package]]
 name = "onig_sys"
-version = "69.8.0"
+version = "69.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8bf3fbc9b931b6c9af85d219c7943c274a6ad26cff7488a2210215edd5f49bf8"
+checksum = "7b829e3d7e9cc74c7e315ee8edb185bf4190da5acde74afd7fc59c35b1f086e7"
 dependencies = [
  "cc",
  "pkg-config",
@@ -6561,9 +6561,9 @@ checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 
 [[package]]
 name = "serde"
-version = "1.0.142"
+version = "1.0.143"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e590c437916fb6b221e1d00df6e3294f3fccd70ca7e92541c475d6ed6ef5fee2"
+checksum = "53e8e5d5b70924f74ff5c6d64d9a5acd91422117c60f48c4e07855238a254553"
 dependencies = [
  "serde_derive",
 ]
@@ -6630,9 +6630,9 @@ dependencies = [
 
 [[package]]
 name = "serde_derive"
-version = "1.0.142"
+version = "1.0.143"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34b5b8d809babe02f538c2cfec6f2c1ed10804c0e5a6a041a049a4f5588ccc2e"
+checksum = "d3d8e8de557aee63c26b85b947f5e59b690d0454c753f3adeb5cd7835ab88391"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -8703,6 +8703,7 @@ dependencies = [
  "prost",
  "prost-build",
  "prost-types",
+ "quanta",
  "quickcheck",
  "rand 0.8.5",
  "rand_distr",
