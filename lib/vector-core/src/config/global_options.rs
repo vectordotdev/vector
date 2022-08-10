@@ -1,6 +1,7 @@
+use std::{fs::DirBuilder, path::PathBuf, time::Duration};
+
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::{fs::DirBuilder, path::PathBuf};
 use vector_common::TimeZone;
 
 use super::{proxy::ProxyConfig, AcknowledgementsConfig, LogSchema};
@@ -45,6 +46,8 @@ pub struct GlobalOptions {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+    #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
+    pub expire_metrics: Option<Duration>,
 }
 
 impl GlobalOptions {

@@ -152,21 +152,21 @@ metrics = "0.20.1"
 metrics-tracing-context = { version = "0.12.0", default-features = false }
 
 # AWS - Official SDK
-aws-sdk-s3 = { version = "0.16.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-sqs = { version = "0.16.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-cloudwatch = { version = "0.16.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-cloudwatchlogs = { version = "0.16.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-elasticsearch = {version = "0.16.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-firehose = { version = "0.16.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-kinesis = { version = "0.16.0", default-features = false, features = ["rustls"], optional = true }
-aws-types = { version = "0.46.0", default-features = false, features = ["hardcoded-credentials"], optional = true }
-aws-sigv4 = { version = "0.46.0", default-features = false, optional = true }
-aws-config = { version = "0.46.0", default-features = false, features = ["rustls"], optional = true }
-aws-smithy-async = { version = "0.46.0", default-features = false, optional = true }
-aws-smithy-client = { version = "0.46.0", default-features = false, features = ["client-hyper"], optional = true}
-aws-smithy-http = { version = "0.46.0", default-features = false, features = ["event-stream"], optional = true }
-aws-smithy-http-tower = { version = "0.46.0", default-features = false, optional = true }
-aws-smithy-types = { version = "0.46.0", default-features = false, optional = true }
+aws-sdk-s3 = { version = "0.17.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-sqs = { version = "0.17.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-cloudwatch = { version = "0.17.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-cloudwatchlogs = { version = "0.17.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-elasticsearch = {version = "0.17.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-firehose = { version = "0.17.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-kinesis = { version = "0.17.0", default-features = false, features = ["rustls"], optional = true }
+aws-types = { version = "0.47.0", default-features = false, features = ["hardcoded-credentials"], optional = true }
+aws-sigv4 = { version = "0.47.0", default-features = false, optional = true }
+aws-config = { version = "0.47.0", default-features = false, features = ["rustls"], optional = true }
+aws-smithy-async = { version = "0.47.0", default-features = false, optional = true }
+aws-smithy-client = { version = "0.47.0", default-features = false, features = ["client-hyper"], optional = true}
+aws-smithy-http = { version = "0.47.0", default-features = false, features = ["event-stream"], optional = true }
+aws-smithy-http-tower = { version = "0.47.0", default-features = false, optional = true }
+aws-smithy-types = { version = "0.47.0", default-features = false, optional = true }
 
 # Azure
 azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b7171eb40909f7f2805f4622e076f8a6dbbe2d98", default-features = false, features = ["enable_reqwest"], optional = true }
@@ -221,10 +221,10 @@ vrl-stdlib = { path = "lib/vrl/stdlib" }
 arc-swap = { version = "1.5", default-features = false, optional = true }
 async-compression = { version = "0.3.12", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
 avro-rs = { version = "0.13.0", default-features = false, optional = true }
-axum = { version = "0.5.14", default-features = false }
+axum = { version = "0.5.15", default-features = false }
 base64 = { version = "0.13.0", default-features = false, optional = true }
 bloom = { version = "0.3.2", default-features = false, optional = true }
-bollard = { version = "0.13.0", default-features = false, features = ["ssl"] }
+bollard = { version = "0.13.0", default-features = false, features = ["ssl", "chrono"] }
 bytes = { version = "1.2.1", default-features = false, features = ["serde"] }
 bytesize = { version = "1.1.0", default-features = false }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
@@ -329,7 +329,7 @@ azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev =
 azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b7171eb40909f7f2805f4622e076f8a6dbbe2d98", default-features = false, features = ["azurite_workaround"] }
 base64 = "0.13.0"
 criterion = { version = "0.3.6", features = ["html_reports", "async_tokio"] }
-libc = "0.2.127"
+libc = "0.2.129"
 pretty_assertions = "1.2.1"
 proptest = "1.0"
 quickcheck = "1.0.3"
@@ -644,7 +644,7 @@ sinks-console = []
 sinks-datadog_archives = ["sinks-aws_s3", "sinks-azure_blob", "sinks-gcp"]
 sinks-datadog_events = []
 sinks-datadog_logs = []
-sinks-datadog_metrics = ["protobuf-build", "sinks-azure_blob"]
+sinks-datadog_metrics = ["protobuf-build"]
 sinks-datadog_traces = ["protobuf-build", "dep:rmpv", "dep:rmp-serde", "dep:serde_bytes"]
 sinks-elasticsearch = ["aws-core", "dep:aws-sigv4", "transforms-metric_to_log"]
 sinks-file = ["dep:async-compression"]

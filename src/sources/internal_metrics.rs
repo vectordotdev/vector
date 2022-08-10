@@ -179,17 +179,17 @@ mod tests {
             Event,
         },
         metrics::Controller,
-        SourceSender,
+        test_util, SourceSender,
     };
 
     #[test]
     fn generate_config() {
-        crate::test_util::test_generate_config::<InternalMetricsConfig>();
+        test_util::test_generate_config::<InternalMetricsConfig>();
     }
 
     #[test]
     fn captures_internal_metrics() {
-        let _ = crate::metrics::init_test();
+        test_util::trace_init();
 
         // There *seems* to be a race condition here (CI was flaky), so add a slight delay.
         std::thread::sleep(std::time::Duration::from_millis(300));
@@ -258,7 +258,7 @@ mod tests {
     }
 
     async fn event_from_config(config: InternalMetricsConfig) -> Event {
-        let _ = crate::metrics::init_test();
+        test_util::trace_init();
 
         let (sender, mut recv) = SourceSender::new_test();
 
