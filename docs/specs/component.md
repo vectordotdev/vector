@@ -136,8 +136,8 @@ emission of Vector events to the next downstream component(s).
   - MUST NOT emit for pull-based sinks since they do not send events. For
     example, the `prometheus_exporter` sink MUST NOT emit this event.
 - Properties
-  - `count` - REQUIRED, the number of Vector events.
-  - `byte_size` - REQUIRED, the estimated JSON byte size of all events sent.
+  - `count` - The count of Vector events.
+  - `byte_size` - The estimated JSON byte size of all events sent.
   - `output` - OPTIONAL, for components that can use multiple outputs, the name
     of the output that events were sent to. For events sent to the default
     output, this value MUST be `_default`.
