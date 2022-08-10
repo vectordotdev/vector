@@ -3,7 +3,7 @@ mod label_filter;
 mod recorder;
 mod storage;
 
-use std::sync::atomic::Ordering;
+use std::time::Duration;
 
 use chrono::Utc;
 use metrics::Key;
@@ -129,30 +129,19 @@ impl Controller {
         CONTROLLER.get().ok_or(Error::NotInitialized)
     }
 
+    /// Set or clear the expiry time after which idle metrics are dropped from the set of captured
+    /// metrics.
+    pub fn set_expiry(&self, timeout: Option<Duration>) {
+        self.recorder
+            .with_registry(|registry| registry.set_expiry(timeout));
+    }
+
     /// Take a snapshot of all gathered metrics and expose them as metric
     /// [`Event`](crate::event::Event)s.
-    #[allow(clippy::cast_precision_loss)]
     pub fn capture_metrics(&self) -> Vec<Metric> {
         let timestamp = Utc::now();
-        let mut metrics = Vec::<Metric>::new();
 
-        self.recorder.with_registry(|registry| {
-            registry.visit_counters(|key, counter| {
-                // NOTE this will truncate if the value is greater than 2**52.
-                let value = counter.load(Ordering::Relaxed) as f64;
-                let value = MetricValue::Counter { value };
-                metrics.push(Metric::from_metric_kv(key, value, timestamp));
-            });
-            registry.visit_gauges(|key, gauge| {
-                let value = gauge.load(Ordering::Relaxed);
-                let value = MetricValue::Gauge { value };
-                metrics.push(Metric::from_metric_kv(key, value, timestamp));
-            });
-            registry.visit_histograms(|key, histogram| {
-                let value = histogram.make_metric();
-                metrics.push(Metric::from_metric_kv(key, value, timestamp));
-            });
-        });
+        let mut metrics = self.recorder.with_registry(Registry::visit_metrics);
 
         // Add aliases for deprecated metrics
         for i in 0..metrics.len() {
@@ -176,6 +165,7 @@ impl Controller {
             }
         }
 
+        #[allow(clippy::cast_precision_loss)]
         let value = (metrics.len() + 2) as f64;
         metrics.push(Metric::from_metric_kv(
             &CARDINALITY_KEY,
@@ -239,7 +229,21 @@ macro_rules! update_counter {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use crate::event::MetricKind;
+
+    const IDLE_TIMEOUT: Duration = Duration::from_millis(500);
+
+    fn init_metrics() -> &'static Controller {
+        if let Err(error) = init_test() {
+            assert!(
+                error == Error::AlreadyInitialized,
+                "Failed to initialize metrics recorder: {:?}",
+                error
+            );
+        }
+        Controller::get().expect("Could not get global metrics controller")
+    }
 
     #[test]
     fn cardinality_matches() {
@@ -271,5 +275,19 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn expires_metrics() {
+        let controller = init_metrics();
+        controller.set_expiry(Some(IDLE_TIMEOUT));
+
+        metrics::counter!("test2", 1);
+        metrics::counter!("test3", 2);
+        assert_eq!(controller.capture_metrics().len(), 4);
+
+        std::thread::sleep(IDLE_TIMEOUT * 2);
+        metrics::counter!("test2", 3);
+        assert_eq!(controller.capture_metrics().len(), 3);
     }
 }

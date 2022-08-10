@@ -4,7 +4,8 @@ use crate::{
     sources::socket::SocketConfig,
     test_util::{
         mock::{error_sink, error_source, panic_sink, panic_source},
-        next_addr, random_lines, send_lines, start_topology, wait_for_tcp, CountReceiver,
+        next_addr, random_lines, send_lines, start_topology, trace_init, wait_for_tcp,
+        CountReceiver,
     },
 };
 use futures_util::StreamExt;
@@ -14,6 +15,8 @@ use tokio_stream::wrappers::UnboundedReceiverStream;
 /// Ensures that an unrelated source completing immediately with an error does not prematurely terminate the topology.
 #[tokio::test]
 async fn test_source_error() {
+    trace_init();
+
     let num_lines: usize = 10;
 
     let in_addr = next_addr();
@@ -56,6 +59,8 @@ async fn test_source_error() {
 /// Ensures that an unrelated source panicking does not prematurely terminate the topology.
 #[tokio::test]
 async fn test_source_panic() {
+    trace_init();
+
     let num_lines: usize = 10;
 
     let in_addr = next_addr();
@@ -100,6 +105,8 @@ async fn test_source_panic() {
 /// Ensures that an unrelated sink completing immediately with an error does not prematurely terminate the topology.
 #[tokio::test]
 async fn test_sink_error() {
+    trace_init();
+
     let num_lines: usize = 10;
 
     let in1_addr = next_addr();
@@ -146,6 +153,8 @@ async fn test_sink_error() {
 /// Ensures that an unrelated sink panicking does not prematurely terminate the topology.
 #[tokio::test]
 async fn test_sink_panic() {
+    trace_init();
+
     let num_lines: usize = 10;
 
     let in1_addr = next_addr();

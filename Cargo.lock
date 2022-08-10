@@ -8703,6 +8703,7 @@ dependencies = [
  "prost",
  "prost-build",
  "prost-types",
+ "quanta",
  "quickcheck",
  "rand 0.8.5",
  "rand_distr",
