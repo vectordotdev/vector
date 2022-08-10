@@ -13,6 +13,7 @@ use http::{
 use hyper::Body;
 use tower::Service;
 use tracing::Instrument;
+use vector_common::internal_event::BytesSent;
 use vector_core::{
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_event::EventsSent,
@@ -60,8 +61,11 @@ impl DriverResponse for NewRelicApiResponse {
         }
     }
 
-    fn bytes_sent(&self) -> Option<(usize, &str)> {
-        Some((self.metadata.request_encoded_size(), self.protocol))
+    fn bytes_sent(&self) -> Option<BytesSent> {
+        Some(BytesSent {
+            byte_size: self.metadata.request_encoded_size(),
+            protocol: self.protocol,
+        })
     }
 }
 

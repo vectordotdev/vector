@@ -271,7 +271,7 @@ pub(crate) use self::{
 #[macro_export]
 macro_rules! emit {
     ($event:expr) => {
-        vector_common::internal_event::emit(vector_common::internal_event::DefaultName {
+        vector_core::internal_event::emit(vector_core::internal_event::DefaultName {
             event: $event,
             name: stringify!($event),
         })
@@ -282,25 +282,6 @@ macro_rules! emit {
 #[macro_export]
 macro_rules! emit {
     ($event:expr) => {
-        vector_common::internal_event::emit($event)
-    };
-}
-
-#[cfg(test)]
-#[macro_export]
-macro_rules! register {
-    ($event:expr) => {
-        vector_common::internal_event::register(vector_common::internal_event::DefaultName {
-            event: $event,
-            name: stringify!($event),
-        })
-    };
-}
-
-#[cfg(not(test))]
-#[macro_export]
-macro_rules! register {
-    ($event:expr) => {
-        vector_common::internal_event::register($event)
+        vector_core::internal_event::emit($event)
     };
 }

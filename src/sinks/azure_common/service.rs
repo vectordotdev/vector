@@ -9,25 +9,21 @@ use azure_storage_blobs::prelude::*;
 use futures::{future::BoxFuture, TryFutureExt};
 use tower::Service;
 use tracing::Instrument;
-use vector_common::internal_event::{
-    ByteSize, BytesSent, InternalEventHandle, Protocol, Registered,
-};
 
 use crate::{
     internal_events::azure_blob::{AzureBlobHttpError, AzureBlobResponseError},
     sinks::azure_common::config::{AzureBlobRequest, AzureBlobResponse},
 };
+use vector_common::internal_event::BytesSent;
 
 #[derive(Clone)]
 pub(crate) struct AzureBlobService {
-    client: Arc<ContainerClient>,
-    bytes_sent: Registered<BytesSent>,
+    pub(self) client: Arc<ContainerClient>,
 }
 
 impl AzureBlobService {
-    pub fn new(client: Arc<ContainerClient>) -> AzureBlobService {
-        let bytes_sent = register!(BytesSent::from(Protocol::HTTPS));
-        AzureBlobService { client, bytes_sent }
+    pub const fn new(client: Arc<ContainerClient>) -> AzureBlobService {
+        AzureBlobService { client }
     }
 }
 
@@ -41,12 +37,10 @@ impl Service<AzureBlobRequest> for AzureBlobService {
     }
 
     fn call(&mut self, request: AzureBlobRequest) -> Self::Future {
-        let this = self.clone();
+        let client =
+            Arc::clone(&self.client).as_blob_client(request.metadata.partition_key.as_str());
 
         Box::pin(async move {
-            let client = this
-                .client
-                .as_blob_client(request.metadata.partition_key.as_str());
             let byte_size = request.blob_data.len();
             let blob = client
                 .put_block_blob(request.blob_data)
@@ -68,7 +62,12 @@ impl Service<AzureBlobRequest> for AzureBlobService {
                         }),
                     };
                 })
-                .inspect_ok(|_| this.bytes_sent.emit(ByteSize(byte_size)))
+                .inspect_ok(|_| {
+                    emit!(BytesSent {
+                        byte_size,
+                        protocol: "https",
+                    });
+                })
                 .instrument(info_span!("request").or_current())
                 .await;
 

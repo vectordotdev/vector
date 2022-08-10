@@ -19,7 +19,7 @@ pub trait DriverResponse {
 
     // TODO, remove the default implementation once all sinks have
     // implemented this function.
-    fn bytes_sent(&self) -> Option<(usize, &str)> {
+    fn bytes_sent(&self) -> Option<BytesSent> {
         None
     }
 }
@@ -175,11 +175,8 @@ where
                 trace!(message = "Service call succeeded.", request_id);
                 finalizers.update_status(response.event_status());
                 if response.event_status() == EventStatus::Delivered {
-                    if let Some((byte_size, protocol)) = response.bytes_sent() {
-                        emit(BytesSent {
-                            byte_size,
-                            protocol: protocol.to_string().into(),
-                        });
+                    if let Some(bytes_sent) = response.bytes_sent() {
+                        emit(bytes_sent);
                     }
                     emit(response.events_sent());
                 }

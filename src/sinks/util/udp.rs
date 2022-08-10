@@ -11,9 +11,7 @@ use futures::{future::BoxFuture, ready, stream::BoxStream, FutureExt, StreamExt}
 use snafu::{ResultExt, Snafu};
 use tokio::{net::UdpSocket, sync::oneshot, time::sleep};
 use tokio_util::codec::Encoder;
-use vector_common::internal_event::{
-    ByteSize, BytesSent, InternalEventHandle, Protocol, Registered,
-};
+use vector_common::internal_event::BytesSent;
 use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
@@ -179,15 +177,13 @@ enum UdpServiceState {
 pub struct UdpService {
     connector: UdpConnector,
     state: UdpServiceState,
-    bytes_sent: Registered<BytesSent>,
 }
 
 impl UdpService {
-    fn new(connector: UdpConnector) -> Self {
+    const fn new(connector: UdpConnector) -> Self {
         Self {
             connector,
             state: UdpServiceState::Disconnected,
-            bytes_sent: register!(BytesSent::from(Protocol::UDP)),
         }
     }
 }
@@ -226,7 +222,6 @@ impl tower::Service<BytesMut> for UdpService {
     fn call(&mut self, msg: BytesMut) -> Self::Future {
         let (sender, receiver) = oneshot::channel();
         let byte_size = msg.len();
-        let bytes_sent = self.bytes_sent.clone();
 
         let mut socket =
             match std::mem::replace(&mut self.state, UdpServiceState::Sending(receiver)) {
@@ -245,7 +240,10 @@ impl tower::Service<BytesMut> for UdpService {
                 // emitting the `BytesSent` event, and related metrics... and practically, those sinks don't compress
                 // anyways, so the metrics are correct as-is... they just may not be correct in the future if
                 // compression support was added, etc.
-                bytes_sent.emit(ByteSize(byte_size));
+                emit!(BytesSent {
+                    byte_size,
+                    protocol: "udp",
+                });
             }
 
             result
@@ -260,19 +258,17 @@ where
     connector: UdpConnector,
     transformer: Transformer,
     encoder: E,
-    bytes_sent: Registered<BytesSent>,
 }
 
 impl<E> UdpSink<E>
 where
     E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync,
 {
-    fn new(connector: UdpConnector, transformer: Transformer, encoder: E) -> Self {
+    const fn new(connector: UdpConnector, transformer: Transformer, encoder: E) -> Self {
         Self {
             connector,
             transformer,
             encoder,
-            bytes_sent: register!(BytesSent::from(Protocol::UDP)),
         }
     }
 }
@@ -307,7 +303,10 @@ where
                             byte_size,
                         });
 
-                        self.bytes_sent.emit(ByteSize(bytes.len()));
+                        emit!(BytesSent {
+                            byte_size: bytes.len(),
+                            protocol: "udp",
+                        });
                         finalizers.update_status(EventStatus::Delivered);
                     }
                     Err(error) => {
