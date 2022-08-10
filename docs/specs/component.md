@@ -143,9 +143,9 @@ emission of Vector events to the next downstream component(s).
     output, this value MUST be `_default`.
 - Metrics
   - MUST increment the `component_sent_events_total` counter by the defined
-    value with the defined properties as metric tags.
-  - MUST increment the `component_sent_event_bytes_total` counter by the event's
-    byte size in JSON representation.
+    `quantity` property with the other properties as metric tags.
+  - MUST increment the `component_sent_event_bytes_total` counter by the
+    defined `byte_size` property with the other properties as metric tags.
 - Logs
   - MUST log a `Events sent.` message at the `trace` level with the
     defined properties as key-value pairs.
