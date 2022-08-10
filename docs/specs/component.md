@@ -176,21 +176,16 @@ event in accordance with the [EventsDropped event] requirements.
 - Emission
   - MUST emit immediately after egress of raw network bytes regardless
     if the transmission was successful or not.
+    - This includes pull-based sinks, such as the `prometheus_exporter` sink,
+      and SHOULD reflect the bytes sent to the client when requested (pulled).
   - MUST emit *after* processing of the bytes (encryption, compression,
     filtering, etc.)
-  - MUST NOT emit for pull-based sinks since they do not send data. For
-    example, the `prometheus_exporter` sink MUST NOT emit this event.
 - Properties
   - `byte_size` - REQUIRED, number of raw network bytes sent after processing.
-    - SHUOLD be the closest representation possible of raw network bytes based
+    - SHOULD be the closest representation possible of raw network bytes based
       on the sink's capabilities. For example, if the sink uses a HTTP
       client that does not provide access to the total request byte size, then
       the sink should use the byte size of the payload/body.
-  - `url` - REQUIRED, the URL of the downstream destination.
-    - For HTTP, MUST not include the query string, only the host and path.
-      (i.e., `http(s)://<host>:<port>/<path>`)
-    - For sockets, the full socket URL (i.e., `tcp://<address>:<port>`)
-    - For files, MUST be the full file url (i.e., `file://<path>`)
 - Metrics
   - MUST increment the `component_sent_network_bytes_total` counter by the
     defined value with the defined properties as metric tags.
@@ -208,18 +203,14 @@ ingress of *raw network bytes*.
   - MUST emit immediately after ingress of raw network bytes.
   - MUST emit *before* processing of the bytes (decryption, decompression,
     filtering, etc.).
+    - This includes pull-based sources that issue requests to ingest bytes.
 - Properties
   - `byte_size` - REQUIRED, number of raw network bytes received before
     processing (decryption, decompression, filtering, etc.).
-    - SHUOLD be the closest representation possible of raw network bytes based
+    - SHOULD be the closest representation possible of raw network bytes based
       on the source's capabilities. For example, if the source uses a HTTP
       client that only provides access to the request body, then the raw
       request body bytes should be used.
-  - `url` - REQUIRED, the URL of the upstream source.
-    - For HTTP, MUST not include the query string, only the host and path.
-      (i.e., `http://<host>:<port>/<path>`)
-    - For sockets, the full socket URL (i.e., `tcp://<address>:<port>`)
-    - For files, MUST be the full file url (i.e., `file://<path>`)
 - Metrics
   - MUST increment the `component_received_network_bytes_total` counter by the
     defined value with the defined properties as metric tags.
