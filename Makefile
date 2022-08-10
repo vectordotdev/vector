@@ -339,18 +339,6 @@ test-integration: test-integration-nginx test-integration-postgresql_metrics tes
 test-integration: test-integration-redis test-integration-splunk test-integration-dnstap test-integration-datadog-agent test-integration-datadog-logs
 test-integration: test-integration-datadog-traces test-integration-shutdown
 
-.PHONY: test-integration-amqp
-test-integration-amqp: ## Runs Amqp integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh amqp stop
-	@scripts/setup_integration_env.sh amqp start
-	sleep 10 # Many services are very slow... Give them a sec..
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features "amqp-integration-tests" --lib ::amqp:: -- --nocapture
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh amqp stop
-endif
-
 .PHONY: test-integration-aws-sqs
 test-integration-aws-sqs: ## Runs AWS SQS integration tests
 	FILTER=::aws_sqs make test-integration-aws

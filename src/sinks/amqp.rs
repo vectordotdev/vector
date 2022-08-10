@@ -165,22 +165,6 @@ impl AmqpSink {
         self.transformer.transform(&mut event);
         self.encoder.encode(event, &mut body).map_err(|_| ())?;
         Ok(body.freeze().to_vec())
-        /*
-        encoding.apply_rules(&mut event);
-
-        let body = match event {
-            Event::Log(ref log) => match encoding.codec() {
-                Encoding::Json => serde_json::to_vec(log).expect("JSON serialization should not fail"),
-                Encoding::Text => log
-                    .get(log_schema().message_key())
-                    .map(|v| v.as_bytes().unwrap().to_vec())
-                    .unwrap_or_default(),
-            },
-            _ => panic!("Invalid DataType"),
-        };
-
-        body
-        */
     }
 }
 
@@ -298,11 +282,6 @@ async fn healthcheck(_config: AmqpSinkConfig, channel: Arc<lapin::Channel>) -> c
 #[cfg(test)]
 mod tests {
     use super::*;
-    use codecs::{
-        encoding::{JsonSerializer, TextSerializer},
-        JsonSerializerConfig,
-    };
-    use std::collections::BTreeMap;
 
     #[test]
     pub fn generate_config() {
@@ -375,11 +354,10 @@ mod integration_tests {
     use crate::{
         shutdown::ShutdownSignal,
         test_util::{random_lines_with_stream, random_string},
-        SourceSender,
+        SourceSender, serde::{default_framing_message_based, default_decoding},
     };
     use futures::StreamExt;
     use std::time::Duration;
-    use vector_buffers::Acker;
 
     pub fn make_config() -> AmqpSinkConfig {
         let mut config = AmqpSinkConfig::default();
@@ -388,7 +366,7 @@ mod integration_tests {
         let pass = std::env::var("AMQP_PASSWORD").unwrap_or_else(|_| "guest".to_string());
         let vhost = std::env::var("AMQP_VHOST").unwrap_or_else(|_| "%2f".to_string());
         config.connection.connection_string =
-            format!("amqp://{}:{}@127.0.0.1:5672/{}", user, pass, vhost);
+            format!("amqp://{}:{}@rabbitmq:5672/{}", user, pass, vhost);
         config
     }
 
@@ -435,8 +413,7 @@ mod integration_tests {
             .await
             .unwrap();
 
-        let (acker, ack_counter) = Acker::basic();
-        let sink = VectorSink::from_event_sink(AmqpSink::new(config.clone(), acker).await.unwrap());
+        let sink = VectorSink::from_event_sink(AmqpSink::new(config.clone()).await.unwrap());
 
         // prepare consumer
         let mut queue_opts = lapin::options::QueueDeclareOptions::default();
@@ -490,11 +467,6 @@ mod integration_tests {
 
         assert_eq!(out.len(), input.len());
         assert_eq!(out, input);
-
-        assert_eq!(
-            ack_counter.load(std::sync::atomic::Ordering::Relaxed),
-            num_events
-        );
     }
 
     async fn amqp_round_trip() {
@@ -515,8 +487,7 @@ mod integration_tests {
             .await
             .unwrap();
 
-        let (amqp_acker, amqp_ack_counter) = Acker::basic();
-        let amqp_sink = AmqpSink::new(config.clone(), amqp_acker).await.unwrap();
+        let amqp_sink = AmqpSink::new(config.clone()).await.unwrap();
         let amqp_sink = VectorSink::from_event_sink(amqp_sink);
 
         let source_cfg = crate::sources::amqp::AmqpSourceConfig {
@@ -526,6 +497,8 @@ mod integration_tests {
             routing_key: None,
             exchange_key: None,
             offset_key: None,
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
         };
         let (tx, rx) = SourceSender::new_test();
         let amqp_source =
@@ -565,10 +538,5 @@ mod integration_tests {
         let output = crate::test_util::collect_n(rx, 1000).await;
 
         assert_eq!(output.len(), nb_events_published);
-
-        assert_eq!(
-            amqp_ack_counter.load(std::sync::atomic::Ordering::Relaxed),
-            nb_events_published
-        );
     }
 }

@@ -17,10 +17,7 @@ use crate::{
 use async_stream::stream;
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use codecs::{
-    decoding::{DeserializerConfig, FramingConfig},
-    StreamDecodingError,
-};
+use codecs::decoding::{DeserializerConfig, FramingConfig};
 use futures::{FutureExt, StreamExt};
 use lapin::Channel;
 use snafu::Snafu;
@@ -64,12 +61,12 @@ pub struct AmqpSourceConfig {
     #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
-    framing: FramingConfig,
+    pub(crate) framing: FramingConfig,
 
     #[configurable(derived)]
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
-    decoding: DeserializerConfig,
+    pub(crate) decoding: DeserializerConfig,
 }
 
 impl Default for AmqpSourceConfig {
@@ -93,18 +90,22 @@ inventory::submit! {
 
 impl_generate_config_from_default!(AmqpSourceConfig);
 
-#[async_trait::async_trait]
-#[typetag::serde(name = "amqp")]
-impl SourceConfig for AmqpSourceConfig {
-    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let decoder = DecodingConfig::new(
+impl AmqpSourceConfig {
+    fn decoder(&self) -> Decoder {
+        DecodingConfig::new(
             self.framing.clone(),
             self.decoding.clone(),
             LogNamespace::Legacy,
         )
-        .build();
+        .build()
+    }
+}
 
-        amqp_source(self, decoder, cx.shutdown, cx.out).await
+#[async_trait::async_trait]
+#[typetag::serde(name = "amqp")]
+impl SourceConfig for AmqpSourceConfig {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        amqp_source(self, cx.shutdown, cx.out).await
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
@@ -127,7 +128,6 @@ enum ShutdownOrMessage {
 
 pub(crate) async fn amqp_source(
     config: &AmqpSourceConfig,
-    decoder: Decoder,
     shutdown: ShutdownSignal,
     out: SourceSender,
 ) -> crate::Result<super::Source> {
@@ -138,14 +138,11 @@ pub(crate) async fn amqp_source(
         .await
         .map_err(|e| BuildError::AmqpCreateError { source: e })?;
 
-    Ok(Box::pin(run_amqp_source(
-        config, decoder, shutdown, out, channel,
-    )))
+    Ok(Box::pin(run_amqp_source(config, shutdown, out, channel)))
 }
 
 async fn run_amqp_source(
     config: AmqpSourceConfig,
-    decoder: Decoder,
     shutdown: ShutdownSignal,
     mut out: SourceSender,
     channel: Channel,
@@ -186,7 +183,7 @@ async fn run_amqp_source(
                     }
 
                     let payload = Cursor::new(Bytes::copy_from_slice(&msg.data));
-                    let mut stream = FramedRead::new(payload, decoder.clone());
+                    let mut stream = FramedRead::new(payload, config.decoder());
 
                     let routing_key = config.routing_key.as_ref();
                     let exchange_key = config.exchange_key.as_ref();
@@ -231,6 +228,8 @@ async fn run_amqp_source(
                                    }
                                 }
                                 Err(error) => {
+                                    use codecs::StreamDecodingError as _;
+
                                     // Error is logged by `codecs::Decoder`, no further handling
                                     // is needed here.
                                     if !error.can_continue() {
@@ -272,7 +271,7 @@ pub mod test {
         let pass = std::env::var("AMQP_PASSWORD").unwrap_or_else(|_| "guest".to_string());
         let vhost = std::env::var("AMQP_VHOST").unwrap_or_else(|_| "%2f".to_string());
         config.connection.connection_string =
-            format!("amqp://{}:{}@127.0.0.1:5672/{}", user, pass, vhost);
+            format!("amqp://{}:{}@rabbitmq:5672/{}", user, pass, vhost);
         config
     }
 
