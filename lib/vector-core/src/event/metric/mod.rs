@@ -214,6 +214,12 @@ impl Metric {
         &self.data.value
     }
 
+    /// Gets a mutable reference to the value of this metric.
+    #[inline]
+    pub fn value_mut(&mut self) -> &mut MetricValue {
+        &mut self.data.value
+    }
+
     /// Gets the kind of this metric.
     #[inline]
     pub fn kind(&self) -> MetricKind {

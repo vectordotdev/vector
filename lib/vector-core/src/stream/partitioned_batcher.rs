@@ -21,8 +21,8 @@ use crate::{
     partition::Partitioner,
     stream::batcher::{
         config::BatchConfigParts,
-        data::BatchReduce,
         limiter::{ByteSizeOfItemSize, ItemBatchSize, SizeLimit},
+        reducer::FunctionReducer,
     },
     time::KeyedTimer,
     ByteSizeOf,
@@ -270,7 +270,7 @@ impl BatcherSettings {
         self,
         item_size: I,
         reducer: F,
-    ) -> BatchConfigParts<SizeLimit<I>, BatchReduce<F, S>>
+    ) -> BatchConfigParts<SizeLimit<I>, FunctionReducer<F, S>>
     where
         I: ItemBatchSize<T>,
         F: FnMut(&mut S, T),
@@ -283,7 +283,7 @@ impl BatcherSettings {
                 current_size: 0,
                 item_size_calculator: item_size,
             },
-            batch_data: BatchReduce::new(reducer),
+            batch_data: FunctionReducer::with_default_state(reducer),
             timeout: self.timeout,
         }
     }

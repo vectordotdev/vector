@@ -1,12 +1,14 @@
 use std::{fmt, sync::Arc};
 
 use async_trait::async_trait;
+use chrono::Utc;
 use futures_util::{
     future::ready,
     stream::{self, BoxStream},
     StreamExt,
 };
 use tower::Service;
+use vector_common::finalization::EventFinalizers;
 use vector_core::{
     event::{Event, Metric, MetricValue},
     partition::Partitioner,
@@ -98,9 +100,9 @@ where
             // Aggregate counters with identical timestamps, otherwise identical counters (same
             // series and same timestamp, when rounded to whole seconds) will be dropped in a
             // last-write-wins situation when they hit the DD metrics intake.
-            .map(|((api_key, endpoint), mut metrics)| {
-                todo!()
-                ((api_key, endpoint), metrics)
+            .map(|((api_key, endpoint), metrics)| {
+                let collapsed_metrics = collapse_counters_by_series_and_timestamp(metrics);
+                ((api_key, endpoint), collapsed_metrics)
             })
             // Sort metrics by name, which significantly improves HTTP compression.
             .map(|((api_key, endpoint), mut metrics)| {
@@ -150,5 +152,114 @@ where
         // a normal async fn in `DatadogMetricsSink` itself, and then call out to it from this trait
         // implementation, which makes the compiler happy.
         self.run_inner(input).await
+    }
+}
+
+fn collapse_counters_by_series_and_timestamp(mut metrics: Vec<Metric>) -> Vec<Metric> {
+    let mut remaining = metrics.len();
+    let mut idx = 0;
+    let now_ts = Utc::now().timestamp();
+
+    // For each metric, see if it's a counter. If so, we check the rest of the metrics
+    // _after_ it to see if they share the same series _and_ timestamp, when converted
+    // to a Unix timestamp. If they match, we take that counter's value and merge it
+    // with our "current" counter metric, and then drop the secondary one from the
+    // vector.
+    //
+    // For any non-counter, we simply ignore it and leave it as-is.
+    while remaining > 1 {
+        let curr_idx = idx;
+        let counter_ts = match metrics[curr_idx].value() {
+            MetricValue::Counter { .. } => metrics[curr_idx]
+                .data()
+                .timestamp()
+                .map(|dt| dt.timestamp())
+                .unwrap_or(now_ts),
+            // If it's not a counter, we can skip it.
+            _ => {
+                remaining -= 1;
+                idx += 1;
+                continue;
+            }
+        };
+
+        let mut accumulated_value = 0.0;
+        let mut accumulated_finalizers = EventFinalizers::default();
+
+        // Now go through each metric _after_ the current one to see if it matches the
+        // current metric: is a counter, with the same name and timestamp. If it is, we
+        // accumulate its value and then remove it.
+        //
+        // Otherwise, we skip it.
+        let mut is_disjoint = false;
+        let mut had_match = false;
+        let mut inner_idx = curr_idx + 1;
+        let mut inner_remaining = remaining;
+        while inner_remaining > 0 {
+            match metrics[inner_idx].value() {
+                MetricValue::Counter { value } => {
+                    let other_counter_ts = metrics[inner_idx]
+                        .data()
+                        .timestamp()
+                        .map(|dt| dt.timestamp())
+                        .unwrap_or(now_ts);
+                    if metrics[curr_idx].series() == metrics[inner_idx].series()
+                        && counter_ts == other_counter_ts
+                    {
+                        had_match = true;
+
+                        // Collapse this counter by accumulating its value, and its
+                        // finalizers, and removing it from the original vector of metrics.
+                        accumulated_value += *value;
+
+                        let mut old_metric = metrics.swap_remove(inner_idx);
+                        accumulated_finalizers.merge(old_metric.metadata_mut().take_finalizers());
+                    } else {
+                        // We hit a counter that _doesn't_ match, but we can't just skip
+                        // it because we also need to evaulate it against all the
+                        // counters that come after it, so we only increment the index
+                        // for this inner loop.
+                        //
+                        // As well, we mark ourselves to stop incrementing the outer
+                        // index if we find more counters to accumulate, because we've
+                        // hit a disjoint counter here. While we may be continuing to
+                        // shrink the count of remaining metrics from accumulating,
+                        // we have to ensure this counter we just visited is visited by
+                        // the outer loop.
+                        is_disjoint = true;
+                    }
+                }
+                // If it's not a counter, we can skip it.
+                _ => {}
+            };
+
+            // Update our indexes.
+            inner_idx += 1;
+            inner_remaining -= 1;
+            remaining -= 1;
+
+            if !is_disjoint {
+                idx += 1;
+            }
+        }
+
+        // If we had matches during the accumulator phase, update our original counter.
+        if had_match {
+            match metrics.get_mut(curr_idx) {
+                Some(metric) => match metric.value_mut() {
+                    MetricValue::Counter { value } => {
+                        *value += accumulated_value;
+                        metric
+                            .metadata_mut()
+                            .merge_finalizers(accumulated_finalizers);
+                    }
+                    _ => unreachable!("current index must represent a counter"),
+                },
+                _ => unreachable!("current index must exist"),
+            }
+        }
+
+        remaining -= 1;
+        idx += 1;
     }
 }
