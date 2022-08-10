@@ -193,6 +193,8 @@ impl Test {
             result,
             result_approx: false,
             skip,
+            read_only_paths: vec![],
+            read_only_metadata_paths: vec![],
         }
     }
 }

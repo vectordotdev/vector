@@ -3,12 +3,14 @@ platforms:
 - kubernetes
 
 sinks:
+- apex
 - aws_sqs
 - aws_cloudwatch_logs
 - aws_cloudwatch_metrics
 - aws_kinesis_firehose
 - aws_kinesis_streams
 - aws_s3
+- axiom
 - azure_monitor_logs
 - clickhouse
 - datadog_logs

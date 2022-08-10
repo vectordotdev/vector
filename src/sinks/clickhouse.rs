@@ -2,15 +2,15 @@ use bytes::{BufMut, Bytes, BytesMut};
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
-use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
+use vector_config::configurable_component;
 
 use crate::{
+    codecs::Transformer,
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     http::{Auth, HttpClient, HttpError, MaybeAuth},
     sinks::util::{
-        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{BatchedHttpSink, HttpEventEncoder, HttpRetryLogic, HttpSink},
         retries::{RetryAction, RetryLogic},
         BatchConfig, Buffer, Compression, RealtimeSizeBasedDefaultBatchSettings,
@@ -19,29 +19,51 @@ use crate::{
     tls::{TlsConfig, TlsSettings},
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+/// Configuration for the `clickhouse` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ClickhouseConfig {
-    // Deprecated name
+    /// The endpoint of the Clickhouse server.
     #[serde(alias = "host")]
     pub endpoint: UriSerde,
+
+    /// The table that data will be inserted into.
     pub table: String,
+
+    /// The database that contains the table that data will be inserted into.
     pub database: Option<String>,
+
+    /// Sets `input_format_skip_unknown_fields`, allowing Clickhouse to discard fields not present in the table schema.
     #[serde(default)]
     pub skip_unknown_fields: bool,
+
+    #[configurable(derived)]
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
+
+    #[configurable(derived)]
     #[serde(
-        skip_serializing_if = "crate::serde::skip_serializing_if_default",
-        default
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    pub encoding: EncodingConfigWithDefault<Encoding>,
+    pub encoding: Transformer,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
+
+    #[configurable(derived)]
     pub auth: Option<Auth>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -55,14 +77,6 @@ inventory::submit! {
 }
 
 impl_generate_config_from_default!(ClickhouseConfig);
-
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
-#[serde(rename_all = "snake_case")]
-#[derivative(Default)]
-pub enum Encoding {
-    #[derivative(Default)]
-    Default,
-}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "clickhouse")]
@@ -88,7 +102,6 @@ impl SinkConfig for ClickhouseConfig {
             request,
             batch.timeout,
             client.clone(),
-            cx.acker(),
         )
         .sink_map_err(|error| error!(message = "Fatal clickhouse sink error.", %error));
 
@@ -105,18 +118,18 @@ impl SinkConfig for ClickhouseConfig {
         "clickhouse"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
 pub struct ClickhouseEventEncoder {
-    encoding: EncodingConfigWithDefault<Encoding>,
+    transformer: Transformer,
 }
 
 impl HttpEventEncoder<BytesMut> for ClickhouseEventEncoder {
     fn encode_event(&mut self, mut event: Event) -> Option<BytesMut> {
-        self.encoding.apply_rules(&mut event);
+        self.transformer.transform(&mut event);
         let log = event.into_log();
 
         let mut body = crate::serde::json::to_bytes(&log).expect("Events should be valid json!");
@@ -134,7 +147,7 @@ impl HttpSink for ClickhouseConfig {
 
     fn build_encoder(&self) -> Self::Encoder {
         ClickhouseEventEncoder {
-            encoding: self.encoding.clone(),
+            transformer: self.encoding.clone(),
         }
     }
 
@@ -311,6 +324,7 @@ mod integration_tests {
         future::{ok, ready},
         stream,
     };
+    use serde::Deserialize;
     use serde_json::Value;
     use tokio::time::{timeout, Duration};
     use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
@@ -318,8 +332,8 @@ mod integration_tests {
 
     use super::*;
     use crate::{
+        codecs::TimestampFormat,
         config::{log_schema, SinkConfig, SinkContext},
-        sinks::util::encoding::TimestampFormat,
         test_util::{
             components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
             random_string, trace_init,
@@ -439,10 +453,6 @@ mod integration_tests {
 
         let table = gen_table();
         let host = clickhouse_address();
-        let encoding = EncodingConfigWithDefault {
-            timestamp_format: Some(TimestampFormat::Unix),
-            ..Default::default()
-        };
 
         let mut batch = BatchConfig::default();
         batch.max_events = Some(1);
@@ -451,7 +461,7 @@ mod integration_tests {
             endpoint: host.parse().unwrap(),
             table: table.clone(),
             compression: Compression::None,
-            encoding,
+            encoding: Transformer::new(None, None, Some(TimestampFormat::Unix)).unwrap(),
             batch,
             request: TowerRequestConfig {
                 retry_attempts: Some(1),

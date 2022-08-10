@@ -17,7 +17,7 @@ mod sink {
 
     #[derive(Debug)]
     pub struct SplunkEventEncodeError {
-        pub error: Error,
+        pub error: vector_core::Error,
     }
 
     impl InternalEvent for SplunkEventEncodeError {
@@ -158,6 +158,32 @@ mod sink {
     impl InternalEvent for SplunkIndexerAcknowledgementAcksRemoved {
         fn emit(self) {
             decrement_gauge!("splunk_pending_acks", self.count);
+        }
+    }
+
+    pub struct SplunkEventTimestampInvalidType<'a> {
+        pub r#type: &'a str,
+    }
+
+    impl<'a> InternalEvent for SplunkEventTimestampInvalidType<'a> {
+        fn emit(self) {
+            warn!(
+                message =
+                    "Timestamp was an unexpected type. Deferring to Splunk to set the timestamp.",
+                invalid_type = self.r#type,
+                internal_log_rate_secs = 10
+            );
+        }
+    }
+
+    pub struct SplunkEventTimestampMissing;
+
+    impl InternalEvent for SplunkEventTimestampMissing {
+        fn emit(self) {
+            warn!(
+                message = "Timestamp was not found. Deferring to Splunk to set the timestamp.",
+                internal_log_rate_secs = 10
+            );
         }
     }
 }

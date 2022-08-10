@@ -93,6 +93,13 @@ components: sources: heroku_logs: {
 					examples: ["console"]
 				}
 			}
+			source_type: {
+				description: "The name of the source type."
+				required:    true
+				type: string: {
+					examples: ["heroku_logs"]
+				}
+			}
 			timestamp: fields._current_timestamp
 		}
 	}

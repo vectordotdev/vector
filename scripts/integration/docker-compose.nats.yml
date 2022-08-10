@@ -54,16 +54,12 @@ services:
       - "cargo"
       - "nextest"
       - "run"
-      - "--retries"
-      - "0"
       - "--no-fail-fast"
       - "--no-default-features"
       - "--features"
       - "nats-integration-tests"
       - "--lib"
       - "::nats::"
-      - "--"
-      - "--nocapture"
     depends_on:
       - nats
       - nats-userpass
@@ -84,6 +80,7 @@ services:
       - backend
     volumes:
       - ${PWD}:/code
+      - target:/code/target
       - cargogit:/usr/local/cargo/git
       - cargoregistry:/usr/local/cargo/registry
 
@@ -91,5 +88,6 @@ networks:
   backend: {}
 
 volumes:
+  target: {}
   cargogit: {}
   cargoregistry: {}

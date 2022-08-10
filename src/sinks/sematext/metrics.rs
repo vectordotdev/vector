@@ -5,8 +5,8 @@ use futures::{future::BoxFuture, stream, FutureExt, SinkExt};
 use http::{StatusCode, Uri};
 use hyper::{Body, Request};
 use indoc::indoc;
-use serde::{Deserialize, Serialize};
 use tower::Service;
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use super::Region;
@@ -47,16 +47,34 @@ impl SinkBatchSettings for SematextMetricsDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 1.0;
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
-struct SematextMetricsConfig {
+/// Configuration for the `sematext_metrics` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug, Default)]
+pub struct SematextMetricsConfig {
+    /// Sets the default namespace for any metrics sent.
+    ///
+    /// This namespace is only used if a metric has no existing namespace. When a namespace is
+    /// present, it is used as a prefix to the metric name, and separated with a period (`.`).
     pub default_namespace: String,
+
+    #[configurable(derived)]
     pub region: Option<Region>,
+
+    /// The endpoint to send data to.
     pub endpoint: Option<String>,
+
+    /// The token that will be used to write to Sematext.
     pub token: String,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub(self) batch: BatchConfig<SematextMetricsDefaultBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -118,7 +136,7 @@ impl SinkConfig for SematextMetricsConfig {
         };
 
         let healthcheck = healthcheck(endpoint.clone(), client.clone()).boxed();
-        let sink = SematextMetricsService::new(self.clone(), write_uri(&endpoint)?, cx, client)?;
+        let sink = SematextMetricsService::new(self.clone(), write_uri(&endpoint)?, client)?;
 
         Ok((sink, healthcheck))
     }
@@ -131,8 +149,8 @@ impl SinkConfig for SematextMetricsConfig {
         "sematext_metrics"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
@@ -152,7 +170,6 @@ impl SematextMetricsService {
     pub fn new(
         config: SematextMetricsConfig,
         endpoint: http::Uri,
-        cx: SinkContext,
         client: HttpClient,
     ) -> Result<VectorSink> {
         let batch = config.batch.into_batch_settings()?;
@@ -173,7 +190,6 @@ impl SematextMetricsService {
                 sematext_service,
                 MetricsBuffer::new(batch.size),
                 batch.timeout,
-                cx.acker(),
             )
             .with_flat_map(move |event: Event| {
                 stream::iter({
@@ -252,7 +268,7 @@ fn encode_events(
             .namespace
             .unwrap_or_else(|| default_namespace.into());
         let label = series.name.name;
-        let ts = encode_timestamp(data.timestamp);
+        let ts = encode_timestamp(data.time.timestamp);
 
         // Authentication in Sematext is by inserting the token as a tag.
         let mut tags = series.tags.unwrap_or_default();
@@ -420,7 +436,7 @@ mod tests {
             events.push(event);
         }
 
-        let _ = sink.run_events(events).await.unwrap();
+        sink.run_events(events).await.unwrap();
 
         let output = rx.take(metrics.len()).collect::<Vec<_>>().await;
         assert_eq!("os,metric_type=counter,os.host=somehost,token=atoken swap.size=324292 1597784400000000000", output[0].1);

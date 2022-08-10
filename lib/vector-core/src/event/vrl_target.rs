@@ -1,8 +1,8 @@
-use std::{collections::BTreeMap, convert::TryFrom, marker::PhantomData, sync::Arc};
+use std::{collections::BTreeMap, convert::TryFrom, marker::PhantomData};
 
 use lookup::{LookupBuf, SegmentBuf};
 use snafu::Snafu;
-use vrl_lib::{prelude::VrlValueConvert, ProgramInfo};
+use vrl_lib::{prelude::VrlValueConvert, MetadataTarget, ProgramInfo, SecretTarget};
 
 use super::{Event, EventMetadata, LogEvent, Metric, MetricKind, TraceEvent, Value};
 use crate::config::log_schema;
@@ -145,13 +145,28 @@ impl VrlTarget {
             VrlTarget::Metric { metric, .. } => TargetEvents::One(Event::Metric(metric)),
         }
     }
+
+    fn metadata(&self) -> &EventMetadata {
+        match self {
+            VrlTarget::LogEvent(_, metadata) | VrlTarget::Trace(_, metadata) => metadata,
+            VrlTarget::Metric { metric, .. } => metric.metadata(),
+        }
+    }
+
+    fn metadata_mut(&mut self) -> &mut EventMetadata {
+        match self {
+            VrlTarget::LogEvent(_, metadata) | VrlTarget::Trace(_, metadata) => metadata,
+            VrlTarget::Metric { metric, .. } => metric.metadata_mut(),
+        }
+    }
 }
 
 impl vrl_lib::Target for VrlTarget {
     fn target_insert(&mut self, path: &LookupBuf, value: ::value::Value) -> Result<(), String> {
         match self {
             VrlTarget::LogEvent(ref mut log, _) | VrlTarget::Trace(ref mut log, _) => {
-                log.target_insert(path, value)
+                log.insert(path, value);
+                Ok(())
             }
             VrlTarget::Metric {
                 ref mut metric,
@@ -193,7 +208,7 @@ impl vrl_lib::Target for VrlTarget {
                         }
                         ["timestamp"] => {
                             let value = value.clone().try_timestamp().map_err(|e| e.to_string())?;
-                            metric.data.timestamp = Some(value);
+                            metric.data.time.timestamp = Some(value);
                         }
                         ["kind"] => {
                             metric.data.kind = MetricKind::try_from(value.clone())?;
@@ -207,7 +222,7 @@ impl vrl_lib::Target for VrlTarget {
                         }
                     }
 
-                    metric_value.insert_by_path(path, value);
+                    metric_value.insert(path, value);
 
                     return Ok(());
                 }
@@ -224,14 +239,14 @@ impl vrl_lib::Target for VrlTarget {
     #[allow(clippy::redundant_closure_for_method_calls)] // false positive
     fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String> {
         match self {
-            VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => log.target_get(path),
+            VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => Ok(log.get(path)),
             VrlTarget::Metric { value, .. } => target_get_metric(path, value),
         }
     }
 
     fn target_get_mut(&mut self, path: &LookupBuf) -> Result<Option<&mut Value>, String> {
         match self {
-            VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => log.target_get_mut(path),
+            VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => Ok(log.get_mut(path)),
             VrlTarget::Metric { value, .. } => target_get_mut_metric(path, value),
         }
     }
@@ -243,7 +258,7 @@ impl vrl_lib::Target for VrlTarget {
     ) -> Result<Option<::value::Value>, String> {
         match self {
             VrlTarget::LogEvent(ref mut log, _) | VrlTarget::Trace(ref mut log, _) => {
-                log.target_remove(path, compact)
+                Ok(log.remove(path, compact))
             }
             VrlTarget::Metric {
                 ref mut metric,
@@ -256,7 +271,7 @@ impl vrl_lib::Target for VrlTarget {
                 if let Some(paths) = path.to_alternative_components(MAX_METRIC_PATH_DEPTH).get(0) {
                     let removed_value = match paths.as_slice() {
                         ["namespace"] => metric.series.name.namespace.take().map(Into::into),
-                        ["timestamp"] => metric.data.timestamp.take().map(Into::into),
+                        ["timestamp"] => metric.data.time.timestamp.take().map(Into::into),
                         ["tags"] => metric.series.tags.take().map(|map| {
                             map.into_iter()
                                 .map(|(k, v)| (k, v.into()))
@@ -272,7 +287,7 @@ impl vrl_lib::Target for VrlTarget {
                         }
                     };
 
-                    value.remove_by_path(path, false);
+                    value.remove(path, false);
 
                     return Ok(removed_value);
                 }
@@ -281,62 +296,36 @@ impl vrl_lib::Target for VrlTarget {
             }
         }
     }
+}
 
-    fn get_metadata(&self, key: &str) -> Result<Option<::value::Value>, String> {
-        let metadata = match self {
-            VrlTarget::LogEvent(_, metadata) | VrlTarget::Trace(_, metadata) => metadata,
-            VrlTarget::Metric { metric, .. } => metric.metadata(),
-        };
-
-        match key {
-            "datadog_api_key" => Ok(metadata
-                .datadog_api_key()
-                .as_ref()
-                .map(|api_key| ::value::Value::from(api_key.to_string()))),
-            "splunk_hec_token" => Ok(metadata
-                .splunk_hec_token()
-                .as_ref()
-                .map(|token| ::value::Value::from(token.to_string()))),
-            _ => Err(format!("key {} not available", key)),
-        }
+impl MetadataTarget for VrlTarget {
+    fn get_metadata(&self, path: &LookupBuf) -> Result<Option<::value::Value>, String> {
+        let value = self.metadata().value().get(path).cloned();
+        Ok(value)
     }
 
-    fn set_metadata(&mut self, key: &str, value: String) -> Result<(), String> {
-        let metadata = match self {
-            VrlTarget::LogEvent(_, metadata) | VrlTarget::Trace(_, metadata) => metadata,
-            VrlTarget::Metric { metric, .. } => metric.metadata_mut(),
-        };
-
-        match key {
-            "datadog_api_key" => {
-                metadata.set_datadog_api_key(Some(Arc::from(value.as_str())));
-                Ok(())
-            }
-            "splunk_hec_token" => {
-                metadata.set_splunk_hec_token(Some(Arc::from(value.as_str())));
-                Ok(())
-            }
-            _ => Err(format!("key {} not available", key)),
-        }
+    fn set_metadata(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
+        self.metadata_mut().value_mut().insert(path, value);
+        Ok(())
     }
 
-    fn remove_metadata(&mut self, key: &str) -> Result<(), String> {
-        let metadata = match self {
-            VrlTarget::LogEvent(_, metadata) | VrlTarget::Trace(_, metadata) => metadata,
-            VrlTarget::Metric { metric, .. } => metric.metadata_mut(),
-        };
+    fn remove_metadata(&mut self, path: &LookupBuf) -> Result<(), String> {
+        self.metadata_mut().value_mut().remove(path, false);
+        Ok(())
+    }
+}
 
-        match key {
-            "datadog_api_key" => {
-                metadata.set_datadog_api_key(None);
-                Ok(())
-            }
-            "splunk_hec_token" => {
-                metadata.set_splunk_hec_token(None);
-                Ok(())
-            }
-            _ => Err(format!("key {} not available", key)),
-        }
+impl SecretTarget for VrlTarget {
+    fn get_secret(&self, key: &str) -> Option<&str> {
+        self.metadata().secrets().get_secret(key)
+    }
+
+    fn insert_secret(&mut self, key: &str, value: &str) {
+        self.metadata_mut().secrets_mut().insert_secret(key, value);
+    }
+
+    fn remove_secret(&mut self, key: &str) {
+        self.metadata_mut().secrets_mut().remove_secret(key);
     }
 }
 
@@ -356,7 +345,7 @@ fn target_get_metric<'a>(path: &LookupBuf, value: &'a Value) -> Result<Option<&'
         return Ok(Some(value));
     }
 
-    let value = value.get_by_path(path);
+    let value = value.get(path);
 
     for paths in path.to_alternative_components(MAX_METRIC_PATH_DEPTH) {
         match paths.as_slice() {
@@ -389,7 +378,7 @@ fn target_get_mut_metric<'a>(
         return Ok(Some(value));
     }
 
-    let value = value.get_by_path_mut(path);
+    let value = value.get_mut(path);
 
     for paths in path.to_alternative_components(MAX_METRIC_PATH_DEPTH) {
         match paths.as_slice() {

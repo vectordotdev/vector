@@ -8,7 +8,10 @@ use quickcheck::{empty_shrinker, Arbitrary, Gen};
 
 use crate::{
     event::{
-        metric::{Bucket, MetricData, MetricName, MetricSeries, MetricSketch, Quantile, Sample},
+        metric::{
+            Bucket, MetricData, MetricName, MetricSeries, MetricSketch, MetricTime, Quantile,
+            Sample,
+        },
         Event, EventMetadata, LogEvent, Metric, MetricKind, MetricValue, StatisticKind, TraceEvent,
         Value,
     },
@@ -191,12 +194,12 @@ impl Arbitrary for MetricValue {
             },
             4 => MetricValue::AggregatedHistogram {
                 buckets: Vec::arbitrary(g),
-                count: u32::arbitrary(g),
+                count: u64::arbitrary(g),
                 sum: f64::arbitrary(g) % MAX_F64_SIZE,
             },
             5 => MetricValue::AggregatedSummary {
                 quantiles: Vec::arbitrary(g),
-                count: u32::arbitrary(g),
+                count: u64::arbitrary(g),
                 sum: f64::arbitrary(g) % MAX_F64_SIZE,
             },
             6 => {
@@ -425,7 +428,7 @@ impl Arbitrary for Bucket {
     fn arbitrary(g: &mut Gen) -> Self {
         Bucket {
             upper_limit: f64::arbitrary(g) % MAX_F64_SIZE,
-            count: u32::arbitrary(g),
+            count: u64::arbitrary(g),
         }
     }
 
@@ -560,8 +563,15 @@ impl Arbitrary for MetricData {
             None
         };
 
+        let interval_ms = bool::arbitrary(g)
+            .then(|| u32::arbitrary(g))
+            .and_then(std::num::NonZeroU32::new);
+
         MetricData {
-            timestamp: dt,
+            time: MetricTime {
+                timestamp: dt,
+                interval_ms,
+            },
             kind: MetricKind::arbitrary(g),
             value: MetricValue::arbitrary(g),
         }

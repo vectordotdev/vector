@@ -57,15 +57,6 @@ impl Function for Exists {
         }
     }
 
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let field = args
-            .required_any("field")
-            .downcast_ref::<expression::Query>()
-            .unwrap();
-
-        exists(field, ctx)
-    }
-
     fn compile(
         &self,
         _state: (&mut state::LocalEnv, &mut state::ExternalEnv),

@@ -4,10 +4,9 @@ use async_trait::async_trait;
 use futures_util::{stream::BoxStream, Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot::{channel, Receiver, Sender};
-use vector_buffers::Acker;
 use vector_core::{
-    config::{AcknowledgementsConfig, DataType, Input, Output},
-    event::{Event, EventArray, EventContainer},
+    config::{AcknowledgementsConfig, DataType, Input, LogNamespace, Output},
+    event::{Event, EventArray, EventContainer, LogEvent},
     schema::Definition,
     sink::{StreamSink, VectorSink},
     source::Source,
@@ -75,7 +74,7 @@ struct OneshotSourceConfig {
 #[async_trait]
 #[typetag::serde(name = "oneshot")]
 impl SourceConfig for OneshotSourceConfig {
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::all())]
     }
 
@@ -117,19 +116,16 @@ impl SinkConfig for OneshotSinkConfig {
         "oneshot"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        None
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &AcknowledgementsConfig::DEFAULT
     }
 
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let tx = {
             let mut guard = self.tx.lock().expect("who cares if the lock is poisoned");
             guard.take()
         };
-        let sink = Box::new(OneshotSink {
-            acker: cx.acker,
-            tx,
-        });
+        let sink = Box::new(OneshotSink { tx });
 
         let healthcheck = Box::pin(async { Ok(()) });
 
@@ -138,7 +134,6 @@ impl SinkConfig for OneshotSinkConfig {
 }
 
 struct OneshotSink {
-    acker: Acker,
     tx: Option<Sender<EventArray>>,
 }
 
@@ -150,7 +145,6 @@ impl StreamSink<EventArray> for OneshotSink {
             .next()
             .await
             .expect("must always get an item in oneshot sink");
-        self.acker.ack(events.len());
         let _ = tx.send(events);
 
         Ok(())
@@ -209,7 +203,7 @@ async fn create_topology(
 #[tokio::test]
 async fn test_function_transform_single_event() {
     assert_transform_compliance(async {
-        let original_event = Event::from("function transform being tested");
+        let original_event = Event::Log(LogEvent::from("function transform being tested"));
 
         let (topology, rx) = create_topology(original_event.clone(), TransformType::Function).await;
         topology.stop().await;
@@ -227,7 +221,7 @@ async fn test_function_transform_single_event() {
 #[tokio::test]
 async fn test_sync_transform_single_event() {
     assert_transform_compliance(async {
-        let original_event = Event::from("function transform being tested");
+        let original_event = Event::Log(LogEvent::from("function transform being tested"));
 
         let (topology, rx) =
             create_topology(original_event.clone(), TransformType::Synchronous).await;
@@ -246,7 +240,7 @@ async fn test_sync_transform_single_event() {
 #[tokio::test]
 async fn test_task_transform_single_event() {
     assert_transform_compliance(async {
-        let original_event = Event::from("function transform being tested");
+        let original_event = Event::Log(LogEvent::from("function transform being tested"));
 
         let (topology, rx) = create_topology(original_event.clone(), TransformType::Task).await;
         topology.stop().await;

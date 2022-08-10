@@ -51,11 +51,6 @@ impl Function for Timestamp {
 
         Ok(Box::new(TimestampFn { value }))
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        timestamp(value)
-    }
 }
 
 #[derive(Debug, Clone)]

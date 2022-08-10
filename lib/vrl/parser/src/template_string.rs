@@ -51,13 +51,15 @@ impl TemplateString {
                     )),
                 )
             })
-            .map(|(_span, expr)| expr)
-            .unwrap_or_else(|| {
-                Expr::Literal(Node::new(
-                    diagnostic::Span::default(),
-                    RawString("".to_string()),
-                ))
-            })
+            .map_or_else(
+                || {
+                    Expr::Literal(Node::new(
+                        diagnostic::Span::default(),
+                        RawString("".to_string()),
+                    ))
+                },
+                |(_span, expr)| expr,
+            )
     }
 
     /// If the template string is just a single literal string return that string

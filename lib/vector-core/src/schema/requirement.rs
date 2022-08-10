@@ -1,7 +1,4 @@
-use std::{
-    borrow::Cow,
-    collections::{BTreeMap, BTreeSet},
-};
+use std::collections::{BTreeMap, BTreeSet};
 
 use lookup::LookupBuf;
 use value::Kind;
@@ -63,6 +60,7 @@ impl Requirement {
     /// This differs from `required_meaning` in that it is valid for the event to not have the
     /// specified meaning defined, but invalid for that meaning to be defined, but its [`Kind`] not
     /// matching the configured expectation.
+    #[must_use]
     pub fn optional_meaning(mut self, meaning: &'static str, kind: Kind) -> Self {
         self.insert_meaning(meaning, kind, true);
         self
@@ -100,18 +98,10 @@ impl Requirement {
             match maybe_meaning_path {
                 Some(path) => {
                     // Get the kind at the path for the given semantic meaning.
-                    // If no kind is found, we set the kind to "any", since we
-                    // lack any further information.
-                    let definition_kind = definition
-                        .collection()
-                        .find_known_at_path(&mut path.to_lookup())
-                        .ok()
-                        .flatten()
-                        .map_or_else(Kind::any, Cow::into_owned);
+                    let definition_kind = definition.event_kind().at_path(path);
 
                     if !req_meaning.kind.is_superset(&definition_kind) {
-                        // We found a field matching the defined semantic
-                        // meaning, but its kind does not match the expected
+                        // The semantic meaning kind does not match the expected
                         // kind, so we can't use it in the sink.
                         errors.push(ValidationError::MeaningKind {
                             identifier,
@@ -260,7 +250,7 @@ mod tests {
                 "empty",
                 TestCase {
                     requirement: Requirement::empty(),
-                    definition: Definition::empty(),
+                    definition: Definition::empty_legacy_namespace(),
                     errors: vec![],
                 },
             ),
@@ -268,7 +258,7 @@ mod tests {
                 "missing required meaning",
                 TestCase {
                     requirement: Requirement::empty().required_meaning("foo", Kind::any()),
-                    definition: Definition::empty(),
+                    definition: Definition::empty_legacy_namespace(),
                     errors: vec![ValidationError::MeaningMissing { identifier: "foo" }],
                 },
             ),
@@ -278,7 +268,7 @@ mod tests {
                     requirement: Requirement::empty()
                         .required_meaning("foo", Kind::any())
                         .required_meaning("bar", Kind::any()),
-                    definition: Definition::empty(),
+                    definition: Definition::empty_legacy_namespace(),
                     errors: vec![
                         ValidationError::MeaningMissing { identifier: "bar" },
                         ValidationError::MeaningMissing { identifier: "foo" },
@@ -289,7 +279,7 @@ mod tests {
                 "missing optional meaning",
                 TestCase {
                     requirement: Requirement::empty().optional_meaning("foo", Kind::any()),
-                    definition: Definition::empty(),
+                    definition: Definition::empty_legacy_namespace(),
                     errors: vec![],
                 },
             ),
@@ -299,7 +289,7 @@ mod tests {
                     requirement: Requirement::empty()
                         .optional_meaning("foo", Kind::any())
                         .required_meaning("bar", Kind::any()),
-                    definition: Definition::empty(),
+                    definition: Definition::empty_legacy_namespace(),
                     errors: vec![ValidationError::MeaningMissing { identifier: "bar" }],
                 },
             ),
@@ -307,7 +297,7 @@ mod tests {
                 "invalid required meaning kind",
                 TestCase {
                     requirement: Requirement::empty().required_meaning("foo", Kind::boolean()),
-                    definition: Definition::empty().required_field(
+                    definition: Definition::empty_legacy_namespace().with_field(
                         "foo",
                         Kind::integer(),
                         Some("foo"),
@@ -323,7 +313,7 @@ mod tests {
                 "invalid optional meaning kind",
                 TestCase {
                     requirement: Requirement::empty().optional_meaning("foo", Kind::boolean()),
-                    definition: Definition::empty().required_field(
+                    definition: Definition::empty_legacy_namespace().with_field(
                         "foo",
                         Kind::integer(),
                         Some("foo"),
@@ -339,9 +329,9 @@ mod tests {
                 "duplicate meaning pointers",
                 TestCase {
                     requirement: Requirement::empty().optional_meaning("foo", Kind::boolean()),
-                    definition: Definition::empty()
-                        .required_field("foo", Kind::integer(), Some("foo"))
-                        .merge(Definition::empty().required_field(
+                    definition: Definition::empty_legacy_namespace()
+                        .with_field("foo", Kind::integer(), Some("foo"))
+                        .merge(Definition::empty_legacy_namespace().with_field(
                             "bar",
                             Kind::boolean(),
                             Some("foo"),

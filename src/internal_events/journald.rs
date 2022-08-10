@@ -27,3 +27,25 @@ impl InternalEvent for JournaldInvalidRecordError {
         counter!("invalid_record_bytes_total", self.text.len() as u64); // deprecated
     }
 }
+
+pub struct JournaldNegativeAcknowledgmentError<'a> {
+    pub cursor: &'a str,
+}
+
+impl InternalEvent for JournaldNegativeAcknowledgmentError<'_> {
+    fn emit(self) {
+        error!(
+            message = "Event received a negative acknowledgment, journal has been stopped.",
+            error_code = "negative_acknowledgement",
+            error_type = error_type::ACKNOWLEDGMENT_FAILED,
+            stage = error_stage::SENDING,
+            cursor = self.cursor,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "negative_acknowledgment",
+            "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
+            "stage" => error_stage::SENDING,
+        );
+    }
+}

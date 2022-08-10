@@ -8,7 +8,7 @@ ARG FEATURES=api,api-client,sources-datadog_agent,sources-fluent,sources-host_me
 #
 FROM docker.io/rust:${RUST_VERSION}-${DEBIAN_RELEASE} as builder
 RUN apt-get update && apt-get -y --no-install-recommends install build-essential git clang cmake libclang-dev libsasl2-dev libstdc++-10-dev libssl-dev libxxhash-dev zlib1g-dev zlib1g
-RUN git clone https://github.com/rui314/mold.git && cd mold && git checkout v1.1.1 && make -j"$(nproc)" && make install
+RUN git clone https://github.com/rui314/mold.git && cd mold && git checkout v1.2.1 && make -j"$(nproc)" && make install
 
 WORKDIR /vector
 COPY . .
@@ -32,4 +32,3 @@ RUN mkdir -p /var/lib/vector
 RUN ["vector", "--version"]
 
 ENTRYPOINT ["/usr/bin/vector"]
-

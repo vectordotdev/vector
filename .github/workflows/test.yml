@@ -27,7 +27,9 @@ env:
   VERBOSE: true
   CI: true
   PROFILE: debug
-  RUSTFLAGS: "-D warnings"
+  # observing issues fetching boringssl via HTTPS in the OSX build, seeing if this helps
+  # can be removed when we switch back to the upstream openssl-sys crate
+  CARGO_NET_GIT_FETCH_WITH_CLI: true
 
 jobs:
   changes:
@@ -107,6 +109,7 @@ jobs:
       - run: make test
         env:
           CARGO_BUILD_JOBS: 5
+      - run: make test-enterprise
       - name: Upload test results
         run: scripts/upload-test-results.sh
         if: always()
@@ -210,7 +213,7 @@ jobs:
 
   cross-linux-check:
     if: ${{ needs.changes.outputs.dependencies == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     name: Cross - Linux
     needs: cross-linux
     steps:
@@ -223,7 +226,7 @@ jobs:
     # Full CI suites for this platform were only recently introduced.
     # Some failures are permitted until we can properly correct them.
     continue-on-error: true
-    runs-on: macos-latest
+    runs-on: macos-11
     needs: changes
     env:
       CARGO_INCREMENTAL: 0
@@ -246,6 +249,7 @@ jobs:
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make test
       - run: make test-behavior
+      - run: make test-enterprise
 
   test-windows:
     name: Unit - Windows
@@ -256,6 +260,7 @@ jobs:
       - uses: actions/checkout@v3
       - run: .\scripts\environment\bootstrap-windows-2019.ps1
       - run: make test
+      - run: make test-enterprise
 
   test-vrl:
     name: VRL - Linux
@@ -279,7 +284,6 @@ jobs:
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: cargo install cargo-hack
       - run: make check-component-features
 
   check-msrv:
@@ -334,16 +338,9 @@ jobs:
       - name: Check events
         if: needs.changes.outputs.source == 'true'
         run: make check-events
-      - name: Check cargo deny advisories
+      - name: Check cargo deny advisories/licenses
         if: needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.deny == 'true'
-        uses: EmbarkStudios/cargo-deny-action@v1.3.1
-        with:
-          command: check advisories
-      - name: Check cargo deny licenses
-        if: needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.deny == 'true'
-        uses: EmbarkStudios/cargo-deny-action@v1.3.1
-        with:
-          command: check licenses
+        run: make check-deny
       - name: Check Cue docs
         if: needs.changes.outputs.cue == 'true'
         run: make check-docs

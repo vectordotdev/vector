@@ -56,13 +56,6 @@ impl Function for Push {
 
         Ok(Box::new(PushFn { value, item }))
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let list = args.required("value");
-        let item = args.required("item");
-
-        push(list, item)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -80,12 +73,20 @@ impl Expression for PushFn {
     }
 
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
-        let item = TypeDef::array(BTreeMap::from([(
-            0.into(),
-            self.item.type_def(state).into(),
-        )]));
+        let item = self.item.type_def(state).kind().clone().upgrade_undefined();
+        let mut typedef = self.value.type_def(state).restrict_array();
 
-        self.value.type_def(state).merge_append(item).infallible()
+        let array = typedef.as_array_mut().expect("must be an array");
+
+        if let Some(exact_len) = array.exact_length() {
+            // The exact array length is known, so just add the item to the correct index.
+            array.known_mut().insert(exact_len.into(), item);
+        } else {
+            // We don't know where the item will be inserted, so just add it to the unknown.
+            array.set_unknown(array.unknown_kind().union(item));
+        }
+
+        typedef.infallible()
     }
 }
 

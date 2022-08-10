@@ -9,6 +9,8 @@ use hyper::{Body, Request};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio_stream::wrappers::IntervalStream;
+use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
 use super::parser;
@@ -41,19 +43,52 @@ enum ConfigError {
     BothEndpointsAndHosts,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
-struct PrometheusScrapeConfig {
-    // Deprecated name
+/// Configuration for the `prometheus_scrape` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
+pub struct PrometheusScrapeConfig {
+    /// Endpoints to scrape metrics from.
     #[serde(alias = "hosts")]
     endpoints: Vec<String>,
+
+    /// The interval between scrapes, in seconds.
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
+
+    /// Overrides the name of the tag used to add the instance to each metric.
+    ///
+    /// The tag value will be the host/port of the scraped instance.
+    ///
+    /// By default, `"instance"` is used.
     instance_tag: Option<String>,
+
+    /// Overrides the name of the tag used to add the endpoint to each metric.
+    ///
+    /// The tag value will be the endpoint of the scraped instance.
+    ///
+    /// By default, `"endpoint"` is used.
     endpoint_tag: Option<String>,
+
+    /// Controls how tag conflicts are handled if the scraped source has tags that Vector would add.
+    ///
+    /// If `true`, Vector will not add the new tag if the scraped metric has the tag already. If `false`, Vector will
+    /// rename the conflicting tag by prepending `exported_` to the name.
+    ///
+    /// This matches Prometheus’ `honor_labels` configuration.
     #[serde(default = "crate::serde::default_false")]
     honor_labels: bool,
+
+    /// Custom parameters for the scrape request query string.
+    ///
+    /// One or more values for the same parameter key can be provided. The parameters provided in this option are
+    /// appended to any parameters manually provided in the `endpoints` option. This option is especially useful when
+    /// scraping the `/federate` endpoint.
     query: Option<HashMap<String, Vec<String>>>,
+
+    #[configurable(derived)]
     tls: Option<TlsConfig>,
+
+    #[configurable(derived)]
     auth: Option<Auth>,
 }
 
@@ -133,7 +168,7 @@ impl SourceConfig for PrometheusScrapeConfig {
         .boxed())
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(config::DataType::Metric)]
     }
 
@@ -184,7 +219,7 @@ impl SourceConfig for PrometheusCompatConfig {
         config.build(cx).await
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(config::DataType::Metric)]
     }
 
@@ -421,7 +456,7 @@ mod test {
             components::{
                 assert_source_compliance, run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS,
             },
-            next_addr, start_topology,
+            next_addr, start_topology, wait_for_tcp,
         },
         Error,
     };
@@ -442,6 +477,7 @@ mod test {
         });
 
         tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+        wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics", in_addr)],
@@ -456,7 +492,7 @@ mod test {
 
         let events = run_and_assert_source_compliance(
             config,
-            Duration::from_secs(1),
+            Duration::from_secs(3),
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
@@ -474,6 +510,7 @@ mod test {
         });
 
         tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+        wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics", in_addr)],
@@ -488,7 +525,7 @@ mod test {
 
         let events = run_and_assert_source_compliance(
             config,
-            Duration::from_secs(1),
+            Duration::from_secs(3),
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
@@ -524,6 +561,7 @@ mod test {
         });
 
         tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+        wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics", in_addr)],
@@ -538,7 +576,7 @@ mod test {
 
         let events = run_and_assert_source_compliance(
             config,
-            Duration::from_secs(1),
+            Duration::from_secs(3),
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
@@ -587,6 +625,7 @@ mod test {
         });
 
         tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+        wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics?key1=val1", in_addr)],
@@ -607,7 +646,7 @@ mod test {
 
         let events = run_and_assert_source_compliance(
             config,
-            Duration::from_secs(1),
+            Duration::from_secs(3),
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
@@ -689,6 +728,7 @@ mod test {
                 error!(message = "Server error.", %error);
             }
         });
+        wait_for_tcp(in_addr).await;
 
         let mut config = config::Config::builder();
         config.add_source(
@@ -715,6 +755,8 @@ mod test {
                 quantiles: vec![],
                 distributions_as_summaries: false,
                 flush_period_secs: Duration::from_secs(1),
+                suppress_timestamp: false,
+                acknowledgements: Default::default(),
             },
         );
 
@@ -794,7 +836,7 @@ mod integration_tests {
 
         let events = run_and_assert_source_compliance(
             config,
-            Duration::from_secs(1),
+            Duration::from_secs(3),
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;

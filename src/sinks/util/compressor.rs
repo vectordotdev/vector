@@ -26,15 +26,15 @@ impl From<Compression> for Writer {
         let writer = BytesMut::with_capacity(1_024).writer();
         match compression {
             Compression::None => Writer::Plain(writer),
-            Compression::Gzip(level) => Writer::Gzip(GzEncoder::new(writer, level)),
-            Compression::Zlib(level) => Writer::Zlib(ZlibEncoder::new(writer, level)),
+            Compression::Gzip(level) => Writer::Gzip(GzEncoder::new(writer, level.as_flate2())),
+            Compression::Zlib(level) => Writer::Zlib(ZlibEncoder::new(writer, level.as_flate2())),
         }
     }
 }
 
 impl io::Write for Writer {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        #[allow(clippy::disallowed_method)] // Caller handles the result of `write`.
+        #[allow(clippy::disallowed_methods)] // Caller handles the result of `write`.
         match self {
             Writer::Plain(inner_buf) => inner_buf.write(buf),
             Writer::Gzip(writer) => writer.write(buf),
@@ -119,7 +119,7 @@ impl Compressor {
 
 impl io::Write for Compressor {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        #[allow(clippy::disallowed_method)] // Caller handles the result of `write`.
+        #[allow(clippy::disallowed_methods)] // Caller handles the result of `write`.
         self.inner.write(buf)
     }
 

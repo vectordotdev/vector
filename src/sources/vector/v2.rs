@@ -1,11 +1,12 @@
-use futures::TryFutureExt;
-use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
+
+use futures::TryFutureExt;
 use tokio::net::TcpStream;
 use tonic::{
     transport::{server::Connected, Certificate},
     Request, Response, Status,
 };
+use vector_config::configurable_component;
 use vector_core::{
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
     ByteSizeOf,
@@ -45,7 +46,7 @@ impl proto::Service for Service {
 
         emit!(EventsReceived { count, byte_size });
 
-        let receiver = BatchNotifier::maybe_apply_to_events(self.acknowledgements, &mut events);
+        let receiver = BatchNotifier::maybe_apply_to(self.acknowledgements, &mut events);
 
         self.pipeline
             .clone()
@@ -86,14 +87,26 @@ async fn handle_batch_status(receiver: Option<BatchStatusReceiver>) -> Result<()
         BatchStatus::Delivered => Ok(()),
     }
 }
-#[derive(Deserialize, Serialize, Debug, Clone)]
+
+/// Configuration for version two of the `vector` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct VectorConfig {
+    /// The address to listen for connections on.
+    ///
+    /// It _must_ include a port.
     pub address: SocketAddr,
+
+    /// The timeout, in seconds, before a connection is forcefully closed during shutdown.
     #[serde(default = "default_shutdown_timeout_secs")]
     pub shutdown_timeout_secs: u64,
+
+    #[configurable(derived)]
     #[serde(default)]
     tls: Option<TlsEnableableConfig>,
+
+    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
 }
@@ -123,6 +136,7 @@ impl VectorConfig {
             acknowledgements,
         })
         .accept_gzip();
+
         let source =
             run_grpc_server(self.address, tls_settings, service, cx.shutdown).map_err(|error| {
                 error!(message = "Source future failed.", %error);
@@ -180,14 +194,14 @@ mod tests {
         sinks::vector::v2::VectorConfig as SinkConfig,
         test_util::{
             self,
-            components::{assert_source_compliance, SOCKET_PUSH_SOURCE_TAGS},
+            components::{assert_source_compliance, SOURCE_TAGS},
         },
         SourceSender,
     };
 
     #[tokio::test]
     async fn receive_message() {
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, async {
             let addr = test_util::next_addr();
             let config = format!(r#"address = "{}""#, addr);
             let source: VectorConfig = toml::from_str(&config).unwrap();
@@ -219,7 +233,7 @@ mod tests {
 
     #[tokio::test]
     async fn receive_compressed_message() {
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, async {
             let addr = test_util::next_addr();
             let config = format!(r#"address = "{}""#, addr);
             let source: VectorConfig = toml::from_str(&config).unwrap();

@@ -11,7 +11,7 @@ pub mod metrics;
 pub mod partition;
 pub mod vec;
 
-pub use compression::{Compression, GZIP_FAST};
+pub use compression::Compression;
 pub use partition::{Partition, PartitionBuffer, PartitionInnerBuffer};
 
 #[derive(Debug)]
@@ -48,8 +48,12 @@ impl Buffer {
             let writer = BytesMut::with_capacity(bytes).writer();
             match compression {
                 Compression::None => InnerBuffer::Plain(writer),
-                Compression::Gzip(level) => InnerBuffer::Gzip(GzEncoder::new(writer, level)),
-                Compression::Zlib(level) => InnerBuffer::Zlib(ZlibEncoder::new(writer, level)),
+                Compression::Gzip(level) => {
+                    InnerBuffer::Gzip(GzEncoder::new(writer, level.as_flate2()))
+                }
+                Compression::Zlib(level) => {
+                    InnerBuffer::Zlib(ZlibEncoder::new(writer, level.as_flate2()))
+                }
             }
         })
     }
@@ -141,7 +145,6 @@ mod test {
     use bytes::{Buf, BytesMut};
     use futures::{future, stream, SinkExt, StreamExt};
     use tokio::time::Duration;
-    use vector_buffers::Acker;
 
     use super::{Buffer, Compression};
     use crate::sinks::util::{BatchSettings, BatchSink, EncodedEvent};
@@ -150,7 +153,6 @@ mod test {
     async fn gzip() {
         use flate2::read::MultiGzDecoder;
 
-        let (acker, _) = Acker::basic();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
@@ -168,7 +170,6 @@ mod test {
             svc,
             Buffer::new(batch_settings.size, Compression::gzip_default()),
             batch_settings.timeout,
-            acker,
         );
 
         let input = std::iter::repeat(BytesMut::from(
@@ -176,7 +177,7 @@ mod test {
         ))
         .take(100_000);
 
-        let _ = buffered
+        buffered
             .sink_map_err(drop)
             .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item, 0))))
             .await

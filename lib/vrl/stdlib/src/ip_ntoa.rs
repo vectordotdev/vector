@@ -46,11 +46,6 @@ impl Function for IpNtoa {
 
         Ok(Box::new(IpNtoaFn { value }))
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        ip_ntoa(value)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -77,13 +72,13 @@ mod tests {
         ip_ntoa => IpNtoa;
 
         invalid {
-            args: func_args![value: u32::MAX as i64 + 1],
+            args: func_args![value: i64::from(u32::MAX) + 1],
             want: Err("cannot convert to bytes: integer does not fit in u32"),
             tdef: TypeDef::bytes().fallible(),
         }
 
         valid {
-            args: func_args![value: 16909060],
+            args: func_args![value: 16_909_060],
             want: Ok(value!("1.2.3.4")),
             tdef: TypeDef::bytes().fallible(),
         }

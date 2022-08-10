@@ -1,4 +1,4 @@
-use std::{fs::DirBuilder, path::PathBuf};
+use std::{fs::DirBuilder, path::PathBuf, time::Duration};
 
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -28,6 +28,7 @@ pub(crate) enum DataDirError {
     },
 }
 
+// If this is modified, make sure those changes are reflected in the `ConfigBuilder::append` function!
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(default)]
 pub struct GlobalOptions {
@@ -45,6 +46,8 @@ pub struct GlobalOptions {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+    #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
+    pub expire_metrics: Option<Duration>,
 }
 
 impl GlobalOptions {
@@ -59,7 +62,7 @@ impl GlobalOptions {
         local_data_dir: Option<&PathBuf>,
     ) -> crate::Result<PathBuf> {
         let data_dir = local_data_dir
-            .or_else(|| self.data_dir.as_ref())
+            .or(self.data_dir.as_ref())
             .ok_or(DataDirError::MissingDataDir)
             .map_err(Box::new)?
             .clone();

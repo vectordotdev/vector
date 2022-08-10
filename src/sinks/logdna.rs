@@ -4,17 +4,17 @@ use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
 use once_cell::sync::Lazy;
-use serde::{Deserialize, Serialize};
 use serde_json::json;
+use vector_config::configurable_component;
 
 use crate::{
+    codecs::Transformer,
     config::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
     },
     event::Event,
     http::{Auth, HttpClient},
     sinks::util::{
-        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{HttpEventEncoder, HttpSink, PartitionHttpSink},
         BatchConfig, BoxedRawValue, JsonArrayBuffer, PartitionBuffer, PartitionInnerBuffer,
         RealtimeSizeBasedDefaultBatchSettings, TowerRequestConfig, UriSerde,
@@ -26,33 +26,53 @@ static HOST: Lazy<Uri> = Lazy::new(|| Uri::from_static("https://logs.logdna.com"
 
 const PATH: &str = "/logs/ingest";
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub(super) struct LogdnaConfig {
+/// Configuration for the `logdna` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug)]
+pub struct LogdnaConfig {
+    /// The Ingestion API key.
     api_key: String,
-    // Deprecated name
+
+    /// The endpoint to send logs to.
     #[serde(alias = "host")]
     endpoint: Option<UriSerde>,
 
+    /// The hostname that will be attached to each batch of events.
+    #[configurable(metadata(templateable))]
     hostname: Template,
+
+    /// The MAC address that will be attached to each batch of events.
     mac: Option<String>,
+
+    /// The IP address that will be attached to each batch of events.
     ip: Option<String>,
+
+    /// The tags that will be attached to each batch of events.
+    #[configurable(metadata(templateable))]
     tags: Option<Vec<Template>>,
 
+    #[configurable(derived)]
     #[serde(
-        skip_serializing_if = "crate::serde::skip_serializing_if_default",
-        default
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    pub encoding: EncodingConfigWithDefault<Encoding>,
+    pub encoding: Transformer,
 
+    /// The default app that will be set for events that do not contain a `file` or `app` field.
     default_app: Option<String>,
+
+    /// The default environment that will be set for events that do not contain an `env` field.
     default_env: Option<String>,
 
+    #[configurable(derived)]
     #[serde(default)]
     batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 
+    #[configurable(derived)]
     #[serde(default)]
     request: TowerRequestConfig,
 
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -75,14 +95,6 @@ impl GenerateConfig for LogdnaConfig {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
-#[serde(rename_all = "snake_case")]
-#[derivative(Default)]
-pub enum Encoding {
-    #[derivative(Default)]
-    Default,
-}
-
 #[async_trait::async_trait]
 #[typetag::serde(name = "logdna")]
 impl SinkConfig for LogdnaConfig {
@@ -100,7 +112,6 @@ impl SinkConfig for LogdnaConfig {
             request_settings,
             batch_settings.timeout,
             client.clone(),
-            cx.acker(),
         )
         .sink_map_err(|error| error!(message = "Fatal logdna sink error.", %error));
 
@@ -117,8 +128,8 @@ impl SinkConfig for LogdnaConfig {
         "logdna"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
@@ -131,7 +142,7 @@ pub struct PartitionKey {
 pub struct LogdnaEventEncoder {
     hostname: Template,
     tags: Option<Vec<Template>>,
-    encoding: EncodingConfigWithDefault<Encoding>,
+    transformer: Transformer,
     default_app: Option<String>,
     default_env: Option<String>,
 }
@@ -178,7 +189,7 @@ impl HttpEventEncoder<PartitionInnerBuffer<serde_json::Value, PartitionKey>>
             })
             .ok()?;
 
-        self.encoding.apply_rules(&mut event);
+        self.transformer.transform(&mut event);
         let mut log = event.into_log();
 
         let line = log
@@ -238,7 +249,7 @@ impl HttpSink for LogdnaConfig {
         LogdnaEventEncoder {
             hostname: self.hostname.clone(),
             tags: self.tags.clone(),
-            encoding: self.encoding.clone(),
+            transformer: self.encoding.clone(),
             default_app: self.default_app.clone(),
             default_env: self.default_env.clone(),
         }
@@ -366,16 +377,16 @@ mod tests {
         .unwrap();
         let mut encoder = config.build_encoder();
 
-        let mut event1 = Event::from("hello world");
+        let mut event1 = Event::Log(LogEvent::from("hello world"));
         event1.as_mut_log().insert("app", "notvector");
         event1.as_mut_log().insert("magic", "vector");
 
-        let mut event2 = Event::from("hello world");
+        let mut event2 = Event::Log(LogEvent::from("hello world"));
         event2.as_mut_log().insert("file", "log.txt");
 
-        let event3 = Event::from("hello world");
+        let event3 = Event::Log(LogEvent::from("hello world"));
 
-        let mut event4 = Event::from("hello world");
+        let mut event4 = Event::Log(LogEvent::from("hello world"));
         event4.as_mut_log().insert("env", "staging");
 
         let event1_out = encoder.encode_event(event1).unwrap().into_parts().0;

@@ -26,4 +26,4 @@ type = "socket"
 inputs = ["socket_source"]
 mode = "tcp"
 address = "localhost:8080"
-encoding = "json"
+encoding.codec = "json"

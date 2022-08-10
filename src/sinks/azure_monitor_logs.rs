@@ -11,14 +11,15 @@ use openssl::{base64, hash, pkey, sign};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
+use vector_config::configurable_component;
 
 use crate::{
+    codecs::Transformer,
     config::{log_schema, AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
     http::HttpClient,
     sinks::{
         util::{
-            encoding::{EncodingConfigWithDefault, EncodingConfiguration},
             http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
             BatchConfig, BoxedRawValue, JsonArrayBuffer, RealtimeSizeBasedDefaultBatchSettings,
             TowerRequestConfig,
@@ -32,25 +33,59 @@ fn default_host() -> String {
     "ods.opinsights.azure.com".into()
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+/// Configuration for the `azure_monitor_logs` sink.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct AzureMonitorLogsConfig {
+    /// The [unique identifier][uniq_id] for the Log Analytics workspace.
+    ///
+    /// [uniq_id]: https://docs.microsoft.com/en-us/azure/azure-monitor/platform/data-collector-api#request-uri-parameters
     pub customer_id: String,
+
+    /// The [primary or the secondary key][shared_key] for the Log Analytics workspace.
+    ///
+    /// [shared_key]: https://docs.microsoft.com/en-us/azure/azure-monitor/platform/data-collector-api#authorization
     pub shared_key: String,
+
+    /// The [record type][record_type] of the data that is being submitted.
+    ///
+    /// Can only contain letters, numbers, and underscores (_), and may not exceed 100 characters.
+    ///
+    /// [record_type]: https://docs.microsoft.com/en-us/azure/azure-monitor/platform/data-collector-api#request-headers
+    #[configurable(validation(pattern = "[a-zA-Z0-9_]{1,100}"))]
     pub log_type: String,
+
+    /// The [Resource ID][resource_id] of the Azure resource the data should be associated with.
+    ///
+    /// [resource_id]: https://docs.microsoft.com/en-us/azure/azure-monitor/platform/data-collector-api#request-headers
     pub azure_resource_id: Option<String>,
+
+    /// [Alternative host][alt_host] for dedicated Azure regions.
+    ///
+    /// [alt_host]: https://docs.azure.cn/en-us/articles/guidance/developerdifferences#check-endpoints-in-azure
     #[serde(default = "default_host")]
     pub(super) host: String,
+
+    #[configurable(derived)]
     #[serde(
-        skip_serializing_if = "crate::serde::skip_serializing_if_default",
-        default
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    pub encoding: EncodingConfigWithDefault<Encoding>,
+    pub encoding: Transformer,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -119,7 +154,6 @@ impl SinkConfig for AzureMonitorLogsConfig {
             request_settings,
             batch_settings.timeout,
             client,
-            cx.acker(),
         )
         .sink_map_err(|error| error!(message = "Fatal azure_monitor_logs sink error.", %error));
 
@@ -134,8 +168,8 @@ impl SinkConfig for AzureMonitorLogsConfig {
         "azure_monitor_logs"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
@@ -143,18 +177,18 @@ impl SinkConfig for AzureMonitorLogsConfig {
 struct AzureMonitorLogsSink {
     uri: Uri,
     customer_id: String,
-    encoding: EncodingConfigWithDefault<Encoding>,
+    transformer: Transformer,
     shared_key: pkey::PKey<pkey::Private>,
     default_headers: HeaderMap,
 }
 
 struct AzureMonitorLogsEventEncoder {
-    encoding: EncodingConfigWithDefault<Encoding>,
+    transformer: Transformer,
 }
 
 impl HttpEventEncoder<serde_json::Value> for AzureMonitorLogsEventEncoder {
     fn encode_event(&mut self, mut event: Event) -> Option<serde_json::Value> {
-        self.encoding.apply_rules(&mut event);
+        self.transformer.transform(&mut event);
 
         // it seems like Azure Monitor doesn't support full 9-digit nanosecond precision
         // adjust the timestamp format accordingly, keeping only milliseconds
@@ -186,7 +220,7 @@ impl HttpSink for AzureMonitorLogsSink {
 
     fn build_encoder(&self) -> Self::Encoder {
         AzureMonitorLogsEventEncoder {
-            encoding: self.encoding.clone(),
+            transformer: self.transformer.clone(),
         }
     }
 
@@ -242,7 +276,7 @@ impl AzureMonitorLogsSink {
 
         Ok(AzureMonitorLogsSink {
             uri,
-            encoding: config.encoding.clone(),
+            transformer: config.encoding.clone(),
             customer_id: config.customer_id.clone(),
             shared_key,
             default_headers,
@@ -354,7 +388,7 @@ mod tests {
         let sink = AzureMonitorLogsSink {
             uri: mock_endpoint,
             customer_id: "weee".to_string(),
-            encoding: EncodingConfigWithDefault::from(Encoding::Default),
+            transformer: Default::default(),
             shared_key,
             default_headers: HeaderMap::new(),
         };
@@ -372,11 +406,10 @@ mod tests {
             request_settings,
             Duration::from_secs(1),
             client,
-            context.acker(),
         )
         .sink_map_err(|error| error!(message = "Fatal azure_monitor_logs sink error.", %error));
 
-        let event = Event::from("simple message");
+        let event = Event::Log(LogEvent::from("simple message"));
         run_and_assert_sink_compliance(
             VectorSink::from_event_sink(sink),
             stream::once(ready(event)),

@@ -18,7 +18,7 @@ use vector_core::event_test_util;
 use crate::{
     config::{SourceConfig, SourceContext},
     event::{Event, EventArray, Metric, MetricValue},
-    metrics::{self, Controller},
+    metrics::Controller,
     sinks::VectorSink,
     SourceSender,
 };
@@ -62,7 +62,7 @@ pub const FILE_SINK_TAGS: [&str; 2] = ["file", "protocol"];
 pub const HTTP_SINK_TAGS: [&str; 2] = ["endpoint", "protocol"];
 
 /// The standard set of tags for all `AWS`-based sinks.
-pub const AWS_SINK_TAGS: [&str; 3] = ["endpoint", "protocol", "region"];
+pub const AWS_SINK_TAGS: [&str; 2] = ["protocol", "region"];
 
 /// This struct is used to describe a set of component tests.
 pub struct ComponentTests {
@@ -151,13 +151,7 @@ impl ComponentTests {
 pub fn init_test() {
     super::trace_init();
     event_test_util::clear_recorded_events();
-
-    // Handle multiple initializations.
-    if let Err(error) = metrics::init_test() {
-        if error != metrics::Error::AlreadyInitialized {
-            panic!("Failed to initialize metrics recorder: {:?}", error);
-        }
-    }
+    super::trace_init();
 }
 
 /// Tests if the given metric contains all the given tag names

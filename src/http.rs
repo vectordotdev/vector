@@ -13,10 +13,10 @@ use hyper::{
 };
 use hyper_openssl::HttpsConnector;
 use hyper_proxy::ProxyConnector;
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tower::Service;
 use tracing::Instrument;
+use vector_config::configurable_component;
 
 use crate::{
     config::ProxyConfig,
@@ -37,6 +37,17 @@ pub enum HttpError {
     CallRequest { source: hyper::Error },
     #[snafu(display("Failed to build HTTP request: {}", source))]
     BuildRequest { source: http::Error },
+}
+
+impl HttpError {
+    pub const fn is_retriable(&self) -> bool {
+        match self {
+            HttpError::BuildRequest { .. } | HttpError::MakeProxyConnector { .. } => false,
+            HttpError::CallRequest { .. }
+            | HttpError::BuildTlsConnector { .. }
+            | HttpError::MakeHttpsConnector { .. } => true,
+        }
+    }
 }
 
 pub type HttpClientFuture = <HttpClient as Service<http::Request<Body>>>::Future;
@@ -103,7 +114,7 @@ where
             let response = response_result
                 .map_err(|error| {
                     // Emit the error into the internal events system.
-                    emit!(http_client::GotHttpError {
+                    emit!(http_client::GotHttpWarning {
                         error: &error,
                         roundtrip
                     });
@@ -128,8 +139,15 @@ pub fn build_proxy_connector(
     tls_settings: MaybeTlsSettings,
     proxy_config: &ProxyConfig,
 ) -> Result<ProxyConnector<HttpsConnector<HttpConnector>>, HttpError> {
+    // Create dedicated TLS connector for the proxied connection with user TLS settings.
+    let tls = tls_connector_builder(&tls_settings)
+        .context(BuildTlsConnectorSnafu)?
+        .build();
     let https = build_tls_connector(tls_settings)?;
     let mut proxy = ProxyConnector::new(https).unwrap();
+    // Make proxy connector aware of user TLS settings by setting the TLS connector:
+    // https://github.com/vectordotdev/vector/issues/13683
+    proxy.set_tls(Some(tls));
     proxy_config
         .configure(&mut proxy)
         .context(MakeProxyConnectorSnafu)?;
@@ -209,11 +227,32 @@ impl<B> fmt::Debug for HttpClient<B> {
     }
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
+/// Configuration of the authentication strategy for HTTP requests.
+///
+/// HTTP authentication should almost always be used with HTTPS only, as the authentication credentials are passed as an
+/// HTTP header without any additional encryption beyond what is provided by the transport itself.
+#[configurable_component]
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
 pub enum Auth {
-    Basic { user: String, password: String },
-    Bearer { token: String },
+    /// Basic authentication.
+    ///
+    /// The username and password are concatenated and encoded via base64.
+    Basic {
+        /// The username to send.
+        user: String,
+
+        /// The password to send.
+        password: String,
+    },
+
+    /// Bearer authentication.
+    ///
+    /// A bearer token (OAuth2, JWT, etc) is passed as-is.
+    Bearer {
+        /// The bearer token to send.
+        token: String,
+    },
 }
 
 pub trait MaybeAuth: Sized {

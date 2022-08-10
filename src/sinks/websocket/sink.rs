@@ -7,6 +7,7 @@ use std::{
 };
 
 use async_trait::async_trait;
+use bytes::BytesMut;
 use futures::{
     future::{self},
     pin_mut,
@@ -27,23 +28,22 @@ use tokio_tungstenite::{
     },
     WebSocketStream as WsStream,
 };
+use tokio_util::codec::Encoder as _;
 use vector_core::{
-    buffers::Acker,
     internal_event::{BytesSent, EventsSent},
+    ByteSizeOf,
 };
 
 use crate::{
+    codecs::{Encoder, Transformer},
     dns, emit,
-    event::Event,
+    event::{Event, EventStatus, Finalizable},
+    http::Auth,
     internal_events::{
         ConnectionOpen, OpenGauge, WsConnectionError, WsConnectionEstablished,
         WsConnectionFailedError, WsConnectionShutdown,
     },
-    sinks::util::{
-        encoding::{Encoder, EncodingConfig, StandardEncodings},
-        retries::ExponentialBackoff,
-        StreamSink,
-    },
+    sinks::util::{retries::ExponentialBackoff, StreamSink},
     sinks::websocket::config::WebSocketSinkConfig,
     tls::{MaybeTlsSettings, MaybeTlsStream, TlsError},
 };
@@ -67,10 +67,15 @@ pub struct WebSocketConnector {
     host: String,
     port: u16,
     tls: MaybeTlsSettings,
+    auth: Option<Auth>,
 }
 
 impl WebSocketConnector {
-    pub fn new(uri: String, tls: MaybeTlsSettings) -> Result<Self, WebSocketError> {
+    pub fn new(
+        uri: String,
+        tls: MaybeTlsSettings,
+        auth: Option<Auth>,
+    ) -> Result<Self, WebSocketError> {
         let request = (&uri).into_client_request().context(CreateFailedSnafu)?;
         let (host, port) = Self::extract_host_and_port(&request).context(CreateFailedSnafu)?;
 
@@ -79,6 +84,7 @@ impl WebSocketConnector {
             host,
             port,
             tls,
+            auth,
         })
     }
 
@@ -89,7 +95,7 @@ impl WebSocketConnector {
             .ok_or(WsError::Url(UrlError::NoHostName))?
             .to_string();
         let mode = uri_mode(request.uri())?;
-        let port = request.uri().port_u16().unwrap_or_else(|| match mode {
+        let port = request.uri().port_u16().unwrap_or(match mode {
             UriMode::Tls => 443,
             UriMode::Plain => 80,
         });
@@ -119,9 +125,14 @@ impl WebSocketConnector {
     }
 
     async fn connect(&self) -> Result<WsStream<MaybeTlsStream<TcpStream>>, WebSocketError> {
-        let request = (&self.uri)
+        let mut request = (&self.uri)
             .into_client_request()
             .context(CreateFailedSnafu)?;
+
+        if let Some(auth) = &self.auth {
+            auth.apply(&mut request);
+        }
+
         let maybe_tls = self.tls_connect().await?;
 
         let ws_config = WebSocketConfig {
@@ -183,22 +194,26 @@ impl PingInterval {
 }
 
 pub struct WebSocketSink {
-    encoding: EncodingConfig<StandardEncodings>,
+    transformer: Transformer,
+    encoder: Encoder<()>,
     connector: WebSocketConnector,
-    acker: Acker,
     ping_interval: Option<u64>,
     ping_timeout: Option<u64>,
 }
 
 impl WebSocketSink {
-    pub fn new(config: &WebSocketSinkConfig, connector: WebSocketConnector, acker: Acker) -> Self {
-        Self {
-            encoding: config.encoding.clone(),
+    pub fn new(config: &WebSocketSinkConfig, connector: WebSocketConnector) -> crate::Result<Self> {
+        let transformer = config.encoding.transformer();
+        let serializer = config.encoding.build()?;
+        let encoder = Encoder::<()>::new(serializer);
+
+        Ok(Self {
+            transformer,
+            encoder,
             connector,
-            acker,
             ping_interval: config.ping_interval.filter(|v| *v > 0),
             ping_timeout: config.ping_timeout.filter(|v| *v > 0),
-        }
+        })
     }
 
     async fn create_sink_and_stream(
@@ -225,7 +240,7 @@ impl WebSocketSink {
     }
 
     async fn handle_events<I, WS, O>(
-        &self,
+        &mut self,
         input: &mut I,
         ws_stream: &mut WS,
         ws_sink: &mut O,
@@ -267,30 +282,45 @@ impl WebSocketSink {
                 },
 
                 event = input.next() => {
-                    if event.is_none() {
+                    let mut event = if let Some(event) = event {
+                        event
+                    } else {
                         break;
-                    }
-                    let log = encode_event(event.unwrap(), &self.encoding);
-                    let res = match log {
-                        Some(msg) => {
-                            let msg_len = msg.len();
-                            ws_sink.send(msg).await.map(|_| {
+                    };
+
+                    let finalizers = event.take_finalizers();
+
+                    self.transformer.transform(&mut event);
+
+                    let event_byte_size = event.size_of();
+
+                    let mut bytes = BytesMut::new();
+                    let res = match self.encoder.encode(event, &mut bytes) {
+                        Ok(()) => {
+                            finalizers.update_status(EventStatus::Delivered);
+
+                            let message = Message::text(String::from_utf8_lossy(&bytes));
+                            let message_len = message.len();
+
+                            ws_sink.send(message).await.map(|_| {
                                 emit!(EventsSent {
                                     count: 1,
-                                    byte_size: msg_len,
+                                    byte_size: event_byte_size,
                                     output: None
                                 });
                                 emit!(BytesSent {
-                                    byte_size: msg_len,
+                                    byte_size: message_len,
                                     protocol: "websocket"
                                 });
                             })
                         },
-                        None => {
+                        Err(_) => {
+                            // Error is handled by `Encoder`.
+                            finalizers.update_status(EventStatus::Errored);
                             Ok(())
                         }
                     };
-                    self.acker.ack(1);
+
                     res
                 },
                 else => break,
@@ -312,7 +342,7 @@ impl WebSocketSink {
 
 #[async_trait]
 impl StreamSink<Event> for WebSocketSink {
-    async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+    async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let input = input.fuse().peekable();
         pin_mut!(input);
 
@@ -345,59 +375,29 @@ const fn is_closed(error: &WsError) -> bool {
     )
 }
 
-fn encode_event(event: Event, encoding: &EncodingConfig<StandardEncodings>) -> Option<Message> {
-    let msg = encoding.encode_input_to_string(event).ok();
-    msg.map(Message::text)
-}
-
 #[cfg(all(test, feature = "sources-utils-tls"))]
 mod tests {
     use std::net::SocketAddr;
 
+    use codecs::JsonSerializerConfig;
     use futures::{future, FutureExt, StreamExt};
     use serde_json::Value as JsonValue;
     use tokio::time::timeout;
     use tokio_tungstenite::{
-        accept_async,
-        tungstenite::{
-            error::{Error as WsError, ProtocolError},
-            Message,
-        },
+        accept_async, accept_hdr_async,
+        tungstenite::error::{Error as WsError, ProtocolError},
+        tungstenite::handshake::server::{Request, Response},
     };
 
     use super::*;
     use crate::{
         config::{SinkConfig, SinkContext},
-        event::{Event, Value as EventValue},
-        sinks::util::encoding::StandardEncodings,
         test_util::{
             components::{run_and_assert_sink_compliance, SINK_TAGS},
             next_addr, random_lines_with_stream, trace_init, CountReceiver,
         },
         tls::{self, TlsConfig, TlsEnableableConfig},
     };
-
-    #[test]
-    fn encodes_raw_logs() {
-        let event = Event::from("foo");
-        assert_eq!(
-            Message::text("foo"),
-            encode_event(event, &EncodingConfig::from(StandardEncodings::Text)).unwrap()
-        );
-    }
-
-    #[test]
-    fn encodes_log_events() {
-        let mut event = Event::new_empty_log();
-
-        let log = event.as_mut_log();
-        log.insert("str", EventValue::from("bar"));
-        log.insert("num", EventValue::from(10));
-
-        let encoded = encode_event(event, &EncodingConfig::from(StandardEncodings::Json));
-        let expected = Message::text(r#"{"num":10,"str":"bar"}"#);
-        assert_eq!(expected, encoded.unwrap());
-    }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_websocket() {
@@ -407,13 +407,38 @@ mod tests {
         let config = WebSocketSinkConfig {
             uri: format!("ws://{}", addr),
             tls: None,
-            encoding: StandardEncodings::Json.into(),
+            encoding: JsonSerializerConfig::new().into(),
             ping_interval: None,
             ping_timeout: None,
+            acknowledgements: Default::default(),
+            auth: None,
         };
         let tls = MaybeTlsSettings::Raw(());
 
-        send_events_and_assert(addr, config, tls).await;
+        send_events_and_assert(addr, config, tls, None).await;
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_auth_websocket() {
+        trace_init();
+
+        let auth = Some(Auth::Bearer {
+            token: "OiJIUzI1NiIsInR5cCI6IkpXVCJ".to_string(),
+        });
+        let auth_clone = auth.clone();
+        let addr = next_addr();
+        let config = WebSocketSinkConfig {
+            uri: format!("ws://{}", addr),
+            tls: None,
+            encoding: JsonSerializerConfig::new().into(),
+            ping_interval: None,
+            ping_timeout: None,
+            acknowledgements: Default::default(),
+            auth,
+        };
+        let tls = MaybeTlsSettings::Raw(());
+
+        send_events_and_assert(addr, config, tls, auth_clone).await;
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -435,12 +460,14 @@ mod tests {
                     ..Default::default()
                 },
             }),
-            encoding: StandardEncodings::Json.into(),
+            encoding: JsonSerializerConfig::new().into(),
             ping_timeout: None,
             ping_interval: None,
+            acknowledgements: Default::default(),
+            auth: None,
         };
 
-        send_events_and_assert(addr, config, tls).await;
+        send_events_and_assert(addr, config, tls, None).await;
     }
 
     #[tokio::test]
@@ -451,13 +478,15 @@ mod tests {
         let config = WebSocketSinkConfig {
             uri: format!("ws://{}", addr),
             tls: None,
-            encoding: StandardEncodings::Json.into(),
+            encoding: JsonSerializerConfig::new().into(),
             ping_interval: None,
             ping_timeout: None,
+            acknowledgements: Default::default(),
+            auth: None,
         };
         let tls = MaybeTlsSettings::Raw(());
 
-        let mut receiver = create_count_receiver(addr, tls.clone(), true);
+        let mut receiver = create_count_receiver(addr, tls.clone(), true, None);
 
         let context = SinkContext::new_test();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
@@ -473,7 +502,7 @@ mod tests {
         time::sleep(Duration::from_millis(500)).await;
         assert!(!receiver.await.is_empty());
 
-        let mut receiver = create_count_receiver(addr, tls, false);
+        let mut receiver = create_count_receiver(addr, tls, false, None);
         assert!(timeout(Duration::from_secs(10), receiver.connected())
             .await
             .is_ok());
@@ -483,8 +512,9 @@ mod tests {
         addr: SocketAddr,
         config: WebSocketSinkConfig,
         tls: MaybeTlsSettings,
+        auth: Option<Auth>,
     ) {
-        let mut receiver = create_count_receiver(addr, tls, false);
+        let mut receiver = create_count_receiver(addr, tls, false, auth);
 
         let context = SinkContext::new_test();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
@@ -508,6 +538,7 @@ mod tests {
         addr: SocketAddr,
         tls: MaybeTlsSettings,
         interrupt_stream: bool,
+        auth: Option<Auth>,
     ) -> CountReceiver<String> {
         CountReceiver::receive_items_stream(move |tripwire, connected| async move {
             let listener = tls.bind(&addr).await.unwrap();
@@ -519,25 +550,58 @@ mod tests {
 
             let stream = stream
                 .take_until(tripwire)
-                .filter_map(|maybe_tls_stream| async move {
-                    let maybe_tls_stream = maybe_tls_stream.unwrap();
-                    let ws_stream = accept_async(maybe_tls_stream).await.unwrap();
+                .filter_map(move |maybe_tls_stream| {
+                    let au = auth.clone();
+                    async move {
+                        let maybe_tls_stream = maybe_tls_stream.unwrap();
+                        let ws_stream = match au {
+                            Some(a) => {
+                                let auth_callback = |req: &Request, res: Response| {
+                                    let hdr = req.headers().get("Authorization");
+                                    if let Some(h) = hdr {
+                                        match a {
+                                            Auth::Bearer { token } => {
+                                                if format!("Bearer {}", token)
+                                                    != h.to_str().unwrap()
+                                                {
+                                                    return Err(
+                                                        http::Response::<Option<String>>::new(None),
+                                                    );
+                                                }
+                                            }
+                                            Auth::Basic {
+                                                user: _user,
+                                                password: _password,
+                                            } => { /* Not needed for tests at the moment */ }
+                                        }
+                                    }
+                                    Ok(res)
+                                };
+                                accept_hdr_async(maybe_tls_stream, auth_callback)
+                                    .await
+                                    .unwrap()
+                            }
+                            None => accept_async(maybe_tls_stream).await.unwrap(),
+                        };
 
-                    Some(
-                        ws_stream
-                            .filter_map(|msg| {
-                                future::ready(match msg {
-                                    Ok(msg) if msg.is_text() => Some(Ok(msg.into_text().unwrap())),
-                                    Err(WsError::Protocol(
-                                        ProtocolError::ResetWithoutClosingHandshake,
-                                    )) => None,
-                                    Err(e) => Some(Err(e)),
-                                    _ => None,
+                        Some(
+                            ws_stream
+                                .filter_map(|msg| {
+                                    future::ready(match msg {
+                                        Ok(msg) if msg.is_text() => {
+                                            Some(Ok(msg.into_text().unwrap()))
+                                        }
+                                        Err(WsError::Protocol(
+                                            ProtocolError::ResetWithoutClosingHandshake,
+                                        )) => None,
+                                        Err(e) => Some(Err(e)),
+                                        _ => None,
+                                    })
                                 })
-                            })
-                            .take_while(|msg| future::ready(msg.is_ok()))
-                            .filter_map(|msg| future::ready(msg.ok())),
-                    )
+                                .take_while(|msg| future::ready(msg.is_ok()))
+                                .filter_map(|msg| future::ready(msg.ok())),
+                        )
+                    }
                 })
                 .map(move |ws_stream| {
                     connected.take().map(|trigger| trigger.send(()));

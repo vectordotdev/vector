@@ -24,7 +24,10 @@ interpreted as described in [RFC 2119].
       - [ComponentEventsDropped](#componenteventsdropped)
       - [SinkNetworkBytesSent](#sinknetworkbytessent)
       - [SourceNetworkBytesReceived](#sourcenetworkbytesreceived)
-  - [Health checks](#health-checks)
+  - [Sink Operational Requirements](#sink-operational-requirements)
+    - [Health checks](#health-checks)
+    - [Finalization](#finalization)
+  - [Acknowledgements](#acknowledgements)
 
 ## Introduction
 
@@ -219,7 +222,9 @@ ingress of *raw network bytes*.
     defined properties as key-value pairs.
   - MUST NOT be rate limited.
 
-## Health checks
+## Sink Operational Requirements
+
+### Health checks
 
 All sink components SHOULD define a health check. These checks are executed at
 boot and as part of `vector validate`. This health check SHOULD, as closely as
@@ -232,6 +237,22 @@ sink might fail if AWS is unhealthy, but the check itself should not query for
 AWS's status.
 
 See the [development documentation][health checks] for more context guidance.
+
+### Finalization
+
+All sink components MUST defer finalization of events until after those events have been
+delivered. This finalization controls when the events are removed from any source disk buffer. To do
+this, the sink must extract the finalizers from events before they are delivered and ensure they are
+not dropped until after delivery is completed.
+
+## Acknowledgements
+
+Further to the above, all sink components MUST support acknowledgements. This requires both a
+configuration option named `acknowledgements` conforming to the `AcknowledgementsConfig` type, as
+well as updating the status of all finalizers deferred above after delivery of the events is
+completed. This update is automatically handled for all sinks that use the newer `StreamSink`
+framework.  Additionally, unit tests for the sink SHOULD ensure through unit tests that delivered
+batches have their status updated properly for both normal delivery and delivery errors.
 
 [Configuration Specification]: configuration.md
 [Error event]: instrumentation.md#Error

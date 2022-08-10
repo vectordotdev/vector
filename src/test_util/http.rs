@@ -36,8 +36,8 @@ where
     let server = Server::bind(&address).serve(make_service);
 
     tokio::spawn(async move {
-        if let Err(e) = server.await {
-            eprintln!("blackhole HTTP server error: {}", e);
+        if let Err(error) = server.await {
+            error!(message = "Blackhole HTTP server error.", ?error);
         }
     });
 

@@ -8,7 +8,7 @@ use std::{
 use async_stream::stream;
 use futures::{stream, Stream, StreamExt};
 use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 use crate::{
     conditions::{AnyCondition, Condition},
@@ -22,28 +22,49 @@ use crate::{
 mod merge_strategy;
 
 use crate::event::Value;
-use merge_strategy::*;
+pub use merge_strategy::*;
 
-//------------------------------------------------------------------------------
-
-#[derive(Deserialize, Serialize, Debug, Default, Clone)]
+/// Configuration for the `reduce` transform.
+#[configurable_component(transform)]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields, default)]
 pub struct ReduceConfig {
+    /// The maximum period of time to wait after the last event is received, in milliseconds, before a combined event should be considered complete.
     pub expire_after_ms: Option<u64>,
 
+    /// The interval to check for and flush any expired events, in milliseconds.
     pub flush_period_ms: Option<u64>,
 
-    /// An ordered list of fields to distinguish reduces by. Each
-    /// reduce has a separate event merging state.
+    /// An ordered list of fields by which to group events.
+    ///
+    /// Each group with matching values for the specified keys is reduced independently, allowing you to keep
+    /// independent event streams separate. When no fields are specified, all events will be combined in a single group.
+    ///
+    /// For example, if `group_by = ["host", "region"]`, then all incoming events that have the same host and region
+    /// will be grouped together before being reduced.
     #[serde(default)]
     pub group_by: Vec<String>,
 
+    /// A map of field names to custom merge strategies.
+    ///
+    /// For each field specified, the given strategy will be used for combining events rather than the default behavior.
+    ///
+    /// The default behavior is as follows:
+    ///
+    /// - The first value of a string field is kept, subsequent values are discarded.
+    /// - For timestamp fields the first is kept and a new field `[field-name]_end` is added with the last received timestamp value.
+    /// - Numeric values are summed.
     #[serde(default)]
     pub merge_strategies: IndexMap<String, MergeStrategy>,
 
-    /// An optional condition that determines when an event is the end of a
-    /// reduce.
+    /// A condition used to distinguish the final event of a transaction.
+    ///
+    /// If this condition resolves to `true` for an event, the current transaction is immediately flushed with this event.
     pub ends_when: Option<AnyCondition>,
+
+    /// A condition used to distinguish the first event of a transaction.
+    ///
+    /// If this condition resolves to `true` for an event, the previous transaction is flushed (without this event) and a new transaction is started.
     pub starts_when: Option<AnyCondition>,
 }
 
@@ -160,8 +181,6 @@ impl ReduceState {
     }
 }
 
-//------------------------------------------------------------------------------
-
 pub struct Reduce {
     expire_after: Duration,
     flush_period: Duration,
@@ -237,16 +256,15 @@ impl Reduce {
     }
 
     fn transform_one(&mut self, output: &mut Vec<Event>, event: Event) {
-        let starts_here = self
-            .starts_when
-            .as_ref()
-            .map(|c| c.check(&event))
-            .unwrap_or(false);
-        let ends_here = self
-            .ends_when
-            .as_ref()
-            .map(|c| c.check(&event))
-            .unwrap_or(false);
+        let (starts_here, event) = match &self.starts_when {
+            Some(condition) => condition.check(event),
+            None => (false, event),
+        };
+
+        let (ends_here, event) = match &self.ends_when {
+            Some(condition) => condition.check(event),
+            None => (false, event),
+        };
 
         let event = event.into_log();
         let discriminant = Discriminant::from_log_event(&event, &self.group_by);

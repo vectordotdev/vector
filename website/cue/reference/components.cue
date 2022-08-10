@@ -361,7 +361,7 @@ components: {
 					enabled: bool
 
 					if enabled {
-						batched: bool | *false
+						framing: bool | *false
 						enum:    [#EncodingCodec, ...#EncodingCodec] | null
 					}
 				}
@@ -413,6 +413,9 @@ components: {
 			can_verify_certificate: bool
 			if Args.mode == "connect" {
 				can_verify_hostname: bool
+			}
+			if Args.mode == "accept" {
+				can_add_client_metadata: bool | *false
 			}
 			enabled_default: bool
 		}
@@ -535,8 +538,8 @@ components: {
 		// `warnings` describes any warnings the user should know about the
 		// component.
 		//
-		// For example, the `grok_parser` might offer a performance warning
-		// since the `regex_parser` and other transforms are faster.
+		// For example, a transform might be known to have performance issues
+		// or a lack of support for specific features, etc.
 		warnings: [...string] | null // Allow for empty list
 
 		// `notices` communicates useful information to the user that is neither
@@ -593,8 +596,9 @@ components: {
 
 			_tls_accept: {
 				_args: {
-					can_verify_certificate: bool | *true
-					enabled_default:        bool
+					can_verify_certificate:  bool | *true
+					can_add_client_metadata: bool | *false
+					enabled_default:         bool
 				}
 				let Args = _args
 
@@ -616,6 +620,17 @@ components: {
 						type: string: {
 							default: null
 							examples: ["/path/to/certificate_authority.crt"]
+						}
+					}
+					if Args.can_add_client_metadata {
+						client_metadata_key: {
+							common:      false
+							description: "The key name added to each event with the client certificate's metadata."
+							required:    false
+							type: string: {
+								default: null
+								examples: ["client_cert"]
+							}
 						}
 					}
 					crt_file: {
@@ -716,7 +731,7 @@ components: {
 					if Args.can_verify_certificate {
 						verify_certificate: {
 							common:      false
-							description: "If `true` (the default), Vector will validate the TLS certificate of the remote host."
+							description: "If `true` (the default), Vector will validate the TLS certificate of the remote host. Specifically the issuer is checked but not CRLs (Certificate Revocation Lists)."
 							required:    false
 							type: bool: default: true
 						}

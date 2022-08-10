@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 
 use ::value::Value;
-use serde_json::value::{RawValue, Value as JsonValue};
-use serde_json::{Error, Map};
+use serde_json::{
+    value::{RawValue, Value as JsonValue},
+    Error, Map,
+};
 use vrl::prelude::*;
 
 fn parse_json(value: Value) -> Resolved {
@@ -77,13 +79,13 @@ fn validate_depth(value: Value) -> std::result::Result<u8, ExpressionError> {
     //
     // The upper cap is 128 because serde_json has the same recursion limit by default.
     // https://github.com/serde-rs/json/blob/4d57ebeea8d791b8a51c229552d2d480415d00e6/json/src/de.rs#L111
-    if !(1..=128).contains(&res) {
+    if (1..=128).contains(&res) {
+        Ok(res as u8)
+    } else {
         Err(ExpressionError::from(format!(
             "max_depth value should be greater than 0 and less than 128, got {}",
             res
         )))
-    } else {
-        Ok(res as u8)
     }
 }
 
@@ -182,17 +184,6 @@ impl Function for ParseJson {
         match max_depth {
             Some(max_depth) => Ok(Box::new(ParseJsonMaxDepthFn { value, max_depth })),
             None => Ok(Box::new(ParseJsonFn { value })),
-        }
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let max_depth = args.optional("max_depth");
-
-        if let Some(max_depth) = max_depth {
-            parse_json_with_depth(value, max_depth)
-        } else {
-            parse_json(value)
         }
     }
 }

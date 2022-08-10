@@ -1,7 +1,8 @@
 use std::{
-    fmt, io,
+    fmt, io, mem,
     path::PathBuf,
     sync::atomic::{AtomicBool, AtomicU16, AtomicU64, Ordering},
+    sync::Arc,
     time::Instant,
 };
 
@@ -9,18 +10,22 @@ use bytecheck::CheckBytes;
 use bytes::BytesMut;
 use crossbeam_utils::atomic::AtomicCell;
 use fslock::LockFile;
+use futures::StreamExt;
 use rkyv::{with::Atomic, Archive, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::{fs, io::AsyncWriteExt, sync::Notify};
+use vector_common::{finalizer::OrderedFinalizer, shutdown::ShutdownSignal};
 
 use super::{
     backed_archive::BackedArchive,
-    common::{DiskBufferConfig, MAX_FILE_ID},
+    common::{align16, DiskBufferConfig, MAX_FILE_ID},
     io::{AsyncFile, WritableMemoryMap},
     ser::SerializeError,
     Filesystem,
 };
 use crate::buffer_usage_data::BufferUsageHandle;
+
+pub const LEDGER_LEN: usize = align16(mem::size_of::<ArchivedLedgerState>());
 
 /// Error that occurred during calls to [`Ledger`].
 #[derive(Debug, Snafu)]
@@ -200,13 +205,14 @@ impl ArchivedLedgerState {
 }
 
 /// Tracks the internal state of the buffer.
-pub struct Ledger<FS>
+pub(crate) struct Ledger<FS>
 where
     FS: Filesystem,
 {
     // Buffer configuration.
     config: DiskBufferConfig<FS>,
     // Advisory lock for this buffer directory.
+    #[allow(dead_code)]
     ledger_lock: LockFile,
     // Ledger state.
     state: BackedArchive<FS::MutableMemoryMap, LedgerState>,
@@ -268,12 +274,12 @@ where
     /// leads to behavior where writes and reads will change this value only by the size of the
     /// records being written and read, while data files on disk will grow incrementally, and be
     /// deleted in full.
-    pub(super) fn get_total_buffer_size(&self) -> u64 {
+    pub fn get_total_buffer_size(&self) -> u64 {
         self.total_buffer_size.load(Ordering::Acquire)
     }
 
     /// Increments the total number of bytes for all unread records in the buffer.
-    pub(super) fn increment_total_buffer_size(&self, amount: u64) {
+    pub fn increment_total_buffer_size(&self, amount: u64) {
         let last_total_buffer_size = self.total_buffer_size.fetch_add(amount, Ordering::AcqRel);
         trace!(
             previous_buffer_size = last_total_buffer_size,
@@ -283,7 +289,7 @@ where
     }
 
     /// Decrements the total number of bytes for all unread records in the buffer.
-    pub(super) fn decrement_total_buffer_size(&self, amount: u64) {
+    pub fn decrement_total_buffer_size(&self, amount: u64) {
         let last_total_buffer_size = self.total_buffer_size.fetch_sub(amount, Ordering::AcqRel);
         trace!(
             previous_buffer_size = last_total_buffer_size,
@@ -522,11 +528,24 @@ where
                 initial_buffer_size,
             );
     }
+
+    pub fn track_dropped_events(&self, count: u64) {
+        // We don't know how many bytes are represented by dropped events because we never actually had a chance to read
+        // them, so we have to use a byte size of 0 here.
+        //
+        // On the flipside, this would only matter if we incremented the buffer size and simultaneously skipped/lost the
+        // events within the same process lifecycle, since otherwise we'd start from the correct buffer size when
+        // loading the buffer initially.
+        //
+        // TODO: Can we do better here?
+        self.usage_handle
+            .increment_dropped_event_count_and_byte_size(count, 0, false);
+    }
 }
 
 impl<FS> Ledger<FS>
 where
-    FS: Filesystem,
+    FS: Filesystem + 'static,
     FS::File: Unpin,
 {
     /// Loads or creates a ledger for the given [`DiskBufferConfig`].
@@ -683,6 +702,18 @@ where
 
         Ok(())
     }
+
+    #[must_use]
+    pub(super) fn spawn_finalizer(self: Arc<Self>) -> OrderedFinalizer<u64> {
+        let (finalizer, mut stream) = OrderedFinalizer::new(ShutdownSignal::noop());
+        tokio::spawn(async move {
+            while let Some((_status, amount)) = stream.next().await {
+                self.increment_pending_acks(amount);
+                self.notify_writer_waiters();
+            }
+        });
+        finalizer
+    }
 }
 
 impl<FS> fmt::Debug for Ledger<FS>
@@ -692,21 +723,18 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Ledger")
             .field("config", &self.config)
-            .field("ledger_lock", &self.ledger_lock)
             .field("state", &self.state.get_archive_ref())
             .field(
                 "total_buffer_size",
                 &self.total_buffer_size.load(Ordering::Acquire),
             )
-            .field("reader_notify", &self.reader_notify)
-            .field("writer_notify", &self.writer_notify)
             .field("pending_acks", &self.pending_acks.load(Ordering::Acquire))
             .field(
                 "unacked_reader_file_id_offset",
                 &self.unacked_reader_file_id_offset.load(Ordering::Acquire),
             )
             .field("writer_done", &self.writer_done.load(Ordering::Acquire))
-            .field("last_flush", &self.last_flush)
+            .field("last_flush", &self.last_flush.load())
             .finish()
     }
 }

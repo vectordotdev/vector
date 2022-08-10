@@ -25,13 +25,13 @@ use crate::{
 fn random_events_with_stream(
     len: usize,
     count: usize,
-    batch: Option<Arc<BatchNotifier>>,
+    batch: Option<BatchNotifier>,
 ) -> (Vec<String>, impl Stream<Item = EventArray>) {
     let (lines, stream) = random_lines_with_stream(len, count, batch);
     (
         lines,
         stream.map(|mut events| {
-            events.for_each_log(|log| {
+            events.iter_logs_mut().for_each(|log| {
                 log.insert("title", "All!");
                 log.insert("invalid", "Tik");
             });
@@ -128,9 +128,9 @@ async fn api_key_in_metadata() {
     let (expected, events) = random_events_with_stream(100, 10, None);
 
     let events = events.map(|mut events| {
-        events.for_each_log(|log| {
+        events.iter_logs_mut().for_each(|log| {
             log.metadata_mut()
-                .set_datadog_api_key(Some(Arc::from("from_metadata")));
+                .set_datadog_api_key(Arc::from("from_metadata"));
         });
         events
     });

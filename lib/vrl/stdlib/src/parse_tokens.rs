@@ -51,11 +51,6 @@ impl Function for ParseTokens {
             required: true,
         }]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        parse_tokens(value)
-    }
 }
 
 #[derive(Debug, Clone)]

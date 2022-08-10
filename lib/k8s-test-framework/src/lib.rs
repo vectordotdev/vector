@@ -1,3 +1,5 @@
+#![deny(warnings)]
+
 //! Kubernetes test framework.
 //!
 //! The main goal of the design of this test framework is to wire kubernetes
