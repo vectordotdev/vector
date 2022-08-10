@@ -118,7 +118,7 @@ impl GenerateConfig for AmqpSinkConfig {
 impl SinkConfig for AmqpSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, super::Healthcheck)> {
         let sink = AmqpSink::new(self.clone()).await?;
-        let hc = healthcheck(self.clone(), sink.channel.clone()).boxed();
+        let hc = healthcheck(self.clone(), Arc::clone(&sink.channel)).boxed();
         Ok((VectorSink::from_event_sink(Box::new(sink)), hc))
     }
 
@@ -211,7 +211,7 @@ impl Sink<Event> for AmqpSink {
 
         let body = self.encode_event(item)?;
 
-        let channel = self.channel.clone();
+        let channel = Arc::clone(&self.channel);
         let f = Box::pin(channel.basic_publish(
             &exchange,
             &routing_key,
@@ -352,16 +352,19 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
+        serde::{default_decoding, default_framing_message_based},
         shutdown::ShutdownSignal,
         test_util::{random_lines_with_stream, random_string},
-        SourceSender, serde::{default_framing_message_based, default_decoding},
+        SourceSender,
     };
     use futures::StreamExt;
     use std::time::Duration;
 
     pub fn make_config() -> AmqpSinkConfig {
-        let mut config = AmqpSinkConfig::default();
-        config.exchange = "it".to_string();
+        let mut config = AmqpSinkConfig {
+            exchange: "it".to_string(),
+            ..Default::default()
+        };
         let user = std::env::var("AMQP_USER").unwrap_or_else(|_| "guest".to_string());
         let pass = std::env::var("AMQP_PASSWORD").unwrap_or_else(|_| "guest".to_string());
         let vhost = std::env::var("AMQP_VHOST").unwrap_or_else(|_| "%2f".to_string());
@@ -401,8 +404,10 @@ mod integration_tests {
         let queue = format!("test-{}-queue", random_string(10));
 
         let (_conn, channel) = config.connection.connect().await.unwrap();
-        let mut exchange_opts = lapin::options::ExchangeDeclareOptions::default();
-        exchange_opts.auto_delete = true;
+        let exchange_opts = lapin::options::ExchangeDeclareOptions {
+            auto_delete: true,
+            ..Default::default()
+        };
         channel
             .exchange_declare(
                 &config.exchange,
@@ -416,8 +421,10 @@ mod integration_tests {
         let sink = VectorSink::from_event_sink(AmqpSink::new(config.clone()).await.unwrap());
 
         // prepare consumer
-        let mut queue_opts = lapin::options::QueueDeclareOptions::default();
-        queue_opts.auto_delete = true;
+        let queue_opts = lapin::options::QueueDeclareOptions {
+            auto_delete: true,
+            ..Default::default()
+        };
         channel
             .queue_declare(&queue, queue_opts, lapin::types::FieldTable::default())
             .await
@@ -475,8 +482,10 @@ mod integration_tests {
         let queue = format!("test-{}-queue", random_string(10));
 
         let (_conn, channel) = config.connection.connect().await.unwrap();
-        let mut exchange_opts = lapin::options::ExchangeDeclareOptions::default();
-        exchange_opts.auto_delete = true;
+        let exchange_opts = lapin::options::ExchangeDeclareOptions {
+            auto_delete: true,
+            ..Default::default()
+        };
         channel
             .exchange_declare(
                 &config.exchange,
@@ -507,8 +516,10 @@ mod integration_tests {
                 .unwrap();
 
         // prepare server
-        let mut queue_opts = lapin::options::QueueDeclareOptions::default();
-        queue_opts.auto_delete = true;
+        let queue_opts = lapin::options::QueueDeclareOptions {
+            auto_delete: true,
+            ..Default::default()
+        };
         channel
             .queue_declare(&queue, queue_opts, lapin::types::FieldTable::default())
             .await

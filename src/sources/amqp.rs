@@ -121,11 +121,6 @@ impl SourceConfig for AmqpSourceConfig {
     }
 }
 
-enum ShutdownOrMessage {
-    Shutdown,
-    Message(Option<Result<(lapin::Channel, lapin::message::Delivery), lapin::Error>>),
-}
-
 pub(crate) async fn amqp_source(
     config: &AmqpSourceConfig,
     shutdown: ShutdownSignal,
@@ -163,90 +158,96 @@ async fn run_amqp_source(
         .fuse();
     let mut shutdown = shutdown.fuse();
     loop {
-        let msg = futures::select! {
-            _ = shutdown => ShutdownOrMessage::Shutdown,
-            opt_m = consumer.next() => ShutdownOrMessage::Message(opt_m),
-        };
-        if let ShutdownOrMessage::Message(Some(try_m)) = msg {
-            match try_m {
-                Err(error) => {
-                    emit!(AmqpEventFailed { error });
-                    return Err(());
-                }
-                Ok((_, msg)) => {
-                    emit!(AmqpEventReceived {
-                        byte_size: msg.data.len()
-                    });
+        let should_break = futures::select! {
+            _ = shutdown => true,
+            opt_m = consumer.next() => {
+                if let Some(try_m) = opt_m {
+                    match try_m {
+                        Err(error) => {
+                            emit!(AmqpEventFailed { error });
+                            return Err(());
+                        }
+                        Ok((_, msg)) => {
+                            emit!(AmqpEventReceived {
+                                byte_size: msg.data.len()
+                            });
 
-                    if msg.data.is_empty() {
-                        return Err(());
-                    }
+                            if msg.data.is_empty() {
+                                return Err(());
+                            }
 
-                    let payload = Cursor::new(Bytes::copy_from_slice(&msg.data));
-                    let mut stream = FramedRead::new(payload, config.decoder());
+                            let payload = Cursor::new(Bytes::copy_from_slice(&msg.data));
+                            let mut stream = FramedRead::new(payload, config.decoder());
 
-                    let routing_key = config.routing_key.as_ref();
-                    let exchange_key = config.exchange_key.as_ref();
-                    let offset_key = config.offset_key.as_ref();
-                    let out = &mut out;
+                            let routing_key = config.routing_key.as_ref();
+                            let exchange_key = config.exchange_key.as_ref();
+                            let offset_key = config.offset_key.as_ref();
+                            let out = &mut out;
 
-                    let mut stream = stream! {
-                        while let Some(result) = stream.next().await {
-                            match result {
-                                Ok((events, _byte_size)) => {
-                                    for mut event in events {
-                                        let log = event.as_mut_log();
+                            let mut stream = stream! {
+                                while let Some(result) = stream.next().await {
+                                    match result {
+                                        Ok((events, _byte_size)) => {
+                                            for mut event in events {
+                                                let log = event.as_mut_log();
 
-                                        // Extract timestamp from amqp message
-                                        let timestamp = msg
-                                            .properties
-                                            .timestamp()
-                                            .and_then(|millis| Utc.timestamp_millis_opt(millis as _).latest())
-                                            .unwrap_or_else(Utc::now);
-                                        log.insert(log_schema().timestamp_key(), timestamp);
+                                                // Extract timestamp from amqp message
+                                                let timestamp = msg
+                                                    .properties
+                                                    .timestamp()
+                                                    .and_then(|millis| Utc.timestamp_millis_opt(millis as _).latest())
+                                                    .unwrap_or_else(Utc::now);
+                                                log.insert(log_schema().timestamp_key(), timestamp);
 
-                                        // Add source type
-                                        log.insert(log_schema().source_type_key(), Bytes::from("amqp"));
+                                                // Add source type
+                                                log.insert(log_schema().source_type_key(), Bytes::from("amqp"));
 
-                                        if let Some(key_field) = routing_key {
-                                            log.insert(key_field.as_str(), Value::from(msg.routing_key.to_string()));
+                                                if let Some(key_field) = routing_key {
+                                                    log.insert(key_field.as_str(), Value::from(msg.routing_key.to_string()));
+                                                }
+
+                                                if let Some(exchange_key) = exchange_key {
+                                                    log.insert(exchange_key.as_str(), Value::from(msg.exchange.to_string()));
+                                                }
+
+                                                if let Some(offset_key) = offset_key {
+                                                    log.insert(offset_key.as_str(), Value::from(msg.delivery_tag as i64));
+                                                }
+
+                                                if let Err(error) = msg.acker.ack(ack_options).await {
+                                                    emit!(AmqpCommitFailed { error });
+                                                }
+
+                                                yield event;
+                                            }
                                         }
+                                        Err(error) => {
+                                            use codecs::StreamDecodingError as _;
 
-                                        if let Some(exchange_key) = exchange_key {
-                                            log.insert(exchange_key.as_str(), Value::from(msg.exchange.to_string()));
+                                            // Error is logged by `codecs::Decoder`, no further handling
+                                            // is needed here.
+                                            if !error.can_continue() {
+                                                break;
+                                            }
                                         }
-
-                                        if let Some(offset_key) = offset_key {
-                                            log.insert(offset_key.as_str(), Value::from(msg.delivery_tag as i64));
-                                        }
-
-                                        if let Err(error) = msg.acker.ack(ack_options).await {
-                                            emit!(AmqpCommitFailed { error });
-                                        }
-
-                                        yield event;
-                                   }
-                                }
-                                Err(error) => {
-                                    use codecs::StreamDecodingError as _;
-
-                                    // Error is logged by `codecs::Decoder`, no further handling
-                                    // is needed here.
-                                    if !error.can_continue() {
-                                        break;
                                     }
                                 }
                             }
+                            .boxed();
+
+                            if let Err(error) = out.send_event_stream(&mut stream).await {
+                                emit!(AmqpDeliveryFailed { error });
+                            }
                         }
                     }
-                    .boxed();
-
-                    if let Err(error) = out.send_event_stream(&mut stream).await {
-                        emit!(AmqpDeliveryFailed { error });
-                    }
+                    false
+                } else {
+                    true
                 }
             }
-        } else {
+        };
+
+        if should_break {
             break;
         }
     }
@@ -265,8 +266,10 @@ pub mod test {
     }
 
     pub fn make_config() -> AmqpSourceConfig {
-        let mut config = AmqpSourceConfig::default();
-        config.queue = "it".to_string();
+        let mut config = AmqpSourceConfig {
+            queue: "it".to_string(),
+            ..Default::default()
+        };
         let user = std::env::var("AMQP_USER").unwrap_or_else(|_| "guest".to_string());
         let pass = std::env::var("AMQP_PASSWORD").unwrap_or_else(|_| "guest".to_string());
         let vhost = std::env::var("AMQP_VHOST").unwrap_or_else(|_| "%2f".to_string());
@@ -330,7 +333,7 @@ mod integration_test {
         let exchange = format!("test-{}-exchange", random_string(10));
         let queue = format!("test-{}-queue", random_string(10));
         let routing_key = "my_key";
-        println!("Test exchange name: {}", exchange);
+        trace!("Test exchange name: {}", exchange);
         let consumer = format!("test-consumer-{}", random_string(10));
 
         let mut config = make_config();
@@ -340,8 +343,10 @@ mod integration_test {
         config.exchange_key = Some("exchange".to_string());
         let (_conn, channel) = config.connection.connect().await.unwrap();
 
-        let mut exchange_opts = lapin::options::ExchangeDeclareOptions::default();
-        exchange_opts.auto_delete = true;
+        let exchange_opts = lapin::options::ExchangeDeclareOptions {
+            auto_delete: true,
+            ..Default::default()
+        };
         channel
             .exchange_declare(
                 &exchange,
@@ -352,8 +357,10 @@ mod integration_test {
             .await
             .unwrap();
 
-        let mut queue_opts = QueueDeclareOptions::default();
-        queue_opts.auto_delete = true;
+        let queue_opts = QueueDeclareOptions {
+            auto_delete: true,
+            ..Default::default()
+        };
         channel
             .queue_declare(
                 &config.queue,
@@ -374,7 +381,7 @@ mod integration_test {
             .await
             .unwrap();
 
-        println!("Sending event...");
+        trace!("Sending event...");
         let now = Utc::now();
         send_event(
             &channel,
@@ -385,7 +392,7 @@ mod integration_test {
         )
         .await;
 
-        println!("Receiving event...");
+        trace!("Receiving event...");
         let (tx, rx) = SourceSender::new_test();
         tokio::spawn(
             amqp_source(&config, ShutdownSignal::noop(), tx)
@@ -397,7 +404,7 @@ mod integration_test {
         assert!(!events.is_empty());
 
         let log = events[0].as_log();
-        println!("{:?}", log);
+        trace!("{:?}", log);
         assert_eq!(log[log_schema().message_key()], "my message".into());
         assert_eq!(log["message_key"], routing_key.into());
         assert_eq!(log[log_schema().source_type_key()], "amqp".into());
