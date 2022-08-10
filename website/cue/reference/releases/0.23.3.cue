@@ -1,13 +1,15 @@
 package metadata
 
-releases: "0.23.1": {
-	date:     "2022-08-08"
+releases: "0.23.3": {
+	date:     "2022-08-10"
 	codename: ""
 
 	whats_next: []
 
 	description: """
 		This patch release contains a few fixes for regressions in 0.23.0.
+
+		This is the first release after 0.23.0, versions 0.23.1 and 0.23.2 were skipped.
 
 		**Note:** Please see the release notes for [`v0.23.0`](/releases/0.23.0/) for additional changes if upgrading from
 		`v0.22.X`. In particular, the upgrade guide for breaking changes.
