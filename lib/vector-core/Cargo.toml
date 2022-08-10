@@ -34,6 +34,7 @@ ordered-float = { version = "3.0.0", default-features = false }
 pin-project = { version = "1.0.11", default-features = false }
 prost = { version = "0.10.4", default-features = false, features = ["std"] }
 prost-types = { version = "0.10.1", default-features = false }
+quanta = { version = "0.10.1", default-features = false }
 regex = { version = "1.6.0", default-features = false, features = ["std", "perf"] }
 serde = { version = "1.0.142", default-features = false, features = ["derive", "rc"] }
 serde_json = { version = "1.0.83", default-features = false }

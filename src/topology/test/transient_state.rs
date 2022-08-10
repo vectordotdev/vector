@@ -68,6 +68,8 @@ impl SourceConfig for MockSourceConfig {
 
 #[tokio::test]
 async fn closed_source() {
+    trace_init();
+
     let mut old_config = Config::builder();
     let (trigger_old, source) = MockSourceConfig::new();
     old_config.add_source("in", source);
