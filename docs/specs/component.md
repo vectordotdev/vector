@@ -175,7 +175,7 @@ event in accordance with the [EventsDropped event] requirements.
 
 - Emission
   - MUST emit immediately after egress of raw network bytes regardless
-    if the transmission was successful or not.
+    of whether the transmission was successful or not.
     - This includes pull-based sinks, such as the `prometheus_exporter` sink,
       and SHOULD reflect the bytes sent to the client when requested (pulled).
   - MUST emit *after* processing of the bytes (encryption, compression,
