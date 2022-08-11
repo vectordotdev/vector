@@ -139,6 +139,8 @@ impl From<ResourceLog> for Event {
             rl.log_record.dropped_attributes_count,
         );
 
+        le.insert(log_schema().source_type_key(), Bytes::from("opentelemetry"));
+
         le.into()
     }
 }
