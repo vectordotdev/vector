@@ -3,6 +3,9 @@ use std::net::SocketAddr;
 use bytes::Bytes;
 use futures_util::FutureExt;
 use http::StatusCode;
+use opentelemetry_proto::proto::collector::logs::v1::{
+    ExportLogsServiceRequest, ExportLogsServiceResponse,
+};
 use prost::Message;
 use snafu::Snafu;
 use tracing::Span;
@@ -15,7 +18,6 @@ use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Rep
 use crate::{
     event::Event,
     internal_events::{BytesReceived, EventsReceived, StreamClosedError},
-    opentelemetry::LogService::{ExportLogsServiceRequest, ExportLogsServiceResponse},
     shutdown::ShutdownSignal,
     sources::util::{decode, ErrorMessage},
     tls::MaybeTlsSettings,

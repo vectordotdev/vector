@@ -75,14 +75,11 @@ depends = ""
 members = [
   ".",
   "lib/codecs",
-  "lib/enrichment",
-  "lib/vector-buffers",
-  "lib/vector-common",
-  "lib/vector-config",
-  "lib/vector-config-common",
-  "lib/vector-config-macros",
-  "lib/vector-core",
+  "lib/datadog/filter",
+  "lib/datadog/grok",
+  "lib/datadog/search-syntax",
   "lib/dnsmsg-parser",
+  "lib/enrichment",
   "lib/fakedata",
   "lib/file-source",
   "lib/k8s-e2e-tests",
@@ -90,9 +87,17 @@ members = [
   "lib/lookup",
   "lib/portpicker",
   "lib/prometheus-parser",
+  "lib/opentelemetry-proto",
   "lib/tracing-limit",
-  "lib/vector-api-client",
   "lib/value",
+  "lib/vector-api-client",
+  "lib/vector-buffers",
+  "lib/vector-common",
+  "lib/vector-config",
+  "lib/vector-config-common",
+  "lib/vector-config-macros",
+  "lib/vector-core",
+  "lib/vector-vrl-functions",
   "lib/vrl/cli",
   "lib/vrl/compiler",
   "lib/vrl/core",
@@ -102,10 +107,6 @@ members = [
   "lib/vrl/tests",
   "lib/vrl/proptests",
   "lib/vrl/vrl",
-  "lib/vector-vrl-functions",
-  "lib/datadog/grok",
-  "lib/datadog/search-syntax",
-  "lib/datadog/filter",
 ]
 
 [dependencies]
@@ -118,6 +119,7 @@ file-source = { path = "lib/file-source", optional = true }
 lookup = { path = "lib/lookup" }
 portpicker = { path = "lib/portpicker" }
 prometheus-parser = { path = "lib/prometheus-parser", optional = true }
+opentelemetry-proto = { path = "lib/opentelemetry-proto", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
 value = { path = "lib/value" }
 vector_buffers = { path = "lib/vector-buffers", default-features = false }
@@ -434,8 +436,6 @@ protobuf-build = ["dep:tonic-build", "dep:prost-build"]
 
 gcp = ["dep:base64", "dep:goauth", "dep:smpl_jwt"]
 
-opentelemetry = ["dep:hex", "dep:tonic", "protobuf-build"]
-
 # Enrichment Tables
 enrichment-tables = ["enrichment-tables-file","enrichment-tables-geoip"]
 enrichment-tables-file = [ "dep:csv", "dep:seahash", "dep:hash_hasher" ]
@@ -510,7 +510,7 @@ sources-logstash = ["listenfd", "tokio-util/net", "sources-utils-tcp-keepalive",
 sources-mongodb_metrics = ["dep:mongodb"]
 sources-nats = ["dep:nats", "dep:nkeys"]
 sources-nginx_metrics = ["dep:nom"]
-sources-opentelemetry = ["dep:prost-types", "sources-http", "sources-utils-http", "sources-vector", "opentelemetry"]
+sources-opentelemetry = ["dep:opentelemetry-proto", "dep:prost-types", "sources-http", "sources-utils-http", "sources-vector"]
 sources-postgresql_metrics = ["dep:postgres-openssl", "dep:tokio-postgres"]
 sources-prometheus = ["dep:prometheus-parser", "sinks-prometheus", "sources-http", "sources-utils-http"]
 sources-redis= ["dep:redis"]
