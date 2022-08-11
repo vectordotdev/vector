@@ -182,7 +182,7 @@ impl std::fmt::Display for ExecFailedToSignalChild {
             #[cfg(unix)]
             NoPid => write!(f, "child had no pid"),
             #[cfg(windows)]
-            IoError(err) => write!(f, "io error: {}"),
+            IoError(err) => write!(f, "io error: {}", err),
         }
     }
 }

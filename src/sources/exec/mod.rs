@@ -419,7 +419,7 @@ async fn run_command(
     'outer: loop {
         tokio::select! {
             _ = &mut shutdown => {
-                if !shutdown_child(&child, &command) {
+                if !shutdown_child(&mut child, &command).await {
                         break 'outer; // couldn't signal, exit early
                 }
             }
@@ -485,8 +485,11 @@ fn handle_exit_status(config: &ExecConfig, exit_status: Option<i32>, exec_durati
 }
 
 #[cfg(unix)]
-fn shutdown_child(child: &tokio::process::Child, command: &tokio::process::Command) -> bool {
-    match child.id().map(|pid| i32::try_from(pid)) {
+async fn shutdown_child(
+    child: &mut tokio::process::Child,
+    command: &tokio::process::Command,
+) -> bool {
+    match child.id().map(i32::try_from) {
         Some(Ok(pid)) => {
             // shutting down, send a SIGTERM to the child
             if let Err(error) = nix::sys::signal::kill(
@@ -494,7 +497,7 @@ fn shutdown_child(child: &tokio::process::Child, command: &tokio::process::Comma
                 nix::sys::signal::Signal::SIGTERM,
             ) {
                 emit!(ExecFailedToSignalChildError {
-                    command: &command,
+                    command,
                     error: ExecFailedToSignalChild::SignalError(error)
                 });
                 false
@@ -504,14 +507,14 @@ fn shutdown_child(child: &tokio::process::Child, command: &tokio::process::Comma
         }
         Some(Err(err)) => {
             emit!(ExecFailedToSignalChildError {
-                command: &command,
+                command,
                 error: ExecFailedToSignalChild::FailedToMarshalPid(err)
             });
             false
         }
         None => {
             emit!(ExecFailedToSignalChildError {
-                command: &command,
+                command,
                 error: ExecFailedToSignalChild::NoPid
             });
             false
@@ -520,9 +523,12 @@ fn shutdown_child(child: &tokio::process::Child, command: &tokio::process::Comma
 }
 
 #[cfg(windows)]
-fn shutdown_child(child: &tokio::process::Child, command: &tokio::process::Command) -> bool {
+async fn shutdown_child(
+    child: &mut tokio::process::Child,
+    command: &tokio::process::Command,
+) -> bool {
     // TODO Graceful shutdown of Windows processes
-    match child.kill() {
+    match child.kill().await {
         Ok(()) => true,
         Err(err) => {
             emit!(ExecFailedToSignalChildError {
