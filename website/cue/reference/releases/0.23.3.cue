@@ -9,7 +9,8 @@ releases: "0.23.3": {
 	description: """
 		This patch release contains a few fixes for regressions in 0.23.0.
 
-		This is the first release after 0.23.0, versions 0.23.1 and 0.23.2 were skipped.
+		This is the first release after 0.23.0, versions 0.23.1 and 0.23.2 were inadvertently skipped due to a [version
+		mismatch during release](https://github.com/vectordotdev/vector/pull/13930).
 
 		**Note:** Please see the release notes for [`v0.23.0`](/releases/0.23.0/) for additional changes if upgrading from
 		`v0.22.X`. In particular, the upgrade guide for breaking changes.
