@@ -32,6 +32,7 @@ components: sinks: papertrail: {
 				can_verify_certificate: true
 				can_verify_hostname:    true
 				enabled_default:        true
+				enabled_by_scheme:      false
 			}
 			to: {
 				service: services.papertrail

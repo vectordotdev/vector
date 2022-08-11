@@ -12,6 +12,7 @@ components: sources: kafka: {
 				can_verify_certificate: false
 				can_verify_hostname:    false
 				enabled_default:        false
+				enabled_by_scheme:      false
 			}
 			from: components._kafka.features.collect.from
 		}
