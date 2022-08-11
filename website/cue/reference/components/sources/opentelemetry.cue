@@ -107,18 +107,16 @@ components: sources: opentelemetry: {
 						address: "0.0.0.0:4317"
 						tls: {
 							enabled:  true
-							ca_file:  "/var/vector/ca.pem"
-							crt_file: "/var/vector/cert.pem"
-							key_file: "/var/vector/cert.key"
+							crt_file: "/etc/ssl/certs/vector.pem"
+							key_file: "/etc/ssl/private/vector.key"
 						}
 					}
 					http: {
 						address: "0.0.0.0:4318"
 						tls: {
 							enabled:  true
-							ca_file:  "/var/vector/ca.pem"
-							crt_file: "/var/vector/cert.pem"
-							key_file: "/var/vector/cert.key"
+							crt_file: "/etc/ssl/certs/vector.pem"
+							key_file: "/etc/ssl/private/vector.key"
 						}
 					}
 				}
