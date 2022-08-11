@@ -2,8 +2,8 @@ use ::value::Value;
 use vrl::prelude::*;
 
 fn chunks(value: Value, chunk_size: Value) -> Resolved {
-    let chunk_size = chunk_size.try_integer()?;
     let bytes = value.try_bytes()?;
+    let chunk_size = chunk_size.try_integer()?;
 
     if chunk_size < 1 {
         return Err(r#""chunk_size" must be at least 1 byte"#.into());
