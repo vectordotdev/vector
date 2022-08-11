@@ -6,10 +6,6 @@ components: sources: opentelemetry: {
 
 	title: "OpenTelemetry"
 
-	description: """
-		Collect OpenTelemetry data over gRPC and HTTP (currently, only logs are supported).
-		"""
-
 	classes: {
 		commonly_used: false
 		delivery:      "at_least_once"
@@ -42,7 +38,11 @@ components: sources: opentelemetry: {
 
 	support: {
 		requirements: []
-		warnings: []
+		warnings: [
+			"""
+				The `opentelemetry` source only supports log events at this time.
+				""",
+		]
 		notices: []
 	}
 
@@ -98,6 +98,32 @@ components: sources: opentelemetry: {
 		}
 	}
 
+	configuration_examples: [
+		{
+			title: "OTLP Defaults"
+			configuration: {
+				opentelemetry: {
+					grpc: {
+						address: "0.0.0.0:4317"
+						tls: {
+							enabled:  true
+							crt_file: "/etc/ssl/certs/vector.pem"
+							key_file: "/etc/ssl/private/vector.key"
+						}
+					}
+					http: {
+						address: "0.0.0.0:4318"
+						tls: {
+							enabled:  true
+							crt_file: "/etc/ssl/certs/vector.pem"
+							key_file: "/etc/ssl/private/vector.key"
+						}
+					}
+				}
+			}
+		},
+	]
+
 	outputs: [
 		{
 			name: "logs"
@@ -109,14 +135,29 @@ components: sources: opentelemetry: {
 
 	output: {
 		logs: event: {
-			description: "An individual event from a batch of events received through a gRPC request sent by OpenTelemetry SDK"
+			description: "An individual log event from a batch of events received through an OTLP request"
 			fields: {
 				attributes: {
 					description: "Attributes that describe the specific event occurrence."
 					required:    false
 					common:      true
 					type: object: {
-						examples: [{"k1": "v1"}]
+						examples: [
+							{
+								"http.status.code":          500
+								"http.url":                  "http://example.com"
+								"my.custom.application.tag": "hello"
+							},
+							{
+								"http.scheme":      "https"
+								"http.host":        "donut.mycie.com"
+								"http.target":      "/order"
+								"http.method":      "post"
+								"http.status_code": 500
+								"http.flavor":      "1.1"
+								"http.user_agent":  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.149 Safari/537.36"
+							},
+						]
 					}
 				}
 				resources: {
@@ -124,7 +165,16 @@ components: sources: opentelemetry: {
 					required:    false
 					common:      true
 					type: object: {
-						examples: [{"k1": "v1"}]
+						examples: [
+							{
+								"service.name":    "donut_shop"
+								"service.version": "2.0.0"
+								"k8s.pod.uid":     "1138528c-c36e-11e9-a1a7-42010a800198"
+							},
+							{
+								"container.name": "vector"
+							},
+						]
 					}
 				}
 				message: {
@@ -133,7 +183,7 @@ components: sources: opentelemetry: {
 					common:      true
 					type: string: {
 						default: null
-						examples: ["hello world"]
+						examples: ["20200415T072306-0700 INFO I like donuts"]
 					}
 				}
 				trace_id: {
@@ -142,7 +192,7 @@ components: sources: opentelemetry: {
 					common:      true
 					type: string: {
 						default: null
-						examples: ["37e7518fe2e2fcaf22b41c2dac059221"]
+						examples: ["66346462623365646437363566363230"]
 					}
 				}
 				span_id: {
@@ -151,17 +201,21 @@ components: sources: opentelemetry: {
 					common:      true
 					type: string: {
 						default: null
-						examples: ["05abe7510db73b88"]
+						examples: ["43222c2d51a7abe3"]
 					}
 				}
 				severity_number: {
-					description: "Numerical value of the severity. Smaller numerical values correspond to less severe events (such as debug events), larger numerical values correspond to more severe events (such as errors and critical events)."
-					required:    false
-					common:      true
+					description: """
+						Numerical value of the severity.
+						
+						Smaller numerical values correspond to less severe events (such as debug events), larger numerical values correspond to more severe events (such as errors and critical events).
+						"""
+					required: false
+					common:   true
 					type: uint: {
 						default: null
 						unit:    null
-						examples: [9]
+						examples: [3, 9, 17, 24]
 					}
 				}
 				severity_text: {
@@ -170,7 +224,7 @@ components: sources: opentelemetry: {
 					common:      true
 					type: string: {
 						default: null
-						examples: ["info"]
+						examples: ["TRACE3", "INFO", "ERROR", "FATAL4"]
 					}
 				}
 				flags: {
@@ -183,18 +237,22 @@ components: sources: opentelemetry: {
 					}
 				}
 				timestamp: {
-					description: "The UTC Datetime when the event occurred."
-					required:    true
-					type: uint: {
-						unit: null
-					}
+					description: """
+						The UTC Datetime when the event occurred. If this value is unset, or `0`, it will be set to the `observed_timestamp` field.
+						
+						This field is converted from the `time_unix_nano` Protobuf field.
+						"""
+					required: true
+					type: timestamp: {}
 				}
 				observed_timestamp: {
-					description: "The UTC Datetime when the event was observed by the collection system."
-					required:    true
-					type: uint: {
-						unit: null
-					}
+					description: """
+						The UTC Datetime when the event was observed by the collection system. If this value is unset, or `0`, it will be set to the current time.
+						
+						This field is converted from the `observed_time_unix_nano` Protobuf field.
+						"""
+					required: true
+					type: timestamp: {}
 				}
 				dropped_attributes_count: {
 					description: "Counts for attributes dropped due to collection limits."
