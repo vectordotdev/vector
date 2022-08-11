@@ -10,7 +10,7 @@ readme = "README.md"
 publish = false
 default-run = "vector"
 autobenches = false # our benchmarks are not runnable on their own either way
-rust-version = "1.62.0"
+rust-version = "1.63.0"
 
 [[bin]]
 name = "graphql-schema"
