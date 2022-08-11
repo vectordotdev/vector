@@ -746,7 +746,6 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogGcsRequestBuilder {
 fn generate_object_key(key_prefix: Option<String>, partition_key: String) -> String {
     let filename = Uuid::new_v4().to_string();
 
-    
     format!(
         "{}/{}{}.{}",
         key_prefix.unwrap_or_default(),
