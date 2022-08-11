@@ -209,7 +209,7 @@ pub const fn memory_buffer_default_max_events() -> NonZeroUsize {
 }
 
 /// A specific type of buffer stage.
-#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
 pub enum BufferType {

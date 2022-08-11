@@ -7,7 +7,7 @@ use crate::Value;
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Value::Bytes(val) => write!(
+            Self::Bytes(val) => write!(
                 f,
                 r#""{}""#,
                 String::from_utf8_lossy(val)
@@ -15,10 +15,10 @@ impl fmt::Display for Value {
                     .replace('"', r#"\""#)
                     .replace('\n', r#"\n"#)
             ),
-            Value::Integer(val) => write!(f, "{}", val),
-            Value::Float(val) => write!(f, "{}", val),
-            Value::Boolean(val) => write!(f, "{}", val),
-            Value::Object(map) => {
+            Self::Integer(val) => write!(f, "{}", val),
+            Self::Float(val) => write!(f, "{}", val),
+            Self::Boolean(val) => write!(f, "{}", val),
+            Self::Object(map) => {
                 let joined = map
                     .iter()
                     .map(|(key, val)| format!(r#""{}": {}"#, key, val))
@@ -26,7 +26,7 @@ impl fmt::Display for Value {
                     .join(", ");
                 write!(f, "{{ {} }}", joined)
             }
-            Value::Array(array) => {
+            Self::Array(array) => {
                 let joined = array
                     .iter()
                     .map(ToString::to_string)
@@ -34,10 +34,10 @@ impl fmt::Display for Value {
                     .join(", ");
                 write!(f, "[{}]", joined)
             }
-            Value::Timestamp(val) => {
+            Self::Timestamp(val) => {
                 write!(f, "t'{}'", val.to_rfc3339_opts(SecondsFormat::AutoSi, true))
             }
-            Value::Regex(regex) => write!(f, "r'{}'", **regex),
+            Self::Regex(regex) => write!(f, "r'{}'", **regex),
             Self::Null => write!(f, "null"),
         }
     }

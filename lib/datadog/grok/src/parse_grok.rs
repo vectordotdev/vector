@@ -8,7 +8,7 @@ use crate::{
     parse_grok_rules::{GrokField, GrokRule},
 };
 
-#[derive(thiserror::Error, Debug, PartialEq)]
+#[derive(thiserror::Error, Debug, PartialEq, Eq)]
 pub enum Error {
     #[error("failed to apply filter '{}' to '{}'", .0, .1)]
     FailedToApplyFilter(String, String),

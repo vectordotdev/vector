@@ -15,7 +15,7 @@ use crate::{event::Event, serde::skip_serializing_if_default};
 
 /// Transformations to prepare an event for serialization.
 #[configurable_component(no_deser)]
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Transformer {
     /// List of fields that will be included in the encoded event.
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]

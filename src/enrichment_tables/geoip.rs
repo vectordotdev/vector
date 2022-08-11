@@ -16,7 +16,7 @@ use crate::config::{EnrichmentTableConfig, EnrichmentTableDescription, GenerateC
 const ASN_DATABASE_TYPE: &str = "GeoLite2-ASN";
 const ISP_DATABASE_TYPE: &str = "GeoIP2-ISP";
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct GeoipConfig {
     pub path: String,
     #[serde(default = "default_locale")]

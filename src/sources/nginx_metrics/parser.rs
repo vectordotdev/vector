@@ -8,7 +8,7 @@ use nom::{
 };
 use snafu::Snafu;
 
-#[derive(Debug, Snafu, PartialEq)]
+#[derive(Debug, Snafu, PartialEq, Eq)]
 pub enum ParseError {
     #[snafu(display("failed to parse NginxStubStatus, kind: `{:?}`", kind))]
     NginxStubStatusParseError { kind: ErrorKind },
