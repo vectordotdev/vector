@@ -38,6 +38,7 @@ components: sinks: datadog_traces: {
 				can_verify_certificate: true
 				can_verify_hostname:    true
 				enabled_default:        true
+				enabled_by_scheme:      true
 			}
 			to: {
 				service: services.datadog_traces
