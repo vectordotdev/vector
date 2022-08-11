@@ -106,8 +106,8 @@ components: sources: opentelemetry: {
 					grpc: {
 						address: "0.0.0.0:4317"
 						tls: {
-							enabled: true
-							ca_file: "/var/vector/ca.pem"
+							enabled:  true
+							ca_file:  "/var/vector/ca.pem"
 							crt_file: "/var/vector/cert.pem"
 							key_file: "/var/vector/cert.key"
 						}
@@ -115,8 +115,8 @@ components: sources: opentelemetry: {
 					http: {
 						address: "0.0.0.0:4318"
 						tls: {
-							enabled: true
-							ca_file: "/var/vector/ca.pem"
+							enabled:  true
+							ca_file:  "/var/vector/ca.pem"
 							crt_file: "/var/vector/cert.pem"
 							key_file: "/var/vector/cert.key"
 						}
