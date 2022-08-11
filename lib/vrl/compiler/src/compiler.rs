@@ -22,6 +22,10 @@ pub struct CompilationResult {
     pub config: CompileConfig,
 }
 
+/// The compiler has many `compile_*` functions. These all accept a `state` param which
+/// should contain the type state of the program immediately before the expression
+/// that is being compiled would execute. The state should be modified to reflect the
+/// state after the compiled expression executes. This logic lives in `Expression::type_info`.
 pub struct Compiler<'a> {
     fns: &'a [Box<dyn Function>],
     diagnostics: Diagnostics,
@@ -256,9 +260,12 @@ impl<'a> Compiler<'a> {
         let original_state = state.clone();
         let exprs = self.compile_exprs(node.into_inner().into_iter(), state)?;
         let block = Block::new_scoped(exprs);
-        let type_info = block.type_info(&original_state);
-        *state = type_info.state;
-        Some((block, type_info.result))
+
+        // The type information from `compile_exprs` doesn't applying the "scoping" from the block.
+        // This is recalculated using the block.
+        *state = original_state;
+        let result = block.apply_type_info(state);
+        Some((block, result))
     }
 
     fn compile_array(&mut self, node: Node<ast::Array>, state: &mut TypeState) -> Option<Array> {
@@ -319,6 +326,8 @@ impl<'a> Compiler<'a> {
             else_block,
         };
 
+        // The current state is from one of the branches. Restore it and calculate
+        // the type state from the full "if statement" expression.
         *state = original_state;
         if_statement.apply_type_info(state);
         Some(if_statement)
@@ -380,6 +389,8 @@ impl<'a> Compiler<'a> {
             .map_err(|err| self.diagnostics.push(Box::new(err)))
             .ok()?;
 
+        // Both "lhs" and "rhs" are compiled above, but "rhs" isn't always executed.
+        // The expression can provide a more accurate type state.
         *state = op.type_info(&original_state).state;
         Some(op)
     }
@@ -516,6 +527,8 @@ impl<'a> Compiler<'a> {
             }
         }
 
+        // The state hasn't been updated from the actual assignment yet. Recalculate the type
+        // from the new assignment expression.
         *state = original_state;
         assignment.apply_type_info(state);
 
@@ -689,6 +702,7 @@ impl<'a> Compiler<'a> {
         });
 
         if let Some(function) = &function {
+            // Update the final state using the function expression to make sure it's accurate.
             *state = function.type_info(&original_state).state;
         }
 

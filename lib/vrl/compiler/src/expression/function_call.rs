@@ -164,8 +164,7 @@ impl<'a> Builder<'a> {
                 })
             })?;
 
-        //
-        // // Check function closure validity.
+        // Check function closure validity.
         let closure = Self::check_closure(
             function.as_ref(),
             closure_variables,

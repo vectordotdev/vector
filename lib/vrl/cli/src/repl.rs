@@ -58,9 +58,6 @@ pub(crate) fn run(
     let func_docs_regex = Regex::new(r"^help\sdocs\s(\w{1,})$").unwrap();
     let error_docs_regex = Regex::new(r"^help\serror\s(\w{1,})$").unwrap();
 
-    // let mut external_state = state::ExternalEnv::default();
-    // let mut local_state = state::LocalEnv::default();
-
     let mut state = TypeState::default();
 
     let mut rt = Runtime::new(state::Runtime::default());
