@@ -22,9 +22,7 @@ use stream_cancel::{Trigger, Tripwire};
 use tracing::{Instrument, Span};
 use vector_config::configurable_component;
 use vector_core::{
-    internal_event::{
-        ByteSize, BytesSent, EventsSent, InternalEventHandle as _, Protocol, Registered,
-    },
+    internal_event::{BytesSent, EventsSent},
     ByteSizeOf,
 };
 
@@ -388,7 +386,6 @@ fn handle(
     buckets: &[f64],
     quantiles: &[f64],
     metrics: &IndexMap<MetricRef, (Metric, MetricMetadata)>,
-    bytes_sent: &Registered<BytesSent>,
 ) -> Response<Body> {
     let mut response = Response::new(Body::empty());
 
@@ -410,7 +407,10 @@ fn handle(
                 HeaderValue::from_static("text/plain; version=0.0.4"),
             );
 
-            bytes_sent.emit(ByteSize(body_size));
+            emit!(BytesSent {
+                byte_size: body_size,
+                protocol: "http",
+            });
         }
         _ => {
             *response.status_mut() = StatusCode::NOT_FOUND;
@@ -434,8 +434,6 @@ impl PrometheusExporter {
             return;
         }
 
-        let bytes_sent = register!(BytesSent::from(Protocol::HTTP));
-
         let span = Span::current();
         let metrics = Arc::clone(&self.metrics);
         let default_namespace = self.config.default_namespace.clone();
@@ -448,7 +446,6 @@ impl PrometheusExporter {
             let default_namespace = default_namespace.clone();
             let buckets = buckets.clone();
             let quantiles = quantiles.clone();
-            let bytes_sent = bytes_sent.clone();
 
             async move {
                 Ok::<_, Infallible>(service_fn(move |req| {
@@ -467,7 +464,6 @@ impl PrometheusExporter {
                             &buckets,
                             &quantiles,
                             &metrics,
-                            &bytes_sent,
                         );
 
                         emit!(EventsSent {
