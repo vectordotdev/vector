@@ -298,7 +298,7 @@ impl BufferType {
 /// defined, otherwise, for example, two instances of the same disk buffer type in a single chained
 /// buffer topology would try to both open the same buffer files on disk, which wouldn't work or
 /// would go horribly wrong.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BufferConfig {
     pub stages: Vec<BufferType>,
 }

@@ -68,7 +68,7 @@ enum BuildError {
 
 /// Configuration for the `file` source.
 #[configurable_component(source)]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[serde(deny_unknown_fields, default)]
 pub struct FileConfig {
     /// Array of file patterns to include. [Globbing](https://vector.dev/docs/reference/configuration/sources/file/#globbing) is supported.
