@@ -9,7 +9,6 @@ use http::{Request, StatusCode, Uri};
 use hyper::Body;
 use snafu::ResultExt;
 use tower::Service;
-use vector_common::internal_event::BytesSent;
 use vector_core::{
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_event::EventsSent,
@@ -109,11 +108,8 @@ impl DriverResponse for TraceApiResponse {
         }
     }
 
-    fn bytes_sent(&self) -> Option<BytesSent> {
-        Some(BytesSent {
-            byte_size: self.uncompressed_size,
-            protocol: &self.protocol,
-        })
+    fn bytes_sent(&self) -> Option<(usize, &str)> {
+        Some((self.uncompressed_size, &self.protocol))
     }
 }
 
