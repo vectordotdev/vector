@@ -89,7 +89,13 @@ impl Expression for ChunksFn {
     }
 
     fn type_def(&self, _state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
-        TypeDef::array(Collection::from_unknown(Kind::bytes())).fallible()
+        let chunk_size_is_expression = self.chunk_size.as_value().is_none();
+        // chunk_size is converted to a usize later, so if a user-supplied Value::Integer (i64) is
+        // larger than the platform's usize::MAX, it could fail to convert.
+        let chunk_size_limited_by_architecture = usize::BITS < 64;
+
+        TypeDef::array(Collection::from_unknown(Kind::bytes()))
+            .with_fallibility(chunk_size_is_expression || chunk_size_limited_by_architecture)
     }
 }
 
