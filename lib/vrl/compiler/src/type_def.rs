@@ -113,7 +113,7 @@ impl TypeDef {
 
     #[inline]
     #[must_use]
-    pub fn add_bytes(mut self) -> Self {
+    pub fn or_bytes(mut self) -> Self {
         self.kind.add_bytes();
         self
     }
@@ -126,7 +126,7 @@ impl TypeDef {
 
     #[inline]
     #[must_use]
-    pub fn add_integer(mut self) -> Self {
+    pub fn or_integer(mut self) -> Self {
         self.kind.add_integer();
         self
     }
@@ -139,7 +139,7 @@ impl TypeDef {
 
     #[inline]
     #[must_use]
-    pub fn add_float(mut self) -> Self {
+    pub fn or_float(mut self) -> Self {
         self.kind.add_float();
         self
     }
@@ -152,7 +152,7 @@ impl TypeDef {
 
     #[inline]
     #[must_use]
-    pub fn add_boolean(mut self) -> Self {
+    pub fn or_boolean(mut self) -> Self {
         self.kind.add_boolean();
         self
     }
@@ -165,7 +165,7 @@ impl TypeDef {
 
     #[inline]
     #[must_use]
-    pub fn add_timestamp(mut self) -> Self {
+    pub fn or_timestamp(mut self) -> Self {
         self.kind.add_timestamp();
         self
     }
@@ -178,7 +178,7 @@ impl TypeDef {
 
     #[inline]
     #[must_use]
-    pub fn add_regex(mut self) -> Self {
+    pub fn or_regex(mut self) -> Self {
         self.kind.add_regex();
         self
     }
@@ -187,6 +187,26 @@ impl TypeDef {
     #[must_use]
     pub fn null() -> Self {
         Kind::null().into()
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn or_null(mut self) -> Self {
+        self.kind.add_null();
+        self
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn undefined() -> Self {
+        Kind::undefined().into()
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn or_undefined(mut self) -> Self {
+        self.kind.add_undefined();
+        self
     }
 
     #[inline]
@@ -208,7 +228,7 @@ impl TypeDef {
     }
 
     #[inline]
-    pub fn add_array(mut self, collection: impl Into<Collection<Index>>) -> Self {
+    pub fn or_array(mut self, collection: impl Into<Collection<Index>>) -> Self {
         self.kind.add_array(collection);
         self
     }
@@ -241,7 +261,7 @@ impl TypeDef {
     }
 
     #[inline]
-    pub fn add_object(mut self, collection: impl Into<Collection<Field>>) -> Self {
+    pub fn or_object(mut self, collection: impl Into<Collection<Field>>) -> Self {
         self.kind.add_object(collection);
         self
     }
@@ -409,7 +429,7 @@ mod test {
         assert_eq!(
             a.merge(b),
             Details {
-                type_def: TypeDef::integer().add_float(),
+                type_def: TypeDef::integer().or_float(),
                 value: Some(Value::from(5))
             }
         )

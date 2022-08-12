@@ -2,8 +2,7 @@ use value::Value;
 use vector_common::TimeZone;
 use vector_config::configurable_component;
 use vector_core::compile_vrl;
-use vrl::state::LocalEnv;
-use vrl::{diagnostic::Formatter, Program, Runtime, VrlRuntime};
+use vrl::{diagnostic::Formatter, CompilationResult, CompileConfig, Program, Runtime, VrlRuntime};
 
 use crate::event::TargetEvents;
 use crate::{
@@ -45,17 +44,21 @@ impl ConditionalConfig for VrlConfig {
             .chain(vector_vrl_functions::vrl_functions())
             .collect::<Vec<_>>();
 
-        let mut state = vrl::state::ExternalEnv::default().read_only();
-        state.set_external_context(enrichment_tables.clone());
+        let state = vrl::state::TypeState::default();
 
-        let (program, warnings) =
-            compile_vrl(&self.source, &functions, &mut state, LocalEnv::default()).map_err(
-                |diagnostics| {
-                    Formatter::new(&self.source, diagnostics)
-                        .colored()
-                        .to_string()
-                },
-            )?;
+        let mut config = CompileConfig::default();
+        config.set_custom(enrichment_tables.clone());
+        config.set_read_only();
+
+        let CompilationResult {
+            program,
+            warnings,
+            config: _,
+        } = compile_vrl(&self.source, &functions, &state, config).map_err(|diagnostics| {
+            Formatter::new(&self.source, diagnostics)
+                .colored()
+                .to_string()
+        })?;
 
         if !warnings.is_empty() {
             let warnings = Formatter::new(&self.source, warnings).colored().to_string();

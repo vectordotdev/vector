@@ -18,7 +18,10 @@ use rustyline::{
 use value::Secrets;
 use vector_common::TimeZone;
 use vector_vrl_functions::vrl_functions;
-use vrl::{diagnostic::Formatter, prelude::BTreeMap, state, Runtime, Target, VrlRuntime};
+use vrl::state::TypeState;
+use vrl::{
+    diagnostic::Formatter, prelude::BTreeMap, state, CompileConfig, Runtime, Target, VrlRuntime,
+};
 
 // Create a list of all possible error values for potential docs lookup
 static ERRORS: Lazy<Vec<String>> = Lazy::new(|| {
@@ -55,8 +58,8 @@ pub(crate) fn run(
     let func_docs_regex = Regex::new(r"^help\sdocs\s(\w{1,})$").unwrap();
     let error_docs_regex = Regex::new(r"^help\serror\s(\w{1,})$").unwrap();
 
-    let mut external_state = state::ExternalEnv::default();
-    let mut local_state = state::LocalEnv::default();
+    let mut state = TypeState::default();
+
     let mut rt = Runtime::new(state::Runtime::default());
     let mut rl = Editor::<Repl>::new()?;
     rl.set_helper(Some(Repl::new()));
@@ -116,17 +119,14 @@ pub(crate) fn run(
                     _ => line,
                 };
 
-                let (local, result) = resolve(
+                let result = resolve(
                     objects.get_mut(index).expect("object should exist"),
                     &mut rt,
                     command,
-                    &mut external_state,
-                    std::mem::take(&mut local_state),
+                    &mut state,
                     timezone,
                     vrl_runtime,
                 );
-
-                let _v = std::mem::replace(&mut local_state, local);
 
                 let string = match result {
                     Ok(v) => v.to_string(),
@@ -155,31 +155,26 @@ fn resolve(
     target: &mut TargetValue,
     runtime: &mut Runtime,
     program: &str,
-    external: &mut state::ExternalEnv,
-    local: state::LocalEnv,
+    state: &mut TypeState,
     timezone: TimeZone,
     vrl_runtime: VrlRuntime,
-) -> (state::LocalEnv, Result<Value, String>) {
+) -> Result<Value, String> {
     let mut functions = stdlib::all();
     functions.extend(vector_vrl_functions::vrl_functions());
 
+    let mut config = CompileConfig::default();
     // The CLI should be moved out of the "vrl" module, and then it can use the `vector-core::compile_vrl` function which includes this automatically
-    external.set_read_only_metadata_path(LookupBuf::from("vector"), true);
+    config.set_read_only_metadata_path(LookupBuf::from("vector"), true);
 
-    let program = match vrl::compile_with_state(program, &functions, external, local.clone()) {
-        Ok((program, _)) => program,
+    let program = match vrl::compile_with_state(program, &functions, state, config) {
+        Ok(result) => result.program,
         Err(diagnostics) => {
-            return (
-                local,
-                Err(Formatter::new(program, diagnostics).colored().to_string()),
-            )
+            return Err(Formatter::new(program, diagnostics).colored().to_string());
         }
     };
 
-    (
-        program.local_env().clone(),
-        execute(runtime, &program, target, timezone, vrl_runtime),
-    )
+    *state = program.final_type_state();
+    execute(runtime, &program, target, timezone, vrl_runtime)
 }
 
 fn execute(
@@ -294,8 +289,7 @@ impl Validator for Repl {
         ctx: &mut validate::ValidationContext,
     ) -> rustyline::Result<ValidationResult> {
         let timezone = TimeZone::default();
-        let local_state = state::LocalEnv::default();
-        let mut external_state = state::ExternalEnv::default();
+        let mut state = TypeState::default();
         let mut rt = Runtime::new(state::Runtime::default());
         let mut target = TargetValue {
             value: Value::Null,
@@ -303,12 +297,11 @@ impl Validator for Repl {
             secrets: Secrets::new(),
         };
 
-        let (_, result) = resolve(
+        let result = resolve(
             &mut target,
             &mut rt,
             ctx.input(),
-            &mut external_state,
-            local_state,
+            &mut state,
             timezone,
             VrlRuntime::Ast,
         );

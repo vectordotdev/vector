@@ -16,7 +16,8 @@ use vector_common::TimeZone;
 use vrl::{
     diagnostic::Formatter,
     prelude::{BTreeMap, VrlValueConvert},
-    state, Runtime, SecretTarget, TargetValueRef, Terminate, VrlRuntime,
+    state, CompilationResult, CompileConfig, Runtime, SecretTarget, TargetValueRef, Terminate,
+    VrlRuntime,
 };
 use vrl_tests::{docs, Test};
 
@@ -180,19 +181,20 @@ fn main() {
         functions.append(&mut vector_vrl_functions::vrl_functions());
         let test_enrichment = test_enrichment::test_enrichment_table();
 
-        let mut external_env = vrl::state::ExternalEnv::default();
-        external_env.set_external_context(test_enrichment.clone());
+        let external_env = vrl::state::ExternalEnv::default();
+        let mut config = CompileConfig::default();
+        config.set_custom(test_enrichment.clone());
 
         // Set some read-only paths that can be tested
         for (path, recursive) in &test.read_only_paths {
-            external_env.set_read_only_event_path(path.clone(), *recursive);
+            config.set_read_only_event_path(path.clone(), *recursive);
         }
         for (path, recursive) in &test.read_only_metadata_paths {
-            external_env.set_read_only_metadata_path(path.clone(), *recursive);
+            config.set_read_only_metadata_path(path.clone(), *recursive);
         }
 
         let compile_start = Instant::now();
-        let program = vrl::compile_with_external(&test.source, &functions, &mut external_env);
+        let result = vrl::compile_with_external(&test.source, &functions, &external_env, config);
         let compile_end = compile_start.elapsed();
 
         let want = test.result.clone();
@@ -203,8 +205,12 @@ fn main() {
             .then(|| format!("comp: {:>9.3?}", compile_end))
             .unwrap_or_default();
 
-        match program {
-            Ok((program, warnings)) if warnings.is_empty() => {
+        match result {
+            Ok(CompilationResult {
+                program,
+                warnings,
+                config: _,
+            }) if warnings.is_empty() => {
                 let run_start = Instant::now();
                 let result = run_vrl(
                     runtime,
@@ -342,7 +348,12 @@ fn main() {
                     }
                 }
             }
-            Ok((_, diagnostics)) | Err(diagnostics) => {
+            Ok(CompilationResult {
+                program: _,
+                warnings: diagnostics,
+                config: _,
+            })
+            | Err(diagnostics) => {
                 let mut failed = false;
                 let mut formatter = Formatter::new(&test.source, diagnostics);
                 if !test.skip {

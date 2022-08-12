@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 
 use ::value::Value;
 use vrl::prelude::*;
+use vrl::state::TypeState;
 
 use crate::{
     vrl_util::{self, add_index, evaluate_condition, index_from_args},
@@ -89,7 +90,7 @@ impl Function for FindEnrichmentTableRecords {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &TypeState,
         ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -132,14 +133,15 @@ impl Function for FindEnrichmentTableRecords {
                 .map_err(|err| Box::new(err) as Box<_>)?,
         );
 
-        Ok(Box::new(FindEnrichmentTableRecordsFn {
+        Ok(FindEnrichmentTableRecordsFn {
             table,
             condition,
             index,
             select,
             case_sensitive,
             enrichment_tables: registry.as_readonly(),
-        }))
+        }
+        .as_expr())
     }
 
     fn compile_argument(
@@ -187,7 +189,7 @@ pub struct FindEnrichmentTableRecordsFn {
     enrichment_tables: TableSearch,
 }
 
-impl Expression for FindEnrichmentTableRecordsFn {
+impl FunctionExpression for FindEnrichmentTableRecordsFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let condition = self
             .condition
@@ -219,7 +221,7 @@ impl Expression for FindEnrichmentTableRecordsFn {
         )
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &TypeState) -> TypeDef {
         TypeDef::array(Collection::from_unknown(Kind::object(Collection::any()))).fallible()
     }
 }

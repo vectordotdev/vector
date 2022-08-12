@@ -801,6 +801,7 @@ mod test {
     use vector_common::btreemap;
     use vector_core::config::proxy::ProxyConfig;
     use vrl::prelude::Collection;
+    use vrl::CompileConfig;
     use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
 
     use super::{
@@ -967,16 +968,19 @@ mod test {
         // We need to set up some state here to inform the VRL compiler that
         // .tags is an object and merge() is thus a safe operation (mimicking
         // the environment this code will actually run in).
-        let mut state = vrl::state::ExternalEnv::new_with_kind(
+        let state = vrl::state::ExternalEnv::new_with_kind(
             Kind::object(btreemap! {
                 "tags" => Kind::object(BTreeMap::new()),
             }),
             Kind::object(Collection::empty()),
         );
-        assert!(
-            vrl::compile_with_external(vrl.as_str(), vrl_stdlib::all().as_ref(), &mut state)
-                .is_ok()
-        );
+        assert!(vrl::compile_with_external(
+            vrl.as_str(),
+            vrl_stdlib::all().as_ref(),
+            &state,
+            CompileConfig::default()
+        )
+        .is_ok());
     }
 
     #[test]

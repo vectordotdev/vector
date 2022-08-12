@@ -1,15 +1,14 @@
-use std::fmt;
-
-use lookup::LookupBuf;
-use value::{kind::remove, Kind, Value};
-
 use crate::{
     expression::{Container, Resolved, Variable},
     parser::ast::Ident,
-    state::{ExternalEnv, LocalEnv},
+    state::ExternalEnv,
+    state::{TypeInfo, TypeState},
     type_def::Details,
-    Context, Expression, TypeDef,
+    Context, Expression,
 };
+use lookup::LookupBuf;
+use std::fmt;
+use value::{kind::remove, Kind, Value};
 
 #[derive(Clone, PartialEq)]
 pub struct Query {
@@ -115,15 +114,17 @@ impl Expression for Query {
         }
     }
 
-    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
+    fn type_info(&self, state: &TypeState) -> TypeInfo {
         use Target::{Container, External, FunctionCall, Internal};
 
-        match &self.target {
-            External => state.1.target().clone().type_def.at_path(&self.path),
-            Internal(variable) => variable.type_def(state).at_path(&self.path),
-            FunctionCall(call) => call.type_def(state).at_path(&self.path),
-            Container(container) => container.type_def(state).at_path(&self.path),
-        }
+        let result = match &self.target {
+            External => state.external.target().clone().type_def.at_path(&self.path),
+            Internal(variable) => variable.type_info(state).result.at_path(&self.path),
+            FunctionCall(call) => call.type_info(state).result.at_path(&self.path),
+            Container(container) => container.type_info(state).result.at_path(&self.path),
+        };
+
+        TypeInfo::new(state, result)
     }
 }
 
@@ -187,7 +188,6 @@ impl fmt::Debug for Target {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::state;
 
     #[test]
     fn test_type_def() {
@@ -196,8 +196,8 @@ mod tests {
             path: LookupBuf::root(),
         };
 
-        let state = (&state::LocalEnv::default(), &state::ExternalEnv::default());
-        let type_def = query.type_def(state);
+        let state = TypeState::default();
+        let type_def = query.type_info(&state).result;
 
         assert!(type_def.is_infallible());
         assert!(type_def.is_object());

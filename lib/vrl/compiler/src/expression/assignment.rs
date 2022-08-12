@@ -10,10 +10,10 @@ use crate::{
         ast::{self, Ident},
         Node,
     },
-    state::{ExternalEnv, LocalEnv},
+    state::{TypeInfo, TypeState},
     type_def::Details,
     value::kind::DefaultValue,
-    Context, Expression, Span, TypeDef,
+    CompileConfig, Context, Expression, Span, TypeDef,
 };
 
 #[derive(Clone, PartialEq)]
@@ -24,9 +24,9 @@ pub struct Assignment {
 impl Assignment {
     pub(crate) fn new(
         node: Node<Variant<Node<ast::AssignmentTarget>, Node<Expr>>>,
-        local: &mut LocalEnv,
-        external: &mut ExternalEnv,
+        state: &TypeState,
         fallible_rhs: Option<&dyn DiagnosticMessage>,
+        config: &CompileConfig,
     ) -> Result<Self, Error> {
         let (_, variant) = node.take();
 
@@ -35,7 +35,6 @@ impl Assignment {
                 let target_span = target.span();
                 let expr_span = expr.span();
                 let assignment_span = Span::new(target_span.start(), expr_span.start() - 1);
-                let type_def = expr.type_def((local, external));
 
                 // Fallible expressions require infallible assignment.
                 if fallible_rhs.is_some() {
@@ -60,20 +59,15 @@ impl Assignment {
 
                 let expr = expr.into_inner();
                 let target = Target::try_from(target.into_inner())?;
-                verify_mutable(&target, external, expr_span, assignment_span)?;
+                verify_mutable(&target, config, expr_span, assignment_span)?;
                 verify_overwriteable(
                     &target,
-                    local,
-                    external,
+                    state,
                     target_span,
                     expr_span,
                     assignment_span,
                     expr.clone(),
                 )?;
-
-                let value = expr.as_value();
-
-                target.insert_type_def(local, external, type_def, value);
 
                 Variant::Single {
                     target,
@@ -86,7 +80,7 @@ impl Assignment {
                 let err_span = err.span();
                 let expr_span = expr.span();
                 let assignment_span = Span::new(ok_span.start(), err_span.end());
-                let type_def = expr.type_def((local, external));
+                let type_def = expr.type_info(state).result;
 
                 // Infallible expressions do not need fallible assignment.
                 if type_def.is_infallible() {
@@ -120,11 +114,10 @@ impl Assignment {
                 // set to being infallible, as the error will be captured by the
                 // "err" target.
                 let ok = Target::try_from(ok.into_inner())?;
-                verify_mutable(&ok, external, expr_span, ok_span)?;
+                verify_mutable(&ok, config, expr_span, ok_span)?;
                 verify_overwriteable(
                     &ok,
-                    local,
-                    external,
+                    state,
                     ok_span,
                     expr_span,
                     assignment_span,
@@ -133,27 +126,19 @@ impl Assignment {
 
                 let type_def = type_def.infallible();
                 let default_value = type_def.default_value();
-                let value = expr.as_value();
-
-                ok.insert_type_def(local, external, type_def, value);
 
                 // "err" target is assigned `null` or a string containing the
                 // error message.
                 let err = Target::try_from(err.into_inner())?;
-                verify_mutable(&err, external, expr_span, err_span)?;
+                verify_mutable(&err, config, expr_span, err_span)?;
                 verify_overwriteable(
                     &err,
-                    local,
-                    external,
+                    state,
                     err_span,
                     expr_span,
                     assignment_span,
                     expr.clone(),
                 )?;
-
-                let type_def = TypeDef::bytes().add_null().infallible();
-
-                err.insert_type_def(local, external, type_def, None);
 
                 Variant::Infallible {
                     ok,
@@ -188,13 +173,13 @@ impl Assignment {
 
 fn verify_mutable(
     target: &Target,
-    external: &ExternalEnv,
+    config: &CompileConfig,
     expr_span: Span,
     assignment_span: Span,
 ) -> Result<(), Error> {
     match target {
         Target::External(lookup_buf) => {
-            if external.is_read_only_event_path(lookup_buf) {
+            if config.is_read_only_event_path(lookup_buf) {
                 Err(Error {
                     variant: ErrorVariant::ReadOnly,
                     expr_span,
@@ -214,8 +199,7 @@ fn verify_mutable(
 /// index, while the parent of the field/index isn't an actual object/array.
 fn verify_overwriteable(
     target: &Target,
-    local: &LocalEnv,
-    external: &ExternalEnv,
+    state: &TypeState,
     target_span: Span,
     expr_span: Span,
     assignment_span: Span,
@@ -225,10 +209,11 @@ fn verify_overwriteable(
 
     let root_kind = match target {
         Target::Noop => Kind::any(),
-        Target::Internal(ident, _) => local
+        Target::Internal(ident, _) => state
+            .local
             .variable(ident)
             .map_or_else(Kind::any, |detail| detail.type_def.kind().clone()),
-        Target::External(_) => external.target_kind().clone(),
+        Target::External(_) => state.external.target_kind().clone(),
     };
 
     let mut parent_span = target_span;
@@ -301,8 +286,8 @@ impl Expression for Assignment {
         self.variant.resolve(ctx)
     }
 
-    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
-        self.variant.type_def(state)
+    fn type_info(&self, state: &TypeState) -> TypeInfo {
+        self.variant.type_info(state)
     }
 }
 
@@ -340,17 +325,11 @@ pub(crate) enum Target {
 }
 
 impl Target {
-    fn insert_type_def(
-        &self,
-        local: &mut LocalEnv,
-        external: &mut ExternalEnv,
-        new_type_def: TypeDef,
-        value: Option<Value>,
-    ) {
+    fn insert_type_def(&self, state: &mut TypeState, new_type_def: TypeDef, value: Option<Value>) {
         match self {
             Self::Noop => {}
             Self::Internal(ident, path) => {
-                let type_def = match local.variable(ident) {
+                let type_def = match state.local.variable(ident) {
                     None => TypeDef::null().with_type_inserted(path, new_type_def),
                     Some(&Details { ref type_def, .. }) => {
                         type_def.clone().with_type_inserted(path, new_type_def)
@@ -358,12 +337,13 @@ impl Target {
                 };
 
                 let details = Details { type_def, value };
-                local.insert_variable(ident.clone(), details);
+                state.local.insert_variable(ident.clone(), details);
             }
 
             Self::External(path) => {
-                external.update_target(Details {
-                    type_def: external
+                state.external.update_target(Details {
+                    type_def: state
+                        .external
                         .target()
                         .type_def
                         .clone()
@@ -532,16 +512,37 @@ where
         Ok(value)
     }
 
-    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
-        use Variant::{Infallible, Single};
+    fn type_info(&self, state: &TypeState) -> TypeInfo {
+        let mut state = state.clone();
+        match &self {
+            Variant::Single { target, expr } => {
+                let expr_result = expr.apply_type_info(&mut state);
+                target.insert_type_def(&mut state, expr_result.clone(), expr.as_value());
+                TypeInfo::new(state, expr_result)
+            }
+            Variant::Infallible {
+                ok,
+                err,
+                expr,
+                default,
+            } => {
+                let expr_result = expr.apply_type_info(&mut state);
 
-        match self {
-            Single { expr, .. } => expr.type_def(state),
-            Infallible { expr, .. } => {
-                // Return type is either the "expr" type, or "bytes" (the error message).
-                let mut type_def = expr.type_def(state);
-                type_def.kind_mut().add_bytes();
-                type_def.infallible()
+                // The "ok" type is either the result of the expression, or a "default" value when the expression fails.
+                let ok_type = expr_result
+                    .clone()
+                    .union(TypeDef::from(default.kind()))
+                    .infallible();
+                ok.insert_type_def(&mut state, ok_type, expr.as_value());
+
+                // The "err" type is either the error message "bytes" or "null" (not undefined).
+                let err_type = TypeDef::from(Kind::bytes().or_null());
+                err.insert_type_def(&mut state, err_type, None);
+
+                // Return type of the assignment expression itself is either the "expr" type or "bytes (the error message).
+                let assignment_result = expr_result.infallible().or_bytes();
+
+                TypeInfo::new(state, assignment_result)
             }
         }
     }

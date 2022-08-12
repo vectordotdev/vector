@@ -1,21 +1,19 @@
 pub mod closure;
 
+use diagnostic::{DiagnosticMessage, Label, Note};
+use lookup::LookupBuf;
+use parser::ast::Ident;
 use std::{
     collections::{BTreeMap, HashMap},
     fmt,
 };
-
-use anymap::AnyMap;
-use diagnostic::{DiagnosticMessage, Label, Note};
-use parser::ast::Ident;
 use value::{kind::Collection, Value};
 
 use crate::{
     expression::{container::Variant, Block, Container, Expr, Expression, FunctionArgument},
-    parser::Node,
-    state::{ExternalEnv, LocalEnv},
+    state::TypeState,
     value::{kind, Kind},
-    Span,
+    CompileConfig, Span, TypeDef,
 };
 
 pub type Compiled = Result<Box<dyn Expression>, Box<dyn DiagnosticMessage>>;
@@ -50,7 +48,7 @@ pub trait Function: Send + Sync + fmt::Debug {
     /// resolved to its final [`Value`].
     fn compile(
         &self,
-        state: (&mut LocalEnv, &mut ExternalEnv),
+        state: &TypeState,
         ctx: &mut FunctionCompileContext,
         arguments: ArgumentList,
     ) -> Compiled;
@@ -93,26 +91,15 @@ pub struct Example {
     pub result: Result<&'static str, &'static str>,
 }
 
-#[derive(Debug)]
 pub struct FunctionCompileContext {
     span: Span,
-    external_context: AnyMap,
+    config: CompileConfig,
 }
 
 impl FunctionCompileContext {
     #[must_use]
-    pub fn new(span: Span) -> Self {
-        Self {
-            span,
-            external_context: AnyMap::new(),
-        }
-    }
-
-    /// Add an external context to the compile context.
-    #[must_use]
-    pub fn with_external_context(mut self, context: AnyMap) -> Self {
-        self.external_context = context;
-        self
+    pub fn new(span: Span, config: CompileConfig) -> Self {
+        Self { span, config }
     }
 
     /// Span information for the function call.
@@ -124,18 +111,28 @@ impl FunctionCompileContext {
     /// Get an immutable reference to a stored external context, if one exists.
     #[must_use]
     pub fn get_external_context<T: 'static>(&self) -> Option<&T> {
-        self.external_context.get::<T>()
+        self.config.get_custom()
     }
 
     /// Get a mutable reference to a stored external context, if one exists.
     pub fn get_external_context_mut<T: 'static>(&mut self) -> Option<&mut T> {
-        self.external_context.get_mut::<T>()
+        self.config.get_custom_mut()
+    }
+
+    #[must_use]
+    pub fn is_read_only_metadata_path(&self, path: &LookupBuf) -> bool {
+        self.config.is_read_only_metadata_path(path)
+    }
+
+    #[must_use]
+    pub fn is_read_only_event_path(&self, path: &LookupBuf) -> bool {
+        self.config.is_read_only_event_path(path)
     }
 
     /// Consume the `FunctionCompileContext`, returning the (potentially mutated) `AnyMap`.
     #[must_use]
-    pub fn into_external_context(self) -> AnyMap {
-        self.external_context
+    pub fn into_config(self) -> CompileConfig {
+        self.config
     }
 }
 
@@ -457,53 +454,38 @@ fn required<T>(argument: Option<T>) -> T {
     argument.expect("invalid function signature")
 }
 
-impl From<HashMap<&'static str, Value>> for ArgumentList {
-    fn from(map: HashMap<&'static str, Value>) -> Self {
-        Self {
-            arguments: map
-                .into_iter()
-                .map(|(k, v)| (k, v.into()))
-                .collect::<HashMap<_, _>>(),
-            closure: None,
+#[cfg(any(test, feature = "test"))]
+mod test_impls {
+    use super::*;
+    use crate::parser::Node;
+
+    impl From<HashMap<&'static str, Value>> for ArgumentList {
+        fn from(map: HashMap<&'static str, Value>) -> Self {
+            Self {
+                arguments: map
+                    .into_iter()
+                    .map(|(k, v)| (k, v.into()))
+                    .collect::<HashMap<_, _>>(),
+                closure: None,
+            }
         }
     }
-}
 
-impl From<Vec<Node<FunctionArgument>>> for ArgumentList {
-    fn from(arguments: Vec<Node<FunctionArgument>>) -> Self {
-        let arguments = arguments
-            .into_iter()
-            .map(|arg| {
-                let arg = arg.into_inner();
-                // TODO: find a better API design that doesn't require unwrapping.
-                let key = arg.parameter().expect("exists").keyword;
-                let expr = arg.into_inner();
-
-                (key, expr)
-            })
-            .collect::<HashMap<_, _>>();
-
-        Self {
-            arguments,
-            ..Default::default()
+    impl From<ArgumentList> for Vec<(&'static str, Option<FunctionArgument>)> {
+        fn from(args: ArgumentList) -> Self {
+            args.arguments
+                .iter()
+                .map(|(key, expr)| {
+                    (
+                        *key,
+                        Some(FunctionArgument::new(
+                            None,
+                            Node::new(Span::default(), expr.clone()),
+                        )),
+                    )
+                })
+                .collect()
         }
-    }
-}
-
-impl From<ArgumentList> for Vec<(&'static str, Option<FunctionArgument>)> {
-    fn from(args: ArgumentList) -> Self {
-        args.arguments
-            .iter()
-            .map(|(key, expr)| {
-                (
-                    *key,
-                    Some(FunctionArgument::new(
-                        None,
-                        Node::new(Span::default(), expr.clone()),
-                    )),
-                )
-            })
-            .collect()
     }
 }
 
@@ -513,14 +495,16 @@ impl From<ArgumentList> for Vec<(&'static str, Option<FunctionArgument>)> {
 pub struct FunctionClosure {
     pub variables: Vec<Ident>,
     pub block: Block,
+    pub block_type_def: TypeDef,
 }
 
 impl FunctionClosure {
     #[must_use]
-    pub fn new<T: Into<Ident>>(variables: Vec<T>, block: Block) -> Self {
+    pub fn new<T: Into<Ident>>(variables: Vec<T>, block: Block, block_type_def: TypeDef) -> Self {
         Self {
             variables: variables.into_iter().map(Into::into).collect(),
             block,
+            block_type_def,
         }
     }
 }

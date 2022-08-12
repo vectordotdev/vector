@@ -1,5 +1,6 @@
 use ::value::Value;
 use percent_encoding::{utf8_percent_encode, AsciiSet};
+use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
 
 fn encode_percent(value: Value, ascii_set: &Bytes) -> Resolved {
@@ -101,7 +102,7 @@ impl Function for EncodePercent {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -112,7 +113,7 @@ impl Function for EncodePercent {
             .try_bytes()
             .expect("ascii_set not bytes");
 
-        Ok(Box::new(EncodePercentFn { value, ascii_set }))
+        Ok(EncodePercentFn { value, ascii_set }.as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -157,13 +158,13 @@ struct EncodePercentFn {
     ascii_set: Bytes,
 }
 
-impl Expression for EncodePercentFn {
+impl FunctionExpression for EncodePercentFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         encode_percent(value, &self.ascii_set)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::bytes()
     }
 }
