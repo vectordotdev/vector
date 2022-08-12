@@ -66,17 +66,23 @@ components: {
 		// `classes` represent the various classifications for this component
 		classes: #Classes & {_args: kind: Kind}
 
-		// `examples` demonstrates various ways to use the component using an
-		// input, output, and example configuration.
+		#Config: {
+			...
+			for k, v in configuration {
+				"\( k )"?: _ | *null
+			}
+		}
+
 		#ExampleConfig: {
-			title:           string
-			context?:        string
-			"configuration": {
-				...
-				for k, v in configuration {
-					"\( k )"?: _ | *null
-				}
-			} | string
+			title:         string
+			configuration: #Config
+			notes?:        string
+		}
+
+		#Example: {
+			title:         string
+			configuration: #Config
+			notes?:        string
 
 			if Kind == "source" {
 				input: string
@@ -93,11 +99,19 @@ components: {
 			if Kind != "sink" {
 				output: #Event | [#Event, ...#Event] | null
 			}
-
-			notes?: string
 		}
 
-		examples?: [#ExampleConfig, ...#ExampleConfig]
+		// `examples` demonstrates various ways to use the component using an
+		// input, output, and example configuration.
+		examples?: [#Example, ...#Example]
+
+		// `configuration_examples` demonstrates various ways configure the components. This differs
+		// from `examples` in that the list should be representative examples of how the component
+		// can be configured.
+		//
+		// This will be used to drive the config examples at the top of each component page in the
+		// future.
+		configuration_examples?: [#ExampleConfig, ...#ExampleConfig]
 
 		// `features` describes the various supported features of the component.
 		// Setting these helps to reduce boilerplate.
@@ -413,6 +427,10 @@ components: {
 			can_verify_certificate: bool
 			if Args.mode == "connect" {
 				can_verify_hostname: bool
+				enabled_by_scheme:   bool
+			}
+			if Args.mode == "accept" {
+				can_add_client_metadata: bool | *false
 			}
 			enabled_default: bool
 		}
@@ -593,8 +611,9 @@ components: {
 
 			_tls_accept: {
 				_args: {
-					can_verify_certificate: bool | *true
-					enabled_default:        bool
+					can_verify_certificate:  bool | *true
+					can_add_client_metadata: bool | *false
+					enabled_default:         bool
 				}
 				let Args = _args
 
@@ -618,13 +637,15 @@ components: {
 							examples: ["/path/to/certificate_authority.crt"]
 						}
 					}
-					client_metadata_key: {
-						common:      false
-						description: "The key name added to each event with the client certificate's metadata."
-						required:    false
-						type: string: {
-							default: null
-							examples: ["client_cert"]
+					if Args.can_add_client_metadata {
+						client_metadata_key: {
+							common:      false
+							description: "The key name added to each event with the client certificate's metadata."
+							required:    false
+							type: string: {
+								default: null
+								examples: ["client_cert"]
+							}
 						}
 					}
 					crt_file: {
@@ -671,6 +692,7 @@ components: {
 					can_verify_certificate: bool | *true
 					can_verify_hostname:    bool | *false
 					enabled_default:        bool
+					enabled_by_scheme:      bool
 				}
 				let Args = _args
 
@@ -678,11 +700,15 @@ components: {
 				description: "Configures the TLS options for outgoing connections."
 				required:    false
 				type: object: options: {
-					enabled: {
-						common:      true
-						description: "Enable TLS during connections to the remote."
-						required:    false
-						type: bool: default: Args.enabled_default
+					if Args.enabled_by_scheme != _|_ {
+						if !Args.enabled_by_scheme {
+							enabled: {
+								common:      true
+								description: "Enable TLS during connections to the remote."
+								required:    false
+								type: bool: default: Args.enabled_default
+							}
+						}
 					}
 
 					ca_file: {

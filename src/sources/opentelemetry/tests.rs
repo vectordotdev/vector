@@ -116,6 +116,7 @@ async fn receive_grpc_logs() {
             ("dropped_attributes_count", 3.into()),
             ("timestamp", Utc.timestamp_nanos(1).into()),
             ("observed_timestamp", Utc.timestamp_nanos(2).into()),
+            ("source_type", "opentelemetry".into()),
         ]);
         let expect_event = Event::from(LogEvent::from(expect_vec));
         assert_eq!(actual_event, expect_event);

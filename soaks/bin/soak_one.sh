@@ -144,6 +144,12 @@ do
                    --experiment-duration-seconds "${TOTAL_SAMPLES}" \
                    --warmup-duration-seconds "${WARMUP_SECONDS}" \
                    /usr/bin/vector
+    echo "::group::Vector stdout"
+    cat "${SOAK_CAPTURE_DIR}/vector.stdout.log"
+    echo "::endgroup::"
+    echo "::group::Vector stderr"
+    cat "${SOAK_CAPTURE_DIR}/vector.stderr.log"
+    echo "::endgroup::"
     popd > /dev/null
 done
 

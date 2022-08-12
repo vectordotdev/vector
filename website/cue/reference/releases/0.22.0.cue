@@ -24,6 +24,7 @@ releases: "0.22.0": {
 		"VRL sometimes miscalculates type definitions when conditionals are used causing later usages of values assigned in conditionals to not require type coercion as they should ([#12948](https://github.com/vectordotdev/vector/issues/12948)). Fixed in v0.22.1.",
 		"Metrics from AWS components were tagged with an `endpoint` including the full path of the request. For the `aws_s3` sink this caused cardinality issues since the AWS S3 key is included in the URL. Fixed in v0.22.3.",
 		"The `gcp_pubsub` source would log errors due to attempting to fetch too quickly when it has no acknowledgements to pass along. Fixed in v0.22.3.",
+		"Vector shuts down when a configured source codec (`decoding.codec`) receives invalid data. Fixed in v0.23.1.",
 	]
 
 	description: """
