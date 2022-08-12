@@ -19,6 +19,9 @@ use crate::{
     ByteSizeOf,
 };
 
+#[cfg(any(test, feature = "test"))]
+mod arbitrary;
+
 mod data;
 pub use self::data::*;
 
