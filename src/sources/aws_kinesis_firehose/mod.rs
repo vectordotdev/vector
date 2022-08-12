@@ -63,7 +63,7 @@ pub struct AwsKinesisFirehoseConfig {
 
 /// Compression scheme for records in a Firehose message.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative, PartialEq)]
+#[derive(Clone, Copy, Debug, Derivative, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 #[derivative(Default)]
 pub enum Compression {

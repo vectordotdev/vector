@@ -22,7 +22,7 @@ pub use self::{
 
 pub type FilePosition = u64;
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ReadFrom {
     Beginning,
     End,

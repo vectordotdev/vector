@@ -115,7 +115,7 @@ pub struct StreamingConfig {
     respawn_interval_secs: u64,
 }
 
-#[derive(Debug, PartialEq, Snafu)]
+#[derive(Debug, PartialEq, Eq, Snafu)]
 pub enum ExecConfigError {
     #[snafu(display("A non-empty list for command must be provided"))]
     CommandEmpty,

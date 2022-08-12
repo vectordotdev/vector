@@ -16,7 +16,7 @@ use value::Value;
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct IndexHandle(pub usize);
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Condition<'a> {
     /// Condition exactly matches the field value.
     Equals { field: &'a str, value: Value },

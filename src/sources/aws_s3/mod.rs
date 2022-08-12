@@ -30,7 +30,7 @@ pub mod sqs;
 
 /// Compression scheme for objects retrieved from S3.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative, PartialEq)]
+#[derive(Clone, Copy, Debug, Derivative, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 #[derivative(Default)]
 pub enum Compression {

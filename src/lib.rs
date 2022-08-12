@@ -140,7 +140,7 @@ pub fn get_version() -> String {
     format!("{} ({})", pkg_version, build_string)
 }
 
-#[allow(unused)]
+#[allow(warnings)]
 pub mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }
