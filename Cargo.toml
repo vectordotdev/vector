@@ -463,6 +463,7 @@ sources-logs = [
   "sources-logstash",
   "sources-nats",
   "sources-opentelemetry",
+  "sources-file-descriptor",
   "sources-redis",
   "sources-socket",
   "sources-splunk_hec",
@@ -511,6 +512,7 @@ sources-mongodb_metrics = ["dep:mongodb"]
 sources-nats = ["dep:nats", "dep:nkeys"]
 sources-nginx_metrics = ["dep:nom"]
 sources-opentelemetry = ["dep:prost-types", "sources-http", "sources-utils-http", "sources-vector", "opentelemetry"]
+sources-file-descriptor = ["tokio-util/io"]
 sources-postgresql_metrics = ["dep:postgres-openssl", "dep:tokio-postgres"]
 sources-prometheus = ["dep:prometheus-parser", "sinks-prometheus", "sources-http", "sources-utils-http"]
 sources-redis= ["dep:redis"]
