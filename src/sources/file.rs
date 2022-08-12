@@ -823,12 +823,12 @@ mod tests {
         let offset: u64 = 0;
 
         let meta = EventMetadata {
-            host_key: host_key,
-            hostname: hostname,
-            file_key: file_key,
-            offset_key: offset_key,
+            host_key,
+            hostname,
+            file_key,
+            offset_key,
         };
-        let log = create_event(line, offset, &file, &meta);
+        let log = create_event(line, offset, file, &meta);
 
         assert_eq!(log["file"], file.into());
         assert_eq!(log["host"], "Some.Machine".into());
