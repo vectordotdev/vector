@@ -1,5 +1,5 @@
 use diagnostic::{DiagnosticList, DiagnosticMessage, Severity, Span};
-use lookup::LookupBuf;
+use lookup::{LookupBuf, OwnedPath};
 use parser::ast::{self, Node, QueryTarget};
 
 use crate::{
@@ -861,10 +861,10 @@ impl<'a> Compiler<'a> {
             }
             ast::AssignmentTarget::Internal(ident, path) => (
                 QueryTarget::Internal(ident),
-                path.unwrap_or_else(LookupBuf::root),
+                path.unwrap_or_else(OwnedPath::root),
             ),
             ast::AssignmentTarget::External(path) => {
-                (QueryTarget::External, path.unwrap_or_else(LookupBuf::root))
+                (QueryTarget::External, path.unwrap_or_else(OwnedPath::root))
             }
         };
 

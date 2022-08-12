@@ -5,7 +5,7 @@ mod jit;
 mod owned;
 
 use self::jit::{JitLookup, JitPath};
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 
 pub use borrowed::BorrowedSegment;
 pub use concat::PathConcat;
@@ -62,6 +62,22 @@ pub trait Path<'a>: Clone {
     fn eq(&self, other: impl Path<'a>) -> bool {
         self.segment_iter().eq(other.segment_iter())
     }
+
+    fn can_start_with(&self, _prefix: impl Path<'a>) -> bool {
+        unimplemented!()
+        // let mut self_iter = self.segment_iter();
+        // for prefix_segment in prefix.segment_iter() {
+        //     match self_iter.next() {
+        //         None => return false,
+        //         Some(self_segment) => {
+        //             if !self_segment.can_equal(prefix_segment) {
+        //                 return false;
+        //             }
+        //         }
+        //     }
+        // }
+        // true
+    }
 }
 
 impl<'a> Path<'a> for &'a str {
@@ -78,7 +94,7 @@ pub enum PathPrefix {
     Metadata,
 }
 
-#[derive(Hash, Eq, PartialEq, Clone)]
+#[derive(Hash, Eq, PartialEq, Clone, PartialOrd, Ord)]
 pub struct TargetPath {
     pub prefix: PathPrefix,
     pub path: OwnedPath,
@@ -97,11 +113,24 @@ impl TargetPath {
             path: OwnedPath::root(),
         }
     }
+
+    pub fn can_start_with(&self, prefix: &Self) -> bool {
+        if self.prefix != prefix.prefix {
+            return false;
+        }
+        (&self.path).can_start_with(&prefix.path)
+    }
 }
 
 impl Display for TargetPath {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         //TODO: implement
         write!(f, "<TODO: Display impl for TargetPath")
+    }
+}
+
+impl Debug for TargetPath {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(self, f)
     }
 }

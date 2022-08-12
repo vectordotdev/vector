@@ -11,7 +11,7 @@ use std::{
 use arbitrary::Arbitrary;
 use diagnostic::Span;
 use lookup::lookup_v2::{OwnedPath, PathPrefix, TargetPath};
-use lookup::{LookupBuf, PrefixedLookupBuf};
+use lookup::LookupBuf;
 use ordered_float::NotNan;
 
 use crate::{template_string::TemplateString, Error};
@@ -873,7 +873,7 @@ impl AssignmentTarget {
                 span,
                 Query {
                     target: Node::new(span, QueryTarget::Internal(ident.clone())),
-                    path: Node::new(span, path.clone()),
+                    path: Node::new(span, path.clone().into()),
                 },
             )),
             AssignmentTarget::Internal(ident, None) => {
