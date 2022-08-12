@@ -11,7 +11,7 @@ remap: functions: chunks: {
 			name:        "value"
 			description: "The array of bytes to split."
 			required:    true
-			type: ["array", "string", "bytes"]
+			type: ["array", "string"]
 		},
 		{
 			name:        "chunk_size"
