@@ -28,7 +28,8 @@ remap: functions: chunks: {
 	return: {
 		types: ["array"]
 		rules: [
-			"Returns an integer if `chunk_size` is `0` (this is the default). Returns a float otherwise.",
+			"`chunks` is considered fallible if the platform architecture's usize integer is smaller than 64 bits",
+			"`chunks` is considered fallible if the supplied `chunk_size` is an expression, and infallible if it's a literal integer.",
 		]
 	}
 
