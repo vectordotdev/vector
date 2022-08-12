@@ -12,7 +12,11 @@ fn chunks(value: Value, chunk_size: Value) -> Resolved {
     if let Ok(chunk_size) = usize::try_from(chunk_size) {
         Ok(bytes.chunks(chunk_size).collect::<Vec<_>>().into())
     } else {
-        Err(r#""chunk_size" must be a valid usize for this target architecture"#.into())
+        Err(format!(
+            r#""chunk_size" must be at least 1 byte and no greater than {} bytes"#,
+            usize::MAX
+        )
+        .into())
     }
 }
 
