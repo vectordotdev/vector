@@ -1,7 +1,6 @@
 pub mod config;
 pub mod data;
 pub mod limiter;
-pub mod reducer;
 
 use std::{
     pin::Pin,

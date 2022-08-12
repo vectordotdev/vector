@@ -1064,32 +1064,6 @@ fn round_to_even(v: f64) -> f64 {
     f64::from_bits(bits)
 }
 
-#[cfg(any(test, feature = "test"))]
-mod arbitrary {
-    use proptest::prelude::*;
-
-    use super::AgentDDSketch;
-
-    fn arb_agent_ddsketch() -> BoxedStrategy<AgentDDSketch> {
-        any::<Vec<f64>>()
-            .prop_map(|samples| {
-                let mut sketch = AgentDDSketch::with_agent_defaults();
-                sketch.insert_many(&samples);
-                sketch
-            })
-            .boxed()
-    }
-
-    impl Arbitrary for AgentDDSketch {
-        type Parameters = ();
-        type Strategy = BoxedStrategy<AgentDDSketch>;
-
-        fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
-            arb_agent_ddsketch()
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::{round_to_even, AgentDDSketch, Config, AGENT_DEFAULT_EPS, MAX_KEY};
