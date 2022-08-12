@@ -1,4 +1,5 @@
 use crate::lookup_v2::{parse_path, BorrowedSegment, Path};
+use std::fmt::{Display, Formatter};
 use vector_config::configurable_component;
 
 /// A lookup path.
@@ -36,6 +37,12 @@ impl OwnedPath {
 
     pub fn single_field(field: &str) -> Self {
         vec![OwnedSegment::field(field)].into()
+    }
+}
+
+impl Display for OwnedPath {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", String::from(self.clone()))
     }
 }
 

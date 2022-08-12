@@ -335,7 +335,7 @@ pub Query: Query = {
 
         Query { target, path }
     },
-    LQuery <target: Sp<QueryTarget>> <path: Sp<Path>> RQuery => Query { target, path: path.into() },
+    LQuery <target: Sp<QueryTarget>> <path: Sp<Path>> RQuery => Query { target, path: path.map(OwnedPath::into) },
 };
 
 #[inline]

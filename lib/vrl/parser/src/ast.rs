@@ -888,7 +888,7 @@ impl AssignmentTarget {
                             .map_or(PathPrefix::Event, |x| x.prefix.clone());
                         Node::new(span, QueryTarget::External(prefix))
                     },
-                    path: Node::new(span, path.clone().map_or(LookupBuf::root(), |x| x.path)),
+                    path: Node::new(span, path.clone().map_or(OwnedPath::root(), |x| x.path)),
                 },
             )),
         }
