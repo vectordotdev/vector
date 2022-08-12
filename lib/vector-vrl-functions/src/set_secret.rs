@@ -1,5 +1,6 @@
 use ::value::Value;
 use vrl::prelude::*;
+use vrl::state::TypeState;
 
 fn set_secret(
     ctx: &mut Context,
@@ -47,13 +48,13 @@ impl Function for SetSecret {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let key = arguments.required("key");
         let secret = arguments.required("secret");
-        Ok(Box::new(SetSecretFn { key, secret }))
+        Ok(SetSecretFn { key, secret }.as_expr())
     }
 }
 
@@ -63,14 +64,14 @@ struct SetSecretFn {
     secret: Box<dyn Expression>,
 }
 
-impl Expression for SetSecretFn {
+impl FunctionExpression for SetSecretFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let key = self.key.resolve(ctx)?;
         let secret = self.secret.resolve(ctx)?;
         set_secret(ctx, key, secret)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &TypeState) -> TypeDef {
         TypeDef::null().infallible()
     }
 }

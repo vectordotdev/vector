@@ -1,5 +1,5 @@
 #![deny(
-    warnings,
+    // warnings,
     clippy::all,
     clippy::pedantic,
     unreachable_pub,
@@ -28,6 +28,7 @@
     clippy::too_many_lines, // allowed in initial deny commit
 )]
 
+mod compile_config;
 mod compiler;
 mod context;
 mod program;
@@ -39,7 +40,8 @@ pub mod state;
 pub mod type_def;
 pub mod value;
 
-pub use compiler::Compiler;
+pub use self::compile_config::CompileConfig;
+pub use compiler::{CompilationResult, Compiler};
 pub use core::{
     value, ExpressionError, MetadataTarget, Resolved, SecretTarget, Target, TargetValue,
     TargetValueRef,
@@ -49,14 +51,15 @@ use std::{fmt::Display, str::FromStr};
 pub use context::Context;
 use diagnostic::DiagnosticList;
 pub(crate) use diagnostic::Span;
-pub use expression::Expression;
+pub use expression::{Expression, FunctionExpression};
 pub use function::{Function, Parameter};
 pub use paste::paste;
 pub use program::{Program, ProgramInfo};
+pub use state::{TypeInfo, TypeState};
 pub use type_def::TypeDef;
 use vector_config::configurable_component;
 
-pub type Result<T = (Program, DiagnosticList)> = std::result::Result<T, DiagnosticList>;
+pub type Result<T = CompilationResult> = std::result::Result<T, DiagnosticList>;
 
 /// Available VRL runtimes.
 #[configurable_component]

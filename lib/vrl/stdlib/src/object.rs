@@ -43,13 +43,13 @@ impl Function for Object {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(ObjectFn { value }))
+        Ok(ObjectFn { value }.as_expr())
     }
 }
 
@@ -58,12 +58,12 @@ struct ObjectFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ObjectFn {
+impl FunctionExpression for ObjectFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         object(self.value.resolve(ctx)?)
     }
 
-    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &state::TypeState) -> TypeDef {
         self.value
             .type_def(state)
             .fallible_unless(Kind::object(Collection::any()))

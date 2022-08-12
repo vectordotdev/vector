@@ -47,17 +47,18 @@ impl Function for ParseCommonLog {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let timestamp_format = arguments.optional("timestamp_format");
 
-        Ok(Box::new(ParseCommonLogFn {
+        Ok(ParseCommonLogFn {
             value,
             timestamp_format,
-        }))
+        }
+        .as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -88,7 +89,7 @@ struct ParseCommonLogFn {
     timestamp_format: Option<Box<dyn Expression>>,
 }
 
-impl Expression for ParseCommonLogFn {
+impl FunctionExpression for ParseCommonLogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?;
         let timestamp_format = self
@@ -100,7 +101,7 @@ impl Expression for ParseCommonLogFn {
         parse_common_log(bytes, timestamp_format, ctx)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::object(inner_kind()).fallible()
     }
 }

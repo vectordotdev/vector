@@ -1,6 +1,7 @@
 use crate::{get_metadata_key, MetadataKey};
 use ::value::Value;
 use vrl::prelude::*;
+use vrl::state::TypeState;
 
 fn get_metadata_field(
     ctx: &mut Context,
@@ -41,16 +42,16 @@ impl Function for GetMetadataField {
 
     fn compile(
         &self,
-        (_local, external): (&mut state::LocalEnv, &mut state::ExternalEnv),
+        state: &TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let key = get_metadata_key(&mut arguments)?;
         let kind = match &key {
             MetadataKey::Legacy(_) => Kind::bytes().or_null(),
-            MetadataKey::Query(query) => external.metadata_kind().at_path(query.path()),
+            MetadataKey::Query(query) => state.external.metadata_kind().at_path(query.path()),
         };
-        Ok(Box::new(GetMetadataFieldFn { key, kind }))
+        Ok(GetMetadataFieldFn { key, kind }.as_expr())
     }
 }
 
@@ -60,12 +61,12 @@ struct GetMetadataFieldFn {
     kind: Kind,
 }
 
-impl Expression for GetMetadataFieldFn {
+impl FunctionExpression for GetMetadataFieldFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         get_metadata_field(ctx, &self.key)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &TypeState) -> TypeDef {
         TypeDef::from(self.kind.clone()).infallible()
     }
 }

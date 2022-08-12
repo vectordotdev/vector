@@ -529,7 +529,7 @@ _values: {
 	// `examples` clarify values through examples. This should be used
 	// when examples cannot be derived from the `default` or `enum`
 	// options.
-	examples: [#Object] | *[]
+	examples: [#Object, ...#Object] | *[]
 
 	// `options` represent the child options for this option.
 	options: #Schema

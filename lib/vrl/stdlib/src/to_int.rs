@@ -104,13 +104,13 @@ impl Function for ToInt {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(ToIntFn { value }))
+        Ok(ToIntFn { value }.as_expr())
     }
 }
 
@@ -119,14 +119,14 @@ struct ToIntFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ToIntFn {
+impl FunctionExpression for ToIntFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
 
         to_int(value)
     }
 
-    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &state::TypeState) -> TypeDef {
         let td = self.value.type_def(state);
 
         TypeDef::integer().with_fallibility(

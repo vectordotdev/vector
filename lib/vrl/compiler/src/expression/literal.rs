@@ -9,7 +9,7 @@ use value::{Value, ValueRegex};
 
 use crate::{
     expression::Resolved,
-    state::{ExternalEnv, LocalEnv},
+    state::{TypeInfo, TypeState},
     Context, Expression, Span, TypeDef,
 };
 
@@ -55,7 +55,7 @@ impl Expression for Literal {
         Some(self.to_value())
     }
 
-    fn type_def(&self, _: (&LocalEnv, &ExternalEnv)) -> TypeDef {
+    fn type_info(&self, state: &TypeState) -> TypeInfo {
         use Literal::{Boolean, Float, Integer, Null, Regex, String, Timestamp};
 
         let type_def = match self {
@@ -68,7 +68,7 @@ impl Expression for Literal {
             Null => TypeDef::null(),
         };
 
-        type_def.infallible()
+        TypeInfo::new(state, type_def.infallible())
     }
 }
 

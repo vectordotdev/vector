@@ -102,7 +102,7 @@ impl Function for ParseKeyValue {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -128,13 +128,14 @@ impl Function for ParseKeyValue {
             .optional("accept_standalone_key")
             .unwrap_or_else(|| expr!(true));
 
-        Ok(Box::new(ParseKeyValueFn {
+        Ok(ParseKeyValueFn {
             value,
             key_value_delimiter,
             field_delimiter,
             whitespace,
             standalone_key,
-        }))
+        }
+        .as_expr())
     }
 
     fn compile_argument(
@@ -219,7 +220,7 @@ pub(crate) struct ParseKeyValueFn {
     pub(crate) standalone_key: Box<dyn Expression>,
 }
 
-impl Expression for ParseKeyValueFn {
+impl FunctionExpression for ParseKeyValueFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?;
         let key_value_delimiter = self.key_value_delimiter.resolve(ctx)?;
@@ -236,7 +237,7 @@ impl Expression for ParseKeyValueFn {
         )
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::object(Collection::any()).fallible()
     }
 }

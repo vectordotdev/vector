@@ -1,8 +1,8 @@
 use crate::{get_metadata_key, MetadataKey};
 use ::value::kind::remove;
 use ::value::Value;
+use vrl::prelude::state::TypeState;
 use vrl::prelude::*;
-use vrl::state::{ExternalEnv, LocalEnv};
 
 fn remove_metadata_field(
     ctx: &mut Context,
@@ -46,14 +46,14 @@ impl Function for RemoveMetadataField {
 
     fn compile(
         &self,
-        (_, external): (&mut state::LocalEnv, &mut state::ExternalEnv),
-        _ctx: &mut FunctionCompileContext,
+        _state: &TypeState,
+        ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let key = get_metadata_key(&mut arguments)?;
 
         if let MetadataKey::Query(query) = &key {
-            if external.is_read_only_metadata_path(query.path()) {
+            if ctx.is_read_only_metadata_path(query.path()) {
                 return Err(vrl::function::Error::ReadOnlyMutation {
                     context: format!("{} is read-only, and cannot be removed", query),
                 }
@@ -75,17 +75,11 @@ impl Expression for RemoveMetadataFieldFn {
         remove_metadata_field(ctx, &self.key)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
-        TypeDef::null().infallible()
-    }
+    fn type_info(&self, state: &TypeState) -> TypeInfo {
+        let mut state = state.clone();
 
-    fn update_state(
-        &mut self,
-        _local: &mut LocalEnv,
-        external: &mut ExternalEnv,
-    ) -> std::result::Result<(), ExpressionError> {
         if let MetadataKey::Query(query) = &self.key {
-            let mut new_kind = external.metadata_kind().clone();
+            let mut new_kind = state.external.metadata_kind().clone();
 
             let result = new_kind.remove_at_path(
                 &query.path().to_lookup(),
@@ -95,15 +89,16 @@ impl Expression for RemoveMetadataFieldFn {
             );
 
             match result {
-                Ok(_) => external.update_metadata(new_kind),
+                Ok(_) => state.external.update_metadata(new_kind),
                 Err(_) => {
                     // This isn't ideal, but "remove_at_path" doesn't support
                     // the path used, so no assumptions can be made about the resulting type
                     // see: https://github.com/vectordotdev/vector/issues/13460
-                    external.update_metadata(Kind::any())
+                    state.external.update_metadata(Kind::any())
                 }
             }
         }
-        Ok(())
+
+        TypeInfo::new(state, TypeDef::null())
     }
 }
