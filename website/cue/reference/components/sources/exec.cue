@@ -195,6 +195,20 @@ components: sources: exec: {
 				[`maximum_buffer_size_bytes`](#maximum_buffer_size_bytes) is reached.
 				"""
 		}
+		shutdown: {
+			title: "Shutting Down"
+			body: """
+				When Vector begins shutting down (typically due to a SIGTERM), this source will
+				signal to the child process to terminate, if it is running, to shut down.
+
+				On *nix platforms, Vector will issue a SIGTERM to the child process, allowing it to
+				gracefully shutdown, and the source will continue reading until the process exits or
+				Vector's shutdown grace period expires.
+
+				On Windows, the subprocess will be issued a SIGKILL and terminate abruptly. In the
+				future we hope to support graceful shutdown of Windows processes as well.
+				"""
+		}
 	}
 
 	telemetry: metrics: {
