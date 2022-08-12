@@ -9,7 +9,9 @@ use lookup::path;
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 use vector_common::finalization::AddBatchNotifier;
-use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
+use vector_common::internal_event::{
+    ByteSize, BytesReceived, InternalEventHandle as _, Registered,
+};
 use vector_core::{event::BatchNotifier, ByteSizeOf};
 use warp::reject;
 
@@ -28,27 +30,31 @@ use crate::{
     SourceSender,
 };
 
+#[derive(Clone)]
+pub(super) struct Context {
+    pub(super) compression: Compression,
+    pub(super) decoder: Decoder,
+    pub(super) acknowledgements: bool,
+    pub(super) bytes_received: Registered<BytesReceived>,
+    pub(super) out: SourceSender,
+}
+
 /// Publishes decoded events from the FirehoseRequest to the pipeline
-pub async fn firehose(
+pub(super) async fn firehose(
     request_id: String,
     source_arn: String,
     request: FirehoseRequest,
-    compression: Compression,
-    decoder: Decoder,
-    acknowledgements: bool,
-    mut out: SourceSender,
+    mut context: Context,
 ) -> Result<impl warp::Reply, reject::Rejection> {
-    // TODO: Move this up into the caller
-    let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
     for record in request.records {
-        let bytes = decode_record(&record, compression)
+        let bytes = decode_record(&record, context.compression)
             .with_context(|_| ParseRecordsSnafu {
                 request_id: request_id.clone(),
             })
             .map_err(reject::custom)?;
-        bytes_received.emit(ByteSize(bytes.len()));
+        context.bytes_received.emit(ByteSize(bytes.len()));
 
-        let mut stream = FramedRead::new(bytes.as_ref(), decoder.clone());
+        let mut stream = FramedRead::new(bytes.as_ref(), context.decoder.clone());
         loop {
             match stream.next().await {
                 Some(Ok((mut events, _byte_size))) => {
@@ -57,7 +63,8 @@ pub async fn firehose(
                         byte_size: events.size_of(),
                     });
 
-                    let (batch, receiver) = acknowledgements
+                    let (batch, receiver) = context
+                        .acknowledgements
                         .then(|| {
                             let (batch, receiver) = BatchNotifier::new_with_receiver();
                             (Some(batch), Some(receiver))
@@ -80,7 +87,7 @@ pub async fn firehose(
                     }
 
                     let count = events.len();
-                    if let Err(error) = out.send_batch(events).await {
+                    if let Err(error) = context.out.send_batch(events).await {
                         emit!(StreamClosedError {
                             error: error.clone(),
                             count,
