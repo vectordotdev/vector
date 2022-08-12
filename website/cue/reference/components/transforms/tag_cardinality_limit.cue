@@ -86,7 +86,7 @@ components: transforms: tag_cardinality_limit: {
 	examples: [
 		{
 			title: "Drop high-cardinality tag"
-			context: """
+			notes: """
 				In this example we'll demonstrate how to drop a
 				high-cardinality tag named `user_id`. Notice that the
 				second metric's `user_id` tag has been removed. That's

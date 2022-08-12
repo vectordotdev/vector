@@ -55,7 +55,7 @@ nom = { version = "7", optional = true }
 ordered-float = { version = "3.0.0", default-features = false }
 pin-project = { version = "1.0.11", default-features = false }
 serde_json = { version = "1.0.83", default-features = false, features = ["std", "raw_value"] }
-serde = { version = "1.0.142", optional = true, features = ["derive"] }
+serde = { version = "1.0.143", optional = true, features = ["derive"] }
 smallvec = { version = "1", default-features = false }
 snafu = { version = "0.7", optional = true }
 stream-cancel = { version = "0.8.1", default-features = false }

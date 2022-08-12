@@ -7,24 +7,27 @@ The key words “MUST”, “MUST NOT”, “REQUIRED”, “SHALL”, “SHALL 
 “SHOULD NOT”, “RECOMMENDED”, “MAY”, and “OPTIONAL” in this document are to be
 interpreted as described in [RFC 2119].
 
-- [Introduction](#introduction)
-- [Scope](#scope)
-- [How to read this document](#how-to-read-this-document)
-- [Naming](#naming)
-  - [Source and sink naming](#source-and-sink-naming)
-  - [Transform naming](#transform-naming)
-- [Configuration](#configuration)
-  - [Options](#options)
-    - [`endpoint(s)`](#endpoints)
-- [Instrumentation](#instrumentation)
-  - [Events](#events)
-    - [ComponentBytesReceived](#componentbytesreceived)
-    - [ComponentEventsReceived](#componenteventsreceived)
-    - [ComponentEventsSent](#componenteventssent)
-    - [ComponentBytesSent](#componentbytessent)
-    - [ComponentError](#componenterror)
-    - [ComponentEventsDropped](#componenteventsdropped)
-- [Health checks](#health-checks)
+- [Component Specification](#component-specification)
+  - [Introduction](#introduction)
+  - [Scope](#scope)
+  - [Naming](#naming)
+    - [Source and sink naming](#source-and-sink-naming)
+    - [Transform naming](#transform-naming)
+  - [Configuration](#configuration)
+    - [Options](#options)
+      - [`endpoint(s)`](#endpoints)
+  - [Instrumentation](#instrumentation)
+    - [Events](#events)
+      - [ComponentEventsReceived](#componenteventsreceived)
+      - [ComponentEventsSent](#componenteventssent)
+      - [ComponentError](#componenterror)
+      - [ComponentEventsDropped](#componenteventsdropped)
+      - [SinkNetworkBytesSent](#sinknetworkbytessent)
+      - [SourceNetworkBytesReceived](#sourcenetworkbytesreceived)
+  - [Sink Operational Requirements](#sink-operational-requirements)
+    - [Health checks](#health-checks)
+    - [Finalization](#finalization)
+  - [Acknowledgements](#acknowledgements)
 
 ## Introduction
 
@@ -41,11 +44,9 @@ aspects that components inherit "for free". For example, this specification does
 not cover global context, such as `component_id`, that all components receive in
 their telemetry by nature of being a Vector component.
 
-## How to read this document
-
-This document is written from the broad perspective of a Vector component.
-Unless otherwise stated, a section applies to all component types (sources,
-transforms, and sinks).
+Finally, this document is written from the broad perspective of a Vector
+component. Unless otherwise stated, a section applies to all component types
+(sources, transforms, and sinks).
 
 ## Naming
 
@@ -55,13 +56,17 @@ follow the following guidelines.
 ### Source and sink naming
 
 - MUST only contain ASCII alphanumeric, lowercase, and underscores.
-- MUST be a noun named after the protocol or service that the component integrates with.
-- MAY be suffixed with the event type, `logs`, `metrics`, or `traces` (e.g., `kubernetes_logs`, `apache_metrics`).
+- MUST be a noun named after the protocol or service that the component
+  integrates with.
+- MAY be suffixed with the event type only if the component is specific to
+  that type, `logs`, `metrics`, or `traces` (e.g., `kubernetes_logs`,
+  `apache_metrics`).
 
 ### Transform naming
 
 - MUST only contain ASCII alphanumeric, lowercase, and underscores.
-- MUST be a verb describing the broad purpose of the transform (e.g., `route`, `sample`, `delegate`).
+- MUST be a verb describing the broad purpose of the transform (e.g., `route`,
+  `sample`, `delegate`).
 
 ## Configuration
 
@@ -87,11 +92,11 @@ Vector components MUST be instrumented for optimal observability and monitoring.
 
 ### Events
 
-This section lists all required events that a component MUST emit. Additional events
-are listed that a component is RECOMMENDED to emit, but remain OPTIONAL. It is
-expected that components will emit custom events beyond those listed here that
-reflect component specific behavior. There is leeway in the implementation of these
-events:
+This section lists all required events that a component MUST emit. Additional
+events are listed that a component is RECOMMENDED to emit, but remain OPTIONAL.
+It is expected that components will emit custom events beyond those listed here
+that reflect component specific behavior. There is leeway in the implementation
+of these events:
 
 - Events MAY be augmented with additional component-specific context. For
   example, the `socket` source adds a `mode` attribute as additional context.
@@ -103,44 +108,21 @@ events:
   individual events. For example, emitting the `EventsReceived` event for 10
   events MUST increment the `component_received_events_total` counter by 10.
 
-#### ComponentBytesReceived
-
-*Sources* MUST emit a `ComponentBytesReceived` event immediately after receiving, decompressing
-and filtering bytes from the upstream source and before the creation of a Vector event.
-
-- Properties
-  - `byte_size`
-    - For UDP, TCP, and Unix protocols, the total number of bytes received from
-      the socket excluding the delimiter.
-    - For HTTP-based protocols, the total number of bytes in the HTTP body, as
-      represented by the `Content-Length` header.
-    - For files, the total number of bytes read from the file excluding the
-      delimiter.
-  - `protocol` - The protocol used to send the bytes (i.e., `tcp`, `udp`,
-    `unix`, `http`, `https`, `file`, etc.)
-  - `http_path` - If relevant, the HTTP path, excluding query strings.
-  - `socket` - If relevant, the socket number that bytes were received from.
-- Metrics
-  - MUST increment the `component_received_bytes_total` counter by the defined value with
-    the defined properties as metric tags.
-- Logs
-  - MUST log a `Bytes received.` message at the `trace` level with the
-    defined properties as key-value pairs.
-  - MUST NOT be rate limited.
-
 #### ComponentEventsReceived
 
-*All components* MUST emit an `ComponentEventsReceived` event immediately after creating
-or receiving one or more Vector events.
+*All components* MUST emit a `ComponentEventsReceived` event that represents
+the reception of Vector events from an upstream component.
 
+- Emission
+  - MUST emit immediately after creating or receiving Vector events.
 - Properties
   - `count` - The count of Vector events.
-  - `byte_size` - The cumulative in-memory byte size of all events received.
+  - `byte_size` - The estimated JSON byte size of all events received.
 - Metrics
-  - MUST increment the `component_received_events_total` counter by the defined `quantity`
-    property with the other properties as metric tags.
-  - MUST increment the `component_received_event_bytes_total` counter by the defined
-    `byte_size` property with the other properties as metric tags.
+  - MUST increment the `component_received_events_total` counter by the defined
+    `quantity` property with the other properties as metric tags.
+  - MUST increment the `component_received_event_bytes_total` counter by the
+    defined `byte_size` property with the other properties as metric tags.
 - Logs
   - MUST log a `Events received.` message at the `trace` level with the
     defined properties as key-value pairs.
@@ -148,56 +130,27 @@ or receiving one or more Vector events.
 
 #### ComponentEventsSent
 
-*All components* that send events down stream, and delete them in Vector, MUST
-emit an `ComponentEventsSent` event immediately after sending, if the transmission was
-successful.
+*All components* MUST emit an `ComponentEventsSent` event that represents the
+emission of Vector events to the next downstream component(s).
 
-Note that for sinks that simply expose data, but don't delete the data after
-sending it, like the `prometheus_exporter` sink, SHOULD NOT publish this metric.
-
+- Emission
+  - MUST emit immediately after *successful* transmission of Vector events.
+    MUST NOT emit if the transmission was unsuccessful.
+  - MUST NOT emit for pull-based sinks since they do not send events. For
+    example, the `prometheus_exporter` sink MUST NOT emit this event.
 - Properties
   - `count` - The count of Vector events.
-  - `byte_size` - The cumulative in-memory byte size of all events sent.
-  - `output` - For components that can use multiple outputs, the name of the
-    output that events were sent to. For events sent to the default output, this
-    value MUST be `_default`.
+  - `byte_size` - The estimated JSON byte size of all events sent.
+  - `output` - OPTIONAL, for components that can use multiple outputs, the name
+    of the output that events were sent to. For events sent to the default
+    output, this value MUST be `_default`.
 - Metrics
-  - MUST increment the `component_sent_events_total` counter by the defined value with the
-    defined properties as metric tags.
-  - MUST increment the `component_sent_event_bytes_total` counter by the event's byte size
-    in JSON representation.
+  - MUST increment the `component_sent_events_total` counter by the defined
+    `quantity` property with the other properties as metric tags.
+  - MUST increment the `component_sent_event_bytes_total` counter by the
+    defined `byte_size` property with the other properties as metric tags.
 - Logs
   - MUST log a `Events sent.` message at the `trace` level with the
-    defined properties as key-value pairs.
-  - MUST NOT be rate limited.
-
-#### ComponentBytesSent
-
-*Sinks* that send events down stream, and delete them in Vector, MUST emit
-a `ComponentBytesSent` event immediately after sending bytes to the downstream target, if
-the transmission was successful. The reported bytes MUST be before compression.
-
-Note that for sinks that simply expose data, but don't delete the data after
-sending it, like the `prometheus_exporter` sink, SHOULD NOT publish this metric.
-
-- Properties
-  - `byte_size`
-    - For UDP, TCP, and Unix protocols, the total number of bytes placed on the
-      socket excluding the delimiter.
-    - For HTTP-based protocols, the total number of bytes in the HTTP body, as
-      represented by the `Content-Length` header.
-    - For files, the total number of bytes written to the file excluding the
-      delimiter.
-  - `protocol` - The protocol used to send the bytes (i.e., `tcp`, `udp`,
-    `unix`, `http`, `https`, `file`, etc.)
-  - `endpoint` - If relevant, the endpoint that the bytes were sent to. For
-    HTTP, this MUST be the host and path only, excluding the query string.
-  - `file` - If relevant, the absolute path of the file.
-- Metrics
-  - MUST increment the `component_sent_bytes_total` counter by the defined value with the
-    defined properties as metric tags.
-- Logs
-  - MUST log a `Bytes sent.` message at the `trace` level with the
     defined properties as key-value pairs.
   - MUST NOT be rate limited.
 
@@ -217,6 +170,57 @@ implement since errors are specific to the component.
 
 *All components* that can drop events MUST emit a `ComponentEventsDropped`
 event in accordance with the [EventsDropped event] requirements.
+
+#### SinkNetworkBytesSent
+
+*Sinks* MUST emit a `SinkNetworkBytesSent` that represents the egress of
+*raw network bytes*.
+
+- Emission
+  - MUST emit immediately after egress of raw network bytes regardless
+    of whether the transmission was successful or not.
+    - This includes pull-based sinks, such as the `prometheus_exporter` sink,
+      and SHOULD reflect the bytes sent to the client when requested (pulled).
+  - MUST emit *after* processing of the bytes (encryption, compression,
+    filtering, etc.)
+- Properties
+  - `byte_size` - The number of raw network bytes sent after processing.
+    - SHOULD be the closest representation possible of raw network bytes based
+      on the sink's capabilities. For example, if the sink uses a HTTP
+      client that does not provide access to the total request byte size, then
+      the sink should use the byte size of the payload/body.
+- Metrics
+  - MUST increment the `component_sent_network_bytes_total` counter by the
+    defined value with the defined properties as metric tags.
+- Logs
+  - MUST log a `Network bytes sent.` message at the `trace` level with the
+    defined properties as key-value pairs.
+  - MUST NOT be rate limited.
+
+#### SourceNetworkBytesReceived
+
+*Sources* MUST emit a `SourceNetworkBytesReceived` event that represents the
+ingress of *raw network bytes*.
+
+- Emission
+  - MUST emit immediately after ingress of raw network bytes.
+  - MUST emit *before* processing of the bytes (decryption, decompression,
+    filtering, etc.).
+    - This includes pull-based sources that issue requests to ingest bytes.
+- Properties
+  - `byte_size` - The number of raw network bytes received before
+    processing (decryption, decompression, filtering, etc.).
+    - SHOULD be the closest representation possible of raw network bytes based
+      on the source's capabilities. For example, if the source uses a HTTP
+      client that only provides access to the request body, then the raw
+      request body bytes should be used.
+- Metrics
+  - MUST increment the `component_received_network_bytes_total` counter by the
+    defined value with the defined properties as metric tags.
+- Logs
+  - MUST log a `Network bytes received.` message at the `trace` level with the
+    defined properties as key-value pairs.
+  - MUST NOT be rate limited.
 
 ## Sink Operational Requirements
 

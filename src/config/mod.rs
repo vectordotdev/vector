@@ -1062,7 +1062,6 @@ mod tests {
             indoc! {r#"
                 [enterprise]
                 api_key = "api_key"
-                application_key = "application_key"
                 configuration_key = "configuration_key"
 
                 [enterprise.tags]
@@ -1084,7 +1083,6 @@ mod tests {
             indoc! {r#"
                 [enterprise]
                 api_key = "api_key"
-                application_key = "application_key"
                 configuration_key = "configuration_key"
 
                 [enterprise.tags]
