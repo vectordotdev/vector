@@ -23,7 +23,10 @@ releases: "0.23.0": {
 		},
 	]
 
-	known_issues: []
+	known_issues: [
+		"Vector shuts down when a configured source codec (`decoding.codec`) receives invalid data. Fixed in v0.23.1.",
+		"The `elasticsearch` sink doesn't evaluate templated configuration options like the `index` configuration before applying the `only_fields` and `except_fields` options, causing templates to fail to be evaluated if they used a field that was dropped. Fixed in v0.23.1.",
+	]
 
 	description: """
 		The Vector team is pleased to announce version 0.23.0!

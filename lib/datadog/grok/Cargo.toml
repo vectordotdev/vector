@@ -12,7 +12,7 @@ chrono-tz = { version = "0.6.3", default-features = false }
 lalrpop-util = { version = "0.19", default-features = false }
 nom = { version = "7.1.1", default-features = false, features = ["std"] }
 once_cell = { version = "1.13", default-features = false, features = ["std"] }
-onig = { version = "6.3", default-features = false }
+onig = { version = "6.4", default-features = false }
 ordered-float = { version = "3", default-features = false }
 peeking_take_while = { version = "1.0.0", default-features = false }
 regex = { version = "1.6", default-features = false, features = ["perf"] }
