@@ -60,9 +60,8 @@ Timestamps are represented as [`DateTime` Rust structs][date_time] stored as UTC
 
 There are cases where Vector interacts with formats that don't have a formal timestamp definition,
 such as JSON. In these cases, Vector ingests the timestamp in its primitive form (string or
-integer). You can then coerce the field into a timestamp using the coercer transform. If you're
-parsing this data out of a string, all Vector parser transforms include a `types` option, allowing
-you to extract and coerce in one step.
+integer). You can then coerce the field into a timestamp using a `remap` transform with the
+`parse_timestamp` VRL function.
 
 #### Time zones
 
