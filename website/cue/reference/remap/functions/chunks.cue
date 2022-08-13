@@ -15,20 +15,18 @@ remap: functions: chunks: {
 		},
 		{
 			name:        "chunk_size"
-			description: "The desired length of each chunk in bytes."
-			required:    false
-			default:     0
+			description: "The desired length of each chunk in bytes. This may be constrained by the host platform architecture."
+			required:    true
 			type: ["integer"]
 		},
 	]
 	internal_failure_reasons: [
-		"`chunk_size` must be a valid usize for this target architecture",
 		"`chunk_size` must be at least 1 byte",
+		"`chunk_size` is too large"
 	]
 	return: {
 		types: ["array"]
 		rules: [
-			"`chunks` is considered fallible if the platform architecture's usize integer is smaller than 64 bits",
 			"`chunks` is considered fallible if the supplied `chunk_size` is an expression, and infallible if it's a literal integer.",
 		]
 	}

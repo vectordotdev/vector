@@ -13,7 +13,7 @@ fn chunks(value: Value, chunk_size: Value) -> Resolved {
         Ok(bytes.chunks(chunk_size).collect::<Vec<_>>().into())
     } else {
         Err(format!(
-            r#""chunk_size" must be at least 1 byte and no greater than {} bytes"#,
+            r#""chunk_size" is too large: must be at most {}"#,
             usize::MAX
         )
         .into())
@@ -51,13 +51,6 @@ impl Function for Chunks {
                 result: Ok(r#"["abcd", "efgh"]"#),
             },
             Example {
-                title: "chunk size must be at least 1 byte",
-                source: r#"chunks("hello world", 0)"#,
-                result: Err(
-                    r#"function call error for "chunks" at (0:24): "chunk_size" must be at least 1 byte"#,
-                ),
-            },
-            Example {
                 title: "chunk sizes do not respect unicode code point boundaries",
                 source: r#"chunks("ab你好", 4)"#,
                 result: Ok(r#"["ab�","�好"]"#),
@@ -73,6 +66,30 @@ impl Function for Chunks {
     ) -> Compiled {
         let value = arguments.required("value");
         let chunk_size = arguments.required("chunk_size");
+
+        // chunk_size is converted to a usize, so if a user-supplied Value::Integer (i64) is
+        // larger than the platform's usize::MAX, it could fail to convert.
+        if let Some(literal) = chunk_size.as_value() {
+            if let Some(integer) = literal.as_integer() {
+                if integer < 1 {
+                    return Err(vrl::function::Error::InvalidArgument {
+                        keyword: "chunk_size",
+                        value: literal,
+                        error: r#""chunk_size" must be at least 1 byte"#,
+                    }
+                    .into());
+                }
+
+                if usize::try_from(integer).is_err() {
+                    return Err(vrl::function::Error::InvalidArgument {
+                        keyword: "chunk_size",
+                        value: literal,
+                        error: r#""chunk_size" is too large"#,
+                    }
+                    .into());
+                }
+            }
+        }
 
         Ok(Box::new(ChunksFn { value, chunk_size }))
     }
@@ -93,13 +110,9 @@ impl Expression for ChunksFn {
     }
 
     fn type_def(&self, _state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
-        let chunk_size_is_expression = self.chunk_size.as_value().is_none();
-        // chunk_size is converted to a usize later, so if a user-supplied Value::Integer (i64) is
-        // larger than the platform's usize::MAX, it could fail to convert.
-        let chunk_size_limited_by_architecture = usize::BITS < 64;
+        let not_literal = self.chunk_size.as_value().is_none();
 
-        TypeDef::array(Collection::from_unknown(Kind::bytes()))
-            .with_fallibility(chunk_size_is_expression || chunk_size_limited_by_architecture)
+        TypeDef::array(Collection::from_unknown(Kind::bytes())).with_fallibility(not_literal)
     }
 }
 
@@ -122,7 +135,7 @@ mod tests {
             args: func_args![value: "",
                              chunk_size: 0,
             ],
-            want: Err(r#""chunk_size" must be at least 1 byte"#),
+            want: Err(r#"invalid argument"#),
             tdef: TypeDef::array(Collection::from_unknown(Kind::bytes())),
         }
 
