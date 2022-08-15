@@ -185,6 +185,7 @@ urls: {
 	fail_safe:                                  "\(wikipedia)/wiki/Fail-safe"
 	ffi:                                        "\(wikipedia)/wiki/Foreign_function_interface"
 	file:                                       "\(wikipedia)/wiki/Computer_file"
+	file_descriptor:                            "\(wikipedia)/wiki/File_descriptor"
 	file_system:                                "\(wikipedia)/wiki/File_system"
 	fluent:                                     "https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1"
 	fluentd:                                    "https://www.fluentd.org/"

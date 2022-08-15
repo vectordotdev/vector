@@ -15,7 +15,7 @@ use tokio::sync::{Notify, OwnedSemaphorePermit, Semaphore, TryAcquireError};
 use crate::Bufferable;
 
 /// Error returned by `LimitedSender::send` when the receiver has disconnected.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct SendError<T>(pub T);
 
 impl<T> fmt::Display for SendError<T> {
@@ -27,7 +27,7 @@ impl<T> fmt::Display for SendError<T> {
 impl<T: fmt::Debug> std::error::Error for SendError<T> {}
 
 /// Error returned by `LimitedSender::try_send`.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum TrySendError<T> {
     InsufficientCapacity(T),
     Disconnected(T),

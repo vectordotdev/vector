@@ -103,7 +103,7 @@ mod integration_tests {
         let key = keys[0].clone();
         let key_parts = key.split('/').collect::<Vec<_>>();
         assert!(key_parts.len() == 2);
-        assert!(*key_parts.get(0).unwrap() == "test-prefix");
+        assert!(*key_parts.first().unwrap() == "test-prefix");
         assert!(key.ends_with(".log"));
 
         let obj = get_object(&bucket, key).await;

@@ -88,7 +88,7 @@ pub struct KinesisFirehoseSinkConfig {
     pub acknowledgements: AcknowledgementsConfig,
 }
 
-#[derive(Debug, PartialEq, Snafu)]
+#[derive(Debug, PartialEq, Eq, Snafu)]
 pub enum BuildError {
     #[snafu(display(
         "Batch max size is too high. The value must be {} bytes or less",

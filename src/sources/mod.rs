@@ -24,6 +24,11 @@ pub mod eventstoredb_metrics;
 pub mod exec;
 #[cfg(feature = "sources-file")]
 pub mod file;
+#[cfg(any(
+    feature = "sources-stdin",
+    all(unix, feature = "sources-file-descriptor")
+))]
+pub mod file_descriptors;
 #[cfg(feature = "sources-fluent")]
 pub mod fluent;
 #[cfg(feature = "sources-gcp_pubsub")]
@@ -66,8 +71,6 @@ pub mod socket;
 pub mod splunk_hec;
 #[cfg(feature = "sources-statsd")]
 pub mod statsd;
-#[cfg(feature = "sources-stdin")]
-pub mod stdin;
 #[cfg(feature = "sources-syslog")]
 pub mod syslog;
 #[cfg(feature = "sources-vector")]
@@ -137,6 +140,12 @@ pub enum Sources {
     /// File.
     #[cfg(feature = "sources-file")]
     File(#[configurable(derived)] file::FileConfig),
+
+    /// File descriptor.
+    #[cfg(all(unix, feature = "sources-file-descriptor"))]
+    FileDescriptor(
+        #[configurable(derived)] file_descriptors::file_descriptor::FileDescriptorSourceConfig,
+    ),
 
     /// Fluent.
     #[cfg(feature = "sources-fluent")]
@@ -232,7 +241,7 @@ pub enum Sources {
 
     /// Stdin.
     #[cfg(feature = "sources-stdin")]
-    Stdin(#[configurable(derived)] stdin::StdinConfig),
+    Stdin(#[configurable(derived)] file_descriptors::stdin::StdinConfig),
 
     /// Syslog.
     #[cfg(feature = "sources-syslog")]
