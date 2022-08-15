@@ -82,25 +82,26 @@ remap: {
 		and without a value, `null` will be used. This table can return following fields:
 
 		* ISP databases:
-
 			* `autonomous_system_number`
 			* `autonomous_system_organization`
 			* `isp`
 			* `organization`
 
 		* City databases:
-
 			* `city_name`
 			* `continent_code`
 			* `country_code`
 			* `country_name`
 			* `region_code`
 			* `region_name`
-			* `metro_code`		
+			* `metro_code`
 			* `latitude`
-			* `longitude`		
+			* `longitude`
 			* `postal_code`
 			* `timezone`
+
+		* Connection-Type databases:
+			* `connection_type`
 
 		To use this function, you need to update your Vector configuration to
 		include an

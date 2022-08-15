@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, fs, net::IpAddr, sync::Arc, time::SystemTime};
 
 use enrichment::{Case, Condition, IndexHandle, Table};
 use maxminddb::{
-    geoip2::{City, Isp},
+    geoip2::{City, ConnectionType, Isp},
     MaxMindDBError, Reader,
 };
 use serde::{Deserialize, Serialize};
@@ -13,8 +13,24 @@ use crate::config::{EnrichmentTableConfig, EnrichmentTableDescription, GenerateC
 // MaxMind GeoIP database files have a type field we can use to recognize specific
 // products. If we encounter one of these two types, we look for ASN/ISP information;
 // otherwise we expect to be working with a City database.
-const ASN_DATABASE_TYPE: &str = "GeoLite2-ASN";
-const ISP_DATABASE_TYPE: &str = "GeoIP2-ISP";
+#[derive(Copy, Clone, Debug)]
+pub enum DatabaseKind {
+    Asn,
+    Isp,
+    ConnectionType,
+    City,
+}
+
+impl From<&str> for DatabaseKind {
+    fn from(v: &str) -> Self {
+        match v {
+            "GeoLite2-ASN" => Self::Asn,
+            "GeoIP2-ISP" => Self::Isp,
+            "GeoIP2-Connection-Type" => Self::ConnectionType,
+            _ => Self::City,
+        }
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct GeoipConfig {
@@ -61,36 +77,32 @@ impl EnrichmentTableConfig for GeoipConfig {
 pub struct Geoip {
     config: GeoipConfig,
     dbreader: Arc<maxminddb::Reader<Vec<u8>>>,
+    dbkind: DatabaseKind,
     last_modified: SystemTime,
 }
 
 impl Geoip {
     pub fn new(config: GeoipConfig) -> crate::Result<Self> {
-        let table = Geoip {
-            last_modified: fs::metadata(&config.path)?.modified()?,
-            dbreader: Arc::new(Reader::open_readfile(config.path.clone())?),
-            config,
-        };
+        let dbreader = Arc::new(Reader::open_readfile(config.path.clone())?);
+        let dbkind = DatabaseKind::from(dbreader.metadata.database_type.as_str());
 
         // Check if we can read database with dummy Ip.
         let ip = IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0));
-        let result = if table.has_isp_db() {
-            table.dbreader.lookup::<Isp>(ip).map(|_| ())
-        } else {
-            table.dbreader.lookup::<City>(ip).map(|_| ())
+        let result = match dbkind {
+            DatabaseKind::Asn | DatabaseKind::Isp => dbreader.lookup::<Isp>(ip).map(|_| ()),
+            DatabaseKind::ConnectionType => dbreader.lookup::<ConnectionType>(ip).map(|_| ()),
+            DatabaseKind::City => dbreader.lookup::<City>(ip).map(|_| ()),
         };
 
         match result {
-            Ok(_) | Err(MaxMindDBError::AddressNotFoundError(_)) => (),
-            Err(error) => return Err(error.into()),
+            Ok(_) | Err(MaxMindDBError::AddressNotFoundError(_)) => Ok(Geoip {
+                last_modified: fs::metadata(&config.path)?.modified()?,
+                dbreader,
+                dbkind,
+                config,
+            }),
+            Err(error) => Err(error.into()),
         }
-
-        Ok(table)
-    }
-
-    fn has_isp_db(&self) -> bool {
-        self.dbreader.metadata.database_type == ASN_DATABASE_TYPE
-            || self.dbreader.metadata.database_type == ISP_DATABASE_TYPE
     }
 
     fn lookup(&self, ip: IpAddr, select: Option<&[String]>) -> Option<BTreeMap<String, Value>> {
@@ -104,108 +116,82 @@ impl Geoip {
             }
         };
 
-        if self.has_isp_db() {
-            let data = self.dbreader.lookup::<Isp>(ip).ok()?;
+        macro_rules! add_field {
+            ($k:expr, $v:expr) => {
+                add_field($k, $v.map(Into::into))
+            };
+        }
 
-            add_field(
-                "autonomous_system_number",
-                data.autonomous_system_number.map(Into::into),
-            );
-            add_field(
-                "autonomous_system_organization",
-                data.autonomous_system_organization.map(Into::into),
-            );
+        match self.dbkind {
+            DatabaseKind::Asn | DatabaseKind::Isp => {
+                let data = self.dbreader.lookup::<Isp>(ip).ok()?;
 
-            add_field("isp", data.isp.map(Into::into));
+                add_field!("autonomous_system_number", data.autonomous_system_number);
+                add_field!(
+                    "autonomous_system_organization",
+                    data.autonomous_system_organization
+                );
+                add_field!("isp", data.isp);
+                add_field!("organization", data.organization);
+            }
+            DatabaseKind::City => {
+                let data = self.dbreader.lookup::<City>(ip).ok()?;
 
-            add_field("organization", data.organization.map(Into::into));
-        } else {
-            let data = self.dbreader.lookup::<City>(ip).ok()?;
+                add_field!(
+                    "city_name",
+                    self.take_translation(data.city.as_ref().and_then(|c| c.names.as_ref()))
+                );
 
-            add_field(
-                "city_name",
-                data.city
-                    .as_ref()
-                    .and_then(|c| c.names.as_ref())
-                    .and_then(|names| names.get(&*self.config.locale))
-                    .map(|&name| name.into()),
-            );
+                add_field!("continent_code", data.continent.and_then(|c| c.code));
 
-            add_field(
-                "continent_code",
-                data.continent.and_then(|c| c.code).map(Into::into),
-            );
+                let country = data.country.as_ref();
+                add_field!("country_code", country.and_then(|country| country.iso_code));
+                add_field!(
+                    "country_name",
+                    self.take_translation(country.and_then(|c| c.names.as_ref()))
+                );
 
-            let country = data.country.as_ref();
-            add_field(
-                "country_code",
-                country.and_then(|country| country.iso_code).map(Into::into),
-            );
-            add_field(
-                "country_name",
-                country
-                    .and_then(|country| {
-                        country
-                            .names
-                            .as_ref()
-                            .and_then(|names| names.get(&*self.config.locale))
-                    })
-                    .map(|&name| name.into()),
-            );
+                let location = data.location.as_ref();
+                add_field!("timezone", location.and_then(|location| location.time_zone));
+                add_field!("latitude", location.and_then(|location| location.latitude));
+                add_field!(
+                    "longitude",
+                    location.and_then(|location| location.longitude)
+                );
+                add_field!(
+                    "metro_code",
+                    location.and_then(|location| location.metro_code)
+                );
 
-            let location = data.location.as_ref();
-            add_field(
-                "timezone",
-                location
-                    .and_then(|location| location.time_zone)
-                    .map(Into::into),
-            );
-            add_field(
-                "latitude",
-                location
-                    .and_then(|location| location.latitude)
-                    .map(Into::into),
-            );
-            add_field(
-                "longitude",
-                location
-                    .and_then(|location| location.longitude)
-                    .map(Into::into),
-            );
-            add_field(
-                "metro_code",
-                location
-                    .and_then(|location| location.metro_code)
-                    .map(Into::into),
-            );
+                // last subdivision is most specific per https://github.com/maxmind/GeoIP2-java/blob/39385c6ce645374039450f57208b886cf87ade47/src/main/java/com/maxmind/geoip2/model/AbstractCityResponse.java#L96-L107
+                let subdivision = data.subdivisions.as_ref().and_then(|s| s.last());
+                add_field!(
+                    "region_name",
+                    self.take_translation(subdivision.and_then(|s| s.names.as_ref()))
+                );
+                add_field!(
+                    "region_code",
+                    subdivision.and_then(|subdivision| subdivision.iso_code)
+                );
+                add_field!("postal_code", data.postal.and_then(|p| p.code));
+            }
+            DatabaseKind::ConnectionType => {
+                let data = self.dbreader.lookup::<ConnectionType>(ip).ok()?;
 
-            // last subdivision is most specific per https://github.com/maxmind/GeoIP2-java/blob/39385c6ce645374039450f57208b886cf87ade47/src/main/java/com/maxmind/geoip2/model/AbstractCityResponse.java#L96-L107
-            let subdivision = data.subdivisions.as_ref().and_then(|s| s.last());
-            add_field(
-                "region_name",
-                subdivision
-                    .and_then(|subdivision| {
-                        subdivision
-                            .names
-                            .as_ref()
-                            .and_then(|names| names.get(&*self.config.locale))
-                    })
-                    .map(|&name| name.into()),
-            );
-            add_field(
-                "region_code",
-                subdivision
-                    .and_then(|subdivision| subdivision.iso_code)
-                    .map(Into::into),
-            );
-
-            add_field(
-                "postal_code",
-                data.postal.and_then(|p| p.code).map(Into::into),
-            );
+                add_field!("connection_type", data.connection_type);
+            }
         }
 
         Some(map)
+    }
+
+    fn take_translation<'a>(
+        &self,
+        translations: Option<&BTreeMap<&str, &'a str>>,
+    ) -> Option<&'a str> {
+        translations
+            .and_then(|translations| translations.get(&*self.config.locale))
+            .copied()
     }
 }
 
@@ -396,6 +382,27 @@ mod tests {
     #[test]
     fn isp_lookup_no_results() {
         let values = find("10.1.12.1", "tests/data/GeoLite2-ASN-Test.mmdb");
+
+        assert!(values.is_none());
+    }
+
+    #[test]
+    fn connection_type_lookup_success() {
+        let values = find(
+            "201.243.200.1",
+            "tests/data/GeoIP2-Connection-Type-Test.mmdb",
+        )
+        .unwrap();
+
+        let mut expected = BTreeMap::<String, Value>::new();
+        expected.insert("connection_type".to_string(), "Corporate".into());
+
+        assert_eq!(values, expected);
+    }
+
+    #[test]
+    fn connection_type_lookup_missing() {
+        let values = find("10.1.12.1", "tests/data/GeoIP2-Connection-Type-Test.mmdb");
 
         assert!(values.is_none());
     }
