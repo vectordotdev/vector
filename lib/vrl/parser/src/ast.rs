@@ -11,7 +11,6 @@ use std::{
 use arbitrary::Arbitrary;
 use diagnostic::Span;
 use lookup::lookup_v2::{OwnedPath, PathPrefix, TargetPath};
-use lookup::LookupBuf;
 use ordered_float::NotNan;
 
 use crate::{template_string::TemplateString, Error};
@@ -859,7 +858,7 @@ impl fmt::Debug for Assignment {
 pub enum AssignmentTarget {
     Noop,
     Query(Query),
-    Internal(Ident, Option<LookupBuf>),
+    Internal(Ident, Option<OwnedPath>),
     External(Option<TargetPath>),
 }
 

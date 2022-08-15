@@ -1,5 +1,5 @@
 use diagnostic::{DiagnosticList, DiagnosticMessage, Severity, Span};
-use lookup::{LookupBuf, OwnedPath};
+use lookup::{LookupBuf, OwnedPath, PathPrefix};
 use parser::ast::{self, Node, QueryTarget};
 
 use crate::{
@@ -30,7 +30,7 @@ pub struct Compiler<'a> {
     ///
     /// This list allows us to avoid printing "undefined variable" compilation
     /// errors when the reason for it being undefined is another compiler error.
-    skip_missing_query_target: Vec<(QueryTarget, LookupBuf)>,
+    skip_missing_query_target: Vec<(QueryTarget, OwnedPath)>,
 
     /// Track which expression in a chain of expressions is fallible.
     ///
@@ -601,7 +601,7 @@ impl<'a> Compiler<'a> {
         //
         // This data is exposed to the caller of the compiler, to allow any
         // potential external optimizations.
-        if let Target::External = target {
+        if let Target::External(prefix) = target {
             self.external_queries.push(path.clone());
         }
 
@@ -624,7 +624,7 @@ impl<'a> Compiler<'a> {
         let span = node.span();
 
         let target = match node.into_inner() {
-            External(prefix) => Target::External,
+            External(prefix) => Target::External(prefix),
             Internal(ident) => {
                 let variable = self.compile_variable(Node::new(span, ident), external)?;
                 Target::Internal(variable)
@@ -768,7 +768,7 @@ impl<'a> Compiler<'a> {
 
         if self
             .skip_missing_query_target
-            .contains(&(QueryTarget::Internal(ident.clone()), LookupBuf::root()))
+            .contains(&(QueryTarget::Internal(ident.clone()), OwnedPath::root()))
         {
             return None;
         }
@@ -864,7 +864,9 @@ impl<'a> Compiler<'a> {
                 path.unwrap_or_else(OwnedPath::root),
             ),
             ast::AssignmentTarget::External(path) => {
-                (QueryTarget::External, path.unwrap_or_else(OwnedPath::root))
+                let prefix = path.map_or(PathPrefix::Event, |x|x.prefix);
+                let path = path.map(|x|x.path).unwrap_or_else(OwnedPath::root);
+                (QueryTarget::External(prefix), path)
             }
         };
 
