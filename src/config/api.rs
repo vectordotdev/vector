@@ -2,7 +2,7 @@ use std::net::{Ipv4Addr, SocketAddr};
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Copy, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Copy, Clone)]
 #[serde(default, deny_unknown_fields)]
 pub struct Options {
     #[serde(default = "default_enabled")]

@@ -141,3 +141,80 @@ impl InternalEvent for ExecCommandExecuted<'_> {
         );
     }
 }
+
+pub enum ExecFailedToSignalChild {
+    #[cfg(unix)]
+    SignalError(nix::errno::Errno),
+    #[cfg(unix)]
+    FailedToMarshalPid(std::num::TryFromIntError),
+    #[cfg(unix)]
+    NoPid,
+    #[cfg(windows)]
+    IoError(std::io::Error),
+}
+
+impl ExecFailedToSignalChild {
+    fn to_error_code(&self) -> String {
+        use ExecFailedToSignalChild::*;
+
+        match self {
+            #[cfg(unix)]
+            SignalError(err) => format!("errno_{}", err),
+            #[cfg(unix)]
+            FailedToMarshalPid(_) => String::from("failed_to_marshal_pid"),
+            #[cfg(unix)]
+            NoPid => String::from("no_pid"),
+            #[cfg(windows)]
+            IoError(err) => err.to_string(),
+        }
+    }
+}
+
+impl std::fmt::Display for ExecFailedToSignalChild {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        use ExecFailedToSignalChild::*;
+
+        match self {
+            #[cfg(unix)]
+            SignalError(err) => write!(f, "errno: {}", err),
+            #[cfg(unix)]
+            FailedToMarshalPid(err) => write!(f, "failed to marshal pid to i32: {}", err),
+            #[cfg(unix)]
+            NoPid => write!(f, "child had no pid"),
+            #[cfg(windows)]
+            IoError(err) => write!(f, "io error: {}", err),
+        }
+    }
+}
+
+pub struct ExecFailedToSignalChildError<'a> {
+    pub command: &'a tokio::process::Command,
+    pub error: ExecFailedToSignalChild,
+}
+
+impl InternalEvent for ExecFailedToSignalChildError<'_> {
+    fn emit(self) {
+        error!(
+            message = %format!("Failed to send SIGTERM to child, aborting early: {}", self.error),
+            command = ?self.command.as_std(),
+            error_code = %self.error.to_error_code(),
+            error_type = error_type::COMMAND_FAILED,
+            stage = error_stage::RECEIVING,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "command" => format!("{:?}", self.command.as_std()),
+            "error_code" => self.error.to_error_code(),
+            "error_type" => error_type::COMMAND_FAILED,
+            "stage" => error_stage::RECEIVING,
+        );
+        // deprecated
+        counter!(
+            "processing_errors_total", 1,
+            "command_code" => format!("{:?}", self.command.as_std()),
+            "error" => self.error.to_error_code(),
+            "error_type" => error_type::COMMAND_FAILED,
+            "stage" => error_stage::RECEIVING,
+        );
+    }
+}

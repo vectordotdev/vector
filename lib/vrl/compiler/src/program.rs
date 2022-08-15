@@ -1,29 +1,30 @@
 use lookup::LookupBuf;
 
+use crate::state::TypeState;
 use crate::{
     expression::{Block, Resolved},
-    state::LocalEnv,
     Context, Expression,
 };
 
 #[derive(Debug, Clone)]
 pub struct Program {
+    /// The initial state that the program was compiled with.
+    pub(crate) initial_state: TypeState,
     pub(crate) expressions: Block,
     pub(crate) info: ProgramInfo,
 }
 
 impl Program {
-    /// Get a reference to the final local environment of the compiler that
-    /// compiled the current program.
-    ///
-    /// Can be used to instantiate a new program with the same local state as
-    /// the previous program.
-    ///
-    /// Specifically, this is used by the VRL REPL to incrementally compile
-    /// a program as each line is compiled.
+    /// Retrieves the state of the type system before the program runs.
     #[must_use]
-    pub fn local_env(&self) -> &LocalEnv {
-        &self.expressions.local_env
+    pub fn initial_type_state(&self) -> TypeState {
+        self.initial_state.clone()
+    }
+
+    /// Retrieves the state of the type system after the program runs.
+    #[must_use]
+    pub fn final_type_state(&self) -> TypeState {
+        self.expressions.type_info(&self.initial_state).state
     }
 
     /// Get detailed information about the program, as collected by the VRL

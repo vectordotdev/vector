@@ -29,7 +29,7 @@ pub(crate) enum DataDirError {
 }
 
 // If this is modified, make sure those changes are reflected in the `ConfigBuilder::append` function!
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct GlobalOptions {
     #[serde(default = "crate::default_data_dir")]

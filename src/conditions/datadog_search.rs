@@ -15,7 +15,7 @@ use crate::conditions::{Condition, Conditional, ConditionalConfig};
 
 /// A condition that uses the [Datadog Search](https://docs.datadoghq.com/logs/explorer/search_syntax/) query syntax against an event.
 #[configurable_component]
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct DatadogSearchConfig {
     /// The query string.
     source: String,

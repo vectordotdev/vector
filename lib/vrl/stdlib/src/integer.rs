@@ -43,13 +43,13 @@ impl Function for Integer {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(IntegerFn { value }))
+        Ok(IntegerFn { value }.as_expr())
     }
 }
 
@@ -58,12 +58,12 @@ struct IntegerFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for IntegerFn {
+impl FunctionExpression for IntegerFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         int(self.value.resolve(ctx)?)
     }
 
-    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &state::TypeState) -> TypeDef {
         let non_integer = !self.value.type_def(state).is_integer();
 
         TypeDef::integer().with_fallibility(non_integer)

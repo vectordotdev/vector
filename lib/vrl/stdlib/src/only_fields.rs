@@ -20,7 +20,7 @@ impl Function for OnlyFields {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -33,7 +33,7 @@ impl Function for OnlyFields {
             }
         }
 
-        Ok(Box::new(OnlyFieldsFn { paths }))
+        Ok(OnlyFieldsFn { paths }.as_expr())
     }
 }
 
@@ -42,7 +42,7 @@ pub struct OnlyFieldsFn {
     paths: Vec<Path>,
 }
 
-impl Expression for OnlyFieldsFn {
+impl FunctionExpression for OnlyFieldsFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let paths = self.paths.iter().map(Path::to_string).collect::<Vec<_>>();
 
@@ -56,7 +56,7 @@ impl Expression for OnlyFieldsFn {
         Ok(Value::Null)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef {
             fallible: true,
             kind: value::Kind::null(),

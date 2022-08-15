@@ -86,15 +86,13 @@ impl Function for ParseAwsCloudWatchLogSubscriptionMessage {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(ParseAwsCloudWatchLogSubscriptionMessageFn {
-            value,
-        }))
+        Ok(ParseAwsCloudWatchLogSubscriptionMessageFn { value }.as_expr())
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -111,13 +109,13 @@ struct ParseAwsCloudWatchLogSubscriptionMessageFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ParseAwsCloudWatchLogSubscriptionMessageFn {
+impl FunctionExpression for ParseAwsCloudWatchLogSubscriptionMessageFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?;
         parse_aws_cloudwatch_log_subscription_message(bytes)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::object(inner_kind()).fallible(/* message parsing error */)
     }
 }

@@ -35,7 +35,7 @@ impl Function for ParseLogFmt {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -48,12 +48,13 @@ impl Function for ParseLogFmt {
         let whitespace = Whitespace::Lenient;
         let standalone_key = expr!(true);
 
-        Ok(Box::new(ParseKeyValueFn {
+        Ok(ParseKeyValueFn {
             value,
             key_value_delimiter,
             field_delimiter,
             whitespace,
             standalone_key,
-        }))
+        }
+        .as_expr())
     }
 }

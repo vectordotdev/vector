@@ -6,7 +6,13 @@ use crate::{
     metrics::AgentDDSketch,
 };
 
-include!(concat!(env!("OUT_DIR"), "/event.rs"));
+#[allow(warnings)] // Ignore some clippy warnings
+#[allow(clippy::all)]
+mod proto_event {
+    include!(concat!(env!("OUT_DIR"), "/event.rs"));
+}
+pub use proto_event::*;
+
 pub use event_wrapper::Event;
 pub use metric::Value as MetricValue;
 

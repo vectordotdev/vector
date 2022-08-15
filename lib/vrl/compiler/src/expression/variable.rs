@@ -1,12 +1,12 @@
-use std::fmt;
-
 use diagnostic::{DiagnosticMessage, Label};
+use std::fmt;
 use value::Value;
 
+use crate::state::{TypeInfo, TypeState};
 use crate::{
     expression::{levenstein, Resolved},
     parser::ast::Ident,
-    state::{ExternalEnv, LocalEnv},
+    state::LocalEnv,
     Context, Expression, Span, TypeDef,
 };
 
@@ -51,11 +51,13 @@ impl Expression for Variable {
             .unwrap_or(Value::Null))
     }
 
-    fn type_def(&self, (local, _): (&LocalEnv, &ExternalEnv)) -> TypeDef {
-        local
+    fn type_info(&self, state: &TypeState) -> TypeInfo {
+        let result = state
+            .local
             .variable(&self.ident)
-            .cloned()
-            .map_or_else(|| TypeDef::null().infallible(), |d| d.type_def)
+            .map_or_else(|| TypeDef::undefined().infallible(), |d| d.type_def.clone());
+
+        TypeInfo::new(state, result)
     }
 }
 

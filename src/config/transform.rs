@@ -65,7 +65,7 @@ impl TransformOuter<String> {
             let mut children = Vec::new();
 
             expansions.insert(
-                key.clone(),
+                key,
                 inner_topology
                     .outputs()
                     .into_iter()

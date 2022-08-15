@@ -33,12 +33,12 @@ impl Function for IsNullish {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
-        Ok(Box::new(IsNullishFn { value }))
+        Ok(IsNullishFn { value }.as_expr())
     }
 }
 
@@ -47,13 +47,13 @@ struct IsNullishFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for IsNullishFn {
+impl FunctionExpression for IsNullishFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         Ok(is_nullish(value).into())
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::boolean().infallible()
     }
 }

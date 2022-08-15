@@ -139,8 +139,8 @@ impl<'a> ArbitraryDepth<'a> for IfStatement {
 
         Ok(IfStatement {
             predicate: node(predicate),
-            consequent: node(consequent),
-            alternative: alternative.map(node),
+            if_node: node(consequent),
+            else_node: alternative.map(node),
         })
     }
 }

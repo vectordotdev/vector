@@ -12,6 +12,7 @@ use line::{Line, Metric, MetricKind};
 
 pub const METRIC_NAME_LABEL: &str = "__name__";
 
+#[allow(warnings)] // Ignore some clippy warnings
 pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/prometheus.rs"));
 
