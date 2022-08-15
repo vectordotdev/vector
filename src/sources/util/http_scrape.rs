@@ -51,8 +51,8 @@ pub(crate) const fn default_scrape_interval_secs() -> u64 {
 
 /// Methods that allow context-specific behavior during the scraping procedure.
 pub(crate) trait HttpScraper {
-    /// (Optional) Called before the HTTP request is made, allows building context.
-    fn build(&mut self, _url: &Uri) {}
+    /// Called before the HTTP request is made, allows expanding context.
+    fn build(self, url: &Uri) -> Self;
 
     /// Called after the HTTP request succeeds and returns the decoded/parsed Event array.
     fn on_response(&mut self, url: &Uri, header: &Parts, body: &Bytes) -> Option<Vec<Event>>;
@@ -111,7 +111,7 @@ pub(crate) async fn http_scrape<H: HttpScraper + std::marker::Send + Clone>(
         let endpoint = url.to_string();
 
         let mut context = context.clone();
-        context.build(&url);
+        context = context.build(&url);
 
         let mut builder = Request::get(&url).header(http::header::ACCEPT, &inputs.content_type);
 

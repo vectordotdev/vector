@@ -201,6 +201,10 @@ fn enrich_events(events: &mut Vec<Event>) {
 }
 
 impl HttpScraper for HttpScrapeContext {
+    fn build(self, _uri: &Uri) -> HttpScrapeContext {
+        self
+    }
+
     /// Decodes the HTTP response body into events per the decoder configured.
     fn on_response(
         &mut self,

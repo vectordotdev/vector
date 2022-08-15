@@ -241,9 +241,9 @@ struct PrometheusScrapeContext {
 }
 
 impl HttpScraper for PrometheusScrapeContext {
-    /// Builds the instance info and endpoint info for the current request
-    fn build(&mut self, url: &Uri) {
-        self.instance_info = self.instance_tag.as_ref().map(|tag| {
+    /// Expands the context with the instance info and endpoint info for the current request
+    fn build(self, url: &Uri) -> PrometheusScrapeContext {
+        let instance_info = self.instance_tag.as_ref().map(|tag| {
             let instance = format!(
                 "{}:{}",
                 url.host().unwrap_or_default(),
@@ -259,12 +259,18 @@ impl HttpScraper for PrometheusScrapeContext {
                 honor_label: self.honor_labels,
             }
         });
-
-        self.endpoint_info = self.endpoint_tag.as_ref().map(|tag| EndpointInfo {
+        let endpoint_info = self.endpoint_tag.as_ref().map(|tag| EndpointInfo {
             tag: tag.to_string(),
             endpoint: url.to_string(),
             honor_label: self.honor_labels,
         });
+        PrometheusScrapeContext {
+            honor_labels: self.honor_labels,
+            instance_tag: self.instance_tag,
+            endpoint_tag: self.endpoint_tag,
+            instance_info,
+            endpoint_info,
+        }
     }
 
     /// Parses the Prometheus HTTP response into metric events
