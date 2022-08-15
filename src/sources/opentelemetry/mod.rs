@@ -18,7 +18,7 @@ use vector_core::config::LogNamespace;
 use crate::{
     config::{
         AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource, SourceConfig,
-        SourceContext, SourceDescription,
+        SourceContext,
     },
     opentelemetry::LogService::logs_service_server::LogsServiceServer,
     serde::bool_or_struct,
@@ -94,12 +94,7 @@ impl GenerateConfig for OpentelemetryConfig {
     }
 }
 
-inventory::submit! {
-    SourceDescription::new::<OpentelemetryConfig>("opentelemetry")
-}
-
 #[async_trait::async_trait]
-#[typetag::serde(name = "opentelemetry")]
 impl SourceConfig for OpentelemetryConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);

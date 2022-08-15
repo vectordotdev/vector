@@ -11,7 +11,7 @@ use vector_core::config::LogNamespace;
 const NAME: &str = "file_descriptor";
 
 use crate::{
-    config::{GenerateConfig, Output, Resource, SourceConfig, SourceContext, SourceDescription},
+    config::{GenerateConfig, Output, Resource, SourceConfig, SourceContext},
     serde::default_decoding,
 };
 /// Configuration for the `file_descriptor` source.
@@ -61,10 +61,6 @@ impl FileDescriptorConfig for FileDescriptorSourceConfig {
     }
 }
 
-inventory::submit! {
-    SourceDescription::new::<FileDescriptorSourceConfig>(NAME)
-}
-
 impl GenerateConfig for FileDescriptorSourceConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(indoc! {r#"
@@ -75,7 +71,6 @@ impl GenerateConfig for FileDescriptorSourceConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "file_descriptor")]
 impl SourceConfig for FileDescriptorSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
         let pipe = io::BufReader::new(unsafe { File::from_raw_fd(self.fd as i32) });

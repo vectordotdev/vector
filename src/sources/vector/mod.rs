@@ -4,9 +4,7 @@ pub mod v2;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
-use crate::config::{
-    GenerateConfig, Output, Resource, SourceConfig, SourceContext, SourceDescription,
-};
+use crate::config::{GenerateConfig, Output, Resource, SourceConfig, SourceContext};
 
 /// Marker type for the version one of the configuration for the `vector` source.
 #[configurable_component]
@@ -60,10 +58,6 @@ pub enum VectorConfig {
     V2(#[configurable(derived)] VectorConfigV2),
 }
 
-inventory::submit! {
-    SourceDescription::new::<VectorConfig>("vector")
-}
-
 impl GenerateConfig for VectorConfig {
     fn generate_config() -> toml::Value {
         let config =
@@ -77,7 +71,6 @@ impl GenerateConfig for VectorConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "vector")]
 impl SourceConfig for VectorConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         match self {

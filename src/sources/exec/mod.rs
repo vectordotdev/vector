@@ -26,7 +26,7 @@ use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{log_schema, Output, SourceConfig, SourceContext, SourceDescription},
+    config::{log_schema, Output, SourceConfig, SourceContext},
     event::Event,
     internal_events::{
         BytesReceived, ExecCommandExecuted, ExecEventsReceived, ExecFailedError,
@@ -173,10 +173,6 @@ const STREAM_KEY: &str = "stream";
 const PID_KEY: &str = "pid";
 const COMMAND_KEY: &str = "command";
 
-inventory::submit! {
-    SourceDescription::new::<ExecConfig>("exec")
-}
-
 impl_generate_config_from_default!(ExecConfig);
 
 impl ExecConfig {
@@ -217,7 +213,6 @@ impl ExecConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "exec")]
 impl SourceConfig for ExecConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         self.validate()?;

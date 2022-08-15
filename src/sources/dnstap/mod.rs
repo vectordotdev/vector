@@ -6,7 +6,7 @@ use vector_core::ByteSizeOf;
 
 use super::util::framestream::{build_framestream_unix_source, FrameHandler};
 use crate::{
-    config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
+    config::{log_schema, DataType, Output, SourceConfig, SourceContext},
     event::{Event, LogEvent},
     internal_events::{BytesReceived, DnstapParseError, EventsReceived},
     Result,
@@ -106,14 +106,9 @@ impl Default for DnstapConfig {
     }
 }
 
-inventory::submit! {
-    SourceDescription::new::<DnstapConfig>("dnstap")
-}
-
 impl_generate_config_from_default!(DnstapConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "dnstap")]
 impl SourceConfig for DnstapConfig {
     async fn build(&self, cx: SourceContext) -> Result<super::Source> {
         let frame_handler = DnstapFrameHandler::new(self);

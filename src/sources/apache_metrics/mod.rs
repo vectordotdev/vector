@@ -14,9 +14,7 @@ use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    config::{
-        self, GenerateConfig, Output, ProxyConfig, SourceConfig, SourceContext, SourceDescription,
-    },
+    config::{self, GenerateConfig, Output, ProxyConfig, SourceConfig, SourceContext},
     event::metric::{Metric, MetricKind, MetricValue},
     http::HttpClient,
     internal_events::{
@@ -58,10 +56,6 @@ pub fn default_namespace() -> String {
     "apache".to_string()
 }
 
-inventory::submit! {
-    SourceDescription::new::<ApacheMetricsConfig>("apache_metrics")
-}
-
 impl GenerateConfig for ApacheMetricsConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
@@ -74,7 +68,6 @@ impl GenerateConfig for ApacheMetricsConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "apache_metrics")]
 impl SourceConfig for ApacheMetricsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let urls = self

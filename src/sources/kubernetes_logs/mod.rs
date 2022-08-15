@@ -31,7 +31,7 @@ use vector_core::{transform::TaskTransform, ByteSizeOf};
 use crate::{
     config::{
         log_schema, ComponentKey, DataType, GenerateConfig, GlobalOptions, Output, SourceConfig,
-        SourceContext, SourceDescription,
+        SourceContext,
     },
     event::{Event, LogEvent},
     internal_events::{
@@ -152,10 +152,6 @@ pub struct Config {
     delay_deletion_ms: usize,
 }
 
-inventory::submit! {
-    SourceDescription::new::<Config>(COMPONENT_ID)
-}
-
 impl GenerateConfig for Config {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(&Self {
@@ -195,7 +191,6 @@ impl Default for Config {
 const COMPONENT_ID: &str = "kubernetes_logs";
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "kubernetes_logs")]
 impl SourceConfig for Config {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let source = Source::new(self, &cx.globals, &cx.key).await?;

@@ -32,7 +32,6 @@ mod crash;
 #[cfg(all(feature = "sources-http", feature = "sinks-http"))]
 mod end_to_end;
 
-#[cfg(all(feature = "sinks-blackhole", feature = "sources-stdin"))]
 mod transient_state;
 
 #[cfg(all(feature = "sinks-console", feature = "sources-demo_logs"))]
@@ -86,8 +85,7 @@ fn into_message_stream(array: EventArray) -> impl futures::Stream<Item = String>
 async fn topology_shutdown_while_active() {
     trace_init();
 
-    let (mut in1, mut source1, counter) = basic_source_with_event_counter();
-    source1.set_force_shutdown(true);
+    let (mut in1, source1, counter) = basic_source_with_event_counter(true);
 
     let transform1 = basic_transform(" transformed", 0.0);
     let (out1, sink1) = basic_sink(10);

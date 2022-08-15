@@ -10,7 +10,7 @@ use vector_core::ByteSizeOf;
 
 use self::types::Stats;
 use crate::{
-    config::{self, Output, SourceConfig, SourceContext, SourceDescription},
+    config::{self, Output, SourceConfig, SourceContext},
     http::HttpClient,
     internal_events::{
         BytesReceived, EventStoreDbMetricsHttpError, EventStoreDbStatsParsingError,
@@ -47,14 +47,9 @@ pub fn default_endpoint() -> String {
     "https://localhost:2113/stats".to_string()
 }
 
-inventory::submit! {
-    SourceDescription::new::<EventStoreDbConfig>("eventstoredb_metrics")
-}
-
 impl_generate_config_from_default!(EventStoreDbConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "eventstoredb_metrics")]
 impl SourceConfig for EventStoreDbConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         eventstoredb(

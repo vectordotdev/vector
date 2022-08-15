@@ -2,37 +2,45 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 use component::ComponentDescription;
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 use vector_core::config::{AcknowledgementsConfig, GlobalOptions, LogNamespace, Output};
 
 use super::{component, schema, ComponentKey, ProxyConfig, Resource};
-use crate::{shutdown::ShutdownSignal, sources, SourceSender};
+use crate::{
+    shutdown::ShutdownSignal,
+    sources::{self, Sources},
+    SourceSender,
+};
 
-#[derive(Debug, Deserialize, Serialize)]
+/// Fully resolved source component.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct SourceOuter {
+    #[configurable(derived)]
     #[serde(
         default,
         skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
     )]
     pub proxy: ProxyConfig,
-    #[serde(flatten)]
-    pub(crate) inner: Box<dyn SourceConfig>,
+
     #[serde(default, skip)]
     pub sink_acknowledgements: bool,
+
+    #[serde(flatten)]
+    pub(crate) inner: Sources,
 }
 
 impl SourceOuter {
-    pub(crate) fn new(source: impl SourceConfig + 'static) -> Self {
+    pub(crate) fn new(source: Sources) -> Self {
         Self {
-            inner: Box::new(source),
             proxy: Default::default(),
             sink_acknowledgements: false,
+            inner: source,
         }
     }
 }
 
 #[async_trait]
-#[typetag::serde(tag = "type")]
 pub trait SourceConfig: core::fmt::Debug + Send + Sync {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source>;
 

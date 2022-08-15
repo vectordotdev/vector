@@ -11,7 +11,6 @@ use crate::{
     codecs::DecodingConfig,
     config::{
         AcknowledgementsConfig, GenerateConfig, Output, Resource, SourceConfig, SourceContext,
-        SourceDescription,
     },
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
@@ -95,7 +94,6 @@ impl fmt::Display for Compression {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "aws_kinesis_firehose")]
 impl SourceConfig for AwsKinesisFirehoseConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let decoder = DecodingConfig::new(
@@ -145,10 +143,6 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
     fn can_acknowledge(&self) -> bool {
         true
     }
-}
-
-inventory::submit! {
-    SourceDescription::new::<AwsKinesisFirehoseConfig>("aws_kinesis_firehose")
 }
 
 impl GenerateConfig for AwsKinesisFirehoseConfig {

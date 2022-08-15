@@ -23,7 +23,7 @@ use vector_core::ByteSizeOf;
 
 use super::util::MultilineConfig;
 use crate::{
-    config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
+    config::{log_schema, DataType, Output, SourceConfig, SourceContext},
     docker::{docker, DockerTlsConfig},
     event::{self, merge_state::LogEventMergeState, LogEvent, Value},
     internal_events::{
@@ -186,14 +186,9 @@ impl DockerLogsConfig {
     }
 }
 
-inventory::submit! {
-    SourceDescription::new::<DockerLogsConfig>("docker_logs")
-}
-
 impl_generate_config_from_default!(DockerLogsConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "docker_logs")]
 impl SourceConfig for DockerLogsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let source = DockerLogsSource::new(
@@ -247,7 +242,6 @@ struct DockerCompatConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "docker")]
 impl SourceConfig for DockerCompatConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         self.config.build(cx).await

@@ -5,7 +5,7 @@ use codecs::{encoding::FramingConfig, TextSerializerConfig};
 use crate::{
     config::Config,
     sinks::console::{ConsoleSinkConfig, Target},
-    sources::socket::SocketConfig,
+    sources::{socket::SocketConfig, Sources},
     test_util::{next_addr, start_topology, trace_init},
 };
 
@@ -14,7 +14,10 @@ async fn topology_doesnt_reload_new_data_dir() {
     trace_init();
 
     let mut old_config = Config::builder();
-    old_config.add_source("in", SocketConfig::make_basic_tcp_config(next_addr()));
+    old_config.add_source(
+        "in",
+        Sources::Socket(SocketConfig::make_basic_tcp_config(next_addr())),
+    );
     old_config.add_sink(
         "out",
         &["in"],

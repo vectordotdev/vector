@@ -39,7 +39,7 @@ use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
-        SourceConfig, SourceContext, SourceDescription,
+        SourceConfig, SourceContext,
     },
     event::Event,
     internal_events::{HttpBytesReceived, HttpDecompressError, StreamClosedError},
@@ -126,12 +126,7 @@ impl GenerateConfig for DatadogAgentConfig {
     }
 }
 
-inventory::submit! {
-    SourceDescription::new::<DatadogAgentConfig>("datadog_agent")
-}
-
 #[async_trait::async_trait]
-#[typetag::serde(name = "datadog_agent")]
 impl SourceConfig for DatadogAgentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);

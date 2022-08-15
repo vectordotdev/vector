@@ -35,8 +35,8 @@ use super::{
 };
 use crate::{
     config::{
-        ComponentKey, DataType, Input, Output, OutputId, ProxyConfig, SinkContext, SourceContext,
-        TransformContext, TransformOuter,
+        ComponentKey, DataType, Input, Output, OutputId, ProxyConfig, SinkContext, SourceConfig,
+        SourceContext, TransformContext, TransformOuter,
     },
     event::{EventArray, EventContainer},
     internal_events::EventsReceived,

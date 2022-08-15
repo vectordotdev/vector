@@ -18,7 +18,7 @@ use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
-        SourceConfig, SourceContext, SourceDescription,
+        SourceConfig, SourceContext,
     },
     event::{Event, Value},
     serde::{bool_or_struct, default_decoding},
@@ -118,10 +118,6 @@ pub struct SimpleHttpConfig {
     acknowledgements: AcknowledgementsConfig,
 }
 
-inventory::submit! {
-    SourceDescription::new::<SimpleHttpConfig>("http")
-}
-
 impl GenerateConfig for SimpleHttpConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
@@ -204,7 +200,6 @@ impl HttpSource for SimpleHttpSource {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "http")]
 impl SourceConfig for SimpleHttpConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         if self.encoding.is_some() && (self.framing.is_some() || self.decoding.is_some()) {

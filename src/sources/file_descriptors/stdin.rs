@@ -5,7 +5,7 @@ use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
 use crate::{
-    config::{Output, Resource, SourceConfig, SourceContext, SourceDescription},
+    config::{Output, Resource, SourceConfig, SourceContext},
     serde::default_decoding,
 };
 
@@ -70,14 +70,9 @@ impl Default for StdinConfig {
     }
 }
 
-inventory::submit! {
-    SourceDescription::new::<StdinConfig>(NAME)
-}
-
 impl_generate_config_from_default!(StdinConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "stdin")]
 impl SourceConfig for StdinConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
         self.source(io::BufReader::new(io::stdin()), cx.shutdown, cx.out)

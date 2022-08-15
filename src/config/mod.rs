@@ -32,7 +32,7 @@ mod schema;
 mod sink;
 mod source;
 mod transform;
-mod unit_test;
+pub mod unit_test;
 mod validation;
 mod vars;
 pub mod watcher;

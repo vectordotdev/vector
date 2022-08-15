@@ -18,10 +18,7 @@ use crate::common::sqs::SqsClientBuilder;
 use crate::tls::TlsConfig;
 use crate::{
     aws::auth::AwsAuthentication,
-    config::{
-        AcknowledgementsConfig, DataType, Output, ProxyConfig, SourceConfig, SourceContext,
-        SourceDescription,
-    },
+    config::{AcknowledgementsConfig, DataType, Output, ProxyConfig, SourceConfig, SourceContext},
     line_agg,
     serde::bool_or_struct,
 };
@@ -108,14 +105,9 @@ pub struct AwsS3Config {
     tls_options: Option<TlsConfig>,
 }
 
-inventory::submit! {
-    SourceDescription::new::<AwsS3Config>("aws_s3")
-}
-
 impl_generate_config_from_default!(AwsS3Config);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "aws_s3")]
 impl SourceConfig for AwsS3Config {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let multiline_config: Option<line_agg::Config> = self

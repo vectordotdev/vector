@@ -10,10 +10,7 @@ use std::{
 };
 
 use crate::{
-    config::{
-        log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext,
-        SourceDescription,
-    },
+    config::{log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, LogEvent, Value},
     internal_events::{
         BytesReceived, JournaldInvalidRecordError, JournaldNegativeAcknowledgmentError,
@@ -180,16 +177,11 @@ impl JournaldConfig {
     }
 }
 
-inventory::submit! {
-    SourceDescription::new::<JournaldConfig>("journald")
-}
-
 impl_generate_config_from_default!(JournaldConfig);
 
 type Record = HashMap<String, String>;
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "journald")]
 impl SourceConfig for JournaldConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         if self.remap_priority {

@@ -18,7 +18,7 @@ use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    config::{self, Output, SourceConfig, SourceContext, SourceDescription},
+    config::{self, Output, SourceConfig, SourceContext},
     event::metric::{Metric, MetricKind, MetricValue},
     internal_events::{
         CollectionCompleted, EndpointBytesReceived, MongoDbMetricsBsonParseError,
@@ -112,14 +112,9 @@ pub fn default_namespace() -> String {
     "mongodb".to_string()
 }
 
-inventory::submit! {
-    SourceDescription::new::<MongoDbMetricsConfig>("mongodb_metrics")
-}
-
 impl_generate_config_from_default!(MongoDbMetricsConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "mongodb_metrics")]
 impl SourceConfig for MongoDbMetricsConfig {
     async fn build(&self, mut cx: SourceContext) -> crate::Result<super::Source> {
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());

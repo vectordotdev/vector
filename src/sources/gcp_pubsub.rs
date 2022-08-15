@@ -207,7 +207,6 @@ const fn default_poll_time() -> f64 {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "gcp_pubsub")]
 impl SourceConfig for PubsubConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
         let ack_deadline_secs = match (self.ack_deadline_secs, self.ack_deadline_seconds) {

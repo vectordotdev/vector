@@ -20,7 +20,7 @@ use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{
         log_schema, AcknowledgementsConfig, GenerateConfig, Output, Resource, SourceConfig,
-        SourceContext, SourceDescription,
+        SourceContext,
     },
     event::{Event, LogEvent},
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
@@ -64,14 +64,6 @@ pub struct LogplexConfig {
     acknowledgements: AcknowledgementsConfig,
 }
 
-inventory::submit! {
-    SourceDescription::new::<LogplexConfig>("logplex")
-}
-
-inventory::submit! {
-    SourceDescription::new::<LogplexConfig>("heroku_logs")
-}
-
 impl GenerateConfig for LogplexConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
@@ -108,7 +100,6 @@ impl HttpSource for LogplexSource {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "heroku_logs")]
 impl SourceConfig for LogplexConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let decoder = DecodingConfig::new(
@@ -143,37 +134,6 @@ impl SourceConfig for LogplexConfig {
 
     fn resources(&self) -> Vec<Resource> {
         vec![Resource::tcp(self.address)]
-    }
-
-    fn can_acknowledge(&self) -> bool {
-        true
-    }
-}
-
-// Add a compatibility alias to avoid breaking existing configs
-
-/// Configuration for the `logplex` source.
-#[configurable_component(source)]
-#[derive(Clone, Debug)]
-pub struct LogplexCompatConfig(#[configurable(transparent)] LogplexConfig);
-
-#[async_trait::async_trait]
-#[typetag::serde(name = "logplex")]
-impl SourceConfig for LogplexCompatConfig {
-    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        self.0.build(cx).await
-    }
-
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
-        self.0.outputs(global_log_namespace)
-    }
-
-    fn source_type(&self) -> &'static str {
-        self.0.source_type()
-    }
-
-    fn resources(&self) -> Vec<Resource> {
-        self.0.resources()
     }
 
     fn can_acknowledge(&self) -> bool {

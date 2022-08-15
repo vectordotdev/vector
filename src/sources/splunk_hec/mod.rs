@@ -27,9 +27,7 @@ use self::{
     splunk_response::{HecResponse, HecResponseMetadata, HecStatusCode},
 };
 use crate::{
-    config::{
-        log_schema, DataType, Output, Resource, SourceConfig, SourceContext, SourceDescription,
-    },
+    config::{log_schema, DataType, Output, Resource, SourceConfig, SourceContext},
     event::{Event, LogEvent, Value},
     internal_events::{
         EventsReceived, HttpBytesReceived, SplunkHecRequestBodyInvalidError, SplunkHecRequestError,
@@ -91,10 +89,6 @@ pub struct SplunkConfig {
     acknowledgements: HecAcknowledgementsConfig,
 }
 
-inventory::submit! {
-    SourceDescription::new::<SplunkConfig>("splunk_hec")
-}
-
 impl_generate_config_from_default!(SplunkConfig);
 
 impl Default for SplunkConfig {
@@ -115,7 +109,6 @@ fn default_socket_address() -> SocketAddr {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "splunk_hec")]
 impl SourceConfig for SplunkConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;

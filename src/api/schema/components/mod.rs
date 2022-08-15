@@ -13,7 +13,6 @@ use once_cell::sync::Lazy;
 use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
 use vector_core::internal_event::DEFAULT_OUTPUT;
 
-use crate::topology::schema::merged_definition;
 use crate::{
     api::schema::{
         components::state::component_by_component_key,
@@ -23,6 +22,7 @@ use crate::{
     config::{ComponentKey, Config},
     filter_check,
 };
+use crate::{config::SourceConfig, topology::schema::merged_definition};
 
 #[derive(Debug, Clone, Interface)]
 #[graphql(

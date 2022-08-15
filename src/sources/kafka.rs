@@ -27,10 +27,7 @@ use vector_common::{byte_size_of::ByteSizeOf, finalizer::OrderedFinalizer};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{
-        log_schema, AcknowledgementsConfig, LogSchema, Output, SourceConfig, SourceContext,
-        SourceDescription,
-    },
+    config::{log_schema, AcknowledgementsConfig, LogSchema, Output, SourceConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, Event, Value},
     internal_events::{
         KafkaBytesReceived, KafkaEventsReceived, KafkaNegativeAcknowledgmentError,
@@ -197,14 +194,9 @@ fn default_headers_key() -> String {
     "headers".into()
 }
 
-inventory::submit! {
-    SourceDescription::new::<KafkaSourceConfig>("kafka")
-}
-
 impl_generate_config_from_default!(KafkaSourceConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "kafka")]
 impl SourceConfig for KafkaSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let consumer = create_consumer(self)?;

@@ -12,7 +12,7 @@ use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    config::{DataType, Output, SourceConfig, SourceContext, SourceDescription},
+    config::{DataType, Output, SourceConfig, SourceContext},
     event::metric::{Metric, MetricKind, MetricValue},
     http::{Auth, HttpClient},
     internal_events::{
@@ -92,14 +92,9 @@ pub fn default_namespace() -> String {
     "nginx".to_string()
 }
 
-inventory::submit! {
-    SourceDescription::new::<NginxMetricsConfig>("nginx_metrics")
-}
-
 impl_generate_config_from_default!(NginxMetricsConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "nginx_metrics")]
 impl SourceConfig for NginxMetricsConfig {
     async fn build(&self, mut cx: SourceContext) -> crate::Result<super::Source> {
         let tls = TlsSettings::from_options(&self.tls)?;

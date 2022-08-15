@@ -29,7 +29,7 @@ use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    config::{DataType, Output, SourceConfig, SourceContext, SourceDescription},
+    config::{DataType, Output, SourceConfig, SourceContext},
     event::metric::{Metric, MetricKind, MetricValue},
     internal_events::{
         CollectionCompleted, EndpointBytesReceived, EventsReceived, PostgresqlMetricsCollectError,
@@ -162,14 +162,9 @@ impl Default for PostgresqlMetricsConfig {
     }
 }
 
-inventory::submit! {
-    SourceDescription::new::<PostgresqlMetricsConfig>("postgresql_metrics")
-}
-
 impl_generate_config_from_default!(PostgresqlMetricsConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "postgresql_metrics")]
 impl SourceConfig for PostgresqlMetricsConfig {
     async fn build(&self, mut cx: SourceContext) -> crate::Result<super::Source> {
         let datname_filter = DatnameFilter::new(

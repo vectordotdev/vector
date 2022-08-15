@@ -88,7 +88,6 @@ pub struct AwsSqsConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "aws_sqs")]
 impl SourceConfig for AwsSqsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
         let client = self.build_client(&cx).await?;
