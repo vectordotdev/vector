@@ -2362,6 +2362,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a357d28ed41a50f9c765dbfe56cbc04a64e53e5fc58ba79fbc34c10ef3df831f"
 
 [[package]]
+name = "encode_unicode"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "34aa73646ffb006b8f5147f3dc182bd4bcb190227ce861fc4a4844bf8e3cb2c0"
+
+[[package]]
 name = "encoding_rs"
 version = "0.8.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5480,7 +5486,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b6176190f1637d46034820b82fbe758727ccb40da9c9fc2255d695eb05ea29c"
 dependencies = [
  "ansi_term",
- "prettytable-rs",
+ "prettytable-rs 0.8.0",
  "structopt",
 ]
 
@@ -5502,9 +5508,22 @@ checksum = "0fd04b170004fa2daccf418a7f8253aaf033c27760b5f225889024cf66d7ac2e"
 dependencies = [
  "atty",
  "csv",
- "encode_unicode",
+ "encode_unicode 0.3.6",
  "lazy_static",
  "term 0.5.2",
+ "unicode-width",
+]
+
+[[package]]
+name = "prettytable-rs"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5f375cb74c23b51d23937ffdeb48b1fbf5b6409d4b9979c1418c1de58bc8f801"
+dependencies = [
+ "atty",
+ "encode_unicode 1.0.0",
+ "lazy_static",
+ "term 0.7.0",
  "unicode-width",
 ]
 
@@ -8821,7 +8840,7 @@ dependencies = [
  "indoc",
  "lookup",
  "once_cell",
- "prettytable-rs",
+ "prettytable-rs 0.9.0",
  "regex",
  "rustyline",
  "serde_json",
