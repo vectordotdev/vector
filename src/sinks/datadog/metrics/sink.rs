@@ -333,14 +333,15 @@ mod tests {
 
         assert_eq!(expected, actual);
 
+        let gauge_value = 41.0;
         let input = vec![
-            create_gauge("basic", 42.0),
-            create_gauge("basic", 42.0),
-            create_gauge("basic", 42.0),
-            create_gauge("basic", 42.0),
-            create_gauge("basic", 42.0),
-            create_gauge("basic", 42.0),
-            create_gauge("basic", 42.0),
+            create_gauge("basic", gauge_value),
+            create_gauge("basic", gauge_value),
+            create_gauge("basic", gauge_value),
+            create_gauge("basic", gauge_value),
+            create_gauge("basic", gauge_value),
+            create_gauge("basic", gauge_value),
+            create_gauge("basic", gauge_value),
         ];
         let expected = input.clone();
         let actual = collapse_counters_by_series_and_timestamp(input);
@@ -352,13 +353,13 @@ mod tests {
     fn collapse_identical_metrics_counter() {
         let counter_value = 42.0;
         let input = vec![
-            create_counter("basic", 42.0),
-            create_counter("basic", 42.0),
-            create_counter("basic", 42.0),
-            create_counter("basic", 42.0),
-            create_counter("basic", 42.0),
-            create_counter("basic", 42.0),
-            create_counter("basic", 42.0),
+            create_counter("basic", counter_value),
+            create_counter("basic", counter_value),
+            create_counter("basic", counter_value),
+            create_counter("basic", counter_value),
+            create_counter("basic", counter_value),
+            create_counter("basic", counter_value),
+            create_counter("basic", counter_value),
         ];
 
         let expected_counter_value = input.len() as f64 * counter_value;
