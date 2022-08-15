@@ -151,17 +151,25 @@ pub(crate) async fn http_scrape<H: HttpScraper + std::marker::Send + Clone>(
                             start,
                             end: Instant::now()
                         });
-                        match context.on_response(&url, &header, &body) {
-                            Some(events) => {
-                                emit!(HttpScrapeEventsReceived {
-                                    byte_size: events.size_of(),
-                                    count: events.len(),
-                                    url: url.to_string()
-                                });
-                                Some(stream::iter(events))
-                            }
-                            None => None,
-                        }
+                        // match context.on_response(&url, &header, &body) {
+                        //     Some(events) => {
+                        //         emit!(HttpScrapeEventsReceived {
+                        //             byte_size: events.size_of(),
+                        //             count: events.len(),
+                        //             url: url.to_string()
+                        //         });
+                        //         Some(stream::iter(events))
+                        //     }
+                        //     None => None,
+                        // }
+                        context.on_response(&url, &header, &body).map(|events| {
+                            emit!(HttpScrapeEventsReceived {
+                                byte_size: events.size_of(),
+                                count: events.len(),
+                                url: url.to_string()
+                            });
+                            stream::iter(events)
+                        })
                     }
                     Ok((header, _)) => {
                         context.on_http_response_error(&url, &header);
