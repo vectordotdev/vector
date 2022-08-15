@@ -122,7 +122,7 @@ impl Function for Set {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -130,7 +130,7 @@ impl Function for Set {
         let path = arguments.required("path");
         let data = arguments.required("data");
 
-        Ok(Box::new(SetFn { value, path, data }))
+        Ok(SetFn { value, path, data }.as_expr())
     }
 }
 
@@ -141,7 +141,7 @@ pub(crate) struct SetFn {
     data: Box<dyn Expression>,
 }
 
-impl Expression for SetFn {
+impl FunctionExpression for SetFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let path = self.path.resolve(ctx)?;
         let value = self.value.resolve(ctx)?;
@@ -150,17 +150,17 @@ impl Expression for SetFn {
         set(path, value, data)
     }
 
-    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &state::TypeState) -> TypeDef {
         let value_td = self.value.type_def(state);
 
         let mut td = TypeDef::from(Kind::never()).fallible();
 
         if value_td.is_array() {
-            td = td.add_array(Collection::any())
+            td = td.or_array(Collection::any())
         };
 
         if value_td.is_object() {
-            td = td.add_object(Collection::any())
+            td = td.or_object(Collection::any())
         };
 
         td

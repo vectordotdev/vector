@@ -1,0 +1,28 @@
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:9876
+
+exporters:
+  otlp:
+    endpoint: runner:4317
+    tls:
+      insecure: true
+  otlphttp:
+    endpoint: http://runner:4318
+    tls:
+      insecure: true
+
+extensions:
+  health_check:
+
+service:
+  telemetry:
+    logs:
+      level: debug
+  extensions: [health_check]
+  pipelines:
+    logs:
+      receivers: [otlp]
+      exporters: [otlp,otlphttp]

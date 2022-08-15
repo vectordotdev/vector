@@ -174,7 +174,7 @@ impl Function for ParseJson {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -182,8 +182,8 @@ impl Function for ParseJson {
         let max_depth = arguments.optional("max_depth");
 
         match max_depth {
-            Some(max_depth) => Ok(Box::new(ParseJsonMaxDepthFn { value, max_depth })),
-            None => Ok(Box::new(ParseJsonFn { value })),
+            Some(max_depth) => Ok(ParseJsonMaxDepthFn { value, max_depth }.as_expr()),
+            None => Ok(ParseJsonFn { value }.as_expr()),
         }
     }
 }
@@ -193,13 +193,13 @@ struct ParseJsonFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ParseJsonFn {
+impl FunctionExpression for ParseJsonFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         parse_json(value)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         type_def()
     }
 }
@@ -210,14 +210,14 @@ struct ParseJsonMaxDepthFn {
     max_depth: Box<dyn Expression>,
 }
 
-impl Expression for ParseJsonMaxDepthFn {
+impl FunctionExpression for ParseJsonMaxDepthFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let max_depth = self.max_depth.resolve(ctx)?;
         parse_json_with_depth(value, max_depth)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         type_def()
     }
 }
@@ -235,12 +235,12 @@ fn inner_kind() -> Kind {
 fn type_def() -> TypeDef {
     TypeDef::bytes()
         .fallible()
-        .add_boolean()
-        .add_integer()
-        .add_float()
+        .or_boolean()
+        .or_integer()
+        .or_float()
         .add_null()
-        .add_array(Collection::from_unknown(inner_kind()))
-        .add_object(Collection::from_unknown(inner_kind()))
+        .or_array(Collection::from_unknown(inner_kind()))
+        .or_object(Collection::from_unknown(inner_kind()))
 }
 
 #[cfg(test)]
@@ -266,12 +266,12 @@ mod tests {
             args: func_args![ value: r#"{"field": "value"# ],
             want: Err("unable to parse json: EOF while parsing a string at line 1 column 16"),
             tdef: TypeDef::bytes().fallible()
-                .add_boolean()
-                .add_integer()
-                .add_float()
-                .add_null()
-                .add_array(Collection::from_unknown(inner_kind()))
-                .add_object(Collection::from_unknown(inner_kind())),
+                .or_boolean()
+                .or_integer()
+                .or_float()
+                .or_null()
+                .or_array(Collection::from_unknown(inner_kind()))
+                .or_object(Collection::from_unknown(inner_kind())),
         }
 
         max_depth {
@@ -296,12 +296,12 @@ mod tests {
             args: func_args![ value: r#"{"field": "value"#, max_depth: 3 ],
             want: Err("unable to read json: EOF while parsing a string at line 1 column 16"),
             tdef: TypeDef::bytes().fallible()
-                .add_boolean()
-                .add_integer()
-                .add_float()
-                .add_null()
-                .add_array(Collection::from_unknown(inner_kind()))
-                .add_object(Collection::from_unknown(inner_kind())),
+                .or_boolean()
+                .or_integer()
+                .or_float()
+                .or_null()
+                .or_array(Collection::from_unknown(inner_kind()))
+                .or_object(Collection::from_unknown(inner_kind())),
         }
 
         invalid_input_max_depth {

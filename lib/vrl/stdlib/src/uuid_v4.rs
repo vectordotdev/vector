@@ -1,6 +1,7 @@
 use ::value::Value;
 use bytes::Bytes;
 use vrl::prelude::*;
+use vrl::state::TypeState;
 
 fn uuid_v4() -> Value {
     let mut buf = [0; 36];
@@ -26,23 +27,23 @@ impl Function for UuidV4 {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         _: ArgumentList,
     ) -> Compiled {
-        Ok(Box::new(UuidV4Fn))
+        Ok(UuidV4Fn.as_expr())
     }
 }
 
 #[derive(Debug, Clone, Copy)]
 struct UuidV4Fn;
 
-impl Expression for UuidV4Fn {
+impl FunctionExpression for UuidV4Fn {
     fn resolve(&self, _: &mut Context) -> Resolved {
         Ok(uuid_v4())
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &TypeState) -> TypeDef {
         TypeDef::bytes().infallible()
     }
 }

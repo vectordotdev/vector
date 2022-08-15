@@ -1025,8 +1025,8 @@ mod integration_tests {
                         .await
                         .unwrap();
                     sleep(Duration::from_secs(2)).await;
-                    let result = collect_ready(out).await;
-                    result
+
+                    collect_ready(out).await
                 })
                 .await;
 

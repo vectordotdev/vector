@@ -66,6 +66,7 @@ tracing-test = "0.1"
 value = { path = "../../value", features = ["test"] }
 vrl-core = { path = "../../vrl/core", features = ["test"] }
 vector_common = { path = "../../vector-common", default-features = false, features = ["btreemap"] }
+vrl = { path = "../vrl" , features = ["test"]}
 
 [features]
 default = [
@@ -351,3 +352,4 @@ bench = false
 name = "benches"
 harness = false
 required-features = ["default"]
+

@@ -38,13 +38,13 @@ impl Function for IsObject {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(IsObjectFn { value }))
+        Ok(IsObjectFn { value }.as_expr())
     }
 }
 
@@ -53,12 +53,12 @@ struct IsObjectFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for IsObjectFn {
+impl FunctionExpression for IsObjectFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         self.value.resolve(ctx).map(|v| value!(v.is_object()))
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::boolean().infallible()
     }
 }

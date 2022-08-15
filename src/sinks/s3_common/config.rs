@@ -101,7 +101,7 @@ pub struct S3Options {
 ///
 /// [aws_docs]: https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-class-intro.html
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative, PartialEq)]
+#[derive(Clone, Copy, Debug, Derivative, PartialEq, Eq)]
 #[derivative(Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum S3StorageClass {

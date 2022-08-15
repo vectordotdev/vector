@@ -8,16 +8,16 @@ impl<'a> ToLua<'a> for Value {
     #![allow(clippy::wrong_self_convention)] // this trait is defined by mlua
     fn to_lua(self, lua: &'a Lua) -> LuaResult<LuaValue<'_>> {
         match self {
-            Value::Bytes(b) => lua.create_string(b.as_ref()).map(LuaValue::String),
-            Value::Regex(regex) => lua
+            Self::Bytes(b) => lua.create_string(b.as_ref()).map(LuaValue::String),
+            Self::Regex(regex) => lua
                 .create_string(regex.as_bytes_slice())
                 .map(LuaValue::String),
-            Value::Integer(i) => Ok(LuaValue::Integer(i)),
-            Value::Float(f) => Ok(LuaValue::Number(f.into_inner())),
-            Value::Boolean(b) => Ok(LuaValue::Boolean(b)),
-            Value::Timestamp(t) => timestamp_to_table(lua, t).map(LuaValue::Table),
-            Value::Object(m) => lua.create_table_from(m.into_iter()).map(LuaValue::Table),
-            Value::Array(a) => lua.create_sequence_from(a.into_iter()).map(LuaValue::Table),
+            Self::Integer(i) => Ok(LuaValue::Integer(i)),
+            Self::Float(f) => Ok(LuaValue::Number(f.into_inner())),
+            Self::Boolean(b) => Ok(LuaValue::Boolean(b)),
+            Self::Timestamp(t) => timestamp_to_table(lua, t).map(LuaValue::Table),
+            Self::Object(m) => lua.create_table_from(m.into_iter()).map(LuaValue::Table),
+            Self::Array(a) => lua.create_sequence_from(a.into_iter()).map(LuaValue::Table),
             Self::Null => lua.create_string("").map(LuaValue::String),
         }
     }

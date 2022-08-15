@@ -58,7 +58,7 @@ impl Function for ToUnixTimestamp {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -72,7 +72,7 @@ impl Function for ToUnixTimestamp {
             })
             .unwrap_or_default();
 
-        Ok(Box::new(ToUnixTimestampFn { value, unit }))
+        Ok(ToUnixTimestampFn { value, unit }.as_expr())
     }
 
     fn compile_argument(
@@ -158,7 +158,7 @@ struct ToUnixTimestampFn {
     unit: Unit,
 }
 
-impl Expression for ToUnixTimestampFn {
+impl FunctionExpression for ToUnixTimestampFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let unit = self.unit;
@@ -166,7 +166,7 @@ impl Expression for ToUnixTimestampFn {
         to_unix_timestamp(value, unit)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::integer().infallible()
     }
 }

@@ -416,7 +416,7 @@ impl<'a> Batch<'a> {
             Some(Ok(bytes)) => {
                 match decode_record(&bytes, self.source.remap_priority) {
                     Ok(mut record) => {
-                        if let Some(tmp) = record.remove(&*CURSOR) {
+                        if let Some(tmp) = record.remove(CURSOR) {
                             self.cursor = Some(tmp);
                         }
 
@@ -567,7 +567,7 @@ fn create_event(record: Record, batch: &Option<BatchNotifier>) -> LogEvent {
     }
     // Translate the timestamp, and so leave both old and new names.
     if let Some(Value::Bytes(timestamp)) = log
-        .get(&*SOURCE_TIMESTAMP)
+        .get(SOURCE_TIMESTAMP)
         .or_else(|| log.get(RECEIVED_TIMESTAMP))
     {
         if let Ok(timestamp) = String::from_utf8_lossy(timestamp).parse::<u64>() {

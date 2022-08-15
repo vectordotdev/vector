@@ -419,13 +419,13 @@ IfStatement: IfStatement =
         let mut alternative = alternative;
         alternatives.reverse();
         for Node { span, mut node } in alternatives {
-            node.alternative = alternative;
+            node.else_node = alternative;
             let node = Node::new(span, Expr::IfStatement(Node::new(span, node)));
 
             alternative = Some(Node::new(node.span(), Block(vec![node])));
         }
 
-        IfStatement { predicate, consequent, alternative }
+        IfStatement { predicate, if_node: consequent, else_node: alternative }
 };
 
 #[inline]
@@ -434,7 +434,7 @@ ElseIf: IfStatement =
     <predicate: Sp<Predicate>>
     NonterminalNewline*
     <consequent: Sp<Block>> => {
-    IfStatement { predicate, consequent, alternative: None }
+    IfStatement { predicate, if_node: consequent, else_node: None }
 };
 
 #[inline]

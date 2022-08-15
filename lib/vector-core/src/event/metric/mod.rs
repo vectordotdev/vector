@@ -270,6 +270,7 @@ impl Metric {
     #[allow(clippy::cast_precision_loss)]
     pub(crate) fn from_metric_kv(
         key: &metrics::Key,
+        kind: MetricKind,
         value: MetricValue,
         timestamp: DateTime<Utc>,
     ) -> Self {
@@ -278,7 +279,7 @@ impl Metric {
             .map(|label| (String::from(label.key()), String::from(label.value())))
             .collect::<MetricTags>();
 
-        Self::new(key.name().to_string(), MetricKind::Absolute, value)
+        Self::new(key.name().to_string(), kind, value)
             .with_namespace(Some("vector"))
             .with_timestamp(Some(timestamp))
             .with_tags((!labels.is_empty()).then(|| labels))

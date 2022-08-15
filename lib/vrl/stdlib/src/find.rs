@@ -49,7 +49,7 @@ impl Function for Find {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -57,11 +57,12 @@ impl Function for Find {
         let pattern = arguments.required("pattern");
         let from = arguments.optional("from");
 
-        Ok(Box::new(FindFn {
+        Ok(FindFn {
             value,
             pattern,
             from,
-        }))
+        }
+        .as_expr())
     }
 }
 
@@ -107,7 +108,7 @@ impl FindFn {
     }
 }
 
-impl Expression for FindFn {
+impl FunctionExpression for FindFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let pattern = self.pattern.resolve(ctx)?;
@@ -120,7 +121,7 @@ impl Expression for FindFn {
         find(value, pattern, from)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::integer().infallible()
     }
 }

@@ -47,7 +47,7 @@ impl Function for MatchDatadogQuery {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -69,7 +69,7 @@ impl Function for MatchDatadogQuery {
         // VRL `Value` against the Datadog Search Syntax literal.
         let filter = build_matcher(&node, &VrlFilter::default());
 
-        Ok(Box::new(MatchDatadogQueryFn { value, filter }))
+        Ok(MatchDatadogQueryFn { value, filter }.as_expr())
     }
 
     fn compile_argument(
@@ -133,7 +133,7 @@ struct MatchDatadogQueryFn {
     filter: Box<dyn Matcher<Value>>,
 }
 
-impl Expression for MatchDatadogQueryFn {
+impl FunctionExpression for MatchDatadogQueryFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
 
@@ -142,7 +142,7 @@ impl Expression for MatchDatadogQueryFn {
         Ok(self.filter.run(&value).into())
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         type_def()
     }
 }

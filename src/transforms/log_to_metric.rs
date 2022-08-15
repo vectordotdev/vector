@@ -1,5 +1,6 @@
 use std::{collections::BTreeMap, convert::TryFrom, num::ParseFloatError};
 
+use chrono::Utc;
 use indexmap::IndexMap;
 use vector_config::configurable_component;
 
@@ -289,7 +290,8 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
     let timestamp = log
         .get(log_schema().timestamp_key())
         .and_then(Value::as_timestamp)
-        .cloned();
+        .cloned()
+        .or_else(|| Some(Utc::now()));
     let metadata = event.metadata().clone();
 
     let field = config.field();

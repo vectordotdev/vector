@@ -7,7 +7,7 @@ use vector_config::configurable_component;
 use super::{BoxedFramingError, CharacterDelimitedDecoder};
 
 /// Config used to build a `NewlineDelimitedDecoder`.
-#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
 pub struct NewlineDelimitedDecoderConfig {
     #[serde(
         default,
@@ -19,7 +19,7 @@ pub struct NewlineDelimitedDecoderConfig {
 
 /// Options for building a `NewlineDelimitedDecoder`.
 #[configurable_component]
-#[derive(Clone, Debug, Derivative, PartialEq)]
+#[derive(Clone, Debug, Derivative, PartialEq, Eq)]
 #[derivative(Default)]
 pub struct NewlineDelimitedDecoderOptions {
     /// The maximum length of the byte buffer.

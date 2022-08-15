@@ -25,6 +25,7 @@ expr-literal = ["compiler/expr-literal"]
 expr-op = ["compiler/expr-op"]
 expr-query = ["compiler/expr-query"]
 expr-unary = ["compiler/expr-unary"]
+test = ["compiler/test"]
 
 [dependencies]
 bytes = "1.2.1"

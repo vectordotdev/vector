@@ -75,7 +75,7 @@ impl Function for Split {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -83,11 +83,12 @@ impl Function for Split {
         let pattern = arguments.required("pattern");
         let limit = arguments.optional("limit").unwrap_or(expr!(999_999_999));
 
-        Ok(Box::new(SplitFn {
+        Ok(SplitFn {
             value,
             pattern,
             limit,
-        }))
+        }
+        .as_expr())
     }
 }
 
@@ -98,7 +99,7 @@ pub(crate) struct SplitFn {
     limit: Box<dyn Expression>,
 }
 
-impl Expression for SplitFn {
+impl FunctionExpression for SplitFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let limit = self.limit.resolve(ctx)?;
@@ -107,7 +108,7 @@ impl Expression for SplitFn {
         split(value, limit, pattern)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::array(Collection::from_unknown(Kind::bytes())).infallible()
     }
 }
