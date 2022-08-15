@@ -47,6 +47,7 @@ urls: {
 	aws_ecs_task_metadata:                      "\(aws_docs)/AmazonECS/latest/developerguide/task-metadata-endpoint.html"
 	aws_elb:                                    "https://aws.amazon.com/elasticloadbalancing/"
 	aws_elb_access_format:                      "\(aws_docs)/elasticloadbalancing/latest/application/load-balancer-access-logs.html#access-log-entry-examples"
+	aws_clb_access_format:                      "\(aws_docs)/elasticloadbalancing/latest/classic/access-log-collection.html#access-log-entry-examples"
 	aws_elb_https:                              "\(aws_docs)/elasticloadbalancing/latest/classic/elb-create-https-ssl-load-balancer.html"
 	aws_iam:                                    "\(aws_docs)/IAM/latest/UserGuide/introduction.html"
 	aws_iam_role:                               "\(aws_docs)/IAM/latest/UserGuide/id_roles.html"

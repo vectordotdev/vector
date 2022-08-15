@@ -141,6 +141,7 @@ default = [
     "now",
     "object",
     "parse_aws_alb_log",
+    "parse_aws_clb_log",
     "parse_aws_cloudwatch_log_subscription_message",
     "parse_aws_vpc_flow_log",
     "parse_apache_log",
@@ -281,6 +282,7 @@ now = ["dep:chrono"]
 object = []
 parse_apache_log = ["dep:chrono", "dep:once_cell", "dep:regex", "vector_common/conversion"]
 parse_aws_alb_log = ["dep:nom"]
+parse_aws_clb_log = ["dep:nom"]
 parse_aws_cloudwatch_log_subscription_message = ["dep:serde_json", "vector_common/aws_cloudwatch_logs_subscription", "dep:chrono"]
 parse_aws_vpc_flow_log = []
 parse_common_log = ["dep:chrono", "dep:once_cell", "dep:regex", "vector_common/conversion"]

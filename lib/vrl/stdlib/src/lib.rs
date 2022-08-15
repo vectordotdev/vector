@@ -180,6 +180,8 @@ mod only_fields;
 mod parse_apache_log;
 #[cfg(feature = "parse_aws_alb_log")]
 mod parse_aws_alb_log;
+#[cfg(feature = "parse_aws_clb_log")]
+mod parse_aws_clb_log;
 #[cfg(feature = "parse_aws_cloudwatch_log_subscription_message")]
 mod parse_aws_cloudwatch_log_subscription_message;
 #[cfg(feature = "parse_aws_vpc_flow_log")]
@@ -449,6 +451,8 @@ pub use only_fields::OnlyFields;
 pub use parse_apache_log::ParseApacheLog;
 #[cfg(feature = "parse_aws_alb_log")]
 pub use parse_aws_alb_log::ParseAwsAlbLog;
+#[cfg(feature = "parse_aws_clb_log")]
+pub use parse_aws_clb_log::ParseAwsClbLog;
 #[cfg(feature = "parse_aws_cloudwatch_log_subscription_message")]
 pub use parse_aws_cloudwatch_log_subscription_message::ParseAwsCloudWatchLogSubscriptionMessage;
 #[cfg(feature = "parse_aws_vpc_flow_log")]
@@ -734,6 +738,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ParseApacheLog),
         #[cfg(feature = "parse_aws_alb_log")]
         Box::new(ParseAwsAlbLog),
+        #[cfg(feature = "parse_aws_clb_log")]
+        Box::new(ParseAwsClbLog),
         #[cfg(feature = "parse_aws_cloudwatch_log_subscription_message")]
         Box::new(ParseAwsCloudWatchLogSubscriptionMessage),
         #[cfg(feature = "parse_aws_vpc_flow_log")]
