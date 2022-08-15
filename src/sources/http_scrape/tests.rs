@@ -45,16 +45,16 @@ async fn bytes_decoding() {
 
     tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
 
-    run_compliance(HttpScrapeConfig::new(
-        format!("http://{}/endpoint", in_addr),
-        INTERVAL_SECS,
-        HashMap::new(),
-        default_decoding(),
-        default_framing_message_based(),
-        HashMap::new(),
-        None,
-        None,
-    ))
+    run_compliance(HttpScrapeConfig {
+        endpoint: format!("http://{}/endpoint", in_addr),
+        scrape_interval_secs: INTERVAL_SECS,
+        query: HashMap::new(),
+        decoding: default_decoding(),
+        framing: default_framing_message_based(),
+        headers: HashMap::new(),
+        tls: None,
+        auth: None,
+    })
     .await;
 }
 
@@ -71,18 +71,18 @@ async fn json_decoding_newline_delimited() {
     tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
     wait_for_tcp(in_addr).await;
 
-    run_compliance(HttpScrapeConfig::new(
-        format!("http://{}/endpoint", in_addr),
-        INTERVAL_SECS,
-        HashMap::new(),
-        DeserializerConfig::Json,
-        FramingConfig::NewlineDelimited {
+    run_compliance(HttpScrapeConfig {
+        endpoint: format!("http://{}/endpoint", in_addr),
+        scrape_interval_secs: INTERVAL_SECS,
+        query: HashMap::new(),
+        decoding: DeserializerConfig::Json,
+        framing: FramingConfig::NewlineDelimited {
             newline_delimited: NewlineDelimitedDecoderOptions::default(),
         },
-        HashMap::new(),
-        None,
-        None,
-    ))
+        headers: HashMap::new(),
+        tls: None,
+        auth: None,
+    })
     .await;
 }
 
@@ -99,21 +99,21 @@ async fn json_decoding_character_delimited() {
     tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
     wait_for_tcp(in_addr).await;
 
-    run_compliance(HttpScrapeConfig::new(
-        format!("http://{}/endpoint", in_addr),
-        INTERVAL_SECS,
-        HashMap::new(),
-        DeserializerConfig::Json,
-        FramingConfig::CharacterDelimited {
+    run_compliance(HttpScrapeConfig {
+        endpoint: format!("http://{}/endpoint", in_addr),
+        scrape_interval_secs: INTERVAL_SECS,
+        query: HashMap::new(),
+        decoding: DeserializerConfig::Json,
+        framing: FramingConfig::CharacterDelimited {
             character_delimited: CharacterDelimitedDecoderOptions {
                 delimiter: b',',
                 max_length: Some(usize::MAX),
             },
         },
-        HashMap::new(),
-        None,
-        None,
-    ))
+        headers: HashMap::new(),
+        tls: None,
+        auth: None,
+    })
     .await;
 }
 
@@ -129,22 +129,22 @@ async fn request_query_applied() {
     tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
     wait_for_tcp(in_addr).await;
 
-    let events = run_compliance(HttpScrapeConfig::new(
-        format!("http://{}/endpoint?key1=val1", in_addr),
-        INTERVAL_SECS,
-        HashMap::from([
+    let events = run_compliance(HttpScrapeConfig {
+        endpoint: format!("http://{}/endpoint?key1=val1", in_addr),
+        scrape_interval_secs: INTERVAL_SECS,
+        query: HashMap::from([
             ("key1".to_string(), vec!["val2".to_string()]),
             (
                 "key2".to_string(),
                 vec!["val1".to_string(), "val2".to_string()],
             ),
         ]),
-        DeserializerConfig::Json,
-        default_framing_message_based(),
-        HashMap::new(),
-        None,
-        None,
-    ))
+        decoding: DeserializerConfig::Json,
+        framing: default_framing_message_based(),
+        headers: HashMap::new(),
+        tls: None,
+        auth: None,
+    })
     .await;
 
     let logs: Vec<_> = events.into_iter().map(|event| event.into_log()).collect();
@@ -195,18 +195,18 @@ async fn headers_applied() {
     tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
     wait_for_tcp(in_addr).await;
 
-    run_compliance(HttpScrapeConfig::new(
-        format!("http://{}/endpoint", in_addr),
-        INTERVAL_SECS,
-        HashMap::new(),
-        default_decoding(),
-        default_framing_message_based(),
-        HashMap::from([(
+    run_compliance(HttpScrapeConfig {
+        endpoint: format!("http://{}/endpoint", in_addr),
+        scrape_interval_secs: INTERVAL_SECS,
+        query: HashMap::new(),
+        decoding: default_decoding(),
+        framing: default_framing_message_based(),
+        headers: HashMap::from([(
             "f00".to_string(),
             vec!["bazz".to_string(), "bizz".to_string()],
         )]),
-        None,
-        None,
-    ))
+        auth: None,
+        tls: None,
+    })
     .await;
 }

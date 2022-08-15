@@ -50,32 +50,32 @@ pub(crate) async fn run_error(config: HttpScrapeConfig) {
 /// An endpoint in the config that is not reachable should generate errors.
 #[tokio::test]
 async fn invalid_endpoint() {
-    run_error(HttpScrapeConfig::new(
-        "http://nope".to_string(),
-        INTERVAL_SECS,
-        HashMap::new(),
-        default_decoding(),
-        default_framing_message_based(),
-        HashMap::new(),
-        None,
-        None,
-    ))
+    run_error(HttpScrapeConfig {
+        endpoint: "http://nope".to_string(),
+        scrape_interval_secs: INTERVAL_SECS,
+        query: HashMap::new(),
+        decoding: default_decoding(),
+        framing: default_framing_message_based(),
+        headers: HashMap::new(),
+        auth: None,
+        tls: None,
+    })
     .await;
 }
 
 /// Logs (raw bytes) should be scraped and decoded successfully.
 #[tokio::test]
 async fn scraped_logs_bytes() {
-    let events = run_compliance(HttpScrapeConfig::new(
-        format!("{}/logs/bytes", dufs_address()),
-        INTERVAL_SECS,
-        HashMap::new(),
-        DeserializerConfig::Bytes,
-        default_framing_message_based(),
-        HashMap::new(),
-        None,
-        None,
-    ))
+    let events = run_compliance(HttpScrapeConfig {
+        endpoint: format!("{}/logs/bytes", dufs_address()),
+        scrape_interval_secs: INTERVAL_SECS,
+        query: HashMap::new(),
+        decoding: DeserializerConfig::Bytes,
+        framing: default_framing_message_based(),
+        headers: HashMap::new(),
+        auth: None,
+        tls: None,
+    })
     .await;
     // panics if not log event
     let log = events[0].as_log();
@@ -85,16 +85,16 @@ async fn scraped_logs_bytes() {
 /// Logs (json) should be scraped and decoded successfully.
 #[tokio::test]
 async fn scraped_logs_json() {
-    let events = run_compliance(HttpScrapeConfig::new(
-        format!("{}/logs/json.json", dufs_address()),
-        INTERVAL_SECS,
-        HashMap::new(),
-        DeserializerConfig::Json,
-        default_framing_message_based(),
-        HashMap::new(),
-        None,
-        None,
-    ))
+    let events = run_compliance(HttpScrapeConfig {
+        endpoint: format!("{}/logs/json.json", dufs_address()),
+        scrape_interval_secs: INTERVAL_SECS,
+        query: HashMap::new(),
+        decoding: DeserializerConfig::Json,
+        framing: default_framing_message_based(),
+        headers: HashMap::new(),
+        auth: None,
+        tls: None,
+    })
     .await;
     // panics if not log event
     let log = events[0].as_log();
@@ -104,16 +104,16 @@ async fn scraped_logs_json() {
 /// Metrics should be scraped and decoded successfully.
 #[tokio::test]
 async fn scraped_metrics_native_json() {
-    let events = run_compliance(HttpScrapeConfig::new(
-        format!("{}/metrics/native.json", dufs_address()),
-        INTERVAL_SECS,
-        HashMap::new(),
-        DeserializerConfig::NativeJson,
-        default_framing_message_based(),
-        HashMap::new(),
-        None,
-        None,
-    ))
+    let events = run_compliance(HttpScrapeConfig {
+        endpoint: format!("{}/metrics/native.json", dufs_address()),
+        scrape_interval_secs: INTERVAL_SECS,
+        query: HashMap::new(),
+        decoding: DeserializerConfig::NativeJson,
+        framing: default_framing_message_based(),
+        headers: HashMap::new(),
+        auth: None,
+        tls: None,
+    })
     .await;
 
     // panics if not metric event
@@ -127,16 +127,16 @@ async fn scraped_metrics_native_json() {
 /// Traces should be scraped and decoded successfully.
 #[tokio::test]
 async fn scraped_trace_native_json() {
-    let events = run_compliance(HttpScrapeConfig::new(
-        format!("{}/traces/native.json", dufs_address()),
-        INTERVAL_SECS,
-        HashMap::new(),
-        DeserializerConfig::NativeJson,
-        default_framing_message_based(),
-        HashMap::new(),
-        None,
-        None,
-    ))
+    let events = run_compliance(HttpScrapeConfig {
+        endpoint: format!("{}/traces/native.json", dufs_address()),
+        scrape_interval_secs: INTERVAL_SECS,
+        query: HashMap::new(),
+        decoding: DeserializerConfig::NativeJson,
+        framing: default_framing_message_based(),
+        headers: HashMap::new(),
+        auth: None,
+        tls: None,
+    })
     .await;
 
     let trace = events[0].as_trace();
@@ -146,92 +146,92 @@ async fn scraped_trace_native_json() {
 /// Passing no authentication for the auth-gated endpoint should yield errors.
 #[tokio::test]
 async fn unauthorized_no_auth() {
-    run_error(HttpScrapeConfig::new(
-        format!("{}/logs/json.json", dufs_auth_address()),
-        INTERVAL_SECS,
-        HashMap::new(),
-        DeserializerConfig::Json,
-        default_framing_message_based(),
-        HashMap::new(),
-        None,
-        None,
-    ))
+    run_error(HttpScrapeConfig {
+        endpoint: format!("{}/logs/json.json", dufs_auth_address()),
+        scrape_interval_secs: INTERVAL_SECS,
+        query: HashMap::new(),
+        decoding: DeserializerConfig::Json,
+        framing: default_framing_message_based(),
+        headers: HashMap::new(),
+        auth: None,
+        tls: None,
+    })
     .await;
 }
 
 /// Passing the incorrect credentials for the auth-gated endpoint should yield errors.
 #[tokio::test]
 async fn unauthorized_wrong_auth() {
-    run_error(HttpScrapeConfig::new(
-        format!("{}/logs/json.json", dufs_auth_address()),
-        INTERVAL_SECS,
-        HashMap::new(),
-        DeserializerConfig::Json,
-        default_framing_message_based(),
-        HashMap::new(),
-        None,
-        Some(Auth::Basic {
+    run_error(HttpScrapeConfig {
+        endpoint: format!("{}/logs/json.json", dufs_auth_address()),
+        scrape_interval_secs: INTERVAL_SECS,
+        query: HashMap::new(),
+        decoding: DeserializerConfig::Json,
+        framing: default_framing_message_based(),
+        headers: HashMap::new(),
+        tls: None,
+        auth: Some(Auth::Basic {
             user: "white_rabbit".to_string(),
             password: "morpheus".to_string(),
         }),
-    ))
+    })
     .await;
 }
 
 /// Passing the correct credentials for the auth-gated endpoint should succeed.
 #[tokio::test]
 async fn authorized() {
-    run_compliance(HttpScrapeConfig::new(
-        format!("{}/logs/json.json", dufs_auth_address()),
-        INTERVAL_SECS,
-        HashMap::new(),
-        DeserializerConfig::Json,
-        default_framing_message_based(),
-        HashMap::new(),
-        None,
-        Some(Auth::Basic {
+    run_compliance(HttpScrapeConfig {
+        endpoint: format!("{}/logs/json.json", dufs_auth_address()),
+        scrape_interval_secs: INTERVAL_SECS,
+        query: HashMap::new(),
+        decoding: DeserializerConfig::Json,
+        framing: default_framing_message_based(),
+        headers: HashMap::new(),
+        tls: None,
+        auth: Some(Auth::Basic {
             user: "user".to_string(),
             password: "pass".to_string(),
         }),
-    ))
+    })
     .await;
 }
 
 /// Passing an incorrect CA file for TLS should yield errors.
 #[tokio::test]
 async fn tls_invalid_ca() {
-    run_error(HttpScrapeConfig::new(
-        format!("{}/logs/json.json", dufs_https_address()),
-        INTERVAL_SECS,
-        HashMap::new(),
-        DeserializerConfig::Json,
-        default_framing_message_based(),
-        HashMap::new(),
-        Some(TlsConfig {
+    run_error(HttpScrapeConfig {
+        endpoint: format!("{}/logs/json.json", dufs_https_address()),
+        scrape_interval_secs: INTERVAL_SECS,
+        query: HashMap::new(),
+        decoding: DeserializerConfig::Json,
+        framing: default_framing_message_based(),
+        headers: HashMap::new(),
+        tls: Some(TlsConfig {
             ca_file: Some("tests/data/http-scrape/certs/invalid-ca-cert.pem".into()),
             ..Default::default()
         }),
-        None,
-    ))
+        auth: None,
+    })
     .await;
 }
 
 /// Passing the correct CA file for TLS should succeed.
 #[tokio::test]
 async fn tls_valid() {
-    run_compliance(HttpScrapeConfig::new(
-        format!("{}/logs/json.json", dufs_https_address()),
-        INTERVAL_SECS,
-        HashMap::new(),
-        DeserializerConfig::Json,
-        default_framing_message_based(),
-        HashMap::new(),
-        Some(TlsConfig {
+    run_compliance(HttpScrapeConfig {
+        endpoint: format!("{}/logs/json.json", dufs_https_address()),
+        scrape_interval_secs: INTERVAL_SECS,
+        query: HashMap::new(),
+        decoding: DeserializerConfig::Json,
+        framing: default_framing_message_based(),
+        headers: HashMap::new(),
+        tls: Some(TlsConfig {
             ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
             ..Default::default()
         }),
-        None,
-    ))
+        auth: None,
+    })
     .await;
 }
 
@@ -239,16 +239,16 @@ async fn tls_valid() {
 #[tokio::test]
 async fn shutdown() {
     let source_id = ComponentKey::from("http_scrape_shutdown");
-    let source = HttpScrapeConfig::new(
-        format!("{}/logs/json.json", dufs_address()),
-        INTERVAL_SECS,
-        HashMap::new(),
-        DeserializerConfig::Json,
-        default_framing_message_based(),
-        HashMap::new(),
-        None,
-        None,
-    );
+    let source = HttpScrapeConfig {
+        endpoint: format!("{}/logs/json.json", dufs_address()),
+        scrape_interval_secs: INTERVAL_SECS,
+        query: HashMap::new(),
+        decoding: DeserializerConfig::Json,
+        framing: default_framing_message_based(),
+        headers: HashMap::new(),
+        tls: None,
+        auth: None,
+    };
 
     // build the context for the source and get a SourceShutdownCoordinator to signal with
     let (tx, _rx) = SourceSender::new_test();

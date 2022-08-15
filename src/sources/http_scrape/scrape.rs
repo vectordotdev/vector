@@ -41,41 +41,41 @@ pub(crate) const NAME: &str = "http_scrape";
 pub struct HttpScrapeConfig {
     /// Endpoint to scrape events from. The full path must be specified.
     /// Example: "http://127.0.0.1:9898/logs"
-    endpoint: String,
+    pub endpoint: String,
 
     /// The interval between scrapes, in seconds.
     #[serde(default = "default_scrape_interval_secs")]
-    scrape_interval_secs: u64,
+    pub scrape_interval_secs: u64,
 
     /// Custom parameters for the scrape request query string.
     ///
     /// One or more values for the same parameter key can be provided. The parameters provided in this option are
     /// appended to any parameters manually provided in the `endpoint` option.
     #[serde(default)]
-    query: HashMap<String, Vec<String>>,
+    pub query: HashMap<String, Vec<String>>,
 
     /// Decoder to use on the HTTP responses.
     #[configurable(derived)]
     #[serde(default = "default_decoding")]
-    decoding: DeserializerConfig,
+    pub decoding: DeserializerConfig,
 
     /// Framing to use in the decoding.
     #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
-    framing: FramingConfig,
+    pub framing: FramingConfig,
 
     /// Headers to apply to the HTTP requests.
     /// One or more values for the same header can be provided.
     #[serde(default)]
-    headers: HashMap<String, Vec<String>>,
+    pub headers: HashMap<String, Vec<String>>,
 
     /// TLS configuration.
     #[configurable(derived)]
-    tls: Option<TlsConfig>,
+    pub tls: Option<TlsConfig>,
 
     /// HTTP Authentication.
     #[configurable(derived)]
-    auth: Option<Auth>,
+    pub auth: Option<Auth>,
 }
 
 impl Default for HttpScrapeConfig {
@@ -89,31 +89,6 @@ impl Default for HttpScrapeConfig {
             headers: HashMap::new(),
             tls: None,
             auth: None,
-        }
-    }
-}
-
-#[allow(clippy::too_many_arguments)]
-impl HttpScrapeConfig {
-    pub const fn new(
-        endpoint: String,
-        scrape_interval_secs: u64,
-        query: HashMap<String, Vec<String>>,
-        decoding: DeserializerConfig,
-        framing: FramingConfig,
-        headers: HashMap<String, Vec<String>>,
-        tls: Option<TlsConfig>,
-        auth: Option<Auth>,
-    ) -> Self {
-        Self {
-            endpoint,
-            scrape_interval_secs,
-            query,
-            decoding,
-            framing,
-            headers,
-            tls,
-            auth,
         }
     }
 }
