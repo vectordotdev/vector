@@ -113,13 +113,18 @@ pub(crate) async fn http_scrape<H: HttpScraper + std::marker::Send + Clone>(
         let mut context = context.clone();
         context = context.build(&url);
 
-        let mut builder = Request::get(&url).header(http::header::ACCEPT, &inputs.content_type);
+        let mut builder = Request::get(&url);
 
-        // add user supplied headers
+        // add user specified headers
         for (header, values) in &inputs.headers {
             for value in values {
                 builder = builder.header(header, value);
             }
+        }
+
+        // set ACCEPT header if not user specified
+        if !inputs.headers.contains_key(http::header::ACCEPT.as_str()) {
+            builder = builder.header(http::header::ACCEPT, &inputs.content_type);
         }
 
         // building an empty request should be infallible

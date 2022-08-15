@@ -210,3 +210,29 @@ async fn headers_applied() {
     })
     .await;
 }
+
+/// ACCEPT HTTP request headers configured by the user should take precedence
+#[tokio::test]
+async fn accept_header_override() {
+    let in_addr = next_addr();
+
+    // (The Bytes decoder will default to text/plain encoding)
+    let dummy_endpoint = warp::path!("endpoint")
+        .and(warp::header::exact("Accept", "application/json"))
+        .map(|| r#"{"data" : "foo"}"#);
+
+    tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+    wait_for_tcp(in_addr).await;
+
+    run_compliance(HttpScrapeConfig {
+        endpoint: format!("http://{}/endpoint", in_addr),
+        scrape_interval_secs: INTERVAL_SECS,
+        query: HashMap::new(),
+        decoding: DeserializerConfig::Bytes,
+        framing: default_framing_message_based(),
+        headers: HashMap::from([("ACCEPT".to_string(), vec!["application/json".to_string()])]),
+        auth: None,
+        tls: None,
+    })
+    .await;
+}
