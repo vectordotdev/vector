@@ -1,5 +1,5 @@
 use diagnostic::{DiagnosticList, DiagnosticMessage, Severity, Span};
-use lookup::{LookupBuf, OwnedPath, PathPrefix};
+use lookup::{OwnedPath, PathPrefix, TargetPath};
 use parser::ast::{self, Node, QueryTarget};
 
 use crate::{
@@ -22,8 +22,8 @@ pub struct Compiler<'a> {
     fallible: bool,
     abortable: bool,
     local: LocalEnv,
-    external_queries: Vec<LookupBuf>,
-    external_assignments: Vec<LookupBuf>,
+    external_queries: Vec<TargetPath>,
+    external_assignments: Vec<TargetPath>,
 
     /// A list of variables that are missing, because the rhs expression of the
     /// assignment failed to compile.
@@ -602,7 +602,11 @@ impl<'a> Compiler<'a> {
         // This data is exposed to the caller of the compiler, to allow any
         // potential external optimizations.
         if let Target::External(prefix) = target {
-            self.external_queries.push(path.clone());
+            let target_path = TargetPath {
+                prefix,
+                path: path.clone()
+            };
+            self.external_queries.push(target_path);
         }
 
         Some(Query::new(target, path))
@@ -660,7 +664,7 @@ impl<'a> Compiler<'a> {
         //
         // See: https://github.com/vectordotdev/vector/issues/12547
         if ident.as_deref() == "get" {
-            self.external_queries.push(LookupBuf::root());
+            self.external_queries.push(TargetPath::event_root());
         }
 
         let arguments = arguments
@@ -854,18 +858,18 @@ impl<'a> Compiler<'a> {
 
     #[cfg(feature = "expr-assignment")]
     fn skip_missing_assignment_target(&mut self, target: ast::AssignmentTarget) {
-        let query = match target {
+        let query = match &target {
             ast::AssignmentTarget::Noop => return,
             ast::AssignmentTarget::Query(ast::Query { target, path }) => {
-                (target.into_inner(), path.into_inner())
+                (target.clone().into_inner(), path.clone().into_inner())
             }
             ast::AssignmentTarget::Internal(ident, path) => (
-                QueryTarget::Internal(ident),
-                path.unwrap_or_else(OwnedPath::root),
+                QueryTarget::Internal(ident.clone()),
+                path.clone().unwrap_or_else(OwnedPath::root),
             ),
             ast::AssignmentTarget::External(path) => {
-                let prefix = path.map_or(PathPrefix::Event, |x|x.prefix);
-                let path = path.map(|x|x.path).unwrap_or_else(OwnedPath::root);
+                let prefix = path.as_ref().map_or(PathPrefix::Event, |x|x.prefix);
+                let path = path.clone().map(|x|x.path).unwrap_or_else(OwnedPath::root);
                 (QueryTarget::External(prefix), path)
             }
         };

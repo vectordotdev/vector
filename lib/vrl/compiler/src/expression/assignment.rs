@@ -2,7 +2,7 @@ use std::{convert::TryFrom, fmt};
 
 use diagnostic::{DiagnosticMessage, Label, Note};
 use lookup::lookup_v2::TargetPath;
-use lookup::{LookupBuf, OwnedPath, PathPrefix, PrefixedLookupBuf, SegmentBuf};
+use lookup::{LookupBuf, OwnedPath, PathPrefix, SegmentBuf};
 use value::{Kind, Value};
 
 use crate::{
@@ -370,7 +370,7 @@ impl Target {
                                 .target()
                                 .type_def
                                 .clone()
-                                .with_type_inserted(&target_path.path.into(), new_type_def),
+                                .with_type_inserted(&target_path.path.clone().into(), new_type_def),
                             value,
                         });
                     }

@@ -1,7 +1,7 @@
 use std::collections::{hash_map::Entry, BTreeSet, HashMap};
 
 use anymap::AnyMap;
-use lookup::{LookupBuf, TargetPath};
+use lookup::{TargetPath};
 use value::{Kind, Value};
 
 use crate::{parser::ast::Ident, type_def::Details, value::Collection};

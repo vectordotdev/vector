@@ -21,32 +21,7 @@ use crate::{Look, Lookup, LookupError};
 mod test;
 
 mod segmentbuf;
-use crate::lookup_v2::PathPrefix;
 pub use segmentbuf::{FieldBuf, SegmentBuf};
-
-#[derive(PartialEq, Clone, Hash, Eq)]
-pub struct PrefixedLookupBuf {
-    pub prefix: PathPrefix,
-    pub path: LookupBuf,
-}
-
-impl PrefixedLookupBuf {
-    pub fn event_root() -> Self {
-        PrefixedLookupBuf {
-            prefix: PathPrefix::Event,
-            path: LookupBuf::root(),
-        }
-    }
-}
-
-impl Display for PrefixedLookupBuf {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self.prefix {
-            PathPrefix::Event => write!(f, ".{}", self.path),
-            PathPrefix::Metadata => write!(f, "&{}", self.path),
-        }
-    }
-}
 
 /// `LookupBuf`s are pre-validated, owned event lookup paths.
 ///

@@ -1,7 +1,7 @@
 ///! Contains backwards compatibility with lookup "v1"
 ///! This is all temporary and will be deleted with migration to the V2 lookup code is complete.
-use crate::lookup_v2::{BorrowedSegment, OwnedPath, OwnedSegment, Path, TargetPath};
-use crate::{FieldBuf, LookupBuf, PrefixedLookupBuf, SegmentBuf};
+use crate::lookup_v2::{BorrowedSegment, OwnedPath, OwnedSegment, Path};
+use crate::{FieldBuf, LookupBuf, SegmentBuf};
 use std::borrow::Cow;
 
 impl<'a> Path<'a> for &'a LookupBuf {
@@ -12,15 +12,6 @@ impl<'a> Path<'a> for &'a LookupBuf {
             buf: self,
             segment_i: 0,
             coalesce_i: 0,
-        }
-    }
-}
-
-impl From<PrefixedLookupBuf> for TargetPath {
-    fn from(lookup: PrefixedLookupBuf) -> Self {
-        Self {
-            prefix: lookup.prefix,
-            path: lookup.path.into(),
         }
     }
 }
