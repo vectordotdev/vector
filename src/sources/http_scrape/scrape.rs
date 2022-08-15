@@ -17,7 +17,7 @@ use crate::{
     serde::default_framing_message_based,
     sources,
     sources::util::http_scrape::{
-        default_scrape_interval_secs, get_url, http_scrape, GenericHttpScrapeInputs, HttpScraper,
+        build_url, default_scrape_interval_secs, http_scrape, GenericHttpScrapeInputs, HttpScraper,
     },
     tls::{TlsConfig, TlsSettings},
     Result,
@@ -133,7 +133,7 @@ impl SourceConfig for HttpScrapeConfig {
         let urls = endpoints
             .iter()
             .map(|s| s.parse::<Uri>().context(sources::UriParseSnafu))
-            .map(|r| r.map(|uri| get_url(&uri, &self.query)))
+            .map(|r| r.map(|uri| build_url(&uri, &self.query)))
             .collect::<std::result::Result<Vec<Uri>, sources::BuildError>>()?;
 
         let tls = TlsSettings::from_options(&self.tls)?;

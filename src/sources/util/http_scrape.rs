@@ -1,7 +1,7 @@
 //! Common logic for sources that are HTTP scrapers.
 //!
 //! Specific HTTP scraping sources will:
-//!   - Call get_url() to build the URL(s) to scrape.
+//!   - Call build_url() to build the URL(s) to scrape.
 //!   - Implmement a specific context struct which:
 //!       - Contains the data that source needs in order to process the HTTP responses into internal_events
 //!       - Implements the HttpScraper trait
@@ -62,7 +62,7 @@ pub(crate) trait HttpScraper {
 }
 
 /// Builds a url for the HTTP requests.
-pub(crate) fn get_url(uri: &Uri, query: &HashMap<String, Vec<String>>) -> Uri {
+pub(crate) fn build_url(uri: &Uri, query: &HashMap<String, Vec<String>>) -> Uri {
     let mut serializer = url::form_urlencoded::Serializer::new(String::new());
     if let Some(query) = uri.query() {
         serializer.extend_pairs(url::form_urlencoded::parse(query.as_bytes()));
