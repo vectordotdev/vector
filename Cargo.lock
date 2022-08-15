@@ -4053,9 +4053,9 @@ version = "0.1.0"
 dependencies = [
  "bytes 1.2.1",
  "chrono",
- "prost",
+ "prost 0.10.4",
  "prost-build",
- "prost-types",
+ "prost-types 0.10.1",
  "snap",
 ]
 
