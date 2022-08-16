@@ -5027,7 +5027,7 @@ dependencies = [
  "tonic 0.7.2",
  "tonic-build",
  "value",
- "vector_core",
+ "vector-core",
 ]
 
 [[package]]
