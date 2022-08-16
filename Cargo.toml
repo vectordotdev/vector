@@ -37,9 +37,10 @@ debug = true
 name = "vector"
 section = "admin"
 maintainer-scripts = "distribution/debian/scripts/"
-conf-files = ["/etc/default/vector"]
+conf-files = ["/etc/vector/vector.toml", "/etc/default/vector"]
 assets = [
   ["target/release/vector", "/usr/bin/", "755"],
+  ["config/vector.toml", "/etc/vector/vector.toml", "644"],
   ["config/examples/*", "/etc/vector/examples/", "644"],
   ["distribution/systemd/vector.service", "/lib/systemd/system/vector.service", "644"],
   ["distribution/systemd/vector.default", "/etc/default/vector", "600"]

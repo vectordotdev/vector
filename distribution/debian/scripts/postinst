@@ -1,50 +1,21 @@
 #!/bin/sh
 set -e
 
-create_user() {
-  id vector >/dev/null 2>&1 ||
-    useradd --system \
-      --shell /sbin/nologin \
-      --home-dir /var/lib/vector \
-      --user-group \
-      --comment "Vector observability data router" \
-      vector
+# Add Vector to adm group to read /var/logs
+usermod --append --groups adm vector || true
 
-  # Add to adm group to read /var/logs
-  usermod --append --groups adm vector || true
+if getent group 'systemd-journal'
+then
+  # Add Vector to systemd-journal to read journald logs
+  usermod --append --groups systemd-journal vector || true
+  systemctl daemon-reload || true
+fi
 
-  # Add to systemd-journal to read journald logs
-  if getent group 'systemd-journal'; then
-    usermod --append --groups systemd-journal vector || true
-  fi
-
-  # Add to systemd-journal-remote to read remote journald logs
-  if getent group 'systemd-journal-remote'; then
-    usermod --append --groups systemd-journal-remote vector || true
-  fi
-}
-
-configure_permissions() {
-  if [ ! -d "/var/lib/vector" ]; then
-    # Create default Vector data directory
-    mkdir -p /var/lib/vector
-  fi
-
-  # Own and RW restrict Vector data directory
-  install --group vector --owner vector --mode 740 --directory /var/lib/vector
-
-  # Own and RW restrict Vector config directory
-  install --group vector --owner vector --mode 740 --directory /etc/vector
-
-  # Own and RW restrict SystemD default EnvironmentFile
-  install --group vector --owner vector --mode 640 --directory /etc/default/vector
-}
-
-case "$1" in
-configure)
-  create_user
-  configure_permissions
-  ;;
-esac
+if getent group 'systemd-journal-remote'
+then
+  # Add Vector to systemd-journal-remote to read remote journald logs
+  usermod --append --groups systemd-journal-remote vector || true
+  systemctl daemon-reload || true
+fi
 
 #DEBHELPER#
