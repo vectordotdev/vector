@@ -82,7 +82,7 @@ use vector_config::configurable_component;
 use vector_core::config::{LogNamespace, Output};
 pub use vector_core::source::Source;
 
-use crate::config::{unit_test::UnitTestSourceConfig, SourceConfig, SourceContext};
+use crate::config::{unit_test::UnitTestSourceConfig, SourceConfig, SourceContext, Resource};
 
 /// Common build errors
 #[derive(Debug, Snafu)]
@@ -541,6 +541,96 @@ impl SourceConfig for Sources {
             Self::UnitTest(config) => config.source_type(),
             #[cfg(feature = "sources-vector")]
             Self::Vector(config) => config.source_type(),
+        }
+    }
+
+    fn resources(&self) -> Vec<Resource> {
+        match self {
+            #[cfg(feature = "sources-apache_metrics")]
+            Self::ApacheMetrics(config) => config.resources(),
+            #[cfg(feature = "sources-aws_ecs_metrics")]
+            Self::AwsEcsMetrics(config) => config.resources(),
+            #[cfg(feature = "sources-aws_kinesis_firehose")]
+            Self::AwsKinesisFirehose(config) => config.resources(),
+            #[cfg(feature = "sources-aws_s3")]
+            Self::AwsS3(config) => config.resources(),
+            #[cfg(feature = "sources-aws_sqs")]
+            Self::AwsSqs(config) => config.resources(),
+            #[cfg(feature = "sources-datadog_agent")]
+            Self::DatadogAgent(config) => config.resources(),
+            #[cfg(feature = "sources-demo_logs")]
+            Self::DemoLogs(config) => config.resources(),
+            #[cfg(all(unix, feature = "sources-dnstap"))]
+            Self::Dnstap(config) => config.resources(),
+            #[cfg(feature = "sources-docker_logs")]
+            Self::DockerLogs(config) => config.resources(),
+            #[cfg(feature = "sources-eventstoredb_metrics")]
+            Self::EventstoreDbMetrics(config) => config.resources(),
+            #[cfg(feature = "sources-exec")]
+            Self::Exec(config) => config.resources(),
+            #[cfg(feature = "sources-file")]
+            Self::File(config) => config.resources(),
+            #[cfg(all(unix, feature = "sources-file-descriptor"))]
+            Self::FileDescriptor(config) => config.resources(),
+            #[cfg(feature = "sources-fluent")]
+            Self::Fluent(config) => config.resources(),
+            #[cfg(feature = "sources-gcp_pubsub")]
+            Self::GcpPubsub(config) => config.resources(),
+            #[cfg(feature = "sources-heroku_logs")]
+            Self::HerokuLogs(config) => config.resources(),
+            #[cfg(feature = "sources-host_metrics")]
+            Self::HostMetrics(config) => config.resources(),
+            #[cfg(feature = "sources-http")]
+            Self::Http(config) => config.resources(),
+            #[cfg(feature = "sources-internal_logs")]
+            Self::InternalLogs(config) => config.resources(),
+            #[cfg(feature = "sources-internal_metrics")]
+            Self::InternalMetrics(config) => config.resources(),
+            #[cfg(all(unix, feature = "sources-journald"))]
+            Self::Journald(config) => config.resources(),
+            #[cfg(feature = "sources-kafka")]
+            Self::Kafka(config) => config.resources(),
+            #[cfg(feature = "sources-kubernetes_logs")]
+            Self::KubernetesLogs(config) => config.resources(),
+            #[cfg(all(feature = "sources-logstash"))]
+            Self::Logstash(config) => config.resources(),
+            #[cfg(feature = "sources-mongodb_metrics")]
+            Self::MongodbMetrics(config) => config.resources(),
+            #[cfg(all(feature = "sources-nats"))]
+            Self::Nats(config) => config.resources(),
+            #[cfg(feature = "sources-nginx_metrics")]
+            Self::NginxMetrics(config) => config.resources(),
+            #[cfg(feature = "sources-postgresql_metrics")]
+            Self::PostgresqlMetrics(config) => config.resources(),
+            #[cfg(feature = "sources-prometheus")]
+            Self::PrometheusScrape(config) => config.resources(),
+            #[cfg(feature = "sources-prometheus")]
+            Self::PrometheusRemoteWrite(config) => config.resources(),
+            #[cfg(feature = "sources-redis")]
+            Self::Redis(config) => config.resources(),
+            #[cfg(test)]
+            Self::TestBackpressure(config) => config.resources(),
+            #[cfg(test)]
+            Self::TestBasic(config) => config.resources(),
+            #[cfg(test)]
+            Self::TestError(config) => config.resources(),
+            #[cfg(test)]
+            Self::TestPanic(config) => config.resources(),
+            #[cfg(test)]
+            Self::TestTripwire(config) => config.resources(),
+            #[cfg(feature = "sources-socket")]
+            Self::Socket(config) => config.resources(),
+            #[cfg(feature = "sources-splunk_hec")]
+            Self::SplunkHec(config) => config.resources(),
+            #[cfg(feature = "sources-statsd")]
+            Self::Statsd(config) => config.resources(),
+            #[cfg(feature = "sources-stdin")]
+            Self::Stdin(config) => config.resources(),
+            #[cfg(feature = "sources-syslog")]
+            Self::Syslog(config) => config.resources(),
+            Self::UnitTest(config) => config.resources(),
+            #[cfg(feature = "sources-vector")]
+            Self::Vector(config) => config.resources(),
         }
     }
 

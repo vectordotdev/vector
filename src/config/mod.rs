@@ -533,6 +533,8 @@ pub struct TestOutput<T = OutputId> {
 mod tests {
     use std::{collections::HashMap, path::PathBuf};
 
+    use tokio::runtime::Builder;
+
     use crate::{config, topology};
     use indoc::indoc;
 
@@ -560,7 +562,7 @@ mod tests {
         let err = load(
             r#"
             [sources.in]
-            type = "basic_source"
+            type = "test_basic"
 
             [transforms.sample]
             type = "basic_transform"
@@ -599,10 +601,10 @@ mod tests {
         let err = load(
             r#"
             [sources.foo]
-            type = "basic_source"
+            type = "test_basic"
 
             [sources.bar]
-            type = "basic_source"
+            type = "test_basic"
 
             [transforms.foo]
             type = "basic_transform"
@@ -651,31 +653,45 @@ mod tests {
         assert!(errors[0].starts_with(expected_prefix));
     }
 
-    #[tokio::test]
+    #[test]
     #[cfg(unix)]
-    async fn conflicting_fd_resources() {
-        let errors = load(
-            r#"
-            [sources.file_descriptor1]
-            type = "file_descriptor"
-            fd = 10
+    fn conflicting_fd_resources() {
+        let runtime = Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("should not fail to build runtime");
 
-            [sources.file_descriptor2]
-            type = "file_descriptor"
-            fd = 10
+        let errors = runtime.block_on(async {
+            load(
+                r#"
+                [sources.file_descriptor1]
+                type = "file_descriptor"
+                fd = 10
 
-            [sinks.out]
-            type = "basic_sink"
-            inputs = ["file_descriptor1", "file_descriptor2"]
-            "#,
-            Format::Toml,
-        )
-        .await
-        .unwrap_err();
+                [sources.file_descriptor2]
+                type = "file_descriptor"
+                fd = 10
+
+                [sinks.out]
+                type = "basic_sink"
+                inputs = ["file_descriptor1", "file_descriptor2"]
+                "#,
+                Format::Toml,
+            )
+            .await
+            .unwrap_err()
+        });
 
         assert_eq!(errors.len(), 1);
         let expected_prefix = "Resource `file descriptor: 10` is claimed by multiple components:";
         assert!(errors[0].starts_with(expected_prefix));
+
+        // We have to manually shutdown the runtime in this way, versus using the normal
+        // `#[tokio::test]` attribute macro, because otherwise the runtime will block on drop,
+        // waiting for blocking tasks to complete... and by definition, reading from STDIN will
+        // block on reading forever until there's a key press to drive a read such that other logic
+        // like "is it time to shutdown?" would be given a chance to run.
+        runtime.shutdown_background();
     }
 
     #[tokio::test]
@@ -708,10 +724,10 @@ mod tests {
         let warnings = load(
             r#"
             [sources.in1]
-            type = "basic_source"
+            type = "test_basic"
 
             [sources.in2]
-            type = "basic_source"
+            type = "test_basic"
 
             [transforms.sample1]
             type = "basic_transform"
@@ -748,7 +764,7 @@ mod tests {
         let errors = load(
             r#"
             [sources.in]
-            type = "basic_source"
+            type = "test_basic"
 
             [transforms.one]
             type = "basic_transform"
@@ -794,7 +810,7 @@ mod tests {
         let config = load_from_str(
             indoc! {r#"
                 [sources.in]
-                type = "basic_source"
+                type = "test_basic"
 
                 [sinks.out]
                 type = "basic_sink"
@@ -815,7 +831,7 @@ mod tests {
         let config = load_from_str(
             indoc! {r#"
             [sources.in]
-            type = "basic_source"
+            type = "test_basic"
 
             [sinks.out]
             type = "basic_sink"
@@ -846,7 +862,7 @@ mod tests {
                   timestamp_key = "then"
 
                 [sources.in]
-                  type = "basic_source"
+                  type = "test_basic"
 
                 [sinks.out]
                   type = "basic_sink"
@@ -866,7 +882,7 @@ mod tests {
         let mut config: ConfigBuilder = format::deserialize(
             indoc! {r#"
                 [sources.in]
-                  type = "basic_source"
+                  type = "test_basic"
 
                 [sinks.out]
                   type = "basic_sink"
@@ -924,7 +940,7 @@ mod tests {
         let mut config: ConfigBuilder = format::deserialize(
             indoc! {r#"
                 [sources.in]
-                  type = "basic_source"
+                  type = "test_basic"
 
                 [sinks.out]
                   type = "basic_sink"
@@ -939,7 +955,7 @@ mod tests {
                 format::deserialize(
                     indoc! {r#"
                         [sources.in]
-                          type = "basic_source"
+                          type = "test_basic"
 
                         [transforms.foo]
                           type = "basic_transform"

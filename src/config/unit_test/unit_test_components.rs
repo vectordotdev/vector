@@ -34,9 +34,9 @@ impl SourceConfig for UnitTestSourceConfig {
 
         Ok(Box::pin(async move {
             let mut out = cx.out;
-            let shutdown = cx.shutdown;
+            let _shutdown = cx.shutdown;
             out.send_batch(events).await.map_err(|_| ())?;
-            shutdown.await;
+            //shutdown.await;
             Ok(())
         }))
     }
