@@ -13,7 +13,7 @@ derivative = { version = "2", default-features = false }
 dyn-clone = { version = "1", default-features = false }
 lookup = { path = "../lookup", default-features = false }
 memchr = { version = "2", default-features = false }
-once_cell = { version = "1.12", default-features = false }
+once_cell = { version = "1.13", default-features = false }
 ordered-float = { version = "3.0.0", default-features = false }
 prost = { version = "0.10.4", default-features = false, features = ["std"] }
 regex = { version = "1.5.6", default-features = false, features = ["std", "perf"] }
