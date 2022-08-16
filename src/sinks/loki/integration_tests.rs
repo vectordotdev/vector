@@ -51,6 +51,38 @@ async fn build_sink(codec: &str) -> (uuid::Uuid, VectorSink) {
     (stream, sink)
 }
 
+async fn build_sink_with_compression(codec: &str, compression: &str) -> (uuid::Uuid, VectorSink) {
+    let stream = uuid::Uuid::new_v4();
+
+    let config = format!(
+        r#"
+            endpoint = "{}"
+            labels = {{test_name = "placeholder"}}
+            encoding.codec = "{}"
+            compression = "{}"
+            remove_timestamp = false
+            tenant_id = "default"
+        "#,
+        loki_address(),
+        codec,
+        compression
+    );
+
+    let (mut config, cx) = load_sink::<LokiConfig>(&config).unwrap();
+
+    let test_name = config
+        .labels
+        .get_mut(&Template::try_from("test_name").unwrap())
+        .unwrap();
+    assert_eq!(test_name.get_ref(), &Bytes::from("placeholder"));
+
+    *test_name = Template::try_from(stream.to_string()).unwrap();
+
+    let (sink, _) = config.build(cx).await.unwrap();
+
+    (stream, sink)
+}
+
 fn line_generator(index: usize) -> String {
     format!("random line {}", index)
 }
@@ -62,6 +94,42 @@ fn event_generator(index: usize) -> Event {
 #[tokio::test]
 async fn text() {
     let (stream, sink) = build_sink("text").await;
+
+    let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+    let (lines, events) = generate_lines_with_stream(line_generator, 10, Some(batch));
+    run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+    tokio::time::sleep(tokio::time::Duration::new(1, 0)).await;
+
+    let (_, outputs) = fetch_stream(stream.to_string(), "default").await;
+    assert_eq!(lines.len(), outputs.len());
+    for (i, output) in outputs.iter().enumerate() {
+        assert_eq!(output, &lines[i]);
+    }
+}
+
+#[tokio::test]
+async fn text_with_none_compression() {
+    let (stream, sink) = build_sink_with_compression("text", "none").await;
+
+    let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+    let (lines, events) = generate_lines_with_stream(line_generator, 10, Some(batch));
+    run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+    tokio::time::sleep(tokio::time::Duration::new(1, 0)).await;
+
+    let (_, outputs) = fetch_stream(stream.to_string(), "default").await;
+    assert_eq!(lines.len(), outputs.len());
+    for (i, output) in outputs.iter().enumerate() {
+        assert_eq!(output, &lines[i]);
+    }
+}
+
+#[tokio::test]
+async fn text_with_gzip_compression() {
+    let (stream, sink) = build_sink_with_compression("text", "gzip").await;
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
     let (lines, events) = generate_lines_with_stream(line_generator, 10, Some(batch));
