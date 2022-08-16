@@ -13,8 +13,8 @@ inherent = "1.0"
 lalrpop-util = { version = "0.19.8", features = ["lexer"] }
 once_cell = { version = "1.13" }
 quickcheck = { version = "1.0.3", optional = true }
-vector_config = { path = "../vector-config" }
-vector_config_macros = { path = "../vector-config-macros" }
+vector-config = { path = "../vector-config" }
+vector-config-macros = { path = "../vector-config-macros" }
 
 [dev-dependencies]
 criterion = { version = "0.3.6", features = ["html_reports", "async_tokio"] }
