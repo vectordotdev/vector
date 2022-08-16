@@ -124,6 +124,13 @@ pub struct FileConfig {
     /// By default, the global `data_dir` option is used. Please make sure the user Vector is running as has write permissions to this directory.
     pub data_dir: Option<PathBuf>,
 
+    /// Enables adding the file offset to each event and sets the name of the log field used.
+    ///
+    /// The value will be the byte offset of the start of the line within the file.
+    ///
+    /// Off by default, the offset is only added to the event if this is set.
+    pub offset_key: Option<String>,
+
     /// Delay between file discovery calls, in milliseconds.
     ///
     /// This controls the interval at which Vector searches for files. Higher value result in greater chances of some short living files being missed between searches, but lower value increases the performance impact of file discovery.
@@ -294,6 +301,7 @@ impl Default for FileConfig {
             },
             ignore_not_found: false,
             host_key: None,
+            offset_key: None,
             data_dir: None,
             glob_minimum_cooldown_ms: 1000, // millis
             message_start_indicator: None,
@@ -421,12 +429,15 @@ pub fn file_source(
         handle: tokio::runtime::Handle::current(),
     };
 
-    let file_key = config.file_key.clone();
-    let host_key = config
-        .host_key
-        .clone()
-        .unwrap_or_else(|| log_schema().host_key().to_string());
-    let hostname = crate::get_hostname().ok();
+    let event_metadata = EventMetadata {
+        host_key: config
+            .host_key
+            .clone()
+            .unwrap_or_else(|| log_schema().host_key().to_string()),
+        hostname: crate::get_hostname().ok(),
+        file_key: config.file_key.clone(),
+        offset_key: config.offset_key.clone(),
+    };
 
     let include = config.include.clone();
     let exclude = config.exclude.clone();
@@ -535,19 +546,24 @@ pub fn file_source(
         let span2 = span.clone();
         let mut messages = messages.map(move |line| {
             let _enter = span2.enter();
-            let mut event =
-                create_event(line.text, &line.filename, &host_key, &hostname, &file_key);
+            let mut event = create_event(
+                line.text,
+                line.start_offset,
+                &line.filename,
+                &event_metadata,
+            );
+
             if let Some(finalizer) = &finalizer {
                 let (batch, receiver) = BatchNotifier::new_with_receiver();
                 event = event.with_batch_notifier(&batch);
                 let entry = FinalizerEntry {
                     file_name: line.filename,
                     file_id: line.file_id,
-                    offset: line.offset,
+                    offset: line.end_offset,
                 };
                 finalizer.add(entry, receiver);
             } else {
-                checkpoints.update(line.file_id, line.offset);
+                checkpoints.update(line.file_id, line.end_offset);
             }
             event
         });
@@ -602,25 +618,35 @@ fn wrap_with_line_agg(
     let logic = line_agg::Logic::new(config);
     Box::new(
         LineAgg::new(
-            rx.map(|line| (line.filename, line.text, (line.file_id, line.offset))),
+            rx.map(|line| {
+                (
+                    line.filename,
+                    line.text,
+                    (line.file_id, line.start_offset, line.end_offset),
+                )
+            }),
             logic,
         )
-        .map(|(filename, text, (file_id, offset))| Line {
-            text,
-            filename,
-            file_id,
-            offset,
-        }),
+        .map(
+            |(filename, text, (file_id, start_offset, end_offset))| Line {
+                text,
+                filename,
+                file_id,
+                start_offset,
+                end_offset,
+            },
+        ),
     )
 }
 
-fn create_event(
-    line: Bytes,
-    file: &str,
-    host_key: &str,
-    hostname: &Option<String>,
-    file_key: &Option<String>,
-) -> LogEvent {
+struct EventMetadata {
+    host_key: String,
+    hostname: Option<String>,
+    file_key: Option<String>,
+    offset_key: Option<String>,
+}
+
+fn create_event(line: Bytes, offset: u64, file: &str, meta: &EventMetadata) -> LogEvent {
     emit!(FileEventsReceived {
         count: 1,
         file,
@@ -632,12 +658,16 @@ fn create_event(
     // Add source type
     event.insert(log_schema().source_type_key(), Bytes::from("file"));
 
-    if let Some(file_key) = &file_key {
+    if let Some(offset_key) = &meta.offset_key {
+        event.insert(offset_key.as_str(), offset);
+    }
+
+    if let Some(file_key) = &meta.file_key {
         event.insert(file_key.as_str(), file);
     }
 
-    if let Some(hostname) = &hostname {
-        event.insert(host_key, hostname.clone());
+    if let Some(hostname) = &meta.hostname {
+        event.insert(meta.host_key.as_str(), hostname.clone());
     }
 
     event
@@ -785,14 +815,24 @@ mod tests {
     fn file_create_event() {
         let line = Bytes::from("hello world");
         let file = "some_file.rs";
+
         let host_key = "host".to_string();
         let hostname = Some("Some.Machine".to_string());
         let file_key = Some("file".to_string());
+        let offset_key = Some("offset".to_string());
+        let offset: u64 = 0;
 
-        let log = create_event(line, file, &host_key, &hostname, &file_key);
+        let meta = EventMetadata {
+            host_key,
+            hostname,
+            file_key,
+            offset_key,
+        };
+        let log = create_event(line, offset, file, &meta);
 
         assert_eq!(log["file"], file.into());
         assert_eq!(log["host"], "Some.Machine".into());
+        assert_eq!(log["offset"], 0.into());
         assert_eq!(log[log_schema().message_key()], "hello world".into());
         assert_eq!(log[log_schema().source_type_key()], "file".into());
     }
