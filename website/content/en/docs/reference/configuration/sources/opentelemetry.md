@@ -1,6 +1,6 @@
 ---
 title: OpenTelemetry
-description: Receive [OpenTelemetry](https://opentelemetry.io/) data directly from a SDK or an OpenTelemetry Collector.
+description: Receive [OTLP](https://opentelemetry.io/docs/reference/specification/protocol/otlp/) data through gRPC or HTTP.
 kind: source
 layout: component
 tags: ["opentelemetry", "component", "source", "logs"]

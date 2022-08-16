@@ -18,7 +18,7 @@ use nom::{
 /// Parsers in this module should return this IResult instead of `nom::IResult`.
 type IResult<'a, O> = Result<(&'a str, O), nom::Err<ErrorKind>>;
 
-#[derive(Debug, snafu::Snafu, PartialEq)]
+#[derive(Debug, snafu::Snafu, PartialEq, Eq)]
 pub enum ErrorKind {
     #[snafu(display("invalid metric type, parsing: `{}`", input))]
     InvalidMetricKind { input: String },
@@ -88,7 +88,7 @@ pub enum MetricKind {
     Untyped,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Header {
     pub metric_name: String,
     pub kind: MetricKind,

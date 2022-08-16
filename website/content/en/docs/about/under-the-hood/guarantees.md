@@ -50,8 +50,7 @@ with no error.
 ### At-least-once
 
 The **at-least-once** delivery guarantee ensures that an [event] received by a Vector component is
-ultimately delivered at least once. While rare, it is possible for an event to be delivered more
-than once. See the [Does Vector support exactly-once delivery?](#faq-at-least-once) FAQ below).
+ultimately delivered at least once.
 
 While rare, it is possible for an event to be delivered more than
 once. See the [Does Vector support exactly-once

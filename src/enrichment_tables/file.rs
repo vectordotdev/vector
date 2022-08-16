@@ -41,7 +41,7 @@ struct FileC {
     encoding: Encoding,
 }
 
-#[derive(Serialize, Deserialize, Default, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Default, Debug, Clone, PartialEq, Eq)]
 pub struct FileConfig {
     file: FileC,
     #[serde(default)]
@@ -333,8 +333,8 @@ impl File {
         I: Iterator<Item = &'a Vec<Value>> + 'a,
     {
         data.filter_map(move |row| {
-            if self.row_equals(case, condition, &*row) {
-                Some(self.add_columns(select, &*row))
+            if self.row_equals(case, condition, row) {
+                Some(self.add_columns(select, row))
             } else {
                 None
             }

@@ -7,7 +7,7 @@ use vector_core::config::MEMORY_BUFFER_DEFAULT_MAX_EVENTS;
 
 use crate::config::SinkOuter;
 use crate::topology::builder::SOURCE_SENDER_BUFFER_SIZE;
-use crate::{config::Config, test_util::start_topology};
+use crate::{config::Config, test_util, test_util::start_topology};
 
 // Based on how we pump events from `SourceSender` into `Fanout`, there's always one extra event we
 // may pull out of `SourceSender` but can't yet send into `Fanout`, so we account for that here.
@@ -17,6 +17,8 @@ pub(self) const EXTRA_SOURCE_PUMP_EVENT: usize = 1;
 /// to the source.
 #[tokio::test]
 async fn serial_backpressure() {
+    test_util::trace_init();
+
     let mut config = Config::builder();
 
     let events_to_sink = 100;
@@ -55,6 +57,8 @@ async fn serial_backpressure() {
 /// to emit events that the slower sink accepts.
 #[tokio::test]
 async fn default_fan_out() {
+    test_util::trace_init();
+
     let mut config = Config::builder();
 
     let events_to_sink = 100;
@@ -102,6 +106,8 @@ async fn default_fan_out() {
 /// other one does.
 #[tokio::test]
 async fn buffer_drop_fan_out() {
+    test_util::trace_init();
+
     let mut config = Config::builder();
 
     let events_to_sink = 100;
@@ -155,6 +161,8 @@ async fn buffer_drop_fan_out() {
 #[tokio::test]
 #[ignore]
 async fn multiple_inputs_backpressure() {
+    test_util::trace_init();
+
     // TODO: I think this test needs to be reworked slightly.
     //
     // The test is meant to indicate that the sum of the events produced by both sources matches what the sink receives,

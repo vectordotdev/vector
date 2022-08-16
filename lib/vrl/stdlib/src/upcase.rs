@@ -1,5 +1,6 @@
 use ::value::Value;
 use vrl::prelude::*;
+use vrl::state::TypeState;
 
 fn upcase(value: Value) -> Resolved {
     Ok(value.try_bytes_utf8_lossy()?.to_uppercase().into())
@@ -31,13 +32,13 @@ impl Function for Upcase {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(UpcaseFn { value }))
+        Ok(UpcaseFn { value }.as_expr())
     }
 }
 
@@ -46,13 +47,13 @@ struct UpcaseFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for UpcaseFn {
+impl FunctionExpression for UpcaseFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         upcase(value)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &TypeState) -> TypeDef {
         TypeDef::bytes().infallible()
     }
 }

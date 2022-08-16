@@ -1,5 +1,6 @@
 use ::value::Value;
 use vrl::prelude::*;
+use vrl::state::TypeState;
 
 fn remove_secret(ctx: &mut Context, key: Value) -> std::result::Result<Value, ExpressionError> {
     let key_bytes = key.as_bytes().expect("argument must be a string");
@@ -34,12 +35,12 @@ impl Function for RemoveSecret {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let key = arguments.required("key");
-        Ok(Box::new(RemoveSecretFn { key }))
+        Ok(RemoveSecretFn { key }.as_expr())
     }
 }
 
@@ -48,13 +49,13 @@ struct RemoveSecretFn {
     key: Box<dyn Expression>,
 }
 
-impl Expression for RemoveSecretFn {
+impl FunctionExpression for RemoveSecretFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let key = self.key.resolve(ctx)?;
         remove_secret(ctx, key)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &TypeState) -> TypeDef {
         TypeDef::null().infallible()
     }
 }

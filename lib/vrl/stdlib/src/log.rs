@@ -85,7 +85,7 @@ impl Function for Log {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -105,12 +105,13 @@ impl Function for Log {
             .expect("log level not bytes");
         let rate_limit_secs = arguments.optional("rate_limit_secs");
 
-        Ok(Box::new(LogFn {
+        Ok(LogFn {
             span: ctx.span(),
             value,
             level,
             rate_limit_secs,
-        }))
+        }
+        .as_expr())
     }
 
     fn compile_argument(
@@ -162,7 +163,7 @@ struct LogFn {
     rate_limit_secs: Option<Box<dyn Expression>>,
 }
 
-impl Expression for LogFn {
+impl FunctionExpression for LogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let rate_limit_secs = match &self.rate_limit_secs {
@@ -175,7 +176,7 @@ impl Expression for LogFn {
         log(rate_limit_secs, &self.level, value, span)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::null().infallible()
     }
 }

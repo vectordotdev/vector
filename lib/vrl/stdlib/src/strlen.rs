@@ -33,13 +33,13 @@ impl Function for Strlen {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(StrlenFn { value }))
+        Ok(StrlenFn { value }.as_expr())
     }
 }
 
@@ -48,14 +48,14 @@ struct StrlenFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for StrlenFn {
+impl FunctionExpression for StrlenFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
 
         strlen(value)
     }
 
-    fn type_def(&self, _state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _state: &state::TypeState) -> TypeDef {
         TypeDef::integer().infallible()
     }
 }

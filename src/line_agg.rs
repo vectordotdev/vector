@@ -19,7 +19,7 @@ use vector_config::configurable_component;
 
 /// Mode of operation of the line aggregator.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Mode {
     /// All consecutive lines matching this pattern are included in the group.
