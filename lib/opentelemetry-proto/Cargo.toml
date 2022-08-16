@@ -7,10 +7,10 @@ publish = false
 
 [build-dependencies]
 prost-build = { version = "0.10.4", default-features = false}
-tonic-build = { version = "0.7", default-features = false, features = ["prost", "transport"] }
+tonic-build = { version = "0.7", default-features = false, features = ["compression", "prost", "transport"] }
 
 [dependencies]
-tonic = { version = "0.7.2", default-features = false, features = ["codegen", "prost", "tls", "tls-roots", "transport"] }
+tonic = { version = "0.7.2", default-features = false, features = ["codegen", "compression", "prost", "tls", "tls-roots", "transport"] }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
 prost = { version = "0.10.4", default-features = false, features = ["std"] }
 bytes = { version = "1.1.0", default-features = false, features = ["serde"] }
