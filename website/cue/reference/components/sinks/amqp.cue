@@ -38,10 +38,10 @@ components: sinks: amqp: {
 			request: enabled: false
 			tls: {
 				enabled:                true
-				can_enable:             true
 				can_verify_certificate: false
 				can_verify_hostname:    false
 				enabled_default:        false
+				enabled_by_scheme:      false
 			}
 			to: components._amqp.features.send.to
 		}
@@ -86,6 +86,7 @@ components: sinks: amqp: {
 	input: {
 		logs: true
 		metrics: null
+                traces: false
 	}
 
 	how_it_works: components._amqp.how_it_works
