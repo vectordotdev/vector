@@ -32,6 +32,7 @@ no-proxy = { version  = "0.3.2", default-features = false, features = ["serializ
 once_cell = { version = "1.13", default-features = false }
 ordered-float = { version = "3.0.0", default-features = false }
 pin-project = { version = "1.0.12", default-features = false }
+proptest = { version = "1.0", optional = true }
 prost = { version = "0.10.4", default-features = false, features = ["std"] }
 prost-types = { version = "0.10.1", default-features = false }
 quanta = { version = "0.10.1", default-features = false }
@@ -86,7 +87,7 @@ api = ["dep:async-graphql", "value/api"]
 default = []
 lua = ["dep:mlua", "dep:tokio-stream"]
 vrl = ["dep:vrl-lib", "dep:enrichment"]
-test = ["vector_common/test"]
+test = ["vector_common/test", "proptest"]
 
 [[bench]]
 name = "event"
