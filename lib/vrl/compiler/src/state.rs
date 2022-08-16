@@ -101,7 +101,7 @@ impl ExternalEnv {
         }
     }
 
-    pub(crate) fn is_read_only_path(&self, target_path: &TargetPath) -> bool {
+    pub fn is_read_only_path(&self, target_path: &TargetPath) -> bool {
         for read_only_path in &self.read_only_paths {
             // any paths that are a parent of read-only paths also can't be modified
             if read_only_path.path.can_start_with(&target_path) {

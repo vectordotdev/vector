@@ -37,6 +37,15 @@ impl Query {
         matches!(self.target, Target::External(_))
     }
 
+    pub fn external_path(&self) -> Option<TargetPath> {
+        match self.target {
+            Target::External(prefix) => {
+                Some(TargetPath {prefix, path: self.path.clone()})
+            },
+            _ => None,
+        }
+    }
+
     pub fn as_variable(&self) -> Option<&Variable> {
         match &self.target {
             Target::Internal(variable) => Some(variable),
@@ -126,7 +135,7 @@ impl Expression for Query {
         match &self.target {
             External(prefix) => match prefix {
                 PathPrefix::Event => state.1.target().clone().type_def.at_path(&self.path.clone().into()),
-                PathPrefix::Metadata => state.1.metadata_kind().clone().at_path(&self.path.clone().into())
+                PathPrefix::Metadata => state.1.metadata_kind().at_path(&self.path.clone()).into()
             },
             Internal(variable) => variable.type_def(state).at_path(&self.path.clone().into()),
             FunctionCall(call) => call.type_def(state).at_path(&self.path.clone().into()),

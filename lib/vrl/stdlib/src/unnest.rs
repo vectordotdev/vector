@@ -1,5 +1,5 @@
 use ::value::Value;
-use lookup_lib::LookupBuf;
+use lookup_lib::{LookupBuf, OwnedPath, TargetPath};
 use vrl::prelude::*;
 
 fn unnest(path: &expression::Query, root_lookup: &LookupBuf, ctx: &mut Context) -> Resolved {
@@ -9,7 +9,7 @@ fn unnest(path: &expression::Query, root_lookup: &LookupBuf, ctx: &mut Context) 
         expression::Target::External => {
             let root = ctx
                 .target()
-                .target_get(root_lookup)
+                .target_get(&TargetPath::event_root())
                 .expect("must never fail")
                 .expect("always a value");
             unnest_root(root, lookup_buf)
@@ -32,9 +32,9 @@ fn unnest(path: &expression::Query, root_lookup: &LookupBuf, ctx: &mut Context) 
     }
 }
 
-fn unnest_root(root: &Value, path: &LookupBuf) -> Resolved {
+fn unnest_root(root: &Value, path: &OwnedPath) -> Resolved {
     let values = root
-        .get_by_path(path)
+        .get(path)
         .cloned()
         .ok_or(value::Error::Expected {
             got: Kind::null(),
@@ -46,7 +46,7 @@ fn unnest_root(root: &Value, path: &LookupBuf) -> Resolved {
         .into_iter()
         .map(|value| {
             let mut event = root.clone();
-            event.insert_by_path(path, value);
+            event.insert(path, value);
             event
         })
         .collect::<Vec<_>>();
@@ -186,7 +186,7 @@ impl Expression for UnnestFn {
 ///    { "a" => { "b" => { "c" => 3 } } },
 ///  ]`
 ///
-pub(crate) fn invert_array_at_path(typedef: &TypeDef, path: &LookupBuf) -> TypeDef {
+pub(crate) fn invert_array_at_path(typedef: &TypeDef, path: &OwnedPath) -> TypeDef {
     let kind = typedef.kind().at_path(path);
 
     let mut array = if let Some(array) = kind.into_array() {
