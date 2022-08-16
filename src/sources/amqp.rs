@@ -167,7 +167,7 @@ async fn run_amqp_source(
                             emit!(AmqpEventFailed { error });
                             return Err(());
                         }
-                        Ok((_, msg)) => {
+                        Ok(msg) => {
                             emit!(AmqpEventReceived {
                                 byte_size: msg.data.len()
                             });
@@ -310,7 +310,7 @@ mod integration_test {
         text: &str,
         _timestamp: i64,
     ) {
-        let payload = text.as_bytes().to_vec();
+        let payload = text.as_bytes();
         let payload_len = payload.len();
         trace!("Sending message of length {} to {}", payload_len, exchange,);
 
@@ -319,7 +319,7 @@ mod integration_test {
                 exchange,
                 routing_key,
                 BasicPublishOptions::default(),
-                payload,
+                payload.as_ref(),
                 BasicProperties::default(),
             )
             .await

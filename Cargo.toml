@@ -197,8 +197,7 @@ goauth = { version = "0.13.1", optional = true }
 smpl_jwt = { version = "0.7.1", default-features = false, optional = true }
 
 # Amqp
-lapin = { version = "1.7.1", default-features = false, optional = true }
-tokio-amqp = { version = "1.0", default-features = false, optional = true }
+lapin = { version = "2.1.1", default-features = false, optional = true }
 
 # API
 async-graphql = { version = "4.0.6", default-features = false, optional = true, features = ["chrono"] }
@@ -489,7 +488,7 @@ sources-metrics = [
   "sources-vector",
 ]
 
-sources-amqp = ["lapin", "tokio-amqp"]
+sources-amqp = ["lapin"]
 sources-apache_metrics = []
 sources-aws_ecs_metrics = []
 sources-aws_kinesis_firehose = ["dep:base64", "dep:infer", "sources-utils-tls"]
@@ -640,7 +639,7 @@ sinks-metrics = [
   "sinks-splunk_hec"
 ]
 
-sinks-amqp = ["lapin", "tokio-amqp"]
+sinks-amqp = ["lapin"]
 sinks-aws_cloudwatch_logs = ["aws-core", "dep:aws-sdk-cloudwatchlogs"]
 sinks-aws_cloudwatch_metrics = ["aws-core", "dep:aws-sdk-cloudwatch"]
 sinks-aws_kinesis_firehose = ["aws-core", "dep:aws-sdk-firehose"]

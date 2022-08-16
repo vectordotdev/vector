@@ -525,7 +525,7 @@ mod integration_tests {
             if let Ok(Some(try_msg)) =
                 tokio::time::timeout(Duration::from_secs(10), consumer.next()).await
             {
-                let (_, msg) = try_msg.unwrap();
+                let msg = try_msg.unwrap();
                 let s = String::from_utf8_lossy(msg.data.as_slice()).into_owned();
                 out.push(s);
             } else {

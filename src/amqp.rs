@@ -1,7 +1,6 @@
 use lapin::tcp::{OwnedIdentity, OwnedTLSConfig};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use tokio_amqp::*;
 use vector_config::configurable_component;
 
 /// Client certificate for rabbit authentication
@@ -66,15 +65,15 @@ impl AmqpConfig {
                 };
                 lapin::Connection::connect_with_config(
                     &addr,
-                    lapin::ConnectionProperties::default().with_tokio(),
-                    tls_config.as_ref(),
+                    lapin::ConnectionProperties::default(),
+                    tls_config,
                 )
                 .await
             }
             None => {
                 lapin::Connection::connect(
                     &addr,
-                    lapin::ConnectionProperties::default().with_tokio(),
+                    lapin::ConnectionProperties::default(),
                 )
                 .await
             }
