@@ -83,7 +83,7 @@ impl GrokRuleParseContext {
     }
 }
 
-#[derive(thiserror::Error, Debug, PartialEq)]
+#[derive(thiserror::Error, Debug, PartialEq, Eq)]
 pub enum Error {
     #[error("failed to parse grok expression '{}': {}", .0, .1)]
     InvalidGrokExpression(String, String),

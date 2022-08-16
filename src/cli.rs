@@ -210,14 +210,14 @@ pub enum SubCommand {
     Vrl(vrl_cli::Opts),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Color {
     Auto,
     Always,
     Never,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LogFormat {
     Text,
     Json,

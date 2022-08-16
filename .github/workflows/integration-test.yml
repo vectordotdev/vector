@@ -21,6 +21,7 @@ on:
       - "Makefile"
       - "rust-toolchain"
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
 
 concurrency:
   # For pull requests, cancel running workflows, for master, run all

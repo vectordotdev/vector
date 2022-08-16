@@ -41,7 +41,7 @@ impl Function for Merge {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -49,7 +49,7 @@ impl Function for Merge {
         let from = arguments.required("from");
         let deep = arguments.optional("deep").unwrap_or_else(|| expr!(false));
 
-        Ok(Box::new(MergeFn { to, from, deep }))
+        Ok(MergeFn { to, from, deep }.as_expr())
     }
 }
 
@@ -60,7 +60,7 @@ pub(crate) struct MergeFn {
     deep: Box<dyn Expression>,
 }
 
-impl Expression for MergeFn {
+impl FunctionExpression for MergeFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let mut to_value = self.to.resolve(ctx)?.try_object()?;
         let from_value = self.from.resolve(ctx)?.try_object()?;
@@ -71,7 +71,7 @@ impl Expression for MergeFn {
         Ok(to_value.into())
     }
 
-    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &state::TypeState) -> TypeDef {
         // TODO: this has a known bug when deep is true
         // see: https://github.com/vectordotdev/vector/issues/13597
         self.to

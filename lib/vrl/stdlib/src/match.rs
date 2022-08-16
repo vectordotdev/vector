@@ -47,14 +47,14 @@ impl Function for Match {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let pattern = arguments.required("pattern");
 
-        Ok(Box::new(MatchFn { value, pattern }))
+        Ok(MatchFn { value, pattern }.as_expr())
     }
 }
 
@@ -64,7 +64,7 @@ pub(crate) struct MatchFn {
     pattern: Box<dyn Expression>,
 }
 
-impl Expression for MatchFn {
+impl FunctionExpression for MatchFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let pattern = self.pattern.resolve(ctx)?;
@@ -72,7 +72,7 @@ impl Expression for MatchFn {
         match_(value, pattern)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::boolean().infallible()
     }
 }

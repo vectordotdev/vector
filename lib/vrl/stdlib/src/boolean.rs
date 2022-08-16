@@ -1,4 +1,5 @@
 use ::value::Value;
+use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
 
 fn boolean(value: Value) -> Resolved {
@@ -43,13 +44,13 @@ impl Function for Boolean {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(BooleanFn { value }))
+        Ok(BooleanFn { value }.as_expr())
     }
 }
 
@@ -58,12 +59,12 @@ struct BooleanFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for BooleanFn {
+impl FunctionExpression for BooleanFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         boolean(self.value.resolve(ctx)?)
     }
 
-    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &state::TypeState) -> TypeDef {
         let non_boolean = !self.value.type_def(state).is_boolean();
 
         TypeDef::boolean().with_fallibility(non_boolean)

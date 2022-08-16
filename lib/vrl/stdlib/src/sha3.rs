@@ -63,7 +63,7 @@ impl Function for Sha3 {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -74,7 +74,7 @@ impl Function for Sha3 {
             .try_bytes()
             .expect("variant not bytes");
 
-        Ok(Box::new(Sha3Fn { value, variant }))
+        Ok(Sha3Fn { value, variant }.as_expr())
     }
 
     fn compile_argument(
@@ -105,7 +105,7 @@ struct Sha3Fn {
     variant: Bytes,
 }
 
-impl Expression for Sha3Fn {
+impl FunctionExpression for Sha3Fn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let variant = &self.variant;
@@ -113,7 +113,7 @@ impl Expression for Sha3Fn {
         sha3(value, variant)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::bytes().infallible()
     }
 }

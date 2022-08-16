@@ -60,7 +60,7 @@ impl Function for Redact {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -91,11 +91,12 @@ impl Function for Redact {
 
         let redactor = Redactor::Full;
 
-        Ok(Box::new(RedactFn {
+        Ok(RedactFn {
             value,
             filters,
             redactor,
-        }))
+        }
+        .as_expr())
     }
 
     fn compile_argument(
@@ -174,7 +175,7 @@ fn redact(value: Value, filters: &[Filter], redactor: &Redactor) -> Value {
     }
 }
 
-impl Expression for RedactFn {
+impl FunctionExpression for RedactFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let filters = &self.filters;
@@ -183,7 +184,7 @@ impl Expression for RedactFn {
         Ok(redact(value, filters, redactor))
     }
 
-    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &state::TypeState) -> TypeDef {
         self.value.type_def(state).infallible()
     }
 }

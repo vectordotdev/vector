@@ -189,7 +189,7 @@ mod test {
             .unwrap();
 
         assert!(output.len() > 1);
-        assert!(dbg!(output.iter().map(|o| o.len()).sum::<usize>()) < 80_000);
+        assert!(output.iter().map(|o| o.len()).sum::<usize>() < 80_000);
 
         let decompressed = output.into_iter().flat_map(|batch| {
             let mut decompressed = vec![];

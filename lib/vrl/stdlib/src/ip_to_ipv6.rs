@@ -40,13 +40,13 @@ impl Function for IpToIpv6 {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(IpToIpv6Fn { value }))
+        Ok(IpToIpv6Fn { value }.as_expr())
     }
 }
 
@@ -55,13 +55,13 @@ struct IpToIpv6Fn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for IpToIpv6Fn {
+impl FunctionExpression for IpToIpv6Fn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         ip_to_ipv6(value)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::bytes().fallible()
     }
 }

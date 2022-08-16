@@ -47,14 +47,14 @@ impl Function for Includes {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let item = arguments.required("item");
 
-        Ok(Box::new(IncludesFn { value, item }))
+        Ok(IncludesFn { value, item }.as_expr())
     }
 }
 
@@ -64,7 +64,7 @@ struct IncludesFn {
     item: Box<dyn Expression>,
 }
 
-impl Expression for IncludesFn {
+impl FunctionExpression for IncludesFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let list = self.value.resolve(ctx)?;
         let item = self.item.resolve(ctx)?;
@@ -72,7 +72,7 @@ impl Expression for IncludesFn {
         includes(list, item)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::boolean().infallible()
     }
 }

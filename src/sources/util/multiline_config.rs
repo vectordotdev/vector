@@ -8,7 +8,7 @@ use crate::line_agg;
 
 /// Configuration of multi-line aggregation.
 #[configurable_component]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct MultilineConfig {
     /// Regular expression pattern that is used to match the start of a new message.

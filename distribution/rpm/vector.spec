@@ -55,7 +55,6 @@ mkdir -p %{buildroot}%{_sharedstatedir}/%{_name}
 mkdir -p %{buildroot}%{_unitdir}
 
 cp -a %{_builddir}/bin/vector %{buildroot}%{_bindir}
-cp -a %{_builddir}/config/vector.toml %{buildroot}%{_sysconfdir}/%{_name}/vector.toml
 cp -a %{_builddir}/config/examples/. %{buildroot}%{_sysconfdir}/%{_name}/examples
 cp -a %{_builddir}/systemd/vector.service %{buildroot}%{_unitdir}/vector.service
 cp -a %{_builddir}/systemd/vector.default %{buildroot}%{_sysconfdir}/default/vector
@@ -65,6 +64,12 @@ getent passwd %{_username} > /dev/null || \
   useradd --shell /sbin/nologin --system --home-dir %{_sharedstatedir}/%{_name} --user-group \
     --comment "Vector observability data router" %{_username}
 chown %{_username} %{_sharedstatedir}/%{_name}
+chmod 740 %{_sharedstatedir}/%{_name}
+chown %{_username} %{_sysconfdir}/%{_name}
+chmod 740 %{_sysconfdir}/%{_name}
+chown %{_username} %{_sysconfdir}/default/vector
+chmod 640 %{_sysconfdir}/default/vector
+usermod -aG adm %{_username}  || true
 usermod -aG systemd-journal %{_username}  || true
 usermod -aG systemd-journal-remote %{_username}  || true
 
@@ -75,7 +80,6 @@ rm -rf %{buildroot}
 %defattr(-,root,root,-)
 %{_bindir}/*
 %{_unitdir}/vector.service
-%config(noreplace) %{_sysconfdir}/%{_name}/vector.toml
 %config(noreplace) %{_sysconfdir}/default/vector
 %config %{_sysconfdir}/%{_name}/examples/*
 %dir %{_sharedstatedir}/%{_name}

@@ -1,6 +1,6 @@
 use async_graphql::{Object, SimpleObject, Union};
 
-#[derive(Debug, Clone, PartialEq, SimpleObject)]
+#[derive(Debug, Clone, PartialEq, Eq, SimpleObject)]
 /// A component was found that matched the provided pattern
 pub struct Matched {
     #[graphql(skip)]
@@ -18,7 +18,7 @@ impl Matched {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, SimpleObject)]
+#[derive(Debug, Clone, PartialEq, Eq, SimpleObject)]
 /// There isn't currently a component that matches this pattern
 pub struct NotMatched {
     #[graphql(skip)]
@@ -39,7 +39,7 @@ impl NotMatched {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, SimpleObject)]
+#[derive(Debug, Clone, PartialEq, Eq, SimpleObject)]
 /// The pattern matched source(s) which cannot be tapped for inputs or sink(s)
 /// which cannot be tapped for outputs
 pub struct InvalidMatch {
@@ -61,7 +61,7 @@ impl InvalidMatch {
     }
 }
 
-#[derive(Union, Debug, Clone, PartialEq)]
+#[derive(Union, Debug, Clone, PartialEq, Eq)]
 /// A specific kind of notification with additional details
 pub enum Notification {
     Matched(Matched),

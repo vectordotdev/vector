@@ -4,7 +4,7 @@ use vector_config::configurable_component;
 
 /// TCP keepalive settings for socket-based components.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct TcpKeepaliveConfig {
     /// The time to wait, in seconds, before starting to send TCP keepalive probes on an idle connection.

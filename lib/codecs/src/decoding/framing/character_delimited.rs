@@ -30,7 +30,7 @@ impl CharacterDelimitedDecoderConfig {
 
 /// Options for building a `CharacterDelimitedDecoder`.
 #[configurable_component]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CharacterDelimitedDecoderOptions {
     /// The character that delimits byte sequences.
     #[serde(with = "vector_core::serde::ascii_char")]
