@@ -659,7 +659,7 @@ fn create_event(line: Bytes, offset: u64, file: &str, meta: &EventMetadata) -> L
     event.insert(log_schema().source_type_key(), Bytes::from("file"));
 
     if let Some(offset_key) = &meta.offset_key {
-        event.insert(offset_key.as_str(), offset.to_string());
+        event.insert(offset_key.as_str(), offset);
     }
 
     if let Some(file_key) = &meta.file_key {
@@ -832,7 +832,7 @@ mod tests {
 
         assert_eq!(log["file"], file.into());
         assert_eq!(log["host"], "Some.Machine".into());
-        assert_eq!(log["offset"], "0".into());
+        assert_eq!(log["offset"], 0.into());
         assert_eq!(log[log_schema().message_key()], "hello world".into());
         assert_eq!(log[log_schema().source_type_key()], "file".into());
     }
