@@ -17,10 +17,10 @@ use vector_config::configurable_component;
 
 use super::{
     AddCertToStoreSnafu, AddExtraChainCertSnafu, CaStackPushSnafu, DerExportSnafu,
-    FileOpenFailedSnafu, FileReadFailedSnafu, MaybeTls, NewCaStackSnafu, NewStoreBuilderSnafu,
-    ParsePkcs12Snafu, Pkcs12Snafu, PrivateKeyParseSnafu, Result, SetAlpnProtocolsSnafu,
-    SetCertificateSnafu, SetPrivateKeySnafu, SetVerifyCertSnafu, TlsError, TlsIdentitySnafu,
-    X509ParseSnafu,
+    EncodeAlpnProtocolsSnafu, FileOpenFailedSnafu, FileReadFailedSnafu, MaybeTls, NewCaStackSnafu,
+    NewStoreBuilderSnafu, ParsePkcs12Snafu, Pkcs12Snafu, PrivateKeyParseSnafu, Result,
+    SetAlpnProtocolsSnafu, SetCertificateSnafu, SetPrivateKeySnafu, SetVerifyCertSnafu, TlsError,
+    TlsIdentitySnafu, X509ParseSnafu,
 };
 
 const PEM_START_MARKER: &str = "-----BEGIN ";
@@ -283,10 +283,9 @@ impl TlsSettings {
             load_mac_certs(context).unwrap();
         }
 
-        if self.alpn_protocols.is_some() {
-            let alpn = self.alpn_protocols.as_ref().unwrap();
+        if let Some(apln) = &self.alpn_protocols {
             context
-                .set_alpn_protos(alpn.as_slice())
+                .set_alpn_protos(apln.as_slice())
                 .context(SetAlpnProtocolsSnafu)?;
         }
 
@@ -333,13 +332,16 @@ impl TlsConfig {
         }
     }
 
+    /// The input must be in ALPN "wire format".
+    ///
+    /// It consists of a sequence of supported protocol names prefixed by their byte length.
     fn parse_alpn_protocols(&self) -> Result<Option<Vec<u8>>> {
         match &self.alpn_protocols {
             None => Ok(None),
             Some(protocols) => {
                 let mut data: Vec<u8> = Vec::new();
                 for str in protocols.iter() {
-                    data.push(str.len().try_into().unwrap());
+                    data.push(str.len().try_into().context(EncodeAlpnProtocolsSnafu)?);
                     data.append(&mut str.to_owned().into_bytes());
                 }
                 Ok(Some(data))
