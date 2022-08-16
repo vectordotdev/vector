@@ -1,40 +1,19 @@
-ARG ALPINE_IMAGE=docker.io/alpine:3.16.0
-ARG DISTROLESS_CC_IMAGE=gcr.io/distroless/static-debian11
+FROM docker.io/alpine:3.14 AS builder
 
-#-------------------------------------------------------------------------------
-FROM ${ALPINE_IMAGE} AS staging
+WORKDIR /vector
 
-# Set a well-known working directory for staging
-WORKDIR /staging
+COPY vector-*-unknown-linux-musl*.tar.gz ./
+RUN tar -xvf vector-0*-"$(cat /etc/apk/arch)"-unknown-linux-musl*.tar.gz --strip-components=2
 
-# Prepare a staging root filesystem
-RUN mkdir -p \
-  rootfs/etc/vector \
-  rootfs/usr/bin \
-  rootfs/var/lib/vector
+RUN mkdir -p /var/lib/vector
 
-# Copy and unpack Vector distribution
-COPY vector-*-unknown-linux-musl*.tar.gz .
-RUN mkdir vector \
-    && tar zxvf vector-*-"$(cat /etc/apk/arch)"-unknown-linux-musl*.tar.gz \
-    -C vector --strip-components=2
+FROM gcr.io/distroless/static
 
-# Prepare Vector in the staging root filesystem
-RUN cp vector/bin/* rootfs/usr/bin/ \
-  && cp -r vector/config/* rootfs/etc/vector/
+COPY --from=builder /vector/bin/* /usr/local/bin/
+COPY --from=builder /vector/config/vector.toml /etc/vector/vector.toml
+COPY --from=builder /var/lib/vector /var/lib/vector
 
-#-------------------------------------------------------------------------------
-FROM ${ALPINE_IMAGE}
+# Smoke test
+RUN ["vector", "--version"]
 
-# Set image labels
-ARG VECTOR_VERSION
-LABEL org.opencontainers.image.source="https://github.com/vectordotdev/vector" \
-  org.opencontainers.image.title="Vector (Distroless static variant)" \
-  org.opencontainers.image.url="https://vector.dev/" \
-  org.opencontainers.image.version="${VECTOR_VERSION}"
-
-# Copy root filesystem from staging
-COPY --from=staging /staging/rootfs/ /
-
-# Configure the image entrypoint
-ENTRYPOINT ["vector"]
+ENTRYPOINT ["/usr/local/bin/vector"]
