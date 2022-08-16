@@ -138,7 +138,7 @@ impl<Fut: Future> FuturesSet<Fut> for FuturesOrdered<Fut> {
     }
 
     fn push(&mut self, future: Fut) {
-        Self::push(self, future);
+        Self::push_back(self, future);
     }
 }
 
