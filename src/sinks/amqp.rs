@@ -1,31 +1,38 @@
 use crate::{
     amqp::AmqpConfig,
-    codecs::{Encoder, EncodingConfig, Transformer},
+    codecs::{EncodingConfig, Transformer},
     config::{DataType, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     internal_events::{
         sink::{AmqpAcknowledgementFailed, AmqpDeliveryFailed, AmqpNoAcknowledgement},
         TemplateRenderingError,
     },
-    sinks::VectorSink,
+    sinks::{util::builder::SinkBuilderExt, VectorSink},
     template::{Template, TemplateParseError},
 };
-use bytes::BytesMut;
+use async_trait::async_trait;
+use bytes::{Bytes, BytesMut};
 use codecs::TextSerializerConfig;
-use futures::{future::BoxFuture, ready, FutureExt, Sink};
-use lapin::options::BasicPublishOptions;
-use lapin::BasicProperties;
-use serde::{Deserialize, Serialize};
+use futures::{future::BoxFuture, FutureExt, StreamExt};
+use futures_util::stream::BoxStream;
+use lapin::{options::BasicPublishOptions, BasicProperties};
 use snafu::{ResultExt, Snafu};
 use std::{
     convert::TryFrom,
-    pin::Pin,
+    io,
     sync::Arc,
     task::{Context, Poll},
 };
 use tokio_util::codec::Encoder as _;
+use tower::{Service, ServiceBuilder};
+use vector_common::{
+    finalization::{EventFinalizers, EventStatus, Finalizable},
+    internal_event::EventsSent,
+};
 use vector_config::configurable_component;
-use vector_core::config::AcknowledgementsConfig;
+use vector_core::{config::AcknowledgementsConfig, sink::StreamSink, stream::DriverResponse};
+
+use super::util::{encoding::Encoder, request_builder::EncodeResult, Compression, RequestBuilder};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -76,27 +83,6 @@ impl Default for AmqpSinkConfig {
     }
 }
 
-#[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
-#[serde(rename_all = "snake_case")]
-pub enum Encoding {
-    Text,
-    Json,
-}
-
-enum InFlight {
-    Sending(BoxFuture<'static, Result<lapin::publisher_confirm::PublisherConfirm, lapin::Error>>),
-    Committing(BoxFuture<'static, Result<lapin::publisher_confirm::Confirmation, lapin::Error>>),
-}
-
-pub struct AmqpSink {
-    channel: Arc<lapin::Channel>,
-    exchange: Template,
-    routing_key: Option<Template>,
-    transformer: Transformer,
-    encoder: Encoder<()>,
-    in_flight: Option<InFlight>,
-}
-
 inventory::submit! {
     SinkDescription::new::<AmqpSinkConfig>("amqp")
 }
@@ -119,7 +105,7 @@ impl SinkConfig for AmqpSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, super::Healthcheck)> {
         let sink = AmqpSink::new(self.clone()).await?;
         let hc = healthcheck(self.clone(), Arc::clone(&sink.channel)).boxed();
-        Ok((VectorSink::from_event_sink(Box::new(sink)), hc))
+        Ok((VectorSink::from_event_streamsink(sink), hc))
     }
 
     fn input(&self) -> Input {
@@ -135,6 +121,174 @@ impl SinkConfig for AmqpSinkConfig {
     }
 }
 
+#[derive(Clone, Debug)]
+struct AMQPEncoder {
+    encoder: crate::codecs::Encoder<()>,
+    transformer: crate::codecs::Transformer,
+}
+
+impl Encoder<Event> for AMQPEncoder {
+    fn encode_input(&self, mut input: Event, writer: &mut dyn io::Write) -> io::Result<usize> {
+        let mut body = BytesMut::new();
+        self.transformer.transform(&mut input);
+        let mut encoder = self.encoder.clone();
+        encoder
+            .encode(input, &mut body)
+            .map_err(|_| io::Error::new(io::ErrorKind::Other, "unable to encode"))?;
+
+        let body = body.freeze().to_vec();
+        writer.write_all(&body)?;
+
+        Ok(body.len())
+    }
+}
+
+struct AMQPRequest {
+    body: Bytes,
+    exchange: String,
+    routing_key: String,
+    finalizers: EventFinalizers,
+}
+
+impl Finalizable for AMQPRequest {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        std::mem::take(&mut self.finalizers)
+    }
+}
+
+struct AMQPMetadata {
+    exchange: String,
+    routing_key: String,
+    finalizers: EventFinalizers,
+}
+
+struct AMQPService {
+    channel: Arc<lapin::Channel>,
+}
+
+struct AMQPResponse {
+    byte_size: usize,
+}
+
+impl DriverResponse for AMQPResponse {
+    fn event_status(&self) -> EventStatus {
+        EventStatus::Delivered
+    }
+
+    fn events_sent(&self) -> EventsSent {
+        EventsSent {
+            count: 1,
+            byte_size: self.byte_size,
+            output: None,
+        }
+    }
+}
+
+impl Service<AMQPRequest> for AMQPService {
+    type Response = AMQPResponse;
+
+    type Error = ();
+
+    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
+
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, req: AMQPRequest) -> Self::Future {
+        let channel = Arc::clone(&self.channel);
+        Box::pin(async move {
+            let byte_size = req.body.len();
+            let f = channel
+                .basic_publish(
+                    &req.exchange,
+                    &req.routing_key,
+                    BasicPublishOptions::default(),
+                    req.body.as_ref(),
+                    BasicProperties::default(),
+                )
+                .await;
+
+            match f {
+                Ok(result) => match result.await {
+                    Ok(lapin::publisher_confirm::Confirmation::Nack(_)) => {
+                        emit!(AmqpNoAcknowledgement::default());
+                    }
+                    Err(error) => emit!(AmqpAcknowledgementFailed { error }),
+                    Ok(_) => (),
+                },
+                Err(error) => emit!(AmqpDeliveryFailed { error }),
+            }
+
+            Ok(AMQPResponse { byte_size })
+        })
+    }
+}
+
+struct AMQPRequestBuilder {
+    encoder: AMQPEncoder,
+}
+
+impl RequestBuilder<AMQPEvent> for AMQPRequestBuilder {
+    type Metadata = AMQPMetadata;
+    type Events = Event;
+    type Encoder = AMQPEncoder;
+    type Payload = Bytes;
+    type Request = AMQPRequest;
+    type Error = io::Error;
+
+    fn compression(&self) -> Compression {
+        Compression::None
+    }
+
+    fn encoder(&self) -> &Self::Encoder {
+        &self.encoder
+    }
+
+    fn split_input(&self, mut input: AMQPEvent) -> (Self::Metadata, Self::Events) {
+        let metadata = AMQPMetadata {
+            exchange: input.exchange,
+            routing_key: input.routing_key,
+            finalizers: input.event.take_finalizers(),
+        };
+
+        (metadata, input.event)
+    }
+
+    fn build_request(
+        &self,
+        metadata: Self::Metadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
+        let body = payload.into_payload();
+        AMQPRequest {
+            body,
+            finalizers: metadata.finalizers,
+            exchange: metadata.exchange,
+            routing_key: metadata.routing_key,
+        }
+    }
+}
+
+/// Stores the event together with the rendered exchange and routing_key values.
+/// This is passed into the `RequestBuilder` which then splits it out into the event
+/// and metadata containing the exchange and routing_key.
+/// This event needs to be created prior to building the request so we can filter out
+/// any events that error whilst redndering the templates.
+struct AMQPEvent {
+    event: Event,
+    exchange: String,
+    routing_key: String,
+}
+
+pub struct AmqpSink {
+    channel: Arc<lapin::Channel>,
+    exchange: Template,
+    routing_key: Option<Template>,
+    transformer: Transformer,
+    encoder: crate::codecs::Encoder<()>,
+}
+
 impl AmqpSink {
     async fn new(config: AmqpSinkConfig) -> crate::Result<Self> {
         let (_, channel) = config
@@ -145,7 +299,7 @@ impl AmqpSink {
 
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build()?;
-        let encoder = Encoder::<()>::new(serializer);
+        let encoder = crate::codecs::Encoder::<()>::new(serializer);
 
         Ok(AmqpSink {
             channel: Arc::new(channel),
@@ -156,112 +310,78 @@ impl AmqpSink {
                 .transpose()?,
             transformer,
             encoder,
-            in_flight: None,
         })
     }
 
-    fn encode_event(&mut self, mut event: Event) -> Result<Vec<u8>, ()> {
-        let mut body = BytesMut::new();
-        self.transformer.transform(&mut event);
-        self.encoder.encode(event, &mut body).map_err(|_| ())?;
-        Ok(body.freeze().to_vec())
-    }
-}
-
-impl Sink<Event> for AmqpSink {
-    type Error = ();
-
-    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.poll_flush(cx)
-    }
-
-    fn start_send(mut self: Pin<&mut Self>, item: Event) -> Result<(), Self::Error> {
-        assert!(
-            self.in_flight.is_none(),
-            "Expected `poll_ready` to be called first."
-        );
-
-        let exchange = match self.exchange.render_string(&item) {
-            Ok(e) => e,
-            Err(missing_keys) => {
+    /// Transforms an event into an AMQP event by rendering the required template fields.
+    /// Returns None if there is an error whilst rendering.
+    fn make_amqp_event(&self, event: Event) -> Option<AMQPEvent> {
+        let exchange = self
+            .exchange
+            .render_string(&event)
+            .map_err(|missing_keys| {
                 emit!(TemplateRenderingError {
                     error: missing_keys,
                     field: Some("exchange"),
                     drop_event: true,
-                });
-                return Ok(());
-            }
-        };
+                })
+            })
+            .ok()?;
 
-        let routing_key = if let Some(t) = &self.routing_key {
-            match t.render_string(&item) {
-                Ok(k) => k,
-                Err(error) => {
+        let routing_key = match &self.routing_key {
+            None => String::new(),
+            Some(key) => key
+                .render_string(&event)
+                .map_err(|missing_keys| {
                     emit!(TemplateRenderingError {
-                        error,
+                        error: missing_keys,
                         field: Some("routing_key"),
                         drop_event: true,
-                    });
-                    return Ok(());
-                }
-            }
-        } else {
-            "".to_string()
+                    })
+                })
+                .ok()?,
         };
 
-        let body = self.encode_event(item)?;
-
-        let channel = Arc::clone(&self.channel);
-        let f = Box::pin(channel.basic_publish(
-            &exchange,
-            &routing_key,
-            BasicPublishOptions::default(),
-            body,
-            BasicProperties::default(),
-        ));
-
-        self.in_flight = Some(InFlight::Sending(Box::pin(f)));
-
-        Ok(())
+        Some(AMQPEvent {
+            event,
+            exchange,
+            routing_key,
+        })
     }
 
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        let this = Pin::into_inner(self);
-        while let Some(in_flight) = this.in_flight.as_mut() {
-            match in_flight {
-                InFlight::Sending(ref mut fut) => match ready!(fut.as_mut().poll(cx)) {
-                    Ok(result) => {
-                        this.in_flight = Some(InFlight::Committing(Box::pin(result)));
+    async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        let request_builder = AMQPRequestBuilder {
+            encoder: AMQPEncoder {
+                encoder: self.encoder.clone(),
+                transformer: self.transformer.clone(),
+            },
+        };
+        let service = ServiceBuilder::new().service(AMQPService {
+            channel: Arc::clone(&self.channel),
+        });
+
+        let sink = input
+            .filter_map(|event| std::future::ready(self.make_amqp_event(event)))
+            .request_builder(None, request_builder)
+            .filter_map(|request| async move {
+                match request {
+                    Err(e) => {
+                        error!("Failed to build AMQP request: {:?}.", e);
+                        None
                     }
-                    Err(err) => {
-                        emit!(AmqpDeliveryFailed { error: err });
-                        return Poll::Ready(Err(()));
-                    }
-                },
-                InFlight::Committing(ref mut fut) => {
-                    let r = ready!(fut.as_mut().poll(cx));
-                    this.in_flight.take();
-                    match r {
-                        Err(e) => {
-                            emit!(AmqpAcknowledgementFailed { error: e });
-                            return Poll::Ready(Err(()));
-                        }
-                        Ok(confirm) => {
-                            if let lapin::publisher_confirm::Confirmation::Nack(_) = confirm {
-                                emit!(AmqpNoAcknowledgement::default());
-                                return Poll::Ready(Err(()));
-                            }
-                        }
-                    };
+                    Ok(req) => Some(req),
                 }
-            }
-        }
+            })
+            .into_driver(service);
 
-        Poll::Ready(Ok(()))
+        sink.run().await
     }
+}
 
-    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.poll_flush(cx)
+#[async_trait]
+impl StreamSink<Event> for AmqpSink {
+    async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        self.run_inner(input).await
     }
 }
 
@@ -287,64 +407,6 @@ mod tests {
     pub fn generate_config() {
         crate::test_util::test_generate_config::<AmqpSinkConfig>();
     }
-
-    /*
-    TODO Put these back... obvs..
-    #[test]
-    fn amqp_encode_event_log_text() {
-        crate::test_util::trace_init();
-        let message = "hello world".to_string();
-        let encoding = TextSerializerConfig::new();
-        let serializer = encoding.build().unwrap();
-        let mut encoder = Encoder::<()>::new(serializer);
-        let bytes = encode_event(message.clone().into(), &encoder.transformer(), &mut encoder);
-
-        assert_eq!(&bytes[..], message.as_bytes());
-    }
-
-    #[test]
-    fn amqp_encode_event_log_json() {
-        crate::test_util::trace_init();
-        let message = "hello world".to_string();
-        let mut event = Event::from(message.clone());
-        event.as_mut_log().insert("key", "value");
-        event.as_mut_log().insert("foo", "bar");
-
-        let encoding = JsonSerializerConfig::new();
-        let serializer = encoding.build().unwrap();
-        let encoder = Encoder::<()>::new(serializer);
-
-        let bytes = encode_event(event, &encoder.transformer(), &encoder);
-
-        let map: BTreeMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
-
-        assert_eq!(map[&log_schema().message_key().to_string()], message);
-        assert_eq!(map["key"], "value".to_string());
-        assert_eq!(map["foo"], "bar".to_string());
-    }
-
-    #[test]
-    fn amqp_encode_event_log_apply_rules() {
-        crate::test_util::trace_init();
-        let mut event = Event::from("hello");
-        event.as_mut_log().insert("key", "value");
-
-        let bytes = encode_event(
-            event,
-            &EncodingConfig {
-                codec: Encoding::Json,
-                schema: None,
-                only_fields: None,
-                except_fields: Some(vec!["key".into()]),
-                timestamp_format: None,
-            },
-        );
-
-        let map: BTreeMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
-
-        assert!(!map.contains_key("key"));
-    }
-    */
 }
 
 #[cfg(feature = "amqp-integration-tests")]
@@ -418,7 +480,7 @@ mod integration_tests {
             .await
             .unwrap();
 
-        let sink = VectorSink::from_event_sink(AmqpSink::new(config.clone()).await.unwrap());
+        let sink = VectorSink::from_event_streamsink(AmqpSink::new(config.clone()).await.unwrap());
 
         // prepare consumer
         let queue_opts = lapin::options::QueueDeclareOptions {
@@ -497,7 +559,7 @@ mod integration_tests {
             .unwrap();
 
         let amqp_sink = AmqpSink::new(config.clone()).await.unwrap();
-        let amqp_sink = VectorSink::from_event_sink(amqp_sink);
+        let amqp_sink = VectorSink::from_event_streamsink(amqp_sink);
 
         let source_cfg = crate::sources::amqp::AmqpSourceConfig {
             connection: config.connection.clone(),
