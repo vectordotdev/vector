@@ -27,7 +27,7 @@ use tokio_util::codec::Encoder as _;
 use tower::{Service, ServiceBuilder};
 use vector_common::{
     finalization::{EventFinalizers, EventStatus, Finalizable},
-    internal_event::EventsSent,
+    internal_event::{BytesSent, EventsSent},
 };
 use vector_config::configurable_component;
 use vector_core::{config::AcknowledgementsConfig, sink::StreamSink, stream::DriverResponse};
@@ -185,6 +185,13 @@ impl DriverResponse for AMQPResponse {
             byte_size: self.byte_size,
             output: None,
         }
+    }
+
+    fn bytes_sent(&self) -> Option<BytesSent> {
+        Some(BytesSent {
+            byte_size: self.byte_size,
+            protocol: "amqp 0.9.1",
+        })
     }
 }
 
@@ -420,7 +427,10 @@ mod integration_tests {
     use crate::{
         serde::{default_decoding, default_framing_message_based},
         shutdown::ShutdownSignal,
-        test_util::{random_lines_with_stream, random_string},
+        test_util::{
+            components::{run_and_assert_sink_compliance, SINK_TAGS},
+            random_lines_with_stream, random_string,
+        },
         SourceSender,
     };
     use futures::StreamExt;
@@ -484,7 +494,9 @@ mod integration_tests {
             .await
             .unwrap();
 
-        let sink = VectorSink::from_event_streamsink(AMQPSink::new(config.clone()).await.unwrap());
+        let cx = SinkContext::new_test();
+        let (sink, healthcheck) = config.build(cx).await.unwrap();
+        healthcheck.await.expect("Health check failed");
 
         // prepare consumer
         let queue_opts = lapin::options::QueueDeclareOptions {
@@ -520,7 +532,7 @@ mod integration_tests {
 
         let num_events = 1000;
         let (input, events) = random_lines_with_stream(100, num_events, None);
-        sink.run(events).await.unwrap();
+        run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
 
         // loop instead of iter so we can set a timeout
         let mut failures = 0;
@@ -562,8 +574,9 @@ mod integration_tests {
             .await
             .unwrap();
 
-        let amqp_sink = AMQPSink::new(config.clone()).await.unwrap();
-        let amqp_sink = VectorSink::from_event_streamsink(amqp_sink);
+        let cx = SinkContext::new_test();
+        let (amqp_sink, healthcheck) = config.build(cx).await.unwrap();
+        healthcheck.await.expect("Health check failed");
 
         let source_cfg = crate::sources::amqp::AMQPSourceConfig {
             connection: config.connection.clone(),
@@ -604,11 +617,11 @@ mod integration_tests {
 
         let _source_fut = tokio::spawn(amqp_source);
 
-        //Have sink publish events
+        // Have sink publish events
         let events_fut = async move {
             let num_events = 1000;
             let (_, events) = random_lines_with_stream(100, num_events, None);
-            amqp_sink.run(events).await.unwrap();
+            run_and_assert_sink_compliance(amqp_sink, events, &SINK_TAGS).await;
             num_events
         };
         let nb_events_published = tokio::spawn(events_fut).await.unwrap();
