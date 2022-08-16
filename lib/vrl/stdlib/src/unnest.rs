@@ -33,9 +33,9 @@ fn unnest(path: &expression::Query, root_lookup: &LookupBuf, ctx: &mut Context) 
 }
 
 fn unnest_root(root: &Value, path: &LookupBuf) -> Resolved {
-    let values = root
-        .get_by_path(path)
-        .cloned()
+    let mut trimmed = root.clone();
+    let values = trimmed
+        .remove_by_path(path, true)
         .ok_or(value::Error::Expected {
             got: Kind::null(),
             expected: Kind::array(Collection::any()),
@@ -45,7 +45,7 @@ fn unnest_root(root: &Value, path: &LookupBuf) -> Resolved {
     let events = values
         .into_iter()
         .map(|value| {
-            let mut event = root.clone();
+            let mut event = trimmed.clone();
             event.insert_by_path(path, value);
             event
         })

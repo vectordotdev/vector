@@ -1,0 +1,98 @@
+#                                    __   __  __
+#                                    \ \ / / / /
+#                                     \ V / / /
+#                                      \_/  \/
+#
+#                                    V E C T O R
+#                                   Configuration
+#
+# ------------------------------------------------------------------------------
+# Website: https://vector.dev
+# Docs: https://vector.dev/docs
+# Chat: https://chat.vector.dev
+# ------------------------------------------------------------------------------
+
+# The directory used for persisting Vector state.
+data_dir = "/var/lib/vector"
+
+# Configure Vector's GraphQL API.
+[api]
+enabled = true
+address = "0.0.0.0:8686"
+playground = false
+
+# Receives observability data from a Datadog Agent over HTTP or HTTPS.
+[sources.datadog_agent]
+type = "datadog_agent"
+address = "0.0.0.0:8282"
+
+# Collect logs from a Fluentd or Fluent Bit agent.
+[sources.fluent]
+type = "fluent"
+address = "0.0.0.0:24224"
+
+# Collect logs emitted by an HTTP server.
+[sources.http]
+type = "http"
+address = "0.0.0.0:80"
+[sources.http.framing]
+method = "newline_delimited"
+[sources.http.decoding]
+codec = "json"
+
+# Access to the metrics produced by Vector itself.
+[sources.internal_metrics]
+type = "internal_metrics"
+
+# Collect logs from a Logstash agent.
+[sources.logstash]
+type = "logstash"
+address = "0.0.0.0:5044"
+
+# Receive logs from Splunk.
+[sources.splunk_hec]
+type = "splunk_hec"
+address = "0.0.0.0:8080"
+
+# Collect metrics emitted by the StatsD aggregator.
+[sources.statsd]
+type = "statsd"
+mode = "tcp"
+address = "0.0.0.0:8125"
+
+# Collect logs sent via Syslog.
+[sources.syslog_tcp]
+type = "syslog"
+mode = "tcp"
+address = "0.0.0.0:601"
+
+# Collect logs sent via Syslog.
+[sources.syslog_udp]
+type = "syslog"
+mode = "udp"
+address = "0.0.0.0:514"
+
+# Collect observability data from another Vector instance.
+[sources.vector]
+type = "vector"
+address = "0.0.0.0:6000"
+
+# Send observability events nowhere
+[sinks.blackhole]
+type = "blackhole"
+inputs = [
+    "datadog_agent",
+    "fluent",
+    "http",
+    "logstash",
+    "splunk_hec",
+    "syslog_tcp",
+    "syslog_udp",
+    "vector",
+]
+
+# Output metric events to a Prometheus exporter running on the host.
+[sinks.prom_exporter]
+type = "prometheus_exporter"
+inputs = ["internal_metrics", "statsd"]
+address = "0.0.0.0:9090"
