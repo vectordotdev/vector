@@ -603,6 +603,17 @@ mod test {
         include_bytes!("../../tests/data/ca/intermediate_server/private/localhost.key.pem");
 
     #[test]
+    fn parse_alpn_protocols() {
+        let options = TlsConfig {
+            alpn_protocols: Some(vec![String::from("h2")]),
+            ..Default::default()
+        };
+        let settings =
+            TlsSettings::from_options(&Some(options)).expect("Failed to parse alpn_protocols");
+        assert_eq!(settings.alpn_protocols, Some(vec![2, 104. 50]));
+    }
+
+    #[test]
     fn from_options_pkcs12() {
         let options = TlsConfig {
             crt_file: Some(TEST_PKCS12_PATH.into()),
