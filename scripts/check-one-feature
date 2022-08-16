@@ -41,7 +41,7 @@ cp --archive --link $base_target_dir/debug $target
 rm --force $base_target_dir/debug/.cargo-lock
 
 echo "===== Feature: $feature ====="
-if cargo check --bin vector \
+if cargo check --tests --bin vector \
 	--no-default-features \
 	--features $feature \
 	--target-dir $target \
