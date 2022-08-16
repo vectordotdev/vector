@@ -1,7 +1,6 @@
 use crate::{get_metadata_key, MetadataKey};
 use ::value::Value;
 use vrl::prelude::*;
-use vrl::query::Target as QueryTarget;
 use vrl::state::{ExternalEnv, LocalEnv};
 
 fn set_metadata_field(
@@ -15,8 +14,8 @@ fn set_metadata_field(
             ctx.target_mut().insert_secret(key, str_value.as_ref());
             Value::Null
         }
-        MetadataKey::Query(query) => {
-            ctx.target_mut().set_metadata(query.path(), value)?;
+        MetadataKey::Query(path) => {
+            ctx.target_mut().target_insert(path, value)?;
             Value::Null
         }
     })
@@ -62,12 +61,12 @@ impl Function for SetMetadataField {
         let key = get_metadata_key(&mut arguments)?;
         let value = arguments.required_expr("value");
 
-        if let MetadataKey::Query(query) = &key {
-            if external.is_read_only_metadata_path(query.path()) {
+        if let MetadataKey::Query(target_path) = &key {
+            if external.is_read_only_path(&target_path) {
                 return Err(vrl::function::Error::ReadOnlyMutation {
-                    context: format!("{} is read-only, and cannot be modified", query),
+                    context: format!("{} is read-only, and cannot be modified", target_path),
                 }
-                .into());
+                    .into());
             }
         }
 
@@ -109,18 +108,11 @@ impl Expression for SetMetadataFieldFn {
         local: &mut LocalEnv,
         external: &mut ExternalEnv,
     ) -> std::result::Result<(), ExpressionError> {
-        if let MetadataKey::Query(query) = &self.key {
+        if let MetadataKey::Query(target_path) = &self.key {
             let insert_type = self.value.type_def((local, external)).kind().clone();
-            match query.target() {
-                QueryTarget::External => {
-                    let mut new_type = external.metadata_kind().clone();
-                    new_type.insert(query.path(), insert_type);
-                    external.update_metadata(new_type);
-                }
-                QueryTarget::Container(_)
-                | QueryTarget::FunctionCall(_)
-                | QueryTarget::Internal(_) => unreachable!("only external queries are allowed"),
-            }
+            let mut new_type = external.kind(target_path.prefix);
+            new_type.insert(&target_path.path, insert_type);
+            external.update_metadata(new_type);
         }
         Ok(())
     }

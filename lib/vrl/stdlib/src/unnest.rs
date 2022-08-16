@@ -1,32 +1,32 @@
 use ::value::Value;
-use lookup_lib::{LookupBuf, OwnedPath, TargetPath};
+use lookup_lib::{OwnedPath, TargetPath};
 use vrl::prelude::*;
 
-fn unnest(path: &expression::Query, root_lookup: &LookupBuf, ctx: &mut Context) -> Resolved {
+fn unnest(path: &expression::Query, ctx: &mut Context) -> Resolved {
     let lookup_buf = path.path();
 
     match path.target() {
-        expression::Target::External => {
+        expression::Target::External(prefix) => {
             let root = ctx
                 .target()
-                .target_get(&TargetPath::event_root())
+                .target_get(&TargetPath::root(*prefix))
                 .expect("must never fail")
                 .expect("always a value");
             unnest_root(root, lookup_buf)
         }
         expression::Target::Internal(v) => {
             let value = ctx.state().variable(v.ident()).unwrap_or(&Value::Null);
-            let root = value.get_by_path(root_lookup).expect("always a value");
+            let root = value.get(&OwnedPath::root()).expect("always a value");
             unnest_root(root, lookup_buf)
         }
         expression::Target::Container(expr) => {
             let value = expr.resolve(ctx)?;
-            let root = value.get_by_path(root_lookup).expect("always a value");
+            let root = value.get(&OwnedPath::root()).expect("always a value");
             unnest_root(root, lookup_buf)
         }
         expression::Target::FunctionCall(expr) => {
             let value = expr.resolve(ctx)?;
-            let root = value.get_by_path(root_lookup).expect("always a value");
+            let root = value.get(&OwnedPath::root()).expect("always a value");
             unnest_root(root, lookup_buf)
         }
     }
@@ -102,9 +102,7 @@ impl Function for Unnest {
         mut arguments: ArgumentList,
     ) -> Compiled {
         let path = arguments.required_query("path")?;
-        let root = LookupBuf::root();
-
-        Ok(Box::new(UnnestFn { path, root }))
+        Ok(Box::new(UnnestFn { path }))
     }
 
     fn compile_argument(
@@ -137,7 +135,6 @@ impl Function for Unnest {
 #[derive(Debug, Clone)]
 struct UnnestFn {
     path: expression::Query,
-    root: LookupBuf,
 }
 
 impl UnnestFn {
@@ -147,25 +144,24 @@ impl UnnestFn {
 
         Self {
             path: expression::Query::new(
-                expression::Target::External,
+                expression::Target::External(PathPrefix::Event),
                 FromStr::from_str(path).unwrap(),
-            ),
-            root: LookupBuf::root(),
+            )
         }
     }
 }
 
 impl Expression for UnnestFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        unnest(&self.path, &self.root, ctx)
+        unnest(&self.path, ctx)
     }
 
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         use expression::Target;
 
         match self.path.target() {
-            Target::External => invert_array_at_path(
-                &TypeDef::from(state.1.target_kind().clone()),
+            Target::External(prefix) => invert_array_at_path(
+                &TypeDef::from(state.1.kind(*prefix)),
                 self.path.path(),
             ),
             Target::Internal(v) => invert_array_at_path(&v.type_def(state), self.path.path()),

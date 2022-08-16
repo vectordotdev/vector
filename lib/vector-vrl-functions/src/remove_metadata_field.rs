@@ -1,6 +1,7 @@
 use crate::{get_metadata_key, MetadataKey};
 use ::value::kind::remove;
 use ::value::Value;
+use lookup::LookupBuf;
 use vrl::prelude::*;
 use vrl::state::{ExternalEnv, LocalEnv};
 
@@ -13,8 +14,8 @@ fn remove_metadata_field(
             ctx.target_mut().remove_secret(key);
             Value::Null
         }
-        MetadataKey::Query(query) => {
-            ctx.target_mut().remove_metadata(query.path())?;
+        MetadataKey::Query(target_path) => {
+            ctx.target_mut().target_remove(target_path, false)?;
             Value::Null
         }
     })
@@ -53,7 +54,7 @@ impl Function for RemoveMetadataField {
         let key = get_metadata_key(&mut arguments)?;
 
         if let MetadataKey::Query(query) = &key {
-            if external.is_read_only_metadata_path(query.path()) {
+            if external.is_read_only_path(query) {
                 return Err(vrl::function::Error::ReadOnlyMutation {
                     context: format!("{} is read-only, and cannot be removed", query),
                 }
@@ -88,7 +89,7 @@ impl Expression for RemoveMetadataFieldFn {
             let mut new_kind = external.metadata_kind().clone();
 
             let result = new_kind.remove_at_path(
-                &query.path().to_lookup(),
+                &LookupBuf::from(query.path.clone()).to_lookup(),
                 remove::Strategy {
                     coalesced_path: remove::CoalescedPath::Reject,
                 },

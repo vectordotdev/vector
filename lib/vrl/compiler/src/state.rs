@@ -1,7 +1,7 @@
 use std::collections::{hash_map::Entry, BTreeSet, HashMap};
 
 use anymap::AnyMap;
-use lookup::{TargetPath};
+use lookup::{PathPrefix, TargetPath};
 use value::{Kind, Value};
 
 use crate::{parser::ast::Ident, type_def::Details, value::Collection};
@@ -121,7 +121,7 @@ impl ExternalEnv {
 
     /// Adds a path that is considered read only. Assignments to any paths that match
     /// will fail at compile time.
-    pub(crate) fn set_read_only_path(&mut self, path: TargetPath, recursive: bool) {
+    pub fn set_read_only_path(&mut self, path: TargetPath, recursive: bool) {
         self.read_only_paths
             .insert(ReadOnlyPath { path, recursive });
     }
@@ -136,6 +136,13 @@ impl ExternalEnv {
 
     pub fn target_kind(&self) -> &Kind {
         self.target().type_def.kind()
+    }
+
+    pub fn kind(&self, prefix: PathPrefix) -> Kind {
+        match prefix {
+            PathPrefix::Event => self.target_kind(),
+            PathPrefix::Metadata => self.metadata_kind()
+        }.clone()
     }
 
     pub fn metadata_kind(&self) -> &Kind {

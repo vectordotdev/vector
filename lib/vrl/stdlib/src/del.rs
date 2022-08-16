@@ -5,18 +5,18 @@ use vrl::prelude::*;
 fn del(query: &expression::Query, ctx: &mut Context) -> Resolved {
     let path = query.path();
 
-    if query.is_external() {
+    if let Some(target_path) = query.external_path() {
         Ok(ctx
             .target_mut()
-            .target_remove(path, false)
+            .target_remove(&target_path, false)
             .ok()
             .flatten()
             .unwrap_or(Value::Null))
     } else if let Some(ident) = query.variable_ident() {
         match ctx.state_mut().variable_mut(ident) {
             Some(value) => {
-                let new_value = value.get_by_path(path).cloned();
-                value.remove_by_path(path, false);
+                let new_value = value.get(path).cloned();
+                value.remove(path, false);
                 Ok(new_value.unwrap_or(Value::Null))
             }
             None => Ok(Value::Null),
@@ -26,7 +26,7 @@ fn del(query: &expression::Query, ctx: &mut Context) -> Resolved {
 
         // No need to do the actual deletion, as the expression is only
         // available as an argument to the function.
-        Ok(value.get_by_path(path).cloned().unwrap_or(Value::Null))
+        Ok(value.get(path).cloned().unwrap_or(Value::Null))
     } else {
         Ok(Value::Null)
     }
@@ -89,11 +89,12 @@ impl Function for Del {
     ) -> Compiled {
         let query = arguments.required_query("target")?;
 
-        if external.is_read_only_path(query.path()) {
-            return Err(vrl::function::Error::ReadOnlyMutation {
-                context: format!("{} is read-only, and cannot be deleted", query),
+        if let Some(target_path) = query.external_path() {
+            if external.is_read_only_path(&target_path){
+                return Err(vrl::function::Error::ReadOnlyMutation {
+                    context: format!("{} is read-only, and cannot be deleted", query),
+                }.into());
             }
-            .into());
         }
 
         let return_type = query.type_def((local, external));

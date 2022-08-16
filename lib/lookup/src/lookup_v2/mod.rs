@@ -102,16 +102,25 @@ pub struct TargetPath {
 
 impl TargetPath {
     pub fn event_root() -> Self {
-        Self {
-            prefix: PathPrefix::Event,
-            path: OwnedPath::root(),
-        }
+        Self::root(PathPrefix::Event)
     }
     pub fn metadata_root() -> Self {
+        Self::root(PathPrefix::Metadata)
+    }
+
+    pub fn root(prefix: PathPrefix) -> Self {
         Self {
-            prefix: PathPrefix::Metadata,
-            path: OwnedPath::root(),
+            prefix,
+            path: OwnedPath::root()
         }
+    }
+
+    pub fn event(path: OwnedPath) -> Self {
+        Self {prefix: PathPrefix::Event, path}
+    }
+
+    pub fn metadata(path: OwnedPath) -> Self {
+        Self {prefix: PathPrefix::Metadata, path}
     }
 
     pub fn can_start_with(&self, prefix: &Self) -> bool {

@@ -3,7 +3,7 @@ use std::borrow::Cow::{self, Borrowed, Owned};
 
 use ::value::Value;
 use indoc::indoc;
-use lookup::LookupBuf;
+use lookup::{owned_path, TargetPath};
 use once_cell::sync::Lazy;
 use prettytable::{format, Cell, Row, Table};
 use regex::Regex;
@@ -164,7 +164,7 @@ fn resolve(
     functions.extend(vector_vrl_functions::vrl_functions());
 
     // The CLI should be moved out of the "vrl" module, and then it can use the `vector-core::compile_vrl` function which includes this automatically
-    external.set_read_only_metadata_path(LookupBuf::from("vector"), true);
+    external.set_read_only_path(TargetPath::metadata(owned_path!("vector")), true);
 
     let program = match vrl::compile_with_state(program, &functions, external, local.clone()) {
         Ok((program, _)) => program,
