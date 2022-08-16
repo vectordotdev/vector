@@ -1,10 +1,10 @@
 use crate::{
-    amqp::AmqpConfig,
+    amqp::AMQPConfig,
     codecs::{EncodingConfig, Transformer},
     config::{DataType, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     internal_events::{
-        sink::{AmqpAcknowledgementFailed, AmqpDeliveryFailed, AmqpNoAcknowledgement},
+        sink::{AMQPAcknowledgementFailed, AMQPDeliveryFailed, AMQPNoAcknowledgement},
         TemplateRenderingError,
     },
     sinks::{util::builder::SinkBuilderExt, VectorSink},
@@ -37,7 +37,7 @@ use super::util::{encoding::Encoder, request_builder::EncodeResult, Compression,
 #[derive(Debug, Snafu)]
 enum BuildError {
     #[snafu(display("creating amqp producer failed: {}", source))]
-    AmqpCreateFailed {
+    AMQPCreateFailed {
         source: Box<dyn std::error::Error + Send + Sync>,
     },
     #[snafu(display("invalid exchange template: {}", source))]
@@ -46,18 +46,22 @@ enum BuildError {
     RoutingKeyTemplate { source: TemplateParseError },
 }
 
-/// Configuration for the `amqp` sink. Handles AMQP version 0.9.
+/// Configuration for the `amqp` sink.
+///
+/// Supports AMQP version 0.9.1
 #[configurable_component(source)]
 #[derive(Clone, Debug)]
-pub struct AmqpSinkConfig {
+pub struct AMQPSinkConfig {
     /// The exchange to publish messages to.
     pub(crate) exchange: String,
 
     /// Template use to generate a routing key which corresponds to a queue binding.
+    // TODO: We will eventually be able to add metadata on a per-field basis, such that we can add metadata for marking
+    // this field as being capable of using Vector's templating syntax.
     pub(crate) routing_key: Option<String>,
 
-    /// Connection options for Amqp sink
-    pub(crate) connection: AmqpConfig,
+    /// Connection options for AMQP sink
+    pub(crate) connection: AMQPConfig,
 
     #[configurable(derived)]
     pub(crate) encoding: EncodingConfig,
@@ -71,23 +75,23 @@ pub struct AmqpSinkConfig {
     pub(crate) acknowledgements: AcknowledgementsConfig,
 }
 
-impl Default for AmqpSinkConfig {
+impl Default for AMQPSinkConfig {
     fn default() -> Self {
         Self {
             exchange: "vector".to_string(),
             routing_key: None,
             encoding: TextSerializerConfig::new().into(),
-            connection: AmqpConfig::default(),
+            connection: AMQPConfig::default(),
             acknowledgements: AcknowledgementsConfig::default(),
         }
     }
 }
 
 inventory::submit! {
-    SinkDescription::new::<AmqpSinkConfig>("amqp")
+    SinkDescription::new::<AMQPSinkConfig>("amqp")
 }
 
-impl GenerateConfig for AmqpSinkConfig {
+impl GenerateConfig for AMQPSinkConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(
             r#"connection.connection_string = "amqp://localhost:5672/%2f"
@@ -101,9 +105,9 @@ impl GenerateConfig for AmqpSinkConfig {
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "amqp")]
-impl SinkConfig for AmqpSinkConfig {
+impl SinkConfig for AMQPSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, super::Healthcheck)> {
-        let sink = AmqpSink::new(self.clone()).await?;
+        let sink = AMQPSink::new(self.clone()).await?;
         let hc = healthcheck(self.clone(), Arc::clone(&sink.channel)).boxed();
         Ok((VectorSink::from_event_streamsink(sink), hc))
     }
@@ -212,12 +216,12 @@ impl Service<AMQPRequest> for AMQPService {
             match f {
                 Ok(result) => match result.await {
                     Ok(lapin::publisher_confirm::Confirmation::Nack(_)) => {
-                        emit!(AmqpNoAcknowledgement::default());
+                        emit!(AMQPNoAcknowledgement::default());
                     }
-                    Err(error) => emit!(AmqpAcknowledgementFailed { error }),
+                    Err(error) => emit!(AMQPAcknowledgementFailed { error }),
                     Ok(_) => (),
                 },
-                Err(error) => emit!(AmqpDeliveryFailed { error }),
+                Err(error) => emit!(AMQPDeliveryFailed { error }),
             }
 
             Ok(AMQPResponse { byte_size })
@@ -281,7 +285,7 @@ struct AMQPEvent {
     routing_key: String,
 }
 
-pub struct AmqpSink {
+pub struct AMQPSink {
     channel: Arc<lapin::Channel>,
     exchange: Template,
     routing_key: Option<Template>,
@@ -289,19 +293,19 @@ pub struct AmqpSink {
     encoder: crate::codecs::Encoder<()>,
 }
 
-impl AmqpSink {
-    async fn new(config: AmqpSinkConfig) -> crate::Result<Self> {
+impl AMQPSink {
+    async fn new(config: AMQPSinkConfig) -> crate::Result<Self> {
         let (_, channel) = config
             .connection
             .connect()
             .await
-            .map_err(|e| BuildError::AmqpCreateFailed { source: e })?;
+            .map_err(|e| BuildError::AMQPCreateFailed { source: e })?;
 
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build()?;
         let encoder = crate::codecs::Encoder::<()>::new(serializer);
 
-        Ok(AmqpSink {
+        Ok(AMQPSink {
             channel: Arc::new(channel),
             exchange: Template::try_from(config.exchange).context(ExchangeTemplateSnafu)?,
             routing_key: config
@@ -379,13 +383,13 @@ impl AmqpSink {
 }
 
 #[async_trait]
-impl StreamSink<Event> for AmqpSink {
+impl StreamSink<Event> for AMQPSink {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
     }
 }
 
-async fn healthcheck(_config: AmqpSinkConfig, channel: Arc<lapin::Channel>) -> crate::Result<()> {
+async fn healthcheck(_config: AMQPSinkConfig, channel: Arc<lapin::Channel>) -> crate::Result<()> {
     trace!("Healthcheck started.");
 
     if !channel.status().connected() {
@@ -405,7 +409,7 @@ mod tests {
 
     #[test]
     pub fn generate_config() {
-        crate::test_util::test_generate_config::<AmqpSinkConfig>();
+        crate::test_util::test_generate_config::<AMQPSinkConfig>();
     }
 }
 
@@ -422,8 +426,8 @@ mod integration_tests {
     use futures::StreamExt;
     use std::time::Duration;
 
-    pub fn make_config() -> AmqpSinkConfig {
-        let mut config = AmqpSinkConfig {
+    pub fn make_config() -> AMQPSinkConfig {
+        let mut config = AMQPSinkConfig {
             exchange: "it".to_string(),
             ..Default::default()
         };
@@ -480,7 +484,7 @@ mod integration_tests {
             .await
             .unwrap();
 
-        let sink = VectorSink::from_event_streamsink(AmqpSink::new(config.clone()).await.unwrap());
+        let sink = VectorSink::from_event_streamsink(AMQPSink::new(config.clone()).await.unwrap());
 
         // prepare consumer
         let queue_opts = lapin::options::QueueDeclareOptions {
@@ -558,10 +562,10 @@ mod integration_tests {
             .await
             .unwrap();
 
-        let amqp_sink = AmqpSink::new(config.clone()).await.unwrap();
+        let amqp_sink = AMQPSink::new(config.clone()).await.unwrap();
         let amqp_sink = VectorSink::from_event_streamsink(amqp_sink);
 
-        let source_cfg = crate::sources::amqp::AmqpSourceConfig {
+        let source_cfg = crate::sources::amqp::AMQPSourceConfig {
             connection: config.connection.clone(),
             queue: queue.clone(),
             consumer: format!("test-{}-amqp-source", random_string(10)),

@@ -16,15 +16,15 @@ pub(crate) enum ClientCertDer {
 /// Connection options for AMQP.
 #[configurable_component]
 #[derive(Clone, Debug)]
-pub(crate) struct AmqpConfig {
-    /// Connection string format: amqp://user:password@host:port/vhost?timeout=seconds
+pub(crate) struct AMQPConfig {
+    /// Format: amqp://user:password@host:port/vhost?timeout=seconds
     pub(crate) connection_string: String,
 
     #[configurable(derived)]
     pub(crate) tls: Option<crate::tls::TlsConfig>,
 }
 
-impl Default for AmqpConfig {
+impl Default for AMQPConfig {
     fn default() -> Self {
         Self {
             connection_string: "amqp://127.0.0.1/%2f".to_string(),
@@ -33,7 +33,7 @@ impl Default for AmqpConfig {
     }
 }
 
-impl AmqpConfig {
+impl AMQPConfig {
     pub(crate) async fn connect(
         &self,
     ) -> Result<(lapin::Connection, lapin::Channel), Box<dyn std::error::Error + Send + Sync>> {
@@ -70,13 +70,7 @@ impl AmqpConfig {
                 )
                 .await
             }
-            None => {
-                lapin::Connection::connect(
-                    &addr,
-                    lapin::ConnectionProperties::default(),
-                )
-                .await
-            }
+            None => lapin::Connection::connect(&addr, lapin::ConnectionProperties::default()).await,
         }?;
         let channel = conn.create_channel().await?;
         Ok((conn, channel))

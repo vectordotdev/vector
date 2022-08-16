@@ -5,11 +5,11 @@ pub mod source {
     use vector_core::internal_event::InternalEvent;
 
     #[derive(Debug)]
-    pub struct AmqpEventReceived {
+    pub struct AMQPEventReceived {
         pub byte_size: usize,
     }
 
-    impl InternalEvent for AmqpEventReceived {
+    impl InternalEvent for AMQPEventReceived {
         fn emit(self) {
             trace!(message = "Received one event.", internal_log_rate_secs = 10);
             counter!("processed_events_total", 1);
@@ -18,11 +18,11 @@ pub mod source {
     }
 
     #[derive(Debug)]
-    pub struct AmqpConsumerFailed {
+    pub struct AMQPConsumerFailed {
         pub error: lapin::Error,
     }
 
-    impl InternalEvent for AmqpConsumerFailed {
+    impl InternalEvent for AMQPConsumerFailed {
         fn emit(self) {
             error!(message = "Failed to consume.", error = ?self.error, internal_log_rate_secs = 10);
             counter!("events_consume_failed_total", 1);
@@ -30,11 +30,11 @@ pub mod source {
     }
 
     #[derive(Debug)]
-    pub struct AmqpEventFailed {
+    pub struct AMQPEventFailed {
         pub error: lapin::Error,
     }
 
-    impl InternalEvent for AmqpEventFailed {
+    impl InternalEvent for AMQPEventFailed {
         fn emit(self) {
             error!(message = "Failed to read message.", error = ?self.error, internal_log_rate_secs = 10);
             counter!("events_failed_total", 1);
@@ -42,22 +42,22 @@ pub mod source {
     }
 
     #[derive(Debug)]
-    pub struct AmqpKeyExtractionFailed<'a> {
+    pub struct AMQPKeyExtractionFailed<'a> {
         pub key_field: &'a str,
     }
 
-    impl InternalEvent for AmqpKeyExtractionFailed<'_> {
+    impl InternalEvent for AMQPKeyExtractionFailed<'_> {
         fn emit(self) {
             error!(message = "Failed to extract key.", key_field = %self.key_field, internal_log_rate_secs = 10);
         }
     }
 
     #[derive(Debug)]
-    pub struct AmqpDeliveryFailed {
+    pub struct AMQPDeliveryFailed {
         pub error: ClosedError,
     }
 
-    impl InternalEvent for AmqpDeliveryFailed {
+    impl InternalEvent for AMQPDeliveryFailed {
         fn emit(self) {
             error!(message = "Unable to deliver", error = ?self.error, internal_log_rate_secs = 10);
             counter!("consumer_delivery_failed_total", 1);
@@ -65,11 +65,11 @@ pub mod source {
     }
 
     #[derive(Debug)]
-    pub struct AmqpCommitFailed {
+    pub struct AMQPCommitFailed {
         pub error: lapin::Error,
     }
 
-    impl InternalEvent for AmqpCommitFailed {
+    impl InternalEvent for AMQPCommitFailed {
         fn emit(self) {
             error!(message = "Unable to ack", error = ?self.error, internal_log_rate_secs = 10);
             counter!("consumer_ack_failed_total", 1);
@@ -83,11 +83,11 @@ pub mod sink {
     use vector_core::internal_event::InternalEvent;
 
     #[derive(Debug)]
-    pub struct AmqpDeliveryFailed {
+    pub struct AMQPDeliveryFailed {
         pub error: lapin::Error,
     }
 
-    impl InternalEvent for AmqpDeliveryFailed {
+    impl InternalEvent for AMQPDeliveryFailed {
         fn emit(self) {
             error!(message = "Unable to deliver", error = ?self.error, internal_log_rate_secs = 10);
             counter!("events_deliver_failed_total", 1);
@@ -95,11 +95,11 @@ pub mod sink {
     }
 
     #[derive(Debug)]
-    pub struct AmqpAcknowledgementFailed {
+    pub struct AMQPAcknowledgementFailed {
         pub error: lapin::Error,
     }
 
-    impl InternalEvent for AmqpAcknowledgementFailed {
+    impl InternalEvent for AMQPAcknowledgementFailed {
         fn emit(self) {
             error!(message = "Acknowledgement failed", error = ?self.error, internal_log_rate_secs = 10);
             counter!("events_acknowledgement_failed_total", 1);
@@ -107,9 +107,9 @@ pub mod sink {
     }
 
     #[derive(Debug, Default)]
-    pub struct AmqpNoAcknowledgement;
+    pub struct AMQPNoAcknowledgement;
 
-    impl InternalEvent for AmqpNoAcknowledgement {
+    impl InternalEvent for AMQPNoAcknowledgement {
         fn emit(self) {
             error!(message = "No acknowledgement", internal_log_rate_secs = 10);
             counter!("events_acknowledgement_failed_total", 1);

@@ -3,12 +3,12 @@ use std::io::Cursor;
 use crate::codecs::{Decoder, DecodingConfig};
 use crate::config::SourceContext;
 use crate::{
-    amqp::AmqpConfig,
+    amqp::AMQPConfig,
     config::{log_schema, DataType, Output, SourceConfig, SourceDescription},
     event::Value,
     internal_events::source::{
-        AmqpCommitFailed, AmqpConsumerFailed, AmqpDeliveryFailed, AmqpEventFailed,
-        AmqpEventReceived,
+        AMQPCommitFailed, AMQPConsumerFailed, AMQPDeliveryFailed, AMQPEventFailed,
+        AMQPEventReceived,
     },
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
@@ -27,36 +27,36 @@ use vector_core::config::LogNamespace;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
-    #[snafu(display("Could not create Amqp consumer: {}", source))]
-    AmqpCreateError {
+    #[snafu(display("Could not create AMQP consumer: {}", source))]
+    AMQPCreateError {
         source: Box<dyn std::error::Error + Send + Sync>,
     },
-    #[snafu(display("Could not subscribe to Amqp queue: {}", source))]
-    AmqpSubscribeError { source: lapin::Error },
+    #[snafu(display("Could not subscribe to AMQP queue: {}", source))]
+    AMQPSubscribeError { source: lapin::Error },
 }
 
 /// Configuration for the `amqp` source.
 #[configurable_component(source)]
 #[derive(Clone, Debug, Derivative)]
 #[serde(deny_unknown_fields)]
-pub struct AmqpSourceConfig {
+pub struct AMQPSourceConfig {
     /// The queue.
     pub(crate) queue: String,
 
     /// The consumer.
     pub(crate) consumer: String,
 
-    /// The log field name to use for the Amqp routing key.
+    /// The log field name to use for the AMQP routing key.
     pub(crate) routing_key: Option<String>,
 
-    /// The log field name to use for the Amqp exchange key.
+    /// The log field name to use for the AMQP exchange key.
     pub(crate) exchange_key: Option<String>,
 
-    /// The log field name to use for the Amqp offset key.
+    /// The log field name to use for the AMQP offset key.
     pub(crate) offset_key: Option<String>,
 
-    /// Connection options for Amqp source.
-    pub(crate) connection: AmqpConfig,
+    /// Connection options for AMQP source.
+    pub(crate) connection: AMQPConfig,
 
     #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
@@ -69,7 +69,7 @@ pub struct AmqpSourceConfig {
     pub(crate) decoding: DeserializerConfig,
 }
 
-impl Default for AmqpSourceConfig {
+impl Default for AMQPSourceConfig {
     fn default() -> Self {
         Self {
             queue: "vector".to_string(),
@@ -77,7 +77,7 @@ impl Default for AmqpSourceConfig {
             routing_key: None,
             exchange_key: None,
             offset_key: None,
-            connection: AmqpConfig::default(),
+            connection: AMQPConfig::default(),
             framing: default_framing_message_based(),
             decoding: default_decoding(),
         }
@@ -85,12 +85,12 @@ impl Default for AmqpSourceConfig {
 }
 
 inventory::submit! {
-    SourceDescription::new::<AmqpSourceConfig>("amqp")
+    SourceDescription::new::<AMQPSourceConfig>("amqp")
 }
 
-impl_generate_config_from_default!(AmqpSourceConfig);
+impl_generate_config_from_default!(AMQPSourceConfig);
 
-impl AmqpSourceConfig {
+impl AMQPSourceConfig {
     fn decoder(&self) -> Decoder {
         DecodingConfig::new(
             self.framing.clone(),
@@ -103,7 +103,7 @@ impl AmqpSourceConfig {
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "amqp")]
-impl SourceConfig for AmqpSourceConfig {
+impl SourceConfig for AMQPSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         amqp_source(self, cx.shutdown, cx.out).await
     }
@@ -122,7 +122,7 @@ impl SourceConfig for AmqpSourceConfig {
 }
 
 pub(crate) async fn amqp_source(
-    config: &AmqpSourceConfig,
+    config: &AMQPSourceConfig,
     shutdown: ShutdownSignal,
     out: SourceSender,
 ) -> crate::Result<super::Source> {
@@ -131,13 +131,13 @@ pub(crate) async fn amqp_source(
         .connection
         .connect()
         .await
-        .map_err(|e| BuildError::AmqpCreateError { source: e })?;
+        .map_err(|e| BuildError::AMQPCreateError { source: e })?;
 
     Ok(Box::pin(run_amqp_source(config, shutdown, out, channel)))
 }
 
 async fn run_amqp_source(
-    config: AmqpSourceConfig,
+    config: AMQPSourceConfig,
     shutdown: ShutdownSignal,
     mut out: SourceSender,
     channel: Channel,
@@ -153,7 +153,7 @@ async fn run_amqp_source(
         )
         .await
         .map_err(|error| {
-            emit!(AmqpConsumerFailed { error });
+            emit!(AMQPConsumerFailed { error });
         })?
         .fuse();
     let mut shutdown = shutdown.fuse();
@@ -164,11 +164,11 @@ async fn run_amqp_source(
                 if let Some(try_m) = opt_m {
                     match try_m {
                         Err(error) => {
-                            emit!(AmqpEventFailed { error });
+                            emit!(AMQPEventFailed { error });
                             return Err(());
                         }
                         Ok(msg) => {
-                            emit!(AmqpEventReceived {
+                            emit!(AMQPEventReceived {
                                 byte_size: msg.data.len()
                             });
 
@@ -215,7 +215,7 @@ async fn run_amqp_source(
                                                 }
 
                                                 if let Err(error) = msg.acker.ack(ack_options).await {
-                                                    emit!(AmqpCommitFailed { error });
+                                                    emit!(AMQPCommitFailed { error });
                                                 }
 
                                                 yield event;
@@ -236,7 +236,7 @@ async fn run_amqp_source(
                             .boxed();
 
                             if let Err(error) = out.send_event_stream(&mut stream).await {
-                                emit!(AmqpDeliveryFailed { error });
+                                emit!(AMQPDeliveryFailed { error });
                             }
                         }
                     }
@@ -257,16 +257,16 @@ async fn run_amqp_source(
 
 #[cfg(test)]
 pub mod test {
-    use super::{amqp_source, AmqpSourceConfig};
+    use super::{amqp_source, AMQPSourceConfig};
     use crate::{shutdown::ShutdownSignal, SourceSender};
 
     #[test]
     fn generate_config() {
-        crate::test_util::test_generate_config::<AmqpSourceConfig>();
+        crate::test_util::test_generate_config::<AMQPSourceConfig>();
     }
 
-    pub fn make_config() -> AmqpSourceConfig {
-        let mut config = AmqpSourceConfig {
+    pub fn make_config() -> AMQPSourceConfig {
+        let mut config = AMQPSourceConfig {
             queue: "it".to_string(),
             ..Default::default()
         };
