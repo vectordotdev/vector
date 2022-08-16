@@ -630,6 +630,7 @@ build-ci-docker-images: ## Rebuilds all Docker images used in CI
 .PHONY: clean
 clean: environment-clean ## Clean everything
 	cargo clean
+	rm -rf target-feature-*/
 
 .PHONY: fmt
 fmt: ## Format code
