@@ -1,5 +1,5 @@
 [package]
-name = "vector_buffers"
+name = "vector-buffers"
 version = "0.1.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2021"
@@ -29,7 +29,7 @@ snafu = { version = "0.7.1", default-features = false, features = ["std"] }
 tokio-util = { version = "0.7.0", default-features = false }
 tokio = { version = "1.20.1", default-features = false, features = ["rt", "macros", "rt-multi-thread", "sync", "fs", "io-util", "time"] }
 tracing = { version = "0.1.34", default-features = false, features = ["attributes"] }
-vector_common = { path = "../vector-common", default-features = false, features = ["byte_size_of"] }
+vector-common = { path = "../vector-common", default-features = false, features = ["byte_size_of"] }
 
 [dev-dependencies]
 clap = "3.2.17"
