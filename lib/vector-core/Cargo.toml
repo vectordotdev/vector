@@ -1,5 +1,5 @@
 [package]
-name = "vector_core"
+name = "vector-core"
 version = "0.1.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2021"
@@ -53,10 +53,10 @@ typetag = { version = "0.2.3", default-features = false }
 twox-hash = { version = "1.6.3", default-features = false }
 url = { version = "2", default-features = false }
 value = { path = "../value", default-features = false, features = ["lua", "toml", "json", "api"] }
-vector_buffers = { path = "../vector-buffers", default-features = false }
-vector_common = { path = "../vector-common" }
-vector_config = { path = "../vector-config" }
-vector_config_macros = { path = "../vector-config-macros" }
+vector-buffers = { path = "../vector-buffers", default-features = false }
+vector-common = { path = "../vector-common" }
+vector-config = { path = "../vector-config" }
+vector-config-macros = { path = "../vector-config-macros" }
 # Rename to "vrl" once we use a release with stable `-Z namespaced-features`:
 # https://doc.rust-lang.org/cargo/reference/unstable.html#namespaced-features
 vrl-lib = { package = "vrl", path = "../vrl/vrl", optional = true }
@@ -78,7 +78,7 @@ noisy_float = "0.2.0"
 rand = "0.8.5"
 rand_distr = "0.4.3"
 tracing-subscriber = { version = "0.3.15", default-features = false, features = ["env-filter", "fmt", "ansi", "registry"] }
-vector_common = { path = "../vector-common", default-features = false, features = ["test"] }
+vector-common = { path = "../vector-common", default-features = false, features = ["test"] }
 value = { path = "../value", default-features = false, features = ["lua", "toml", "json", "api", "arbitrary", "test"] }
 vrl-lib = { package = "vrl", path = "../vrl/vrl"}
 
@@ -87,7 +87,7 @@ api = ["dep:async-graphql", "value/api"]
 default = []
 lua = ["dep:mlua", "dep:tokio-stream"]
 vrl = ["dep:vrl-lib", "dep:enrichment"]
-test = ["vector_common/test", "proptest"]
+test = ["vector-common/test", "proptest"]
 
 [[bench]]
 name = "event"

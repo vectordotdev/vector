@@ -1,5 +1,5 @@
 [package]
-name = "vector_config"
+name = "vector-config"
 version = "0.1.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2021"
@@ -15,8 +15,8 @@ serde = { version = "1.0", default-features = false }
 serde_json = { version = "1.0.83", default-features = false }
 serde_with = { version = "2.0.0", default-features = false, features = ["std"] }
 toml = { version = "0.5.9", default-features = false }
-vector_config_common = { path = "../vector-config-common" }
-vector_config_macros = { path = "../vector-config-macros" }
+vector-config-common = { path = "../vector-config-common" }
+vector-config-macros = { path = "../vector-config-macros" }
 
 [dev-dependencies]
 serde_with = { version = "2.0.0", default-features = false, features = ["std", "macros"] }

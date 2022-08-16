@@ -119,13 +119,13 @@ portpicker = { path = "lib/portpicker" }
 prometheus-parser = { path = "lib/prometheus-parser", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
 value = { path = "lib/value" }
-vector_buffers = { path = "lib/vector-buffers", default-features = false }
-vector_common = { path = "lib/vector-common" }
-vector_config = { path = "lib/vector-config" }
-vector_config_common = { path = "lib/vector-config-common" }
-vector_config_macros = { path = "lib/vector-config-macros" }
-vector_core = { path = "lib/vector-core", default-features = false, features = ["vrl"] }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
+vector-buffers = { path = "lib/vector-buffers", default-features = false }
+vector-common = { path = "lib/vector-common" }
+vector-config = { path = "lib/vector-config" }
+vector-config-common = { path = "lib/vector-config-common" }
+vector-config-macros = { path = "lib/vector-config-macros" }
+vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl"] }
 vector-vrl-functions = { path = "lib/vector-vrl-functions" }
 vrl-cli = { path = "lib/vrl/cli", optional = true }
 
@@ -342,7 +342,7 @@ tokio = { version = "1.20.1", features = ["test-util"] }
 tokio-test = "0.4.2"
 tower-test = "0.4.0"
 value = { path = "lib/value", features = ["test"] }
-vector_core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
+vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
 wiremock = "0.5.14"
 
 [patch.crates-io]
@@ -405,7 +405,7 @@ api = [
   "dep:async-graphql-warp",
   "dep:base64",
   "dep:itertools",
-  "vector_core/api",
+  "vector-core/api",
 ]
 
 # API client
@@ -414,7 +414,7 @@ api-client = [
   "dep:num-format",
   "dep:number_prefix",
   "dep:tui",
-  "vector_core/api",
+  "vector-core/api",
   "dep:vector-api-client",
 ]
 
@@ -568,7 +568,7 @@ transforms-dedupe = ["dep:lru"]
 transforms-filter = []
 transforms-geoip = ["dep:maxminddb"]
 transforms-log_to_metric = []
-transforms-lua = ["dep:mlua", "vector_core/lua"]
+transforms-lua = ["dep:mlua", "vector-core/lua"]
 transforms-metric_to_log = []
 transforms-pipelines = ["transforms-filter", "transforms-route"]
 transforms-reduce = []
