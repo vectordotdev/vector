@@ -26,17 +26,13 @@ use tokio::{
 };
 use vector_buffers::{BufferConfig, BufferType, WhenFull};
 
+mod backpressure;
+mod compliance;
 #[cfg(all(feature = "sinks-socket", feature = "sources-socket"))]
 mod crash;
-
+mod doesnt_reload;
 #[cfg(all(feature = "sources-http", feature = "sinks-http"))]
 mod end_to_end;
-
-mod transient_state;
-
-#[cfg(all(feature = "sinks-console", feature = "sources-demo_logs"))]
-mod source_finished;
-
 #[cfg(all(
     feature = "sources-prometheus",
     feature = "sinks-prometheus",
@@ -44,12 +40,9 @@ mod source_finished;
     feature = "sources-splunk_hec"
 ))]
 mod reload;
-
-#[cfg(all(feature = "sinks-console", feature = "sources-socket"))]
-mod doesnt_reload;
-
-mod backpressure;
-mod compliance;
+#[cfg(all(feature = "sinks-console", feature = "sources-demo_logs"))]
+mod source_finished;
+mod transient_state;
 
 fn basic_config() -> Config {
     trace_init();

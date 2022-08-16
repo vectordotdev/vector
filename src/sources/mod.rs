@@ -82,7 +82,7 @@ use vector_config::configurable_component;
 use vector_core::config::{LogNamespace, Output};
 pub use vector_core::source::Source;
 
-use crate::config::{unit_test::UnitTestSourceConfig, SourceConfig, SourceContext, Resource};
+use crate::config::{unit_test::UnitTestSourceConfig, Resource, SourceConfig, SourceContext};
 
 /// Common build errors
 #[derive(Debug, Snafu)]

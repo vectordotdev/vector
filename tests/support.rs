@@ -1,0 +1,39 @@
+// Using a shared mod like this is probably not the best idea, since we have to
+// disable the `dead_code` lint, as we don't need all of the helpers from here
+// all over the place.
+#![allow(dead_code)]
+
+use std::{
+    fs::{create_dir, OpenOptions},
+    io::Write,
+    path::PathBuf,
+};
+
+use vector::test_util::{temp_dir, temp_file};
+
+/// Creates a file with given content
+pub fn create_file(config: &str) -> PathBuf {
+    let path = temp_file();
+    overwrite_file(path.clone(), config);
+    path
+}
+
+/// Overwrites file with given content
+pub fn overwrite_file(path: PathBuf, config: &str) {
+    let mut file = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(path)
+        .unwrap();
+
+    file.write_all(config.as_bytes()).unwrap();
+    file.flush().unwrap();
+    file.sync_all().unwrap();
+}
+
+pub fn create_directory() -> PathBuf {
+    let path = temp_dir();
+    create_dir(path.clone()).unwrap();
+    path
+}
