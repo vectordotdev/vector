@@ -18,7 +18,7 @@ use vector_core::event_test_util;
 use crate::{
     config::{SourceConfig, SourceContext},
     event::{Event, EventArray, Metric, MetricValue},
-    metrics::{self, Controller},
+    metrics::Controller,
     sinks::VectorSink,
     SourceSender,
 };
@@ -151,13 +151,7 @@ impl ComponentTests {
 pub fn init_test() {
     super::trace_init();
     event_test_util::clear_recorded_events();
-
-    // Handle multiple initializations.
-    if let Err(error) = metrics::init_test() {
-        if error != metrics::Error::AlreadyInitialized {
-            panic!("Failed to initialize metrics recorder: {:?}", error);
-        }
-    }
+    super::trace_init();
 }
 
 /// Tests if the given metric contains all the given tag names

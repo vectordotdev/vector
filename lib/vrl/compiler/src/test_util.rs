@@ -18,11 +18,10 @@ macro_rules! test_type_def {
             $(
                 #[test]
                 fn $name() {
-                    let mut local = $crate::state::LocalEnv::default();
-                    let mut external = $crate::state::ExternalEnv::default();
-                    let expression = Box::new($expr((&mut local, &mut external)));
+                    let mut state = $crate::state::TypeState::default();
+                    let expression = Box::new($expr(&mut state));
 
-                    assert_eq!(expression.type_def((&local, &external)), $def);
+                    assert_eq!(expression.type_def(&state), $def);
                 }
             )+
         }
@@ -49,10 +48,9 @@ macro_rules! bench_function {
             group.throughput(criterion::Throughput::Elements(1));
             $(
                 group.bench_function(&stringify!($case).to_string(), |b| {
-                    let mut local = $crate::state::LocalEnv::default();
-                    let mut external = $crate::state::ExternalEnv::default();
+                    let mut state = $crate::state::TypeState::default();
 
-                    let (expression, want) = $crate::__prep_bench_or_test!($func, (&mut local, &mut external), $args, $(Ok(::value::Value::from($ok)))? $(Err($err.to_owned()))?);
+                    let (expression, want) = $crate::__prep_bench_or_test!($func, &state, $args, $(Ok(::value::Value::from($ok)))? $(Err($err.to_owned()))?);
                     let expression = expression.unwrap();
                     let mut runtime_state = $crate::state::Runtime::default();
                     let mut target: ::value::Value = ::std::collections::BTreeMap::default().into();
@@ -90,10 +88,9 @@ macro_rules! test_function {
             #[test]
             fn [<$name _ $case:snake:lower>]() {
                 $before
-                let mut local = $crate::state::LocalEnv::default();
-                let mut external = $crate::state::ExternalEnv::default();
+                let mut state = $crate::state::TypeState::default();
 
-                let (expression, want) = $crate::__prep_bench_or_test!($func, (&mut local, &mut external), $args, $(Ok(::value::Value::from($ok)))? $(Err($err.to_owned()))?);
+                let (expression, want) = $crate::__prep_bench_or_test!($func, &state, $args, $(Ok(::value::Value::from($ok)))? $(Err($err.to_owned()))?);
                 match expression {
                     Ok(expression) => {
                         let mut runtime_state = $crate::state::Runtime::default();
@@ -105,8 +102,7 @@ macro_rules! test_function {
                             .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
 
                         assert!(got_value == want, "assertion failed for `{}` case:\n  got:    {:?}\n  wanted: {:?}", stringify!($case), got_value, want);
-                        let got_tdef = expression.type_def((&local, &external));
-
+                        let got_tdef = expression.type_def(&state);
                         assert_eq!(got_tdef, $tdef);
                     }
                     err@Err(_) => {
@@ -127,12 +123,14 @@ macro_rules! test_function {
 #[macro_export]
 macro_rules! __prep_bench_or_test {
     ($func:path, $state:expr, $args:expr, $want:expr) => {{
+        let config = $crate::CompileConfig::default();
         (
             $func.compile(
                 $state,
-                &mut $crate::function::FunctionCompileContext::new(vrl::diagnostic::Span::new(
-                    0, 0,
-                )),
+                &mut $crate::function::FunctionCompileContext::new(
+                    vrl::diagnostic::Span::new(0, 0),
+                    config,
+                ),
                 $args.into(),
             ),
             $want,

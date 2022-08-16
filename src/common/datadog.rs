@@ -33,7 +33,7 @@ pub(crate) struct DatadogPoint<T>(pub(crate) i64, pub(crate) T);
 
 /// A Datadog region.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Region {
     /// US region.

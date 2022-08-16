@@ -28,7 +28,8 @@ components: sinks: datadog_archives: {
 				enabled:                true
 				can_verify_certificate: true
 				can_verify_hostname:    true
-				enabled_default:        false
+				enabled_default:        true
+				enabled_by_scheme:      true
 			}
 		}
 	}

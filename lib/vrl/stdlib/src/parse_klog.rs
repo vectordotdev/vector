@@ -99,13 +99,13 @@ impl Function for ParseKlog {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(ParseKlogFn { value }))
+        Ok(ParseKlogFn { value }.as_expr())
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -122,13 +122,13 @@ struct ParseKlogFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ParseKlogFn {
+impl FunctionExpression for ParseKlogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?;
         parse_klog(bytes)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::object(inner_kind()).fallible()
     }
 }

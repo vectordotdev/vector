@@ -1,5 +1,4 @@
 [enterprise]
-application_key = "application_key"
 configuration_key = "configuration_key"
 endpoint = "${MOCK_SERVER_ENDPOINT}"
 max_retries = 1

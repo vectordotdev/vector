@@ -93,7 +93,7 @@ impl Function for IsJson {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -105,9 +105,9 @@ impl Function for IsJson {
                 let variant = raw_variant
                     .try_bytes()
                     .map_err(|e| Box::new(e) as Box<dyn DiagnosticMessage>)?;
-                Ok(Box::new(IsJsonVariantsFn { value, variant }))
+                Ok(IsJsonVariantsFn { value, variant }.as_expr())
             }
-            None => Ok(Box::new(IsJsonFn { value })),
+            None => Ok(IsJsonFn { value }.as_expr()),
         }
     }
 
@@ -137,13 +137,13 @@ struct IsJsonFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for IsJsonFn {
+impl FunctionExpression for IsJsonFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         is_json(value)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::boolean().infallible()
     }
 }
@@ -154,7 +154,7 @@ struct IsJsonVariantsFn {
     variant: Bytes,
 }
 
-impl Expression for IsJsonVariantsFn {
+impl FunctionExpression for IsJsonVariantsFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let variant = &self.variant;
@@ -162,7 +162,7 @@ impl Expression for IsJsonVariantsFn {
         is_json_with_variant(value, variant)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::boolean().infallible()
     }
 }

@@ -1,4 +1,5 @@
 use ::value::Value;
+use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
 
 fn append(value: Value, items: Value) -> Resolved {
@@ -41,14 +42,14 @@ impl Function for Append {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let items = arguments.required("items");
 
-        Ok(Box::new(AppendFn { value, items }))
+        Ok(AppendFn { value, items }.as_expr())
     }
 }
 
@@ -58,7 +59,7 @@ struct AppendFn {
     items: Box<dyn Expression>,
 }
 
-impl Expression for AppendFn {
+impl FunctionExpression for AppendFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let items = self.items.resolve(ctx)?;
@@ -66,7 +67,7 @@ impl Expression for AppendFn {
         append(value, items)
     }
 
-    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &state::TypeState) -> TypeDef {
         let mut self_value = self.value.type_def(state).restrict_array();
         let items = self.items.type_def(state).restrict_array();
 

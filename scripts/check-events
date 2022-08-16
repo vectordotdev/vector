@@ -34,8 +34,8 @@ end
 
 # A class to hold error reports and common functionality
 class Event
-  attr_accessor :path, :uses, :impl_internal_event
-  attr_reader :name, :reports
+  attr_accessor :path, :uses, :impl_internal_event, :impl_register_event, :impl_event_handle
+  attr_reader :name, :reports, :logs
   attr_writer :members
 
   def initialize(name)
@@ -48,6 +48,8 @@ class Event
     @logs = []
     @uses = 0
     @impl_internal_event = false
+    @impl_register_event = false
+    @impl_event_handle = false
   end
 
   def add_metric(type, name, tags)
@@ -57,8 +59,47 @@ class Event
     end
   end
 
+  # Scan for counter names and tags
+  def scan_metrics(block)
+    block.scan(/ (counter|gauge|histogram)!\((?:\n\s+)?"([^"]+)",(.+?)\)[;\n]/ms) \
+    do |type, name, tags|
+      tags = Hash[tags.scan(/"([^"]+)" => (.+?)(?:,|$)/)]
+      add_metric(type, name, tags)
+    end
+  end
+
+  # Scan for registered counter names and tags
+  def scan_register_metrics(block)
+    # This is a _slightly_ different regex than the above, couldn't figure a way to unify them
+    block.scan(/ register_(counter|gauge|histogram)!\((?:\n\s+)?"([^"]+)"(,.+?)?\)[;,]\n/ms) \
+    do |type, name, tags|
+      tags = tags || ''
+      tags = Hash[tags.scan(/"([^"]+)" => (.+?)(?:,|$)/)]
+      add_metric(type, name, tags)
+    end
+  end
+
   def add_log(type, message, parameters)
     @logs.append([type, message, parameters])
+  end
+
+  # Scan for log outputs and their parameters
+  def scan_logs(block)
+    block.scan(/
+               (trace|debug|info|warn|error)! # The log type
+                \(\s*(?:message\s*=\s*)? # Skip any leading "message =" bit
+                (?:"([^({)][^("]+)"|([^,]+)) # The log message text
+                ([^;]*?) # Match the parameter list
+                \)(?:;|\n\s*}) # Normally would end with simply ");", but some are missing the semicolon
+               /mx) \
+    do |type, raw_message, var_message, parameters|
+      parameters = parameters.scan(/([a-z0-9_]+) *= .|[?%]([a-z0-9_.]+)/) \
+                     .map { |assignment, simple| assignment or simple }
+
+      message = raw_message.nil? ? var_message : raw_message
+
+      add_log(type, message, parameters)
+    end
   end
 
   # The event signature is used to check for duplicates and is
@@ -82,6 +123,10 @@ class Event
   end
 
   def valid?
+    valid_with_handle? self
+  end
+
+  def valid_with_handle?(handle)
     @reports.clear
 
     if @uses == 0
@@ -90,7 +135,7 @@ class Event
 
     EVENT_CLASSES.each do |suffix, (required_message, counters, additional_tags)|
       if @name.end_with? suffix
-        @logs.each do |type, message, parameters|
+        handle.logs.each do |type, message, parameters|
           if type != 'trace'
             @reports.append('Log type MUST be \"trace!\".')
           end
@@ -110,17 +155,17 @@ class Event
       end
     end
 
-    has_errors = @logs.one? { |type, _, _| type == 'error' }
+    has_errors = handle.logs.one? { |type, _, _| type == 'error' }
 
     # Make sure Error events output an error
     if has_errors or @name.end_with? 'Error'
       append('Error events MUST be named "___Error".') unless @name.end_with? 'Error'
-      logs_should_have('error')
+      handle.logs_should_have('error')
       counters_must_include('component_errors_total', ['error_type', 'stage'])
     end
 
     # Make sure error events contain the right parameters
-    @logs.each do |type, message, parameters|
+    handle.logs.each do |type, message, parameters|
       if type == 'error'
         ['error_type', 'stage'].each do |parameter|
           unless parameters.include? parameter
@@ -161,16 +206,16 @@ class Event
     @reports.empty?
   end
 
+  def logs_should_have(level)
+    if @logs.find_index { |type, message, parameters| type == level }.nil?
+      @reports.append("This event MUST log with level #{level}.")
+    end
+  end
+
   private
 
     def append(report)
       @reports.append(report)
-    end
-
-    def logs_should_have(level)
-      if @logs.find_index { |type, message, parameters| type == level }.nil?
-        @reports.append("This event MUST log with level #{level}.")
-      end
     end
 
     def counters_must_include(name, required_tags)
@@ -200,7 +245,8 @@ Find.find('.') do |path|
   if path.end_with? '.rs'
     text = File.read(path)
 
-    text.scan(/\b(?:emit!|internal_event::emit)\((?:[a-z][a-z0-9_:]+)?([A-Z][A-Za-z0-9]+)/) do |event_name,|
+    text.scan(/\b(?:emit!?|register!?)\((?:[a-z][a-z0-9_:]+)?([A-Z][A-Za-z0-9]+)/) \
+    do |event_name,|
       $all_events[event_name].uses += 1
     end
 
@@ -222,37 +268,33 @@ Find.find('.') do |path|
     if (path.start_with? 'src/internal_events/' or path.start_with? 'lib/vector-common/src/internal_event/')
       # Scan internal event structs for member names
       text.scan(/[\n ]struct (\S+?)(?:<.+?>)?(?: {\n(.+?)\n\s*}|;)\n/m) do |struct_name, members|
-        $all_events[struct_name].path = path
+        event = $all_events[struct_name]
+        event.path = path
         if members
           members = members.scan(/ ([A-Za-z0-9_]+): +(.+?),/).map { |member, type| [member, type] }
-          $all_events[struct_name].members = members.to_h
+          event.members = members.to_h
         end
       end
 
       # Scan internal event implementation blocks for logs and metrics
-      text.scan(/^(\s*)impl(?:<.+?>)? InternalEvent for ([A-Za-z0-9_]+)(?:<.+?>)? {\n(.+?)\n\1}$/m) do |_space, event_name, block|
-        $all_events[event_name].impl_internal_event = true
+      text.scan(/^(\s*)impl(?:<.+?>)? (InternalEvent|RegisterInternalEvent|InternalEventHandle) for ([A-Za-z0-9_]+)(?:<.+?>)? {\n(.+?)\n\1}$/m) \
+      do |_space, trait, event_name, block|
+        event = $all_events[event_name]
 
-        # Scan for counter names and tags
-        block.scan(/ (counter|gauge|histogram)!\((?:\n\s+)?"([^"]+)",(.+?)\)[;\n]/m) do |type, name, tags|
-          tags = Hash[tags.scan(/"([^"]+)" => (.+?)(?:,|$)/)]
-          $all_events[event_name].add_metric(type, name, tags)
-        end
-
-        # Scan for log outputs and their parameters
-        block.scan(/
-                    (trace|debug|info|warn|error)! # The log type
-                    \(\s*(?:message\s*=\s*)? # Skip any leading "message =" bit
-                    (?:"([^({)][^("]+)"|([^,]+)) # The log message text
-                    ([^;]*?) # Match the parameter list
-                    \)(?:;|\n\s*}) # Normally would end with simply ");", but some are missing the semicolon
-                   /mx) do |type, raw_message, var_message, parameters|
-          parameters = parameters.scan(/([a-z0-9_]+) *= .|[?%]([a-z0-9_.]+)/) \
-                         .map { |assignment, simple| assignment or simple }
-
-          message = raw_message.nil? ? var_message : raw_message
-
-          $all_events[event_name].add_log(type, message, parameters)
+        if trait == 'InternalEvent'
+          # Look-aside internal events that defer their implementation to a registered event.
+          if ! block.include? '.register('
+            event.impl_internal_event = true
+            event.scan_metrics(block)
+            event.scan_logs(block)
+          end
+        elsif trait == 'RegisterInternalEvent'
+          # Extract the handle type name to join them together
+          event.impl_register_event = block[/type Handle = ([A-Za-z0-9]+);/, 1]
+          event.scan_register_metrics(block)
+        elsif trait == 'InternalEventHandle'
+          event.impl_event_handle = true
+          event.scan_logs(block)
         end
       end
     end
@@ -262,15 +304,33 @@ end
 $duplicates = Hash::new { |hash, key| hash[key] = [] }
 
 $all_events.each do |name, event|
-  if event.impl_internal_event
+  # Check for duplicated signatures
+  if event.impl_internal_event or event.impl_register_event or event.impl_event_handle
     signature = event.signature
     if signature
       $duplicates[event.signature].append(name)
     end
+  end
+
+  # Check events for validity
+  if event.impl_internal_event
     unless event.valid?
       puts "#{event.path}: Errors in event #{event.name}:"
       event.reports.each { |report| puts "    #{report}" }
       error_count += 1
+    end
+  elsif event.impl_register_event
+    handle = $all_events[event.impl_register_event]
+    if handle
+      unless event.valid_with_handle? handle
+        puts "#{event.path}: Errors in event #{event.name}:"
+        event.reports.each { |report| puts "    #{report}" }
+        error_count += 1
+      end
+    else
+      puts "Registered event #{event.name} references non-exitent handle #{event.impl_register_event}"
+      error_count += 1
+      next
     end
   end
 end

@@ -11,7 +11,8 @@ components: sources: aws_s3: components._aws & {
 				enabled:                true
 				can_verify_certificate: true
 				can_verify_hostname:    true
-				enabled_default:        false
+				enabled_default:        true
+				enabled_by_scheme:      true
 			}
 			checkpoint: enabled: false
 			proxy: enabled:      true

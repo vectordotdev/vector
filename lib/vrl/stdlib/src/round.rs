@@ -65,14 +65,14 @@ impl Function for Round {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let precision = arguments.optional("precision").unwrap_or(expr!(0));
 
-        Ok(Box::new(RoundFn { value, precision }))
+        Ok(RoundFn { value, precision }.as_expr())
     }
 }
 
@@ -82,7 +82,7 @@ struct RoundFn {
     precision: Box<dyn Expression>,
 }
 
-impl Expression for RoundFn {
+impl FunctionExpression for RoundFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let precision = self.precision.resolve(ctx)?;
         let value = self.value.resolve(ctx)?;
@@ -90,7 +90,7 @@ impl Expression for RoundFn {
         round(precision, value)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::integer().infallible()
     }
 }

@@ -44,7 +44,7 @@ impl Function for ParseRegexAll {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -54,11 +54,12 @@ impl Function for ParseRegexAll {
             .optional("numeric_groups")
             .unwrap_or_else(|| expr!(false));
 
-        Ok(Box::new(ParseRegexAllFn {
+        Ok(ParseRegexAllFn {
             value,
             pattern,
             numeric_groups,
-        }))
+        }
+        .as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -124,7 +125,7 @@ pub(crate) struct ParseRegexAllFn {
     numeric_groups: Box<dyn Expression>,
 }
 
-impl Expression for ParseRegexAllFn {
+impl FunctionExpression for ParseRegexAllFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let numeric_groups = self.numeric_groups.resolve(ctx)?;
@@ -133,7 +134,7 @@ impl Expression for ParseRegexAllFn {
         parse_regex_all(value, numeric_groups.try_boolean()?, pattern)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::array(Collection::from_unknown(
             Kind::object(util::regex_kind(&self.pattern)).or_null(),
         ))

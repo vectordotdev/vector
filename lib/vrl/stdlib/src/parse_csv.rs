@@ -49,13 +49,13 @@ impl Function for ParseCsv {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let delimiter = arguments.optional("delimiter").unwrap_or(expr!(","));
-        Ok(Box::new(ParseCsvFn { value, delimiter }))
+        Ok(ParseCsvFn { value, delimiter }.as_expr())
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -80,7 +80,7 @@ struct ParseCsvFn {
     delimiter: Box<dyn Expression>,
 }
 
-impl Expression for ParseCsvFn {
+impl FunctionExpression for ParseCsvFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let csv_string = self.value.resolve(ctx)?;
         let delimiter = self.delimiter.resolve(ctx)?;
@@ -88,7 +88,7 @@ impl Expression for ParseCsvFn {
         parse_csv(csv_string, delimiter)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::array(inner_kind()).fallible()
     }
 }

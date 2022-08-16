@@ -2,11 +2,8 @@ use std::fmt;
 
 use value::Value;
 
-use crate::{
-    expression::Resolved,
-    state::{ExternalEnv, LocalEnv},
-    Context, Expression, TypeDef,
-};
+use crate::state::{TypeInfo, TypeState};
+use crate::{expression::Resolved, Context, Expression, TypeDef};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Noop;
@@ -16,8 +13,8 @@ impl Expression for Noop {
         Ok(Value::Null)
     }
 
-    fn type_def(&self, _: (&LocalEnv, &ExternalEnv)) -> TypeDef {
-        TypeDef::null().infallible()
+    fn type_info(&self, state: &TypeState) -> TypeInfo {
+        TypeInfo::new(state, TypeDef::null())
     }
 }
 

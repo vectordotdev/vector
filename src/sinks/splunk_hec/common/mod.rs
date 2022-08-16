@@ -14,7 +14,7 @@ pub(super) const HOST_FIELD: &str = "host";
 
 /// Splunk HEC endpoint configuration.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum EndpointTarget {
     /// Events are sent to the [raw endpoint][raw_endpoint_docs].

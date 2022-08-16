@@ -174,8 +174,8 @@ prop_compose! {
              alternative in prop::collection::vec(expr(), 1..3)) -> Expr {
                     Expr::IfStatement(node(IfStatement {
                         predicate: node(predicate),
-                        consequent: node(Block(consequent.into_iter().map(node).collect())),
-                        alternative: Some(node(Block(alternative.into_iter().map(node).collect()))),
+                        if_node: node(Block(consequent.into_iter().map(node).collect())),
+                        else_node: Some(node(Block(alternative.into_iter().map(node).collect()))),
                     }))
     }
 }

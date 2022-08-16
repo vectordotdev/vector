@@ -47,14 +47,14 @@ impl Function for Push {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let item = arguments.required("item");
 
-        Ok(Box::new(PushFn { value, item }))
+        Ok(PushFn { value, item }.as_expr())
     }
 }
 
@@ -64,7 +64,7 @@ struct PushFn {
     item: Box<dyn Expression>,
 }
 
-impl Expression for PushFn {
+impl FunctionExpression for PushFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let list = self.value.resolve(ctx)?;
         let item = self.item.resolve(ctx)?;
@@ -72,7 +72,7 @@ impl Expression for PushFn {
         push(list, item)
     }
 
-    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &state::TypeState) -> TypeDef {
         let item = self.item.type_def(state).kind().clone().upgrade_undefined();
         let mut typedef = self.value.type_def(state).restrict_array();
 
