@@ -95,7 +95,8 @@ impl Service<KafkaRequest> for KafkaService {
             }
 
             //rdkafka will internally retry forever if the queue is full
-            let result = match kafka_producer.send(record, Timeout::Never).await {
+
+            match kafka_producer.send(record, Timeout::Never).await {
                 Ok((_partition, _offset)) => {
                     emit!(BytesSent {
                         byte_size: request.body.len()
@@ -107,8 +108,7 @@ impl Service<KafkaRequest> for KafkaService {
                     })
                 }
                 Err((kafka_err, _original_record)) => Err(kafka_err),
-            };
-            result
+            }
         })
     }
 }

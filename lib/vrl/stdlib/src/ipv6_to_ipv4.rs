@@ -43,12 +43,12 @@ impl Function for Ipv6ToIpV4 {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
-        Ok(Box::new(Ipv6ToIpV4Fn { value }))
+        Ok(Ipv6ToIpV4Fn { value }.as_expr())
     }
 }
 
@@ -57,13 +57,13 @@ struct Ipv6ToIpV4Fn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for Ipv6ToIpV4Fn {
+impl FunctionExpression for Ipv6ToIpV4Fn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         ipv6_to_ipv4(value)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::bytes().fallible()
     }
 }

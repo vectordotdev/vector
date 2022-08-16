@@ -904,7 +904,7 @@ async fn decode_sketches() {
             assert_eq!(metric.tags().unwrap()["foo"], "bar".to_string());
             assert_eq!(metric.tags().unwrap()["foobar"], "".to_string());
 
-            let s = &*metric.value();
+            let s = metric.value();
             assert!(matches!(s, MetricValue::Sketch { .. }));
             if let MetricValue::Sketch {
                 sketch: MetricSketch::AgentDDSketch(ddsketch),

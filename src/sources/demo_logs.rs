@@ -67,7 +67,7 @@ const fn default_count() -> usize {
     isize::MAX as usize
 }
 
-#[derive(Debug, PartialEq, Snafu)]
+#[derive(Debug, PartialEq, Eq, Snafu)]
 pub enum DemoLogsConfigError {
     #[snafu(display("A non-empty list of lines is required for the shuffle format"))]
     ShuffleDemoLogsItemsEmpty,

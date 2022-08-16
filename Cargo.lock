@@ -1520,9 +1520,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "3.2.16"
+version = "3.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a3dbbb6653e7c55cc8595ad3e1f7be8f32aba4eb7ff7f0fd1163d4f3d137c0a9"
+checksum = "29e724a68d9319343bb3328c9cc2dfde263f4b3142ee1059a9980580171c954b"
 dependencies = [
  "atty",
  "bitflags",
@@ -1537,9 +1537,9 @@ dependencies = [
 
 [[package]]
 name = "clap_derive"
-version = "3.2.15"
+version = "3.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ba52acd3b0a5c33aeada5cdaa3267cdc7c594a98731d4268cdc1532f4264cb4"
+checksum = "13547f7012c01ab4a0e8f8967730ada8f9fdf419e8b6c792788f39cf4e46eefa"
 dependencies = [
  "heck 0.4.0",
  "proc-macro-error",
@@ -1870,22 +1870,6 @@ checksum = "51887d4adc7b564537b15adcfb307936f8075dfcd5f00dde9a9f1d29383682bc"
 dependencies = [
  "cfg-if 1.0.0",
  "once_cell",
-]
-
-[[package]]
-name = "crossterm"
-version = "0.23.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a2102ea4f781910f8a5b98dd061f4c2023f479ce7bb1236330099ceb5a93cf17"
-dependencies = [
- "bitflags",
- "crossterm_winapi",
- "libc",
- "mio 0.8.2",
- "parking_lot",
- "signal-hook",
- "signal-hook-mio",
- "winapi 0.3.9",
 ]
 
 [[package]]
@@ -2376,6 +2360,12 @@ name = "encode_unicode"
 version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a357d28ed41a50f9c765dbfe56cbc04a64e53e5fc58ba79fbc34c10ef3df831f"
+
+[[package]]
+name = "encode_unicode"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "34aa73646ffb006b8f5147f3dc182bd4bcb190227ce861fc4a4844bf8e3cb2c0"
 
 [[package]]
 name = "encoding_rs"
@@ -3942,9 +3932,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.129"
+version = "0.2.131"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64de3cc433455c14174d42e554d4027ee631c4d046d43e3ecc6efc4636cdc7a7"
+checksum = "04c3b4822ccebfa39c02fc03d1534441b22ead323fa0f48bb7ddd8e6ba076a40"
 
 [[package]]
 name = "libflate"
@@ -4200,9 +4190,9 @@ checksum = "2dffe52ecf27772e601905b7522cb4ef790d2cc203488bbd0e2fe85fcb74566d"
 
 [[package]]
 name = "memmap2"
-version = "0.5.5"
+version = "0.5.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a79b39c93a7a5a27eeaf9a23b5ff43f1b9e0ad6b1cdd441140ae53c35613fc7"
+checksum = "95af15f345b17af2efc8ead6080fb8bc376f8cec1b35277b935637595fe77498"
 dependencies = [
  "libc",
 ]
@@ -5287,18 +5277,18 @@ checksum = "db8bcd96cb740d03149cbad5518db9fd87126a10ab519c011893b1754134c468"
 
 [[package]]
 name = "pin-project"
-version = "1.0.11"
+version = "1.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "78203e83c48cffbe01e4a2d35d566ca4de445d79a85372fc64e378bfc812a260"
+checksum = "ad29a609b6bcd67fee905812e544992d216af9d755757c05ed2d0e15a74c6ecc"
 dependencies = [
  "pin-project-internal",
 ]
 
 [[package]]
 name = "pin-project-internal"
-version = "1.0.11"
+version = "1.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "710faf75e1b33345361201d36d04e98ac1ed8909151a017ed384700836104c74"
+checksum = "069bdb1e05adc7a8990dce9cc75370895fbe4e3d58b9b73bf1aee56359344a55"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -5496,7 +5486,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b6176190f1637d46034820b82fbe758727ccb40da9c9fc2255d695eb05ea29c"
 dependencies = [
  "ansi_term",
- "prettytable-rs",
+ "prettytable-rs 0.8.0",
  "structopt",
 ]
 
@@ -5518,9 +5508,22 @@ checksum = "0fd04b170004fa2daccf418a7f8253aaf033c27760b5f225889024cf66d7ac2e"
 dependencies = [
  "atty",
  "csv",
- "encode_unicode",
+ "encode_unicode 0.3.6",
  "lazy_static",
  "term 0.5.2",
+ "unicode-width",
+]
+
+[[package]]
+name = "prettytable-rs"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5f375cb74c23b51d23937ffdeb48b1fbf5b6409d4b9979c1418c1de58bc8f801"
+dependencies = [
+ "atty",
+ "encode_unicode 1.0.0",
+ "lazy_static",
+ "term 0.7.0",
  "unicode-width",
 ]
 
@@ -8088,13 +8091,13 @@ checksum = "59547bce71d9c38b83d9c0e92b6066c4253371f15005def0c30d9657f50c7642"
 
 [[package]]
 name = "tui"
-version = "0.18.0"
+version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "96fe69244ec2af261bced1d9046a6fee6c8c2a6b0228e59e5ba39bc8ba4ed729"
+checksum = "ccdd26cbd674007e649a272da4475fb666d3aa0ad0531da7136db6fab0e5bad1"
 dependencies = [
  "bitflags",
  "cassowary",
- "crossterm 0.23.2",
+ "crossterm",
  "unicode-segmentation",
  "unicode-width",
 ]
@@ -8438,12 +8441,12 @@ dependencies = [
  "bytesize",
  "chrono",
  "cidr-utils",
- "clap 3.2.16",
+ "clap 3.2.17",
  "codecs",
  "colored",
  "console-subscriber",
  "criterion",
- "crossterm 0.25.0",
+ "crossterm",
  "csv",
  "datadog-filter",
  "datadog-search-syntax",
@@ -8624,7 +8627,7 @@ dependencies = [
  "async-trait",
  "bytecheck",
  "bytes 1.2.1",
- "clap 3.2.16",
+ "clap 3.2.17",
  "crc32fast",
  "criterion",
  "crossbeam-queue",
@@ -8832,12 +8835,12 @@ dependencies = [
 name = "vrl-cli"
 version = "0.1.0"
 dependencies = [
- "clap 3.2.16",
+ "clap 3.2.17",
  "exitcode",
  "indoc",
  "lookup",
  "once_cell",
- "prettytable-rs",
+ "prettytable-rs 0.9.0",
  "regex",
  "rustyline",
  "serde_json",
@@ -8970,7 +8973,7 @@ dependencies = [
  "ansi_term",
  "chrono",
  "chrono-tz",
- "clap 3.2.16",
+ "clap 3.2.17",
  "enrichment",
  "glob",
  "lookup",

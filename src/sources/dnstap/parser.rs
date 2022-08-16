@@ -20,6 +20,8 @@ use crate::{
     internal_events::DnstapParseError,
     Error, Result,
 };
+
+#[allow(warnings)]
 mod dnstap_proto {
     include!(concat!(env!("OUT_DIR"), "/dnstap.rs"));
 }

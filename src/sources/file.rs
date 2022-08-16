@@ -68,7 +68,7 @@ enum BuildError {
 
 /// Configuration for the `file` source.
 #[configurable_component(source)]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[serde(deny_unknown_fields, default)]
 pub struct FileConfig {
     /// Array of file patterns to include. [Globbing](https://vector.dev/docs/reference/configuration/sources/file/#globbing) is supported.
@@ -183,7 +183,7 @@ pub struct FileConfig {
 ///
 /// This is important for `checkpointing` when file rotation is used.
 #[configurable_component]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[serde(tag = "strategy", rename_all = "snake_case")]
 pub enum FingerprintConfig {
     /// Read lines from the beginning of the file and compute a checksum over them.
@@ -216,7 +216,7 @@ pub enum FingerprintConfig {
 
 /// File position to use when reading a new file.
 #[configurable_component]
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ReadFromConfig {
     /// Read from the beginning of the file.

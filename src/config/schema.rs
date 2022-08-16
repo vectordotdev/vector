@@ -3,7 +3,7 @@ use vector_core::config::LogNamespace;
 
 pub(crate) use crate::schema::Definition;
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Copy, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Copy, Clone)]
 #[serde(default, deny_unknown_fields)]
 pub struct Options {
     #[serde(default = "default_enabled")]

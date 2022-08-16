@@ -77,7 +77,7 @@ pub enum GcsPredefinedAcl {
 ///
 /// [storage_classes]: https://cloud.google.com/storage/docs/storage-classes
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative, PartialEq)]
+#[derive(Clone, Copy, Debug, Derivative, PartialEq, Eq)]
 #[derivative(Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum GcsStorageClass {

@@ -97,14 +97,14 @@ impl Function for Unnest {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let path = arguments.required_query("path")?;
         let root = LookupBuf::root();
 
-        Ok(Box::new(UnnestFn { path, root }))
+        Ok(UnnestFn { path, root }.as_expr())
     }
 
     fn compile_argument(
@@ -155,17 +155,17 @@ impl UnnestFn {
     }
 }
 
-impl Expression for UnnestFn {
+impl FunctionExpression for UnnestFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         unnest(&self.path, &self.root, ctx)
     }
 
-    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &state::TypeState) -> TypeDef {
         use expression::Target;
 
         match self.path.target() {
             Target::External => invert_array_at_path(
-                &TypeDef::from(state.1.target_kind().clone()),
+                &TypeDef::from(state.external.target_kind().clone()),
                 self.path.path(),
             ),
             Target::Internal(v) => invert_array_at_path(&v.type_def(state), self.path.path()),
@@ -218,6 +218,7 @@ pub(crate) fn invert_array_at_path(typedef: &TypeDef, path: &LookupBuf) -> TypeD
 #[cfg(test)]
 mod tests {
     use vector_common::{btreemap, TimeZone};
+    use vrl::state::TypeState;
 
     use super::*;
 
@@ -476,6 +477,7 @@ mod tests {
             )}),
             Kind::object(Collection::empty()),
         );
+        let state = TypeState { local, external };
 
         let tz = TimeZone::default();
         for (object, expected, func, expected_typedef) in cases {
@@ -483,7 +485,7 @@ mod tests {
             let mut runtime_state = vrl::state::Runtime::default();
             let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
 
-            let got_typedef = func.type_def((&local, &external));
+            let got_typedef = func.type_def(&state);
 
             let got = func
                 .resolve(&mut ctx)

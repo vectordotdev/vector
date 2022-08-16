@@ -43,13 +43,13 @@ impl Function for Timestamp {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(TimestampFn { value }))
+        Ok(TimestampFn { value }.as_expr())
     }
 }
 
@@ -58,13 +58,13 @@ struct TimestampFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for TimestampFn {
+impl FunctionExpression for TimestampFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         timestamp(value)
     }
 
-    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &state::TypeState) -> TypeDef {
         let non_timestamp = !self.value.type_def(state).is_timestamp();
 
         TypeDef::timestamp().with_fallibility(non_timestamp)

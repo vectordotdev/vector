@@ -5,7 +5,7 @@ use compiler::state;
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use indoc::indoc;
 use vector_common::TimeZone;
-use vrl::Runtime;
+use vrl::{CompilationResult, Runtime};
 
 struct Source {
     name: &'static str,
@@ -97,7 +97,11 @@ fn benchmark_vrl_runtimes(c: &mut Criterion) {
     for source in SOURCES {
         let tz = TimeZone::default();
         let functions = vrl_stdlib::all();
-        let (program, _) = vrl::compile(source.program, &functions).unwrap();
+        let CompilationResult {
+            program,
+            warnings: _,
+            config: _,
+        } = vrl::compile(source.program, &functions).unwrap();
 
         group.bench_with_input(BenchmarkId::new(source.name, "ast"), &(), |b, _| {
             let state = state::Runtime::default();

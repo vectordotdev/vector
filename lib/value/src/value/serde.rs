@@ -13,16 +13,16 @@ impl Value {
     /// Converts self into a `Bytes`, using JSON for Map/Array.
     pub fn coerce_to_bytes(&self) -> Bytes {
         match self {
-            Value::Bytes(bytes) => bytes.clone(), // cloning `Bytes` is cheap
-            Value::Regex(regex) => regex.as_bytes(),
-            Value::Timestamp(timestamp) => Bytes::from(timestamp_to_string(timestamp)),
-            Value::Integer(num) => Bytes::from(num.to_string()),
-            Value::Float(num) => Bytes::from(num.to_string()),
-            Value::Boolean(b) => Bytes::from(b.to_string()),
-            Value::Object(map) => {
+            Self::Bytes(bytes) => bytes.clone(), // cloning `Bytes` is cheap
+            Self::Regex(regex) => regex.as_bytes(),
+            Self::Timestamp(timestamp) => Bytes::from(timestamp_to_string(timestamp)),
+            Self::Integer(num) => Bytes::from(num.to_string()),
+            Self::Float(num) => Bytes::from(num.to_string()),
+            Self::Boolean(b) => Bytes::from(b.to_string()),
+            Self::Object(map) => {
                 Bytes::from(serde_json::to_vec(map).expect("Cannot serialize map"))
             }
-            Value::Array(arr) => {
+            Self::Array(arr) => {
                 Bytes::from(serde_json::to_vec(arr).expect("Cannot serialize array"))
             }
             Self::Null => Bytes::from("<null>"),
@@ -33,14 +33,14 @@ impl Value {
     /// Converts self into a `String` representation, using JSON for `Map`/`Array`.
     pub fn to_string_lossy(&self) -> String {
         match self {
-            Value::Bytes(bytes) => String::from_utf8_lossy(bytes).into_owned(),
-            Value::Regex(regex) => regex.as_str().to_string(),
-            Value::Timestamp(timestamp) => timestamp_to_string(timestamp),
-            Value::Integer(num) => num.to_string(),
-            Value::Float(num) => num.to_string(),
-            Value::Boolean(b) => b.to_string(),
-            Value::Object(map) => serde_json::to_string(map).expect("Cannot serialize map"),
-            Value::Array(arr) => serde_json::to_string(arr).expect("Cannot serialize array"),
+            Self::Bytes(bytes) => String::from_utf8_lossy(bytes).into_owned(),
+            Self::Regex(regex) => regex.as_str().to_string(),
+            Self::Timestamp(timestamp) => timestamp_to_string(timestamp),
+            Self::Integer(num) => num.to_string(),
+            Self::Float(num) => num.to_string(),
+            Self::Boolean(b) => b.to_string(),
+            Self::Object(map) => serde_json::to_string(map).expect("Cannot serialize map"),
+            Self::Array(arr) => serde_json::to_string(arr).expect("Cannot serialize array"),
             Self::Null => "<null>".to_string(),
         }
     }
@@ -52,15 +52,15 @@ impl Serialize for Value {
         S: Serializer,
     {
         match &self {
-            Value::Integer(i) => serializer.serialize_i64(*i),
-            Value::Float(f) => serializer.serialize_f64(f.into_inner()),
-            Value::Boolean(b) => serializer.serialize_bool(*b),
-            Value::Bytes(_) | Value::Timestamp(_) => {
+            Self::Integer(i) => serializer.serialize_i64(*i),
+            Self::Float(f) => serializer.serialize_f64(f.into_inner()),
+            Self::Boolean(b) => serializer.serialize_bool(*b),
+            Self::Bytes(_) | Self::Timestamp(_) => {
                 serializer.serialize_str(&self.to_string_lossy())
             }
-            Value::Regex(regex) => serializer.serialize_str(regex.as_str()),
-            Value::Object(m) => serializer.collect_map(m),
-            Value::Array(a) => serializer.collect_seq(a),
+            Self::Regex(regex) => serializer.serialize_str(regex.as_str()),
+            Self::Object(m) => serializer.collect_map(m),
+            Self::Array(a) => serializer.collect_seq(a),
             Self::Null => serializer.serialize_none(),
         }
     }
@@ -201,15 +201,15 @@ impl TryInto<serde_json::Value> for Value {
 
     fn try_into(self) -> Result<serde_json::Value, Self::Error> {
         match self {
-            Value::Boolean(v) => Ok(serde_json::Value::from(v)),
-            Value::Integer(v) => Ok(serde_json::Value::from(v)),
-            Value::Float(v) => Ok(serde_json::Value::from(v.into_inner())),
-            Value::Bytes(v) => Ok(serde_json::Value::from(String::from_utf8(v.to_vec())?)),
-            Value::Regex(regex) => Ok(serde_json::Value::from(regex.as_str().to_string())),
-            Value::Object(v) => Ok(serde_json::to_value(v)?),
-            Value::Array(v) => Ok(serde_json::to_value(v)?),
+            Self::Boolean(v) => Ok(serde_json::Value::from(v)),
+            Self::Integer(v) => Ok(serde_json::Value::from(v)),
+            Self::Float(v) => Ok(serde_json::Value::from(v.into_inner())),
+            Self::Bytes(v) => Ok(serde_json::Value::from(String::from_utf8(v.to_vec())?)),
+            Self::Regex(regex) => Ok(serde_json::Value::from(regex.as_str().to_string())),
+            Self::Object(v) => Ok(serde_json::to_value(v)?),
+            Self::Array(v) => Ok(serde_json::to_value(v)?),
             Self::Null => Ok(serde_json::Value::Null),
-            Value::Timestamp(v) => Ok(serde_json::Value::from(timestamp_to_string(&v))),
+            Self::Timestamp(v) => Ok(serde_json::Value::from(timestamp_to_string(&v))),
         }
     }
 }

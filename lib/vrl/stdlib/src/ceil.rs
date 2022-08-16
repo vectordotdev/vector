@@ -1,4 +1,5 @@
 use ::value::Value;
+use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
 
 use crate::util::round_to_precision;
@@ -48,14 +49,14 @@ impl Function for Ceil {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let precision = arguments.optional("precision");
 
-        Ok(Box::new(CeilFn { value, precision }))
+        Ok(CeilFn { value, precision }.as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -73,7 +74,7 @@ struct CeilFn {
     precision: Option<Box<dyn Expression>>,
 }
 
-impl Expression for CeilFn {
+impl FunctionExpression for CeilFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let precision = self
             .precision
@@ -85,7 +86,7 @@ impl Expression for CeilFn {
         ceil(value, precision)
     }
 
-    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &state::TypeState) -> TypeDef {
         match Kind::from(self.value.type_def(state)) {
             v if v.is_float() || v.is_integer() => v.into(),
             _ => Kind::integer().or_float().into(),

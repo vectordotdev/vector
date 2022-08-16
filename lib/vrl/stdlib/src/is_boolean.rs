@@ -38,13 +38,13 @@ impl Function for IsBoolean {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(IsBooleanFn { value }))
+        Ok(IsBooleanFn { value }.as_expr())
     }
 }
 
@@ -53,12 +53,12 @@ struct IsBooleanFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for IsBooleanFn {
+impl FunctionExpression for IsBooleanFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         self.value.resolve(ctx).map(|v| value!(v.is_boolean()))
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::boolean().infallible()
     }
 }

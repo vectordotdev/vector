@@ -276,7 +276,7 @@ inventory::collect!(EnrichmentTableDescription);
 pub enum Resource {
     Port(SocketAddr, Protocol),
     SystemFdOffset(usize),
-    Stdin,
+    Fd(u32),
     DiskBuffer(String),
 }
 
@@ -351,7 +351,7 @@ impl Display for Resource {
         match self {
             Resource::Port(address, protocol) => write!(fmt, "{} {}", protocol, address),
             Resource::SystemFdOffset(offset) => write!(fmt, "systemd {}th socket", offset + 1),
-            Resource::Stdin => write!(fmt, "stdin"),
+            Resource::Fd(fd) => write!(fmt, "file descriptor: {}", fd),
             Resource::DiskBuffer(name) => write!(fmt, "disk buffer {:?}", name),
         }
     }
@@ -623,6 +623,84 @@ mod tests {
             err,
             vec!["More than one component with name \"foo\" (source, transform).",]
         );
+    }
+
+    #[tokio::test]
+    #[cfg(unix)]
+    async fn conflicting_stdin_and_fd_resources() {
+        let errors = load(
+            r#"
+            [sources.stdin]
+            type = "stdin"
+
+            [sources.file_descriptor]
+            type = "file_descriptor"
+            fd = 0
+
+            [sinks.out]
+            type = "basic_sink"
+            inputs = ["stdin", "file_descriptor"]
+            "#,
+            Format::Toml,
+        )
+        .await
+        .unwrap_err();
+
+        assert_eq!(errors.len(), 1);
+        let expected_prefix = "Resource `file descriptor: 0` is claimed by multiple components:";
+        assert!(errors[0].starts_with(expected_prefix));
+    }
+
+    #[tokio::test]
+    #[cfg(unix)]
+    async fn conflicting_fd_resources() {
+        let errors = load(
+            r#"
+            [sources.file_descriptor1]
+            type = "file_descriptor"
+            fd = 10
+
+            [sources.file_descriptor2]
+            type = "file_descriptor"
+            fd = 10
+
+            [sinks.out]
+            type = "basic_sink"
+            inputs = ["file_descriptor1", "file_descriptor2"]
+            "#,
+            Format::Toml,
+        )
+        .await
+        .unwrap_err();
+
+        assert_eq!(errors.len(), 1);
+        let expected_prefix = "Resource `file descriptor: 10` is claimed by multiple components:";
+        assert!(errors[0].starts_with(expected_prefix));
+    }
+
+    #[tokio::test]
+    #[cfg(unix)]
+    async fn no_conflict_fd_resources() {
+        let result = load(
+            r#"
+            [sources.file_descriptor1]
+            type = "file_descriptor"
+            fd = 10
+
+            [sources.file_descriptor2]
+            type = "file_descriptor"
+            fd = 20
+
+            [sinks.out]
+            type = "basic_sink"
+            inputs = ["file_descriptor1", "file_descriptor2"]
+            "#,
+            Format::Toml,
+        )
+        .await;
+
+        let expected = Ok(vec![]);
+        assert_eq!(result, expected);
     }
 
     #[tokio::test]

@@ -33,7 +33,7 @@ impl OctetCountingDecoderConfig {
 
 /// Options for building a `OctetCountingDecoder`.
 #[configurable_component]
-#[derive(Clone, Debug, Derivative, PartialEq)]
+#[derive(Clone, Debug, Derivative, PartialEq, Eq)]
 #[derivative(Default)]
 pub struct OctetCountingDecoderOptions {
     /// The maximum length of the byte buffer.
@@ -49,7 +49,7 @@ pub struct OctetCountingDecoder {
     octet_decoding: Option<State>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum State {
     NotDiscarding,
     Discarding(usize),
@@ -238,7 +238,7 @@ impl OctetCountingDecoder {
         &mut self,
         src: &mut BytesMut,
     ) -> Option<Result<Option<Bytes>, LinesCodecError>> {
-        if let Some(&first_byte) = src.get(0) {
+        if let Some(&first_byte) = src.first() {
             if (49..=57).contains(&first_byte) {
                 // First character is non zero number so we can assume that
                 // octet count framing is used.

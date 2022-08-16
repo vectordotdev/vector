@@ -2,6 +2,7 @@ use std::net::Ipv4Addr;
 
 use ::value::Value;
 use vrl::prelude::*;
+use vrl::state::TypeState;
 
 fn is_ipv4(value: Value) -> Resolved {
     let value_str = value.try_bytes_utf8_lossy()?;
@@ -46,13 +47,13 @@ impl Function for IsIpv4 {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(IsIpv4Fn { value }))
+        Ok(IsIpv4Fn { value }.as_expr())
     }
 }
 
@@ -61,12 +62,12 @@ struct IsIpv4Fn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for IsIpv4Fn {
+impl FunctionExpression for IsIpv4Fn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         self.value.resolve(ctx).and_then(is_ipv4)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &TypeState) -> TypeDef {
         TypeDef::boolean().infallible()
     }
 }

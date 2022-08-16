@@ -1,3 +1,5 @@
+#![allow(warnings)]
+
 pub mod collector {
     pub mod logs {
         pub mod v1 {

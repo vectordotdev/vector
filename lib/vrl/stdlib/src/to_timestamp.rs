@@ -182,7 +182,7 @@ impl Function for ToTimestamp {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -196,7 +196,7 @@ impl Function for ToTimestamp {
             })
             .unwrap_or_default();
 
-        Ok(Box::new(ToTimestampFn { value, unit }))
+        Ok(ToTimestampFn { value, unit }.as_expr())
     }
 
     fn compile_argument(
@@ -282,7 +282,7 @@ struct ToTimestampFn {
     unit: Unit,
 }
 
-impl Expression for ToTimestampFn {
+impl FunctionExpression for ToTimestampFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let unit = self.unit;
@@ -290,7 +290,7 @@ impl Expression for ToTimestampFn {
         to_timestamp(value, unit)
     }
 
-    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &state::TypeState) -> TypeDef {
         self.value
             .type_def(state)
             .fallible_unless(Kind::timestamp())
