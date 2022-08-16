@@ -190,6 +190,16 @@ components: sources: file: {
 				unit: "bytes"
 			}
 		}
+		offset_key: {
+			category:    "Context"
+			common:      false
+			description: "Enables adding the byte offset within the file of the start of each line to each event and sets the name of the log field used. Off by default, the offset is only added to the event if this is set."
+			required:    false
+			type: string: {
+				default: null
+				examples: ["offset"]
+			}
+		}
 		oldest_first: {
 			category:    "Reading"
 			common:      false
