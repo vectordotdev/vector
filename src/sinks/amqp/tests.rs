@@ -175,7 +175,7 @@ mod integration_tests {
         };
         let (tx, rx) = SourceSender::new_test();
         let amqp_source =
-            crate::sources::amqp::amqp_source(&source_cfg, ShutdownSignal::noop(), tx)
+            crate::sources::amqp::amqp_source(&source_cfg, ShutdownSignal::noop(), tx, LogNamespace::Legacy)
                 .await
                 .unwrap();
 

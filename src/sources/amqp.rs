@@ -1,11 +1,8 @@
-use std::io::Cursor;
-
-use crate::codecs::{Decoder, DecodingConfig};
-use crate::config::SourceContext;
 use crate::{
     amqp::AMQPConfig,
-    config::{log_schema, DataType, Output, SourceConfig, SourceDescription},
-    event::Value,
+    codecs::{Decoder, DecodingConfig},
+    config::SourceContext,
+    config::{log_schema, Output, SourceConfig, SourceDescription},
     internal_events::source::{
         AMQPCommitFailed, AMQPConsumerFailed, AMQPDeliveryFailed, AMQPEventFailed,
         AMQPEventReceived,
@@ -19,11 +16,12 @@ use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use futures::{FutureExt, StreamExt};
-use lapin::Channel;
+use lapin::{message::Delivery, options::BasicAckOptions, Channel};
 use snafu::Snafu;
+use std::io::Cursor;
 use tokio_util::codec::FramedRead;
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_core::{config::LogNamespace, event::Event};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -46,17 +44,24 @@ pub struct AMQPSourceConfig {
     /// The consumer.
     pub(crate) consumer: String,
 
-    /// The log field name to use for the AMQP routing key.
-    pub(crate) routing_key: Option<String>,
-
-    /// The log field name to use for the AMQP exchange key.
-    pub(crate) exchange_key: Option<String>,
-
-    /// The log field name to use for the AMQP offset key.
-    pub(crate) offset_key: Option<String>,
-
     /// Connection options for AMQP source.
     pub(crate) connection: AMQPConfig,
+
+    /// The AMQP routing key.
+    #[serde(default = "default_routing_key")]
+    pub(crate) routing_key: String,
+
+    /// The AMQP exchange key.
+    #[serde(default = "default_exchange_key")]
+    pub(crate) exchange_key: String,
+
+    /// The AMQP offset key.
+    #[serde(default = "default_offset_key")]
+    pub(crate) offset_key: String,
+
+    /// The namespace to use. This overrides the global setting.
+    #[serde(default)]
+    pub log_namespace: Option<bool>,
 
     #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
@@ -69,17 +74,30 @@ pub struct AMQPSourceConfig {
     pub(crate) decoding: DeserializerConfig,
 }
 
+fn default_routing_key() -> String {
+    "routing".into()
+}
+
+fn default_exchange_key() -> String {
+    "exchange".into()
+}
+
+fn default_offset_key() -> String {
+    "offset".into()
+}
+
 impl Default for AMQPSourceConfig {
     fn default() -> Self {
         Self {
             queue: "vector".to_string(),
             consumer: "vector".to_string(),
-            routing_key: None,
-            exchange_key: None,
-            offset_key: None,
+            routing_key: default_routing_key(),
+            exchange_key: default_exchange_key(),
+            offset_key: default_offset_key(),
             connection: AMQPConfig::default(),
             framing: default_framing_message_based(),
             decoding: default_decoding(),
+            log_namespace: None,
         }
     }
 }
@@ -91,13 +109,8 @@ inventory::submit! {
 impl_generate_config_from_default!(AMQPSourceConfig);
 
 impl AMQPSourceConfig {
-    fn decoder(&self) -> Decoder {
-        DecodingConfig::new(
-            self.framing.clone(),
-            self.decoding.clone(),
-            LogNamespace::Legacy,
-        )
-        .build()
+    fn decoder(&self, log_namespace: LogNamespace) -> Decoder {
+        DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build()
     }
 }
 
@@ -105,11 +118,18 @@ impl AMQPSourceConfig {
 #[typetag::serde(name = "amqp")]
 impl SourceConfig for AMQPSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        amqp_source(self, cx.shutdown, cx.out).await
+        let log_namespace = cx.log_namespace(self.log_namespace);
+        amqp_source(self, cx.shutdown, cx.out, log_namespace).await
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        let log_namespace = global_log_namespace.merge(self.log_namespace);
+        let schema_definition = self
+            .decoding
+            .schema_definition(log_namespace)
+            .with_standard_vector_source_metadata();
+
+        vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -125,15 +145,63 @@ pub(crate) async fn amqp_source(
     config: &AMQPSourceConfig,
     shutdown: ShutdownSignal,
     out: SourceSender,
+    log_namespace: LogNamespace,
 ) -> crate::Result<super::Source> {
     let config = config.clone();
     let (_conn, channel) = config
         .connection
         .connect()
         .await
-        .map_err(|e| BuildError::AMQPCreateError { source: e })?;
+        .map_err(|source| BuildError::AMQPCreateError { source })?;
 
-    Ok(Box::pin(run_amqp_source(config, shutdown, out, channel)))
+    Ok(Box::pin(run_amqp_source(
+        config,
+        shutdown,
+        out,
+        channel,
+        log_namespace,
+    )))
+}
+
+async fn populate_event(
+    event: &mut Event,
+    msg: &Delivery,
+    routing_key: &str,
+    exchange_key: &str,
+    offset_key: &str,
+    ack_options: BasicAckOptions,
+    log_namespace: &LogNamespace,
+) {
+    let log = event.as_mut_log();
+
+    // Extract timestamp from amqp message
+    let timestamp = msg
+        .properties
+        .timestamp()
+        .and_then(|millis| Utc.timestamp_millis_opt(millis as _).latest())
+        .unwrap_or_else(Utc::now);
+
+    log_namespace.insert_vector_metadata(
+        log,
+        log_schema().timestamp_key(),
+        "ingest_timestamp",
+        timestamp,
+    );
+
+    log_namespace.insert_vector_metadata(
+        log,
+        log_schema().source_type_key(),
+        "source_type",
+        "amqp",
+    );
+
+    log_namespace.insert_source_metadata("amqp", log, "routing", msg.routing_key.to_string());
+    log_namespace.insert_source_metadata("amqp", log, "exchange", msg.exchange.to_string());
+    log_namespace.insert_source_metadata("amqp", log, "offset", msg.delivery_tag as i64);
+
+    if let Err(error) = msg.acker.ack(ack_options).await {
+        emit!(AMQPCommitFailed { error });
+    }
 }
 
 async fn run_amqp_source(
@@ -141,6 +209,7 @@ async fn run_amqp_source(
     shutdown: ShutdownSignal,
     mut out: SourceSender,
     channel: Channel,
+    log_namespace: LogNamespace,
 ) -> Result<(), ()> {
     let ack_options = lapin::options::BasicAckOptions::default();
     debug!("Starting amqp source, listening to queue {}", config.queue);
@@ -177,11 +246,11 @@ async fn run_amqp_source(
                             }
 
                             let payload = Cursor::new(Bytes::copy_from_slice(&msg.data));
-                            let mut stream = FramedRead::new(payload, config.decoder());
+                            let mut stream = FramedRead::new(payload, config.decoder(log_namespace));
 
-                            let routing_key = config.routing_key.as_ref();
-                            let exchange_key = config.exchange_key.as_ref();
-                            let offset_key = config.offset_key.as_ref();
+                            let routing_key = config.routing_key.as_str();
+                            let exchange_key = config.exchange_key.as_str();
+                            let offset_key = config.offset_key.as_str();
                             let out = &mut out;
 
                             let mut stream = stream! {
@@ -189,35 +258,13 @@ async fn run_amqp_source(
                                     match result {
                                         Ok((events, _byte_size)) => {
                                             for mut event in events {
-                                                let log = event.as_mut_log();
-
-                                                // Extract timestamp from amqp message
-                                                let timestamp = msg
-                                                    .properties
-                                                    .timestamp()
-                                                    .and_then(|millis| Utc.timestamp_millis_opt(millis as _).latest())
-                                                    .unwrap_or_else(Utc::now);
-                                                log.insert(log_schema().timestamp_key(), timestamp);
-
-                                                // Add source type
-                                                log.insert(log_schema().source_type_key(), Bytes::from("amqp"));
-
-                                                if let Some(key_field) = routing_key {
-                                                    log.insert(key_field.as_str(), Value::from(msg.routing_key.to_string()));
-                                                }
-
-                                                if let Some(exchange_key) = exchange_key {
-                                                    log.insert(exchange_key.as_str(), Value::from(msg.exchange.to_string()));
-                                                }
-
-                                                if let Some(offset_key) = offset_key {
-                                                    log.insert(offset_key.as_str(), Value::from(msg.delivery_tag as i64));
-                                                }
-
-                                                if let Err(error) = msg.acker.ack(ack_options).await {
-                                                    emit!(AMQPCommitFailed { error });
-                                                }
-
+                                                populate_event(&mut event,
+                                                               &msg,
+                                                               routing_key,
+                                                               exchange_key,
+                                                               offset_key,
+                                                               ack_options,
+                                                               &log_namespace).await;
                                                 yield event;
                                             }
                                         }
@@ -257,7 +304,7 @@ async fn run_amqp_source(
 
 #[cfg(test)]
 pub mod test {
-    use super::{amqp_source, AMQPSourceConfig};
+    use super::*;
     use crate::{shutdown::ShutdownSignal, SourceSender};
 
     #[test]
@@ -281,11 +328,14 @@ pub mod test {
     #[tokio::test]
     async fn amqp_source_create_ok() {
         let config = make_config();
-        assert!(
-            amqp_source(&config, ShutdownSignal::noop(), SourceSender::new_test().0)
-                .await
-                .is_ok()
-        );
+        assert!(amqp_source(
+            &config,
+            ShutdownSignal::noop(),
+            SourceSender::new_test().0,
+            LogNamespace::Legacy
+        )
+        .await
+        .is_ok());
     }
 }
 
@@ -395,7 +445,7 @@ mod integration_test {
         trace!("Receiving event...");
         let (tx, rx) = SourceSender::new_test();
         tokio::spawn(
-            amqp_source(&config, ShutdownSignal::noop(), tx)
+            amqp_source(&config, ShutdownSignal::noop(), tx, LogNamespace::Legacy)
                 .await
                 .unwrap(),
         );
