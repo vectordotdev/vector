@@ -27,7 +27,7 @@ pub enum ExtendedCompression {
     Snappy,
 }
 
-/// Compose with basic compression and Loki-specific compression.  
+/// Compose with basic compression and Loki-specific compression.
 #[configurable_component(sink)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[serde(untagged)]
