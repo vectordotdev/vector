@@ -67,7 +67,7 @@ impl Function for ParseApacheLog {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -79,11 +79,12 @@ impl Function for ParseApacheLog {
 
         let timestamp_format = arguments.optional("timestamp_format");
 
-        Ok(Box::new(ParseApacheLogFn {
+        Ok(ParseApacheLogFn {
             value,
             format,
             timestamp_format,
-        }))
+        }
+        .as_expr())
     }
 
     fn compile_argument(
@@ -139,7 +140,7 @@ struct ParseApacheLogFn {
     timestamp_format: Option<Box<dyn Expression>>,
 }
 
-impl Expression for ParseApacheLogFn {
+impl FunctionExpression for ParseApacheLogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?;
         let timestamp_format = self
@@ -151,7 +152,7 @@ impl Expression for ParseApacheLogFn {
         parse_apache_log(bytes, timestamp_format, &self.format, ctx)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::object(match self.format.as_ref() {
             b"common" => kind_common(),
             b"combined" => kind_combined(),

@@ -66,7 +66,7 @@ impl Function for MapKeys {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -74,11 +74,12 @@ impl Function for MapKeys {
         let recursive = arguments.optional("recursive");
         let closure = arguments.required_closure()?;
 
-        Ok(Box::new(MapKeysFn {
+        Ok(MapKeysFn {
             value,
             recursive,
             closure,
-        }))
+        }
+        .as_expr())
     }
 
     fn closure(&self) -> Option<closure::Definition> {
@@ -110,7 +111,7 @@ struct MapKeysFn {
     closure: FunctionClosure,
 }
 
-impl Expression for MapKeysFn {
+impl FunctionExpression for MapKeysFn {
     fn resolve(&self, ctx: &mut Context) -> Result<Value> {
         let recursive = match &self.recursive {
             None => false,
@@ -118,15 +119,17 @@ impl Expression for MapKeysFn {
         };
 
         let value = self.value.resolve(ctx)?;
-        let FunctionClosure { variables, block } = &self.closure;
+        let FunctionClosure {
+            variables,
+            block,
+            block_type_def: _,
+        } = &self.closure;
         let runner = closure::Runner::new(variables, |ctx| block.resolve(ctx));
 
         map_keys(value, recursive, ctx, runner)
     }
 
-    fn type_def(&self, ctx: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
-        self.value
-            .type_def(ctx)
-            .with_fallibility(self.closure.block.type_def(ctx).is_fallible())
+    fn type_def(&self, ctx: &state::TypeState) -> TypeDef {
+        self.value.type_def(ctx)
     }
 }

@@ -5,7 +5,7 @@ use toml::Value;
 
 use super::GenerateConfig;
 
-#[derive(Debug, Snafu, Clone, PartialEq)]
+#[derive(Debug, Snafu, Clone, PartialEq, Eq)]
 pub enum ExampleError {
     #[snafu(display("unable to create an example for this component"))]
     MissingExample,

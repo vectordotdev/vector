@@ -134,7 +134,7 @@ pub struct TlsConfig {
 }
 
 /// A listening address that can optionally support being passed in by systemd.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[configurable_component]
 #[serde(untagged)]
 pub enum SocketListenAddr {

@@ -95,13 +95,13 @@ impl Function for ToString {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(ToStringFn { value }))
+        Ok(ToStringFn { value }.as_expr())
     }
 }
 
@@ -110,14 +110,14 @@ struct ToStringFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ToStringFn {
+impl FunctionExpression for ToStringFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
 
         to_string(value)
     }
 
-    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &state::TypeState) -> TypeDef {
         let td = self.value.type_def(state);
 
         TypeDef::bytes()

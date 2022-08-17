@@ -125,7 +125,7 @@ impl Requirement {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ValidationErrors(Vec<ValidationError>);
 
 impl ValidationErrors {
@@ -158,7 +158,7 @@ impl std::fmt::Display for ValidationErrors {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[allow(clippy::enum_variant_names)]
 pub enum ValidationError {
     /// A required semantic meaning is missing.

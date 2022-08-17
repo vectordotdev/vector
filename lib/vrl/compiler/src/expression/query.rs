@@ -1,15 +1,14 @@
-use std::fmt;
-
 use lookup::{LookupBuf, OwnedPath, PathPrefix, TargetPath};
-use value::{kind::remove, Kind, Value};
-
 use crate::{
     expression::{Container, Resolved, Variable},
     parser::ast::Ident,
-    state::{ExternalEnv, LocalEnv},
+    state::ExternalEnv,
+    state::{TypeInfo, TypeState},
     type_def::Details,
-    Context, Expression, TypeDef,
+    Context, Expression,
 };
+use value::{kind::remove, Kind, Value};
+use std::fmt;
 
 #[derive(Clone, PartialEq)]
 pub struct Query {
@@ -129,18 +128,17 @@ impl Expression for Query {
         }
     }
 
-    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
+    fn type_info(&self, state: &TypeState) -> TypeInfo {
         use Target::{Container, External, FunctionCall, Internal};
 
-        match &self.target {
-            External(prefix) => match prefix {
-                PathPrefix::Event => state.1.target().clone().type_def.at_path(&self.path.clone().into()),
-                PathPrefix::Metadata => state.1.metadata_kind().at_path(&self.path.clone()).into()
-            },
+        let result = match &self.target {
+            External(prefix) => state.external.kind(*prefix).at_path(&self.path.clone()).into(),
             Internal(variable) => variable.type_def(state).at_path(&self.path.clone().into()),
             FunctionCall(call) => call.type_def(state).at_path(&self.path.clone().into()),
             Container(container) => container.type_def(state).at_path(&self.path.clone().into()),
-        }
+        };
+
+        TypeInfo::new(state, result)
     }
 }
 
@@ -210,7 +208,6 @@ impl fmt::Debug for Target {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::state;
 
     #[test]
     fn test_type_def() {
@@ -219,8 +216,8 @@ mod tests {
             path: LookupBuf::root(),
         };
 
-        let state = (&state::LocalEnv::default(), &state::ExternalEnv::default());
-        let type_def = query.type_def(state);
+        let state = TypeState::default();
+        let type_def = query.type_info(&state).result;
 
         assert!(type_def.is_infallible());
         assert!(type_def.is_object());

@@ -47,13 +47,13 @@ impl Function for TagTypesExternally {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(TagTypesExternallyFn { value }))
+        Ok(TagTypesExternallyFn { value }.as_expr())
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -70,7 +70,7 @@ struct TagTypesExternallyFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for TagTypesExternallyFn {
+impl FunctionExpression for TagTypesExternallyFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let tagged_externally = tag_type_externally(value);
@@ -78,7 +78,7 @@ impl Expression for TagTypesExternallyFn {
         Ok(tagged_externally)
     }
 
-    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &state::TypeState) -> TypeDef {
         match self.value.type_def(state) {
             td if td.is_array() => TypeDef::array(Collection::any()),
             td if td.is_null() => TypeDef::null(),

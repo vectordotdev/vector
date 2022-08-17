@@ -38,13 +38,13 @@ impl Function for StripWhitespace {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(StripWhitespaceFn { value }))
+        Ok(StripWhitespaceFn { value }.as_expr())
     }
 }
 
@@ -53,14 +53,14 @@ struct StripWhitespaceFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for StripWhitespaceFn {
+impl FunctionExpression for StripWhitespaceFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
 
         Ok(value.try_bytes_utf8_lossy()?.trim().into())
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::bytes().infallible()
     }
 }

@@ -480,7 +480,7 @@ impl From<MetricValue> for ::value::Value {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum StatisticKind {
     Histogram,

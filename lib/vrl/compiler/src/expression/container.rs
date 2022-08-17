@@ -2,8 +2,8 @@ use std::fmt;
 
 use crate::{
     expression::{Array, Block, Group, Object, Resolved, Value},
-    state::{ExternalEnv, LocalEnv},
-    Context, Expression, TypeDef,
+    state::{TypeInfo, TypeState},
+    Context, Expression,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -49,14 +49,14 @@ impl Expression for Container {
         }
     }
 
-    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
+    fn type_info(&self, state: &TypeState) -> TypeInfo {
         use Variant::{Array, Block, Group, Object};
 
         match &self.variant {
-            Group(v) => v.type_def(state),
-            Block(v) => v.type_def(state),
-            Array(v) => v.type_def(state),
-            Object(v) => v.type_def(state),
+            Group(v) => v.type_info(state),
+            Block(v) => v.type_info(state),
+            Array(v) => v.type_info(state),
+            Object(v) => v.type_info(state),
         }
     }
 }

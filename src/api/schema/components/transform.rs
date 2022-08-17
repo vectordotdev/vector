@@ -64,7 +64,7 @@ impl Transform {
 
     /// Transform type
     pub async fn component_type(&self) -> &str {
-        &*self.get_component_type()
+        self.get_component_type()
     }
 
     /// Transform output streams

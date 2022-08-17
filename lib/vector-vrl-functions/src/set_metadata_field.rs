@@ -1,7 +1,7 @@
 use crate::{get_metadata_key, MetadataKey};
 use ::value::Value;
 use vrl::prelude::*;
-use vrl::state::{ExternalEnv, LocalEnv};
+use vrl::state::TypeState;
 
 fn set_metadata_field(
     ctx: &mut Context,
@@ -54,15 +54,16 @@ impl Function for SetMetadataField {
 
     fn compile(
         &self,
-        (local, external): (&mut state::LocalEnv, &mut state::ExternalEnv),
-        _ctx: &mut FunctionCompileContext,
+        state: &TypeState,
+        ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let key = get_metadata_key(&mut arguments)?;
         let value = arguments.required_expr("value");
+        let value_type_def = value.type_def(state);
 
         if let MetadataKey::Query(target_path) = &key {
-            if external.is_read_only_path(&target_path) {
+            if ctx.is_read_only_path(&target_path) {
                 return Err(vrl::function::Error::ReadOnlyMutation {
                     context: format!("{} is read-only, and cannot be modified", target_path),
                 }
@@ -71,7 +72,7 @@ impl Function for SetMetadataField {
         }
 
         // for backwards compatibility, make sure value is a string when using legacy.
-        if matches!(key, MetadataKey::Legacy(_)) && !value.type_def((local, external)).is_bytes() {
+        if matches!(key, MetadataKey::Legacy(_)) && !value_type_def.is_bytes() {
             return Err(vrl::function::Error::UnexpectedExpression {
                 keyword: "value",
                 expected: "string",
@@ -99,21 +100,15 @@ impl Expression for SetMetadataFieldFn {
         set_metadata_field(ctx, &self.key, value)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
-        TypeDef::null().infallible()
-    }
+    fn type_info(&self, state: &TypeState) -> TypeInfo {
+        let mut state = state.clone();
 
-    fn update_state(
-        &mut self,
-        local: &mut LocalEnv,
-        external: &mut ExternalEnv,
-    ) -> std::result::Result<(), ExpressionError> {
         if let MetadataKey::Query(target_path) = &self.key {
-            let insert_type = self.value.type_def((local, external)).kind().clone();
-            let mut new_type = external.kind(target_path.prefix);
+            let insert_type = self.value.apply_type_info(&mut state).kind().clone();
+            let mut new_type = state.external.kind(target_path.prefix);
             new_type.insert(&target_path.path, insert_type);
-            external.update_metadata(new_type);
+            state.external.update_metadata(new_type);
         }
-        Ok(())
+        TypeInfo::new(state, TypeDef::null())
     }
 }

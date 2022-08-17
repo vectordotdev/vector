@@ -7,7 +7,7 @@ use vector_config::configurable_component;
 
 /// Configuration of the region/endpoint to use when interacting with an AWS service.
 #[configurable_component]
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[serde(default)]
 pub struct RegionOrEndpoint {
     /// The AWS region to use.

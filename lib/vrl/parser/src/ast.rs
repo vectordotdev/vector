@@ -584,19 +584,15 @@ impl IntoIterator for Object {
 #[derive(Clone, PartialEq)]
 pub struct IfStatement {
     pub predicate: Node<Predicate>,
-    pub consequent: Node<Block>,
-    pub alternative: Option<Node<Block>>,
+    pub if_node: Node<Block>,
+    pub else_node: Option<Node<Block>>,
 }
 
 impl fmt::Debug for IfStatement {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.alternative {
-            Some(alt) => write!(
-                f,
-                "{:?} ? {:?} : {:?}",
-                self.predicate, self.consequent, alt
-            ),
-            None => write!(f, "{:?} ? {:?}", self.predicate, self.consequent),
+        match &self.else_node {
+            Some(alt) => write!(f, "{:?} ? {:?} : {:?}", self.predicate, self.if_node, alt),
+            None => write!(f, "{:?} ? {:?}", self.predicate, self.if_node),
         }
     }
 }
@@ -606,9 +602,9 @@ impl fmt::Display for IfStatement {
         f.write_str("if ")?;
         self.predicate.fmt(f)?;
         f.write_str(" ")?;
-        self.consequent.fmt(f)?;
+        self.if_node.fmt(f)?;
 
-        if let Some(alt) = &self.alternative {
+        if let Some(alt) = &self.else_node {
             f.write_str(" else")?;
             alt.fmt(f)?;
         }

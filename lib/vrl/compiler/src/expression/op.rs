@@ -3,10 +3,10 @@ use std::fmt;
 use diagnostic::{DiagnosticMessage, Label, Note, Span, Urls};
 use value::Value;
 
+use crate::state::{TypeInfo, TypeState};
 use crate::{
     expression::{self, Expr, Resolved},
     parser::{ast, Node},
-    state::{ExternalEnv, LocalEnv},
     value::VrlValueArithmetic,
     Context, Expression, TypeDef,
 };
@@ -23,14 +23,17 @@ impl Op {
         lhs: Node<Expr>,
         opcode: Node<ast::Opcode>,
         rhs: Node<Expr>,
-        state: (&LocalEnv, &ExternalEnv),
+        state: &TypeState,
     ) -> Result<Self, Error> {
         use ast::Opcode::{Eq, Ge, Gt, Le, Lt, Ne};
+
+        let mut state = state.clone();
 
         let (op_span, opcode) = opcode.take();
 
         let (lhs_span, lhs) = lhs.take();
-        let lhs_type_def = lhs.type_def(state);
+        let lhs_type_def = lhs.apply_type_info(&mut state);
+        let rhs_type_def = rhs.apply_type_info(&mut state);
 
         let (rhs_span, rhs) = rhs.take();
 
@@ -53,14 +56,14 @@ impl Op {
         }
 
         if let ast::Opcode::Merge = opcode {
-            if !(lhs.type_def(state).is_object() && rhs.type_def(state).is_object()) {
+            if !(lhs_type_def.is_object() && rhs_type_def.is_object()) {
                 return Err(Error::MergeNonObjects {
-                    lhs_span: if lhs.type_def(state).is_object() {
+                    lhs_span: if lhs_type_def.is_object() {
                         None
                     } else {
                         Some(lhs_span)
                     },
-                    rhs_span: if rhs.type_def(state).is_object() {
+                    rhs_span: if rhs_type_def.is_object() {
                         None
                     } else {
                         Some(rhs_span)
@@ -121,14 +124,20 @@ impl Expression for Op {
         .map_err(Into::into)
     }
 
-    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
+    fn type_info(&self, state: &TypeState) -> TypeInfo {
         use ast::Opcode::{Add, And, Div, Eq, Err, Ge, Gt, Le, Lt, Merge, Mul, Ne, Or, Rem, Sub};
         use value::Kind as K;
 
-        let mut lhs_def = self.lhs.type_def(state);
-        let rhs_def = self.rhs.type_def(state);
+        let mut state = state.clone();
+        let mut lhs_def = self.lhs.apply_type_info(&mut state);
 
-        match self.opcode {
+        // TODO: this is incorrect, but matches the existing behavior of the compiler
+        // see: https://github.com/vectordotdev/vector/issues/13789
+        // and: https://github.com/vectordotdev/vector/issues/13791
+
+        let rhs_def = self.rhs.apply_type_info(&mut state);
+
+        let result = match self.opcode {
             // ok/err ?? ok
             Err if rhs_def.is_infallible() => lhs_def.union(rhs_def).infallible(),
 
@@ -213,9 +222,9 @@ impl Expression for Op {
                         Value::Float(_) => TypeDef::float().fallible(),
                         Value::Integer(v) if v != 0 => TypeDef::integer().infallible(),
                         Value::Integer(_) => TypeDef::integer().fallible(),
-                        _ => TypeDef::float().add_integer().fallible(),
+                        _ => TypeDef::float().or_integer().fallible(),
                     },
-                    _ => TypeDef::float().add_integer().fallible(),
+                    _ => TypeDef::float().or_integer().fallible(),
                 }
             }
 
@@ -269,7 +278,8 @@ impl Expression for Op {
                 .union(rhs_def)
                 .fallible()
                 .with_kind(K::integer().or_float()),
-        }
+        };
+        TypeInfo::new(state, result)
     }
 }
 
@@ -463,7 +473,7 @@ mod tests {
 
         multiply_other {
             expr: |_| op(Mul, (), ()),
-            want: TypeDef::bytes().fallible().add_integer().add_float(),
+            want: TypeDef::bytes().fallible().or_integer().or_float(),
         }
 
         add_string_string {
@@ -513,7 +523,7 @@ mod tests {
 
         add_other {
             expr: |_| op(Add, (), ()),
-            want: TypeDef::bytes().add_integer().add_float().fallible(),
+            want: TypeDef::bytes().or_integer().or_float().fallible(),
         }
 
         remainder_integer {
@@ -538,7 +548,7 @@ mod tests {
 
         remainder_other {
             expr: |_| op(Rem, 5, ()),
-            want: TypeDef::integer().add_float().fallible(),
+            want: TypeDef::integer().or_float().fallible(),
         }
 
         subtract_integer {
@@ -558,7 +568,7 @@ mod tests {
 
         subtract_other {
             expr: |_| op(Sub, 1, ()),
-            want: TypeDef::integer().fallible().add_float(),
+            want: TypeDef::integer().fallible().or_float(),
         }
 
         divide_integer_literal {
@@ -596,15 +606,15 @@ mod tests {
         }
 
         divide_dynamic_rhs {
-            expr: |(local, _): (&mut LocalEnv, &mut ExternalEnv)| {
-                local.insert_variable(Ident::new("foo"), crate::type_def::Details {
+            expr: |state: &mut TypeState| {
+                state.local.insert_variable(Ident::new("foo"), crate::type_def::Details {
                     type_def: TypeDef::null(),
                     value: None,
                 });
 
                 Op {
                     lhs: Box::new(Literal::from(1).into()),
-                    rhs: Box::new(Variable::new(Span::default(), Ident::new("foo"), local).unwrap().into()),
+                    rhs: Box::new(Variable::new(Span::default(), Ident::new("foo"), &state.local).unwrap().into()),
                     opcode: Div,
                 }
             },
@@ -756,7 +766,7 @@ mod tests {
                 rhs: Box::new(Literal::from(true).into()),
                 opcode: Err,
             },
-            want: TypeDef::float().add_boolean(),
+            want: TypeDef::float().or_boolean(),
         }
 
         error_or_fallible {
@@ -794,7 +804,7 @@ mod tests {
                 }.into()),
                 opcode: Err,
             },
-            want: TypeDef::float().add_bytes(),
+            want: TypeDef::float().or_bytes(),
         }
 
         or_nullable {
@@ -802,8 +812,8 @@ mod tests {
                 lhs: Box::new(
                     IfStatement {
                         predicate: Predicate::new_unchecked(vec![Literal::from(true).into()]),
-                        consequent: Block::new(vec![Literal::from("string").into()], LocalEnv::default()),
-                        alternative: None,
+                        if_block: Block::new_scoped(vec![Literal::from("string").into()]),
+                        else_block: None,
                     }.into()),
                 rhs: Box::new(Literal::from("another string").into()),
                 opcode: Or,
@@ -816,13 +826,13 @@ mod tests {
                 lhs: Box::new(
                     IfStatement {
                         predicate: Predicate::new_unchecked(vec![Literal::from(true).into()]),
-                        consequent: Block::new(vec![Literal::from("string").into()], LocalEnv::default()),
-                        alternative:  Some(Block::new(vec![Literal::from(42).into()], LocalEnv::default()))
+                        if_block: Block::new_scoped(vec![Literal::from("string").into()]),
+                        else_block:  Some(Block::new_scoped(vec![Literal::from(42).into()]))
                 }.into()),
                 rhs: Box::new(Literal::from("another string").into()),
                 opcode: Or,
             },
-            want: TypeDef::bytes().add_integer(),
+            want: TypeDef::bytes().or_integer(),
         }
     ];
 }

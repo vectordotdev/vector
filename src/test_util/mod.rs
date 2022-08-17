@@ -128,6 +128,14 @@ pub fn trace_init() {
     let levels = std::env::var("TEST_LOG").unwrap_or_else(|_| "error".to_string());
 
     trace::init(color, false, &levels);
+
+    // Initialize metrics as well
+    if let Err(error) = vector_core::metrics::init_test() {
+        // Handle multiple initializations.
+        if error != vector_core::metrics::Error::AlreadyInitialized {
+            panic!("Failed to initialize metrics recorder: {:?}", error);
+        }
+    }
 }
 
 pub async fn send_lines(

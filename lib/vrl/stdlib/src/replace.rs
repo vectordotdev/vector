@@ -99,7 +99,7 @@ impl Function for Replace {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -108,12 +108,13 @@ impl Function for Replace {
         let with = arguments.required("with");
         let count = arguments.optional("count").unwrap_or(expr!(-1));
 
-        Ok(Box::new(ReplaceFn {
+        Ok(ReplaceFn {
             value,
             pattern,
             with,
             count,
-        }))
+        }
+        .as_expr())
     }
 }
 
@@ -125,7 +126,7 @@ struct ReplaceFn {
     count: Box<dyn Expression>,
 }
 
-impl Expression for ReplaceFn {
+impl FunctionExpression for ReplaceFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let with_value = self.with.resolve(ctx)?;
@@ -135,7 +136,7 @@ impl Expression for ReplaceFn {
         replace(value, with_value, count, pattern)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::bytes().infallible()
     }
 }
