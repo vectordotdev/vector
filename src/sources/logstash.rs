@@ -13,6 +13,7 @@ use smallvec::{smallvec, SmallVec};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Decoder;
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 
 use super::util::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
@@ -98,7 +99,7 @@ impl SourceConfig for LogstashConfig {
         )
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -781,7 +782,7 @@ mod integration_tests {
     async fn source(
         address: String,
         tls: Option<TlsEnableableConfig>,
-    ) -> impl Stream<Item = Event> {
+    ) -> impl Stream<Item = Event> + Unpin {
         let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
         let address: std::net::SocketAddr = address.parse().unwrap();
         let tls_options = match tls {

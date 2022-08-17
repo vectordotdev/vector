@@ -4,11 +4,12 @@ use futures::{future, FutureExt};
 use serde::{Deserialize, Serialize};
 use stream_cancel::{Trigger, Tripwire};
 use tokio::sync::Mutex;
+use vector_core::config::LogNamespace;
 
 use crate::{
     config::{Config, DataType, Output, SourceConfig, SourceContext},
     sinks::blackhole::BlackholeConfig,
-    sources::{stdin::StdinConfig, Source},
+    sources::{file_descriptors::stdin::StdinConfig, Source},
     test_util::{mock::transforms::BasicTransformConfig, start_topology, trace_init},
     Error,
 };
@@ -52,7 +53,7 @@ impl SourceConfig for MockSourceConfig {
         ))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -67,6 +68,8 @@ impl SourceConfig for MockSourceConfig {
 
 #[tokio::test]
 async fn closed_source() {
+    trace_init();
+
     let mut old_config = Config::builder();
     let (trigger_old, source) = MockSourceConfig::new();
     old_config.add_source("in", source);

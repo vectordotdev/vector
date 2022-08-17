@@ -27,7 +27,7 @@ use vector::{
         SourceContext, TransformConfig, TransformContext,
     },
     event::{
-        metric::{self, MetricData, MetricValue},
+        metric::{self, MetricData, MetricTime, MetricValue},
         Event, EventArray, EventContainer, Value,
     },
     schema,
@@ -37,7 +37,9 @@ use vector::{
     test_util::{temp_dir, temp_file},
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
-use vector_buffers::{topology::channel::LimitedReceiver, Acker};
+use vector_buffers::topology::channel::LimitedReceiver;
+use vector_common::finalization::Finalizable;
+use vector_core::config::LogNamespace;
 
 pub fn sink(channel_size: usize) -> (impl Stream<Item = EventArray>, MockSinkConfig) {
     let (tx, rx) = SourceSender::new_with_buffer(channel_size);
@@ -215,7 +217,7 @@ impl SourceConfig for MockSourceConfig {
         }))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(self.data_type.unwrap())]
     }
 
@@ -273,8 +275,11 @@ impl FunctionTransform for MockTransform {
                 };
                 if let Some(increment) = increment {
                     assert!(metric.add(&MetricData {
+                        time: MetricTime {
+                            interval_ms: metric.interval_ms(),
+                            timestamp: metric.timestamp(),
+                        },
                         kind: metric.kind(),
-                        timestamp: metric.timestamp(),
                         value: increment,
                     }));
                 }
@@ -384,7 +389,7 @@ enum HealthcheckError {
 #[async_trait]
 #[typetag::serialize(name = "mock")]
 impl SinkConfig for MockSinkConfig {
-    async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck), vector::Error> {
+    async fn build(&self, _cx: SinkContext) -> Result<(VectorSink, Healthcheck), vector::Error> {
         // If this sink is set to not be healthy, just send the healthcheck error immediately over
         // the oneshot.. otherwise, pass the sender to the sink so it can send it only once it has
         // started running, so that tests can request the topology be healthy before proceeding.
@@ -398,7 +403,6 @@ impl SinkConfig for MockSinkConfig {
         };
 
         let sink = MockSink {
-            acker: cx.acker(),
             sink: self.sink.clone(),
             health_tx,
         };
@@ -420,13 +424,12 @@ impl SinkConfig for MockSinkConfig {
         unimplemented!("not intended for use in real configs")
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        None
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &AcknowledgementsConfig::DEFAULT
     }
 }
 
 struct MockSink {
-    acker: Acker,
     sink: Mode,
     health_tx: Option<oneshot::Sender<vector::Result<()>>>,
 }
@@ -441,12 +444,12 @@ impl StreamSink<Event> for MockSink {
                 }
 
                 // We have an inner sink, so forward the input normally
-                while let Some(event) = input.next().await {
+                while let Some(mut event) = input.next().await {
+                    let finalizers = event.take_finalizers();
                     if let Err(error) = sink.send_event(event).await {
                         error!(message = "Ingesting an event failed at mock sink.", %error);
                     }
-
-                    self.acker.ack(1);
+                    drop(finalizers);
                 }
             }
             Mode::Dead => {

@@ -7,9 +7,9 @@ use bytes::{BufMut, BytesMut};
 use chrono::{DateTime, Utc};
 use futures::FutureExt;
 use http::{StatusCode, Uri};
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tower::Service;
+use vector_config::configurable_component;
 
 use crate::http::HttpClient;
 
@@ -19,7 +19,9 @@ pub(in crate::sinks) enum Field {
     /// float
     Float(f64),
     /// unsigned integer
-    UnsignedInt(u32),
+    /// Influx can support 64 bit integers if compiled with a flag, see:
+    /// https://github.com/influxdata/influxdb/issues/7801#issuecomment-466801839
+    UnsignedInt(u64),
     /// integer
     Int(i64),
     /// boolean
@@ -47,19 +49,55 @@ enum ConfigError {
     },
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration settings for InfluxDB v0.x/v1.x.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct InfluxDb1Settings {
+    /// The name of the database to write into.
+    ///
+    /// Only relevant when using InfluxDB v0.x/v1.x.
     database: String,
+
+    /// The consistency level to use for writes.
+    ///
+    /// Only relevant when using InfluxDB v0.x/v1.x.
     consistency: Option<String>,
+
+    /// The target retention policy for writes.
+    ///
+    /// Only relevant when using InfluxDB v0.x/v1.x.
     retention_policy_name: Option<String>,
+
+    /// The username to authenticate with.
+    ///
+    /// Only relevant when using InfluxDB v0.x/v1.x.
     username: Option<String>,
+
+    /// The password to authenticate with.
+    ///
+    /// Only relevant when using InfluxDB v0.x/v1.x.
     password: Option<String>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration settings for InfluxDB v2.x.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct InfluxDb2Settings {
+    /// The name of the organization to write into.
+    ///
+    /// Only relevant when using InfluxDB v2.x and above.
     org: String,
+
+    /// The name of the bucket to write into.
+    ///
+    /// Only relevant when using InfluxDB v2.x and above.
     bucket: String,
+
+    /// The [token][token_docs] to authenticate with.
+    ///
+    /// Only relevant when using InfluxDB v2.x and above.
+    ///
+    /// [token_docs]: https://v2.docs.influxdata.com/v2.0/security/tokens/
     token: String,
 }
 
@@ -503,6 +541,8 @@ pub mod test_util {
 
 #[cfg(test)]
 mod tests {
+    use serde::{Deserialize, Serialize};
+
     use super::*;
     use crate::sinks::influxdb::test_util::{assert_fields, tags, ts};
 

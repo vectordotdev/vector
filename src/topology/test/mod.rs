@@ -53,6 +53,8 @@ mod backpressure;
 mod compliance;
 
 fn basic_config() -> Config {
+    trace_init();
+
     let mut config = Config::builder();
     config.add_source("in1", basic_source().1);
     config.add_sink("out1", &["in1"], basic_sink(10).1);
@@ -60,6 +62,8 @@ fn basic_config() -> Config {
 }
 
 fn basic_config_with_sink_failing_healthcheck() -> Config {
+    trace_init();
+
     let mut config = Config::builder();
     config.add_source("in1", basic_source().1);
     config.add_sink("out1", &["in1"], basic_sink_failing_healthcheck(10).1);
@@ -132,6 +136,8 @@ async fn topology_shutdown_while_active() {
 
 #[tokio::test]
 async fn topology_source_and_sink() {
+    trace_init();
+
     let (mut in1, source1) = basic_source();
     let (out1, sink1) = basic_sink(10);
 
@@ -153,6 +159,8 @@ async fn topology_source_and_sink() {
 
 #[tokio::test]
 async fn topology_multiple_sources() {
+    trace_init();
+
     let (mut in1, source1) = basic_source();
     let (mut in2, source2) = basic_source();
     let (mut out1, sink1) = basic_sink(10);
@@ -217,6 +225,8 @@ async fn topology_multiple_sinks() {
 
 #[tokio::test]
 async fn topology_transform_chain() {
+    trace_init();
+
     let (mut in1, source1) = basic_source();
     let transform1 = basic_transform(" first", 0.0);
     let transform2 = basic_transform(" second", 0.0);
@@ -287,6 +297,8 @@ async fn topology_remove_one_source() {
 
 #[tokio::test]
 async fn topology_remove_one_sink() {
+    trace_init();
+
     let (mut in1, source1) = basic_source();
     let (out1, sink1) = basic_sink(10);
     let (out2, sink2) = basic_sink(10);
@@ -540,6 +552,8 @@ async fn topology_swap_sink() {
 #[ignore] // TODO: issue #2186
 #[tokio::test]
 async fn topology_swap_transform_is_atomic() {
+    trace_init();
+
     let (mut in1, source1) = basic_source();
     let transform1v1 = basic_transform(" transformed", 0.0);
     let (out1, sink1) = basic_sink(10);
@@ -736,6 +750,8 @@ async fn topology_healthcheck_not_run_on_unchanged_reload() {
 
 #[tokio::test]
 async fn topology_healthcheck_run_for_changes_on_reload() {
+    trace_init();
+
     let mut config = Config::builder();
     // We can't just drop the sender side since that will close the source.
     let (_ch0, src) = basic_source();

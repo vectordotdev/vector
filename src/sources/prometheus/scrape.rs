@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio_stream::wrappers::IntervalStream;
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
 use super::parser;
@@ -167,7 +168,7 @@ impl SourceConfig for PrometheusScrapeConfig {
         .boxed())
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(config::DataType::Metric)]
     }
 
@@ -218,7 +219,7 @@ impl SourceConfig for PrometheusCompatConfig {
         config.build(cx).await
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(config::DataType::Metric)]
     }
 
@@ -455,7 +456,7 @@ mod test {
             components::{
                 assert_source_compliance, run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS,
             },
-            next_addr, start_topology,
+            next_addr, start_topology, wait_for_tcp,
         },
         Error,
     };
@@ -476,6 +477,7 @@ mod test {
         });
 
         tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+        wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics", in_addr)],
@@ -490,7 +492,7 @@ mod test {
 
         let events = run_and_assert_source_compliance(
             config,
-            Duration::from_secs(1),
+            Duration::from_secs(3),
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
@@ -508,6 +510,7 @@ mod test {
         });
 
         tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+        wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics", in_addr)],
@@ -522,7 +525,7 @@ mod test {
 
         let events = run_and_assert_source_compliance(
             config,
-            Duration::from_secs(1),
+            Duration::from_secs(3),
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
@@ -558,6 +561,7 @@ mod test {
         });
 
         tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+        wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics", in_addr)],
@@ -572,7 +576,7 @@ mod test {
 
         let events = run_and_assert_source_compliance(
             config,
-            Duration::from_secs(1),
+            Duration::from_secs(3),
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
@@ -621,6 +625,7 @@ mod test {
         });
 
         tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+        wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{}/metrics?key1=val1", in_addr)],
@@ -641,7 +646,7 @@ mod test {
 
         let events = run_and_assert_source_compliance(
             config,
-            Duration::from_secs(1),
+            Duration::from_secs(3),
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;
@@ -723,6 +728,7 @@ mod test {
                 error!(message = "Server error.", %error);
             }
         });
+        wait_for_tcp(in_addr).await;
 
         let mut config = config::Config::builder();
         config.add_source(
@@ -750,6 +756,7 @@ mod test {
                 distributions_as_summaries: false,
                 flush_period_secs: Duration::from_secs(1),
                 suppress_timestamp: false,
+                acknowledgements: Default::default(),
             },
         );
 
@@ -829,7 +836,7 @@ mod integration_tests {
 
         let events = run_and_assert_source_compliance(
             config,
-            Duration::from_secs(1),
+            Duration::from_secs(3),
             &HTTP_PULL_SOURCE_TAGS,
         )
         .await;

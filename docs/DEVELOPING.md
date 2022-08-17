@@ -322,9 +322,8 @@ to run. A few rules when setting up integration tests:
       an environment variable.
 - [ ] Add a `test-integration-<name>` to Vector's [`Makefile`](/Makefile) and
       ensure that it starts the service before running the integration test.
-- [ ] Add a `test-integration-<name>` job to Vector's
-      [`.github/workflows/test.yml`](.github/workflows/test.yml) workflow and
-      call your make target accordingly.
+- [ ] Add the name of your integration to the include matrix of the `test-integration` job to Vector's
+      [`.github/workflows/integration-test.yml`](.github/workflows/integration-test.yml) workflow.
 
 Once complete, you can run your integration tests with:
 
@@ -359,7 +358,7 @@ before using a cached asset.
 In order to use `sccache`, you must first [install](https://github.com/mozilla/sccache#installation)
 it.  There are pre-built binaries for all major platforms to get you going quickly. The
 [usage](https://github.com/mozilla/sccache#usage) documentation also explains how to set up your
-environment to actually use it.  We recommend using the `.cargo/config` approach as this can help
+environment to actually use it.  We recommend using the `$HOME/.cargo/config` approach as this can help
 speed up all of your Rust development work, and not just developing on Vector.
 
 While `sccache` was originally designed to cache compilation assets in cloud storage, maximizing

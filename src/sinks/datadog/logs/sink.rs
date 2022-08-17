@@ -13,7 +13,6 @@ use lookup::path;
 use snafu::Snafu;
 use tower::Service;
 use vector_core::{
-    buffers::Acker,
     config::{log_schema, LogSchema},
     event::{Event, EventFinalizers, Finalizable, Value},
     partition::Partitioner,
@@ -24,12 +23,10 @@ use vector_core::{
 
 use super::{config::MAX_PAYLOAD_BYTES, service::LogApiRequest};
 use crate::{
-    codecs::Encoder,
-    config::SinkContext,
+    codecs::{Encoder, Transformer},
     sinks::util::{
-        encoding::{Encoder as _, Transformer},
-        request_builder::EncodeResult,
-        Compression, Compressor, RequestBuilder, SinkBuilderExt,
+        encoding::Encoder as _, request_builder::EncodeResult, Compression, Compressor,
+        RequestBuilder, SinkBuilderExt,
     },
 };
 #[derive(Default)]
@@ -48,7 +45,6 @@ impl Partitioner for EventPartitioner {
 pub struct LogSinkBuilder<S> {
     encoding: JsonEncoding,
     service: S,
-    context: SinkContext,
     batch_settings: BatcherSettings,
     compression: Option<Compression>,
     default_api_key: Arc<str>,
@@ -58,14 +54,12 @@ impl<S> LogSinkBuilder<S> {
     pub fn new(
         transformer: Transformer,
         service: S,
-        context: SinkContext,
         default_api_key: Arc<str>,
         batch_settings: BatcherSettings,
     ) -> Self {
         Self {
             encoding: JsonEncoding::new(transformer),
             service,
-            context,
             default_api_key,
             batch_settings,
             compression: None,
@@ -82,7 +76,6 @@ impl<S> LogSinkBuilder<S> {
             default_api_key: self.default_api_key,
             encoding: self.encoding,
             schema_enabled: false,
-            acker: self.context.acker(),
             service: self.service,
             batch_settings: self.batch_settings,
             compression: self.compression.unwrap_or_default(),
@@ -98,8 +91,6 @@ pub struct LogSink<S> {
     /// otherwise we will see `Event` instances with no associated key. In that
     /// case we batch them by this default.
     default_api_key: Arc<str>,
-    /// The ack system for this sink to vector's buffer mechanism
-    acker: Acker,
     /// The API service
     service: S,
     /// The encoding of payloads
@@ -255,7 +246,7 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
 
         // Now just compress it like normal.
         let mut compressor = Compressor::from(self.compression);
-        let _ = compressor.write_all(&buf)?;
+        compressor.write_all(&buf)?;
         let bytes = compressor.into_inner().freeze();
 
         if self.compression.is_compressed() {
@@ -339,7 +330,7 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for SemanticLogRequestBuilde
 
         // Now just compress it like normal.
         let mut compressor = Compressor::from(self.compression);
-        let _ = compressor.write_all(&buf)?;
+        compressor.write_all(&buf)?;
         let bytes = compressor.into_inner().freeze();
 
         if self.compression.is_compressed() {
@@ -404,7 +395,7 @@ where
                         Ok(req) => Some(req),
                     }
                 })
-                .into_driver(self.service, self.acker);
+                .into_driver(self.service);
 
             sink.run().await
         } else {
@@ -427,7 +418,7 @@ where
                         Ok(req) => Some(req),
                     }
                 })
-                .into_driver(self.service, self.acker);
+                .into_driver(self.service);
 
             sink.run().await
         }

@@ -33,13 +33,13 @@ impl Function for Md5 {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(Md5Fn { value }))
+        Ok(Md5Fn { value }.as_expr())
     }
 }
 
@@ -48,13 +48,13 @@ struct Md5Fn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for Md5Fn {
+impl FunctionExpression for Md5Fn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         md5(value)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::bytes().infallible()
     }
 }

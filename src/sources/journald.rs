@@ -9,6 +9,20 @@ use std::{
     time::Duration,
 };
 
+use crate::{
+    config::{
+        log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext,
+        SourceDescription,
+    },
+    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, LogEvent, Value},
+    internal_events::{
+        BytesReceived, JournaldInvalidRecordError, JournaldNegativeAcknowledgmentError,
+        OldEventsReceived,
+    },
+    serde::bool_or_struct,
+    shutdown::ShutdownSignal,
+    SourceSender,
+};
 use bytes::Bytes;
 use chrono::TimeZone;
 use codecs::{decoding::BoxedFramingError, CharacterDelimitedDecoder};
@@ -32,21 +46,7 @@ use tokio::{
 use tokio_util::codec::FramedRead;
 use vector_common::{byte_size_of::ByteSizeOf, finalizer::OrderedFinalizer};
 use vector_config::configurable_component;
-
-use crate::{
-    config::{
-        log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext,
-        SourceDescription,
-    },
-    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, LogEvent, Value},
-    internal_events::{
-        BytesReceived, JournaldInvalidRecordError, JournaldNegativeAcknowledgmentError,
-        OldEventsReceived,
-    },
-    serde::bool_or_struct,
-    shutdown::ShutdownSignal,
-    SourceSender,
-};
+use vector_core::config::LogNamespace;
 
 const DEFAULT_BATCH_SIZE: usize = 16;
 const BATCH_TIMEOUT: Duration = Duration::from_millis(10);
@@ -250,7 +250,7 @@ impl SourceConfig for JournaldConfig {
         ))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -416,7 +416,7 @@ impl<'a> Batch<'a> {
             Some(Ok(bytes)) => {
                 match decode_record(&bytes, self.source.remap_priority) {
                     Ok(mut record) => {
-                        if let Some(tmp) = record.remove(&*CURSOR) {
+                        if let Some(tmp) = record.remove(CURSOR) {
                             self.cursor = Some(tmp);
                         }
 
@@ -567,7 +567,7 @@ fn create_event(record: Record, batch: &Option<BatchNotifier>) -> LogEvent {
     }
     // Translate the timestamp, and so leave both old and new names.
     if let Some(Value::Bytes(timestamp)) = log
-        .get(&*SOURCE_TIMESTAMP)
+        .get(SOURCE_TIMESTAMP)
         .or_else(|| log.get(RECEIVED_TIMESTAMP))
     {
         if let Ok(timestamp) = String::from_utf8_lossy(timestamp).parse::<u64>() {

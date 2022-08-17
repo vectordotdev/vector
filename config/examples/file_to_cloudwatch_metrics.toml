@@ -34,12 +34,12 @@ tags = {method = "{{method}}", status = "{{status}}"}
 [sinks.console_metrics]
 inputs = ["log_to_metric"]
 type = "console"
-encoding = "json"
+encoding.codec = "json"
 
 [sinks.console_logs]
 inputs = ["remap"]
 type = "console"
-encoding = "json"
+encoding.codec = "json"
 
 [sinks.cloudwatch]
 inputs = ["log_to_metric"]

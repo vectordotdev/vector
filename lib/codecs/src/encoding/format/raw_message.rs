@@ -74,7 +74,7 @@ mod tests {
 
     #[test]
     fn serialize_bytes() {
-        let input = Event::Log(LogEvent::from("foo"));
+        let input = Event::from(LogEvent::from_str_legacy("foo"));
         let mut serializer = RawMessageSerializer;
 
         let mut buffer = BytesMut::new();

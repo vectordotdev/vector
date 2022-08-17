@@ -9,9 +9,12 @@ use std::{
 
 use ::value::Value;
 use clap::Parser;
+use lookup::LookupBuf;
 use value::Secrets;
 use vector_common::TimeZone;
+use vrl::state::TypeState;
 use vrl::{diagnostic::Formatter, state, Program, Runtime, Target, VrlRuntime};
+use vrl::{CompilationResult, CompileConfig};
 
 #[cfg(feature = "repl")]
 use super::repl;
@@ -121,9 +124,21 @@ fn run(opts: &Opts) -> Result<(), Error> {
     } else {
         let objects = opts.read_into_objects()?;
         let source = opts.read_program()?;
-        let (program, warnings) = vrl::compile(&source, &stdlib::all()).map_err(|diagnostics| {
-            Error::Parse(Formatter::new(&source, diagnostics).colored().to_string())
-        })?;
+
+        // The CLI should be moved out of the "vrl" module, and then it can use the `vector-core::compile_vrl` function which includes this automatically
+        let mut config = CompileConfig::default();
+        config.set_read_only_metadata_path(LookupBuf::from("vector"), true);
+
+        let state = TypeState::default();
+
+        let CompilationResult {
+            program,
+            warnings,
+            config: _,
+        } = vrl::compile_with_state(&source, &stdlib::all(), &state, CompileConfig::default())
+            .map_err(|diagnostics| {
+                Error::Parse(Formatter::new(&source, diagnostics).colored().to_string())
+            })?;
 
         #[allow(clippy::print_stderr)]
         if opts.print_warnings {
@@ -176,11 +191,11 @@ fn repl(objects: Vec<Value>, timezone: TimeZone, vrl_runtime: VrlRuntime) -> Res
         })
         .collect();
 
-    repl::run(objects, timezone, vrl_runtime);
-    Ok(())
+    repl::run(objects, timezone, vrl_runtime).map_err(Into::into)
 }
 
 #[cfg(not(feature = "repl"))]
+#[allow(clippy::needless_pass_by_value)]
 fn repl(_objects: Vec<Value>, _timezone: TimeZone, _vrl_runtime: VrlRuntime) -> Result<(), Error> {
     Err(Error::ReplFeature)
 }

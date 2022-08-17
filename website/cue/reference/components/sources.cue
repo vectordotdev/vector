@@ -86,7 +86,7 @@ components: sources: [Name=string]: {
 								enum: {
 									bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (e.g. split between messages or stream segments)."
 									character_delimited: "Byte frames which are delimited by a chosen character."
-									length_delimited:    "Byte frames whose length is encoded in a header."
+									length_delimited:    "Byte frames which are prefixed by an unsigned big-endian 32-bit integer indicating the length."
 									newline_delimited:   "Byte frames which are delimited by a newline character."
 									octet_counting:      "Byte frames according to the [octet counting](\(urls.rfc_6587_3_4_1)) format."
 								}
@@ -259,8 +259,9 @@ components: sources: [Name=string]: {
 
 			if features.receive.tls.enabled {
 				tls: configuration._tls_accept & {_args: {
-					can_verify_certificate: features.receive.tls.can_verify_certificate
-					enabled_default:        features.receive.tls.enabled_default
+					can_verify_certificate:  features.receive.tls.can_verify_certificate
+					can_add_client_metadata: features.receive.tls.can_add_client_metadata
+					enabled_default:         features.receive.tls.enabled_default
 				}}
 			}
 		}
@@ -365,5 +366,6 @@ components: sources: [Name=string]: {
 		events_out_total:                 components.sources.internal_metrics.output.metrics.events_out_total
 		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
 		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
+		lag_time_seconds:                 components.sources.internal_metrics.output.metrics.lag_time_seconds
 	}
 }

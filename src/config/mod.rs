@@ -158,24 +158,12 @@ impl Config {
     }
 
     pub fn propagate_acknowledgements(&mut self) -> Result<(), Vec<String>> {
-        if self.global.acknowledgements.enabled() {
-            for (name, sink) in &self.sinks {
-                if sink.inner.acknowledgements().is_none() {
-                    warn!(
-                        message = "Acknowledgements are globally enabled but sink does not support them.",
-                        sink = %name,
-                    );
-                }
-            }
-        }
-
         let inputs: Vec<_> = self
             .sinks
             .iter()
             .filter(|(_, sink)| {
                 sink.inner
                     .acknowledgements()
-                    .unwrap_or(&self.global.acknowledgements)
                     .merge_default(&self.global.acknowledgements)
                     .enabled()
             })
@@ -288,7 +276,7 @@ inventory::collect!(EnrichmentTableDescription);
 pub enum Resource {
     Port(SocketAddr, Protocol),
     SystemFdOffset(usize),
-    Stdin,
+    Fd(u32),
     DiskBuffer(String),
 }
 
@@ -363,7 +351,7 @@ impl Display for Resource {
         match self {
             Resource::Port(address, protocol) => write!(fmt, "{} {}", protocol, address),
             Resource::SystemFdOffset(offset) => write!(fmt, "systemd {}th socket", offset + 1),
-            Resource::Stdin => write!(fmt, "stdin"),
+            Resource::Fd(fd) => write!(fmt, "file descriptor: {}", fd),
             Resource::DiskBuffer(name) => write!(fmt, "disk buffer {:?}", name),
         }
     }
@@ -635,6 +623,84 @@ mod tests {
             err,
             vec!["More than one component with name \"foo\" (source, transform).",]
         );
+    }
+
+    #[tokio::test]
+    #[cfg(unix)]
+    async fn conflicting_stdin_and_fd_resources() {
+        let errors = load(
+            r#"
+            [sources.stdin]
+            type = "stdin"
+
+            [sources.file_descriptor]
+            type = "file_descriptor"
+            fd = 0
+
+            [sinks.out]
+            type = "basic_sink"
+            inputs = ["stdin", "file_descriptor"]
+            "#,
+            Format::Toml,
+        )
+        .await
+        .unwrap_err();
+
+        assert_eq!(errors.len(), 1);
+        let expected_prefix = "Resource `file descriptor: 0` is claimed by multiple components:";
+        assert!(errors[0].starts_with(expected_prefix));
+    }
+
+    #[tokio::test]
+    #[cfg(unix)]
+    async fn conflicting_fd_resources() {
+        let errors = load(
+            r#"
+            [sources.file_descriptor1]
+            type = "file_descriptor"
+            fd = 10
+
+            [sources.file_descriptor2]
+            type = "file_descriptor"
+            fd = 10
+
+            [sinks.out]
+            type = "basic_sink"
+            inputs = ["file_descriptor1", "file_descriptor2"]
+            "#,
+            Format::Toml,
+        )
+        .await
+        .unwrap_err();
+
+        assert_eq!(errors.len(), 1);
+        let expected_prefix = "Resource `file descriptor: 10` is claimed by multiple components:";
+        assert!(errors[0].starts_with(expected_prefix));
+    }
+
+    #[tokio::test]
+    #[cfg(unix)]
+    async fn no_conflict_fd_resources() {
+        let result = load(
+            r#"
+            [sources.file_descriptor1]
+            type = "file_descriptor"
+            fd = 10
+
+            [sources.file_descriptor2]
+            type = "file_descriptor"
+            fd = 20
+
+            [sinks.out]
+            type = "basic_sink"
+            inputs = ["file_descriptor1", "file_descriptor2"]
+            "#,
+            Format::Toml,
+        )
+        .await;
+
+        let expected = Ok(vec![]);
+        assert_eq!(result, expected);
     }
 
     #[tokio::test]
@@ -915,7 +981,7 @@ mod tests {
                 [sinks.out]
                   type = "console"
                   inputs = ["in"]
-                  encoding = "json"
+                  encoding.codec = "json"
             "#},
             Format::Toml,
         )
@@ -948,7 +1014,7 @@ mod tests {
                 [sinks.out]
                   type = "console"
                   inputs = ["in"]
-                  encoding = "json"
+                  encoding.codec = "json"
             "#},
             Format::Toml,
         )
@@ -980,7 +1046,7 @@ mod tests {
                 [sinks.out]
                   type = "console"
                   inputs = ["in"]
-                  encoding = "json"
+                  encoding.codec = "json"
             "#},
             Format::Toml,
         )
@@ -1074,7 +1140,6 @@ mod tests {
             indoc! {r#"
                 [enterprise]
                 api_key = "api_key"
-                application_key = "application_key"
                 configuration_key = "configuration_key"
 
                 [enterprise.tags]
@@ -1096,7 +1161,6 @@ mod tests {
             indoc! {r#"
                 [enterprise]
                 api_key = "api_key"
-                application_key = "application_key"
                 configuration_key = "configuration_key"
 
                 [enterprise.tags]
@@ -1147,18 +1211,18 @@ mod acknowledgements_tests {
                 [sinks.out1]
                     type = "file"
                     inputs = ["in1"]
-                    encoding = "text"
+                    encoding.codec = "text"
                     path = "/path/to/out1"
                 [sinks.out2]
                     type = "file"
                     inputs = ["in2"]
-                    encoding = "text"
+                    encoding.codec = "text"
                     path = "/path/to/out2"
                     acknowledgements = true
                 [sinks.out3]
                     type = "file"
                     inputs = ["parse3"]
-                    encoding = "text"
+                    encoding.codec = "text"
                     path = "/path/to/out3"
                     acknowledgements.enabled = true
             "#},
@@ -1316,7 +1380,7 @@ mod resource_tests {
                 [sinks.out]
                   type = "console"
                   inputs = ["in0","in1"]
-                  encoding = "json"
+                  encoding.codec = "json"
             "#},
             Format::Toml,
         )
@@ -1363,7 +1427,7 @@ mod pipelines_tests {
                 [sinks.out]
                   type = "console"
                   inputs = ["processing"]
-                  encoding = "json"
+                  encoding.codec = "json"
             "#},
             Format::Toml,
         );

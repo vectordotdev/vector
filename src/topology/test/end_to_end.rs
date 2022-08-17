@@ -76,6 +76,8 @@ pub fn http_client(
 }
 
 async fn http_to_http(status: StatusCode, response: StatusCode) {
+    test_util::trace_init();
+
     let address1 = test_util::next_addr();
     let address2 = test_util::next_addr();
     let config = config::load_from_str(
@@ -89,7 +91,7 @@ acknowledgements.enabled = true
 [sinks.out]
 type = "http"
 inputs = ["in"]
-encoding = "json"
+encoding.codec = "json"
 uri = "http://{address2}/"
 "#,
             address1 = address1,

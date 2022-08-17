@@ -150,13 +150,13 @@ impl Function for ToBool {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(ToBoolFn { value }))
+        Ok(ToBoolFn { value }.as_expr())
     }
 }
 
@@ -165,14 +165,14 @@ struct ToBoolFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ToBoolFn {
+impl FunctionExpression for ToBoolFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
 
         to_bool(value)
     }
 
-    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &state::TypeState) -> TypeDef {
         let td = self.value.type_def(state);
 
         TypeDef::boolean().with_fallibility(

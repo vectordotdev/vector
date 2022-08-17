@@ -126,14 +126,14 @@ impl Function for Get {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let path = arguments.required("path");
 
-        Ok(Box::new(GetFn { value, path }))
+        Ok(GetFn { value, path }.as_expr())
     }
 }
 
@@ -143,7 +143,7 @@ pub(crate) struct GetFn {
     path: Box<dyn Expression>,
 }
 
-impl Expression for GetFn {
+impl FunctionExpression for GetFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let path = self.path.resolve(ctx)?;
         let value = self.value.resolve(ctx)?;
@@ -151,7 +151,7 @@ impl Expression for GetFn {
         get(value, path)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::any().fallible()
     }
 }

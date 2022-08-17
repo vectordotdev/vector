@@ -11,6 +11,7 @@ components: sources: gcp_pubsub: {
 				can_verify_certificate: true
 				can_verify_hostname:    true
 				enabled_default:        true
+				enabled_by_scheme:      true
 			}
 			checkpoint: enabled: false
 			proxy: enabled:      true
@@ -193,6 +194,13 @@ components: sources: gcp_pubsub: {
 				type: string: {
 					examples: ["2345"]
 					syntax: "literal"
+				}
+			}
+			source_type: {
+				description: "The name of the source type."
+				required:    true
+				type: string: {
+					examples: ["gcp_pubsub"]
 				}
 			}
 			timestamp: fields._current_timestamp & {

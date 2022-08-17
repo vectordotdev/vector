@@ -16,7 +16,9 @@ use lookup::lookup_v2::{parse_path, OwnedSegment};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
+use tracing_futures::Instrument;
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
 use super::util::MultilineConfig;
@@ -56,7 +58,9 @@ pub struct DockerLogsConfig {
     ///
     /// The value will be the current hostname for wherever Vector is running.
     ///
-    /// By default, the [global `host_key` option](https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key) is used.
+    /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
+    ///
+    /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     #[serde(default = "host_key")]
     host_key: String,
 
@@ -221,7 +225,7 @@ impl SourceConfig for DockerLogsConfig {
         }))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -249,8 +253,8 @@ impl SourceConfig for DockerCompatConfig {
         self.config.build(cx).await
     }
 
-    fn outputs(&self) -> Vec<Output> {
-        self.config.outputs()
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        self.config.outputs(global_log_namespace)
     }
 
     fn source_type(&self) -> &'static str {
@@ -320,7 +324,7 @@ impl DockerLogsSourceCore {
         );
         filters.insert("type".to_owned(), vec!["container".to_owned()]);
 
-        // Apply include filters
+        // Apply include filters.
         if let Some(include_labels) = &self.config.include_labels {
             filters.insert("label".to_owned(), include_labels.clone());
         }
@@ -587,35 +591,39 @@ impl EventStreamBuilder {
     /// Spawn a task to runs event stream until shutdown.
     fn start(&self, id: ContainerId, backoff: Option<Duration>) -> ContainerState {
         let this = self.clone();
-        tokio::spawn(async move {
-            if let Some(duration) = backoff {
-                tokio::time::sleep(duration).await;
-            }
-            match this
-                .core
-                .docker
-                .inspect_container(id.as_str(), None::<InspectContainerOptions>)
-                .await
-            {
-                Ok(details) => match ContainerMetadata::from_details(details) {
-                    Ok(metadata) => {
-                        let info = ContainerLogInfo::new(id, metadata, this.core.now_timestamp);
-                        this.run_event_stream(info).await;
-                        return;
-                    }
-                    Err(error) => emit!(DockerLogsTimestampParseError {
+        tokio::spawn(
+            async move {
+                if let Some(duration) = backoff {
+                    tokio::time::sleep(duration).await;
+                }
+
+                match this
+                    .core
+                    .docker
+                    .inspect_container(id.as_str(), None::<InspectContainerOptions>)
+                    .await
+                {
+                    Ok(details) => match ContainerMetadata::from_details(details) {
+                        Ok(metadata) => {
+                            let info = ContainerLogInfo::new(id, metadata, this.core.now_timestamp);
+                            this.run_event_stream(info).await;
+                            return;
+                        }
+                        Err(error) => emit!(DockerLogsTimestampParseError {
+                            error,
+                            container_id: id.as_str()
+                        }),
+                    },
+                    Err(error) => emit!(DockerLogsContainerMetadataFetchError {
                         error,
                         container_id: id.as_str()
                     }),
-                },
-                Err(error) => emit!(DockerLogsContainerMetadataFetchError {
-                    error,
-                    container_id: id.as_str()
-                }),
-            }
+                }
 
-            this.finish(Err((id, ErrorPersistence::Transient)));
-        });
+                this.finish(Err((id, ErrorPersistence::Transient)));
+            }
+            .in_current_span(),
+        );
 
         ContainerState::new_running()
     }
@@ -624,7 +632,7 @@ impl EventStreamBuilder {
     fn restart(&self, container: &mut ContainerState) {
         if let Some(info) = container.take_info() {
             let this = self.clone();
-            tokio::spawn(this.run_event_stream(info));
+            tokio::spawn(this.run_event_stream(info).in_current_span());
         }
     }
 
@@ -1078,7 +1086,7 @@ fn line_agg_adapter(
             .remove(log_schema().message_key())
             .expect("message must exist in the event");
         let stream_value = log_event
-            .get(&*STREAM)
+            .get(STREAM)
             .expect("stream must exist in the event");
 
         let stream = stream_value.coerce_to_bytes();
@@ -1412,9 +1420,9 @@ mod integration_tests {
 
         let log = events[0].as_log();
         assert_eq!(log[log_schema().message_key()], message.into());
-        assert_eq!(log[&*super::CONTAINER], id.into());
-        assert!(log.get(&*super::CREATED_AT).is_some());
-        assert_eq!(log[&*super::IMAGE], "busybox".into());
+        assert_eq!(log[super::CONTAINER], id.into());
+        assert!(log.get(super::CREATED_AT).is_some());
+        assert_eq!(log[super::IMAGE], "busybox".into());
         assert!(log.get(format!("label.{}", label).as_str()).is_some());
         assert_eq!(events[0].as_log()[&super::NAME], name.into());
         assert_eq!(
@@ -1555,9 +1563,9 @@ mod integration_tests {
 
         let log = events[0].as_log();
         assert_eq!(log[log_schema().message_key()], message.into());
-        assert_eq!(log[&*super::CONTAINER], id.into());
-        assert!(log.get(&*super::CREATED_AT).is_some());
-        assert_eq!(log[&*super::IMAGE], "busybox".into());
+        assert_eq!(log[super::CONTAINER], id.into());
+        assert!(log.get(super::CREATED_AT).is_some());
+        assert_eq!(log[super::IMAGE], "busybox".into());
         assert!(log.get(format!("label.{}", label).as_str()).is_some());
         assert_eq!(events[0].as_log()[&super::NAME], name.into());
         assert_eq!(
@@ -1660,9 +1668,9 @@ mod integration_tests {
 
         let log = events[0].as_log();
         assert_eq!(log[log_schema().message_key()], message.into());
-        assert_eq!(log[&*super::CONTAINER], id.into());
-        assert!(log.get(&*super::CREATED_AT).is_some());
-        assert_eq!(log[&*super::IMAGE], "busybox".into());
+        assert_eq!(log[super::CONTAINER], id.into());
+        assert!(log.get(super::CREATED_AT).is_some());
+        assert_eq!(log[super::IMAGE], "busybox".into());
         assert!(log
             .get("label")
             .unwrap()
@@ -1749,7 +1757,7 @@ mod integration_tests {
             .map(|event| {
                 event
                     .into_log()
-                    .remove(&*crate::config::log_schema().message_key())
+                    .remove(crate::config::log_schema().message_key())
                     .unwrap()
                     .to_string_lossy()
             })

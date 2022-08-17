@@ -4,6 +4,7 @@ use std::{
     fmt::Debug,
 };
 
+use crate::ByteSizeOf;
 pub use ::value::Value;
 pub use array::{into_event_stream, EventArray, EventContainer, LogArray, MetricArray, TraceArray};
 pub use finalization::{
@@ -20,8 +21,6 @@ use vector_buffers::EventCount;
 use vector_common::{finalization, EventDataEq};
 #[cfg(feature = "vrl")]
 pub use vrl_target::{TargetEvents, VrlTarget};
-
-use crate::ByteSizeOf;
 
 pub mod array;
 pub mod discriminant;
@@ -46,6 +45,7 @@ pub const PARTIAL: &str = "_partial";
 
 #[derive(PartialEq, PartialOrd, Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[allow(clippy::large_enum_variant)]
 pub enum Event {
     Log(LogEvent),
     Metric(Metric),
@@ -351,7 +351,16 @@ impl From<proto::DistributionSample> for metric::Sample {
     }
 }
 
-impl From<metric::Bucket> for proto::HistogramBucket {
+impl From<proto::HistogramBucket> for metric::Bucket {
+    fn from(bucket: proto::HistogramBucket) -> Self {
+        Self {
+            upper_limit: bucket.upper_limit,
+            count: u64::from(bucket.count),
+        }
+    }
+}
+
+impl From<metric::Bucket> for proto::HistogramBucket3 {
     fn from(bucket: metric::Bucket) -> Self {
         Self {
             upper_limit: bucket.upper_limit,
@@ -360,8 +369,8 @@ impl From<metric::Bucket> for proto::HistogramBucket {
     }
 }
 
-impl From<proto::HistogramBucket> for metric::Bucket {
-    fn from(bucket: proto::HistogramBucket) -> Self {
+impl From<proto::HistogramBucket3> for metric::Bucket {
+    fn from(bucket: proto::HistogramBucket3) -> Self {
         Self {
             upper_limit: bucket.upper_limit,
             count: bucket.count,

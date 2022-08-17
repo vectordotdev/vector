@@ -38,6 +38,7 @@ components: sinks: datadog_traces: {
 				can_verify_certificate: true
 				can_verify_hostname:    true
 				enabled_default:        true
+				enabled_by_scheme:      true
 			}
 			to: {
 				service: services.datadog_traces
@@ -64,7 +65,7 @@ components: sinks: datadog_traces: {
 	}
 
 	configuration: {
-		default_api_key: sinks._datadog.configuration.api_key
+		default_api_key: sinks._datadog.configuration.default_api_key
 		endpoint:        sinks._datadog.configuration.endpoint
 		site:            sinks._datadog.configuration.site
 	}

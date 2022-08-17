@@ -47,14 +47,14 @@ impl Function for Push {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let item = arguments.required("item");
 
-        Ok(Box::new(PushFn { value, item }))
+        Ok(PushFn { value, item }.as_expr())
     }
 }
 
@@ -64,7 +64,7 @@ struct PushFn {
     item: Box<dyn Expression>,
 }
 
-impl Expression for PushFn {
+impl FunctionExpression for PushFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let list = self.value.resolve(ctx)?;
         let item = self.item.resolve(ctx)?;
@@ -72,16 +72,21 @@ impl Expression for PushFn {
         push(list, item)
     }
 
-    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
-        let item = TypeDef::array(BTreeMap::from([(
-            0.into(),
-            self.item.type_def(state).into(),
-        )]));
-        self.value
-            .type_def(state)
-            .restrict_array()
-            .merge_append(item)
-            .infallible()
+    fn type_def(&self, state: &state::TypeState) -> TypeDef {
+        let item = self.item.type_def(state).kind().clone().upgrade_undefined();
+        let mut typedef = self.value.type_def(state).restrict_array();
+
+        let array = typedef.as_array_mut().expect("must be an array");
+
+        if let Some(exact_len) = array.exact_length() {
+            // The exact array length is known, so just add the item to the correct index.
+            array.known_mut().insert(exact_len.into(), item);
+        } else {
+            // We don't know where the item will be inserted, so just add it to the unknown.
+            array.set_unknown(array.unknown_kind().union(item));
+        }
+
+        typedef.infallible()
     }
 }
 

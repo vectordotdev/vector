@@ -11,7 +11,7 @@ pub mod aws_s3;
 #[cfg(feature = "sources-aws_sqs")]
 pub mod aws_sqs;
 #[cfg(any(feature = "sources-datadog_agent"))]
-pub mod datadog;
+pub mod datadog_agent;
 #[cfg(feature = "sources-demo_logs")]
 pub mod demo_logs;
 #[cfg(all(unix, feature = "sources-dnstap"))]
@@ -24,6 +24,11 @@ pub mod eventstoredb_metrics;
 pub mod exec;
 #[cfg(feature = "sources-file")]
 pub mod file;
+#[cfg(any(
+    feature = "sources-stdin",
+    all(unix, feature = "sources-file-descriptor")
+))]
+pub mod file_descriptors;
 #[cfg(feature = "sources-fluent")]
 pub mod fluent;
 #[cfg(feature = "sources-gcp_pubsub")]
@@ -52,6 +57,8 @@ pub mod mongodb_metrics;
 pub mod nats;
 #[cfg(feature = "sources-nginx_metrics")]
 pub mod nginx_metrics;
+#[cfg(feature = "sources-opentelemetry")]
+pub mod opentelemetry;
 #[cfg(feature = "sources-postgresql_metrics")]
 pub mod postgresql_metrics;
 #[cfg(feature = "sources-prometheus")]
@@ -64,8 +71,6 @@ pub mod socket;
 pub mod splunk_hec;
 #[cfg(feature = "sources-statsd")]
 pub mod statsd;
-#[cfg(feature = "sources-stdin")]
-pub mod stdin;
 #[cfg(feature = "sources-syslog")]
 pub mod syslog;
 #[cfg(feature = "sources-vector")]
@@ -110,7 +115,7 @@ pub enum Sources {
 
     /// Datadog Agent.
     #[cfg(feature = "sources-datadog_agent")]
-    DatadogAgent(#[configurable(derived)] datadog::agent::DatadogAgentConfig),
+    DatadogAgent(#[configurable(derived)] datadog_agent::DatadogAgentConfig),
 
     /// Demo logs.
     #[cfg(feature = "sources-demo_logs")]
@@ -135,6 +140,12 @@ pub enum Sources {
     /// File.
     #[cfg(feature = "sources-file")]
     File(#[configurable(derived)] file::FileConfig),
+
+    /// File descriptor.
+    #[cfg(all(unix, feature = "sources-file-descriptor"))]
+    FileDescriptor(
+        #[configurable(derived)] file_descriptors::file_descriptor::FileDescriptorSourceConfig,
+    ),
 
     /// Fluent.
     #[cfg(feature = "sources-fluent")]
@@ -230,7 +241,7 @@ pub enum Sources {
 
     /// Stdin.
     #[cfg(feature = "sources-stdin")]
-    Stdin(#[configurable(derived)] stdin::StdinConfig),
+    Stdin(#[configurable(derived)] file_descriptors::stdin::StdinConfig),
 
     /// Syslog.
     #[cfg(feature = "sources-syslog")]

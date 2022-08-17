@@ -23,18 +23,11 @@
 //! `Field` can be a specifix field name of the object, or `Any` which represents any element found
 //! within that object.
 
-use std::{
-    borrow::Cow,
-    ops::{Deref, DerefMut},
-};
+use std::ops::{Deref, DerefMut};
 
-use lookup::Lookup;
+use lookup::LookupBuf;
 use value::{
-    kind::{
-        merge,
-        nest::{CoalescedPath, Strategy},
-        Collection, Field, Index,
-    },
+    kind::{merge, Collection, Field, Index},
     Kind, Value,
 };
 
@@ -72,32 +65,15 @@ impl TypeDef {
         &self.kind
     }
 
-    pub fn at_path(&self, path: &Lookup<'_>) -> TypeDef {
-        let fallible = self.fallible;
-
-        let kind = self
-            .kind
-            .find_at_path(path)
-            .ok()
-            .flatten()
-            .map_or_else(Kind::any, Cow::into_owned);
-
-        Self { fallible, kind }
+    #[must_use]
+    pub fn kind_mut(&mut self) -> &mut Kind {
+        &mut self.kind
     }
 
     #[must_use]
-    pub fn for_path(self, path: &Lookup<'_>) -> TypeDef {
+    pub fn at_path(&self, path: &LookupBuf) -> TypeDef {
         let fallible = self.fallible;
-        let kind = self
-            .kind
-            .clone()
-            .nest_at_path(
-                path,
-                Strategy {
-                    coalesced_path: CoalescedPath::Reject,
-                },
-            )
-            .unwrap_or(self.kind);
+        let kind = self.kind.at_path(path);
 
         Self { fallible, kind }
     }
@@ -137,7 +113,7 @@ impl TypeDef {
 
     #[inline]
     #[must_use]
-    pub fn add_bytes(mut self) -> Self {
+    pub fn or_bytes(mut self) -> Self {
         self.kind.add_bytes();
         self
     }
@@ -150,7 +126,7 @@ impl TypeDef {
 
     #[inline]
     #[must_use]
-    pub fn add_integer(mut self) -> Self {
+    pub fn or_integer(mut self) -> Self {
         self.kind.add_integer();
         self
     }
@@ -163,7 +139,7 @@ impl TypeDef {
 
     #[inline]
     #[must_use]
-    pub fn add_float(mut self) -> Self {
+    pub fn or_float(mut self) -> Self {
         self.kind.add_float();
         self
     }
@@ -176,7 +152,7 @@ impl TypeDef {
 
     #[inline]
     #[must_use]
-    pub fn add_boolean(mut self) -> Self {
+    pub fn or_boolean(mut self) -> Self {
         self.kind.add_boolean();
         self
     }
@@ -189,7 +165,7 @@ impl TypeDef {
 
     #[inline]
     #[must_use]
-    pub fn add_timestamp(mut self) -> Self {
+    pub fn or_timestamp(mut self) -> Self {
         self.kind.add_timestamp();
         self
     }
@@ -202,7 +178,7 @@ impl TypeDef {
 
     #[inline]
     #[must_use]
-    pub fn add_regex(mut self) -> Self {
+    pub fn or_regex(mut self) -> Self {
         self.kind.add_regex();
         self
     }
@@ -211,6 +187,26 @@ impl TypeDef {
     #[must_use]
     pub fn null() -> Self {
         Kind::null().into()
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn or_null(mut self) -> Self {
+        self.kind.add_null();
+        self
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn undefined() -> Self {
+        Kind::undefined().into()
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn or_undefined(mut self) -> Self {
+        self.kind.add_undefined();
+        self
     }
 
     #[inline]
@@ -232,7 +228,7 @@ impl TypeDef {
     }
 
     #[inline]
-    pub fn add_array(mut self, collection: impl Into<Collection<Index>>) -> Self {
+    pub fn or_array(mut self, collection: impl Into<Collection<Index>>) -> Self {
         self.kind.add_array(collection);
         self
     }
@@ -265,7 +261,7 @@ impl TypeDef {
     }
 
     #[inline]
-    pub fn add_object(mut self, collection: impl Into<Collection<Field>>) -> Self {
+    pub fn or_object(mut self, collection: impl Into<Collection<Field>>) -> Self {
         self.kind.add_object(collection);
         self
     }
@@ -307,11 +303,11 @@ impl TypeDef {
     #[must_use]
     pub fn collect_subtypes(mut self) -> Self {
         if let Some(object) = self.kind.as_object_mut() {
-            object.set_unknown(None);
+            object.set_unknown(Kind::undefined());
             object.anonymize();
         }
         if let Some(array) = self.kind.as_array_mut() {
-            array.set_unknown(None);
+            array.set_unknown(Kind::undefined());
             array.anonymize();
         }
 
@@ -342,55 +338,39 @@ impl TypeDef {
     }
 
     #[must_use]
-    pub fn merge_deep(mut self, other: Self) -> Self {
-        self.merge(
-            other,
-            merge::Strategy {
-                collisions: merge::CollisionStrategy::Union,
-                indices: merge::Indices::Keep,
-            },
-        );
+    pub fn union(mut self, other: Self) -> Self {
+        self.fallible |= other.fallible;
+        self.kind = self.kind.union(other.kind);
         self
     }
 
-    /// Merge two type definitions.
-    ///
-    /// When merging arrays, the elements of `other` are *appended* to the elements of `self`.
-    /// Meaning, the indices of `other` are updated, to continue onward from the last index of
-    /// `self`.
-    #[must_use]
-    pub fn merge_append(mut self, other: Self) -> Self {
-        self.merge(
-            other,
-            merge::Strategy {
-                collisions: merge::CollisionStrategy::Overwrite,
-                indices: merge::Indices::Append,
-            },
-        );
-        self
-    }
-
+    // deprecated
     pub fn merge(&mut self, other: Self, strategy: merge::Strategy) {
         self.fallible |= other.fallible;
         self.kind.merge(other.kind, strategy);
     }
 
     #[must_use]
-    pub fn with_type_set_at_path(self, path: &Lookup, other: Self) -> Self {
+    pub fn with_type_inserted(self, path: &LookupBuf, other: Self) -> Self {
         if path.is_root() {
             other
         } else {
-            self.merge_overwrite(other.for_path(path))
+            let mut kind = self.kind;
+            kind.insert(path, other.kind);
+            Self {
+                fallible: self.fallible || other.fallible,
+                kind,
+            }
         }
     }
 
     #[must_use]
+    // deprecated
     pub fn merge_overwrite(mut self, other: Self) -> Self {
         self.merge(
             other,
             merge::Strategy {
                 collisions: merge::CollisionStrategy::Overwrite,
-                indices: merge::Indices::Keep,
             },
         );
         self
@@ -422,7 +402,7 @@ impl Details {
     /// Returns the union of 2 possible states
     pub(crate) fn merge(self, other: Self) -> Self {
         Self {
-            type_def: self.type_def.merge_deep(other.type_def),
+            type_def: self.type_def.union(other.type_def),
             value: if self.value == other.value {
                 self.value
             } else {
@@ -449,7 +429,7 @@ mod test {
         assert_eq!(
             a.merge(b),
             Details {
-                type_def: TypeDef::integer().add_float(),
+                type_def: TypeDef::integer().or_float(),
                 value: Some(Value::from(5))
             }
         )

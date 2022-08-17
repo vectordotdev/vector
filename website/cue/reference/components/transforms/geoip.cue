@@ -6,11 +6,15 @@ components: transforms: geoip: {
 	description: """
 		Enrich events with geolocation data from the MaxMind GeoIP2-City,
 		GeoLite2-City, GeoIP2-ISP and GeoLite2-ASN databases.
+
+		Note that this transform has been deprecated in-lieu of using a `geoip` enrichment table
+		along with
+		[`get_enrichment_table_record`](/docs/reference/vrl/functions/#get_enrichment_table_record).
 		"""
 
 	classes: {
 		commonly_used: false
-		development:   "stable"
+		development:   "deprecated"
 		egress_method: "stream"
 		stateful:      false
 	}

@@ -1,8 +1,8 @@
 use futures::FutureExt;
 use http::{uri::InvalidUri, Uri};
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tower::ServiceBuilder;
+use vector_config::configurable_component;
 use vector_core::config::proxy::ProxyConfig;
 
 use super::{
@@ -96,27 +96,57 @@ impl DatadogMetricsEndpointConfiguration {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+/// Configuration for the `datadog_metrics` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogMetricsConfig {
+    /// Sets the default namespace for any metrics sent.
+    ///
+    /// This namespace is only used if a metric has no existing namespace. When a namespace is
+    /// present, it is used as a prefix to the metric name, and separated with a period (`.`).
     pub default_namespace: Option<String>,
-    pub endpoint: Option<String>,
-    // Deprecated, replaced by the site option
+
+    /// The endpoint to send metrics to.
+    pub(crate) endpoint: Option<String>,
+
+    /// The Datadog region to send metrics to.
+    ///
+    /// This option is deprecated, and the `site` field should be used instead.
+    #[configurable(deprecated)]
     pub region: Option<Region>,
+
+    /// The Datadog [site][dd_site] to send metrics to.
+    ///
+    /// [dd_site]: https://docs.datadoghq.com/getting_started/site
     pub site: Option<String>,
-    // Deprecated name
+
+    /// The default Datadog [API key][api_key] to send metrics with.
+    ///
+    /// If a metric has a Datadog [API key][api_key] set explicitly in its metadata, it will take
+    /// precedence over the default.
+    ///
+    /// [api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
     #[serde(alias = "api_key")]
     pub default_api_key: String,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<DatadogMetricsDefaultBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+
+    #[configurable(derived)]
     pub tls: Option<TlsEnableableConfig>,
 }
 
@@ -128,7 +158,7 @@ impl SinkConfig for DatadogMetricsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.build_client(&cx.proxy)?;
         let healthcheck = self.build_healthcheck(client.clone())?;
-        let sink = self.build_sink(client, cx)?;
+        let sink = self.build_sink(client)?;
 
         Ok((sink, healthcheck))
     }
@@ -141,8 +171,8 @@ impl SinkConfig for DatadogMetricsConfig {
         "datadog_metrics"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
@@ -199,7 +229,7 @@ impl DatadogMetricsConfig {
         Ok(healthcheck(client, validate_endpoint, self.default_api_key.clone()).boxed())
     }
 
-    fn build_sink(&self, client: HttpClient, cx: SinkContext) -> crate::Result<VectorSink> {
+    fn build_sink(&self, client: HttpClient) -> crate::Result<VectorSink> {
         let batcher_settings = self.batch.into_batcher_settings()?;
 
         let request_limits = self.request.unwrap_with(&DEFAULT_REQUEST_LIMITS);
@@ -216,7 +246,7 @@ impl DatadogMetricsConfig {
             self.default_namespace.clone(),
         )?;
 
-        let sink = DatadogMetricsSink::new(cx, service, request_builder, batcher_settings);
+        let sink = DatadogMetricsSink::new(service, request_builder, batcher_settings);
 
         Ok(VectorSink::from_event_streamsink(sink))
     }

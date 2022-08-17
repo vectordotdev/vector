@@ -15,7 +15,7 @@ use vector_config_common::attributes::CustomAttribute;
 /// The style of a data container, applying to both enum variants and structs.
 ///
 /// This mirrors the type by the same name in `serde_derive_internal`.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Style {
     /// Named fields.
     Struct,
@@ -44,7 +44,7 @@ impl From<serde_ast::Style> for Style {
 /// The tagging configuration for an enum.
 ///
 /// This mirrors the type by the nearly-same name (`TagType`) in `serde_derive_internal`.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Tagging {
     /// The default.
     ///

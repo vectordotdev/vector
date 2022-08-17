@@ -1,6 +1,7 @@
 use crate::{get_metadata_key, MetadataKey};
 use ::value::Value;
 use vrl::prelude::*;
+use vrl::state::TypeState;
 
 fn get_metadata_field(
     ctx: &mut Context,
@@ -41,32 +42,31 @@ impl Function for GetMetadataField {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        state: &TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let key = get_metadata_key(&mut arguments)?;
-        Ok(Box::new(GetMetadataFieldFn { key }))
+        let kind = match &key {
+            MetadataKey::Legacy(_) => Kind::bytes().or_null(),
+            MetadataKey::Query(query) => state.external.metadata_kind().at_path(query.path()),
+        };
+        Ok(GetMetadataFieldFn { key, kind }.as_expr())
     }
 }
 
 #[derive(Debug, Clone)]
 struct GetMetadataFieldFn {
     key: MetadataKey,
+    kind: Kind,
 }
 
-impl Expression for GetMetadataFieldFn {
+impl FunctionExpression for GetMetadataFieldFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         get_metadata_field(ctx, &self.key)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
-        match &self.key {
-            MetadataKey::Legacy(_) => TypeDef::bytes().add_null().infallible(),
-            MetadataKey::Query(_query) => {
-                // TODO: use metadata schema when it exists to return a better value here
-                TypeDef::any().infallible()
-            }
-        }
+    fn type_def(&self, _: &TypeState) -> TypeDef {
+        TypeDef::from(self.kind.clone()).infallible()
     }
 }

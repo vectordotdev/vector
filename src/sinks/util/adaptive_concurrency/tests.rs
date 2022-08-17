@@ -40,7 +40,7 @@ use crate::{
     },
     sources::demo_logs::DemoLogsConfig,
     test_util::{
-        start_topology,
+        self, start_topology,
         stats::{HistogramStats, LevelTimeHistogram, TimeHistogram, WeightedSumStats},
     },
 };
@@ -155,7 +155,7 @@ struct TestConfig {
 #[async_trait::async_trait]
 #[typetag::serialize(name = "test")]
 impl SinkConfig for TestConfig {
-    async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck), crate::Error> {
+    async fn build(&self, _cx: SinkContext) -> Result<(VectorSink, Healthcheck), crate::Error> {
         let mut batch_settings = BatchSettings::default();
         batch_settings.size.bytes = 9999;
         batch_settings.size.events = 1;
@@ -168,7 +168,6 @@ impl SinkConfig for TestConfig {
                 TestSink::new(self),
                 VecBuffer::new(batch_settings.size),
                 batch_settings.timeout,
-                cx.acker(),
             )
             .with_flat_map(|event| stream::iter(Some(Ok(EncodedEvent::new(event, 0)))))
             .sink_map_err(|error| panic!("Fatal test sink error: {}", error));
@@ -198,8 +197,8 @@ impl SinkConfig for TestConfig {
         unimplemented!("not intended for use in real configs")
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        None
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &AcknowledgementsConfig::DEFAULT
     }
 }
 
@@ -398,7 +397,7 @@ struct TestResults {
 }
 
 async fn run_test(params: TestParams) -> TestResults {
-    let _ = metrics::init_test();
+    test_util::trace_init();
     let (send_done, is_done) = oneshot::channel();
 
     let test_config = TestConfig {
@@ -417,7 +416,12 @@ async fn run_test(params: TestParams) -> TestResults {
     let cstats = Arc::clone(&test_config.controller_stats);
 
     let mut config = config::Config::builder();
-    let demo_logs = DemoLogsConfig::repeat(vec!["line 1".into()], params.requests, params.interval);
+    let demo_logs = DemoLogsConfig::repeat(
+        vec!["line 1".into()],
+        params.requests,
+        params.interval,
+        None,
+    );
     config.add_source("in", demo_logs);
     config.add_sink("out", &["in"], test_config);
 

@@ -3,15 +3,16 @@ use futures::{FutureExt, SinkExt};
 use http::{Request, Uri};
 use hyper::Body;
 use indoc::indoc;
-use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
+use vector_config::configurable_component;
 
 use crate::{
-    codecs::Encoder,
+    codecs::{Encoder, EncodingConfig, Transformer},
     config::{
-        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
+        SinkDescription,
     },
     event::Event,
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope, PUBSUB_URL},
@@ -19,10 +20,6 @@ use crate::{
     sinks::{
         gcs_common::config::healthcheck_response,
         util::{
-            encoding::{
-                EncodingConfig, EncodingConfigAdapter, StandardEncodings,
-                StandardEncodingsMigrator, Transformer,
-            },
             http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
             BatchConfig, BoxedRawValue, JsonArrayBuffer, SinkBatchSettings, TowerRequestConfig,
         },
@@ -49,24 +46,39 @@ impl SinkBatchSettings for PubsubDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 1.0;
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the `gcp_pubsub` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug)]
 pub struct PubsubConfig {
+    /// The project name to which to publish events.
     pub project: String,
+
+    /// The topic within the project to which to publish events.
     pub topic: String,
+
+    /// The endpoint to which to publish events.
     #[serde(default)]
     pub endpoint: Option<String>,
+
     #[serde(default, flatten)]
     pub auth: GcpAuthConfig,
 
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<PubsubDefaultBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
-    encoding: EncodingConfigAdapter<EncodingConfig<StandardEncodings>, StandardEncodingsMigrator>,
 
+    #[configurable(derived)]
+    encoding: EncodingConfig,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub tls: Option<TlsConfig>,
 
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -112,7 +124,6 @@ impl SinkConfig for PubsubConfig {
             request_settings,
             batch_settings.timeout,
             client,
-            cx.acker(),
         )
         .sink_map_err(|error| error!(message = "Fatal gcp_pubsub sink error.", %error));
 
@@ -120,15 +131,15 @@ impl SinkConfig for PubsubConfig {
     }
 
     fn input(&self) -> Input {
-        Input::new(self.encoding.config().input_type())
+        Input::new(self.encoding.config().input_type() & DataType::Log)
     }
 
     fn sink_type(&self) -> &'static str {
         "gcp_pubsub"
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
@@ -154,7 +165,7 @@ impl PubsubSink {
         );
 
         let transformer = config.encoding.transformer();
-        let serializer = config.encoding.encoding()?;
+        let serializer = config.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
 
         Ok(Self {
@@ -252,7 +263,9 @@ mod tests {
 
 #[cfg(all(test, feature = "gcp-pubsub-integration-tests"))]
 mod integration_tests {
+    use codecs::JsonSerializerConfig;
     use reqwest::{Client, Method, Response};
+    use serde::{Deserialize, Serialize};
     use serde_json::{json, Value};
     use vector_core::event::{BatchNotifier, BatchStatus};
 
@@ -276,7 +289,7 @@ mod integration_tests {
             },
             batch: Default::default(),
             request: Default::default(),
-            encoding: EncodingConfig::from(StandardEncodings::Json).into(),
+            encoding: JsonSerializerConfig::new().into(),
             tls: Default::default(),
             acknowledgements: Default::default(),
         }

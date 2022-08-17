@@ -11,7 +11,8 @@ components: sources: aws_s3: components._aws & {
 				enabled:                true
 				can_verify_certificate: true
 				can_verify_hostname:    true
-				enabled_default:        false
+				enabled_default:        true
+				enabled_by_scheme:      true
 			}
 			checkpoint: enabled: false
 			proxy: enabled:      true
@@ -126,6 +127,13 @@ components: sources: aws_s3: components._aws & {
 			}
 			timestamp: fields._current_timestamp & {
 				description: "The Last-Modified time of the object. Defaults the current timestamp if this information is missing."
+			}
+			source_type: {
+				description: "The name of the source type."
+				required:    true
+				type: string: {
+					examples: ["aws_s3"]
+				}
 			}
 			bucket: {
 				description: "The bucket of the object the line came from."

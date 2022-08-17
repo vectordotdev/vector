@@ -33,7 +33,7 @@ components: sinks: aws_kinesis_firehose: components._aws & {
 				enabled: true
 				codec: {
 					enabled: true
-					enum: ["json", "text", "ndjson"]
+					enum: ["json", "text"]
 				}
 			}
 			proxy: enabled: true
@@ -45,7 +45,8 @@ components: sinks: aws_kinesis_firehose: components._aws & {
 				enabled:                true
 				can_verify_certificate: true
 				can_verify_hostname:    true
-				enabled_default:        false
+				enabled_default:        true
+				enabled_by_scheme:      true
 			}
 			to: {
 				service: services.aws_kinesis_firehose

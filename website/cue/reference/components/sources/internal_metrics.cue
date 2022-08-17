@@ -511,6 +511,15 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		component_errors_total: {
+			description:       "The total number of errors encountered by this component."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags & {
+				error_type: _error_type
+				stage:      _stage
+			}
+		}
 		component_received_bytes_total: {
 			description:       string | *"The number of raw bytes accepted by this component from source origins."
 			type:              "counter"
@@ -643,6 +652,18 @@ components: sources: internal_metrics: {
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
+		}
+		internal_metrics_cardinality: {
+			description:       "The total number of metrics emitted from the internal metrics registry."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags: {}
+		}
+		internal_metrics_cardinality_total: {
+			description:       "The total number of metrics emitted from the internal metrics registry. This metric is deprecated in favor of `internal_metrics_cardinality`."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              internal_metrics_cardinality.tags
 		}
 		kafka_queue_messages: {
 			description:       "Current number of messages in producer queues."
@@ -826,6 +847,12 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		lag_time_seconds: {
+			description:       "The difference between the timestamp recorded in each event and the time when it was ingested, expressed as fractional seconds."
+			type:              "histogram"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		logging_driver_errors_total: {
 			description: """
 				The total number of logging driver errors encountered caused by not using either
@@ -897,17 +924,8 @@ components: sources: internal_metrics: {
 				mode: _mode
 			}
 		}
-		component_errors_total: {
-			description:       "The total number of errors encountered by this component."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags & {
-				error_type: _error_type
-				stage:      _stage
-			}
-		}
 		processing_errors_total: {
-			description:       "The total number of processing errors encountered by this component."
+			description:       "The total number of processing errors encountered by this component. This metric is deprecated in favor of `component_errors_total`."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags & {

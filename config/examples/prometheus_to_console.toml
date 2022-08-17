@@ -14,4 +14,4 @@ scrape_interval_secs = 2
 [sinks.console]
 inputs = ["prometheus"]
 type = "console"
-encoding = "json"
+encoding.codec = "json"

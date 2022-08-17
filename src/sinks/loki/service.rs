@@ -8,7 +8,6 @@ use tower::Service;
 use tracing::Instrument;
 use vector_common::internal_event::BytesSent;
 use vector_core::{
-    buffers::Ackable,
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_event::EventsSent,
     stream::DriverResponse,
@@ -81,12 +80,6 @@ pub struct LokiRequest {
     pub payload: Bytes,
     pub tenant_id: Option<String>,
     pub metadata: RequestMetadata,
-}
-
-impl Ackable for LokiRequest {
-    fn ack_size(&self) -> usize {
-        self.metadata.event_count()
-    }
 }
 
 impl Finalizable for LokiRequest {

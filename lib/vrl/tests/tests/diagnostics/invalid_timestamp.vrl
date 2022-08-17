@@ -8,5 +8,6 @@
 #   │
 #   = see documentation about timestamps at https://vrl.dev/expressions/#timestamp
 #   = see language documentation at https://vrl.dev
+#   = try your code in the VRL REPL, learn more at https://vrl.dev/examples
 
 t'foobar'

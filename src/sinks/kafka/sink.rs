@@ -11,11 +11,11 @@ use rdkafka::{
 use snafu::{ResultExt, Snafu};
 use tokio::time::Duration;
 use tower::limit::ConcurrencyLimit;
-use vector_core::{buffers::Acker, config::log_schema};
+use vector_core::config::log_schema;
 
 use super::config::{KafkaRole, KafkaSinkConfig};
 use crate::{
-    codecs::Encoder,
+    codecs::{Encoder, Transformer},
     event::{Event, LogEvent},
     kafka::KafkaStatisticsContext,
     sinks::{
@@ -23,7 +23,7 @@ use crate::{
             config::QUEUED_MIN_MESSAGES, request_builder::KafkaRequestBuilder,
             service::KafkaService,
         },
-        util::{builder::SinkBuilderExt, encoding::Transformer, StreamSink},
+        util::{builder::SinkBuilderExt, StreamSink},
     },
     template::{Template, TemplateParseError},
 };
@@ -39,7 +39,6 @@ pub(super) enum BuildError {
 pub struct KafkaSink {
     transformer: Transformer,
     encoder: Encoder<()>,
-    acker: Acker,
     service: KafkaService,
     topic: Template,
     key_field: Option<String>,
@@ -56,18 +55,17 @@ pub(crate) fn create_producer(
 }
 
 impl KafkaSink {
-    pub(crate) fn new(config: KafkaSinkConfig, acker: Acker) -> crate::Result<Self> {
+    pub(crate) fn new(config: KafkaSinkConfig) -> crate::Result<Self> {
         let producer_config = config.to_rdkafka(KafkaRole::Producer)?;
         let producer = create_producer(producer_config)?;
         let transformer = config.encoding.transformer();
-        let serializer = config.encoding.encoding()?;
+        let serializer = config.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
 
         Ok(KafkaSink {
             headers_key: config.headers_key,
             transformer,
             encoder,
-            acker,
             service: KafkaService::new(producer),
             topic: Template::try_from(config.topic).context(TopicTemplateSnafu)?,
             key_field: config.key_field,
@@ -87,7 +85,7 @@ impl KafkaSink {
         };
         let sink = input
             .filter_map(|event| future::ready(request_builder.build_request(event)))
-            .into_driver(service, self.acker);
+            .into_driver(service);
         sink.run().await
     }
 }
@@ -97,7 +95,7 @@ pub(crate) async fn healthcheck(config: KafkaSinkConfig) -> crate::Result<()> {
     let client = config.to_rdkafka(KafkaRole::Consumer).unwrap();
     let topic = match Template::try_from(config.topic)
         .context(TopicTemplateSnafu)?
-        .render_string(&LogEvent::from(""))
+        .render_string(&LogEvent::from_str_legacy(""))
     {
         Ok(topic) => Some(topic),
         Err(error) => {

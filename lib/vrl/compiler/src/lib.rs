@@ -1,5 +1,5 @@
 #![deny(
-    warnings,
+    // warnings,
     clippy::all,
     clippy::pedantic,
     unreachable_pub,
@@ -28,6 +28,7 @@
     clippy::too_many_lines, // allowed in initial deny commit
 )]
 
+mod compile_config;
 mod compiler;
 mod context;
 mod program;
@@ -39,6 +40,8 @@ pub mod state;
 pub mod type_def;
 pub mod value;
 
+pub use self::compile_config::CompileConfig;
+pub use compiler::{CompilationResult, Compiler};
 pub use core::{
     value, ExpressionError, MetadataTarget, Resolved, SecretTarget, Target, TargetValue,
     TargetValueRef,
@@ -48,15 +51,15 @@ use std::{fmt::Display, str::FromStr};
 pub use context::Context;
 use diagnostic::DiagnosticList;
 pub(crate) use diagnostic::Span;
-pub use expression::Expression;
+pub use expression::{Expression, FunctionExpression};
 pub use function::{Function, Parameter};
 pub use paste::paste;
 pub use program::{Program, ProgramInfo};
-use state::ExternalEnv;
+pub use state::{TypeInfo, TypeState};
 pub use type_def::TypeDef;
 use vector_config::configurable_component;
 
-pub type Result<T = (Program, DiagnosticList)> = std::result::Result<T, DiagnosticList>;
+pub type Result<T = CompilationResult> = std::result::Result<T, DiagnosticList>;
 
 /// Available VRL runtimes.
 #[configurable_component]
@@ -98,42 +101,7 @@ impl Display for VrlRuntime {
     }
 }
 
-/// Compile a given program [`ast`](parser::Program) into the final [`Program`].
-pub fn compile(ast: parser::Program, fns: &[Box<dyn Function>]) -> Result {
-    let mut external = ExternalEnv::default();
-    compile_with_state(ast, fns, &mut external)
-}
-
-pub fn compile_for_repl(
-    ast: parser::Program,
-    fns: &[Box<dyn Function>],
-    local: state::LocalEnv,
-    external: &mut ExternalEnv,
-) -> Result<Program> {
-    compiler::Compiler::new_with_local_state(fns, local)
-        .compile(ast, external)
-        .map(|(program, _)| program)
-}
-
-/// Similar to [`compile`], except that it takes a pre-generated [`State`]
-/// object, allowing running multiple successive programs based on each others
-/// state.
-///
-/// This is particularly useful in REPL-like environments in which you want to
-/// resolve each individual expression, but allow successive expressions to use
-/// the result of previous expressions.
-pub fn compile_with_state(
-    ast: parser::Program,
-    fns: &[Box<dyn Function>],
-    state: &mut ExternalEnv,
-) -> Result {
-    compiler::Compiler::new(fns).compile(ast, state)
-}
-
 /// re-export of commonly used parser types.
 pub(crate) mod parser {
-    pub(crate) use ::parser::{
-        ast::{self, Ident, Node},
-        Program,
-    };
+    pub(crate) use ::parser::ast::{self, Ident, Node};
 }

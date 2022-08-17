@@ -3,10 +3,11 @@ use std::{io, io::Write};
 use vector_core::{event::Event, ByteSizeOf};
 
 use crate::{
+    codecs::Transformer,
     event::{EventFinalizers, Finalizable, LogEvent},
     sinks::{
         elasticsearch::BulkAction,
-        util::encoding::{as_tracked_write, Encoder, Transformer, VisitLogMut},
+        util::encoding::{as_tracked_write, Encoder},
     },
 };
 
@@ -29,7 +30,7 @@ impl ByteSizeOf for ProcessedEvent {
     }
 }
 
-#[derive(PartialEq, Default, Clone, Debug)]
+#[derive(PartialEq, Eq, Default, Clone, Debug)]
 pub struct ElasticsearchEncoder {
     pub transformer: Transformer,
     pub doc_type: String,
@@ -107,15 +108,6 @@ fn write_bulk_action(
             }
         },
     )
-}
-
-impl VisitLogMut for ProcessedEvent {
-    fn visit_logs_mut<F>(&mut self, func: F)
-    where
-        F: Fn(&mut LogEvent),
-    {
-        func(&mut self.log);
-    }
 }
 
 #[cfg(test)]

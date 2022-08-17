@@ -42,6 +42,7 @@ components: sinks: vector: {
 				can_verify_certificate: true
 				can_verify_hostname:    true
 				enabled_default:        false
+				enabled_by_scheme:      true
 			}
 			to: {
 				service: services.vector
@@ -73,7 +74,7 @@ components: sinks: vector: {
 			summary:      true
 			set:          true
 		}
-		traces: false
+		traces: true
 	}
 
 	configuration: {

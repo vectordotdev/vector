@@ -4,6 +4,7 @@ use bytes::Bytes;
 use prometheus_parser::proto;
 use prost::Message;
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 use warp::http::{HeaderMap, StatusCode};
 
 use super::parser;
@@ -90,7 +91,7 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
         )
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(config::DataType::Metric)]
     }
 
@@ -160,6 +161,7 @@ mod test {
         test_util::{
             self,
             components::{assert_source_compliance, HTTP_PUSH_SOURCE_TAGS},
+            wait_for_tcp,
         },
         tls::MaybeTlsSettings,
         SourceSender,
@@ -199,6 +201,7 @@ mod test {
                 .await
                 .unwrap();
             tokio::spawn(source);
+            wait_for_tcp(address).await;
 
             let sink = RemoteWriteConfig {
                 endpoint: format!("{}://localhost:{}/", proto, address.port()),

@@ -6,6 +6,7 @@ use std::sync::{
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use vector_buffers::topology::channel::{limited, LimitedReceiver};
+use vector_core::config::LogNamespace;
 use vector_core::{
     config::{DataType, Output},
     event::{EventArray, EventContainer},
@@ -130,7 +131,7 @@ impl SourceConfig for BasicSourceConfig {
         }))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(self.data_type.unwrap())]
     }
 

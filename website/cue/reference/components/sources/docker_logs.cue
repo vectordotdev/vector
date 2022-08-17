@@ -289,6 +289,13 @@ components: sources: docker_logs: {
 						examples: ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
 					}
 				}
+				source_type: {
+					description: "The name of the source type."
+					required:    true
+					type: string: {
+						examples: ["docker"]
+					}
+				}
 				stream: {
 					description: "The [standard stream](\(urls.standard_streams)) that the log was collected from."
 					required:    true
@@ -342,6 +349,7 @@ components: sources: docker_logs: {
 				message:              _message
 				stream:               _stream
 				host:                 _values.local_host
+				source_type:          "docker"
 			}
 		},
 	]

@@ -173,7 +173,8 @@ impl From<Config> for ConfigBuilder {
             transforms,
             tests,
             secret,
-            ..
+            version: _,
+            expansions: _,
         } = config;
 
         let transforms = transforms
@@ -287,8 +288,6 @@ impl ConfigBuilder {
             errors.push(error);
         }
 
-        self.schema = with.schema;
-
         #[cfg(feature = "enterprise")]
         {
             match (self.enterprise.as_ref(), with.enterprise) {
@@ -319,6 +318,12 @@ impl ConfigBuilder {
         }
 
         self.global.proxy = self.global.proxy.merge(&with.global.proxy);
+
+        self.global.expire_metrics = self.global.expire_metrics.or(with.global.expire_metrics);
+
+        self.schema.append(with.schema, &mut errors);
+
+        self.schema.log_namespace = self.schema.log_namespace.or(with.schema.log_namespace);
 
         if self.global.data_dir.is_none() || self.global.data_dir == default_data_dir() {
             self.global.data_dir = with.global.data_dir;
@@ -462,7 +467,7 @@ mod tests {
     /// should ideally be able to fix so that the original hash passes!
     fn version_hash_match() {
         assert_eq!(
-            "84112522217c90260692863950365f9149f87b723ceea7930eec863653d697c8",
+            "bc0825487e137ee1d1fc76c616795d041c4825b4ca5a7236455ea4515238885c",
             ConfigBuilder::default().sha256_hash()
         );
     }
@@ -491,14 +496,12 @@ mod tests {
 
     #[test]
     fn append_overwrites_enterprise() {
-        let mut base_ent = enterprise::Options::default();
-        base_ent.application_key = "base".to_string();
+        let base_ent = enterprise::Options::default();
         let mut base = ConfigBuilder {
             enterprise: Some(base_ent),
             ..Default::default()
         };
-        let mut other_ent = enterprise::Options::default();
-        other_ent.application_key = "other".to_string();
+        let other_ent = enterprise::Options::default();
         let other = ConfigBuilder {
             enterprise: Some(other_ent),
             ..Default::default()
@@ -516,7 +519,6 @@ mod tests {
             r#"
         [enterprise]
         api_key = "apikey"
-        application_key = "appkey"
         configuration_key = "configkey"
 
         [sources.foo]
@@ -547,7 +549,6 @@ mod tests {
                 r#"
             [enterprise]
             api_key = "apikey"
-            application_key = "appkey"
             configuration_key = "configkey"
 
             [sources.foo]

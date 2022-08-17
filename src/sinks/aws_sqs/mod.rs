@@ -8,6 +8,8 @@ mod sink;
 #[cfg(test)]
 mod integration_tests;
 
+pub use self::config::SqsSinkConfig;
+
 use crate::config::SinkDescription;
 
 inventory::submit! {
