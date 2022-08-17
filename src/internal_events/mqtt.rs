@@ -30,13 +30,13 @@ impl InternalEvent for MqttConnectionError {
         error!(
             message = "MQTT connection error.",
             error = %self.error,
-            // error_code = "ws_connection_error",
+            error_code = "mqtt_connection_error",
             error_type = error_type::WRITER_FAILED,
             stage = error_stage::SENDING,
         );
         counter!(
             "component_errors_total", 1,
-            // "error_code" => "ws_connection_error",
+            "error_code" => "mqtt_connection_error",
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
         );
@@ -57,13 +57,13 @@ impl InternalEvent for MqttClientError {
         error!(
             message = "MQTT client error.",
             error = %self.error,
-            // error_code = "ws_client_error",
+            error_code = "mqtt_client_error",
             error_type = error_type::WRITER_FAILED,
             stage = error_stage::SENDING,
         );
         counter!(
             "component_errors_total", 1,
-            // "error_code" => "ws_client_error",
+            "error_code" => "mqtt_client_error",
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
         );
