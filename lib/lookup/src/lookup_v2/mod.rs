@@ -37,11 +37,7 @@ macro_rules! owned_path {
 /// Use if you want to pre-parse paths so it can be used multiple times.
 /// The return value (when borrowed) implements `Path` so it can be used directly.
 pub fn parse_path(path: &str) -> OwnedPath {
-    let segments = JitPath::new(path)
-        .segment_iter()
-        .map(|segment| segment.into())
-        .collect();
-    OwnedPath { segments }
+    JitPath::new(path).to_owned_path()
 }
 
 /// A path is simply the data describing how to look up a value.
@@ -89,6 +85,27 @@ pub trait Path<'a>: Clone {
         // }
         // true
     }
+    fn to_owned_path(&self) -> OwnedPath {
+        let mut owned_path = OwnedPath::root();
+        let mut coalesce = vec![];
+        for segment in self.segment_iter() {
+            match segment {
+                BorrowedSegment::Invalid => return OwnedPath::invalid(),
+                BorrowedSegment::Index(i) => owned_path.push(OwnedSegment::Index(i)),
+                BorrowedSegment::Field(field) => {
+                    owned_path.push(OwnedSegment::Field(field.to_string()))
+                }
+                BorrowedSegment::CoalesceField(field) => {
+                    coalesce.push(field.to_string());
+                }
+                BorrowedSegment::CoalesceEnd(field) => {
+                    coalesce.push(field.to_string());
+                    owned_path.push(OwnedSegment::Coalesce(std::mem::take(&mut coalesce)));
+                }
+            }
+        }
+        owned_path
+    }
 }
 
 impl<'a> Path<'a> for &'a str {
@@ -122,16 +139,22 @@ impl TargetPath {
     pub fn root(prefix: PathPrefix) -> Self {
         Self {
             prefix,
-            path: OwnedPath::root()
+            path: OwnedPath::root(),
         }
     }
 
     pub fn event(path: OwnedPath) -> Self {
-        Self {prefix: PathPrefix::Event, path}
+        Self {
+            prefix: PathPrefix::Event,
+            path,
+        }
     }
 
     pub fn metadata(path: OwnedPath) -> Self {
-        Self {prefix: PathPrefix::Metadata, path}
+        Self {
+            prefix: PathPrefix::Metadata,
+            path,
+        }
     }
 
     pub fn can_start_with(&self, prefix: &Self) -> bool {

@@ -424,103 +424,19 @@ mod test {
                 owned_path!("foo", "a\"a", "b\\b", "bar"),
             ),
             (r#"."🤖""#, owned_path!("🤖")),
-            (
-                ".(a|b)",
-                owned_path!(
-                    OwnedSegment::coalesce_field("a"),
-                    OwnedSegment::coalesce_end("b")
-                ),
-            ),
-            (
-                "(a|b)",
-                owned_path!(
-                    OwnedSegment::coalesce_field("a"),
-                    OwnedSegment::coalesce_end("b")
-                ),
-            ),
-            (
-                "( a | b )",
-                owned_path!(
-                    OwnedSegment::coalesce_field("a"),
-                    OwnedSegment::coalesce_end("b")
-                ),
-            ),
-            (
-                ".(a|b)[1]",
-                owned_path!(
-                    OwnedSegment::coalesce_field("a"),
-                    OwnedSegment::coalesce_end("b"),
-                    1
-                ),
-            ),
-            (
-                ".(a|b).foo",
-                owned_path!(
-                    OwnedSegment::coalesce_field("a"),
-                    OwnedSegment::coalesce_end("b"),
-                    "foo"
-                ),
-            ),
-            (
-                ".(a|b|c)",
-                owned_path!(
-                    OwnedSegment::coalesce_field("a"),
-                    OwnedSegment::coalesce_field("b"),
-                    OwnedSegment::coalesce_end("c")
-                ),
-            ),
-            (
-                "[1](a|b)",
-                owned_path!(
-                    1,
-                    OwnedSegment::coalesce_field("a"),
-                    OwnedSegment::coalesce_end("b")
-                ),
-            ),
-            (
-                "[1].(a|b)",
-                owned_path!(
-                    1,
-                    OwnedSegment::coalesce_field("a"),
-                    OwnedSegment::coalesce_end("b")
-                ),
-            ),
-            (
-                "foo.(a|b)",
-                owned_path!(
-                    "foo",
-                    OwnedSegment::coalesce_field("a"),
-                    OwnedSegment::coalesce_end("b")
-                ),
-            ),
-            (
-                "(\"a\"|b)",
-                owned_path!(
-                    OwnedSegment::coalesce_field("a"),
-                    OwnedSegment::coalesce_end("b")
-                ),
-            ),
-            (
-                "(a|\"b.c\")",
-                owned_path!(
-                    OwnedSegment::coalesce_field("a"),
-                    OwnedSegment::coalesce_end("b.c")
-                ),
-            ),
-            (
-                "(a|\"b\\\"c\")",
-                owned_path!(
-                    OwnedSegment::coalesce_field("a"),
-                    OwnedSegment::coalesce_end("b\"c")
-                ),
-            ),
-            (
-                "(\"b\\\"c\"|a)",
-                owned_path!(
-                    OwnedSegment::coalesce_field("b\"c"),
-                    OwnedSegment::coalesce_end("a")
-                ),
-            ),
+            (".(a|b)", owned_path!(vec!["a", "b"])),
+            ("(a|b)", owned_path!(vec!["a", "b"])),
+            ("( a | b )", owned_path!(vec!["a", "b"])),
+            (".(a|b)[1]", owned_path!(vec!["a", "b"], 1)),
+            (".(a|b).foo", owned_path!(vec!["a", "b"], "foo")),
+            (".(a|b|c)", owned_path!(vec!["a", "b", "c"])),
+            ("[1](a|b)", owned_path!(1, vec!["a", "b"])),
+            ("[1].(a|b)", owned_path!(1, vec!["a", "b"])),
+            ("foo.(a|b)", owned_path!("foo", vec!["a", "b"])),
+            ("(\"a\"|b)", owned_path!(vec!["a", "b"])),
+            ("(a|\"b.c\")", owned_path!(vec!["a", "b.c"])),
+            ("(a|\"b\\\"c\")", owned_path!(vec!["a", "b\"c"])),
+            ("(\"b\\\"c\"|a)", owned_path!(vec!["b\"c", "a"])),
             ("(a)", owned_path!(OwnedSegment::Invalid)),
         ];
 

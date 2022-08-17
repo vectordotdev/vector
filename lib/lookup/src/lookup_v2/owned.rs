@@ -1,4 +1,5 @@
 use crate::lookup_v2::{parse_path, BorrowedSegment, Path};
+use std::fmt::Write;
 use std::fmt::{Display, Formatter};
 use vector_config::configurable_component;
 
@@ -87,6 +88,15 @@ impl OwnedPath {
         //
         // components
     }
+    pub fn push(&mut self, segment: OwnedSegment) {
+        self.segments.push(segment);
+    }
+
+    pub fn invalid() -> Self {
+        Self {
+            segments: vec![OwnedSegment::Invalid],
+        }
+    }
 }
 
 impl Display for OwnedPath {
@@ -116,32 +126,36 @@ impl From<OwnedPath> for String {
                     OwnedSegment::Field(field) => {
                         serialize_field(field.as_ref(), (i != 0).then(|| "."))
                     }
-
-                    OwnedSegment::CoalesceField(field) => {
-                        let output = serialize_field(
-                            field.as_ref(),
-                            Some(if coalesce_i == 0 {
-                                if i == 0 {
-                                    "("
-                                } else {
-                                    ".("
-                                }
-                            } else {
-                                "|"
-                            }),
-                        );
-                        coalesce_i += 1;
-                        output
-                    }
                     OwnedSegment::Index(index) => format!("[{}]", index),
                     OwnedSegment::Invalid => {
                         (if i == 0 { "<invalid>" } else { ".<invalid>" }).to_owned()
                     }
-                    OwnedSegment::CoalesceEnd(field) => {
-                        format!(
+                    OwnedSegment::Coalesce(fields) => {
+                        let mut output = String::new();
+                        let (last, fields) =
+                            fields.split_last().expect("coalesce must not be empty");
+                        for field in fields {
+                            let field_output = serialize_field(
+                                field.as_ref(),
+                                Some(if coalesce_i == 0 {
+                                    if i == 0 {
+                                        "("
+                                    } else {
+                                        ".("
+                                    }
+                                } else {
+                                    "|"
+                                }),
+                            );
+                            coalesce_i += 1;
+                            output.push_str(&field_output);
+                        }
+                        let _ = write!(
+                            output,
                             "{})",
-                            serialize_field(field.as_ref(), (coalesce_i != 0).then(|| "|"))
-                        )
+                            serialize_field(last.as_ref(), (coalesce_i != 0).then(|| "|"))
+                        );
+                        output
                     }
                 })
                 .collect::<Vec<_>>()
@@ -185,24 +199,23 @@ impl From<Vec<OwnedSegment>> for OwnedPath {
     }
 }
 
-impl<const N: usize> From<[OwnedSegment; N]> for OwnedPath {
-    fn from(segments: [OwnedSegment; N]) -> Self {
-        OwnedPath::from(Vec::from(segments))
-    }
-}
-
-impl<'a, const N: usize> From<[BorrowedSegment<'a>; N]> for OwnedPath {
-    fn from(segments: [BorrowedSegment<'a>; N]) -> Self {
-        OwnedPath::from(segments.map(OwnedSegment::from))
-    }
-}
+// impl<const N: usize> From<[OwnedSegment; N]> for OwnedPath {
+//     fn from(segments: [OwnedSegment; N]) -> Self {
+//         OwnedPath::from(Vec::from(segments))
+//     }
+// }
+//
+// impl<'a, const N: usize> From<[BorrowedSegment<'a>; N]> for OwnedPath {
+//     fn from(segments: [BorrowedSegment<'a>; N]) -> Self {
+//         OwnedPath::from(segments.map(OwnedSegment::from))
+//     }
+// }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub enum OwnedSegment {
     Field(String),
     Index(isize),
-    CoalesceField(String),
-    CoalesceEnd(String),
+    Coalesce(Vec<String>),
     Invalid,
 }
 
@@ -214,12 +227,8 @@ impl OwnedSegment {
         OwnedSegment::Index(value)
     }
 
-    pub fn coalesce_field(field: impl Into<String>) -> OwnedSegment {
-        OwnedSegment::CoalesceField(field.into())
-    }
-
-    pub fn coalesce_end(field: impl Into<String>) -> OwnedSegment {
-        OwnedSegment::CoalesceEnd(field.into())
+    pub fn coalesce(fields: Vec<String>) -> OwnedSegment {
+        OwnedSegment::Coalesce(fields)
     }
 
     pub fn is_field(&self) -> bool {
@@ -233,15 +242,19 @@ impl OwnedSegment {
     }
 }
 
-impl<'a> From<BorrowedSegment<'a>> for OwnedSegment {
-    fn from(x: BorrowedSegment<'a>) -> Self {
-        match x {
-            BorrowedSegment::Field(value) => OwnedSegment::Field(value.to_string()),
-            BorrowedSegment::Index(value) => OwnedSegment::Index(value),
-            BorrowedSegment::Invalid => OwnedSegment::Invalid,
-            BorrowedSegment::CoalesceField(field) => OwnedSegment::CoalesceField(field.to_string()),
-            BorrowedSegment::CoalesceEnd(field) => OwnedSegment::CoalesceEnd(field.to_string()),
-        }
+impl From<Vec<&'static str>> for OwnedSegment {
+    fn from(fields: Vec<&'static str>) -> Self {
+        fields
+            .into_iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .into()
+    }
+}
+
+impl From<Vec<String>> for OwnedSegment {
+    fn from(fields: Vec<String>) -> Self {
+        OwnedSegment::Coalesce(fields)
     }
 }
 
@@ -270,6 +283,7 @@ impl<'a> Path<'a> for &'a Vec<OwnedSegment> {
         OwnedSegmentSliceIter {
             segments: self.as_slice(),
             index: 0,
+            coalesce_i: 0,
         }
     }
 }
@@ -286,14 +300,34 @@ impl<'a> Path<'a> for &'a OwnedPath {
 pub struct OwnedSegmentSliceIter<'a> {
     segments: &'a [OwnedSegment],
     index: usize,
+    coalesce_i: usize,
 }
 
 impl<'a> Iterator for OwnedSegmentSliceIter<'a> {
     type Item = BorrowedSegment<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let output = self.segments.get(self.index).map(|x| x.into());
-        self.index += 1;
+        let output = self.segments.get(self.index).map(|segment| match segment {
+            OwnedSegment::Field(field) => BorrowedSegment::Field(field.as_str().into()),
+            OwnedSegment::Invalid => BorrowedSegment::Invalid,
+            OwnedSegment::Index(i) => BorrowedSegment::Index(*i),
+            OwnedSegment::Coalesce(fields) => {
+                let coalesce_segment;
+                if self.coalesce_i == fields.len() - 1 {
+                    coalesce_segment =
+                        BorrowedSegment::CoalesceEnd(fields[self.coalesce_i].as_str().into());
+                    self.coalesce_i = 0;
+                } else {
+                    coalesce_segment =
+                        BorrowedSegment::CoalesceField(fields[self.coalesce_i].as_str().into());
+                    self.coalesce_i += 1;
+                }
+                coalesce_segment
+            }
+        });
+        if self.coalesce_i == 0 {
+            self.index += 1;
+        }
         output
     }
 }
@@ -317,14 +351,14 @@ mod test {
                 r#"ec2.metadata."availability-zone""#,
             ),
             ("@timestamp", "@timestamp"),
-            ("foo[", "foo.<invalid>"),
+            ("foo[", "<invalid>"),
             ("foo$", "<invalid>"),
             (r#""$peci@l chars""#, r#""$peci@l chars""#),
-            ("foo.foo bar", "foo.<invalid>"),
+            ("foo.foo bar", "<invalid>"),
             (r#"foo."foo bar".bar"#, r#"foo."foo bar".bar"#),
             ("[1]", "[1]"),
             ("[42]", "[42]"),
-            ("foo.[42]", "foo.<invalid>"),
+            ("foo.[42]", "<invalid>"),
             ("[42].foo", "[42].foo"),
             ("[-1]", "[-1]"),
             ("[-42]", "[-42]"),
