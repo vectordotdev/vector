@@ -68,8 +68,8 @@ components: sources: amqp: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: "message_key"
-				examples: ["message_key"]
+				default: "routing"
+				examples: ["routing"]
 				syntax: "literal"
 			}
 		}
@@ -79,8 +79,8 @@ components: sources: amqp: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: "message_key"
-				examples: ["message_key"]
+				default: "exchange"
+				examples: ["exchange"]
 				syntax: "literal"
 			}
 		}
@@ -90,8 +90,8 @@ components: sources: amqp: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: "message_key"
-				examples: ["message_key"]
+				default: "offset"
+				examples: ["offset"]
 				syntax: "literal"
 			}
 		}
