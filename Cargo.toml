@@ -75,24 +75,30 @@ depends = ""
 members = [
   ".",
   "lib/codecs",
+  "lib/datadog/filter",
+  "lib/datadog/grok",
+  "lib/datadog/search-syntax",
+  "lib/dnsmsg-parser",
   "lib/enrichment",
+  "lib/fakedata",
+  "lib/file-source",
+  "lib/k8s-e2e-tests",
+  "lib/k8s-test-framework",
+  "lib/loki-logproto",
+  "lib/lookup",
+  "lib/portpicker",
+  "lib/prometheus-parser",
+  "lib/opentelemetry-proto",
+  "lib/tracing-limit",
+  "lib/value",
+  "lib/vector-api-client",
   "lib/vector-buffers",
   "lib/vector-common",
   "lib/vector-config",
   "lib/vector-config-common",
   "lib/vector-config-macros",
   "lib/vector-core",
-  "lib/dnsmsg-parser",
-  "lib/fakedata",
-  "lib/file-source",
-  "lib/k8s-e2e-tests",
-  "lib/k8s-test-framework",
-  "lib/lookup",
-  "lib/portpicker",
-  "lib/prometheus-parser",
-  "lib/tracing-limit",
-  "lib/vector-api-client",
-  "lib/value",
+  "lib/vector-vrl-functions",
   "lib/vrl/cli",
   "lib/vrl/compiler",
   "lib/vrl/core",
@@ -102,11 +108,6 @@ members = [
   "lib/vrl/tests",
   "lib/vrl/proptests",
   "lib/vrl/vrl",
-  "lib/vector-vrl-functions",
-  "lib/datadog/grok",
-  "lib/datadog/search-syntax",
-  "lib/datadog/filter",
-  "lib/loki-logproto",
 ]
 
 [dependencies]
@@ -119,15 +120,16 @@ file-source = { path = "lib/file-source", optional = true }
 lookup = { path = "lib/lookup" }
 portpicker = { path = "lib/portpicker" }
 prometheus-parser = { path = "lib/prometheus-parser", optional = true }
+opentelemetry-proto = { path = "lib/opentelemetry-proto", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
 value = { path = "lib/value" }
-vector_buffers = { path = "lib/vector-buffers", default-features = false }
-vector_common = { path = "lib/vector-common" }
-vector_config = { path = "lib/vector-config" }
-vector_config_common = { path = "lib/vector-config-common" }
-vector_config_macros = { path = "lib/vector-config-macros" }
-vector_core = { path = "lib/vector-core", default-features = false, features = ["vrl"] }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
+vector-buffers = { path = "lib/vector-buffers", default-features = false }
+vector-common = { path = "lib/vector-common" }
+vector-config = { path = "lib/vector-config" }
+vector-config-common = { path = "lib/vector-config-common" }
+vector-config-macros = { path = "lib/vector-config-macros" }
+vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl"] }
 vector-vrl-functions = { path = "lib/vector-vrl-functions" }
 vrl-cli = { path = "lib/vrl/cli", optional = true }
 loki-logproto = { path = "lib/loki-logproto", optional = true }
@@ -135,7 +137,7 @@ loki-logproto = { path = "lib/loki-logproto", optional = true }
 # Tokio / Futures
 async-stream = { version = "0.3.3", default-features = false }
 async-trait = { version = "0.1.57", default-features = false }
-futures = { version = "0.3.21", default-features = false, features = ["compat", "io-compat"], package = "futures" }
+futures = { version = "0.3.23", default-features = false, features = ["compat", "io-compat"], package = "futures" }
 tokio = { version = "1.20.1", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1.9", default-features = false, features = ["net", "sync", "time"] }
@@ -345,7 +347,7 @@ tokio = { version = "1.20.1", features = ["test-util"] }
 tokio-test = "0.4.2"
 tower-test = "0.4.0"
 value = { path = "lib/value", features = ["test"] }
-vector_core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
+vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
 wiremock = "0.5.14"
 
 [patch.crates-io]
@@ -408,7 +410,7 @@ api = [
   "dep:async-graphql-warp",
   "dep:base64",
   "dep:itertools",
-  "vector_core/api",
+  "vector-core/api",
 ]
 
 # API client
@@ -417,7 +419,7 @@ api-client = [
   "dep:num-format",
   "dep:number_prefix",
   "dep:tui",
-  "vector_core/api",
+  "vector-core/api",
   "dep:vector-api-client",
 ]
 
@@ -435,8 +437,6 @@ aws-core = [
 protobuf-build = ["dep:tonic-build", "dep:prost-build"]
 
 gcp = ["dep:base64", "dep:goauth", "dep:smpl_jwt"]
-
-opentelemetry = ["dep:hex", "dep:tonic", "protobuf-build"]
 
 # Enrichment Tables
 enrichment-tables = ["enrichment-tables-file","enrichment-tables-geoip"]
@@ -499,6 +499,7 @@ sources-docker_logs = ["docker"]
 sources-eventstoredb_metrics = []
 sources-exec = []
 sources-file = ["dep:file-source"]
+sources-file-descriptor = ["tokio-util/io"]
 sources-fluent = ["dep:base64", "listenfd", "tokio-util/net", "dep:rmpv", "dep:rmp-serde", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "dep:serde_bytes"]
 sources-gcp_pubsub = ["gcp", "dep:h2", "dep:prost-types", "protobuf-build", "dep:tonic"]
 sources-heroku_logs = ["sources-utils-http", "sources-utils-http-query", "sources-http"]
@@ -513,8 +514,7 @@ sources-logstash = ["listenfd", "tokio-util/net", "sources-utils-tcp-keepalive",
 sources-mongodb_metrics = ["dep:mongodb"]
 sources-nats = ["dep:nats", "dep:nkeys"]
 sources-nginx_metrics = ["dep:nom"]
-sources-opentelemetry = ["dep:prost-types", "sources-http", "sources-utils-http", "sources-vector", "opentelemetry"]
-sources-file-descriptor = ["tokio-util/io"]
+sources-opentelemetry = ["dep:hex", "dep:opentelemetry-proto", "dep:prost-types", "sources-http", "sources-utils-http", "sources-vector"]
 sources-postgresql_metrics = ["dep:postgres-openssl", "dep:tokio-postgres"]
 sources-prometheus = ["dep:prometheus-parser", "sinks-prometheus", "sources-http", "sources-utils-http"]
 sources-redis= ["dep:redis"]
@@ -571,7 +571,7 @@ transforms-dedupe = ["dep:lru"]
 transforms-filter = []
 transforms-geoip = ["dep:maxminddb"]
 transforms-log_to_metric = []
-transforms-lua = ["dep:mlua", "vector_core/lua"]
+transforms-lua = ["dep:mlua", "vector-core/lua"]
 transforms-metric_to_log = []
 transforms-pipelines = ["transforms-filter", "transforms-route"]
 transforms-reduce = []
