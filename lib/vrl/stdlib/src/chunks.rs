@@ -1,5 +1,6 @@
 use ::value::Value;
 use vrl::prelude::*;
+use vrl::state::TypeState;
 
 fn chunks(value: Value, chunk_size: Value) -> Resolved {
     let bytes = value.try_bytes()?;
@@ -60,7 +61,7 @@ impl Function for Chunks {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -91,7 +92,7 @@ impl Function for Chunks {
             }
         }
 
-        Ok(Box::new(ChunksFn { value, chunk_size }))
+        Ok(ChunksFn { value, chunk_size }.as_expr())
     }
 }
 
@@ -101,7 +102,7 @@ struct ChunksFn {
     chunk_size: Box<dyn Expression>,
 }
 
-impl Expression for ChunksFn {
+impl FunctionExpression for ChunksFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let chunk_size = self.chunk_size.resolve(ctx)?;
@@ -109,7 +110,7 @@ impl Expression for ChunksFn {
         chunks(value, chunk_size)
     }
 
-    fn type_def(&self, _state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _state: &TypeState) -> TypeDef {
         let not_literal = self.chunk_size.as_value().is_none();
 
         TypeDef::array(Collection::from_unknown(Kind::bytes())).with_fallibility(not_literal)
