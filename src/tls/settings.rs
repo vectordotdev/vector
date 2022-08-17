@@ -610,7 +610,7 @@ mod test {
         };
         let settings =
             TlsSettings::from_options(&Some(options)).expect("Failed to parse alpn_protocols");
-        assert_eq!(settings.alpn_protocols, Some(vec![2, 104. 50]));
+        assert_eq!(settings.alpn_protocols, Some(vec![2, 104, 50]));
     }
 
     #[test]
