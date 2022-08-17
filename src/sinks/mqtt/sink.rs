@@ -40,7 +40,7 @@ use crate::{
 pub enum MqttError {
     #[snafu(display("invalid topic template: {}", source))]
     TopicTemplate { source: TemplateParseError },
-    #[snafu(display("MQTT connection: {}", source))]
+    #[snafu(display("MQTT connection error: {}", source))]
     Connection { source: ConnectionError },
     #[snafu(display("TLS error: {}", source))]
     Tls { source: TlsError },
