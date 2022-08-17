@@ -195,9 +195,9 @@ async fn populate_event(
         "amqp",
     );
 
-    log_namespace.insert_source_metadata("amqp", log, "routing", msg.routing_key.to_string());
-    log_namespace.insert_source_metadata("amqp", log, "exchange", msg.exchange.to_string());
-    log_namespace.insert_source_metadata("amqp", log, "offset", msg.delivery_tag as i64);
+    log_namespace.insert_source_metadata("amqp", log, routing_key, "routing", msg.routing_key.to_string());
+    log_namespace.insert_source_metadata("amqp", log, exchange_key, "exchange", msg.exchange.to_string());
+    log_namespace.insert_source_metadata("amqp", log, offset_key, "offset", msg.delivery_tag as i64);
 
     if let Err(error) = msg.acker.ack(ack_options).await {
         emit!(AMQPCommitFailed { error });
@@ -389,8 +389,8 @@ mod integration_test {
         let mut config = make_config();
         config.consumer = consumer;
         config.queue = queue;
-        config.routing_key = Some("message_key".to_string());
-        config.exchange_key = Some("exchange".to_string());
+        config.routing_key = "message_key".to_string();
+        config.exchange_key = "exchange".to_string();
         let (_conn, channel) = config.connection.connect().await.unwrap();
 
         let exchange_opts = lapin::options::ExchangeDeclareOptions {
