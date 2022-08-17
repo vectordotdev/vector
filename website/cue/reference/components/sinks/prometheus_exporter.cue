@@ -368,7 +368,7 @@ components: sinks: prometheus_exporter: {
 		memory_usage: {
 			title: "Memory Usage"
 			body: """
-				Like other Prometheus instances, the `prometheus` sink aggregates
+				Like other Prometheus instances, the `prometheus_exporter` sink aggregates
 				metrics in memory which keeps the memory footprint to a minimum if Prometheus
 				fails to scrape the Vector instance over an extended period of time. The
 				downside is that data will be lost if Vector is restarted. This is by design of
