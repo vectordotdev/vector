@@ -44,7 +44,7 @@ pub enum MqttError {
     Connection { source: ConnectionError },
     #[snafu(display("TLS error: {}", source))]
     Tls { source: TlsError },
-    #[snafu(display("MQTT client: {}", source))]
+    #[snafu(display("MQTT client error: {}", source))]
     Client { source: ClientError },
 }
 
