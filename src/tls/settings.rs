@@ -17,9 +17,10 @@ use vector_config::configurable_component;
 
 use super::{
     AddCertToStoreSnafu, AddExtraChainCertSnafu, CaStackPushSnafu, DerExportSnafu,
-    FileOpenFailedSnafu, FileReadFailedSnafu, MaybeTls, NewCaStackSnafu, NewStoreBuilderSnafu,
-    ParsePkcs12Snafu, Pkcs12Snafu, PrivateKeyParseSnafu, Result, SetCertificateSnafu,
-    SetPrivateKeySnafu, SetVerifyCertSnafu, TlsError, TlsIdentitySnafu, X509ParseSnafu,
+    EncodeAlpnProtocolsSnafu, FileOpenFailedSnafu, FileReadFailedSnafu, MaybeTls, NewCaStackSnafu,
+    NewStoreBuilderSnafu, ParsePkcs12Snafu, Pkcs12Snafu, PrivateKeyParseSnafu, Result,
+    SetAlpnProtocolsSnafu, SetCertificateSnafu, SetPrivateKeySnafu, SetVerifyCertSnafu, TlsError,
+    TlsIdentitySnafu, X509ParseSnafu,
 };
 
 const PEM_START_MARKER: &str = "-----BEGIN ";
@@ -108,6 +109,12 @@ pub struct TlsConfig {
     /// Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
     pub verify_hostname: Option<bool>,
 
+    /// Sets the list of supported ALPN protolols.
+    ///
+    /// Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
+    /// they are defined.
+    pub alpn_protocols: Option<Vec<String>>,
+
     /// Absolute path to an additional CA certificate file.
     ///
     /// The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
@@ -154,6 +161,7 @@ pub struct TlsSettings {
     pub(super) verify_hostname: bool,
     authorities: Vec<X509>,
     pub(super) identity: Option<IdentityStore>, // openssl::pkcs12::ParsedPkcs12 doesn't impl Clone yet
+    alpn_protocols: Option<Vec<u8>>,
 }
 
 #[derive(Clone)]
@@ -187,6 +195,7 @@ impl TlsSettings {
             verify_hostname: options.verify_hostname.unwrap_or(!for_server),
             authorities: options.load_authorities()?,
             identity: options.load_identity()?,
+            alpn_protocols: options.parse_alpn_protocols()?,
         })
     }
 
@@ -274,6 +283,12 @@ impl TlsSettings {
             load_mac_certs(context).unwrap();
         }
 
+        if let Some(alpn) = &self.alpn_protocols {
+            context
+                .set_alpn_protos(alpn.as_slice())
+                .context(SetAlpnProtocolsSnafu)?;
+        }
+
         Ok(())
     }
 
@@ -313,6 +328,23 @@ impl TlsConfig {
                     |der| self.parse_pkcs12_identity(der),
                     |pem| self.parse_pem_identity(pem, &filename),
                 )
+            }
+        }
+    }
+
+    /// The input must be in ALPN "wire format".
+    ///
+    /// It consists of a sequence of supported protocol names prefixed by their byte length.
+    fn parse_alpn_protocols(&self) -> Result<Option<Vec<u8>>> {
+        match &self.alpn_protocols {
+            None => Ok(None),
+            Some(protocols) => {
+                let mut data: Vec<u8> = Vec::new();
+                for str in protocols.iter() {
+                    data.push(str.len().try_into().context(EncodeAlpnProtocolsSnafu)?);
+                    data.append(&mut str.to_owned().into_bytes());
+                }
+                Ok(Some(data))
             }
         }
     }
@@ -569,6 +601,17 @@ mod test {
         include_bytes!("../../tests/data/ca/intermediate_server/certs/localhost.cert.pem");
     const TEST_PEM_KEY_BYTES: &[u8] =
         include_bytes!("../../tests/data/ca/intermediate_server/private/localhost.key.pem");
+
+    #[test]
+    fn parse_alpn_protocols() {
+        let options = TlsConfig {
+            alpn_protocols: Some(vec![String::from("h2")]),
+            ..Default::default()
+        };
+        let settings =
+            TlsSettings::from_options(&Some(options)).expect("Failed to parse alpn_protocols");
+        assert_eq!(settings.alpn_protocols, Some(vec![2, 104, 50]));
+    }
 
     #[test]
     fn from_options_pkcs12() {

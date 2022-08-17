@@ -220,17 +220,18 @@ impl LogNamespace {
         &self,
         source_name: &'a str,
         log: &mut LogEvent,
-        key: impl Path<'a>,
+        legacy_key: impl Path<'a>,
+        metadata_key: impl Path<'a>,
         value: impl Into<Value>,
     ) {
         match self {
             LogNamespace::Vector => {
                 log.metadata_mut()
                     .value_mut()
-                    .insert(path!(source_name).concat(key), value);
+                    .insert(path!(source_name).concat(metadata_key), value);
             }
             LogNamespace::Legacy => {
-                log.try_insert(key, value);
+                log.try_insert(legacy_key, value);
             }
         }
     }

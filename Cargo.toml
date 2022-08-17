@@ -37,9 +37,10 @@ debug = true
 name = "vector"
 section = "admin"
 maintainer-scripts = "distribution/debian/scripts/"
-conf-files = ["/etc/default/vector"]
+conf-files = ["/etc/vector/vector.toml", "/etc/default/vector"]
 assets = [
   ["target/release/vector", "/usr/bin/", "755"],
+  ["config/vector.toml", "/etc/vector/vector.toml", "644"],
   ["config/examples/*", "/etc/vector/examples/", "644"],
   ["distribution/systemd/vector.service", "/lib/systemd/system/vector.service", "644"],
   ["distribution/systemd/vector.default", "/etc/default/vector", "600"]
@@ -74,14 +75,11 @@ depends = ""
 members = [
   ".",
   "lib/codecs",
-  "lib/enrichment",
-  "lib/vector-buffers",
-  "lib/vector-common",
-  "lib/vector-config",
-  "lib/vector-config-common",
-  "lib/vector-config-macros",
-  "lib/vector-core",
+  "lib/datadog/filter",
+  "lib/datadog/grok",
+  "lib/datadog/search-syntax",
   "lib/dnsmsg-parser",
+  "lib/enrichment",
   "lib/fakedata",
   "lib/file-source",
   "lib/k8s-e2e-tests",
@@ -89,9 +87,17 @@ members = [
   "lib/lookup",
   "lib/portpicker",
   "lib/prometheus-parser",
+  "lib/opentelemetry-proto",
   "lib/tracing-limit",
-  "lib/vector-api-client",
   "lib/value",
+  "lib/vector-api-client",
+  "lib/vector-buffers",
+  "lib/vector-common",
+  "lib/vector-config",
+  "lib/vector-config-common",
+  "lib/vector-config-macros",
+  "lib/vector-core",
+  "lib/vector-vrl-functions",
   "lib/vrl/cli",
   "lib/vrl/compiler",
   "lib/vrl/core",
@@ -101,10 +107,6 @@ members = [
   "lib/vrl/tests",
   "lib/vrl/proptests",
   "lib/vrl/vrl",
-  "lib/vector-vrl-functions",
-  "lib/datadog/grok",
-  "lib/datadog/search-syntax",
-  "lib/datadog/filter",
 ]
 
 [dependencies]
@@ -117,6 +119,7 @@ file-source = { path = "lib/file-source", optional = true }
 lookup = { path = "lib/lookup" }
 portpicker = { path = "lib/portpicker" }
 prometheus-parser = { path = "lib/prometheus-parser", optional = true }
+opentelemetry-proto = { path = "lib/opentelemetry-proto", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
 value = { path = "lib/value" }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
@@ -132,7 +135,7 @@ vrl-cli = { path = "lib/vrl/cli", optional = true }
 # Tokio / Futures
 async-stream = { version = "0.3.3", default-features = false }
 async-trait = { version = "0.1.57", default-features = false }
-futures = { version = "0.3.21", default-features = false, features = ["compat", "io-compat"], package = "futures" }
+futures = { version = "0.3.23", default-features = false, features = ["compat", "io-compat"], package = "futures" }
 tokio = { version = "1.20.1", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1.9", default-features = false, features = ["net", "sync", "time"] }
@@ -335,7 +338,7 @@ azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev =
 azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b7171eb40909f7f2805f4622e076f8a6dbbe2d98", default-features = false, features = ["azurite_workaround"] }
 base64 = "0.13.0"
 criterion = { version = "0.3.6", features = ["html_reports", "async_tokio"] }
-libc = "0.2.131"
+libc = "0.2.132"
 pretty_assertions = "1.2.1"
 proptest = "1.0"
 quickcheck = "1.0.3"
@@ -436,8 +439,6 @@ protobuf-build = ["dep:tonic-build", "dep:prost-build"]
 
 gcp = ["dep:base64", "dep:goauth", "dep:smpl_jwt"]
 
-opentelemetry = ["dep:hex", "dep:tonic", "protobuf-build"]
-
 # Enrichment Tables
 enrichment-tables = ["enrichment-tables-file","enrichment-tables-geoip"]
 enrichment-tables-file = [ "dep:csv", "dep:seahash", "dep:hash_hasher" ]
@@ -501,6 +502,7 @@ sources-docker_logs = ["docker"]
 sources-eventstoredb_metrics = []
 sources-exec = []
 sources-file = ["dep:file-source"]
+sources-file-descriptor = ["tokio-util/io"]
 sources-fluent = ["dep:base64", "listenfd", "tokio-util/net", "dep:rmpv", "dep:rmp-serde", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "dep:serde_bytes"]
 sources-gcp_pubsub = ["gcp", "dep:h2", "dep:prost-types", "protobuf-build", "dep:tonic"]
 sources-heroku_logs = ["sources-utils-http", "sources-utils-http-query", "sources-http"]
@@ -515,8 +517,7 @@ sources-logstash = ["listenfd", "tokio-util/net", "sources-utils-tcp-keepalive",
 sources-mongodb_metrics = ["dep:mongodb"]
 sources-nats = ["dep:nats", "dep:nkeys"]
 sources-nginx_metrics = ["dep:nom"]
-sources-opentelemetry = ["dep:prost-types", "sources-http", "sources-utils-http", "sources-vector", "opentelemetry"]
-sources-file-descriptor = ["tokio-util/io"]
+sources-opentelemetry = ["dep:hex", "dep:opentelemetry-proto", "dep:prost-types", "sources-http", "sources-utils-http", "sources-vector"]
 sources-postgresql_metrics = ["dep:postgres-openssl", "dep:tokio-postgres"]
 sources-prometheus = ["dep:prometheus-parser", "sinks-prometheus", "sources-http", "sources-utils-http"]
 sources-redis= ["dep:redis"]
