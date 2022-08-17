@@ -14,7 +14,7 @@ fn chunks(value: Value, chunk_size: Value) -> Resolved {
         Ok(bytes.chunks(chunk_size).collect::<Vec<_>>().into())
     } else {
         Err(format!(
-            r#""chunk_size" is too large: must be at most {}"#,
+            r#""chunk_size" is too large: must be at most {} bytes"#,
             usize::MAX
         )
         .into())
