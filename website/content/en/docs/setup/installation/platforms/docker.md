@@ -30,13 +30,36 @@ Vector is an end-to-end observability data pipeline designed to deploy under var
 
 ## Administration
 
+### Configure
+
+Create a new Vector configuration. The below will output dummy logs to stdout.
+
+```shell
+cat <<-EOF > ~/vector.toml
+[api]
+enabled = true
+address = "0.0.0.0:8686"
+
+[sources.demo_logs]
+type = "demo_logs"
+interval = 1.0
+format = "json"
+
+[sinks.console]
+inputs = ["demo_logs"]
+target = "stdout"
+type = "console"
+encoding.codec = "json"
+EOF
+```
+
 ### Start
 
 ```shell
 docker run \
   -d \
   -v ~/vector.toml:/etc/vector/vector.toml:ro \
-  -p 8383:8383 \
+  -p 8686:8686 \
   timberio/vector:{{< version >}}-debian
 ```
 
