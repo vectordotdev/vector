@@ -1,6 +1,6 @@
 use crate::lookup_v2::{parse_path, BorrowedSegment, Path};
-use vector_config::configurable_component;
 use std::fmt::Write;
+use vector_config::configurable_component;
 
 /// A lookup path.
 #[configurable_component]
@@ -95,7 +95,11 @@ impl From<OwnedPath> for String {
                             coalesce_i += 1;
                             output.push_str(&field_output);
                         }
-                        let _ = write!(output, "{})", serialize_field(last.as_ref(), (coalesce_i != 0).then(|| "|")));
+                        let _ = write!(
+                            output,
+                            "{})",
+                            serialize_field(last.as_ref(), (coalesce_i != 0).then(|| "|"))
+                        );
                         output
                     }
                 })
