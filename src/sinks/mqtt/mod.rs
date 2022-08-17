@@ -6,5 +6,5 @@ pub use config::MqttSinkConfig;
 use crate::config::SinkDescription;
 
 inventory::submit! {
-    SinkDescription::new::<MqttSinkConfig>("websocket")
+    SinkDescription::new::<MqttSinkConfig>(NAME)
 }
