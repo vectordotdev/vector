@@ -17,7 +17,8 @@ base_target_dir="target"
 
 # Check to see if we have the nightly toolchain installed, and if so, do a deeper check to see if
 # there's a custom target directory configured.
-if cargo +nightly 2>&1 >/dev/null; then
+cargo +nightly &> /dev/null && rc=$? || rc=$?
+if [ $rc -eq 0 ]; then
   overridden_base_target_dir=$(cargo +nightly -Zunstable-options config get | grep "build.target-dir" | sed 's/build.target-dir = //' | sed 's/\"//g' || true)
   if [ ! -z "$overridden_base_target_dir" ]; then
     base_target_dir=$overridden_base_target_dir
