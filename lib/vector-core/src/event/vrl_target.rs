@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, convert::TryFrom, marker::PhantomData};
 
-use lookup::{LookupBuf, SegmentBuf};
+use lookup::{LookupBuf, OwnedPath, PathPrefix, SegmentBuf, TargetPath};
 use snafu::Snafu;
 use vrl_lib::{prelude::VrlValueConvert, MetadataTarget, ProgramInfo, SecretTarget};
 
@@ -162,139 +162,162 @@ impl VrlTarget {
 }
 
 impl vrl_lib::Target for VrlTarget {
-    fn target_insert(&mut self, path: &LookupBuf, value: ::value::Value) -> Result<(), String> {
-        match self {
-            VrlTarget::LogEvent(ref mut log, _) | VrlTarget::Trace(ref mut log, _) => {
-                log.insert(path, value);
-                Ok(())
-            }
-            VrlTarget::Metric {
-                ref mut metric,
-                value: metric_value,
-            } => {
-                if path.is_root() {
-                    return Err(MetricPathError::SetPathError.to_string());
-                }
-
-                if let Some(paths) = path.to_alternative_components(MAX_METRIC_PATH_DEPTH).get(0) {
-                    match paths.as_slice() {
-                        ["tags"] => {
-                            let value = value.clone().try_object().map_err(|e| e.to_string())?;
-                            for (field, value) in &value {
-                                metric.insert_tag(
-                                    field.as_str().to_owned(),
-                                    value
-                                        .try_bytes_utf8_lossy()
-                                        .map_err(|e| e.to_string())?
-                                        .into_owned(),
-                                );
-                            }
-                        }
-                        ["tags", field] => {
-                            let value = value.clone().try_bytes().map_err(|e| e.to_string())?;
-                            metric.insert_tag(
-                                (*field).to_owned(),
-                                String::from_utf8_lossy(&value).into_owned(),
-                            );
-                        }
-                        ["name"] => {
-                            let value = value.clone().try_bytes().map_err(|e| e.to_string())?;
-                            metric.series.name.name = String::from_utf8_lossy(&value).into_owned();
-                        }
-                        ["namespace"] => {
-                            let value = value.clone().try_bytes().map_err(|e| e.to_string())?;
-                            metric.series.name.namespace =
-                                Some(String::from_utf8_lossy(&value).into_owned());
-                        }
-                        ["timestamp"] => {
-                            let value = value.clone().try_timestamp().map_err(|e| e.to_string())?;
-                            metric.data.time.timestamp = Some(value);
-                        }
-                        ["kind"] => {
-                            metric.data.kind = MetricKind::try_from(value.clone())?;
-                        }
-                        _ => {
-                            return Err(MetricPathError::InvalidPath {
-                                path: &path.to_string(),
-                                expected: VALID_METRIC_PATHS_SET,
-                            }
-                            .to_string())
-                        }
+    fn target_insert(&mut self, target_path: &TargetPath, value: ::value::Value) -> Result<(), String> {
+        let path = &target_path.path;
+        match target_path.prefix {
+            PathPrefix::Event => {
+                match self {
+                    VrlTarget::LogEvent(ref mut log, _) | VrlTarget::Trace(ref mut log, _) => {
+                        log.insert(path, value);
+                        Ok(())
                     }
+                    VrlTarget::Metric {
+                        ref mut metric,
+                        value: metric_value,
+                    } => {
+                        if path.is_root() {
+                            return Err(MetricPathError::SetPathError.to_string());
+                        }
 
-                    metric_value.insert(path, value);
+                        if let Some(paths) = path.to_alternative_components(MAX_METRIC_PATH_DEPTH).get(0) {
+                            match paths.as_slice() {
+                                ["tags"] => {
+                                    let value = value.clone().try_object().map_err(|e| e.to_string())?;
+                                    for (field, value) in &value {
+                                        metric.insert_tag(
+                                            field.as_str().to_owned(),
+                                            value
+                                                .try_bytes_utf8_lossy()
+                                                .map_err(|e| e.to_string())?
+                                                .into_owned(),
+                                        );
+                                    }
+                                }
+                                ["tags", field] => {
+                                    let value = value.clone().try_bytes().map_err(|e| e.to_string())?;
+                                    metric.insert_tag(
+                                        (*field).to_owned(),
+                                        String::from_utf8_lossy(&value).into_owned(),
+                                    );
+                                }
+                                ["name"] => {
+                                    let value = value.clone().try_bytes().map_err(|e| e.to_string())?;
+                                    metric.series.name.name = String::from_utf8_lossy(&value).into_owned();
+                                }
+                                ["namespace"] => {
+                                    let value = value.clone().try_bytes().map_err(|e| e.to_string())?;
+                                    metric.series.name.namespace =
+                                        Some(String::from_utf8_lossy(&value).into_owned());
+                                }
+                                ["timestamp"] => {
+                                    let value = value.clone().try_timestamp().map_err(|e| e.to_string())?;
+                                    metric.data.time.timestamp = Some(value);
+                                }
+                                ["kind"] => {
+                                    metric.data.kind = MetricKind::try_from(value.clone())?;
+                                }
+                                _ => {
+                                    return Err(MetricPathError::InvalidPath {
+                                        path: &path.to_string(),
+                                        expected: VALID_METRIC_PATHS_SET,
+                                    }
+                                        .to_string())
+                                }
+                            }
 
-                    return Ok(());
+                            metric_value.insert(path, value);
+
+                            return Ok(());
+                        }
+
+                        Err(MetricPathError::InvalidPath {
+                            path: &path.to_string(),
+                            expected: VALID_METRIC_PATHS_SET,
+                        }
+                            .to_string())
+                    }
                 }
+            },
+            PathPrefix::Metadata => {
 
-                Err(MetricPathError::InvalidPath {
-                    path: &path.to_string(),
-                    expected: VALID_METRIC_PATHS_SET,
-                }
-                .to_string())
             }
         }
     }
 
     #[allow(clippy::redundant_closure_for_method_calls)] // false positive
-    fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String> {
-        match self {
-            VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => Ok(log.get(path)),
-            VrlTarget::Metric { value, .. } => target_get_metric(path, value),
+    fn target_get(&self, target_path: &TargetPath) -> Result<Option<&Value>, String> {
+        match target_path.prefix {
+            PathPrefix::Event => match self {
+                VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => Ok(log.get(&target_path.path)),
+                VrlTarget::Metric { value, .. } => target_get_metric(&target_path.path, value),
+            },
+            PathPrefix::Metadata => self.metadata().value().get(&target_path.path)
         }
+
     }
 
-    fn target_get_mut(&mut self, path: &LookupBuf) -> Result<Option<&mut Value>, String> {
-        match self {
-            VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => Ok(log.get_mut(path)),
-            VrlTarget::Metric { value, .. } => target_get_mut_metric(path, value),
+    fn target_get_mut(&mut self, target_path: &TargetPath) -> Result<Option<&mut Value>, String> {
+        match target_path.prefix {
+            PathPrefix::Event => match self {
+                VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => Ok(log.get_mut(&target_path.path)),
+                VrlTarget::Metric { value, .. } => target_get_mut_metric(&target_path.path, value),
+            },
+            PathPrefix::Metadata => self.metadata_mut().value_mut().get_mut(&target_path.path)
         }
     }
 
     fn target_remove(
         &mut self,
-        path: &LookupBuf,
+        target_path: &TargetPath,
         compact: bool,
     ) -> Result<Option<::value::Value>, String> {
-        match self {
-            VrlTarget::LogEvent(ref mut log, _) | VrlTarget::Trace(ref mut log, _) => {
-                Ok(log.remove(path, compact))
-            }
-            VrlTarget::Metric {
-                ref mut metric,
-                value,
-            } => {
-                if path.is_root() {
-                    return Err(MetricPathError::SetPathError.to_string());
-                }
-
-                if let Some(paths) = path.to_alternative_components(MAX_METRIC_PATH_DEPTH).get(0) {
-                    let removed_value = match paths.as_slice() {
-                        ["namespace"] => metric.series.name.namespace.take().map(Into::into),
-                        ["timestamp"] => metric.data.time.timestamp.take().map(Into::into),
-                        ["tags"] => metric.series.tags.take().map(|map| {
-                            map.into_iter()
-                                .map(|(k, v)| (k, v.into()))
-                                .collect::<::value::Value>()
-                        }),
-                        ["tags", field] => metric.remove_tag(field).map(Into::into),
-                        _ => {
-                            return Err(MetricPathError::InvalidPath {
-                                path: &path.to_string(),
-                                expected: VALID_METRIC_PATHS_SET,
-                            }
-                            .to_string())
+        match target_path.prefix {
+            PathPrefix::Event => {
+                match self {
+                    VrlTarget::LogEvent(ref mut log, _) | VrlTarget::Trace(ref mut log, _) => {
+                        Ok(log.remove(&target_path.path, compact))
+                    }
+                    VrlTarget::Metric {
+                        ref mut metric,
+                        value,
+                    } => {
+                        if target_path.path.is_root() {
+                            return Err(MetricPathError::SetPathError.to_string());
                         }
-                    };
 
-                    value.remove(path, false);
+                        if let Some(paths) = target_path.path.to_alternative_components(MAX_METRIC_PATH_DEPTH).get(0) {
+                            let removed_value = match paths.as_slice() {
+                                ["namespace"] => metric.series.name.namespace.take().map(Into::into),
+                                ["timestamp"] => metric.data.time.timestamp.take().map(Into::into),
+                                ["tags"] => metric.series.tags.take().map(|map| {
+                                    map.into_iter()
+                                        .map(|(k, v)| (k, v.into()))
+                                        .collect::<::value::Value>()
+                                }),
+                                ["tags", field] => metric.remove_tag(field).map(Into::into),
+                                _ => {
+                                    return Err(MetricPathError::InvalidPath {
+                                        path: &target_path.path.to_string(),
+                                        expected: VALID_METRIC_PATHS_SET,
+                                    }
+                                        .to_string())
+                                }
+                            };
 
-                    return Ok(removed_value);
+                            value.remove(path, false);
+
+                            return Ok(removed_value);
+                        }
+
+                        Ok(None)
+                    }
                 }
-
-                Ok(None)
+            },
+            PathPrefix::Metadata => {
+                self.metadata_mut().value_mut().remove(&target_path.path, compact)
             }
         }
+
     }
 }
 
@@ -340,7 +363,7 @@ impl SecretTarget for VrlTarget {
 /// - type
 ///
 /// Any other paths result in a `MetricPathError::InvalidPath` being returned.
-fn target_get_metric<'a>(path: &LookupBuf, value: &'a Value) -> Result<Option<&'a Value>, String> {
+fn target_get_metric<'a>(path: &OwnedPath, value: &'a Value) -> Result<Option<&'a Value>, String> {
     if path.is_root() {
         return Ok(Some(value));
     }
@@ -459,7 +482,7 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo) -> Value {
             break;
         }
 
-        // For non-root paths, we contiuously populate the value with the
+        // For non-root paths, we continuously populate the value with the
         // relevant data.
         if let Some(SegmentBuf::Field(field)) = path.iter().next() {
             match field.as_str() {

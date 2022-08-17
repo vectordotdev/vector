@@ -1,4 +1,4 @@
-use lookup::LookupBuf;
+use lookup::{owned_path, TargetPath};
 use vrl_lib::state::TypeState;
 use vrl_lib::{diagnostic::DiagnosticList, CompilationResult, CompileConfig, Function};
 
@@ -18,7 +18,7 @@ pub fn compile_vrl(
     // This path is used to differentiate between log namespaces. It also contains
     // metadata that transforms / sinks may rely on, so setting it to read-only
     // prevents users from potentially breaking behavior relying on it.
-    config.set_read_only_metadata_path(LookupBuf::from("vector"), true);
+    config.set_read_only_path(TargetPath::metadata(owned_path!("vector")), true);
 
     vrl_lib::compile_with_state(source, fns, state, config)
 }
