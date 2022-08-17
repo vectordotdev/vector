@@ -76,9 +76,11 @@ pub struct StreamClosedError {
 impl InternalEvent for StreamClosedError {
     fn emit(self) {
         error!(
-            message = "Failed to forward event(s), downstream is closed.",
+            message = "Events dropped.",
+            reason = "Downstream is closed.",
             error_code = STREAM_CLOSED,
             error_type = error_type::WRITER_FAILED,
+            intentional = "false",
             stage = error_stage::SENDING,
             count = %self.count,
         );
@@ -92,6 +94,7 @@ impl InternalEvent for StreamClosedError {
             "component_discarded_events_total", self.count as u64,
             "error_code" => STREAM_CLOSED,
             "error_type" => error_type::WRITER_FAILED,
+            "intentional" => "false",
             "stage" => error_stage::SENDING,
         );
     }
