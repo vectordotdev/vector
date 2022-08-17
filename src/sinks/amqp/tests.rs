@@ -20,6 +20,7 @@ mod integration_tests {
     };
     use futures::StreamExt;
     use std::{sync::Arc, time::Duration};
+    use vector_core::config::LogNamespace;
 
     pub fn make_config() -> AMQPSinkConfig {
         let mut config = AMQPSinkConfig {
@@ -167,17 +168,22 @@ mod integration_tests {
             connection: config.connection.clone(),
             queue: queue.clone(),
             consumer: format!("test-{}-amqp-source", random_string(10)),
-            routing_key: None,
-            exchange_key: None,
-            offset_key: None,
+            routing_key: "routing".to_string(),
+            exchange_key: "exchange".to_string(),
+            offset_key: "offset".to_string(),
             framing: default_framing_message_based(),
             decoding: default_decoding(),
+            log_namespace: Some(true),
         };
         let (tx, rx) = SourceSender::new_test();
-        let amqp_source =
-            crate::sources::amqp::amqp_source(&source_cfg, ShutdownSignal::noop(), tx, LogNamespace::Legacy)
-                .await
-                .unwrap();
+        let amqp_source = crate::sources::amqp::amqp_source(
+            &source_cfg,
+            ShutdownSignal::noop(),
+            tx,
+            LogNamespace::Legacy,
+        )
+        .await
+        .unwrap();
 
         // prepare server
         let queue_opts = lapin::options::QueueDeclareOptions {
