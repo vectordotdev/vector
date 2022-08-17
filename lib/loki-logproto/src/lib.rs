@@ -1,3 +1,5 @@
+#![allow(clippy::derive_partial_eq_without_eq)]
+
 pub mod stats {
     include!(concat!(env!("OUT_DIR"), "/stats.rs"));
 }
@@ -68,7 +70,7 @@ pub mod util {
             .map(|(k, v)| format!("{}=\"{}\"", k, v))
             .collect();
         labels.sort();
-        return format!("{{{}}}", labels.join(", "));
+        format!("{{{}}}", labels.join(", "))
     }
 }
 

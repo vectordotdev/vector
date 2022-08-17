@@ -31,8 +31,7 @@ impl Encoder<Vec<LokiRecord>> for LokiBatchEncoder {
         let body = match self.0 {
             LokiBatchEncoding::Json => {
                 let body = serde_json::json!({ "streams": [batch] });
-                let body = serde_json::to_vec(&body)?;
-                body
+                serde_json::to_vec(&body)?
             }
             LokiBatchEncoding::Protobuf => {
                 let labels = batch.stream;
@@ -44,7 +43,6 @@ impl Encoder<Vec<LokiRecord>> for LokiBatchEncoder {
                             event.timestamp,
                             String::from_utf8_lossy(&event.event).into_owned(),
                         )
-                        .into()
                     })
                     .collect();
                 let batch = loki_logproto::util::Batch(labels, entries);
