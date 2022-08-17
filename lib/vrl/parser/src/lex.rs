@@ -566,7 +566,7 @@ impl<'input> Iterator for Lexer<'input> {
 
     fn next(&mut self) -> Option<Self::Item> {
         use Token::{
-            Arrow, Bang, Colon, Comma, Dot, Escape, InvalidToken, LBrace, LBracket, LParen, LQuery,
+            Arrow, Ampersand, Bang, Colon, Comma, Dot, Escape, InvalidToken, LBrace, LBracket, LParen, LQuery,
             Newline, RBrace, RBracket, RParen, RQuery, SemiColon, Underscore,
         };
 
@@ -577,7 +577,8 @@ impl<'input> Iterator for Lexer<'input> {
             //
             // We don't advance the internal iterator, because this token does not
             // represent a physical character, instead it is a boundary marker.
-            match self.query_start(start) {
+            let result = self.query_start(start);
+            match result {
                 Err(err) => return Some(Err(err)),
                 Ok(true) => {
                     // dbg!("LQuery"); // NOTE: uncomment this for debugging
@@ -613,6 +614,7 @@ impl<'input> Iterator for Lexer<'input> {
                     ')' => Some(Ok(self.close(start, RParen))),
 
                     '.' => Some(Ok(self.token(start, Dot))),
+                    '&' => Some(Ok(self.token(start, Ampersand))),
                     ':' => Some(Ok(self.token(start, Colon))),
                     ',' => Some(Ok(self.token(start, Comma))),
 
@@ -951,12 +953,12 @@ impl<'input> Lexer<'input> {
                     }
                 }
 
-                '.' if last_char.is_none() => valid = true,
-                '.' if last_char == Some(')') => valid = true,
-                '.' if last_char == Some('}') => valid = true,
-                '.' if last_char == Some(']') => valid = true,
-                '.' if last_char == Some('"') => valid = true,
-                '.' if last_char.map(is_ident_continue) == Some(true) => {
+                '.' | '&' if last_char.is_none() => valid = true,
+                '.' | '&' if last_char == Some(')') => valid = true,
+                '.' | '&' if last_char == Some('}') => valid = true,
+                '.' | '&' if last_char == Some(']') => valid = true,
+                '.' | '&' if last_char == Some('"') => valid = true,
+                '.' | '&' if last_char.map(is_ident_continue) == Some(true) => {
                     // we need to make sure we're not dealing with a float here
                     let digits = self.input[..pos]
                         .chars()
@@ -979,7 +981,6 @@ impl<'input> Lexer<'input> {
                         if ch == '\n' {
                             break;
                         }
-
                         end = pos;
                     }
                     continue;
@@ -1227,7 +1228,7 @@ fn is_ident_continue(ch: char) -> bool {
 
 fn is_query_start(ch: char) -> bool {
     match ch {
-        '.' | '{' | '[' => true,
+        '&' | '.' | '{' | '[' => true,
         ch => is_ident_start(ch),
     }
 }

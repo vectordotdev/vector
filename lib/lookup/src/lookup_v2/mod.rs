@@ -63,20 +63,30 @@ pub trait Path<'a>: Clone {
         self.segment_iter().eq(other.segment_iter())
     }
 
-    fn can_start_with(&self, _prefix: impl Path<'a>) -> bool {
-        unimplemented!()
-        // let mut self_iter = self.segment_iter();
-        // for prefix_segment in prefix.segment_iter() {
-        //     match self_iter.next() {
-        //         None => return false,
-        //         Some(self_segment) => {
-        //             if !self_segment.can_equal(prefix_segment) {
-        //                 return false;
-        //             }
-        //         }
-        //     }
-        // }
-        // true
+    fn can_start_with(&self, prefix: impl Path<'a>) -> bool {
+        let mut self_iter = self.segment_iter();
+        for prefix_segment in prefix.segment_iter() {
+            match self_iter.next() {
+                None => return false,
+                Some(self_segment) => {
+                    match (self_segment, prefix_segment) {
+                        (BorrowedSegment::Invalid, _) | (_, BorrowedSegment::Invalid) => return false,
+                        (BorrowedSegment::Index(a), BorrowedSegment::Index(b)) => {
+                            if a != b {
+                                return false;
+                            }
+                        }
+                        (BorrowedSegment::Field(a), BorrowedSegment::Field(b)) => {
+                            if a != b {
+                                return false;
+                            }
+                        },
+
+                    }
+                }
+            }
+        }
+        true
     }
 }
 
