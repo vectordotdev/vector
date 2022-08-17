@@ -240,6 +240,22 @@ impl OwnedSegment {
     pub fn is_invalid(&self) -> bool {
         matches!(self, OwnedSegment::Invalid)
     }
+
+    pub fn can_start_with(&self, prefix: &OwnedSegment) -> bool {
+        match (self, prefix) {
+            (OwnedSegment::Invalid, _) | (_, OwnedSegment::Invalid) => false,
+            (OwnedSegment::Index(a), OwnedSegment::Index(b)) => a == b,
+            (OwnedSegment::Index(_), _) | (_, OwnedSegment::Index(_)) => false,
+            (OwnedSegment::Field(a), OwnedSegment::Field(b)) => a == b,
+            (OwnedSegment::Field(field), OwnedSegment::Coalesce(fields))
+            | (OwnedSegment::Coalesce(fields), OwnedSegment::Field(field)) => {
+                fields.contains(field)
+            }
+            (OwnedSegment::Coalesce(a), OwnedSegment::Coalesce(b)) => {
+                a.into_iter().any(|a_field| b.contains(a_field))
+            }
+        }
+    }
 }
 
 impl From<Vec<&'static str>> for OwnedSegment {

@@ -18,54 +18,34 @@ impl<'a> Path<'a> for &'a LookupBuf {
 
 impl From<LookupBuf> for OwnedPath {
     fn from(lookup: LookupBuf) -> Self {
-        let mut path = OwnedPath::root();
-        for segment in lookup.segments {
-            match segment {
-                SegmentBuf::Field(field) => {
-                    path.segments.push(OwnedSegment::Field(field.name));
-                }
-                SegmentBuf::Index(i) => {
-                    path.segments.push(OwnedSegment::Index(i));
-                }
+        let segments = lookup
+            .segments
+            .into_iter()
+            .map(|segment| match segment {
+                SegmentBuf::Field(field) => OwnedSegment::Field(field.name),
+                SegmentBuf::Index(i) => OwnedSegment::Index(i),
                 SegmentBuf::Coalesce(fields) => {
-                    if let Some((last, remaining)) = fields.split_last() {
-                        for field in remaining {
-                            path.segments
-                                .push(OwnedSegment::CoalesceField(field.name.clone()));
-                        }
-                        path.segments
-                            .push(OwnedSegment::CoalesceEnd(last.name.clone()));
-                    }
+                    let fields = fields.into_iter().map(|field| field.name).collect();
+                    OwnedSegment::Coalesce(fields)
                 }
-            }
-        }
-        path
+            })
+            .collect();
+        Self { segments }
     }
 }
 
+// This should only be used if the `OwnedPath` has already been verified to be valid.
 impl From<OwnedPath> for LookupBuf {
     fn from(path: OwnedPath) -> Self {
-        let mut lookup = LookupBuf::root();
-        let mut coalesce_fields = vec![];
-
-        for segment in path.segments {
-            match segment {
-                OwnedSegment::Field(field) => {
-                    lookup
-                        .segments
-                        .push_back(SegmentBuf::Field(FieldBuf::from(field)));
-                }
-                OwnedSegment::Index(i) => {
-                    lookup.segments.push_back(SegmentBuf::Index(i));
-                }
-                OwnedSegment::CoalesceField(field) => {
-                    coalesce_fields.push(FieldBuf::from(field));
-                }
-                OwnedSegment::CoalesceEnd(field) => {
-                    coalesce_fields.push(FieldBuf::from(field));
-                    lookup
-                        .segments
-                        .push_back(SegmentBuf::Coalesce(std::mem::take(&mut coalesce_fields)));
+        let segments = path
+            .segments
+            .into_iter()
+            .map(|segment| match segment {
+                OwnedSegment::Field(field) => SegmentBuf::Field(FieldBuf::from(field)),
+                OwnedSegment::Index(i) => SegmentBuf::Index(i),
+                OwnedSegment::Coalesce(fields) => {
+                    let fields = fields.into_iter().map(FieldBuf::from).collect();
+                    SegmentBuf::Coalesce(fields)
                 }
                 OwnedSegment::Invalid => {
                     // eventually "Invalid" will be removed from `OwnedPath`, but until then
@@ -75,9 +55,9 @@ impl From<OwnedPath> for LookupBuf {
                         "compatibility layer shouldn't be used if OwnedPath can be invalid!"
                     )
                 }
-            }
-        }
-        lookup
+            })
+            .collect();
+        LookupBuf::from_segments(segments)
     }
 }
 
