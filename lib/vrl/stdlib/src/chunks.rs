@@ -132,14 +132,6 @@ mod tests {
             tdef: TypeDef::array(Collection::from_unknown(Kind::bytes())),
         }
 
-        minimum_chunk_size {
-            args: func_args![value: "",
-                             chunk_size: 0,
-            ],
-            want: Err(r#"invalid argument"#),
-            tdef: TypeDef::array(Collection::from_unknown(Kind::bytes())),
-        }
-
         mixed_ascii_unicode {
             args: func_args![value: "ab你好",
                              chunk_size: 4,
