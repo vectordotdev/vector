@@ -36,8 +36,7 @@ macro_rules! owned_path {
 /// Use if you want to pre-parse paths so it can be used multiple times.
 /// The return value (when borrowed) implements `Path` so it can be used directly.
 pub fn parse_path(path: &str) -> OwnedPath {
-    JitPath::new(path)
-        .to_owned_path()
+    JitPath::new(path).to_owned_path()
 }
 
 /// A path is simply the data describing how to look up a value.
@@ -66,10 +65,12 @@ pub trait Path<'a>: Clone {
             match segment {
                 BorrowedSegment::Invalid => return OwnedPath::invalid(),
                 BorrowedSegment::Index(i) => owned_path.push(OwnedSegment::Index(i)),
-                BorrowedSegment::Field(field) => owned_path.push(OwnedSegment::Field(field.to_string())),
+                BorrowedSegment::Field(field) => {
+                    owned_path.push(OwnedSegment::Field(field.to_string()))
+                }
                 BorrowedSegment::CoalesceField(field) => {
                     coalesce.push(field.to_string());
-                },
+                }
                 BorrowedSegment::CoalesceEnd(field) => {
                     coalesce.push(field.to_string());
                     owned_path.push(OwnedSegment::Coalesce(std::mem::take(&mut coalesce)));

@@ -424,83 +424,19 @@ mod test {
                 owned_path!("foo", "a\"a", "b\\b", "bar"),
             ),
             (r#"."🤖""#, owned_path!("🤖")),
-            (
-                ".(a|b)",
-                owned_path!(
-                    vec!["a", "b"]
-                ),
-            ),
-            (
-                "(a|b)",
-                owned_path!(
-                    vec!["a", "b"]
-                ),
-            ),
-            (
-                "( a | b )",
-                owned_path!(
-                    vec!["a", "b"]
-                ),
-            ),
-            (
-                ".(a|b)[1]",
-                owned_path!(
-                    vec!["a", "b"],
-                    1
-                ),
-            ),
-            (
-                ".(a|b).foo",
-                owned_path!(
-                    vec!["a", "b"],
-                    "foo"
-                ),
-            ),
-            (
-                ".(a|b|c)",
-                owned_path!(
-                    vec!["a", "b", "c"]
-                ),
-            ),
-            (
-                "[1](a|b)",
-                owned_path!(
-                    1,
-                    vec!["a", "b"]
-                ),
-            ),
-            (
-                "[1].(a|b)",
-                owned_path!(
-                    1,
-                    vec!["a", "b"]
-                ),
-            ),
-            (
-                "foo.(a|b)",
-                owned_path!(
-                    "foo",
-                    vec!["a", "b"]
-                ),
-            ),
-            (
-                "(\"a\"|b)",
-                owned_path!(vec!["a", "b"]),
-            ),
-            (
-                "(a|\"b.c\")",
-                owned_path!(vec!["a", "b.c"]),
-            ),
-            (
-                "(a|\"b\\\"c\")",
-                owned_path!(vec!["a", "b\"c"]),
-            ),
-            (
-                "(\"b\\\"c\"|a)",
-                owned_path!(
-                    vec!["b\"c", "a"]
-                ),
-            ),
+            (".(a|b)", owned_path!(vec!["a", "b"])),
+            ("(a|b)", owned_path!(vec!["a", "b"])),
+            ("( a | b )", owned_path!(vec!["a", "b"])),
+            (".(a|b)[1]", owned_path!(vec!["a", "b"], 1)),
+            (".(a|b).foo", owned_path!(vec!["a", "b"], "foo")),
+            (".(a|b|c)", owned_path!(vec!["a", "b", "c"])),
+            ("[1](a|b)", owned_path!(1, vec!["a", "b"])),
+            ("[1].(a|b)", owned_path!(1, vec!["a", "b"])),
+            ("foo.(a|b)", owned_path!("foo", vec!["a", "b"])),
+            ("(\"a\"|b)", owned_path!(vec!["a", "b"])),
+            ("(a|\"b.c\")", owned_path!(vec!["a", "b.c"])),
+            ("(a|\"b\\\"c\")", owned_path!(vec!["a", "b\"c"])),
+            ("(\"b\\\"c\"|a)", owned_path!(vec!["b\"c", "a"])),
             ("(a)", owned_path!(OwnedSegment::Invalid)),
         ];
 

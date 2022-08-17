@@ -1,4 +1,4 @@
-use crate::lookup_v2::{Path};
+use crate::lookup_v2::Path;
 use std::borrow::Cow;
 use std::iter::Cloned;
 use std::slice::Iter;

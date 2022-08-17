@@ -44,7 +44,7 @@ impl OwnedPath {
 
     pub fn invalid() -> Self {
         Self {
-            segments: vec![OwnedSegment::Invalid]
+            segments: vec![OwnedSegment::Invalid],
         }
     }
 }
@@ -76,7 +76,8 @@ impl From<OwnedPath> for String {
                     }
                     OwnedSegment::Coalesce(fields) => {
                         let mut output = String::new();
-                        let (last, fields) = fields.split_last().expect("coalesce must not be empty");
+                        let (last, fields) =
+                            fields.split_last().expect("coalesce must not be empty");
                         for field in fields {
                             let field_output = serialize_field(
                                 field.as_ref(),
@@ -175,7 +176,11 @@ impl OwnedSegment {
 
 impl From<Vec<&'static str>> for OwnedSegment {
     fn from(fields: Vec<&'static str>) -> Self {
-        fields.into_iter().map(ToString::to_string).collect::<Vec<_>>().into()
+        fields
+            .into_iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .into()
     }
 }
 
@@ -241,10 +246,12 @@ impl<'a> Iterator for OwnedSegmentSliceIter<'a> {
             OwnedSegment::Coalesce(fields) => {
                 let coalesce_segment;
                 if self.coalesce_i == fields.len() - 1 {
-                    coalesce_segment = BorrowedSegment::CoalesceEnd(fields[self.coalesce_i].as_str().into());
+                    coalesce_segment =
+                        BorrowedSegment::CoalesceEnd(fields[self.coalesce_i].as_str().into());
                     self.coalesce_i = 0;
                 } else {
-                    coalesce_segment = BorrowedSegment::CoalesceField(fields[self.coalesce_i].as_str().into());
+                    coalesce_segment =
+                        BorrowedSegment::CoalesceField(fields[self.coalesce_i].as_str().into());
                     self.coalesce_i += 1;
                 }
                 coalesce_segment
