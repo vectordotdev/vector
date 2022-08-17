@@ -283,9 +283,9 @@ impl TlsSettings {
             load_mac_certs(context).unwrap();
         }
 
-        if let Some(apln) = &self.alpn_protocols {
+        if let Some(alpn) = &self.alpn_protocols {
             context
-                .set_alpn_protos(apln.as_slice())
+                .set_alpn_protos(alpn.as_slice())
                 .context(SetAlpnProtocolsSnafu)?;
         }
 
