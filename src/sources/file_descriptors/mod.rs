@@ -10,16 +10,14 @@ use codecs::{
 use futures::{channel::mpsc, executor, SinkExt, StreamExt};
 use tokio::task;
 use tokio_util::{codec::FramedRead, io::StreamReader};
+use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::log_schema,
-    internal_events::{
-        ByteSize, BytesReceived, InternalEventHandle as _, OldEventsReceived, Protocol,
-        StreamClosedError,
-    },
+    internal_events::{OldEventsReceived, StreamClosedError},
     shutdown::ShutdownSignal,
     SourceSender,
 };

@@ -30,8 +30,8 @@ use crate::{
     config::{log_schema, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     internal_events::{
-        BytesReceived, ExecCommandExecuted, ExecEventsReceived, ExecFailedError, ExecTimeoutError,
-        StreamClosedError,
+        ExecCommandExecuted, ExecEventsReceived, ExecFailedError, ExecFailedToSignalChild,
+        ExecFailedToSignalChildError, ExecTimeoutError, StreamClosedError,
     },
     serde::default_decoding,
     shutdown::ShutdownSignal,
@@ -416,6 +416,8 @@ async fn run_command(
     let pid = child.id();
 
     spawn_reader_thread(stdout_reader, decoder.clone(), STDOUT, sender);
+
+    let bytes_received = register!(BytesReceived::from(Protocol::NONE));
 
     'outer: loop {
         tokio::select! {
