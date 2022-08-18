@@ -15,7 +15,7 @@ use crate::{
     serde::default_decoding,
 };
 /// Configuration for the `file_descriptor` source.
-#[configurable_component(source)]
+#[configurable_component(source("file_description"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct FileDescriptorSourceConfig {
@@ -79,10 +79,6 @@ impl SourceConfig for FileDescriptorSourceConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(self.decoding.output_type())]
-    }
-
-    fn source_type(&self) -> &'static str {
-        NAME
     }
 
     fn resources(&self) -> Vec<Resource> {

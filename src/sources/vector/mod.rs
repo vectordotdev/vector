@@ -47,7 +47,7 @@ pub struct VectorConfigV2 {
 }
 
 /// Configurable for the `vector` source.
-#[configurable_component(source)]
+#[configurable_component(source("vector"))]
 #[derive(Clone, Debug)]
 #[serde(untagged)]
 pub enum VectorConfig {
@@ -83,13 +83,6 @@ impl SourceConfig for VectorConfig {
         match self {
             VectorConfig::V1(v1) => v1.config.outputs(),
             VectorConfig::V2(v2) => v2.config.outputs(),
-        }
-    }
-
-    fn source_type(&self) -> &'static str {
-        match self {
-            VectorConfig::V1(v1) => v1.config.source_type(),
-            VectorConfig::V2(v2) => v2.config.source_type(),
         }
     }
 

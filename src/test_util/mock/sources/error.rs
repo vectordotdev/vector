@@ -10,7 +10,7 @@ use vector_core::{
 use crate::config::{SourceConfig, SourceContext};
 
 /// Configuration for the `test_error` source.
-#[configurable_component(source)]
+#[configurable_component(source("test_error"))]
 #[derive(Clone, Debug, Default)]
 pub struct ErrorSourceConfig {
     /// Meaningless field that only exists for triggering config diffs during topology reloading.

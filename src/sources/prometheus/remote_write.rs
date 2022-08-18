@@ -24,7 +24,7 @@ use crate::{
 const SOURCE_NAME: &str = "prometheus_remote_write";
 
 /// Configuration for the `prometheus_remote_write` source.
-#[configurable_component(source)]
+#[configurable_component(source("prometheus_remote_write"))]
 #[derive(Clone, Debug)]
 pub struct PrometheusRemoteWriteConfig {
     /// The address to accept connections on.
@@ -85,10 +85,6 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(config::DataType::Metric)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        SOURCE_NAME
     }
 
     fn can_acknowledge(&self) -> bool {

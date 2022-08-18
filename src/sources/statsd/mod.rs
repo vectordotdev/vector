@@ -38,7 +38,7 @@ use unix::{statsd_unix, UnixConfig};
 use vector_core::config::LogNamespace;
 
 /// Configuration for the `statsd` source.
-#[configurable_component(source)]
+#[configurable_component(source("statsd"))]
 #[derive(Clone, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum StatsdConfig {
@@ -163,10 +163,6 @@ impl SourceConfig for StatsdConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(config::DataType::Metric)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "statsd"
     }
 
     fn resources(&self) -> Vec<Resource> {

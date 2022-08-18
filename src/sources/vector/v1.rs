@@ -107,10 +107,6 @@ impl VectorConfig {
         vec![Output::default(DataType::all())]
     }
 
-    pub(super) const fn source_type(&self) -> &'static str {
-        "vector"
-    }
-
     pub(super) fn resources(&self) -> Vec<Resource> {
         vec![self.address.into()]
     }

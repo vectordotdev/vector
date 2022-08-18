@@ -55,7 +55,7 @@ enum NginxError {
 }
 
 /// Configuration for the `nginx_metrics` source.
-#[configurable_component(source)]
+#[configurable_component(source("nginx_metrics"))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct NginxMetricsConfig {
@@ -138,10 +138,6 @@ impl SourceConfig for NginxMetricsConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Metric)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "nginx_metrics"
     }
 
     fn can_acknowledge(&self) -> bool {

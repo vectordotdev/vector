@@ -15,7 +15,7 @@ use crate::{
 };
 
 /// Configuration for the `internal_logs` source.
-#[configurable_component(source)]
+#[configurable_component(source("internal_logs"))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct InternalLogsConfig {
@@ -61,10 +61,6 @@ impl SourceConfig for InternalLogsConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "internal_logs"
     }
 
     fn can_acknowledge(&self) -> bool {

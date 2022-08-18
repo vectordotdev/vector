@@ -71,7 +71,7 @@ pub(self) struct FilterList {
 }
 
 /// Configuration for the `host_metrics` source.
-#[configurable_component(source)]
+#[configurable_component(source("host_metrics"))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
@@ -133,10 +133,6 @@ impl SourceConfig for HostMetricsConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Metric)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "host_metrics"
     }
 
     fn can_acknowledge(&self) -> bool {

@@ -48,7 +48,7 @@ pub const SOURCE: &str = "splunk_source";
 pub const SOURCETYPE: &str = "splunk_sourcetype";
 
 /// Configuration for the `splunk_hec` source.
-#[configurable_component(source)]
+#[configurable_component(source("splunk_hec"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct SplunkConfig {
@@ -162,10 +162,6 @@ impl SourceConfig for SplunkConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "splunk_hec"
     }
 
     fn resources(&self) -> Vec<Resource> {

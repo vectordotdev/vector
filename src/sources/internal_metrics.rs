@@ -14,7 +14,7 @@ use crate::{
 };
 
 /// Configuration for the `internal_metrics` source.
-#[configurable_component(source)]
+#[configurable_component(source("internal_metrics"))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields, default)]
@@ -99,10 +99,6 @@ impl SourceConfig for InternalMetricsConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Metric)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "internal_metrics"
     }
 
     fn can_acknowledge(&self) -> bool {

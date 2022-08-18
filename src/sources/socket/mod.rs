@@ -17,7 +17,7 @@ use crate::{
 };
 
 /// Configuration for the `socket` source.
-#[configurable_component(source)]
+#[configurable_component(source("socket"))]
 #[derive(Clone, Debug)]
 pub struct SocketConfig {
     #[serde(flatten)]
@@ -218,10 +218,6 @@ impl SourceConfig for SocketConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(self.output_type())]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "socket"
     }
 
     fn resources(&self) -> Vec<Resource> {

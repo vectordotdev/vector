@@ -22,7 +22,7 @@ mod handlers;
 mod models;
 
 /// Configuration for the `aws_kinesis_firehose` source.
-#[configurable_component(source)]
+#[configurable_component(source("aws_kinesis_firehose"))]
 #[derive(Clone, Debug)]
 pub struct AwsKinesisFirehoseConfig {
     /// The address to listen for connections on.
@@ -130,10 +130,6 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(self.decoding.output_type())]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "aws_kinesis_firehose"
     }
 
     fn resources(&self) -> Vec<Resource> {

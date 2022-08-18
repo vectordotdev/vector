@@ -22,7 +22,7 @@ use crate::{
 pub mod types;
 
 /// Configuration for the `eventstoredb_metrics` source.
-#[configurable_component(source)]
+#[configurable_component(source("eventstoredb_metrics"))]
 #[derive(Clone, Debug, Default)]
 pub struct EventStoreDbConfig {
     /// Endpoints to scrape stats from.
@@ -62,10 +62,6 @@ impl SourceConfig for EventStoreDbConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(config::DataType::Metric)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "eventstoredb_metrics"
     }
 
     fn can_acknowledge(&self) -> bool {

@@ -14,7 +14,6 @@ use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
 use futures::{Stream, StreamExt};
 use lookup::lookup_v2::{parse_path, OwnedSegment};
 use once_cell::sync::Lazy;
-use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tracing_futures::Instrument;
 use vector_config::configurable_component;
@@ -50,7 +49,7 @@ static STDOUT: Lazy<Bytes> = Lazy::new(|| "stdout".into());
 static CONSOLE: Lazy<Bytes> = Lazy::new(|| "console".into());
 
 /// Configuration for the `docker_logs` source.
-#[configurable_component(source)]
+#[configurable_component(source("docker_logs"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct DockerLogsConfig {
@@ -222,37 +221,6 @@ impl SourceConfig for DockerLogsConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "docker_logs"
-    }
-
-    fn can_acknowledge(&self) -> bool {
-        false
-    }
-}
-
-// Add a compatibility alias to avoid breaking existing configs
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-struct DockerCompatConfig {
-    #[serde(flatten)]
-    config: DockerLogsConfig,
-}
-
-#[async_trait::async_trait]
-impl SourceConfig for DockerCompatConfig {
-    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        self.config.build(cx).await
-    }
-
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
-        self.config.outputs(global_log_namespace)
-    }
-
-    fn source_type(&self) -> &'static str {
-        "docker"
     }
 
     fn can_acknowledge(&self) -> bool {

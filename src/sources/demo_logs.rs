@@ -24,7 +24,7 @@ use crate::{
 };
 
 /// Configuration for the `demo_logs` source.
-#[configurable_component(source)]
+#[configurable_component(source("demo_logs"))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(default)]
@@ -278,10 +278,6 @@ impl SourceConfig for DemoLogsConfig {
             .with_standard_vector_source_metadata();
 
         vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "demo_logs"
     }
 
     fn can_acknowledge(&self) -> bool {

@@ -74,7 +74,7 @@ const FILE_KEY: &str = "file";
 const SELF_NODE_NAME_ENV_KEY: &str = "VECTOR_SELF_NODE_NAME";
 
 /// Configuration for the `kubernetes_logs` source.
-#[configurable_component(source)]
+#[configurable_component(source("kubernetes_logs"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct Config {
@@ -203,10 +203,6 @@ impl SourceConfig for Config {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        COMPONENT_ID
     }
 
     fn can_acknowledge(&self) -> bool {

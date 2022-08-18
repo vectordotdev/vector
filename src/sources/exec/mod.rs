@@ -42,7 +42,7 @@ use vector_core::config::LogNamespace;
 pub mod sized_bytes_codec;
 
 /// Configuration for the `exec` source.
-#[configurable_component]
+#[configurable_component(source("exec"))]
 #[derive(Clone, Debug)]
 #[serde(default, deny_unknown_fields)]
 pub struct ExecConfig {
@@ -257,10 +257,6 @@ impl SourceConfig for ExecConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(self.decoding.output_type())]
-    }
-
-    fn source_type(&self) -> &'static str {
-        EXEC
     }
 
     fn can_acknowledge(&self) -> bool {

@@ -29,7 +29,7 @@ mod message;
 use self::message::{FluentEntry, FluentMessage, FluentRecord, FluentTag, FluentTimestamp};
 
 /// Configuration for the `fluent` source.
-#[configurable_component(source)]
+#[configurable_component(source("fluent"))]
 #[derive(Clone, Debug)]
 pub struct FluentConfig {
     /// The address to listen for connections on.
@@ -94,10 +94,6 @@ impl SourceConfig for FluentConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "fluent"
     }
 
     fn resources(&self) -> Vec<Resource> {

@@ -14,7 +14,7 @@ use super::FileDescriptorConfig;
 const NAME: &str = "stdin";
 
 /// Configuration for the `stdin` source.
-#[configurable_component(source)]
+#[configurable_component(source("stdin"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct StdinConfig {
@@ -80,10 +80,6 @@ impl SourceConfig for StdinConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(self.decoding.output_type())]
-    }
-
-    fn source_type(&self) -> &'static str {
-        NAME
     }
 
     fn resources(&self) -> Vec<Resource> {

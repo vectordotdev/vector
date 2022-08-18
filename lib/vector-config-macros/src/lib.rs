@@ -3,9 +3,9 @@
 use proc_macro::TokenStream;
 
 mod ast;
+mod component_name;
 mod configurable;
 mod configurable_component;
-mod component_name;
 
 /// Designates a type as being part of a Vector configuration.
 ///
@@ -39,7 +39,7 @@ mod component_name;
 /// use serde;
 ///
 /// /// Configuration for the `kafka` source.
-/// #[configurable_component(source)]
+/// #[configurable_component(source("kafka"))]
 /// #[derive(Clone, Debug)]
 /// pub struct KafkaSourceConfig {
 ///   // ...

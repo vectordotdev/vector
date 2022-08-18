@@ -55,7 +55,7 @@ pub const METRICS: &str = "metrics";
 pub const TRACES: &str = "traces";
 
 /// Configuration for the `datadog_agent` source.
-#[configurable_component(source)]
+#[configurable_component(source("datadog_agent"))]
 #[derive(Clone, Debug)]
 pub struct DatadogAgentConfig {
     /// The address to accept connections on.
@@ -255,10 +255,6 @@ impl SourceConfig for DatadogAgentConfig {
         } else {
             vec![Output::default(DataType::all()).with_schema_definition(definition)]
         }
-    }
-
-    fn source_type(&self) -> &'static str {
-        "datadog_agent"
     }
 
     fn resources(&self) -> Vec<Resource> {

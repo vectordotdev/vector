@@ -30,7 +30,7 @@ use crate::{
 };
 
 /// Configuration for the `syslog` source.
-#[configurable_component(source)]
+#[configurable_component(source("syslog"))]
 #[derive(Clone, Debug)]
 pub struct SyslogConfig {
     #[serde(flatten)]
@@ -206,10 +206,6 @@ impl SourceConfig for SyslogConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "syslog"
     }
 
     fn resources(&self) -> Vec<Resource> {

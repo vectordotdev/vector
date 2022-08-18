@@ -1,6 +1,6 @@
 use std::fmt;
 
-use vector_config_common::{validation, attributes::CustomAttribute};
+use vector_config_common::{attributes::CustomAttribute, validation};
 
 use crate::Configurable;
 

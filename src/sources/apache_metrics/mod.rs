@@ -31,7 +31,7 @@ pub use parser::ParseError;
 use vector_core::config::LogNamespace;
 
 /// Configuration for the `apache_metrics` source.
-#[configurable_component(source)]
+#[configurable_component(source("apache_metrics"))]
 #[derive(Clone, Debug)]
 pub struct ApacheMetricsConfig {
     /// The list of `mod_status` endpoints to scrape metrics from.
@@ -91,10 +91,6 @@ impl SourceConfig for ApacheMetricsConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(config::DataType::Metric)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "apache_metrics"
     }
 
     fn can_acknowledge(&self) -> bool {

@@ -41,7 +41,7 @@ enum ConfigError {
 }
 
 /// Configuration for the `prometheus_scrape` source.
-#[configurable_component(source)]
+#[configurable_component(source("prometheus_scrape"))]
 #[derive(Clone, Debug)]
 pub struct PrometheusScrapeConfig {
     /// Endpoints to scrape metrics from.
@@ -158,10 +158,6 @@ impl SourceConfig for PrometheusScrapeConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(config::DataType::Metric)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "prometheus_scrape"
     }
 
     fn can_acknowledge(&self) -> bool {

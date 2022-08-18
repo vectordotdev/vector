@@ -32,7 +32,7 @@ enum BuildError {
 }
 
 /// Configuration for the `nats` source.
-#[configurable_component(source)]
+#[configurable_component(source("nats"))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
@@ -104,10 +104,6 @@ impl SourceConfig for NatsSourceConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(self.decoding.output_type())]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "nats"
     }
 
     fn can_acknowledge(&self) -> bool {

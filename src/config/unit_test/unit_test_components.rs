@@ -19,7 +19,7 @@ use crate::{
 };
 
 /// Configuration for the `unit_test` source.
-#[configurable_component]
+#[configurable_component(source("unit_test"))]
 #[derive(Clone, Debug, Default)]
 pub struct UnitTestSourceConfig {
     /// List of events sent from this source as part of the test.
@@ -43,10 +43,6 @@ impl SourceConfig for UnitTestSourceConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::all())]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "unit_test"
     }
 
     fn can_acknowledge(&self) -> bool {

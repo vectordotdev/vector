@@ -64,7 +64,7 @@ enum BuildError {
 }
 
 /// Configuration for the `file` source.
-#[configurable_component(source)]
+#[configurable_component(source("file"))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[serde(deny_unknown_fields, default)]
 pub struct FileConfig {
@@ -346,10 +346,6 @@ impl SourceConfig for FileConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "file"
     }
 
     fn can_acknowledge(&self) -> bool {

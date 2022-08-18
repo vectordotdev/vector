@@ -13,7 +13,7 @@ use vector_core::{
 use crate::config::{SourceConfig, SourceContext};
 
 /// Configuration for the `test_tripwire` source.
-#[configurable_component(source)]
+#[configurable_component(source("test_tripwire"))]
 #[derive(Clone, Debug)]
 pub struct TripwireSourceConfig {
     #[serde(skip)]

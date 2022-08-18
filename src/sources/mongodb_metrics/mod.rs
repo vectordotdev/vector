@@ -74,7 +74,7 @@ enum CollectError {
 }
 
 /// Configuration for the `mongodb_metrics` source.
-#[configurable_component(source)]
+#[configurable_component(source("mongodb_metrics"))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct MongoDbMetricsConfig {
@@ -153,10 +153,6 @@ impl SourceConfig for MongoDbMetricsConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(config::DataType::Metric)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "mongodb_metrics"
     }
 
     fn can_acknowledge(&self) -> bool {

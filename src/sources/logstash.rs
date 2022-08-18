@@ -29,7 +29,7 @@ use crate::{
 };
 
 /// Configuration for the `logstash` source.
-#[configurable_component(source)]
+#[configurable_component(source("logstash"))]
 #[derive(Clone, Debug)]
 pub struct LogstashConfig {
     /// The address to listen for connections on.
@@ -96,10 +96,6 @@ impl SourceConfig for LogstashConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "logstash"
     }
 
     fn resources(&self) -> Vec<Resource> {

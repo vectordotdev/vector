@@ -33,7 +33,7 @@ use lookup::path;
 use vector_core::config::LogNamespace;
 
 /// Configuration for `heroku_logs` source.
-#[configurable_component(source)]
+#[configurable_component(source("heroku_logs"))]
 #[derive(Clone, Debug)]
 pub struct LogplexConfig {
     /// The address to listen for connections on.
@@ -126,10 +126,6 @@ impl SourceConfig for LogplexConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(self.decoding.output_type())]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "heroku_logs"
     }
 
     fn resources(&self) -> Vec<Resource> {

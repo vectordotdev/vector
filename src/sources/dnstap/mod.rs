@@ -21,7 +21,7 @@ pub use schema::DnstapEventSchema;
 use vector_core::config::LogNamespace;
 
 /// Configuration for the `dnstap` source.
-#[configurable_component(source)]
+#[configurable_component(source("dnstap"))]
 #[derive(Clone, Debug)]
 pub struct DnstapConfig {
     /// Maximum length, in bytes, that a frame can be.
@@ -117,10 +117,6 @@ impl SourceConfig for DnstapConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "dnstap"
     }
 
     fn can_acknowledge(&self) -> bool {

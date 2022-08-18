@@ -108,7 +108,7 @@ struct PostgresqlMetricsTlsConfig {
 }
 
 /// Configuration for the `postgresql_metrics` source.
-#[configurable_component(source)]
+#[configurable_component(source("postgresql_metrics"))]
 #[derive(Clone, Debug)]
 #[serde(default, deny_unknown_fields)]
 pub struct PostgresqlMetricsConfig {
@@ -209,10 +209,6 @@ impl SourceConfig for PostgresqlMetricsConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Metric)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "postgresql_metrics"
     }
 
     fn can_acknowledge(&self) -> bool {

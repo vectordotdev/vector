@@ -112,7 +112,7 @@ pub(crate) enum PubsubError {
 static CLIENT_ID: Lazy<String> = Lazy::new(|| uuid::Uuid::new_v4().to_string());
 
 /// Configuration for the `gcp_pubsub` source.
-#[configurable_component(source)]
+#[configurable_component(source("gcp_pubsub"))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
@@ -293,10 +293,6 @@ impl SourceConfig for PubsubConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "gcp_pubsub"
     }
 
     fn can_acknowledge(&self) -> bool {

@@ -16,7 +16,7 @@ use vector_core::{
 use crate::config::{SourceConfig, SourceContext};
 
 /// Configuration for the `test_basic` source.
-#[configurable_component(source)]
+#[configurable_component(source("test_basic"))]
 #[derive(Clone, Debug)]
 #[serde(default)]
 pub struct BasicSourceConfig {

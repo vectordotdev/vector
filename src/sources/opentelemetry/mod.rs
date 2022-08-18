@@ -32,7 +32,7 @@ use self::{grpc::Service, http::build_warp_filter};
 pub const LOGS: &str = "logs";
 
 /// Configuration for the `opentelemetry` source.
-#[configurable_component(source)]
+#[configurable_component(source("opentelemetry"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct OpentelemetryConfig {
@@ -126,10 +126,6 @@ impl SourceConfig for OpentelemetryConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log).with_port(LOGS)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "opentelemetry"
     }
 
     fn resources(&self) -> Vec<Resource> {

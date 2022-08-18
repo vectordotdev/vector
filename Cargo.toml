@@ -883,3 +883,4 @@ name = "codecs"
 path = "benches/codecs/main.rs"
 harness = false
 required-features = ["codecs-benches"]
+

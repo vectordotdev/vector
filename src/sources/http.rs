@@ -55,7 +55,7 @@ pub enum HttpMethod {
 }
 
 /// Configuration for the `http` source.
-#[configurable_component(source)]
+#[configurable_component(source("http"))]
 #[derive(Clone, Debug)]
 pub struct SimpleHttpConfig {
     /// The address to listen for connections on.
@@ -260,10 +260,6 @@ impl SourceConfig for SimpleHttpConfig {
                 .map(|d| d.output_type())
                 .unwrap_or(DataType::Log),
         )]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "http"
     }
 
     fn resources(&self) -> Vec<Resource> {

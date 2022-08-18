@@ -82,7 +82,7 @@ enum BuildError {
 type Matches = HashMap<String, HashSet<String>>;
 
 /// Configuration for the `journald` source.
-#[configurable_component(source)]
+#[configurable_component(source("journald"))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields, default)]
 pub struct JournaldConfig {
@@ -244,10 +244,6 @@ impl SourceConfig for JournaldConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "journald"
     }
 
     fn can_acknowledge(&self) -> bool {

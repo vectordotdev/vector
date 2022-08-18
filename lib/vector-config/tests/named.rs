@@ -15,22 +15,25 @@ pub struct Basic;
 
 #[component_name("generics")]
 pub struct Generics<T> {
-	inner: T,
+    inner: T,
 }
 
 #[component_name("bounds")]
-pub struct Bounds<T> where T: AsRef<u64> {
-	inner: T,
+pub struct Bounds<T>
+where
+    T: AsRef<u64>,
+{
+    inner: T,
 }
 
 #[component_name("existing_attrs")]
 #[derive(Serialize)]
 pub struct ExistingAttributes {
-	foo: String,
+    foo: String,
 }
 
 fn assert_serialize<T: Serialize>() {}
 
 fn verify_asserts() {
-	assert_serialize::<ExistingAttributes>();
+    assert_serialize::<ExistingAttributes>();
 }

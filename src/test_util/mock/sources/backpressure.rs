@@ -18,7 +18,7 @@ use vector_core::{
 use crate::config::{SourceConfig, SourceContext};
 
 /// Configuration for the `test_backpressure` source.
-#[configurable_component(source)]
+#[configurable_component(source("test_backpressure"))]
 #[derive(Clone, Debug)]
 pub struct BackpressureSourceConfig {
     // The number of events that have been sent.

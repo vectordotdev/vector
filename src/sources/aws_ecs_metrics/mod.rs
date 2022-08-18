@@ -46,7 +46,7 @@ pub enum Version {
 }
 
 /// Configuration for the `aws_ecs_metrics` source.
-#[configurable_component(source)]
+#[configurable_component(source("aws_ecs_metrics"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct AwsEcsMetricsSourceConfig {
@@ -149,10 +149,6 @@ impl SourceConfig for AwsEcsMetricsSourceConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(config::DataType::Metric)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "aws_ecs_metrics"
     }
 
     fn can_acknowledge(&self) -> bool {

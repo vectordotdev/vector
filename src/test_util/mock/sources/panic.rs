@@ -9,7 +9,7 @@ use vector_core::{
 use crate::config::{SourceConfig, SourceContext};
 
 /// Configuration for the `test_panic` source.
-#[configurable_component(source)]
+#[configurable_component(source("test_panic"))]
 #[derive(Clone, Debug, Default)]
 pub struct PanicSourceConfig {
     /// Meaningless field that only exists for triggering config diffs during topology reloading.
