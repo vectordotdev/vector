@@ -1,11 +1,11 @@
 use std::convert::AsRef;
 
 use lookup::lookup_v2::TargetPath;
-use lookup::{LookupBuf, PathPrefix};
+use lookup::PathPrefix;
 use value::{Secrets, Value};
 
 /// Any target object you want to remap using VRL has to implement this trait.
-pub trait Target: std::fmt::Debug + MetadataTarget + SecretTarget {
+pub trait Target: std::fmt::Debug + SecretTarget {
     /// Insert a given [`Value`] in the provided [`Target`].
     ///
     /// The `path` parameter determines _where_ in the given target the value
@@ -62,14 +62,6 @@ pub trait Target: std::fmt::Debug + MetadataTarget + SecretTarget {
     fn target_remove(&mut self, path: &TargetPath, compact: bool) -> Result<Option<Value>, String>;
 }
 
-pub trait MetadataTarget {
-    fn get_metadata(&self, _path: &LookupBuf) -> Result<Option<Value>, String>;
-
-    fn set_metadata(&mut self, _path: &LookupBuf, _value: Value) -> Result<(), String>;
-
-    fn remove_metadata(&mut self, _path: &LookupBuf) -> Result<(), String>;
-}
-
 pub trait SecretTarget {
     fn get_secret(&self, key: &str) -> Option<&str>;
 
@@ -120,22 +112,6 @@ impl Target for TargetValueRef<'_> {
             PathPrefix::Metadata => self.metadata.remove(&target_path.path, compact),
         };
         Ok(prev_value)
-    }
-}
-
-impl MetadataTarget for TargetValueRef<'_> {
-    fn get_metadata(&self, path: &LookupBuf) -> Result<Option<Value>, String> {
-        Ok(self.metadata.get_by_path(path).cloned())
-    }
-
-    fn set_metadata(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
-        self.metadata.insert_by_path(path, value);
-        Ok(())
-    }
-
-    fn remove_metadata(&mut self, path: &LookupBuf) -> Result<(), String> {
-        self.metadata.remove_by_path(path, false);
-        Ok(())
     }
 }
 
@@ -195,22 +171,6 @@ impl Target for TargetValue {
             PathPrefix::Metadata => self.metadata.remove(&target_path.path, compact),
         };
         Ok(prev_value)
-    }
-}
-
-impl MetadataTarget for TargetValue {
-    fn get_metadata(&self, path: &LookupBuf) -> Result<Option<Value>, String> {
-        Ok(self.metadata.get_by_path(path).cloned())
-    }
-
-    fn set_metadata(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
-        self.metadata.insert_by_path(path, value);
-        Ok(())
-    }
-
-    fn remove_metadata(&mut self, path: &LookupBuf) -> Result<(), String> {
-        self.metadata.remove_by_path(path, false);
-        Ok(())
     }
 }
 

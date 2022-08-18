@@ -1,7 +1,5 @@
-use std::collections::{hash_map::Entry, BTreeSet, HashMap};
-
-use anymap::AnyMap;
-use lookup::{PathPrefix, TargetPath};
+use lookup::PathPrefix;
+use std::collections::{hash_map::Entry, HashMap};
 use value::{Kind, Value};
 
 use crate::{parser::ast::Ident, type_def::Details, value::Collection, TypeDef};
@@ -146,8 +144,9 @@ impl ExternalEnv {
     pub fn kind(&self, prefix: PathPrefix) -> Kind {
         match prefix {
             PathPrefix::Event => self.target_kind(),
-            PathPrefix::Metadata => self.metadata_kind()
-        }.clone()
+            PathPrefix::Metadata => self.metadata_kind(),
+        }
+        .clone()
     }
 
     pub fn metadata_kind(&self) -> &Kind {

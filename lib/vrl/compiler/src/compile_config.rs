@@ -1,11 +1,10 @@
 use anymap::AnyMap;
-use lookup::{LookupBuf, TargetPath};
+use lookup::TargetPath;
 use std::collections::BTreeSet;
 
 pub struct CompileConfig {
     /// Custom context injected by the external environment
     custom: AnyMap,
-
     read_only_paths: BTreeSet<ReadOnlyPath>,
 }
 
@@ -39,7 +38,6 @@ impl CompileConfig {
 
     pub fn is_read_only_path(&self, path: &TargetPath) -> bool {
         for read_only_path in &self.read_only_paths {
-
             // any paths that are a parent of read-only paths also can't be modified
             if read_only_path.path.can_start_with(path) {
                 return true;
@@ -59,10 +57,8 @@ impl CompileConfig {
     /// Adds a path that is considered read only. Assignments to any paths that match
     /// will fail at compile time.
     pub fn set_read_only_path(&mut self, path: TargetPath, recursive: bool) {
-        self.read_only_paths.insert(ReadOnlyPath {
-            path,
-            recursive,
-        });
+        self.read_only_paths
+            .insert(ReadOnlyPath { path, recursive });
     }
 }
 
@@ -78,5 +74,5 @@ impl Default for CompileConfig {
 #[derive(Debug, Clone, Ord, Eq, PartialEq, PartialOrd)]
 struct ReadOnlyPath {
     path: TargetPath,
-    recursive: bool
+    recursive: bool,
 }

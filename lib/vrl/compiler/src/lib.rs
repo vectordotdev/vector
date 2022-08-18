@@ -43,8 +43,7 @@ pub mod value;
 pub use self::compile_config::CompileConfig;
 pub use compiler::{CompilationResult, Compiler};
 pub use core::{
-    value, ExpressionError, MetadataTarget, Resolved, SecretTarget, Target, TargetValue,
-    TargetValueRef,
+    value, ExpressionError, Resolved, SecretTarget, Target, TargetValue, TargetValueRef,
 };
 use std::{fmt::Display, str::FromStr};
 
