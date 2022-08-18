@@ -5,6 +5,7 @@ use proc_macro::TokenStream;
 mod ast;
 mod configurable;
 mod configurable_component;
+mod component_name;
 
 /// Designates a type as being part of a Vector configuration.
 ///
@@ -75,15 +76,23 @@ mod configurable_component;
 /// }
 /// ```
 #[proc_macro_attribute]
-pub fn configurable_component(args: TokenStream, item: TokenStream) -> TokenStream {
-    configurable_component::configurable_component_impl(args, item)
+pub fn configurable_component(attrs: TokenStream, item: TokenStream) -> TokenStream {
+    configurable_component::configurable_component_impl(attrs, item)
 }
 
-/// Generates an implementation of `Configurable` trait for the given container.
+/// Generates an implementation of the `Configurable` trait for the given container.
 ///
 /// In general, `#[configurable_component]` should be preferred as it ensures the other necessary derives/trait
 /// implementations are provided, and offers other features related to describing specific configuration types, etc.
 #[proc_macro_derive(Configurable, attributes(configurable))]
 pub fn derive_configurable(input: TokenStream) -> TokenStream {
     configurable::derive_configurable_impl(input)
+}
+
+/// Generates an implementation of the `NamedComponent` trait for the given container.
+///
+/// The only valid form of this macro is `#[component_name("something")]`.
+#[proc_macro_attribute]
+pub fn component_name(attrs: TokenStream, item: TokenStream) -> TokenStream {
+    component_name::component_name_impl(attrs, item)
 }
