@@ -35,7 +35,7 @@ Vector is an end-to-end observability data pipeline designed to deploy under var
 Create a new Vector configuration. The below will output dummy logs to stdout.
 
 ```shell
-cat <<-EOF > ~/vector.toml
+cat <<-EOF > $PWD/vector.toml
 [api]
 enabled = true
 address = "0.0.0.0:8686"
@@ -58,7 +58,7 @@ EOF
 ```shell
 docker run \
   -d \
-  -v ~/vector.toml:/etc/vector/vector.toml:ro \
+  -v $PWD/vector.toml:/etc/vector/vector.toml:ro \
   -p 8686:8686 \
   timberio/vector:{{< version >}}-debian
 ```
