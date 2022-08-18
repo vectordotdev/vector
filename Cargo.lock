@@ -4582,6 +4582,18 @@ dependencies = [
  "bitflags",
  "cfg-if 1.0.0",
  "libc",
+]
+
+[[package]]
+name = "nix"
+version = "0.25.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e322c04a9e3440c327fca7b6c8a63e6890a32fa2ad689db972425f07e0d22abb"
+dependencies = [
+ "autocfg",
+ "bitflags",
+ "cfg-if 1.0.0",
+ "libc",
  "memoffset",
 ]
 
@@ -8438,7 +8450,7 @@ dependencies = [
  "mlua",
  "mongodb",
  "nats",
- "nix 0.24.2",
+ "nix 0.25.0",
  "nkeys",
  "nom",
  "notify",
