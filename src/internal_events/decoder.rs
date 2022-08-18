@@ -46,6 +46,11 @@ impl<'a> InternalEvent for EncoderFramingError<'a> {
         );
         counter!("encoder_framing_errors_total", 1);
         counter!(
+            "component_errors_total", 1,
+            "error_type" => error_type::ENCODER_FAILED,
+            "stage" => error_stage::SENDING,
+        );
+        counter!(
             "component_discarded_events_total", 1,
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::SENDING,
@@ -72,6 +77,11 @@ impl<'a> InternalEvent for EncoderSerializeError<'a> {
             reason = "Failed serializing frame.",
         );
         counter!("encoder_serialize_errors_total", 1);
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => error_type::ENCODER_FAILED,
+            "stage" => error_stage::SENDING,
+        );
         counter!(
             "component_discarded_events_total", 1,
             "error_type" => error_type::ENCODER_FAILED,
