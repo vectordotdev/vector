@@ -1,9 +1,6 @@
-use std::{future::Future, hash::Hash, marker::PhantomData, pin::Pin, sync::Arc, time::Duration};
+use std::{hash::Hash, marker::PhantomData, pin::Pin, sync::Arc, time::Duration};
 
-use futures_util::{
-    future::FutureExt,
-    stream::{self, BoxStream},
-};
+use futures_util::stream::{self, BoxStream};
 use tower::{
     balance::p2c::Balance,
     buffer::{Buffer, BufferLayer},
@@ -292,10 +289,10 @@ impl TowerRequestSettings {
     }
 
     /// Distributes requests to services [(Endpoint, service, healthcheck)]
-    pub fn distributed_service<Req, RL, HL, S, H, F>(
+    pub fn distributed_service<Req, RL, HL, S>(
         self,
         retry_logic: RL,
-        services: Vec<(String, S, H)>,
+        services: Vec<(String, S)>,
         health_config: HealthConfig,
         health_logic: HL,
     ) -> DistributedService<S, RL, HL, usize, Req>
@@ -307,8 +304,6 @@ impl TowerRequestSettings {
         S::Error: Into<crate::Error> + Send + Sync + 'static,
         S::Response: Send,
         S::Future: Send + 'static,
-        H: Fn() -> F + Send + 'static,
-        F: Future<Output = bool> + Send + 'static,
     {
         let policy = self.retry_policy(retry_logic.clone());
         let settings = self.clone();
@@ -318,23 +313,8 @@ impl TowerRequestSettings {
         let max_concurrency = services.len() * AdaptiveConcurrencySettings::max_concurrency();
         let services = services
             .into_iter()
-            .map(|(endpoint, inner, healthcheck)| {
+            .map(|(endpoint, inner)| {
                 // Build individual service
-                let endpoint_h = endpoint.clone();
-                let healthcheck = move || {
-                    let endpoint = endpoint_h.clone();
-                    (healthcheck)()
-                        .map(move |success| {
-                            if success {
-                                debug!(message = "Healthcheck succeeded.",%endpoint);
-                            } else {
-                                warn!(message = "Healthcheck failed.",%endpoint);
-                            }
-                            success
-                        })
-                        .boxed()
-                };
-
                 ServiceBuilder::new()
                     .layer(AdaptiveConcurrencyLimitLayer::new(
                         settings.concurrency,
@@ -347,7 +327,6 @@ impl TowerRequestSettings {
                             ServiceBuilder::new()
                                 .timeout(settings.timeout)
                                 .service(inner),
-                            healthcheck,
                             open.clone(),
                             endpoint,
                         ), // NOTE: there is a version conflict for crate `tracing` between `tracing_tower` crate

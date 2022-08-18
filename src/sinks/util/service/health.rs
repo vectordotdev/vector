@@ -11,6 +11,7 @@ use std::{
 use futures::{ready, FutureExt};
 use futures_util::{future::BoxFuture, TryFuture};
 use pin_project::pin_project;
+use stream_cancel::{Trigger, Tripwire};
 use tokio::time::{sleep, Duration};
 use tower::Service;
 use vector_config::configurable_component;
@@ -24,9 +25,6 @@ use crate::{
 const RETRY_MAX_DURATION_SECONDS_DEFAULT: u64 = 3_600;
 const RETRY_INITIAL_BACKOFF_SECONDS_DEFAULT: u64 = 1;
 const UNHEALTHY_AMOUNT_OF_ERRORS: usize = 5;
-/// How many errors is allowed in probation period before we consider the service unhealthy again.
-/// Must be less than UNHEALTHY_AMOUNT_OF_ERRORS and greater than 0.
-const PROBATION_AMOUNT: usize = 4;
 
 /// Options for determining health of an endpoint.
 #[configurable_component]
@@ -45,7 +43,6 @@ impl HealthConfig {
         &self,
         logic: L,
         inner: S,
-        healthcheck: impl Fn() -> BoxFuture<'static, bool> + Send + 'static,
         open: OpenGauge,
         endpoint: String,
     ) -> HealthService<S, L> {
@@ -57,10 +54,9 @@ impl HealthConfig {
             logic,
             counters,
             snapshot,
-            open,
             endpoint,
-            state: ServiceState::Healthcheck(healthcheck()),
-            healthcheck: Box::new(healthcheck) as Box<_>,
+            state: CircuitState::Closed(open.clone().open(emit_active_endpoints)),
+            open,
             // An exponential backoff starting from retry_initial_backoff_sec and doubling every time
             // up to retry_max_duration_secs.
             backoff: ExponentialBackoff::from_millis(2)
@@ -89,27 +85,30 @@ pub trait HealthLogic: Clone + Send + Sync + 'static {
     fn is_healthy(&self, response: &Result<Self::Response, Self::Error>) -> Option<bool>;
 }
 
-enum ServiceState {
-    /// Service is unhealthy and should be checked once timeout expires.
-    Unhealthy(BoxFuture<'static, ()>),
-    /// Healthcheck in progress.
-    Healthcheck(BoxFuture<'static, bool>),
-    /// Service is healthy.
-    Healthy {
-        probation: bool,
-        _token: OpenToken<fn(usize)>,
+enum CircuitState {
+    /// Service is unhealthy hence it's not passing requests downstream.
+    /// Contains timeout.
+    Open(BoxFuture<'static, ()>),
+
+    /// Service will pass one request to test its health.
+    HalfOpen {
+        permit: Option<Trigger>,
+        done: Tripwire,
     },
+
+    /// Service is healthy and passing requests downstream.
+    Closed(OpenToken<fn(usize)>),
 }
 
 /// A service which monitors the health of a service.
+/// Behaves like a circuit breaker.
 pub struct HealthService<S, L> {
     inner: S,
-    healthcheck: Box<dyn Fn() -> BoxFuture<'static, bool> + Send>,
     logic: L,
     counters: Arc<HealthCounters>,
     snapshot: HealthSnapshot,
     backoff: ExponentialBackoff,
-    state: ServiceState,
+    state: CircuitState,
     open: OpenGauge,
     endpoint: String,
 }
@@ -126,48 +125,59 @@ where
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         loop {
             self.state = match self.state {
-                ServiceState::Unhealthy(ref mut timer) => {
+                CircuitState::Open(ref mut timer) => {
                     ready!(timer.as_mut().poll(cx));
-                    // It needs to at least pass healthcheck before it can be healthy again
-                    ServiceState::Healthcheck((self.healthcheck)())
+
+                    debug!(message="Endpoint is on probation.", endpoint = %&self.endpoint);
+
+                    // Using Tripwire will let us be notified when the request is done.
+                    // This can't be done through counters since a requests can end without changing them.
+                    let (permit, done) = Tripwire::new();
+
+                    CircuitState::HalfOpen {
+                        permit: Some(permit),
+                        done,
+                    }
                 }
-                ServiceState::Healthcheck(ref mut healthcheck) => {
-                    if ready!(healthcheck.as_mut().poll(cx)) {
-                        // It's at least reachable so let's try again
-                        self.snapshot = self.counters.probation(
-                            self.snapshot,
-                            UNHEALTHY_AMOUNT_OF_ERRORS - PROBATION_AMOUNT,
-                        );
-                        info!(message="Endpoint is on probation.", endpoint = %&self.endpoint);
-                        ServiceState::Healthy {
-                            probation: true,
-                            _token: self.open.clone().open(emit_active_endpoints),
-                        }
+                CircuitState::HalfOpen {
+                    permit: Some(_), ..
+                } => {
+                    // Pass one request to test health.
+                    return self.inner.poll_ready(cx).map_err(Into::into);
+                }
+                CircuitState::HalfOpen {
+                    permit: None,
+                    ref mut done,
+                } => {
+                    let done = Pin::new(done);
+                    ready!(done.poll(cx));
+
+                    if self.counters.healthy(self.snapshot).is_ok() {
+                        // A healthy response was observed
+                        info!(message="Endpoint is healthy.", endpoint = %&self.endpoint);
+
+                        self.backoff.reset();
+                        CircuitState::Closed(self.open.clone().open(emit_active_endpoints))
                     } else {
-                        ServiceState::Unhealthy(
+                        debug!(message="Endpoint failed probation.", endpoint = %&self.endpoint);
+
+                        CircuitState::Open(
                             sleep(self.backoff.next().expect("Should never end")).boxed(),
                         )
                     }
                 }
-                ServiceState::Healthy {
-                    ref mut probation, ..
-                } => {
+                CircuitState::Closed(_) => {
                     // Check for errors
                     match self.counters.healthy(self.snapshot) {
                         Ok(snapshot) => {
                             // Healthy
-                            if *probation {
-                                *probation = false;
-                                info!(message="Endpoint is healthy.", endpoint = %&self.endpoint);
-                            }
                             self.snapshot = snapshot;
-                            self.backoff.reset();
                             return self.inner.poll_ready(cx).map_err(Into::into);
                         }
                         Err(errors) if errors >= UNHEALTHY_AMOUNT_OF_ERRORS => {
                             // Unhealthy
                             warn!(message="Endpoint is unhealthy.", endpoint = %&self.endpoint);
-                            ServiceState::Unhealthy(
+                            CircuitState::Open(
                                 sleep(self.backoff.next().expect("Should never end")).boxed(),
                             )
                         }
@@ -182,10 +192,17 @@ where
     }
 
     fn call(&mut self, req: Req) -> Self::Future {
+        let permit = if let CircuitState::HalfOpen { permit, .. } = &mut self.state {
+            permit.take()
+        } else {
+            None
+        };
+
         HealthFuture {
             inner: self.inner.call(req),
             logic: self.logic.clone(),
             counters: Arc::clone(&self.counters),
+            permit,
         }
     }
 }
@@ -197,6 +214,7 @@ pub struct HealthFuture<F, L> {
     inner: F,
     logic: L,
     counters: Arc<HealthCounters>,
+    permit: Option<Trigger>,
 }
 
 impl<F: TryFuture, L> Future for HealthFuture<F, L>
@@ -216,6 +234,9 @@ where
             Some(true) => this.counters.inc_healthy(),
             Some(false) => this.counters.inc_unhealthy(),
         }
+
+        // Request is done so we can now drop the permit.
+        this.permit.take();
 
         Poll::Ready(output)
     }
@@ -263,20 +284,6 @@ impl HealthCounters {
         }
     }
 
-    /// Returns snapshot with given amount of unhealthy that will fail on healthy, for amount > 0,
-    /// until at least one healthy response has been received since snapshot.
-    fn probation(&self, snapshot: HealthSnapshot, amount: usize) -> HealthSnapshot {
-        HealthSnapshot {
-            // Leave healthy counter as is to detect any healthy response
-            healthy: snapshot.healthy,
-            // Set unhealthy diff to amount
-            unhealthy: self
-                .unhealthy
-                .load(Ordering::Acquire)
-                .saturating_sub(amount),
-        }
-    }
-
     fn snapshot(&self) -> HealthSnapshot {
         HealthSnapshot {
             healthy: self.healthy.load(Ordering::Acquire),
@@ -312,37 +319,6 @@ mod tests {
         assert_eq!(counters.healthy(snapshot), Err(2));
 
         counters.inc_healthy();
-        assert!(counters.healthy(snapshot).is_ok());
-    }
-
-    #[test]
-    fn test_counters_probation() {
-        let counters = HealthCounters::new();
-        let mut snapshot = counters.snapshot();
-
-        counters.inc_unhealthy();
-        counters.inc_unhealthy();
-        snapshot = counters.probation(snapshot, 1);
-        assert_eq!(counters.healthy(snapshot), Err(1));
-
-        counters.inc_unhealthy();
-        assert!(counters.healthy(snapshot).is_err());
-
-        counters.inc_healthy();
-        assert!(counters.healthy(snapshot).is_ok());
-    }
-
-    #[test]
-    fn test_counters_obsolete_probation() {
-        let counters = HealthCounters::new();
-        let mut snapshot = counters.snapshot();
-
-        counters.inc_unhealthy();
-        counters.inc_unhealthy();
-        assert!(counters.healthy(snapshot).is_err());
-
-        counters.inc_healthy();
-        snapshot = counters.probation(snapshot, 1);
         assert!(counters.healthy(snapshot).is_ok());
     }
 }
