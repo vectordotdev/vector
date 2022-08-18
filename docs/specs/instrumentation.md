@@ -127,7 +127,7 @@ not result in data loss if the retry succeeds.**
 - Metrics
   - MUST increment the `<namespace>_discarded_events_total` counter by the
     number of events discarded.
-  - MUST include the listed properties as tags except the `reason` property.
+  - MUST NOT include `count` and `reason` from the `reason` property as tags.
 - Logs
   - MUST log a `Events dropped` message.
   - MUST include the defined properties as key-value pairs.
