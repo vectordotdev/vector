@@ -170,7 +170,7 @@ fn populate_event(
     routing_key: &str,
     exchange_key: &str,
     offset_key: &str,
-    log_namespace: &LogNamespace,
+    log_namespace: LogNamespace,
 ) {
     let log = event.as_mut_log();
 
@@ -220,6 +220,7 @@ fn populate_event(
     );
 }
 
+/// Runs the AMQP source involving the main loop pulling data from the server.
 async fn run_amqp_source(
     config: AMQPSourceConfig,
     shutdown: ShutdownSignal,
@@ -279,7 +280,7 @@ async fn run_amqp_source(
                                                                    routing_key,
                                                                    exchange_key,
                                                                    offset_key,
-                                                                   &log_namespace);
+                                                                   log_namespace);
 
                                                     if let Err(error) = msg.acker.ack(ack_options).await {
                                                         emit!(AMQPCommitFailed { error });
