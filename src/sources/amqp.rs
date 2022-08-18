@@ -195,9 +195,27 @@ async fn populate_event(
         "amqp",
     );
 
-    log_namespace.insert_source_metadata("amqp", log, routing_key, "routing", msg.routing_key.to_string());
-    log_namespace.insert_source_metadata("amqp", log, exchange_key, "exchange", msg.exchange.to_string());
-    log_namespace.insert_source_metadata("amqp", log, offset_key, "offset", msg.delivery_tag as i64);
+    log_namespace.insert_source_metadata(
+        "amqp",
+        log,
+        routing_key,
+        "routing",
+        msg.routing_key.to_string(),
+    );
+    log_namespace.insert_source_metadata(
+        "amqp",
+        log,
+        exchange_key,
+        "exchange",
+        msg.exchange.to_string(),
+    );
+    log_namespace.insert_source_metadata(
+        "amqp",
+        log,
+        offset_key,
+        "offset",
+        msg.delivery_tag as i64,
+    );
 
     if let Err(error) = msg.acker.ack(ack_options).await {
         emit!(AMQPCommitFailed { error });
@@ -324,19 +342,6 @@ pub mod test {
             format!("amqp://{}:{}@rabbitmq:5672/{}", user, pass, vhost);
         config
     }
-
-    #[tokio::test]
-    async fn amqp_source_create_ok() {
-        let config = make_config();
-        assert!(amqp_source(
-            &config,
-            ShutdownSignal::noop(),
-            SourceSender::new_test().0,
-            LogNamespace::Legacy
-        )
-        .await
-        .is_ok());
-    }
 }
 
 #[cfg(feature = "amqp-integration-tests")]
@@ -352,6 +357,19 @@ mod integration_test {
     use chrono::Utc;
     use lapin::options::*;
     use lapin::BasicProperties;
+
+    #[tokio::test]
+    async fn amqp_source_create_ok() {
+        let config = make_config();
+        assert!(amqp_source(
+            &config,
+            ShutdownSignal::noop(),
+            SourceSender::new_test().0,
+            LogNamespace::Legacy
+        )
+        .await
+        .is_ok());
+    }
 
     async fn send_event(
         channel: &lapin::Channel,
