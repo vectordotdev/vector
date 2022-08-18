@@ -36,6 +36,7 @@ impl CompileConfig {
         self.set_read_only_path(TargetPath::metadata_root(), true);
     }
 
+    #[must_use]
     pub fn is_read_only_path(&self, path: &TargetPath) -> bool {
         for read_only_path in &self.read_only_paths {
             // any paths that are a parent of read-only paths also can't be modified

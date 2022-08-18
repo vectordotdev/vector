@@ -868,7 +868,7 @@ impl AssignmentTarget {
                 span,
                 Query {
                     target: Node::new(span, QueryTarget::Internal(ident.clone())),
-                    path: Node::new(span, path.clone().into()),
+                    path: Node::new(span, path.clone()),
                 },
             )),
             AssignmentTarget::Internal(ident, None) => {
@@ -878,9 +878,7 @@ impl AssignmentTarget {
                 span,
                 Query {
                     target: {
-                        let prefix = path
-                            .as_ref()
-                            .map_or(PathPrefix::Event, |x| x.prefix.clone());
+                        let prefix = path.as_ref().map_or(PathPrefix::Event, |x| x.prefix);
                         Node::new(span, QueryTarget::External(prefix))
                     },
                     path: Node::new(span, path.clone().map_or(OwnedPath::root(), |x| x.path)),

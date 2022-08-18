@@ -234,7 +234,7 @@ impl OwnedSegment {
                 fields.contains(field)
             }
             (OwnedSegment::Coalesce(a), OwnedSegment::Coalesce(b)) => {
-                a.into_iter().any(|a_field| b.contains(a_field))
+                a.iter().any(|a_field| b.contains(a_field))
             }
         }
     }

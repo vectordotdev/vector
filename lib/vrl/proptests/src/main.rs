@@ -3,6 +3,7 @@
 #![allow(clippy::print_stderr)] // test framework
 #![allow(clippy::print_stdout)] // test framework
 use diagnostic::Span;
+use lookup::lookup_v2::OwnedSegment;
 use lookup::{FieldBuf, LookupBuf, SegmentBuf};
 use ordered_float::NotNan;
 use parser::ast::{
@@ -116,10 +117,10 @@ prop_compose! {
 
 prop_compose! {
     fn path() (path in prop::collection::vec(ident(), 1..2)) -> LookupBuf {
-        LookupBuf {
+        OwnedPath {
             segments:
             path.into_iter()
-                .map(|field| SegmentBuf::Field(FieldBuf::from(field.as_ref())))
+                .map(|field| OwnedSegment::Field(field))
                 .collect(),
         }
     }

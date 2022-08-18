@@ -565,7 +565,7 @@ impl<'a> Compiler<'a> {
         if let Target::External(prefix) = target {
             let target_path = TargetPath {
                 prefix,
-                path: path.clone()
+                path: path.clone(),
             };
             self.external_queries.push(target_path);
         }
@@ -841,8 +841,8 @@ impl<'a> Compiler<'a> {
                 path.clone().unwrap_or_else(OwnedPath::root),
             ),
             ast::AssignmentTarget::External(path) => {
-                let prefix = path.as_ref().map_or(PathPrefix::Event, |x|x.prefix);
-                let path = path.clone().map(|x|x.path).unwrap_or_else(OwnedPath::root);
+                let prefix = path.as_ref().map_or(PathPrefix::Event, |x| x.prefix);
+                let path = path.clone().map_or_else(OwnedPath::root, |x| x.path);
                 (QueryTarget::External(prefix), path)
             }
         };

@@ -1,4 +1,3 @@
-use lookup::{LookupBuf, OwnedPath, PathPrefix, TargetPath};
 use crate::{
     expression::{Container, Resolved, Variable},
     parser::ast::Ident,
@@ -7,8 +6,9 @@ use crate::{
     type_def::Details,
     Context, Expression,
 };
-use value::{kind::remove, Kind, Value};
+use lookup::{LookupBuf, OwnedPath, PathPrefix, TargetPath};
 use std::fmt;
+use value::{kind::remove, Kind, Value};
 
 #[derive(Clone, PartialEq)]
 pub struct Query {
@@ -38,9 +38,10 @@ impl Query {
 
     pub fn external_path(&self) -> Option<TargetPath> {
         match self.target {
-            Target::External(prefix) => {
-                Some(TargetPath {prefix, path: self.path.clone()})
-            },
+            Target::External(prefix) => Some(TargetPath {
+                prefix,
+                path: self.path.clone(),
+            }),
             _ => None,
         }
     }
@@ -101,7 +102,7 @@ impl Expression for Query {
                 // TODO: fix
                 return Ok(ctx
                     .target()
-                    .target_get(&path.into())
+                    .target_get(&path)
                     .ok()
                     .flatten()
                     .cloned()
@@ -112,18 +113,14 @@ impl Expression for Query {
             Container(container) => container.resolve(ctx)?,
         };
 
-        Ok(value
-            .get(&self.path)
-            .cloned()
-            .unwrap_or(Value::Null))
+        Ok(value.get(&self.path).cloned().unwrap_or(Value::Null))
     }
 
     fn as_value(&self) -> Option<Value> {
         match self.target {
-            Target::Internal(ref variable) => variable
-                .value()
-                .and_then(|v| v.get(self.path()))
-                .cloned(),
+            Target::Internal(ref variable) => {
+                variable.value().and_then(|v| v.get(self.path())).cloned()
+            }
             _ => None,
         }
     }
@@ -132,7 +129,11 @@ impl Expression for Query {
         use Target::{Container, External, FunctionCall, Internal};
 
         let result = match &self.target {
-            External(prefix) => state.external.kind(*prefix).at_path(&self.path.clone()).into(),
+            External(prefix) => state
+                .external
+                .kind(*prefix)
+                .at_path(&self.path.clone())
+                .into(),
             Internal(variable) => variable.type_def(state).at_path(&self.path.clone().into()),
             FunctionCall(call) => call.type_def(state).at_path(&self.path.clone().into()),
             Container(container) => container.type_def(state).at_path(&self.path.clone().into()),
@@ -146,7 +147,7 @@ impl fmt::Display for Query {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.target {
             Target::Internal(_)
-                if !self.path.is_root() && !self.path.segments.iter().next().unwrap().is_index() =>
+                if !self.path.is_root() && !self.path.segments.first().unwrap().is_index() =>
             {
                 write!(f, "{}.{}", self.target, self.path)
             }
@@ -212,8 +213,8 @@ mod tests {
     #[test]
     fn test_type_def() {
         let query = Query {
-            target: Target::External,
-            path: LookupBuf::root(),
+            target: Target::External(PathPrefix::Event),
+            path: OwnedPath::root(),
         };
 
         let state = TypeState::default();

@@ -9,7 +9,7 @@ impl Value {
     /// value would be an object representing `{ "foo": { "bar": true } }`.
     #[must_use]
     pub fn at_path<'a>(self, path: impl Path<'a>) -> Self {
-        let mut result = Value::Null;
+        let mut result = Self::Null;
         result.insert(path, self);
         result
     }

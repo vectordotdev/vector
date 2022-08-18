@@ -345,7 +345,8 @@ impl Target {
                 match target_path.prefix {
                     PathPrefix::Event => {
                         state.external.update_target(Details {
-                            type_def: state.external
+                            type_def: state
+                                .external
                                 .target()
                                 .type_def
                                 .clone()
@@ -389,7 +390,7 @@ impl Target {
             }
 
             External(path) => {
-                let _ = ctx.target_mut().target_insert(&path, value);
+                let _ = ctx.target_mut().target_insert(path, value);
             }
         }
     }
@@ -463,7 +464,7 @@ impl TryFrom<ast::AssignmentTarget> for Target {
                 }
             }
             ast::AssignmentTarget::Internal(ident, path) => {
-                Internal(ident, path.map_or_else(OwnedPath::root, |x| x.into()))
+                Internal(ident, path.unwrap_or_else(OwnedPath::root))
             }
             ast::AssignmentTarget::External(path) => {
                 External(path.unwrap_or_else(TargetPath::event_root))
