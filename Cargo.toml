@@ -320,7 +320,7 @@ security-framework = "2.7.0"
 
 [target.'cfg(unix)'.dependencies]
 atty = { version = "0.2.14", default-features = false }
-nix = { version = "0.24.2", default-features = false, features = ["socket", "signal"] }
+nix = { version = "0.25.0", default-features = false, features = ["socket", "signal"] }
 
 [build-dependencies]
 prost-build = { version = "0.10.4", default-features = false, optional = true }
