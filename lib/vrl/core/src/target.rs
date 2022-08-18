@@ -204,42 +204,44 @@ impl SecretTarget for Secrets {
 
 #[cfg(any(test, feature = "test"))]
 mod value_target_impl {
-    use super::{LookupBuf, MetadataTarget, SecretTarget, Target, Value};
+    use super::{SecretTarget, Target, Value};
+    use lookup::{PathPrefix, TargetPath};
 
     impl Target for Value {
-        fn target_insert(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
-            self.insert_by_path(path, value);
+        fn target_insert(&mut self, target_path: &TargetPath, value: Value) -> Result<(), String> {
+            match target_path.prefix {
+                PathPrefix::Event => self.insert(&target_path.path, value),
+                PathPrefix::Metadata => panic!("Value has no metadata. Use `TargetValue` instead."),
+            };
             Ok(())
         }
 
-        fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String> {
-            Ok(self.get_by_path(path))
+        fn target_get(&self, target_path: &TargetPath) -> Result<Option<&Value>, String> {
+            match target_path.prefix {
+                PathPrefix::Event => Ok(self.get(&target_path.path)),
+                PathPrefix::Metadata => panic!("Value has no metadata. Use `TargetValue` instead."),
+            }
         }
 
-        fn target_get_mut(&mut self, path: &LookupBuf) -> Result<Option<&mut Value>, String> {
-            Ok(self.get_by_path_mut(path))
+        fn target_get_mut(
+            &mut self,
+            target_path: &TargetPath,
+        ) -> Result<Option<&mut Value>, String> {
+            match target_path.prefix {
+                PathPrefix::Event => Ok(self.get_mut(&target_path.path)),
+                PathPrefix::Metadata => panic!("Value has no metadata. Use `TargetValue` instead."),
+            }
         }
 
         fn target_remove(
             &mut self,
-            path: &LookupBuf,
+            target_path: &TargetPath,
             compact: bool,
         ) -> Result<Option<Value>, String> {
-            Ok(self.remove_by_path(path, compact))
-        }
-    }
-
-    impl MetadataTarget for Value {
-        fn get_metadata(&self, _path: &LookupBuf) -> Result<Option<Value>, String> {
-            panic!("Value has no metadata. Use `TargetValue` instead.")
-        }
-
-        fn set_metadata(&mut self, _path: &LookupBuf, _value: Value) -> Result<(), String> {
-            panic!("Value has no metadata. Use `TargetValue` instead.")
-        }
-
-        fn remove_metadata(&mut self, _path: &LookupBuf) -> Result<(), String> {
-            panic!("Value has no metadata. Use `TargetValue` instead.")
+            match target_path.prefix {
+                PathPrefix::Event => Ok(self.remove(&target_path.path, compact)),
+                PathPrefix::Metadata => panic!("Value has no metadata. Use `TargetValue` instead."),
+            }
         }
     }
 

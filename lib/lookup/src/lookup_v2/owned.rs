@@ -113,54 +113,49 @@ impl From<String> for OwnedPath {
 
 impl From<OwnedPath> for String {
     fn from(owned: OwnedPath) -> Self {
-        if owned.segments.is_empty() {
-            String::from("<invalid>")
-        } else {
-            let mut coalesce_i = 0;
+        let mut coalesce_i = 0;
 
-            owned
-                .segments
-                .iter()
-                .enumerate()
-                .map(|(i, segment)| match segment {
-                    OwnedSegment::Field(field) => {
-                        serialize_field(field.as_ref(), (i != 0).then(|| "."))
-                    }
-                    OwnedSegment::Index(index) => format!("[{}]", index),
-                    OwnedSegment::Invalid => {
-                        (if i == 0 { "<invalid>" } else { ".<invalid>" }).to_owned()
-                    }
-                    OwnedSegment::Coalesce(fields) => {
-                        let mut output = String::new();
-                        let (last, fields) =
-                            fields.split_last().expect("coalesce must not be empty");
-                        for field in fields {
-                            let field_output = serialize_field(
-                                field.as_ref(),
-                                Some(if coalesce_i == 0 {
-                                    if i == 0 {
-                                        "("
-                                    } else {
-                                        ".("
-                                    }
+        owned
+            .segments
+            .iter()
+            .enumerate()
+            .map(|(i, segment)| match segment {
+                OwnedSegment::Field(field) => {
+                    serialize_field(field.as_ref(), (i != 0).then(|| "."))
+                }
+                OwnedSegment::Index(index) => format!("[{}]", index),
+                OwnedSegment::Invalid => {
+                    (if i == 0 { "<invalid>" } else { ".<invalid>" }).to_owned()
+                }
+                OwnedSegment::Coalesce(fields) => {
+                    let mut output = String::new();
+                    let (last, fields) = fields.split_last().expect("coalesce must not be empty");
+                    for field in fields {
+                        let field_output = serialize_field(
+                            field.as_ref(),
+                            Some(if coalesce_i == 0 {
+                                if i == 0 {
+                                    "("
                                 } else {
-                                    "|"
-                                }),
-                            );
-                            coalesce_i += 1;
-                            output.push_str(&field_output);
-                        }
-                        let _ = write!(
-                            output,
-                            "{})",
-                            serialize_field(last.as_ref(), (coalesce_i != 0).then(|| "|"))
+                                    ".("
+                                }
+                            } else {
+                                "|"
+                            }),
                         );
-                        output
+                        coalesce_i += 1;
+                        output.push_str(&field_output);
                     }
-                })
-                .collect::<Vec<_>>()
-                .join("")
-        }
+                    let _ = write!(
+                        output,
+                        "{})",
+                        serialize_field(last.as_ref(), (coalesce_i != 0).then(|| "|"))
+                    );
+                    output
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("")
     }
 }
 
@@ -198,18 +193,6 @@ impl From<Vec<OwnedSegment>> for OwnedPath {
         Self { segments }
     }
 }
-
-// impl<const N: usize> From<[OwnedSegment; N]> for OwnedPath {
-//     fn from(segments: [OwnedSegment; N]) -> Self {
-//         OwnedPath::from(Vec::from(segments))
-//     }
-// }
-//
-// impl<'a, const N: usize> From<[BorrowedSegment<'a>; N]> for OwnedPath {
-//     fn from(segments: [BorrowedSegment<'a>; N]) -> Self {
-//         OwnedPath::from(segments.map(OwnedSegment::from))
-//     }
-// }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub enum OwnedSegment {
@@ -355,6 +338,7 @@ mod test {
     #[test]
     fn owned_path_serialize() {
         let test_cases = [
+            (".", ""),
             ("", "<invalid>"),
             ("]", "<invalid>"),
             ("]foo", "<invalid>"),

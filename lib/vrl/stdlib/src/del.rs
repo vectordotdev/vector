@@ -91,10 +91,11 @@ impl Function for Del {
         let query = arguments.required_query("target")?;
 
         if let Some(target_path) = query.external_path() {
-            if ctx.is_read_only_path(&target_path){
+            if ctx.is_read_only_path(&target_path) {
                 return Err(vrl::function::Error::ReadOnlyMutation {
                     context: format!("{} is read-only, and cannot be deleted", query),
-                }.into());
+                }
+                .into());
             }
         }
 
@@ -136,12 +137,12 @@ pub(crate) struct DelFn {
 impl DelFn {
     #[cfg(test)]
     fn new(path: &str) -> Self {
-        use std::str::FromStr;
+        use lookup_lib::{lookup_v2::parse_path, PathPrefix};
 
         Self {
             query: expression::Query::new(
-                expression::Target::External,
-                FromStr::from_str(path).unwrap(),
+                expression::Target::External(PathPrefix::Event),
+                parse_path(path),
             ),
         }
     }

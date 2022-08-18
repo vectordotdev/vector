@@ -566,8 +566,8 @@ impl<'input> Iterator for Lexer<'input> {
 
     fn next(&mut self) -> Option<Self::Item> {
         use Token::{
-            Arrow, Ampersand, Bang, Colon, Comma, Dot, Escape, InvalidToken, LBrace, LBracket, LParen, LQuery,
-            Newline, RBrace, RBracket, RParen, RQuery, SemiColon, Underscore,
+            Ampersand, Arrow, Bang, Colon, Comma, Dot, Escape, InvalidToken, LBrace, LBracket,
+            LParen, LQuery, Newline, RBrace, RBracket, RParen, RQuery, SemiColon, Underscore,
         };
 
         loop {
@@ -614,7 +614,9 @@ impl<'input> Iterator for Lexer<'input> {
                     ')' => Some(Ok(self.close(start, RParen))),
 
                     '.' => Some(Ok(self.token(start, Dot))),
-                    '&' => Some(Ok(self.token(start, Ampersand))),
+                    '&' if !matches!(self.peek(), Some((_, '&'))) => {
+                        Some(Ok(self.token(start, Ampersand)))
+                    }
                     ':' => Some(Ok(self.token(start, Colon))),
                     ',' => Some(Ok(self.token(start, Comma))),
 
@@ -726,6 +728,7 @@ impl<'input> Lexer<'input> {
         // Only continue if the current character is a valid query start
         // character. We know there's at least one more char, given the above
         // assertion.
+
         if !is_query_start(chars.peek().unwrap().1) {
             return Ok(false);
         }
@@ -954,11 +957,12 @@ impl<'input> Lexer<'input> {
                 }
 
                 '.' | '&' if last_char.is_none() => valid = true,
-                '.' | '&' if last_char == Some(')') => valid = true,
-                '.' | '&' if last_char == Some('}') => valid = true,
-                '.' | '&' if last_char == Some(']') => valid = true,
-                '.' | '&' if last_char == Some('"') => valid = true,
-                '.' | '&' if last_char.map(is_ident_continue) == Some(true) => {
+                '&' => valid = false,
+                '.' if last_char == Some(')') => valid = true,
+                '.' if last_char == Some('}') => valid = true,
+                '.' if last_char == Some(']') => valid = true,
+                '.' if last_char == Some('"') => valid = true,
+                '.' if last_char.map(is_ident_continue) == Some(true) => {
                     // we need to make sure we're not dealing with a float here
                     let digits = self.input[..pos]
                         .chars()
