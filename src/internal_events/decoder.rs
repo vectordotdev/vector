@@ -1,6 +1,8 @@
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
+use super::prelude::{error_stage, error_type};
+
 #[derive(Debug)]
 pub struct DecoderFramingFailed<'a> {
     pub error: &'a codecs::decoding::BoxedFramingError,
@@ -33,7 +35,22 @@ pub struct EncoderFramingFailed<'a> {
 impl<'a> InternalEvent for EncoderFramingFailed<'a> {
     fn emit(self) {
         warn!(message = "Failed framing bytes.", error = %self.error, internal_log_rate_secs = 10);
+        error!(
+            message = "Events dropped.",
+            count = 1,
+            error = %self.error,
+            error_type = error_type::ENCODER_FAILED,
+            stage = error_stage::SENDING,
+            intentional = "false",
+            reason = "Failed framing bytes.",
+        );
         counter!("encoder_framing_errors_total", 1);
+        counter!(
+            "component_discarded_events_total", 1,
+            "error_type" => error_type::ENCODER_FAILED,
+            "stage" => error_stage::SENDING,
+            "intentional" => "false",
+        );
     }
 }
 
@@ -45,6 +62,21 @@ pub struct EncoderSerializeFailed<'a> {
 impl<'a> InternalEvent for EncoderSerializeFailed<'a> {
     fn emit(self) {
         warn!(message = "Failed serializing frame.", error = %self.error, internal_log_rate_secs = 10);
+        error!(
+            message = "Events dropped.",
+            count = 1,
+            error = %self.error,
+            error_type = error_type::ENCODER_FAILED,
+            stage = error_stage::SENDING,
+            intentional = "false",
+            reason = "Failed serializing frame.",
+        );
         counter!("encoder_serialize_errors_total", 1);
+        counter!(
+            "component_discarded_events_total", 1,
+            "error_type" => error_type::ENCODER_FAILED,
+            "stage" => error_stage::SENDING,
+            "intentional" => "false",
+        );
     }
 }
