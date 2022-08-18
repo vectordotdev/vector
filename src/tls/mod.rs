@@ -5,6 +5,7 @@ use openssl::{
     ssl::{ConnectConfiguration, SslConnector, SslConnectorBuilder, SslMethod},
 };
 use snafu::{ResultExt, Snafu};
+use std::num::TryFromIntError;
 use tokio::net::TcpStream;
 use tokio_openssl::SslStream;
 
@@ -103,6 +104,13 @@ pub enum TlsError {
     AddCertToStore { source: ErrorStack },
     #[snafu(display("Error setting up the verification certificate: {}", source))]
     SetVerifyCert { source: ErrorStack },
+    #[snafu(display("Error setting ALPN protocols: {}", source))]
+    SetAlpnProtocols { source: ErrorStack },
+    #[snafu(display(
+        "Error encoding ALPN protocols, could not encode length as u8: {}",
+        source
+    ))]
+    EncodeAlpnProtocols { source: TryFromIntError },
     #[snafu(display("PKCS#12 parse failed: {}", source))]
     ParsePkcs12 { source: ErrorStack },
     #[snafu(display("TCP bind failed: {}", source))]
