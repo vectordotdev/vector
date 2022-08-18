@@ -39,31 +39,27 @@ impl<'a> PartialEq<AttributeIdent> for &'a Path {
     }
 }
 
-fn path_any(path: &Path, needles: &[AttributeIdent]) -> bool {
-    needles.iter().any(|ai| path == ai)
-}
-
 #[derive(Clone, Debug)]
 enum ComponentType {
     Source(String),
-    Transform(String),
-    Sink(String),
+    Transform,
+    Sink,
 }
 
 impl ComponentType {
     fn as_type_str(&self) -> &'static str {
         match self {
             Self::Source(_) => "source",
-            Self::Transform(_) => "transform",
-            Self::Sink(_) => "sink",
+            Self::Transform => "transform",
+            Self::Sink => "sink",
         }
     }
 
-    fn as_name_str(&self) -> &str {
+    fn as_name_str(&self) -> Option<&str> {
         match self {
-            Self::Source(s) => s.as_str(),
-            Self::Transform(s) => s.as_str(),
-            Self::Sink(s) => s.as_str(),
+            Self::Source(s) => Some(s.as_str()),
+            Self::Transform => None,
+            Self::Sink => None,
         }
     }
 }
@@ -112,25 +108,16 @@ impl FromMeta for Options {
                     }
                 }
 
-                // Specified a component type.
-                NestedMeta::Meta(Meta::List(ml))
-                    if path_any(&ml.path, &[SOURCE, TRANSFORM, SINK]) =>
-                {
+                // Marked as a source component.
+                NestedMeta::Meta(Meta::List(ml)) if &ml.path == SOURCE => {
                     if component_type.is_some() {
                         errors.push(Error::custom("component type already specified; `source`, `transform`, and `sink` are mutually exclusive").with_span(ml));
                     } else {
                         let maybe_component_name = ml.nested.first();
                         match maybe_component_name {
                             Some(NestedMeta::Lit(Lit::Str(component_name))) => {
-                                component_type = Some(if ml.path == SOURCE {
-                                    ComponentType::Source(component_name.value())
-                                } else if ml.path == TRANSFORM {
-                                    ComponentType::Transform(component_name.value())
-                                } else if ml.path == SINK {
-                                    ComponentType::Sink(component_name.value())
-                                } else {
-                                    unreachable!("asserted finite set of values in match arm guard")
-                                });
+                                component_type =
+                                    Some(ComponentType::Source(component_name.value()));
                             }
                             _ => {
                                 let path_nice = path_to_string(&ml.path);
@@ -141,8 +128,26 @@ impl FromMeta for Options {
                     }
                 }
 
+                // Marked as a transform component.
+                NestedMeta::Meta(Meta::Path(p)) if p == TRANSFORM => {
+                    if component_type.is_some() {
+                        errors.push(Error::custom("component type already specified; `source`, `transform`, and `sink` are mutually exclusive").with_span(p));
+                    } else {
+                        component_type = Some(ComponentType::Transform);
+                    }
+                }
+
+                // Marked as a sink component.
+                NestedMeta::Meta(Meta::Path(p)) if p == SINK => {
+                    if component_type.is_some() {
+                        errors.push(Error::custom("component type already specified; `source`, `transform`, and `sink` are mutually exclusive").with_span(p));
+                    } else {
+                        component_type = Some(ComponentType::Sink);
+                    }
+                }
+
                 NestedMeta::Meta(m) => {
-                    let error = "expected one of: `source(\"...\")`, `transform(\"...\")`, `sink(\"...\")`, `no_ser`, or `no_deser`";
+                    let error = "expected one of: `source(\"...\")`, `transform`, `sink`, `no_ser`, or `no_deser`";
                     errors.push(Error::custom(error).with_span(m));
                 }
 
@@ -185,11 +190,13 @@ pub fn configurable_component_impl(args: TokenStream, item: TokenStream) -> Toke
 
     let component_type = options.component_type().map(|ct| {
         let component_type = ct.as_type_str();
-        let component_name = ct.as_name_str();
+        let maybe_component_name = ct
+            .as_name_str()
+            .map(|name| quote! { #[::vector_config::component_name(#name)] });
 
         quote! {
             #[configurable(metadata(component_type = #component_type))]
-            #[::vector_config::component_name(#component_name)]
+            #maybe_component_name
         }
     });
 
