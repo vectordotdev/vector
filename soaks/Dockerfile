@@ -1,7 +1,7 @@
 #
 # VECTOR BUILDER
 #
-FROM ghcr.io/vectordotdev/vector/soak-builder@sha256:c51a7091de2caebaa690e17f37dbfed4d4059dcdf5114a5596e8ca9b5ef494f3 as builder
+FROM ghcr.io/vectordotdev/vector/soak-builder@sha256:4c51db5b5f8b65f2afbc159395f185f4cfc5a84e5b9bdb88e4c2b7ae229ee817 as builder
 WORKDIR /vector
 COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
