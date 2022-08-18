@@ -28,11 +28,11 @@ impl<'a> InternalEvent for DecoderDeserializeFailed<'a> {
 }
 
 #[derive(Debug)]
-pub struct EncoderFramingFailed<'a> {
+pub struct EncoderFramingError<'a> {
     pub error: &'a codecs::encoding::BoxedFramingError,
 }
 
-impl<'a> InternalEvent for EncoderFramingFailed<'a> {
+impl<'a> InternalEvent for EncoderFramingError<'a> {
     fn emit(self) {
         warn!(message = "Failed framing bytes.", error = %self.error, internal_log_rate_secs = 10);
         error!(
@@ -55,11 +55,11 @@ impl<'a> InternalEvent for EncoderFramingFailed<'a> {
 }
 
 #[derive(Debug)]
-pub struct EncoderSerializeFailed<'a> {
+pub struct EncoderSerializeError<'a> {
     pub error: &'a crate::Error,
 }
 
-impl<'a> InternalEvent for EncoderSerializeFailed<'a> {
+impl<'a> InternalEvent for EncoderSerializeError<'a> {
     fn emit(self) {
         warn!(message = "Failed serializing frame.", error = %self.error, internal_log_rate_secs = 10);
         error!(
