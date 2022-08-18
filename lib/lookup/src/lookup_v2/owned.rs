@@ -55,38 +55,37 @@ impl OwnedPath {
     ///
     /// eg, .tags.nork.noog will never be an accepted path so we don't need to spend the time
     /// collecting it.
-    pub fn to_alternative_components(&self, _limit: usize) -> Vec<Vec<&str>> {
-        // TODO: write after merging in OwnedPath cleanup PR
-        unimplemented!()
-        // let mut components = vec![vec![]];
-        // for segment in self.segments.iter().take(limit) {
-        //     match segment {
-        //         OwnedSegment::Field(field) => {
-        //             for component in &mut components {
-        //                 component.push(name.as_str());
-        //             }
-        //         }
-        //
-        //         OwnedSegment::Coalesce(fields) => {
-        //             components = components
-        //                 .iter()
-        //                 .flat_map(|path| {
-        //                     fields.iter().map(move |field| {
-        //                         let mut path = path.clone();
-        //                         path.push(field.name.as_str());
-        //                         path
-        //                     })
-        //                 })
-        //                 .collect();
-        //         }
-        //
-        //         SegmentBuf::Index(_) => {
-        //             return Vec::new();
-        //         }
-        //     }
-        // }
-        //
-        // components
+    pub fn to_alternative_components(&self, limit: usize) -> Vec<Vec<&str>> {
+        let mut components = vec![vec![]];
+        for segment in self.segments.iter().take(limit) {
+            match segment {
+                OwnedSegment::Invalid => return vec![],
+                OwnedSegment::Field(field) => {
+                    for component in &mut components {
+                        component.push(field.as_str());
+                    }
+                }
+
+                OwnedSegment::Coalesce(fields) => {
+                    components = components
+                        .iter()
+                        .flat_map(|path| {
+                            fields.iter().map(move |field| {
+                                let mut path = path.clone();
+                                path.push(field.as_str());
+                                path
+                            })
+                        })
+                        .collect();
+                }
+
+                OwnedSegment::Index(_) => {
+                    return Vec::new();
+                }
+            }
+        }
+
+        components
     }
     pub fn push(&mut self, segment: OwnedSegment) {
         self.segments.push(segment);

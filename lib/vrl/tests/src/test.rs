@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, fs, path::Path};
 
 use ::value::Value;
 use lookup::lookup_v2::parse_path;
-use lookup::OwnedPath;
+use lookup::TargetPath;
 use vrl::function::Example;
 
 #[derive(Debug)]
@@ -16,9 +16,8 @@ pub struct Test {
     pub result_approx: bool,
     pub skip: bool,
 
-    // paths set to read-only. (can be merged once paths support metadata)
-    pub read_only_paths: Vec<(OwnedPath, bool)>,
-    pub read_only_metadata_paths: Vec<(OwnedPath, bool)>,
+    // paths set to read-only
+    pub read_only_paths: Vec<(TargetPath, bool)>,
 }
 
 enum CaptureMode {
@@ -45,7 +44,6 @@ impl Test {
         }
 
         let mut read_only_paths = vec![];
-        let mut read_only_metadata_paths = vec![];
 
         let mut capture_mode = CaptureMode::None;
         for mut line in content.lines() {
@@ -64,26 +62,29 @@ impl Test {
                     capture_mode = CaptureMode::Result;
                     line = line.strip_prefix("result:").expect("result").trim_start();
                 } else if line.starts_with("read_only:") {
-                    let path_str = line.strip_prefix("read_only:").expect("read-only");
-                    read_only_paths.push((parse_path(path_str), false));
+                    let path_str = line.strip_prefix("read_only:").expect("read-only").trim();
+                    read_only_paths.push((TargetPath::event(parse_path(path_str)), false));
                     continue;
                 } else if line.starts_with("read_only_recursive:") {
                     let path_str = line
                         .strip_prefix("read_only_recursive:")
-                        .expect("read-only");
-                    read_only_paths.push((parse_path(path_str), true));
+                        .expect("read-only")
+                        .trim();
+                    read_only_paths.push((TargetPath::event(parse_path(path_str)), true));
                     continue;
                 } else if line.starts_with("read_only_metadata:") {
                     let path_str = line
                         .strip_prefix("read_only_metadata:")
-                        .expect("read_only_metadata");
-                    read_only_metadata_paths.push((parse_path(path_str), false));
+                        .expect("read_only_metadata")
+                        .trim();
+                    read_only_paths.push((TargetPath::metadata(parse_path(path_str)), false));
                     continue;
                 } else if line.starts_with("read_only_metadata_recursive:") {
                     let path_str = line
                         .strip_prefix("read_only_metadata_recursive:")
-                        .expect("read-read_only_metadata_recursive");
-                    read_only_metadata_paths.push((parse_path(path_str), true));
+                        .expect("read-read_only_metadata_recursive")
+                        .trim();
+                    read_only_paths.push((TargetPath::metadata(parse_path(path_str)), true));
                     continue;
                 }
 
@@ -130,7 +131,6 @@ impl Test {
             result_approx,
             skip,
             read_only_paths,
-            read_only_metadata_paths,
         }
     }
 
@@ -151,7 +151,6 @@ impl Test {
             result_approx: false,
             skip: false,
             read_only_paths: vec![],
-            read_only_metadata_paths: vec![],
         }
     }
 }

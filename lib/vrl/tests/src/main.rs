@@ -11,7 +11,6 @@ use chrono::{DateTime, SecondsFormat, Utc};
 use chrono_tz::Tz;
 use clap::Parser;
 use glob::glob;
-use lookup::TargetPath;
 use value::Secrets;
 use vector_common::TimeZone;
 use vrl::{
@@ -188,10 +187,8 @@ fn main() {
 
         // Set some read-only paths that can be tested
         for (path, recursive) in &test.read_only_paths {
-            config.set_read_only_path(TargetPath::event(path.clone()), *recursive);
-        }
-        for (path, recursive) in &test.read_only_metadata_paths {
-            config.set_read_only_path(TargetPath::metadata(path.clone()), *recursive);
+            println!("Read only path: {:?}", path);
+            config.set_read_only_path(path.clone(), *recursive);
         }
 
         let compile_start = Instant::now();
