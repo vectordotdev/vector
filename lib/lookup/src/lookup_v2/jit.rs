@@ -11,6 +11,7 @@ use std::borrow::Cow;
 use std::str::CharIndices;
 
 use crate::lookup_v2::{BorrowedSegment, Path};
+use crate::PathPrefix;
 
 #[derive(Clone)]
 pub struct JitPath<'a> {
@@ -28,6 +29,7 @@ impl JitPath<'_> {
 pub struct JitLookup<'a> {
     path: &'a str,
     chars: CharIndices<'a>,
+    prefix: Option<PathPrefix>,
     state: JitState,
     escape_buffer: String,
     // keep track of the number of options in a coalesce to prevent size 1 coalesces
