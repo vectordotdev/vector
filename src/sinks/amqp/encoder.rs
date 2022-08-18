@@ -18,8 +18,8 @@ impl Encoder<Event> for AMQPEncoder {
             .encode(input, &mut body)
             .map_err(|_| io::Error::new(io::ErrorKind::Other, "unable to encode"))?;
 
-        let body = body.freeze().to_vec();
-        writer.write_all(&body)?;
+        let body = body.freeze().as_ref();
+        writer.write_all(body)?;
 
         Ok(body.len())
     }
