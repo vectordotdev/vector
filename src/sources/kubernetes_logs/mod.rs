@@ -514,7 +514,7 @@ impl Source {
                 }
             }
 
-            checkpoints.update(line.file_id, line.offset);
+            checkpoints.update(line.file_id, line.end_offset);
             event
         });
         let events = events.flat_map(move |event| {

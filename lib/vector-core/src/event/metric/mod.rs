@@ -19,6 +19,9 @@ use crate::{
     ByteSizeOf,
 };
 
+#[cfg(any(test, feature = "test"))]
+mod arbitrary;
+
 mod data;
 pub use self::data::*;
 
@@ -212,6 +215,12 @@ impl Metric {
     #[inline]
     pub fn value(&self) -> &MetricValue {
         &self.data.value
+    }
+
+    /// Gets a mutable reference to the value of this metric.
+    #[inline]
+    pub fn value_mut(&mut self) -> &mut MetricValue {
+        &mut self.data.value
     }
 
     /// Gets the kind of this metric.

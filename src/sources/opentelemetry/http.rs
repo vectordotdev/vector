@@ -3,6 +3,9 @@ use std::net::SocketAddr;
 use bytes::Bytes;
 use futures_util::FutureExt;
 use http::StatusCode;
+use opentelemetry_proto::proto::collector::logs::v1::{
+    ExportLogsServiceRequest, ExportLogsServiceResponse,
+};
 use prost::Message;
 use snafu::Snafu;
 use tracing::Span;

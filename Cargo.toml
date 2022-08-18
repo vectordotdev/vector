@@ -75,14 +75,11 @@ depends = ""
 members = [
   ".",
   "lib/codecs",
-  "lib/enrichment",
-  "lib/vector-buffers",
-  "lib/vector-common",
-  "lib/vector-config",
-  "lib/vector-config-common",
-  "lib/vector-config-macros",
-  "lib/vector-core",
+  "lib/datadog/filter",
+  "lib/datadog/grok",
+  "lib/datadog/search-syntax",
   "lib/dnsmsg-parser",
+  "lib/enrichment",
   "lib/fakedata",
   "lib/file-source",
   "lib/k8s-e2e-tests",
@@ -90,9 +87,17 @@ members = [
   "lib/lookup",
   "lib/portpicker",
   "lib/prometheus-parser",
+  "lib/opentelemetry-proto",
   "lib/tracing-limit",
-  "lib/vector-api-client",
   "lib/value",
+  "lib/vector-api-client",
+  "lib/vector-buffers",
+  "lib/vector-common",
+  "lib/vector-config",
+  "lib/vector-config-common",
+  "lib/vector-config-macros",
+  "lib/vector-core",
+  "lib/vector-vrl-functions",
   "lib/vrl/cli",
   "lib/vrl/compiler",
   "lib/vrl/core",
@@ -102,10 +107,6 @@ members = [
   "lib/vrl/tests",
   "lib/vrl/proptests",
   "lib/vrl/vrl",
-  "lib/vector-vrl-functions",
-  "lib/datadog/grok",
-  "lib/datadog/search-syntax",
-  "lib/datadog/filter",
 ]
 
 [dependencies]
@@ -118,22 +119,23 @@ file-source = { path = "lib/file-source", optional = true }
 lookup = { path = "lib/lookup" }
 portpicker = { path = "lib/portpicker" }
 prometheus-parser = { path = "lib/prometheus-parser", optional = true }
+opentelemetry-proto = { path = "lib/opentelemetry-proto", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
 value = { path = "lib/value" }
-vector_buffers = { path = "lib/vector-buffers", default-features = false }
-vector_common = { path = "lib/vector-common" }
-vector_config = { path = "lib/vector-config" }
-vector_config_common = { path = "lib/vector-config-common" }
-vector_config_macros = { path = "lib/vector-config-macros" }
-vector_core = { path = "lib/vector-core", default-features = false, features = ["vrl"] }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
+vector-buffers = { path = "lib/vector-buffers", default-features = false }
+vector-common = { path = "lib/vector-common" }
+vector-config = { path = "lib/vector-config" }
+vector-config-common = { path = "lib/vector-config-common" }
+vector-config-macros = { path = "lib/vector-config-macros" }
+vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl"] }
 vector-vrl-functions = { path = "lib/vector-vrl-functions" }
 vrl-cli = { path = "lib/vrl/cli", optional = true }
 
 # Tokio / Futures
 async-stream = { version = "0.3.3", default-features = false }
 async-trait = { version = "0.1.57", default-features = false }
-futures = { version = "0.3.21", default-features = false, features = ["compat", "io-compat"], package = "futures" }
+futures = { version = "0.3.23", default-features = false, features = ["compat", "io-compat"], package = "futures" }
 tokio = { version = "1.20.1", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1.9", default-features = false, features = ["net", "sync", "time"] }
@@ -205,7 +207,7 @@ itertools = { version = "0.10.3", default-features = false, optional = true }
 crossterm = { version = "0.25.0", default-features = false, features = ["event-stream"], optional = true }
 num-format = { version = "0.4.0", default-features = false, features = ["with-num-bigint"], optional = true }
 number_prefix = { version = "0.4.0", default-features = false, features = ["std"], optional = true }
-tui = { version = "0.18.0", optional = true, default-features = false, features = ["crossterm"] }
+tui = { version = "0.19.0", optional = true, default-features = false, features = ["crossterm"] }
 
 # Datadog Pipelines
 datadog-filter = { path = "lib/datadog/filter" }
@@ -273,7 +275,7 @@ openssl-probe = { version = "0.1.5", default-features = false }
 openssl-src = { version = "111", default-features = false }
 ordered-float = { version = "3.0.0", default-features = false }
 percent-encoding = { version = "2.1.0", default-features = false }
-pin-project = { version = "1.0.11", default-features = false }
+pin-project = { version = "1.0.12", default-features = false }
 postgres-openssl = { version = "0.5.0", default-features = false, features = ["runtime"], optional = true }
 pulsar = { version = "4.1.2", default-features = false, features = ["tokio-runtime", "auth-oauth2"], optional = true }
 rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
@@ -314,7 +316,7 @@ schannel = "0.1.20"
 windows-service = "0.5.0"
 
 [target.'cfg(target_os = "macos")'.dependencies]
-security-framework = "2.6.1"
+security-framework = "2.7.0"
 
 [target.'cfg(unix)'.dependencies]
 atty = { version = "0.2.14", default-features = false }
@@ -333,7 +335,7 @@ azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev =
 azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b7171eb40909f7f2805f4622e076f8a6dbbe2d98", default-features = false, features = ["azurite_workaround"] }
 base64 = "0.13.0"
 criterion = { version = "0.3.6", features = ["html_reports", "async_tokio"] }
-libc = "0.2.131"
+libc = "0.2.132"
 pretty_assertions = "1.2.1"
 proptest = "1.0"
 quickcheck = "1.0.3"
@@ -343,7 +345,7 @@ tokio = { version = "1.20.1", features = ["test-util"] }
 tokio-test = "0.4.2"
 tower-test = "0.4.0"
 value = { path = "lib/value", features = ["test"] }
-vector_core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
+vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
 wiremock = "0.5.14"
 
 [patch.crates-io]
@@ -406,7 +408,7 @@ api = [
   "dep:async-graphql-warp",
   "dep:base64",
   "dep:itertools",
-  "vector_core/api",
+  "vector-core/api",
 ]
 
 # API client
@@ -415,7 +417,7 @@ api-client = [
   "dep:num-format",
   "dep:number_prefix",
   "dep:tui",
-  "vector_core/api",
+  "vector-core/api",
   "dep:vector-api-client",
 ]
 
@@ -433,8 +435,6 @@ aws-core = [
 protobuf-build = ["dep:tonic-build", "dep:prost-build"]
 
 gcp = ["dep:base64", "dep:goauth", "dep:smpl_jwt"]
-
-opentelemetry = ["dep:hex", "dep:tonic", "protobuf-build"]
 
 # Enrichment Tables
 enrichment-tables = ["enrichment-tables-file","enrichment-tables-geoip"]
@@ -497,6 +497,7 @@ sources-docker_logs = ["docker"]
 sources-eventstoredb_metrics = []
 sources-exec = []
 sources-file = ["dep:file-source"]
+sources-file-descriptor = ["tokio-util/io"]
 sources-fluent = ["dep:base64", "listenfd", "tokio-util/net", "dep:rmpv", "dep:rmp-serde", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "dep:serde_bytes"]
 sources-gcp_pubsub = ["gcp", "dep:h2", "dep:prost-types", "protobuf-build", "dep:tonic"]
 sources-heroku_logs = ["sources-utils-http", "sources-utils-http-query", "sources-http"]
@@ -511,8 +512,7 @@ sources-logstash = ["listenfd", "tokio-util/net", "sources-utils-tcp-keepalive",
 sources-mongodb_metrics = ["dep:mongodb"]
 sources-nats = ["dep:nats", "dep:nkeys"]
 sources-nginx_metrics = ["dep:nom"]
-sources-opentelemetry = ["dep:prost-types", "sources-http", "sources-utils-http", "sources-vector", "opentelemetry"]
-sources-file-descriptor = ["tokio-util/io"]
+sources-opentelemetry = ["dep:hex", "dep:opentelemetry-proto", "dep:prost-types", "sources-http", "sources-utils-http", "sources-vector"]
 sources-postgresql_metrics = ["dep:postgres-openssl", "dep:tokio-postgres"]
 sources-prometheus = ["dep:prometheus-parser", "sinks-prometheus", "sources-http", "sources-utils-http"]
 sources-redis= ["dep:redis"]
@@ -569,7 +569,7 @@ transforms-dedupe = ["dep:lru"]
 transforms-filter = []
 transforms-geoip = ["dep:maxminddb"]
 transforms-log_to_metric = []
-transforms-lua = ["dep:mlua", "vector_core/lua"]
+transforms-lua = ["dep:mlua", "vector-core/lua"]
 transforms-metric_to_log = []
 transforms-pipelines = ["transforms-filter", "transforms-route"]
 transforms-reduce = []

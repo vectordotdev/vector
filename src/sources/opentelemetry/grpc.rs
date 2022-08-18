@@ -1,8 +1,5 @@
 use crate::{
     internal_events::{EventsReceived, StreamClosedError},
-    opentelemetry::LogService::{
-        logs_service_server::LogsService, ExportLogsServiceRequest, ExportLogsServiceResponse,
-    },
     sources::opentelemetry::LOGS,
     SourceSender,
 };
@@ -10,6 +7,9 @@ use futures::TryFutureExt;
 
 use tonic::{Request, Response, Status};
 
+use opentelemetry_proto::proto::collector::logs::v1::{
+    logs_service_server::LogsService, ExportLogsServiceRequest, ExportLogsServiceResponse,
+};
 use vector_core::{
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
     ByteSizeOf,

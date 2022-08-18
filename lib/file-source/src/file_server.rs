@@ -240,7 +240,7 @@ where
                 let start = time::Instant::now();
                 let mut bytes_read: usize = 0;
                 while let Ok(Some(line)) = watcher.read_line() {
-                    let sz = line.len();
+                    let sz = line.bytes.len();
                     trace!(
                         message = "Read bytes.",
                         path = ?watcher.path,
@@ -251,10 +251,11 @@ where
                     bytes_read += sz;
 
                     lines.push(Line {
-                        text: line,
+                        text: line.bytes,
                         filename: watcher.path.to_str().expect("not a valid path").to_owned(),
                         file_id,
-                        offset: watcher.get_file_position(),
+                        start_offset: line.offset,
+                        end_offset: watcher.get_file_position(),
                     });
 
                     if bytes_read > self.max_read_bytes {
@@ -515,5 +516,6 @@ pub struct Line {
     pub text: Bytes,
     pub filename: String,
     pub file_id: FileFingerprint,
-    pub offset: u64,
+    pub start_offset: u64,
+    pub end_offset: u64,
 }
