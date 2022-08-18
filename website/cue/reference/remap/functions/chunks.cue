@@ -22,7 +22,7 @@ remap: functions: chunks: {
 	]
 	internal_failure_reasons: [
 		"`chunk_size` must be at least 1 byte",
-		"`chunk_size` is too large"
+		"`chunk_size` is too large",
 	]
 	return: {
 		types: ["array"]
@@ -44,7 +44,7 @@ remap: functions: chunks: {
 			source: #"""
 				chunks("ab你好", 4)
 				"""#
-			return: ["ab�","�好"]
+			return: ["ab�", "�好"]
 		},
 	]
 }
