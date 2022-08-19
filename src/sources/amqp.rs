@@ -3,9 +3,9 @@ use crate::{
     codecs::{Decoder, DecodingConfig},
     config::SourceContext,
     config::{log_schema, Output, SourceConfig, SourceDescription},
-    internal_events::source::{
-        AMQPCommitFailed, AMQPConsumerFailed, AMQPDeliveryFailed, AMQPEventFailed,
-        AMQPEventReceived,
+    internal_events::{
+        source::{AMQPEventError, AMQPEventReceived},
+        StreamClosedError,
     },
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
@@ -239,81 +239,84 @@ async fn run_amqp_source(
         )
         .await
         .map_err(|error| {
-            emit!(AMQPConsumerFailed { error });
+            error!(message = "Failed to consume.", error = ?error, internal_log_rate_secs = 10);
         })?
         .fuse();
     let mut shutdown = shutdown.fuse();
     loop {
         let should_break = futures::select! {
-                _ = shutdown => true,
-                opt_m = consumer.next() => {
-                    if let Some(try_m) = opt_m {
-                        match try_m {
-                            Err(error) => {
-                                emit!(AMQPEventFailed { error });
+            _ = shutdown => true,
+            opt_m = consumer.next() => {
+                if let Some(try_m) = opt_m {
+                    match try_m {
+                        Err(error) => {
+                            emit!(AMQPEventError { error });
+                            return Err(());
+                        }
+                        Ok(msg) => {
+                            emit!(AMQPEventReceived {
+                                byte_size: msg.data.len()
+                            });
+
+                            if msg.data.is_empty() {
                                 return Err(());
                             }
-                            Ok(msg) => {
-                                emit!(AMQPEventReceived {
-                                    byte_size: msg.data.len()
-                                });
 
-                                if msg.data.is_empty() {
-                                    return Err(());
-                                }
+                            let payload = Cursor::new(Bytes::copy_from_slice(&msg.data));
+                            let mut stream = FramedRead::new(payload, config.decoder(log_namespace));
 
-                                let payload = Cursor::new(Bytes::copy_from_slice(&msg.data));
-                                let mut stream = FramedRead::new(payload, config.decoder(log_namespace));
+                            let routing_key = config.routing_key.as_str();
+                            let exchange_key = config.exchange_key.as_str();
+                            let offset_key = config.offset_key.as_str();
+                            let out = &mut out;
 
-                                let routing_key = config.routing_key.as_str();
-                                let exchange_key = config.exchange_key.as_str();
-                                let offset_key = config.offset_key.as_str();
-                                let out = &mut out;
+                            let mut stream = stream! {
+                                while let Some(result) = stream.next().await {
+                                    match result {
+                                        Ok((events, _byte_size)) => {
+                                            for mut event in events {
+                                                populate_event(&mut event,
+                                                               &msg,
+                                                               routing_key,
+                                                               exchange_key,
+                                                               offset_key,
+                                                               log_namespace);
 
-                                let mut stream = stream! {
-                                    while let Some(result) = stream.next().await {
-                                        match result {
-                                            Ok((events, _byte_size)) => {
-                                                for mut event in events {
-                                                    populate_event(&mut event,
-                                                                   &msg,
-                                                                   routing_key,
-                                                                   exchange_key,
-                                                                   offset_key,
-                                                                   log_namespace);
-
-                                                    if let Err(error) = msg.acker.ack(ack_options).await {
-                                                        emit!(AMQPCommitFailed { error });
-                                                    }
-
-                                                    yield event;
+                                                if let Err(error) = msg.acker.ack(ack_options).await {
+                                                    error!(message = "Unable to ack", error = ?error, internal_log_rate_secs = 10);
                                                 }
+
+                                                yield event;
                                             }
-                                            Err(error) => {
-                                                use codecs::StreamDecodingError as _;
+                                        }
+                                        Err(error) => {
+                                            use codecs::StreamDecodingError as _;
 
-                                                // Error is logged by `codecs::Decoder`, no further handling
-                                                // is needed here.
-                                                if !error.can_continue() {
-                                                    break;
-                                                }
+                                            // Error is logged by `codecs::Decoder`, no further handling
+                                            // is needed here.
+                                            if !error.can_continue() {
+                                                break;
                                             }
                                         }
                                     }
                                 }
-                                .boxed();
+                            }
+                            .boxed();
 
-                                if let Err(error) = out.send_event_stream(&mut stream).await {
-                                    emit!(AMQPDeliveryFailed { error });
+                            match out.send_event_stream(&mut stream).await {
+                                Err(error) => {
+                                    emit!(StreamClosedError { error, count: 1 });
                                 }
+                                Ok(_) => ()
                             }
                         }
-                        false
-                    } else {
-                        true
                     }
+                    false
+                } else {
+                    true
                 }
-            };
+            }
+        };
 
         if should_break {
             break;

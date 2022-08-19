@@ -1,9 +1,10 @@
 use crate::internal_events::sink::{
-    AMQPAcknowledgementFailed, AMQPDeliveryFailed, AMQPNoAcknowledgement,
+    AMQPAcknowledgementError, AMQPDeliveryError, AMQPNoAcknowledgement,
 };
 use bytes::Bytes;
 use futures::future::BoxFuture;
 use lapin::{options::BasicPublishOptions, BasicProperties};
+use snafu::Snafu;
 use std::{
     sync::Arc,
     task::{Context, Poll},
@@ -77,10 +78,19 @@ pub(super) struct AMQPService {
     pub(super) channel: Arc<lapin::Channel>,
 }
 
+#[derive(Debug, Snafu)]
+pub(super) enum AMQPError {
+    #[snafu(display("Failed retrieving Acknowledgement: {}", error))]
+    AMQPAcknowledgementFailed { error: lapin::Error },
+
+    #[snafu(display("Failed AMQP request: {}", error))]
+    AMQPDeliveryFailed { error: lapin::Error },
+}
+
 impl Service<AMQPRequest> for AMQPService {
     type Response = AMQPResponse;
 
-    type Error = ();
+    type Error = AMQPError;
 
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
@@ -106,14 +116,21 @@ impl Service<AMQPRequest> for AMQPService {
                 Ok(result) => match result.await {
                     Ok(lapin::publisher_confirm::Confirmation::Nack(_)) => {
                         emit!(AMQPNoAcknowledgement::default());
+                        Ok(AMQPResponse { byte_size })
                     }
-                    Err(error) => emit!(AMQPAcknowledgementFailed { error }),
-                    Ok(_) => (),
+                    Err(error) => {
+                        // TODO: In due course the caller could emit these on error.
+                        emit!(AMQPAcknowledgementError { error: &error });
+                        Err(AMQPError::AMQPAcknowledgementFailed { error })
+                    }
+                    Ok(_) => Ok(AMQPResponse { byte_size }),
                 },
-                Err(error) => emit!(AMQPDeliveryFailed { error }),
+                Err(error) => {
+                    // TODO: In due course the caller could emit these on error.
+                    emit!(AMQPDeliveryError { error: &error });
+                    Err(AMQPError::AMQPDeliveryFailed { error })
+                }
             }
-
-            Ok(AMQPResponse { byte_size })
         })
     }
 }
