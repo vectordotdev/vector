@@ -86,7 +86,12 @@ impl Expression for Op {
         use value::Value::{Boolean, Null};
 
         match self.opcode {
-            Err => return self.lhs.resolve(ctx).or_else(|_| self.rhs.resolve(ctx)),
+            Err => {
+                return self
+                    .lhs
+                    .resolve_checked(ctx)?
+                    .or_else(|_| self.rhs.resolve(ctx))
+            }
             Or => {
                 return self
                     .lhs

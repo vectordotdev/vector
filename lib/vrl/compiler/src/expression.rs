@@ -81,6 +81,17 @@ pub trait Expression: Send + Sync + fmt::Debug + DynClone {
     /// An expression is allowed to fail, which aborts the running program.
     fn resolve(&self, ctx: &mut Context) -> Resolved;
 
+    /// Resolve an expression to a concrete [`Value`], and check if the expression aborted.
+    ///
+    /// If the expression aborted, `Err` is returned.
+    fn resolve_checked(&self, ctx: &mut Context) -> Result<Resolved, ExpressionError> {
+        let resolved = self.resolve(ctx);
+        match resolved {
+            Err(error) if error.is_abort() => Err(error),
+            _ => Ok(resolved),
+        }
+    }
+
     /// Resolve an expression to a value without any context, if possible.
     ///
     /// This returns `Some` for static expressions, or `None` for dynamic expressions.

@@ -29,6 +29,12 @@ impl Span {
     }
 }
 
+impl std::fmt::Display for Span {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(formatter, "({}:{})", self.start, self.end)
+    }
+}
+
 impl std::ops::Add<usize> for Span {
     type Output = Self;
 

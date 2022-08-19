@@ -58,10 +58,7 @@ impl Expression for Abort {
             })
             .transpose()?;
 
-        Err(ExpressionError::Abort {
-            span: self.span,
-            message,
-        })
+        Err(ExpressionError::abort(self.span, message.as_deref()))
     }
 
     fn type_info(&self, state: &TypeState) -> TypeInfo {

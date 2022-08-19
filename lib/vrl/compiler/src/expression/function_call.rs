@@ -624,30 +624,8 @@ impl FunctionCall {
 
 impl Expression for FunctionCall {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        self.expr.resolve(ctx).map_err(|err| match err {
-            #[cfg(feature = "expr-abort")]
-            ExpressionError::Abort { .. } => {
-                panic!("abort errors must only be defined by `abort` statement")
-            }
-            ExpressionError::Error {
-                message,
-                mut labels,
-                notes,
-            } => {
-                labels.push(Label::primary(message.clone(), self.span));
-
-                ExpressionError::Error {
-                    message: format!(
-                        r#"function call error for "{}" at ({}:{}): {}"#,
-                        self.ident,
-                        self.span.start(),
-                        self.span.end(),
-                        message
-                    ),
-                    labels,
-                    notes,
-                }
-            }
+        self.expr.resolve(ctx).map_err(|error| {
+            ExpressionError::function_abort(self.span, self.ident, self.abort_on_error, error)
         })
     }
 

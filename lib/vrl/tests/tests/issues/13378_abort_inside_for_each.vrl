@@ -1,0 +1,12 @@
+# object: { "message": "one abort two" }
+# result: { "values": ["one"] }
+
+.values = []
+tokens = split!(del(.message), " ")
+
+for_each(tokens) -> |i, v| {
+    if (v == "abort") {
+        abort
+    }
+    .values = push(.values, v)
+}

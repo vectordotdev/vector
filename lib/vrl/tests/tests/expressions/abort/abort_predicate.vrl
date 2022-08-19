@@ -1,0 +1,6 @@
+# result: {}
+if ({ abort }; true) {
+    "foo"
+} else {
+    "bar"
+}

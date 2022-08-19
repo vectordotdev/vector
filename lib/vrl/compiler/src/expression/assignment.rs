@@ -494,7 +494,7 @@ where
                 err,
                 expr,
                 default,
-            } => match expr.resolve(ctx) {
+            } => match expr.resolve_checked(ctx)? {
                 Ok(value) => {
                     ok.insert(value.clone(), ctx);
                     err.insert(Value::Null, ctx);
