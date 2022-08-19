@@ -264,6 +264,12 @@ impl<const N: usize> From<&[u8; N]> for Value {
     }
 }
 
+impl From<&[u8]> for Value {
+    fn from(data: &[u8]) -> Self {
+        Self::from(Bytes::copy_from_slice(data))
+    }
+}
+
 impl<T: Into<Self>> From<Vec<T>> for Value {
     fn from(set: Vec<T>) -> Self {
         set.into_iter()

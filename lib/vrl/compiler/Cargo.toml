@@ -32,9 +32,9 @@ core = { package = "vrl-core", path = "../core", default-features = false }
 diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
 parser = { package = "vrl-parser", path = "../parser" }
 lookup = { path = "../../lookup" }
-vector_common = { path = "../../vector-common", default-features = false, features = ["conversion", "serde"] }
-vector_config = { path = "../../vector-config" }
-vector_config_macros = { path = "../../vector-config-macros" }
+vector-common = { path = "../../vector-common", default-features = false, features = ["conversion", "serde"] }
+vector-config = { path = "../../vector-config" }
+vector-config-macros = { path = "../../vector-config-macros" }
 value = { path = "../../value" }
 
 bytes = { version = "1.2.1", default-features = false }
@@ -51,7 +51,7 @@ anymap = { version = "0.12.1", default-features = false }
 [dev-dependencies]
 criterion = "0.3"
 indoc = "1"
-vector_common = { path = "../../vector-common", default-features = false, features = ["btreemap"] }
+vector-common = { path = "../../vector-common", default-features = false, features = ["btreemap"] }
 
 [[bench]]
 name = "kind"

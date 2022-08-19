@@ -40,6 +40,8 @@ mod assert_eq;
 mod boolean;
 #[cfg(feature = "ceil")]
 mod ceil;
+#[cfg(feature = "chunks")]
+mod chunks;
 #[cfg(feature = "compact")]
 mod compact;
 #[cfg(feature = "contains")]
@@ -319,6 +321,8 @@ pub use assert_eq::AssertEq;
 pub use boolean::Boolean;
 #[cfg(feature = "ceil")]
 pub use ceil::Ceil;
+#[cfg(feature = "chunks")]
+pub use chunks::Chunks;
 #[cfg(feature = "compact")]
 pub use compact::Compact;
 #[cfg(feature = "contains")]
@@ -598,6 +602,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Boolean),
         #[cfg(feature = "ceil")]
         Box::new(Ceil),
+        #[cfg(feature = "chunks")]
+        Box::new(Chunks),
         #[cfg(feature = "compact")]
         Box::new(Compact),
         #[cfg(feature = "contains")]

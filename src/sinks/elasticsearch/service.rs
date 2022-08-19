@@ -171,7 +171,7 @@ fn get_event_status(response: &Response<Bytes>) -> EventStatus {
         let body = String::from_utf8_lossy(response.body());
         if body.contains("\"errors\":true") {
             emit!(ElasticsearchResponseError::new(
-                "Response containerd errors.",
+                "Response contained errors.",
                 response
             ));
             EventStatus::Rejected

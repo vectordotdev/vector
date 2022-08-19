@@ -350,7 +350,7 @@ where
                 tokio::select! {
                     maybe_report = reporting_rx.recv() => {
                         match maybe_report {
-                            Some(report) => pending_reports.push(report),
+                            Some(report) => pending_reports.push_back(report),
                             None => break,
                         }
                     }

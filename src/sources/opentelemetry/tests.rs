@@ -1,12 +1,6 @@
 use crate::{
     config::{SourceConfig, SourceContext},
     event::{into_event_stream, Event, EventStatus, LogEvent, Value},
-    opentelemetry::{
-        Common::{any_value, AnyValue, KeyValue},
-        LogService::{logs_service_client::LogsServiceClient, ExportLogsServiceRequest},
-        Logs::{LogRecord, ResourceLogs, ScopeLogs},
-        Resource as OtelResource,
-    },
     sources::opentelemetry::{GrpcConfig, HttpConfig, OpentelemetryConfig, LOGS},
     test_util::{
         self,
@@ -18,6 +12,12 @@ use crate::{
 use chrono::{TimeZone, Utc};
 use futures::Stream;
 use futures_util::StreamExt;
+use opentelemetry_proto::proto::{
+    collector::logs::v1::{logs_service_client::LogsServiceClient, ExportLogsServiceRequest},
+    common::v1::{any_value, AnyValue, KeyValue},
+    logs::v1::{LogRecord, ResourceLogs, ScopeLogs},
+    resource::v1::Resource as OtelResource,
+};
 use std::collections::BTreeMap;
 use tonic::Request;
 
