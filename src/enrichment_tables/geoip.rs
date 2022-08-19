@@ -36,10 +36,20 @@ impl From<&str> for DatabaseKind {
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[configurable_component(enrichment_table("geoip"))]
 pub struct GeoipConfig {
-    /// Path to the MaxMind GeoIP database file.
+    /// Path to the [MaxMind GeoIP2](https://dev.maxmind.com/geoip/geoip2/downloadable) or [GeoLite2 binary city
+    /// database file](https://dev.maxmind.com/geoip/geoip2/geolite2/#Download_Access) (**GeoLite2-City.mmdb**).
+    ///
+    /// Other databases, such as the country database, are not supported.
     pub path: String,
 
-    /// The locale to use for the database.
+    /// The locale to use when querying the database.
+    ///
+    /// MaxMind includes localized versions of some of the fields within their database, such as country name. This
+    /// setting can control which of those localized versions are returned by the transform.
+    ///
+    /// More information on which portions of the geolocation data are localized, and what languages are available, can
+    /// be found
+    /// [here](https://support.maxmind.com/hc/en-us/articles/4414877149467-IP-Geolocation-Data#h_01FRRGRYTGZB29ERDBZCX3MR8Q).
     #[serde(default = "default_locale")]
     pub locale: String,
 }

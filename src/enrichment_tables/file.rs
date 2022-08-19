@@ -22,11 +22,16 @@ use crate::config::EnrichmentTableConfig;
 enum Encoding {
     /// Comma-separated values.
     Csv {
-        /// Whether or not to include the headers.
+        /// Whether or not the file contains column headers.
+        ///
+        /// When set to `true`, the first row of the CSV file will be read as the header row, and
+        /// the values will be used for the names of each column. This is the default behavior.
+        ///
+        /// When set to `false`, columns are referred to by their numerical index.
         #[serde(default = "crate::serde::default_true")]
         include_headers: bool,
 
-        /// The value delimiter to use.
+        /// The delimiter used to separate fields in each row of the CSV file.
         #[serde(default = "default_delimiter")]
         delimiter: char,
     },
@@ -45,7 +50,11 @@ impl Default for Encoding {
 #[configurable_component]
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 struct FileSettings {
-    /// Path to the file to use.
+    /// The path of the enrichment table file.
+    ///
+    /// Currently, only [CSV][csv] files are supported.
+    ///
+    /// [csv]: https://en.wikipedia.org/wiki/Comma-separated_values
     path: PathBuf,
 
     #[configurable(derived)]
@@ -59,7 +68,18 @@ pub struct FileConfig {
     #[configurable(derived)]
     file: FileSettings,
 
-    /// Schema mapping for the file.
+    /// Key/value pairs representing mapped log field names and types.
+    ///
+    /// This is used to coerce log fields from strings into their proper types. The available types are listed in the `Types` list below.
+    ///
+    /// Timestamp coercions need to be prefaced with `timestamp|`, for example `"timestamp|%F"`. Timestamp specifiers can use either of the following:
+    ///
+    /// 1. One of the built-in-formats listed in the `Timestamp Formats` table below.
+    /// 2. The [time format specifiers][chrono_fmt] from Rust’s `chrono` library.
+    /// 
+    /// <add timestamp formats table here>
+    ///
+    /// [chrono_fmt]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
     #[serde(default)]
     schema: HashMap<String, String>,
 }
