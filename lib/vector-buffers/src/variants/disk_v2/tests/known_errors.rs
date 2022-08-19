@@ -737,6 +737,10 @@ async fn reader_throws_error_when_record_is_undecodable_via_metadata() {
         fn allocated_bytes(&self) -> usize {
             0
         }
+
+        fn estimated_json_encoded_size_of(&self) -> usize {
+            self.0.estimated_json_encoded_size_of()
+        }
     }
 
     impl EventCount for ControllableRecord {

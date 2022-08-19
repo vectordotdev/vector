@@ -37,6 +37,10 @@ impl ByteSizeOf for Sample {
     fn allocated_bytes(&self) -> usize {
         0
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        self.0.estimated_json_encoded_size_of()
+    }
 }
 
 // Silly implementation of `Encodable` to fulfill `Bufferable` for our test buffer code.

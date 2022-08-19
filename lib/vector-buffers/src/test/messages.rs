@@ -30,6 +30,10 @@ macro_rules! message_wrapper {
             fn allocated_bytes(&self) -> usize {
                 0
             }
+
+            fn estimated_json_encoded_size_of(&self) -> usize {
+                0 // TODO
+            }
         }
 
         impl EventCount for $id {
@@ -88,6 +92,10 @@ impl Message {
 impl ByteSizeOf for Message {
     fn allocated_bytes(&self) -> usize {
         0
+    }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        0 // TODO
     }
 }
 
@@ -200,6 +208,10 @@ impl AddBatchNotifier for UndecodableRecord {
 impl ByteSizeOf for UndecodableRecord {
     fn allocated_bytes(&self) -> usize {
         0
+    }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        0 // TODO
     }
 }
 

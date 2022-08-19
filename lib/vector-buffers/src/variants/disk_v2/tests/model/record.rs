@@ -106,6 +106,10 @@ impl ByteSizeOf for Record {
     fn allocated_bytes(&self) -> usize {
         0
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        0 // TODO
+    }
 }
 
 impl FixedEncodable for Record {
