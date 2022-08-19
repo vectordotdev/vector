@@ -732,7 +732,7 @@ mod test {
 
     #[test]
     fn log_remove() {
-        use vector_common::btreemap;
+        // use vector_common::btreemap;
 
         let cases = vec![
             (
@@ -743,7 +743,7 @@ mod test {
             ),
             (
                 BTreeMap::from([("foo".into(), "bar".into())]),
-                owned_path!(r#"foo bar"#, "foo"),
+                owned_path!(vec![r#"foo bar"#, "foo"]),
                 false,
                 Some(BTreeMap::new().into()),
             ),
@@ -755,7 +755,7 @@ mod test {
             ),
             (
                 btreemap! { "foo" => "bar", "baz" => "qux" },
-                owned_path!(0),
+                owned_path!(),
                 true,
                 Some(BTreeMap::new().into()),
             ),
