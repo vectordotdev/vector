@@ -128,7 +128,7 @@ where
                 CircuitState::Open(ref mut timer) => {
                     ready!(timer.as_mut().poll(cx));
 
-                    debug!(message="Endpoint is on probation.", endpoint = %&self.endpoint);
+                    debug!(message = "Endpoint is on probation.", endpoint = %&self.endpoint);
 
                     // Using Tripwire will let us be notified when the request is done.
                     // This can't be done through counters since a requests can end without changing them.
@@ -154,12 +154,12 @@ where
 
                     if self.counters.healthy(self.snapshot).is_ok() {
                         // A healthy response was observed
-                        info!(message="Endpoint is healthy.", endpoint = %&self.endpoint);
+                        info!(message = "Endpoint is healthy.", endpoint = %&self.endpoint);
 
                         self.backoff.reset();
                         CircuitState::Closed(self.open.clone().open(emit_active_endpoints))
                     } else {
-                        debug!(message="Endpoint failed probation.", endpoint = %&self.endpoint);
+                        debug!(message = "Endpoint failed probation.", endpoint = %&self.endpoint);
 
                         CircuitState::Open(
                             sleep(self.backoff.next().expect("Should never end")).boxed(),
@@ -176,7 +176,7 @@ where
                         }
                         Err(errors) if errors >= UNHEALTHY_AMOUNT_OF_ERRORS => {
                             // Unhealthy
-                            warn!(message="Endpoint is unhealthy.", endpoint = %&self.endpoint);
+                            warn!(message = "Endpoint is unhealthy.", endpoint = %&self.endpoint);
                             CircuitState::Open(
                                 sleep(self.backoff.next().expect("Should never end")).boxed(),
                             )
