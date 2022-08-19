@@ -73,6 +73,7 @@ pub trait Path<'a>: Clone {
         }
         true
     }
+
     fn to_owned_path(&self) -> OwnedPath {
         let mut owned_path = OwnedPath::root();
         let mut coalesce = vec![];

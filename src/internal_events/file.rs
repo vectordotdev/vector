@@ -57,6 +57,7 @@ impl<'a> InternalEvent for FileIoError<'a> {
             error_code = %self.code,
             error_type = error_type::IO_FAILED,
             stage = error_stage::SENDING,
+            internal_log_rate_secs = 10,
         );
         counter!(
             "component_errors_total", 1,
@@ -163,6 +164,7 @@ mod source {
                 error_code = "reading_fingerprint",
                 error_type = error_type::READER_FAILED,
                 stage = error_stage::RECEIVING,
+                internal_log_rate_secs = 10,
             );
             counter!(
                 "component_errors_total", 1,
@@ -196,7 +198,7 @@ mod source {
                 error_code = DELETION_FAILED,
                 error_type = error_type::COMMAND_FAILED,
                 stage = error_stage::RECEIVING,
-                internal_log_rate_secs = 1
+                internal_log_rate_secs = 10,
             );
             counter!(
                 "component_errors_total", 1,
@@ -264,6 +266,7 @@ mod source {
                 error_type = error_type::COMMAND_FAILED,
                 stage = error_stage::RECEIVING,
                 file = %self.file.display(),
+                internal_log_rate_secs = 10,
             );
             counter!(
                 "component_errors_total", 1,
@@ -347,7 +350,8 @@ mod source {
                 error = %self.error,
                 error_code = "writing_checkpoints",
                 error_type = error_type::WRITER_FAILED,
-                stage = error_stage::RECEIVING
+                stage = error_stage::RECEIVING,
+                internal_log_rate_secs = 10,
             );
             counter!("checkpoint_write_errors_total", 1);
             counter!(
@@ -374,6 +378,7 @@ mod source {
                 error_type = error_type::READER_FAILED,
                 stage = error_stage::RECEIVING,
                 path = %self.path.display(),
+                internal_log_rate_secs = 10,
             );
             counter!(
                 "component_errors_total", 1,
@@ -458,6 +463,7 @@ mod source {
                 error_type = error_type::ACKNOWLEDGMENT_FAILED,
                 stage = error_stage::SENDING,
                 filename = self.filename,
+                internal_log_rate_secs = 10,
             );
             counter!(
                 "component_errors_total", 1,

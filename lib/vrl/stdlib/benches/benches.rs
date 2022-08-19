@@ -15,6 +15,7 @@ criterion_group!(
               assert_eq,
               r#bool,
               ceil,
+              chunks,
               compact,
               contains,
               decode_base64,
@@ -212,6 +213,15 @@ bench_function! {
     literal {
         args: func_args![value: 1234.56725, precision: 4],
         want: Ok(1234.5673),
+    }
+}
+
+bench_function! {
+    chunks => vrl_stdlib::Chunks;
+
+    literal {
+        args: func_args![value: "abcdefgh", chunk_size: 4],
+        want: Ok(value!(["abcd", "efgh"])),
     }
 }
 

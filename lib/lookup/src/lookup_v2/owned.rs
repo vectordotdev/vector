@@ -87,6 +87,7 @@ impl OwnedPath {
 
         components
     }
+
     pub fn push(&mut self, segment: OwnedSegment) {
         self.segments.push(segment);
     }
