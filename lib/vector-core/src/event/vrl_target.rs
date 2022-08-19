@@ -483,7 +483,7 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo) -> Value {
 
         // For non-root paths, we continuously populate the value with the
         // relevant data.
-        if let Some(OwnedSegment::Field(field)) = target_path.path.segments.iter().next() {
+        if let Some(OwnedSegment::Field(field)) = target_path.path.segments.first() {
             match field.as_ref() {
                 "name" if !set_name => {
                     set_name = true;
@@ -542,6 +542,7 @@ enum MetricPathError<'a> {
 #[cfg(test)]
 mod test {
     use chrono::{offset::TimeZone, Utc};
+    use lookup::owned_path;
     use pretty_assertions::assert_eq;
     use vector_common::btreemap;
     use vrl_lib::Target;
@@ -553,47 +554,42 @@ mod test {
 
     #[test]
     fn log_get() {
-        use lookup::{FieldBuf, SegmentBuf};
         use vector_common::btreemap;
 
         let cases = vec![
-            (BTreeMap::new(), vec![], Ok(Some(BTreeMap::new().into()))),
+            (
+                BTreeMap::new(),
+                owned_path!(),
+                Ok(Some(BTreeMap::new().into())),
+            ),
             (
                 BTreeMap::from([("foo".into(), "bar".into())]),
-                vec![],
+                owned_path!(),
                 Ok(Some(BTreeMap::from([("foo".into(), "bar".into())]).into())),
             ),
             (
                 BTreeMap::from([("foo".into(), "bar".into())]),
-                vec![SegmentBuf::from("foo")],
+                owned_path!("foo"),
                 Ok(Some("bar".into())),
             ),
             (
                 BTreeMap::from([("foo".into(), "bar".into())]),
-                vec![SegmentBuf::from("bar")],
+                owned_path!("bar"),
                 Ok(None),
             ),
             (
                 btreemap! { "foo" => vec![btreemap! { "bar" => true }] },
-                vec![
-                    SegmentBuf::from("foo"),
-                    SegmentBuf::from(0),
-                    SegmentBuf::from("bar"),
-                ],
+                owned_path!("foo", 0, "bar"),
                 Ok(Some(true.into())),
             ),
             (
                 btreemap! { "foo" => btreemap! { "bar baz" => btreemap! { "baz" => 2 } } },
-                vec![
-                    SegmentBuf::from("foo"),
-                    SegmentBuf::from(vec![FieldBuf::from("qux"), FieldBuf::from(r#""bar baz""#)]),
-                    SegmentBuf::from("baz"),
-                ],
+                owned_path!("foo", vec!["qux", r#"bar baz"#], "baz"),
                 Ok(Some(2.into())),
             ),
         ];
 
-        for (value, segments, expect) in cases {
+        for (value, path, expect) in cases {
             let value: BTreeMap<String, Value> = value;
             let info = ProgramInfo {
                 fallible: false,
@@ -602,7 +598,7 @@ mod test {
                 target_assignments: vec![],
             };
             let target = VrlTarget::new(Event::Log(LogEvent::from(value)), &info);
-            let path = LookupBuf::from_segments(segments);
+            let path = TargetPath::event(path);
 
             assert_eq!(
                 vrl_lib::Target::target_get(&target, &path).map(Option::<&Value>::cloned),
@@ -614,33 +610,26 @@ mod test {
     #[allow(clippy::too_many_lines)]
     #[test]
     fn log_insert() {
-        use lookup::SegmentBuf;
         use vector_common::btreemap;
 
         let cases = vec![
             (
                 BTreeMap::from([("foo".into(), "bar".into())]),
-                vec![],
+                owned_path!(0),
                 btreemap! { "baz" => "qux" }.into(),
                 btreemap! { "baz" => "qux" },
                 Ok(()),
             ),
             (
                 BTreeMap::from([("foo".into(), "bar".into())]),
-                vec![SegmentBuf::from("foo")],
+                owned_path!("foo"),
                 "baz".into(),
                 btreemap! { "foo" => "baz" },
                 Ok(()),
             ),
             (
                 BTreeMap::from([("foo".into(), "bar".into())]),
-                vec![
-                    SegmentBuf::from("foo"),
-                    SegmentBuf::from(2),
-                    SegmentBuf::from("bar baz"),
-                    SegmentBuf::from("a"),
-                    SegmentBuf::from("b"),
-                ],
+                owned_path!("foo", 2, "bar baz", "a", "b"),
                 true.into(),
                 btreemap! {
                     "foo" => vec![
@@ -655,7 +644,7 @@ mod test {
             ),
             (
                 btreemap! { "foo" => vec![0, 1, 2] },
-                vec![SegmentBuf::from("foo"), SegmentBuf::from(5)],
+                owned_path!("foo", 5),
                 "baz".into(),
                 btreemap! {
                     "foo" => vec![
@@ -671,42 +660,42 @@ mod test {
             ),
             (
                 BTreeMap::from([("foo".into(), "bar".into())]),
-                vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
+                owned_path!("foo", 0),
                 "baz".into(),
                 btreemap! { "foo" => vec!["baz"] },
                 Ok(()),
             ),
             (
                 btreemap! { "foo" => Value::Array(vec![]) },
-                vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
+                owned_path!("foo", 0),
                 "baz".into(),
                 btreemap! { "foo" => vec!["baz"] },
                 Ok(()),
             ),
             (
                 btreemap! { "foo" => Value::Array(vec![0.into()]) },
-                vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
+                owned_path!("foo", 0),
                 "baz".into(),
                 btreemap! { "foo" => vec!["baz"] },
                 Ok(()),
             ),
             (
                 btreemap! { "foo" => Value::Array(vec![0.into(), 1.into()]) },
-                vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
+                owned_path!("foo", 0),
                 "baz".into(),
                 btreemap! { "foo" => Value::Array(vec!["baz".into(), 1.into()]) },
                 Ok(()),
             ),
             (
                 btreemap! { "foo" => Value::Array(vec![0.into(), 1.into()]) },
-                vec![SegmentBuf::from("foo"), SegmentBuf::from(1)],
+                owned_path!("foo", 1),
                 "baz".into(),
                 btreemap! { "foo" => Value::Array(vec![0.into(), "baz".into()]) },
                 Ok(()),
             ),
         ];
 
-        for (object, segments, value, expect, result) in cases {
+        for (object, path, value, expect, result) in cases {
             let object: BTreeMap<String, Value> = object;
             let info = ProgramInfo {
                 fallible: false,
@@ -717,7 +706,7 @@ mod test {
             let mut target = VrlTarget::new(Event::Log(LogEvent::from(object)), &info);
             let expect = LogEvent::from(expect);
             let value: ::value::Value = value;
-            let path = LookupBuf::from_segments(segments);
+            let path = TargetPath::event(path);
 
             assert_eq!(
                 vrl_lib::Target::target_insert(&mut target, &path, value.clone()),
@@ -743,46 +732,42 @@ mod test {
 
     #[test]
     fn log_remove() {
-        use lookup::{FieldBuf, SegmentBuf};
         use vector_common::btreemap;
 
         let cases = vec![
             (
                 BTreeMap::from([("foo".into(), "bar".into())]),
-                vec![SegmentBuf::from("foo")],
+                owned_path!("foo"),
                 false,
                 Some(BTreeMap::new().into()),
             ),
             (
                 BTreeMap::from([("foo".into(), "bar".into())]),
-                vec![SegmentBuf::from(vec![
-                    FieldBuf::from(r#""foo bar""#),
-                    FieldBuf::from("foo"),
-                ])],
+                owned_path!(r#"foo bar"#, "foo"),
                 false,
                 Some(BTreeMap::new().into()),
             ),
             (
                 btreemap! { "foo" => "bar", "baz" => "qux" },
-                vec![],
+                owned_path!(),
                 false,
                 Some(BTreeMap::new().into()),
             ),
             (
                 btreemap! { "foo" => "bar", "baz" => "qux" },
-                vec![],
+                owned_path!(0),
                 true,
                 Some(BTreeMap::new().into()),
             ),
             (
                 btreemap! { "foo" => vec![0] },
-                vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
+                owned_path!("foo", 0),
                 false,
                 Some(btreemap! { "foo" => Value::Array(vec![]) }.into()),
             ),
             (
                 btreemap! { "foo" => vec![0] },
-                vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
+                owned_path!("foo", 0),
                 true,
                 Some(BTreeMap::new().into()),
             ),
@@ -791,11 +776,7 @@ mod test {
                     "foo" => btreemap! { "bar baz" => vec![0] },
                     "bar" => "baz",
                 },
-                vec![
-                    SegmentBuf::from("foo"),
-                    SegmentBuf::from(r#""bar baz""#),
-                    SegmentBuf::from(0),
-                ],
+                owned_path!("foo", r#"bar baz"#, 0),
                 false,
                 Some(
                     btreemap! {
@@ -810,17 +791,13 @@ mod test {
                     "foo" => btreemap! { "bar baz" => vec![0] },
                     "bar" => "baz",
                 },
-                vec![
-                    SegmentBuf::from("foo"),
-                    SegmentBuf::from(r#""bar baz""#),
-                    SegmentBuf::from(0),
-                ],
+                owned_path!("foo", r#"bar baz"#, 0),
                 true,
                 Some(btreemap! { "bar" => "baz" }.into()),
             ),
         ];
 
-        for (object, segments, compact, expect) in cases {
+        for (object, path, compact, expect) in cases {
             let info = ProgramInfo {
                 fallible: false,
                 abortable: false,
@@ -828,7 +805,7 @@ mod test {
                 target_assignments: vec![],
             };
             let mut target = VrlTarget::new(Event::Log(LogEvent::from(object)), &info);
-            let path = LookupBuf::from_segments(segments);
+            let path = TargetPath::event(path);
             let removed = vrl_lib::Target::target_get(&target, &path)
                 .unwrap()
                 .cloned();
@@ -838,7 +815,7 @@ mod test {
                 Ok(removed)
             );
             assert_eq!(
-                vrl_lib::Target::target_get(&target, &LookupBuf::root())
+                vrl_lib::Target::target_get(&target, &TargetPath::event_root())
                     .map(Option::<&Value>::cloned),
                 Ok(expect)
             );
@@ -892,7 +869,8 @@ mod test {
                 &info,
             );
 
-            ::vrl_lib::Target::target_insert(&mut target, &LookupBuf::root(), value).unwrap();
+            ::vrl_lib::Target::target_insert(&mut target, &TargetPath::event_root(), value)
+                .unwrap();
 
             assert_eq!(
                 match target.into_events() {
@@ -927,12 +905,12 @@ mod test {
             fallible: false,
             abortable: false,
             target_queries: vec![
-                "name".into(),
-                "namespace".into(),
-                "timestamp".into(),
-                "kind".into(),
-                "type".into(),
-                "tags".into(),
+                TargetPath::event(owned_path!("name")),
+                TargetPath::event(owned_path!("namespace")),
+                TargetPath::event(owned_path!("timestamp")),
+                TargetPath::event(owned_path!("kind")),
+                TargetPath::event(owned_path!("type")),
+                TargetPath::event(owned_path!("tags")),
             ],
             target_assignments: vec![],
         };
@@ -951,7 +929,7 @@ mod test {
                 .into()
             )),
             target
-                .target_get(&LookupBuf::root())
+                .target_get(&TargetPath::event_root())
                 .map(Option::<&Value>::cloned)
         );
     }
@@ -971,42 +949,42 @@ mod test {
 
         let cases = vec![
             (
-                "name",                             // Path
+                owned_path!("name"),                // Path
                 Some(::value::Value::from("name")), // Current value
                 ::value::Value::from("namefoo"),    // New value
                 false,                              // Test deletion
             ),
-            ("namespace", None, "namespacefoo".into(), true),
+            (owned_path!("namespace"), None, "namespacefoo".into(), true),
             (
-                "timestamp",
+                owned_path!("timestamp"),
                 None,
                 Utc.ymd(2020, 12, 8).and_hms(12, 0, 0).into(),
                 true,
             ),
             (
-                "kind",
+                owned_path!("kind"),
                 Some(::value::Value::from("absolute")),
                 "incremental".into(),
                 false,
             ),
-            ("tags.thing", None, "footag".into(), true),
+            (owned_path!("tags", "thing"), None, "footag".into(), true),
         ];
 
         let info = ProgramInfo {
             fallible: false,
             abortable: false,
             target_queries: vec![
-                "name".into(),
-                "namespace".into(),
-                "timestamp".into(),
-                "kind".into(),
+                TargetPath::event(owned_path!("name")),
+                TargetPath::event(owned_path!("namespace")),
+                TargetPath::event(owned_path!("timestamp")),
+                TargetPath::event(owned_path!("kind")),
             ],
             target_assignments: vec![],
         };
         let mut target = VrlTarget::new(Event::Metric(metric), &info);
 
         for (path, current, new, delete) in cases {
-            let path = LookupBuf::from_str(path).unwrap();
+            let path = TargetPath::event(path);
 
             assert_eq!(
                 Ok(current),
@@ -1060,7 +1038,7 @@ mod test {
                 "invalid path zork: expected one of {}",
                 validpaths_get.join(", ")
             )),
-            target.target_get(&LookupBuf::from_str("zork").unwrap())
+            target.target_get(&TargetPath::event(owned_path!("zork")))
         );
 
         assert_eq!(
@@ -1068,7 +1046,7 @@ mod test {
                 "invalid path zork: expected one of {}",
                 validpaths_set.join(", ")
             )),
-            target.target_insert(&LookupBuf::from_str("zork").unwrap(), "thing".into())
+            target.target_insert(&TargetPath::event(owned_path!("zork")), "thing".into())
         );
 
         assert_eq!(
@@ -1076,7 +1054,7 @@ mod test {
                 "invalid path zork: expected one of {}",
                 validpaths_set.join(", ")
             )),
-            target.target_remove(&LookupBuf::from_str("zork").unwrap(), true)
+            target.target_remove(&TargetPath::event(owned_path!("zork")), true)
         );
 
         assert_eq!(
@@ -1084,7 +1062,7 @@ mod test {
                 "invalid path tags.foo.flork: expected one of {}",
                 validpaths_get.join(", ")
             )),
-            target.target_get(&LookupBuf::from_str("tags.foo.flork").unwrap())
+            target.target_get(&TargetPath::event(owned_path!("tags", "foo", "flork")))
         );
     }
 }

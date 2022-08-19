@@ -1,7 +1,7 @@
 use std::ops::{Deref, DerefMut};
 
 use ::value::Value;
-use lookup::{OwnedPath};
+use lookup::OwnedPath;
 use vrl::state::TypeState;
 use vrl::{diagnostic::Label, prelude::*};
 

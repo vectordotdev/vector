@@ -264,7 +264,7 @@ mod value_target_impl {
 mod tests {
     #![allow(clippy::print_stdout)] // tests
 
-    use lookup::{FieldBuf, SegmentBuf};
+    use lookup::owned_path;
 
     use super::*;
     use crate::value;
@@ -272,53 +272,41 @@ mod tests {
     #[test]
     fn target_get() {
         let cases = vec![
-            (value!(true), vec![], Ok(Some(value!(true)))),
-            (value!(true), vec![SegmentBuf::from("foo")], Ok(None)),
-            (value!({}), vec![], Ok(Some(value!({})))),
-            (value!({foo: "bar"}), vec![], Ok(Some(value!({foo: "bar"})))),
+            (value!(true), owned_path!(), Ok(Some(value!(true)))),
+            (value!(true), owned_path!("foo"), Ok(None)),
+            (value!({}), owned_path!(), Ok(Some(value!({})))),
             (
                 value!({foo: "bar"}),
-                vec![SegmentBuf::from("foo")],
+                owned_path!(),
+                Ok(Some(value!({foo: "bar"}))),
+            ),
+            (
+                value!({foo: "bar"}),
+                owned_path!("foo"),
                 Ok(Some(value!("bar"))),
             ),
-            (
-                value!({foo: "bar"}),
-                vec![SegmentBuf::from("bar")],
-                Ok(None),
-            ),
-            (
-                value!([1, 2, 3, 4, 5]),
-                vec![SegmentBuf::from(1)],
-                Ok(Some(value!(2))),
-            ),
+            (value!({foo: "bar"}), owned_path!("bar"), Ok(None)),
+            (value!([1, 2, 3, 4, 5]), owned_path!(1), Ok(Some(value!(2)))),
             (
                 value!({foo: [{bar: true}]}),
-                vec![
-                    SegmentBuf::from("foo"),
-                    SegmentBuf::from(0),
-                    SegmentBuf::from("bar"),
-                ],
+                owned_path!("foo", 0, "bar"),
                 Ok(Some(value!(true))),
             ),
             (
                 value!({foo: {"bar baz": {baz: 2}}}),
-                vec![
-                    SegmentBuf::from("foo"),
-                    SegmentBuf::from(vec![FieldBuf::from("qux"), FieldBuf::from(r#""bar baz""#)]),
-                    SegmentBuf::from("baz"),
-                ],
+                owned_path!("foo", vec!["qux", r#"bar baz"#], "baz"),
                 Ok(Some(value!(2))),
             ),
         ];
 
-        for (value, segments, expect) in cases {
+        for (value, path, expect) in cases {
             let value: Value = value;
             let target = TargetValue {
                 value,
                 metadata: value!({}),
                 secrets: Secrets::new(),
             };
-            let path = LookupBuf::from_segments(segments);
+            let path = TargetPath::event(path);
 
             assert_eq!(
                 target.target_get(&path).map(Option::<&Value>::cloned),
@@ -328,114 +316,102 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn target_insert() {
         let cases = vec![
             (
                 value!({foo: "bar"}),
-                vec![],
+                owned_path!(),
                 value!({baz: "qux"}),
                 value!({baz: "qux"}),
                 Ok(()),
             ),
             (
                 value!({foo: "bar"}),
-                vec![SegmentBuf::from("baz")],
+                owned_path!("baz"),
                 true.into(),
                 value!({foo: "bar", baz: true}),
                 Ok(()),
             ),
             (
                 value!({foo: [{bar: "baz"}]}),
-                vec![
-                    SegmentBuf::from("foo"),
-                    SegmentBuf::from(0),
-                    SegmentBuf::from("baz"),
-                ],
+                owned_path!("foo", 0, "baz"),
                 true.into(),
                 value!({foo: [{bar: "baz", baz: true}]}),
                 Ok(()),
             ),
             (
                 value!({foo: {bar: "baz"}}),
-                vec![SegmentBuf::from("bar"), SegmentBuf::from("baz")],
+                owned_path!("bar", "baz"),
                 true.into(),
                 value!({foo: {bar: "baz"}, bar: {baz: true}}),
                 Ok(()),
             ),
             (
                 value!({foo: "bar"}),
-                vec![SegmentBuf::from("foo")],
+                owned_path!("foo"),
                 "baz".into(),
                 value!({foo: "baz"}),
                 Ok(()),
             ),
             (
                 value!({foo: "bar"}),
-                vec![
-                    SegmentBuf::from("foo"),
-                    SegmentBuf::from(2),
-                    SegmentBuf::from(r#""bar baz""#),
-                    SegmentBuf::from("a"),
-                    SegmentBuf::from("b"),
-                ],
+                owned_path!("foo", 2, r#"bar baz"#, "a", "b"),
                 true.into(),
                 value!({foo: [null, null, {"bar baz": {"a": {"b": true}}}]}),
                 Ok(()),
             ),
-            /*
             (
                 value!({foo: [0, 1, 2]}),
-                vec![SegmentBuf::from("foo"), SegmentBuf::from(5)],
+                owned_path!("foo", 5),
                 "baz".into(),
                 value!({foo: [0, 1, 2, null, null, "baz"]}),
                 Ok(()),
             ),
             (
                 value!({foo: "bar"}),
-                vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
+                owned_path!("foo", 0),
                 "baz".into(),
                 value!({foo: ["baz"]}),
                 Ok(()),
             ),
             (
                 value!({foo: []}),
-                vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
+                owned_path!("foo", 0),
                 "baz".into(),
                 value!({foo: ["baz"]}),
                 Ok(()),
             ),
             (
                 value!({foo: [0]}),
-                vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
+                owned_path!("foo", 0),
                 "baz".into(),
                 value!({foo: ["baz"]}),
                 Ok(()),
             ),
             (
                 value!({foo: [0, 1]}),
-                vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
+                owned_path!("foo", 0),
                 "baz".into(),
                 value!({foo: ["baz", 1]}),
                 Ok(()),
             ),
             (
                 value!({foo: [0, 1]}),
-                vec![SegmentBuf::from("foo"), SegmentBuf::from(1)],
+                owned_path!("foo", 1),
                 "baz".into(),
                 value!({foo: [0, "baz"]}),
                 Ok(()),
             ),
-            */
         ];
 
-        for (target, segments, value, expect, result) in cases {
+        for (target, path, value, expect, result) in cases {
             let mut target = TargetValue {
                 value: target,
                 metadata: value!({}),
                 secrets: Secrets::new(),
             };
-            println!("Inserting at {:?}", segments);
-            let path = LookupBuf::from_segments(segments);
+            let path = TargetPath::event(path);
 
             assert_eq!(
                 Target::target_insert(&mut target, &path, value.clone()),
@@ -454,82 +430,71 @@ mod tests {
         let cases = vec![
             (
                 value!({foo: "bar"}),
-                vec![SegmentBuf::from("baz")],
+                owned_path!("baz"),
                 false,
                 None,
                 Some(value!({foo: "bar"})),
             ),
             (
                 value!({foo: "bar"}),
-                vec![SegmentBuf::from("foo")],
+                owned_path!("foo"),
                 false,
                 Some(value!("bar")),
                 Some(value!({})),
             ),
             (
                 value!({foo: "bar"}),
-                vec![SegmentBuf::coalesce(vec![
-                    FieldBuf::from(r#""foo bar""#),
-                    FieldBuf::from("foo"),
-                ])],
+                owned_path!(vec![r#"foo bar"#, "foo"]),
                 false,
                 Some(value!("bar")),
                 Some(value!({})),
             ),
             (
                 value!({foo: "bar", baz: "qux"}),
-                vec![],
+                owned_path!(),
                 false,
                 Some(value!({foo: "bar", baz: "qux"})),
                 Some(value!({})),
             ),
             (
                 value!({foo: "bar", baz: "qux"}),
-                vec![],
+                owned_path!(),
                 true,
                 Some(value!({foo: "bar", baz: "qux"})),
                 Some(value!({})),
             ),
             (
                 value!({foo: [0]}),
-                vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
+                owned_path!("foo", 0),
                 false,
                 Some(value!(0)),
                 Some(value!({foo: []})),
             ),
             (
                 value!({foo: [0]}),
-                vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
+                owned_path!("foo", 0),
                 true,
                 Some(value!(0)),
                 Some(value!({})),
             ),
             (
                 value!({foo: {"bar baz": [0]}, bar: "baz"}),
-                vec![
-                    SegmentBuf::from("foo"),
-                    SegmentBuf::from(r#""bar baz""#),
-                    SegmentBuf::from(0),
-                ],
+                owned_path!("foo", r#"bar baz"#, 0),
                 false,
                 Some(value!(0)),
                 Some(value!({foo: {"bar baz": []}, bar: "baz"})),
             ),
             (
                 value!({foo: {"bar baz": [0]}, bar: "baz"}),
-                vec![
-                    SegmentBuf::from("foo"),
-                    SegmentBuf::from(r#""bar baz""#),
-                    SegmentBuf::from(0),
-                ],
+                owned_path!("foo", r#"bar baz"#, 0),
                 true,
                 Some(value!(0)),
                 Some(value!({bar: "baz"})),
             ),
         ];
 
-        for (target, segments, compact, value, expect) in cases {
-            let path = LookupBuf::from_segments(segments);
+        for (target, path, compact, value, expect) in cases {
+            let path = TargetPath::event(path);
 
             let mut target = TargetValue {
                 value: target,
@@ -541,7 +506,8 @@ mod tests {
                 Ok(value)
             );
             assert_eq!(
-                Target::target_get(&target, &LookupBuf::root()).map(Option::<&Value>::cloned),
+                Target::target_get(&target, &TargetPath::event_root())
+                    .map(Option::<&Value>::cloned),
                 Ok(expect)
             );
         }

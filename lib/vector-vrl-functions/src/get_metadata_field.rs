@@ -50,7 +50,9 @@ impl Function for GetMetadataField {
         let key = get_metadata_key(&mut arguments)?;
         let kind = match &key {
             MetadataKey::Legacy(_) => Kind::bytes().or_null(),
-            MetadataKey::Query(target_path) => state.external.metadata_kind().at_path(&target_path.path),
+            MetadataKey::Query(target_path) => {
+                state.external.metadata_kind().at_path(&target_path.path)
+            }
         };
         Ok(GetMetadataFieldFn { key, kind }.as_expr())
     }

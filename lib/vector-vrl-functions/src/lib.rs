@@ -9,7 +9,7 @@ pub mod set_secret;
 pub mod set_semantic_meaning;
 
 use ::value::Value;
-use lookup::{TargetPath};
+use lookup::TargetPath;
 use vrl::prelude::*;
 
 pub(crate) fn legacy_keys() -> Vec<Value> {
@@ -45,7 +45,6 @@ fn get_metadata_key(
 ) -> std::result::Result<MetadataKey, Box<dyn DiagnosticMessage>> {
     if let Ok(Some(query)) = arguments.optional_query("key") {
         if let vrl::query::Target::External(_) = query.target() {
-
             // for backwards compatibility reasons, the query is forced to point at metadata
             let target_path = TargetPath::metadata(query.path().clone());
             return Ok(MetadataKey::Query(target_path));

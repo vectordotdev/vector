@@ -1,7 +1,7 @@
 use std::{error::Error, fmt};
 
 use compiler::ExpressionError;
-use lookup::{TargetPath};
+use lookup::TargetPath;
 use value::Value;
 
 use crate::{state, Context, Program, Target, TimeZone};
