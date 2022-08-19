@@ -7,7 +7,6 @@ use vector_config::configurable_component;
 use crate::{
     config::{
         log_schema, DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
-        TransformDescription,
     },
     event::{
         metric::{Metric, MetricKind, MetricValue, StatisticKind},
@@ -23,7 +22,7 @@ use crate::{
 };
 
 /// Configuration for the `log_to_metric` transform.
-#[configurable_component(transform)]
+#[configurable_component(transform("log_to_metric"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct LogToMetricConfig {
@@ -178,10 +177,6 @@ const fn default_kind() -> MetricKind {
 #[derive(Debug, Clone)]
 pub struct LogToMetric {
     config: LogToMetricConfig,
-}
-
-inventory::submit! {
-    TransformDescription::new::<LogToMetricConfig>("log_to_metric")
 }
 
 impl GenerateConfig for LogToMetricConfig {

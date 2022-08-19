@@ -15,7 +15,7 @@ use vector_config::configurable_component;
 
 use crate::{
     codecs::Transformer,
-    config::{log_schema, AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     event::{Event, Value},
     http::HttpClient,
     sinks::{
@@ -34,7 +34,7 @@ fn default_host() -> String {
 }
 
 /// Configuration for the `azure_monitor_logs` sink.
-#[configurable_component]
+#[configurable_component(sink("azure_monitor_logs"))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct AzureMonitorLogsConfig {
@@ -110,10 +110,6 @@ static X_MS_AZURE_RESOURCE_HEADER: Lazy<HeaderName> =
 static TIME_GENERATED_FIELD_HEADER: Lazy<HeaderName> =
     Lazy::new(|| HeaderName::from_static("time-generated-field"));
 static CONTENT_TYPE_VALUE: Lazy<HeaderValue> = Lazy::new(|| HeaderValue::from_static(CONTENT_TYPE));
-
-inventory::submit! {
-    SinkDescription::new::<AzureMonitorLogsConfig>("azure_monitor_logs")
-}
 
 impl_generate_config_from_default!(AzureMonitorLogsConfig);
 

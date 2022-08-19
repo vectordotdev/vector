@@ -14,7 +14,7 @@ use crate::{
 };
 
 /// Configuration for the `websocket` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("websocket"))]
 #[derive(Clone, Debug)]
 pub struct WebSocketSinkConfig {
     /// The WebSocket URI to connect to.

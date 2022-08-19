@@ -23,7 +23,7 @@ use crate::{
 };
 
 /// Configuration for the `azure_blob` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("azure_blob"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct AzureBlobSinkConfig {

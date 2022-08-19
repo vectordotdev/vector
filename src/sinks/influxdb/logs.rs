@@ -8,10 +8,7 @@ use vector_config::configurable_component;
 
 use crate::{
     codecs::Transformer,
-    config::{
-        log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
-        SinkDescription,
-    },
+    config::{log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::{Event, Value},
     http::HttpClient,
     sinks::{
@@ -38,7 +35,7 @@ impl SinkBatchSettings for InfluxDbLogsDefaultBatchSettings {
 }
 
 /// Configuration for the `influxdb_logs` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("influxdb_logs"))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct InfluxDbLogsConfig {
@@ -101,10 +98,6 @@ struct InfluxDbLogsSink {
     measurement: String,
     tags: HashSet<String>,
     transformer: Transformer,
-}
-
-inventory::submit! {
-    SinkDescription::new::<InfluxDbLogsConfig>("influxdb_logs")
 }
 
 impl GenerateConfig for InfluxDbLogsConfig {

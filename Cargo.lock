@@ -8691,13 +8691,16 @@ version = "0.1.0"
 dependencies = [
  "encoding_rs",
  "indexmap",
+ "inventory",
  "no-proxy",
  "num-traits",
  "schemars",
  "serde",
  "serde_json",
  "serde_with 2.0.0",
+ "snafu",
  "toml",
+ "url",
  "vector_config_common",
  "vector_config_macros",
 ]

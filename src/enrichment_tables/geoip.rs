@@ -5,10 +5,10 @@ use maxminddb::{
     geoip2::{City, ConnectionType, Isp},
     MaxMindDBError, Reader,
 };
-use serde::{Deserialize, Serialize};
 use value::Value;
+use vector_config::configurable_component;
 
-use crate::config::{EnrichmentTableConfig, EnrichmentTableDescription, GenerateConfig};
+use crate::config::{EnrichmentTableConfig, GenerateConfig};
 
 // MaxMind GeoIP database files have a type field we can use to recognize specific
 // products. If we encounter one of these two types, we look for ASN/ISP information;
@@ -32,9 +32,14 @@ impl From<&str> for DatabaseKind {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+/// Configuration for the `geoip` enrichment table.
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[configurable_component(enrichment_table("geoip"))]
 pub struct GeoipConfig {
+    /// Path to the MaxMind GeoIP database file.
     pub path: String,
+
+    /// The locale to use for the database.
     #[serde(default = "default_locale")]
     pub locale: String,
 }
@@ -56,10 +61,6 @@ impl GenerateConfig for GeoipConfig {
         })
         .unwrap()
     }
-}
-
-inventory::submit! {
-    EnrichmentTableDescription::new::<GeoipConfig>("geoip")
 }
 
 #[async_trait::async_trait]

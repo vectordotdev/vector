@@ -20,7 +20,7 @@ use crate::{
 pub(crate) const QUEUED_MIN_MESSAGES: u64 = 100000;
 
 /// Configuration for the `kafka` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("kafka"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct KafkaSinkConfig {

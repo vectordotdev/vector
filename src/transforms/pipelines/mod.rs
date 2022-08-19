@@ -109,7 +109,7 @@ use std::{collections::HashSet, fmt::Debug};
 
 use config::EventTypeConfig;
 use indexmap::IndexMap;
-use vector_config::configurable_component;
+use vector_config::{component::GenerateConfig, configurable_component};
 use vector_core::{
     config::{ComponentKey, DataType, Input, Output},
     transform::{
@@ -120,17 +120,12 @@ use vector_core::{
 use crate::{
     conditions::AnyCondition,
     conditions::ConditionConfig,
-    config::{GenerateConfig, TransformDescription},
     schema,
     transforms::route::{RouteConfig, UNMATCHED_ROUTE},
 };
 
-inventory::submit! {
-    TransformDescription::new::<PipelinesConfig>("pipelines")
-}
-
 /// Configuration for the `pipelines` transform.
-#[configurable_component(transform)]
+#[configurable_component(transform("pipelines"))]
 #[derive(Clone, Debug, Default)]
 pub struct PipelinesConfig {
     /// Configuration for the logs-specific side of the pipeline.

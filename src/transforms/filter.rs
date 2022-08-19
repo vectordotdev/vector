@@ -4,10 +4,7 @@ use vector_config::configurable_component;
 
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{
-        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
-        TransformDescription,
-    },
+    config::{DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext},
     event::Event,
     internal_events::FilterEventDiscarded,
     schema,
@@ -15,7 +12,7 @@ use crate::{
 };
 
 /// Configuration for the `filter` transform.
-#[configurable_component(transform)]
+#[configurable_component(transform("filter"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct FilterConfig {
@@ -27,10 +24,6 @@ impl From<AnyCondition> for FilterConfig {
     fn from(condition: AnyCondition) -> Self {
         Self { condition }
     }
-}
-
-inventory::submit! {
-    TransformDescription::new::<FilterConfig>("filter")
 }
 
 impl GenerateConfig for FilterConfig {

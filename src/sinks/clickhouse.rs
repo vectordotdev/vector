@@ -7,7 +7,7 @@ use vector_config::configurable_component;
 
 use crate::{
     codecs::Transformer,
-    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     event::Event,
     http::{Auth, HttpClient, HttpError, MaybeAuth},
     sinks::util::{
@@ -20,7 +20,7 @@ use crate::{
 };
 
 /// Configuration for the `clickhouse` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("clickhouse"))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ClickhouseConfig {
@@ -70,10 +70,6 @@ pub struct ClickhouseConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     acknowledgements: AcknowledgementsConfig,
-}
-
-inventory::submit! {
-    SinkDescription::new::<ClickhouseConfig>("clickhouse")
 }
 
 impl_generate_config_from_default!(ClickhouseConfig);

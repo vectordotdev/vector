@@ -6,9 +6,7 @@ use vector_config::configurable_component;
 use super::Region;
 use crate::{
     codecs::Transformer,
-    config::{
-        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
-    },
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::EventArray,
     sinks::{
         elasticsearch::{BulkConfig, ElasticsearchConfig},
@@ -21,7 +19,7 @@ use crate::{
 };
 
 /// Configuration for the `sematext_logs` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("sematext_logs"))]
 #[derive(Clone, Debug)]
 pub struct SematextLogsConfig {
     #[configurable(derived)]
@@ -56,10 +54,6 @@ pub struct SematextLogsConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     acknowledgements: AcknowledgementsConfig,
-}
-
-inventory::submit! {
-    SinkDescription::new::<SematextLogsConfig>("sematext_logs")
 }
 
 impl GenerateConfig for SematextLogsConfig {

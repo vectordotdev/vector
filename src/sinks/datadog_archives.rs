@@ -87,7 +87,7 @@ impl SinkBatchSettings for DatadogArchivesDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 900.0;
 }
 /// Configuration for the `datadog_archives` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("datadog_archives"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogArchivesSinkConfig {

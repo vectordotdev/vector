@@ -21,8 +21,6 @@ use crate::{
     tls::TlsEnableableConfig,
 };
 
-const SOURCE_NAME: &str = "prometheus_remote_write";
-
 /// Configuration for the `prometheus_remote_write` source.
 #[configurable_component(source("prometheus_remote_write"))]
 #[derive(Clone, Debug)]

@@ -29,10 +29,6 @@ impl SourceConfig for ErrorSourceConfig {
         vec![Output::default(DataType::Log)]
     }
 
-    fn source_type(&self) -> &'static str {
-        "test_error"
-    }
-
     fn can_acknowledge(&self) -> bool {
         false
     }

@@ -11,7 +11,7 @@ const fn default_print_interval_secs() -> u64 {
 }
 
 /// Configuration for the `blackhole` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("blackhole"))]
 #[derive(Clone, Debug, Derivative)]
 #[serde(deny_unknown_fields, default)]
 #[derivative(Default)]

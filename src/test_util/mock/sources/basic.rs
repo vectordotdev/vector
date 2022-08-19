@@ -135,10 +135,6 @@ impl SourceConfig for BasicSourceConfig {
         vec![Output::default(self.data_type.unwrap())]
     }
 
-    fn source_type(&self) -> &'static str {
-        "test_basic"
-    }
-
     fn can_acknowledge(&self) -> bool {
         false
     }

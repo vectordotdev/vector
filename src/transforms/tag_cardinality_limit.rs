@@ -11,10 +11,7 @@ use futures::{Stream, StreamExt};
 use vector_config::configurable_component;
 
 use crate::{
-    config::{
-        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
-        TransformDescription,
-    },
+    config::{DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext},
     event::Event,
     internal_events::{
         TagCardinalityLimitRejectingEvent, TagCardinalityLimitRejectingTag,
@@ -25,7 +22,7 @@ use crate::{
 };
 
 /// Configuration for the `tag_cardinality_limit` transform.
-#[configurable_component(transform)]
+#[configurable_component(transform("tag_cardinality_limit"))]
 #[derive(Clone, Debug)]
 pub struct TagCardinalityLimitConfig {
     /// How many distinct values to accept for any given key.
@@ -99,10 +96,6 @@ const fn default_value_limit() -> u32 {
 
 const fn default_cache_size() -> usize {
     5000 * 1024 // 5KB
-}
-
-inventory::submit! {
-    TransformDescription::new::<TagCardinalityLimitConfig>("tag_cardinality_limit")
 }
 
 impl GenerateConfig for TagCardinalityLimitConfig {

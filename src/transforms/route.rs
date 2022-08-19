@@ -5,10 +5,7 @@ use vector_core::transform::SyncTransform;
 
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{
-        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
-        TransformDescription,
-    },
+    config::{DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext},
     event::Event,
     schema,
     transforms::Transform,
@@ -54,7 +51,7 @@ impl SyncTransform for Route {
 }
 
 /// Configuration for the `route` transform.
-#[configurable_component(transform)]
+#[configurable_component(transform("route"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct RouteConfig {
@@ -73,14 +70,6 @@ impl RouteConfig {
     pub(crate) const fn new(route: IndexMap<String, AnyCondition>) -> Self {
         Self { route }
     }
-}
-
-inventory::submit! {
-    TransformDescription::new::<RouteConfig>("swimlanes")
-}
-
-inventory::submit! {
-    TransformDescription::new::<RouteConfig>("route")
 }
 
 impl GenerateConfig for RouteConfig {

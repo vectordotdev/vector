@@ -15,7 +15,7 @@ use vector_core::{
     source::Source,
 };
 
-use crate::config::{SourceConfig, SourceContext};
+use crate::config::{GenerateConfig, SourceConfig, SourceContext};
 
 /// Configuration for the `test_backpressure` source.
 #[configurable_component(source("test_backpressure"))]
@@ -24,6 +24,15 @@ pub struct BackpressureSourceConfig {
     // The number of events that have been sent.
     #[serde(skip)]
     pub counter: Arc<AtomicUsize>,
+}
+
+impl GenerateConfig for BackpressureSourceConfig {
+    fn generate_config() -> toml::Value {
+        let config = Self {
+            counter: Arc::new(AtomicUsize::new(0)),
+        };
+        toml::Value::try_from(&config).unwrap()
+    }
 }
 
 #[async_trait]
@@ -54,10 +63,6 @@ impl SourceConfig for BackpressureSourceConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::all())]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "test_backpressure"
     }
 
     fn can_acknowledge(&self) -> bool {

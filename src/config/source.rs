@@ -1,11 +1,10 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
-use component::ComponentDescription;
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::{AcknowledgementsConfig, GlobalOptions, LogNamespace, Output};
 
-use super::{component, schema, ComponentKey, ProxyConfig, Resource};
+use super::{schema, ComponentKey, ProxyConfig, Resource};
 use crate::{
     shutdown::ShutdownSignal,
     sources::{self, Sources},
@@ -45,10 +44,6 @@ pub trait SourceConfig: NamedComponent + core::fmt::Debug + Send + Sync {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source>;
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output>;
-
-    fn source_type(&self) -> &'static str {
-        <Self as NamedComponent>::NAME
-    }
 
     /// Resources that the source is using.
     fn resources(&self) -> Vec<Resource> {
@@ -137,7 +132,3 @@ impl SourceContext {
             .into()
     }
 }
-
-pub type SourceDescription = ComponentDescription<Box<dyn SourceConfig>>;
-
-inventory::collect!(SourceDescription);

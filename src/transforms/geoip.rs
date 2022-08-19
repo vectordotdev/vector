@@ -4,10 +4,7 @@ use serde::Serialize;
 use vector_config::configurable_component;
 
 use crate::{
-    config::{
-        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
-        TransformDescription,
-    },
+    config::{DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext},
     event::Event,
     internal_events::{GeoipIpAddressParseError, ParserMissingFieldError},
     schema,
@@ -16,7 +13,7 @@ use crate::{
 };
 
 /// Configuration for the `geoip` transform.
-#[configurable_component(transform)]
+#[configurable_component(transform("geoip"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct GeoipConfig {
@@ -71,10 +68,6 @@ fn default_geoip_target_field() -> String {
 // TODO try to determine the system locale and use that as default if it matches a valid locale?
 fn default_locale() -> String {
     "en".to_string()
-}
-
-inventory::submit! {
-    TransformDescription::new::<GeoipConfig>("geoip")
 }
 
 impl GenerateConfig for GeoipConfig {

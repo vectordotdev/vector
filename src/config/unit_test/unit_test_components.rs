@@ -14,6 +14,7 @@ use vector_core::{
 use crate::{
     conditions::Condition,
     config::{AcknowledgementsConfig, SinkConfig, SinkContext, SourceConfig, SourceContext},
+    impl_generate_config_from_default,
     sinks::Healthcheck,
     sources,
 };
@@ -26,6 +27,8 @@ pub struct UnitTestSourceConfig {
     #[serde(skip)]
     pub events: Vec<Event>,
 }
+
+impl_generate_config_from_default!(UnitTestSourceConfig);
 
 #[async_trait::async_trait]
 impl SourceConfig for UnitTestSourceConfig {

@@ -28,10 +28,6 @@ impl SourceConfig for PanicSourceConfig {
         vec![Output::default(DataType::Log)]
     }
 
-    fn source_type(&self) -> &'static str {
-        "test_panic"
-    }
-
     fn can_acknowledge(&self) -> bool {
         false
     }

@@ -124,6 +124,7 @@ pub mod schemars {
     pub use schemars::*;
 }
 
+pub mod component;
 mod configurable;
 pub use self::configurable::Configurable;
 mod external;

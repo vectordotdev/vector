@@ -78,7 +78,7 @@ pub mod vector;
 
 pub(crate) mod util;
 
-use vector_config::configurable_component;
+use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::{LogNamespace, Output};
 pub use vector_core::source::Source;
 
@@ -134,7 +134,7 @@ pub enum Sources {
 
     /// EventStoreDB Metrics.
     #[cfg(feature = "sources-eventstoredb_metrics")]
-    EventstoreDbMetrics(#[configurable(derived)] eventstoredb_metrics::EventStoreDbConfig),
+    EventstoredbMetrics(#[configurable(derived)] eventstoredb_metrics::EventStoreDbConfig),
 
     /// Exec.
     #[cfg(feature = "sources-exec")]
@@ -205,6 +205,10 @@ pub enum Sources {
     /// NGINX Metrics.
     #[cfg(feature = "sources-nginx_metrics")]
     NginxMetrics(#[configurable(derived)] nginx_metrics::NginxMetricsConfig),
+
+    /// OpenTelemetry.
+    #[cfg(feature = "sources-opentelemetry")]
+    Opentelemetry(#[configurable(derived)] opentelemetry::OpentelemetryConfig),
 
     /// PostgreSQL Metrics.
     #[cfg(feature = "sources-postgresql_metrics")]
@@ -295,7 +299,7 @@ impl SourceConfig for Sources {
             #[cfg(feature = "sources-docker_logs")]
             Self::DockerLogs(config) => config.build(cx).await,
             #[cfg(feature = "sources-eventstoredb_metrics")]
-            Self::EventstoreDbMetrics(config) => config.build(cx).await,
+            Self::EventstoredbMetrics(config) => config.build(cx).await,
             #[cfg(feature = "sources-exec")]
             Self::Exec(config) => config.build(cx).await,
             #[cfg(feature = "sources-file")]
@@ -330,6 +334,8 @@ impl SourceConfig for Sources {
             Self::Nats(config) => config.build(cx).await,
             #[cfg(feature = "sources-nginx_metrics")]
             Self::NginxMetrics(config) => config.build(cx).await,
+            #[cfg(feature = "sources-opentelemetry")]
+            Self::Opentelemetry(config) => config.build(cx).await,
             #[cfg(feature = "sources-postgresql_metrics")]
             Self::PostgresqlMetrics(config) => config.build(cx).await,
             #[cfg(feature = "sources-prometheus")]
@@ -385,7 +391,7 @@ impl SourceConfig for Sources {
             #[cfg(feature = "sources-docker_logs")]
             Self::DockerLogs(config) => config.outputs(global_log_namespace),
             #[cfg(feature = "sources-eventstoredb_metrics")]
-            Self::EventstoreDbMetrics(config) => config.outputs(global_log_namespace),
+            Self::EventstoredbMetrics(config) => config.outputs(global_log_namespace),
             #[cfg(feature = "sources-exec")]
             Self::Exec(config) => config.outputs(global_log_namespace),
             #[cfg(feature = "sources-file")]
@@ -420,6 +426,8 @@ impl SourceConfig for Sources {
             Self::Nats(config) => config.outputs(global_log_namespace),
             #[cfg(feature = "sources-nginx_metrics")]
             Self::NginxMetrics(config) => config.outputs(global_log_namespace),
+            #[cfg(feature = "sources-opentelemetry")]
+            Self::Opentelemetry(config) => config.outputs(global_log_namespace),
             #[cfg(feature = "sources-postgresql_metrics")]
             Self::PostgresqlMetrics(config) => config.outputs(global_log_namespace),
             #[cfg(feature = "sources-prometheus")]
@@ -454,96 +462,6 @@ impl SourceConfig for Sources {
         }
     }
 
-    fn source_type(&self) -> &'static str {
-        match self {
-            #[cfg(feature = "sources-apache_metrics")]
-            Self::ApacheMetrics(config) => config.source_type(),
-            #[cfg(feature = "sources-aws_ecs_metrics")]
-            Self::AwsEcsMetrics(config) => config.source_type(),
-            #[cfg(feature = "sources-aws_kinesis_firehose")]
-            Self::AwsKinesisFirehose(config) => config.source_type(),
-            #[cfg(feature = "sources-aws_s3")]
-            Self::AwsS3(config) => config.source_type(),
-            #[cfg(feature = "sources-aws_sqs")]
-            Self::AwsSqs(config) => config.source_type(),
-            #[cfg(feature = "sources-datadog_agent")]
-            Self::DatadogAgent(config) => config.source_type(),
-            #[cfg(feature = "sources-demo_logs")]
-            Self::DemoLogs(config) => config.source_type(),
-            #[cfg(all(unix, feature = "sources-dnstap"))]
-            Self::Dnstap(config) => config.source_type(),
-            #[cfg(feature = "sources-docker_logs")]
-            Self::DockerLogs(config) => config.source_type(),
-            #[cfg(feature = "sources-eventstoredb_metrics")]
-            Self::EventstoreDbMetrics(config) => config.source_type(),
-            #[cfg(feature = "sources-exec")]
-            Self::Exec(config) => config.source_type(),
-            #[cfg(feature = "sources-file")]
-            Self::File(config) => config.source_type(),
-            #[cfg(all(unix, feature = "sources-file-descriptor"))]
-            Self::FileDescriptor(config) => config.source_type(),
-            #[cfg(feature = "sources-fluent")]
-            Self::Fluent(config) => config.source_type(),
-            #[cfg(feature = "sources-gcp_pubsub")]
-            Self::GcpPubsub(config) => config.source_type(),
-            #[cfg(feature = "sources-heroku_logs")]
-            Self::HerokuLogs(config) => config.source_type(),
-            #[cfg(feature = "sources-host_metrics")]
-            Self::HostMetrics(config) => config.source_type(),
-            #[cfg(feature = "sources-http")]
-            Self::Http(config) => config.source_type(),
-            #[cfg(feature = "sources-internal_logs")]
-            Self::InternalLogs(config) => config.source_type(),
-            #[cfg(feature = "sources-internal_metrics")]
-            Self::InternalMetrics(config) => config.source_type(),
-            #[cfg(all(unix, feature = "sources-journald"))]
-            Self::Journald(config) => config.source_type(),
-            #[cfg(feature = "sources-kafka")]
-            Self::Kafka(config) => config.source_type(),
-            #[cfg(feature = "sources-kubernetes_logs")]
-            Self::KubernetesLogs(config) => config.source_type(),
-            #[cfg(all(feature = "sources-logstash"))]
-            Self::Logstash(config) => config.source_type(),
-            #[cfg(feature = "sources-mongodb_metrics")]
-            Self::MongodbMetrics(config) => config.source_type(),
-            #[cfg(all(feature = "sources-nats"))]
-            Self::Nats(config) => config.source_type(),
-            #[cfg(feature = "sources-nginx_metrics")]
-            Self::NginxMetrics(config) => config.source_type(),
-            #[cfg(feature = "sources-postgresql_metrics")]
-            Self::PostgresqlMetrics(config) => config.source_type(),
-            #[cfg(feature = "sources-prometheus")]
-            Self::PrometheusScrape(config) => config.source_type(),
-            #[cfg(feature = "sources-prometheus")]
-            Self::PrometheusRemoteWrite(config) => config.source_type(),
-            #[cfg(feature = "sources-redis")]
-            Self::Redis(config) => config.source_type(),
-            #[cfg(test)]
-            Self::TestBackpressure(config) => config.source_type(),
-            #[cfg(test)]
-            Self::TestBasic(config) => config.source_type(),
-            #[cfg(test)]
-            Self::TestError(config) => config.source_type(),
-            #[cfg(test)]
-            Self::TestPanic(config) => config.source_type(),
-            #[cfg(test)]
-            Self::TestTripwire(config) => config.source_type(),
-            #[cfg(feature = "sources-socket")]
-            Self::Socket(config) => config.source_type(),
-            #[cfg(feature = "sources-splunk_hec")]
-            Self::SplunkHec(config) => config.source_type(),
-            #[cfg(feature = "sources-statsd")]
-            Self::Statsd(config) => config.source_type(),
-            #[cfg(feature = "sources-stdin")]
-            Self::Stdin(config) => config.source_type(),
-            #[cfg(feature = "sources-syslog")]
-            Self::Syslog(config) => config.source_type(),
-            Self::UnitTest(config) => config.source_type(),
-            #[cfg(feature = "sources-vector")]
-            Self::Vector(config) => config.source_type(),
-        }
-    }
-
     fn resources(&self) -> Vec<Resource> {
         match self {
             #[cfg(feature = "sources-apache_metrics")]
@@ -565,7 +483,7 @@ impl SourceConfig for Sources {
             #[cfg(feature = "sources-docker_logs")]
             Self::DockerLogs(config) => config.resources(),
             #[cfg(feature = "sources-eventstoredb_metrics")]
-            Self::EventstoreDbMetrics(config) => config.resources(),
+            Self::EventstoredbMetrics(config) => config.resources(),
             #[cfg(feature = "sources-exec")]
             Self::Exec(config) => config.resources(),
             #[cfg(feature = "sources-file")]
@@ -600,6 +518,8 @@ impl SourceConfig for Sources {
             Self::Nats(config) => config.resources(),
             #[cfg(feature = "sources-nginx_metrics")]
             Self::NginxMetrics(config) => config.resources(),
+            #[cfg(feature = "sources-opentelemetry")]
+            Self::Opentelemetry(config) => config.resources(),
             #[cfg(feature = "sources-postgresql_metrics")]
             Self::PostgresqlMetrics(config) => config.resources(),
             #[cfg(feature = "sources-prometheus")]
@@ -655,7 +575,7 @@ impl SourceConfig for Sources {
             #[cfg(feature = "sources-docker_logs")]
             Self::DockerLogs(config) => config.can_acknowledge(),
             #[cfg(feature = "sources-eventstoredb_metrics")]
-            Self::EventstoreDbMetrics(config) => config.can_acknowledge(),
+            Self::EventstoredbMetrics(config) => config.can_acknowledge(),
             #[cfg(feature = "sources-exec")]
             Self::Exec(config) => config.can_acknowledge(),
             #[cfg(feature = "sources-file")]
@@ -690,6 +610,8 @@ impl SourceConfig for Sources {
             Self::Nats(config) => config.can_acknowledge(),
             #[cfg(feature = "sources-nginx_metrics")]
             Self::NginxMetrics(config) => config.can_acknowledge(),
+            #[cfg(feature = "sources-opentelemetry")]
+            Self::Opentelemetry(config) => config.can_acknowledge(),
             #[cfg(feature = "sources-postgresql_metrics")]
             Self::PostgresqlMetrics(config) => config.can_acknowledge(),
             #[cfg(feature = "sources-prometheus")]
@@ -721,6 +643,102 @@ impl SourceConfig for Sources {
             Self::UnitTest(config) => config.can_acknowledge(),
             #[cfg(feature = "sources-vector")]
             Self::Vector(config) => config.can_acknowledge(),
+        }
+    }
+}
+
+impl NamedComponent for Sources {
+    const NAME: &'static str = "_invalid_usage";
+
+    fn get_component_name(&self) -> &'static str {
+        match self {
+            #[cfg(feature = "sources-apache_metrics")]
+            Self::ApacheMetrics(config) => config.get_component_name(),
+            #[cfg(feature = "sources-aws_ecs_metrics")]
+            Self::AwsEcsMetrics(config) => config.get_component_name(),
+            #[cfg(feature = "sources-aws_kinesis_firehose")]
+            Self::AwsKinesisFirehose(config) => config.get_component_name(),
+            #[cfg(feature = "sources-aws_s3")]
+            Self::AwsS3(config) => config.get_component_name(),
+            #[cfg(feature = "sources-aws_sqs")]
+            Self::AwsSqs(config) => config.get_component_name(),
+            #[cfg(feature = "sources-datadog_agent")]
+            Self::DatadogAgent(config) => config.get_component_name(),
+            #[cfg(feature = "sources-demo_logs")]
+            Self::DemoLogs(config) => config.get_component_name(),
+            #[cfg(all(unix, feature = "sources-dnstap"))]
+            Self::Dnstap(config) => config.get_component_name(),
+            #[cfg(feature = "sources-docker_logs")]
+            Self::DockerLogs(config) => config.get_component_name(),
+            #[cfg(feature = "sources-eventstoredb_metrics")]
+            Self::EventstoredbMetrics(config) => config.get_component_name(),
+            #[cfg(feature = "sources-exec")]
+            Self::Exec(config) => config.get_component_name(),
+            #[cfg(feature = "sources-file")]
+            Self::File(config) => config.get_component_name(),
+            #[cfg(all(unix, feature = "sources-file-descriptor"))]
+            Self::FileDescriptor(config) => config.get_component_name(),
+            #[cfg(feature = "sources-fluent")]
+            Self::Fluent(config) => config.get_component_name(),
+            #[cfg(feature = "sources-gcp_pubsub")]
+            Self::GcpPubsub(config) => config.get_component_name(),
+            #[cfg(feature = "sources-heroku_logs")]
+            Self::HerokuLogs(config) => config.get_component_name(),
+            #[cfg(feature = "sources-host_metrics")]
+            Self::HostMetrics(config) => config.get_component_name(),
+            #[cfg(feature = "sources-http")]
+            Self::Http(config) => config.get_component_name(),
+            #[cfg(feature = "sources-internal_logs")]
+            Self::InternalLogs(config) => config.get_component_name(),
+            #[cfg(feature = "sources-internal_metrics")]
+            Self::InternalMetrics(config) => config.get_component_name(),
+            #[cfg(all(unix, feature = "sources-journald"))]
+            Self::Journald(config) => config.get_component_name(),
+            #[cfg(feature = "sources-kafka")]
+            Self::Kafka(config) => config.get_component_name(),
+            #[cfg(feature = "sources-kubernetes_logs")]
+            Self::KubernetesLogs(config) => config.get_component_name(),
+            #[cfg(all(feature = "sources-logstash"))]
+            Self::Logstash(config) => config.get_component_name(),
+            #[cfg(feature = "sources-mongodb_metrics")]
+            Self::MongodbMetrics(config) => config.get_component_name(),
+            #[cfg(all(feature = "sources-nats"))]
+            Self::Nats(config) => config.get_component_name(),
+            #[cfg(feature = "sources-nginx_metrics")]
+            Self::NginxMetrics(config) => config.get_component_name(),
+            #[cfg(feature = "sources-opentelemetry")]
+            Self::Opentelemetry(config) => config.get_component_name(),
+            #[cfg(feature = "sources-postgresql_metrics")]
+            Self::PostgresqlMetrics(config) => config.get_component_name(),
+            #[cfg(feature = "sources-prometheus")]
+            Self::PrometheusScrape(config) => config.get_component_name(),
+            #[cfg(feature = "sources-prometheus")]
+            Self::PrometheusRemoteWrite(config) => config.get_component_name(),
+            #[cfg(feature = "sources-redis")]
+            Self::Redis(config) => config.get_component_name(),
+            #[cfg(test)]
+            Self::TestBackpressure(config) => config.get_component_name(),
+            #[cfg(test)]
+            Self::TestBasic(config) => config.get_component_name(),
+            #[cfg(test)]
+            Self::TestError(config) => config.get_component_name(),
+            #[cfg(test)]
+            Self::TestPanic(config) => config.get_component_name(),
+            #[cfg(test)]
+            Self::TestTripwire(config) => config.get_component_name(),
+            #[cfg(feature = "sources-socket")]
+            Self::Socket(config) => config.get_component_name(),
+            #[cfg(feature = "sources-splunk_hec")]
+            Self::SplunkHec(config) => config.get_component_name(),
+            #[cfg(feature = "sources-statsd")]
+            Self::Statsd(config) => config.get_component_name(),
+            #[cfg(feature = "sources-stdin")]
+            Self::Stdin(config) => config.get_component_name(),
+            #[cfg(feature = "sources-syslog")]
+            Self::Syslog(config) => config.get_component_name(),
+            Self::UnitTest(config) => config.get_component_name(),
+            #[cfg(feature = "sources-vector")]
+            Self::Vector(config) => config.get_component_name(),
         }
     }
 }

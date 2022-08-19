@@ -1,11 +1,10 @@
 use std::collections::HashSet;
 
-use component::ComponentDescription;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use vector_core::transform::TransformConfig;
 
-use super::{component, ComponentKey};
+use super::ComponentKey;
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct TransformOuter<T> {
@@ -87,7 +86,3 @@ impl TransformOuter<String> {
         Ok(())
     }
 }
-
-pub type TransformDescription = ComponentDescription<Box<dyn TransformConfig>>;
-
-inventory::collect!(TransformDescription);

@@ -36,7 +36,7 @@ const DEFAULT_FILENAME_TIME_FORMAT: &str = "%s";
 const DEFAULT_FILENAME_APPEND_UUID: bool = true;
 
 /// Configuration for the `aws_s3` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("aws_s3"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct S3SinkConfig {

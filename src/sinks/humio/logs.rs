@@ -4,10 +4,7 @@ use vector_config::configurable_component;
 use super::host_key;
 use crate::{
     codecs::EncodingConfig,
-    config::{
-        AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
-        SinkDescription,
-    },
+    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     sinks::{
         splunk_hec::{
             common::{
@@ -26,7 +23,7 @@ use crate::{
 const HOST: &str = "https://cloud.humio.com";
 
 /// Configuration for the `humio_logs` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("humio_logs"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct HumioLogsConfig {
@@ -119,10 +116,6 @@ pub struct HumioLogsConfig {
     /// [global_timestamp_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.timestamp_key
     #[serde(default = "timestamp_key")]
     pub(super) timestamp_key: String,
-}
-
-inventory::submit! {
-    SinkDescription::new::<HumioLogsConfig>("humio_logs")
 }
 
 pub fn timestamp_nanos_key() -> Option<String> {

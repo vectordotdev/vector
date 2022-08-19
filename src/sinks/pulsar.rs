@@ -21,9 +21,7 @@ use vector_core::config::log_schema;
 
 use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
-    config::{
-        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
-    },
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::{Event, EventFinalizers, EventStatus, Finalizable},
     sinks::util::metadata::RequestMetadata,
 };
@@ -35,7 +33,7 @@ enum BuildError {
 }
 
 /// Configuration for the `pulsar` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("pulsar"))]
 #[derive(Clone, Debug)]
 pub struct PulsarSinkConfig {
     /// The endpoint to which the Pulsar client should connect to.
@@ -132,10 +130,6 @@ struct PulsarSink {
             ),
         >,
     >,
-}
-
-inventory::submit! {
-    SinkDescription::new::<PulsarSinkConfig>("pulsar")
 }
 
 impl GenerateConfig for PulsarSinkConfig {

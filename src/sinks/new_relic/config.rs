@@ -74,7 +74,7 @@ impl RetryLogic for NewRelicApiRetry {
 }
 
 /// Configuration for the `new_relic` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("new_relic"))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct NewRelicConfig {

@@ -10,7 +10,7 @@ use vector_core::{
     source::Source,
 };
 
-use crate::config::{SourceConfig, SourceContext};
+use crate::config::{GenerateConfig, SourceConfig, SourceContext};
 
 /// Configuration for the `test_tripwire` source.
 #[configurable_component(source("test_tripwire"))]
@@ -18,6 +18,15 @@ use crate::config::{SourceConfig, SourceContext};
 pub struct TripwireSourceConfig {
     #[serde(skip)]
     tripwire: Arc<Mutex<Option<Tripwire>>>,
+}
+
+impl GenerateConfig for TripwireSourceConfig {
+    fn generate_config() -> toml::Value {
+        let config = Self {
+            tripwire: Arc::new(Mutex::new(None)),
+        };
+        toml::Value::try_from(&config).unwrap()
+    }
 }
 
 impl TripwireSourceConfig {
@@ -57,10 +66,6 @@ impl SourceConfig for TripwireSourceConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "test_tripwire"
     }
 
     fn can_acknowledge(&self) -> bool {

@@ -8,7 +8,7 @@ use vector_config::configurable_component;
 
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, Input, Output, TransformConfig, TransformContext},
     event::Event,
     internal_events::{TemplateRenderingError, ThrottleEventDiscarded},
     schema,
@@ -17,7 +17,7 @@ use crate::{
 };
 
 /// Configuration for the `throttle` transform.
-#[configurable_component(transform)]
+#[configurable_component(transform("throttle"))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields, default)]
 pub struct ThrottleConfig {
@@ -37,10 +37,6 @@ pub struct ThrottleConfig {
 
     /// A logical condition used to exclude events from sampling.
     exclude: Option<AnyCondition>,
-}
-
-inventory::submit! {
-    TransformDescription::new::<ThrottleConfig>("throttle")
 }
 
 impl_generate_config_from_default!(ThrottleConfig);

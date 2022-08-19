@@ -30,7 +30,7 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tracing::Span;
 use value::Kind;
-use vector_config::configurable_component;
+use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::LogNamespace;
 use vector_core::event::{BatchNotifier, BatchStatus};
 use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Reply};
@@ -194,49 +194,49 @@ impl SourceConfig for DatadogAgentConfig {
             .decoding
             .schema_definition(global_log_namespace.merge(self.log_namespace))
             .with_source_metadata(
-                self.source_type(),
+                self.get_component_name(),
                 "message",
                 "message",
                 Kind::bytes(),
                 Some("message"),
             )
             .with_source_metadata(
-                self.source_type(),
+                self.get_component_name(),
                 "status",
                 "status",
                 Kind::bytes(),
                 Some("severity"),
             )
             .with_source_metadata(
-                self.source_type(),
+                self.get_component_name(),
                 "timestamp",
                 "timestamp",
                 Kind::timestamp(),
                 Some("timestamp"),
             )
             .with_source_metadata(
-                self.source_type(),
+                self.get_component_name(),
                 "hostname",
                 "hostname",
                 Kind::bytes(),
                 Some("host"),
             )
             .with_source_metadata(
-                self.source_type(),
+                self.get_component_name(),
                 "service",
                 "service",
                 Kind::bytes(),
                 Some("service"),
             )
             .with_source_metadata(
-                self.source_type(),
+                self.get_component_name(),
                 "ddsource",
                 "ddsource",
                 Kind::bytes(),
                 Some("source"),
             )
             .with_source_metadata(
-                self.source_type(),
+                self.get_component_name(),
                 "ddtags",
                 "ddtags",
                 Kind::bytes(),

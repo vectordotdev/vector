@@ -21,7 +21,7 @@ use vector_core::{
 
 use crate::{
     codecs::{self, EncodingConfig},
-    config::{log_schema, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, GenerateConfig, SinkConfig, SinkContext},
     gcp::{GcpAuthConfig, GcpAuthenticator},
     http::{HttpClient, HttpError},
     sinks::{
@@ -96,7 +96,7 @@ impl SinkBatchSettings for ChronicleUnstructuredDefaultBatchSettings {
 }
 
 /// Configuration for the `gcp_chronicle_unstructured` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("gcp_chronicle_unstructured"))]
 #[derive(Clone, Debug)]
 pub struct ChronicleUnstructuredConfig {
     /// The endpoint to send data to.
@@ -142,10 +142,6 @@ pub struct ChronicleUnstructuredConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     acknowledgements: AcknowledgementsConfig,
-}
-
-inventory::submit! {
-    SinkDescription::new::<ChronicleUnstructuredConfig>(NAME)
 }
 
 impl GenerateConfig for ChronicleUnstructuredConfig {

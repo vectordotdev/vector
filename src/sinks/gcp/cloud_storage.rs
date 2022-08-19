@@ -14,10 +14,7 @@ use vector_core::event::{EventFinalizers, Finalizable};
 
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
-    config::{
-        AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
-        SinkDescription,
-    },
+    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     event::Event,
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
     http::HttpClient,
@@ -54,7 +51,7 @@ pub enum GcsHealthcheckError {
 const NAME: &str = "gcp_cloud_storage";
 
 /// Configuration for the `gcp_cloud_storage` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("gcp_cloud_storage"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct GcsSinkConfig {
@@ -170,10 +167,6 @@ fn default_config(encoding: EncodingConfigWithFraming) -> GcsSinkConfig {
         tls: Default::default(),
         acknowledgements: Default::default(),
     }
-}
-
-inventory::submit! {
-    SinkDescription::new::<GcsSinkConfig>(NAME)
 }
 
 impl GenerateConfig for GcsSinkConfig {

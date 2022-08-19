@@ -39,7 +39,7 @@ use lookup::path;
 pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
 
 /// Configuration for the `elasticsearch` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("elasticsearch"))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ElasticsearchConfig {

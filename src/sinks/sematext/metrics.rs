@@ -11,9 +11,7 @@ use vector_core::ByteSizeOf;
 
 use super::Region;
 use crate::{
-    config::{
-        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
-    },
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::{
         metric::{Metric, MetricValue},
         Event,
@@ -48,7 +46,7 @@ impl SinkBatchSettings for SematextMetricsDefaultBatchSettings {
 }
 
 /// Configuration for the `sematext_metrics` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("sematext_metrics"))]
 #[derive(Clone, Debug, Default)]
 pub struct SematextMetricsConfig {
     /// Sets the default namespace for any metrics sent.
@@ -81,10 +79,6 @@ pub struct SematextMetricsConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     acknowledgements: AcknowledgementsConfig,
-}
-
-inventory::submit! {
-    SinkDescription::new::<SematextMetricsConfig>("sematext_metrics")
 }
 
 impl GenerateConfig for SematextMetricsConfig {

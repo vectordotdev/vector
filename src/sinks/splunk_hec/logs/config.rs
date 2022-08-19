@@ -29,7 +29,7 @@ use crate::{
 };
 
 /// Configuration for the `splunk_hec_logs` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("splunk_hec_logs"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct HecLogsSinkConfig {

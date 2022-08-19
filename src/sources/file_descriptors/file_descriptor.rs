@@ -15,7 +15,7 @@ use crate::{
     serde::default_decoding,
 };
 /// Configuration for the `file_descriptor` source.
-#[configurable_component(source("file_description"))]
+#[configurable_component(source("file_descriptor"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct FileDescriptorSourceConfig {

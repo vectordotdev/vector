@@ -69,7 +69,7 @@ impl SinkBatchSettings for KinesisDefaultBatchSettings {
 }
 
 /// Configuration for the `aws_kinesis_streams` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("aws_kinesis_streams"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct KinesisSinkConfig {

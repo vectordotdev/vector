@@ -27,7 +27,6 @@ use vrl::{
 use crate::{
     config::{
         log_schema, ComponentKey, DataType, Input, Output, TransformConfig, TransformContext,
-        TransformDescription,
     },
     event::{Event, TargetEvents, VrlTarget},
     internal_events::{RemapMappingAbort, RemapMappingError},
@@ -39,7 +38,7 @@ use crate::{
 const DROPPED: &str = "dropped";
 
 /// Configuration for the `remap` transform.
-#[configurable_component(transform)]
+#[configurable_component(transform("remap"))]
 #[derive(Clone, Debug, Derivative)]
 #[serde(deny_unknown_fields, default)]
 #[derivative(Default)]
@@ -162,10 +161,6 @@ impl RemapConfig {
                 )
             })
     }
-}
-
-inventory::submit! {
-    TransformDescription::new::<RemapConfig>("remap")
 }
 
 impl_generate_config_from_default!(RemapConfig);

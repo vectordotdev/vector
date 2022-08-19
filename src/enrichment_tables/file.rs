@@ -8,19 +8,25 @@ use std::{
 
 use bytes::Bytes;
 use enrichment::{Case, Condition, IndexHandle, Table};
-use serde::{Deserialize, Serialize};
 use tracing::trace;
 use value::Value;
 use vector_common::{conversion::Conversion, datetime::TimeZone};
+use vector_config::configurable_component;
 
-use crate::config::{EnrichmentTableConfig, EnrichmentTableDescription};
+use crate::config::EnrichmentTableConfig;
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
+/// File encoding options.
+#[configurable_component]
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 enum Encoding {
+    /// Comma-separated values.
     Csv {
+        /// Whether or not to include the headers.
         #[serde(default = "crate::serde::default_true")]
         include_headers: bool,
+
+        /// The value delimiter to use.
         #[serde(default = "default_delimiter")]
         delimiter: char,
     },
@@ -35,15 +41,25 @@ impl Default for Encoding {
     }
 }
 
-#[derive(Deserialize, Serialize, Default, Debug, Eq, PartialEq, Clone)]
-struct FileC {
+/// File-specific settings.
+#[configurable_component]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+struct FileSettings {
+    /// Path to the file to use.
     path: PathBuf,
+
+    #[configurable(derived)]
     encoding: Encoding,
 }
 
-#[derive(Serialize, Deserialize, Default, Debug, Clone, PartialEq, Eq)]
+/// Configuration for the `file` enrichment table.
+#[configurable_component(enrichment_table("file"))]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct FileConfig {
-    file: FileC,
+    #[configurable(derived)]
+    file: FileSettings,
+
+    /// Schema mapping for the file.
     #[serde(default)]
     schema: HashMap<String, String>,
 }
@@ -173,10 +189,6 @@ impl EnrichmentTableConfig for FileConfig {
 
         Ok(Box::new(File::new(self.clone(), modified, data, headers)))
     }
-}
-
-inventory::submit! {
-    EnrichmentTableDescription::new::<FileConfig>("file")
 }
 
 impl_generate_config_from_default!(FileConfig);

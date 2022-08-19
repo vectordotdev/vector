@@ -45,7 +45,7 @@ impl SinkBatchSettings for KinesisFirehoseDefaultBatchSettings {
 }
 
 /// Configuration for the `aws_kinesis_firehose` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("aws_kinesis_firehose"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct KinesisFirehoseSinkConfig {

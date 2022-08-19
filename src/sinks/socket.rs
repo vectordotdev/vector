@@ -8,15 +8,12 @@ use vector_config::configurable_component;
 use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
     codecs::{Encoder, EncodingConfig, EncodingConfigWithFraming, SinkType},
-    config::{
-        AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
-        SinkDescription,
-    },
+    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     sinks::util::{tcp::TcpSinkConfig, udp::UdpSinkConfig},
 };
 
 /// Configuration for the `socket` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("socket"))]
 #[derive(Clone, Debug)]
 pub struct SocketSinkConfig {
     #[serde(flatten)]
@@ -79,10 +76,6 @@ pub struct UnixMode {
 
     #[serde(flatten)]
     encoding: EncodingConfigWithFraming,
-}
-
-inventory::submit! {
-    SinkDescription::new::<SocketSinkConfig>("socket")
 }
 
 impl GenerateConfig for SocketSinkConfig {

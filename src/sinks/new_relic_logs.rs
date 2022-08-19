@@ -6,9 +6,7 @@ use vector_config::configurable_component;
 
 use crate::{
     codecs::{EncodingConfigWithFraming, Transformer},
-    config::{
-        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
-    },
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     sinks::{
         http::{HttpMethod, HttpSinkConfig},
         util::{
@@ -52,7 +50,7 @@ impl SinkBatchSettings for NewRelicLogsDefaultBatchSettings {
 }
 
 /// Configuration for the `new_relic_logs` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("new_relic_logs"))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 pub struct NewRelicLogsConfig {
@@ -91,10 +89,6 @@ pub struct NewRelicLogsConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     acknowledgements: AcknowledgementsConfig,
-}
-
-inventory::submit! {
-    SinkDescription::new::<NewRelicLogsConfig>("new_relic_logs")
 }
 
 impl GenerateConfig for NewRelicLogsConfig {

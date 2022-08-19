@@ -12,7 +12,7 @@ use vector_config::configurable_component;
 
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, Input, Output, TransformConfig, TransformContext},
     event::{discriminant::Discriminant, Event, EventMetadata, LogEvent},
     internal_events::ReduceStaleEventFlushed,
     schema,
@@ -25,7 +25,7 @@ use crate::event::Value;
 pub use merge_strategy::*;
 
 /// Configuration for the `reduce` transform.
-#[configurable_component(transform)]
+#[configurable_component(transform("reduce"))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields, default)]
 pub struct ReduceConfig {
@@ -66,10 +66,6 @@ pub struct ReduceConfig {
     ///
     /// If this condition resolves to `true` for an event, the previous transaction is flushed (without this event) and a new transaction is started.
     pub starts_when: Option<AnyCondition>,
-}
-
-inventory::submit! {
-    TransformDescription::new::<ReduceConfig>("reduce")
 }
 
 impl_generate_config_from_default!(ReduceConfig);
