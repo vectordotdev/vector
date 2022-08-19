@@ -13,7 +13,7 @@ RUN mkdir -p \
   rootfs/usr/bin \
   rootfs/var/lib/vector
 
-COPY docker-entrypoint.sh rootfs/usr/bin/docker-entrypoint.sh
+COPY distribution/docker/docker-entrypoint.sh rootfs/usr/bin/docker-entrypoint.sh
 
 # Copy and unpack Vector distribution
 COPY vector-*-unknown-linux-gnu*.tar.gz .
