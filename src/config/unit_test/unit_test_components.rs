@@ -55,7 +55,7 @@ impl SourceConfig for UnitTestSourceConfig {
 
 #[derive(Clone)]
 pub enum UnitTestSinkCheck {
-    /// Check all events that are received again the list of conditions.
+    /// Check all events that are received againstthe list of conditions.
     Checks(Vec<Vec<Condition>>),
 
     /// Check that no events were received.
