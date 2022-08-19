@@ -59,6 +59,10 @@ impl ByteSizeOf for VariableMessage {
     fn allocated_bytes(&self) -> usize {
         self.payload.len()
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        0 // TODO
+    }
 }
 
 impl EventCount for VariableMessage {
