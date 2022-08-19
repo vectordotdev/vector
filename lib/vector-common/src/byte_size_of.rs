@@ -37,6 +37,7 @@ pub trait ByteSizeOf {
     ///
     /// The implementation *MUST* consider the encoding to be comptactly-formatted (e.g. only
     /// significant whitespace is counted).
+    #[must_use]
     fn estimated_json_encoded_size_of(&self) -> usize;
 }
 
@@ -342,7 +343,9 @@ impl ByteSizeOf for DateTime<Utc> {
     fn estimated_json_encoded_size_of(&self) -> usize {
         /// This estimation assumes the following:
         ///
+        /// ```ignore
         /// self.to_rfc3339_opts(secform: SecondsFormat::Millis, use_z: true).len()
+        /// ```
         ///
         /// Our `Value` type uses `SecondsFormat::AutoSi`, which will auto-detect a range between 0
         /// and 9 digits to represent the timestamp at nanosecond precision.
@@ -377,7 +380,7 @@ where
 
     // no trailing comma
     if size > BRACKETS_SIZE {
-        size -= COMMA_SIZE
+        size -= COMMA_SIZE;
     }
 
     size
@@ -402,7 +405,7 @@ where
 
     // no trailing comma
     if size > BRACES_SIZE {
-        size -= COMMA_SIZE
+        size -= COMMA_SIZE;
     }
 
     size
