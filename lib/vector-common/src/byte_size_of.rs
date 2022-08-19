@@ -29,6 +29,15 @@ pub trait ByteSizeOf {
     /// bytes for `String` and `Vec<u8>` instances but not the exterior bytes
     /// for `BTreeMap`.
     fn allocated_bytes(&self) -> usize;
+
+    /// Estimated size of this type, represented as a JSON-encoded string.
+    ///
+    /// This is an *estimation*, and *MUST NOT* be used to calculate the final byte size of a
+    /// JSON-encoded payload.
+    ///
+    /// The implementation *MUST* consider the encoding to be comptactly-formatted (e.g. only
+    /// significant whitespace is counted).
+    fn estimated_json_encoded_size_of(&self) -> usize;
 }
 
 impl<'a, T> ByteSizeOf for &'a T
@@ -38,11 +47,19 @@ where
     fn allocated_bytes(&self) -> usize {
         (*self).size_of()
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        (*self).estimated_json_encoded_size_of()
+    }
 }
 
 impl ByteSizeOf for Bytes {
     fn allocated_bytes(&self) -> usize {
         self.len()
+    }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        string_like_estimated_json_byte_size(self.len())
     }
 }
 
@@ -50,17 +67,46 @@ impl ByteSizeOf for BytesMut {
     fn allocated_bytes(&self) -> usize {
         self.len()
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        string_like_estimated_json_byte_size(self.len())
+    }
 }
 
 impl ByteSizeOf for String {
     fn allocated_bytes(&self) -> usize {
         self.len()
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        string_like_estimated_json_byte_size(self.len())
+    }
 }
 
 impl<'a> ByteSizeOf for &'a str {
     fn allocated_bytes(&self) -> usize {
         0
+    }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        string_like_estimated_json_byte_size(self.len())
+    }
+}
+
+impl ByteSizeOf for bool {
+    fn allocated_bytes(&self) -> usize {
+        0
+    }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        const TRUE_SIZE: usize = 4;
+        const FALSE_SIZE: usize = 5;
+
+        if *self {
+            TRUE_SIZE
+        } else {
+            FALSE_SIZE
+        }
     }
 }
 
@@ -73,6 +119,10 @@ where
         self.iter()
             .fold(0, |acc, (k, v)| acc + k.size_of() + v.size_of())
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        object_like_estimated_json_byte_size(self.iter())
+    }
 }
 
 impl<T> ByteSizeOf for BTreeSet<T>
@@ -81,6 +131,10 @@ where
 {
     fn allocated_bytes(&self) -> usize {
         self.iter().map(ByteSizeOf::size_of).sum()
+    }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        array_like_estimated_json_byte_size(self.iter())
     }
 }
 
@@ -91,6 +145,10 @@ where
     fn allocated_bytes(&self) -> usize {
         self.iter().map(ByteSizeOf::size_of).sum()
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        array_like_estimated_json_byte_size(self.iter())
+    }
 }
 
 impl<A: smallvec::Array> ByteSizeOf for SmallVec<A>
@@ -100,6 +158,10 @@ where
     fn allocated_bytes(&self) -> usize {
         self.iter().map(ByteSizeOf::size_of).sum()
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        array_like_estimated_json_byte_size(self.iter())
+    }
 }
 
 impl<T> ByteSizeOf for &[T]
@@ -108,6 +170,10 @@ where
 {
     fn allocated_bytes(&self) -> usize {
         self.iter().map(ByteSizeOf::size_of).sum()
+    }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        array_like_estimated_json_byte_size(self.iter())
     }
 }
 
@@ -122,6 +188,10 @@ where
     fn allocated_bytes(&self) -> usize {
         self.iter().map(ByteSizeOf::size_of).sum()
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        array_like_estimated_json_byte_size(self.iter())
+    }
 }
 
 impl<T> ByteSizeOf for Option<T>
@@ -131,6 +201,13 @@ where
     fn allocated_bytes(&self) -> usize {
         self.as_ref().map_or(0, ByteSizeOf::allocated_bytes)
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        const NULL_SIZE: usize = 4;
+
+        self.as_ref()
+            .map_or(NULL_SIZE, ByteSizeOf::estimated_json_encoded_size_of)
+    }
 }
 
 macro_rules! num {
@@ -138,6 +215,40 @@ macro_rules! num {
         impl ByteSizeOf for $t {
             fn allocated_bytes(&self) -> usize {
                 0
+            }
+
+            fn estimated_json_encoded_size_of(&self) -> usize {
+                // NOTE: this is converted into a series of if-statements by the compiler: https://godbolt.org/z/GjhqnzqvM
+                fn length(n: $t) -> usize {
+                    let mut power = 10;
+                    let mut count = 1;
+                    while n >= power {
+                        count += 1;
+                        if let Some(new_power) = power.checked_mul(10) {
+                            power = new_power;
+                        } else {
+                            break;
+                        }
+                    }
+                    count
+                }
+
+                length(*self)
+            }
+        }
+    };
+}
+
+macro_rules! fnum {
+    ($t:ty) => {
+        impl ByteSizeOf for $t {
+            fn allocated_bytes(&self) -> usize {
+                0
+            }
+
+            fn estimated_json_encoded_size_of(&self) -> usize {
+                let mut buffer = ryu::Buffer::new();
+                buffer.format(*self).len()
             }
         }
     };
@@ -153,12 +264,16 @@ num!(i16);
 num!(i32);
 num!(i64);
 num!(i128);
-num!(f32);
-num!(f64);
+fnum!(f32);
+fnum!(f64);
 
 impl ByteSizeOf for Box<RawValue> {
     fn allocated_bytes(&self) -> usize {
         self.get().len()
+    }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        self.allocated_bytes()
     }
 }
 
@@ -169,6 +284,25 @@ impl ByteSizeOf for JsonValue {
             JsonValue::String(s) => s.len(),
             JsonValue::Array(a) => a.size_of(),
             JsonValue::Object(o) => o.iter().map(|(k, v)| k.size_of() + v.size_of()).sum(),
+        }
+    }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        const NULL_SIZE: usize = 4;
+
+        match self {
+            JsonValue::Null => NULL_SIZE,
+            JsonValue::Bool(v) => (*v).estimated_json_encoded_size_of(),
+            JsonValue::Number(v) if v.is_u64() => {
+                v.as_u64().unwrap().estimated_json_encoded_size_of()
+            }
+            JsonValue::Number(v) if v.is_i64() => {
+                v.as_i64().unwrap().estimated_json_encoded_size_of()
+            }
+            JsonValue::Number(v) => v.as_f64().unwrap().estimated_json_encoded_size_of(),
+            JsonValue::String(s) => string_like_estimated_json_byte_size(s.len()),
+            JsonValue::Array(a) => array_like_estimated_json_byte_size(a.iter()),
+            JsonValue::Object(o) => object_like_estimated_json_byte_size(o.iter()),
         }
     }
 }
@@ -182,10 +316,94 @@ impl ByteSizeOf for Value {
             _ => 0,
         }
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        const NULL_SIZE: usize = 4;
+
+        match self {
+            Value::Bytes(bytes) => bytes.len(),
+            Value::Object(map) => map.estimated_json_encoded_size_of(),
+            Value::Array(arr) => arr.estimated_json_encoded_size_of(),
+            Value::Boolean(v) => v.estimated_json_encoded_size_of(),
+            Value::Regex(v) => v.to_string().estimated_json_encoded_size_of(),
+            Value::Integer(v) => v.estimated_json_encoded_size_of(),
+            Value::Float(v) => v.estimated_json_encoded_size_of(),
+            Value::Timestamp(v) => v.estimated_json_encoded_size_of(),
+            Value::Null => NULL_SIZE,
+        }
+    }
 }
 
 impl ByteSizeOf for DateTime<Utc> {
     fn allocated_bytes(&self) -> usize {
         0
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        /// This estimation assumes the following:
+        ///
+        /// self.to_rfc3339_opts(secform: SecondsFormat::Millis, use_z: true).len()
+        ///
+        /// Our `Value` type uses `SecondsFormat::AutoSi`, which will auto-detect a range between 0
+        /// and 9 digits to represent the timestamp at nanosecond precision.
+        ///
+        /// Representation will also be off by a few bytes if other formatting options are used when
+        /// serializing to JSON.
+        ///
+        /// "2019-10-12T07:20:50.522Z"
+        const RFC3339_SIZE: usize = 26;
+
+        RFC3339_SIZE
+    }
+}
+
+pub fn string_like_estimated_json_byte_size(len: usize) -> usize {
+    const QUOTES_SIZE: usize = 2;
+
+    len + QUOTES_SIZE
+}
+
+pub fn array_like_estimated_json_byte_size<T, V>(iter: T) -> usize
+where
+    T: Iterator<Item = V>,
+    V: ByteSizeOf,
+{
+    const BRACKETS_SIZE: usize = 2;
+    const COMMA_SIZE: usize = 1;
+
+    let mut size = iter.fold(BRACKETS_SIZE, |acc, v| {
+        acc + v.estimated_json_encoded_size_of() + COMMA_SIZE
+    });
+
+    // no trailing comma
+    if size > BRACKETS_SIZE {
+        size -= COMMA_SIZE
+    }
+
+    size
+}
+
+pub fn object_like_estimated_json_byte_size<T, K, V>(iter: T) -> usize
+where
+    T: Iterator<Item = (K, V)>,
+    K: ByteSizeOf,
+    V: ByteSizeOf,
+{
+    const BRACES_SIZE: usize = 2;
+    const COLON_SIZE: usize = 1;
+    const COMMA_SIZE: usize = 1;
+
+    let mut size = iter.fold(BRACES_SIZE, |acc, (k, v)| {
+        acc + k.estimated_json_encoded_size_of()
+            + COLON_SIZE
+            + v.estimated_json_encoded_size_of()
+            + COMMA_SIZE
+    });
+
+    // no trailing comma
+    if size > BRACES_SIZE {
+        size -= COMMA_SIZE
+    }
+
+    size
 }

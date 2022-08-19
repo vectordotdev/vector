@@ -418,6 +418,20 @@ impl ByteSizeOf for Metric {
             + self.data.allocated_bytes()
             + self.metadata.allocated_bytes()
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        const BRACES_SIZE: usize = 2;
+        const COMMA_SIZE: usize = 1;
+
+        // Both `series` and `data` are flatened into the metric, so we need to subtract their
+        // braces, but keep the one for the `Metric` collection itself.
+        //
+        // Metadata is not encoded, and is thus ignored.
+        BRACES_SIZE + self.series.estimated_json_encoded_size_of() - BRACES_SIZE
+            + COMMA_SIZE
+            + self.data.estimated_json_encoded_size_of()
+            - BRACES_SIZE
+    }
 }
 
 impl Finalizable for Metric {

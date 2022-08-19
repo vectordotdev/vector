@@ -115,6 +115,10 @@ impl ByteSizeOf for CloudwatchRequest {
     fn allocated_bytes(&self) -> usize {
         0
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        0
+    }
 }
 
 #[cfg(test)]

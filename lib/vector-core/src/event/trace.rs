@@ -117,6 +117,10 @@ impl ByteSizeOf for TraceEvent {
     fn allocated_bytes(&self) -> usize {
         self.0.allocated_bytes()
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        self.0.estimated_json_encoded_size_of()
+    }
 }
 
 impl EventCount for TraceEvent {

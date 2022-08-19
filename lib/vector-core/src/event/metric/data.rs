@@ -154,4 +154,8 @@ impl ByteSizeOf for MetricData {
     fn allocated_bytes(&self) -> usize {
         self.value.allocated_bytes()
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        todo!()
+    }
 }

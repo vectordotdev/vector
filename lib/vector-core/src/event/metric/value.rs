@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 
 use float_eq::FloatEq;
 use serde::{Deserialize, Serialize};
-use vector_common::byte_size_of::ByteSizeOf;
+use vector_common::byte_size_of::{self, ByteSizeOf};
 
 use super::{samples_to_buckets, write_list, write_word};
 use crate::metrics::AgentDDSketch;
@@ -333,6 +333,131 @@ impl ByteSizeOf for MetricValue {
             Self::Sketch { sketch } => sketch.allocated_bytes(),
         }
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        const BRACES_SIZE: usize = 2;
+        const COMMA_SIZE: usize = 1;
+        const COLON_SIZE: usize = 1;
+
+        // Enum is externally tagged.
+        let size = BRACES_SIZE;
+
+        match self {
+            // {"counter":{"value":12.02}}
+            Self::Counter { value } => {
+                const COUNTER_VARIANT_KEY_SIZE: usize = 7;
+                const VALUE_KEY_SIZE: usize = 5;
+
+                size + byte_size_of::string_like_estimated_json_byte_size(COUNTER_VARIANT_KEY_SIZE)
+                    + COLON_SIZE
+                    + BRACES_SIZE
+                    + byte_size_of::string_like_estimated_json_byte_size(VALUE_KEY_SIZE)
+                    + COLON_SIZE
+                    + value.estimated_json_encoded_size_of()
+            }
+
+            // {"gauge":{"value":12.02}}
+            Self::Gauge { value } => {
+                const GAUGE_VARIANT_KEY_SIZE: usize = 5;
+                const VALUE_KEY_SIZE: usize = 5;
+
+                size + byte_size_of::string_like_estimated_json_byte_size(GAUGE_VARIANT_KEY_SIZE)
+                    + COLON_SIZE
+                    + BRACES_SIZE
+                    + byte_size_of::string_like_estimated_json_byte_size(VALUE_KEY_SIZE)
+                    + COLON_SIZE
+                    + value.estimated_json_encoded_size_of()
+            }
+
+            // {"set":{"values":["foo","bar"]}}
+            Self::Set { values } => {
+                const SET_VARIANT_KEY_SIZE: usize = 3;
+                const VALUES_KEY_SIZE: usize = 6;
+
+                size + byte_size_of::string_like_estimated_json_byte_size(SET_VARIANT_KEY_SIZE)
+                    + COLON_SIZE
+                    + BRACES_SIZE
+                    + byte_size_of::string_like_estimated_json_byte_size(VALUES_KEY_SIZE)
+                    + COLON_SIZE
+                    + byte_size_of::array_like_estimated_json_byte_size(values.iter())
+            }
+
+            // {"distribution":{"samples":[{"value":1.1,"rate":1.5}],"statistic":"histogram"}}
+            Self::Distribution { samples, statistic } => {
+                const DISTRIBUTION_VARIANT_KEY_SIZE: usize = 12;
+                const SAMPLES_KEY_SIZE: usize = 7;
+                const STATISTIC_KEY_SIZE: usize = 9;
+
+                size + byte_size_of::string_like_estimated_json_byte_size(
+                    DISTRIBUTION_VARIANT_KEY_SIZE,
+                ) + COLON_SIZE
+                    + BRACES_SIZE
+                    + byte_size_of::string_like_estimated_json_byte_size(SAMPLES_KEY_SIZE)
+                    + COLON_SIZE
+                    + byte_size_of::array_like_estimated_json_byte_size(samples.iter())
+                    + COMMA_SIZE
+                    + byte_size_of::string_like_estimated_json_byte_size(STATISTIC_KEY_SIZE)
+                    + COLON_SIZE
+                    + statistic.estimated_json_encoded_size_of()
+            }
+
+            // {"aggregated_histogram":{"buckets":[{"upper_limit":12.4,"count":3}],"count":12,"sum":1.03}}
+            Self::AggregatedHistogram {
+                buckets,
+                count,
+                sum,
+            } => {
+                const AGGREGATED_HISTOGRAM_VARIANT_KEY_SIZE: usize = 20;
+                const BUCKETS_KEY_SIZE: usize = 7;
+                const COUNT_KEY_SIZE: usize = 5;
+                const SUM_KEY_SIZE: usize = 3;
+
+                size + byte_size_of::string_like_estimated_json_byte_size(
+                    AGGREGATED_HISTOGRAM_VARIANT_KEY_SIZE,
+                ) + COLON_SIZE
+                    + BRACES_SIZE
+                    + byte_size_of::string_like_estimated_json_byte_size(BUCKETS_KEY_SIZE)
+                    + COLON_SIZE
+                    + byte_size_of::array_like_estimated_json_byte_size(buckets.iter())
+                    + COMMA_SIZE
+                    + byte_size_of::string_like_estimated_json_byte_size(COUNT_KEY_SIZE)
+                    + COLON_SIZE
+                    + count.estimated_json_encoded_size_of()
+                    + byte_size_of::string_like_estimated_json_byte_size(SUM_KEY_SIZE)
+                    + COLON_SIZE
+                    + sum.estimated_json_encoded_size_of()
+            }
+
+            // {"aggregated_summary":{"quantiles":[{"upper_limit":12.4,"count":3}],"count":12,"sum":1.03}}
+            Self::AggregatedSummary {
+                quantiles,
+                count,
+                sum,
+            } => {
+                const AGGREGATED_SUMMARY_VARIANT_KEY_SIZE: usize = 18;
+                const QUANTILES_KEY_SIZE: usize = 9;
+                const COUNT_KEY_SIZE: usize = 5;
+                const SUM_KEY_SIZE: usize = 3;
+
+                size + byte_size_of::string_like_estimated_json_byte_size(
+                    AGGREGATED_SUMMARY_VARIANT_KEY_SIZE,
+                ) + COLON_SIZE
+                    + BRACES_SIZE
+                    + byte_size_of::string_like_estimated_json_byte_size(QUANTILES_KEY_SIZE)
+                    + COLON_SIZE
+                    + byte_size_of::array_like_estimated_json_byte_size(quantiles.iter())
+                    + COMMA_SIZE
+                    + byte_size_of::string_like_estimated_json_byte_size(COUNT_KEY_SIZE)
+                    + COLON_SIZE
+                    + count.estimated_json_encoded_size_of()
+                    + byte_size_of::string_like_estimated_json_byte_size(SUM_KEY_SIZE)
+                    + COLON_SIZE
+                    + sum.estimated_json_encoded_size_of()
+            }
+
+            Self::Sketch { sketch } => sketch.estimated_json_encoded_size_of(),
+        }
+    }
 }
 
 impl PartialEq for MetricValue {
@@ -489,6 +614,19 @@ pub enum StatisticKind {
     Summary,
 }
 
+impl ByteSizeOf for StatisticKind {
+    fn allocated_bytes(&self) -> usize {
+        0
+    }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        match self {
+            Self::Histogram => 9,
+            Self::Summary => 7,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum MetricSketch {
     /// DDSketch implementation based on the Datadog Agent.
@@ -523,6 +661,25 @@ impl ByteSizeOf for MetricSketch {
             Self::AgentDDSketch(ddsketch) => ddsketch.allocated_bytes(),
         }
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        const BRACES_SIZE: usize = 2;
+        const COLON_SIZE: usize = 1;
+
+        // Enum is externally tagged.
+        let size = BRACES_SIZE;
+
+        match self {
+            MetricSketch::AgentDDSketch(ddsketch) => {
+                const AGENT_DD_SKETCH_VARIANT_KEY_SIZE: usize = 13;
+
+                size + byte_size_of::string_like_estimated_json_byte_size(
+                    AGENT_DD_SKETCH_VARIANT_KEY_SIZE,
+                ) + COLON_SIZE
+                    + ddsketch.estimated_json_encoded_size_of()
+            }
+        }
+    }
 }
 
 // Currently, VRL can only read the type of the value and doesn't consider ny actual metric values.
@@ -545,6 +702,23 @@ impl ByteSizeOf for Sample {
     fn allocated_bytes(&self) -> usize {
         0
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        const BRACES_SIZE: usize = 2;
+        const COLON_SIZE: usize = 1;
+        const COMMA_SIZE: usize = 1;
+        const VALUE_KEY_SIZE: usize = 5;
+        const RATE_KEY_SIZE: usize = 4;
+
+        BRACES_SIZE
+            + byte_size_of::string_like_estimated_json_byte_size(VALUE_KEY_SIZE)
+            + COLON_SIZE
+            + self.value.estimated_json_encoded_size_of()
+            + COMMA_SIZE
+            + byte_size_of::string_like_estimated_json_byte_size(RATE_KEY_SIZE)
+            + COLON_SIZE
+            + self.rate.estimated_json_encoded_size_of()
+    }
 }
 
 /// A single value from a `MetricValue::AggregatedHistogram`. The value
@@ -560,6 +734,23 @@ pub struct Bucket {
 impl ByteSizeOf for Bucket {
     fn allocated_bytes(&self) -> usize {
         0
+    }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        const BRACES_SIZE: usize = 2;
+        const COMMA_SIZE: usize = 1;
+        const COLON_SIZE: usize = 1;
+        const UPPER_LIMIT_KEY_SIZE: usize = 11;
+        const COUNT_KEY_SIZE: usize = 5;
+
+        BRACES_SIZE
+            + byte_size_of::string_like_estimated_json_byte_size(UPPER_LIMIT_KEY_SIZE)
+            + COLON_SIZE
+            + self.upper_limit.estimated_json_encoded_size_of()
+            + COMMA_SIZE
+            + byte_size_of::string_like_estimated_json_byte_size(COUNT_KEY_SIZE)
+            + COLON_SIZE
+            + self.count.estimated_json_encoded_size_of()
     }
 }
 
@@ -603,5 +794,22 @@ impl Quantile {
 impl ByteSizeOf for Quantile {
     fn allocated_bytes(&self) -> usize {
         0
+    }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        const BRACES_SIZE: usize = 2;
+        const COMMA_SIZE: usize = 1;
+        const COLON_SIZE: usize = 1;
+        const QUANTILE_KEY_SIZE: usize = 8;
+        const VALUE_KEY_SIZE: usize = 5;
+
+        BRACES_SIZE
+            + byte_size_of::string_like_estimated_json_byte_size(QUANTILE_KEY_SIZE)
+            + COLON_SIZE
+            + self.quantile.estimated_json_encoded_size_of()
+            + COMMA_SIZE
+            + byte_size_of::string_like_estimated_json_byte_size(VALUE_KEY_SIZE)
+            + COLON_SIZE
+            + self.value.estimated_json_encoded_size_of()
     }
 }

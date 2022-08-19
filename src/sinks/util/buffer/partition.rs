@@ -100,6 +100,10 @@ impl<T: ByteSizeOf, K> ByteSizeOf for PartitionInnerBuffer<T, K> {
     fn allocated_bytes(&self) -> usize {
         self.inner.allocated_bytes()
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        self.inner.estimated_json_encoded_size_of()
+    }
 }
 
 impl<T: ElementCount, K> ElementCount for PartitionInnerBuffer<T, K> {

@@ -7,7 +7,7 @@ use float_eq::FloatEq;
 use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use vector_common::byte_size_of::ByteSizeOf;
+use vector_common::byte_size_of::{self, ByteSizeOf};
 
 use crate::event::{metric::Bucket, Metric, MetricValue};
 
@@ -808,6 +808,43 @@ impl ByteSizeOf for AgentDDSketch {
     fn allocated_bytes(&self) -> usize {
         self.bins.len() * mem::size_of::<Bin>()
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        const BRACES_SIZE: usize = 2;
+        const COMMA_SIZE: usize = 1;
+        const COLON_SIZE: usize = 1;
+        const BINS_KEY_SIZE: usize = 4;
+        const COUNT_KEY_SIZE: usize = 5;
+        const MIN_KEY_SIZE: usize = 3;
+        const MAX_KEY_SIZE: usize = 3;
+        const SUM_KEY_SIZE: usize = 3;
+        const AVG_KEY_SIZE: usize = 3;
+
+        BRACES_SIZE
+            + byte_size_of::string_like_estimated_json_byte_size(BINS_KEY_SIZE)
+            + COLON_SIZE
+            + BinMap::from_bins(&self.bins).estimated_json_encoded_size_of()
+            + COMMA_SIZE
+            + byte_size_of::string_like_estimated_json_byte_size(COUNT_KEY_SIZE)
+            + COLON_SIZE
+            + self.count.estimated_json_encoded_size_of()
+            + COMMA_SIZE
+            + byte_size_of::string_like_estimated_json_byte_size(MIN_KEY_SIZE)
+            + COLON_SIZE
+            + self.min.estimated_json_encoded_size_of()
+            + COMMA_SIZE
+            + byte_size_of::string_like_estimated_json_byte_size(MAX_KEY_SIZE)
+            + COLON_SIZE
+            + self.max.estimated_json_encoded_size_of()
+            + COMMA_SIZE
+            + byte_size_of::string_like_estimated_json_byte_size(SUM_KEY_SIZE)
+            + COLON_SIZE
+            + self.sum.estimated_json_encoded_size_of()
+            + COMMA_SIZE
+            + byte_size_of::string_like_estimated_json_byte_size(AVG_KEY_SIZE)
+            + COLON_SIZE
+            + self.avg.estimated_json_encoded_size_of()
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -852,6 +889,29 @@ impl BinMap {
         } else {
             None
         }
+    }
+}
+
+impl ByteSizeOf for BinMap {
+    fn allocated_bytes(&self) -> usize {
+        0
+    }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        const BRACES_SIZE: usize = 2;
+        const COMMA_SIZE: usize = 1;
+        const COLON_SIZE: usize = 1;
+        const K_KEY_SIZE: usize = 1;
+        const N_KEY_SIZE: usize = 1;
+
+        BRACES_SIZE
+            + byte_size_of::string_like_estimated_json_byte_size(K_KEY_SIZE)
+            + COLON_SIZE
+            + byte_size_of::array_like_estimated_json_byte_size(self.keys.iter())
+            + COMMA_SIZE
+            + byte_size_of::string_like_estimated_json_byte_size(N_KEY_SIZE)
+            + COLON_SIZE
+            + byte_size_of::array_like_estimated_json_byte_size(self.counts.iter())
     }
 }
 

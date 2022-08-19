@@ -109,6 +109,10 @@ impl ByteSizeOf for EventMetadata {
         // by `ByteSizeOf::size_of`.
         self.finalizers.allocated_bytes()
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        0
+    }
 }
 
 impl EventMetadata {

@@ -3,6 +3,7 @@ use std::{collections::HashMap, io};
 use bytes::Bytes;
 use serde::{ser::SerializeSeq, Serialize};
 use vector_buffers::EventCount;
+use vector_common::byte_size_of::{self, ByteSizeOf};
 use vector_core::{
     event::{EventFinalizers, Finalizable},
     ByteSizeOf,
@@ -60,6 +61,21 @@ pub struct LokiEvent {
 impl ByteSizeOf for LokiEvent {
     fn allocated_bytes(&self) -> usize {
         self.timestamp.allocated_bytes() + self.event.allocated_bytes()
+    }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        const BRACKETS_SIZE: usize = 2;
+        const COMMA_SIZE: usize = 1;
+        const STRINGIFIED_TIMESTAMP_QUOTES: usize = 2;
+
+        // This estimation matches the custom `Serialize` impl for `LokiEvent`.
+        BRACKETS_SIZE
+            + self.timestamp.estimated_json_encoded_size_of()
+            + STRINGIFIED_TIMESTAMP_QUOTES
+            + COMMA_SIZE
+            // NOTE: this might be off by a few bytes, if `String::from_utf8_lossy` inserts the
+            // replacement ccharacter `U+FFFD`.
+            + self.event.estimated_json_encoded_size_of()
     }
 }
 

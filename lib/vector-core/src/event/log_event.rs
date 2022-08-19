@@ -65,6 +65,10 @@ impl ByteSizeOf for Inner {
     fn allocated_bytes(&self) -> usize {
         self.fields.allocated_bytes()
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        self.fields.estimated_json_encoded_size_of()
+    }
 }
 
 impl Clone for Inner {
@@ -171,6 +175,10 @@ impl LogEvent {
 impl ByteSizeOf for LogEvent {
     fn allocated_bytes(&self) -> usize {
         self.inner.size_of() + self.metadata.allocated_bytes()
+    }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        self.inner.estimated_json_encoded_size_of()
     }
 }
 

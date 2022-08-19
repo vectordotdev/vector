@@ -45,6 +45,10 @@ impl ByteSizeOf for EventFinalizers {
         // tracking and merging events.
         0
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        0
+    }
 }
 
 impl EventFinalizers {
@@ -120,6 +124,10 @@ impl ByteSizeOf for EventFinalizer {
     fn allocated_bytes(&self) -> usize {
         // Don't count the batch notifier, as it's shared across
         // events in a batch.
+        0
+    }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
         0
     }
 }

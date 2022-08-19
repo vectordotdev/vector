@@ -2,7 +2,7 @@ use core::fmt;
 use std::collections::btree_map;
 
 use serde::{Deserialize, Serialize};
-use vector_common::byte_size_of::ByteSizeOf;
+use vector_common::byte_size_of::{self, ByteSizeOf};
 
 use super::{write_list, write_word, MetricTags};
 
@@ -70,6 +70,23 @@ impl ByteSizeOf for MetricSeries {
     fn allocated_bytes(&self) -> usize {
         self.name.allocated_bytes() + self.tags.allocated_bytes()
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        const METRIC_TAGS_KEY_SIZE: usize = 4;
+        const BRACES_SIZE: usize = 2;
+        const COMMA_SIZE: usize = 1;
+
+        // `MetricName` is flattened, so we need to remove the surrounding braces.
+        let mut size = BRACES_SIZE + self.name.estimated_json_encoded_size_of() - BRACES_SIZE;
+
+        if let Some(tags) = &self.tags {
+            size += COMMA_SIZE
+                + byte_size_of::string_like_estimated_json_byte_size(METRIC_TAGS_KEY_SIZE)
+                + byte_size_of::object_like_estimated_json_byte_size(tags.iter())
+        }
+
+        size
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, PartialOrd, Ord, Serialize)]
@@ -126,5 +143,27 @@ impl fmt::Display for MetricSeries {
 impl ByteSizeOf for MetricName {
     fn allocated_bytes(&self) -> usize {
         self.name.allocated_bytes() + self.namespace.allocated_bytes()
+    }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        const METRIC_NAME_KEY_SIZE: usize = 4;
+        const METRIC_NAMESPACE_KEY_SIZE: usize = 9;
+        const BRACES_SIZE: usize = 2;
+        const COLON_SIZE: usize = 1;
+        const COMMA_SIZE: usize = 1;
+
+        let mut size = BRACES_SIZE
+            + byte_size_of::string_like_estimated_json_byte_size(METRIC_NAME_KEY_SIZE)
+            + COLON_SIZE
+            + byte_size_of::string_like_estimated_json_byte_size(self.name.len());
+
+        if let Some(namespace) = &self.namespace {
+            size += COMMA_SIZE
+                + byte_size_of::string_like_estimated_json_byte_size(METRIC_NAMESPACE_KEY_SIZE)
+                + COLON_SIZE
+                + byte_size_of::string_like_estimated_json_byte_size(namespace.len())
+        }
+
+        size
     }
 }

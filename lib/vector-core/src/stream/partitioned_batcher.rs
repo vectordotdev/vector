@@ -113,6 +113,8 @@ struct Batch<I> {
     /// The total number of `I` bytes stored, does not any overhead in this
     /// structure.
     allocated_bytes: usize,
+    /// Tracked similarly to `allocated_bytes`.
+    estimated_json_encoded_size_of: usize,
     /// The maximum number of elements allowed in this structure.
     element_limit: usize,
     /// The maximum number of allocated bytes (not including overhead) allowed
@@ -125,6 +127,10 @@ struct Batch<I> {
 impl<I> ByteSizeOf for Batch<I> {
     fn allocated_bytes(&self) -> usize {
         self.allocated_bytes
+    }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        self.estimated_json_encoded_size_of
     }
 }
 
@@ -158,6 +164,7 @@ where
         let allocation_limit = cmp::max(allocation_limit, mem::size_of::<I>());
         Self {
             allocated_bytes: 0,
+            estimated_json_encoded_size_of: 0,
             element_limit,
             allocation_limit,
             elements: Vec::with_capacity(128),
@@ -171,6 +178,7 @@ where
     /// panic. Intended to be used only when insertion must not fail.
     fn with(mut self, value: I) -> Self {
         self.allocated_bytes += value.size_of();
+        self.estimated_json_encoded_size_of += value.estimated_json_encoded_size_of();
         self.elements.push(value);
         self
     }
@@ -207,6 +215,7 @@ where
     fn push(&mut self, value: I) {
         assert!(self.has_space(&value));
         self.allocated_bytes += value.size_of();
+        self.estimated_json_encoded_size_of += value.estimated_json_encoded_size_of();
         self.elements.push(value);
     }
 }

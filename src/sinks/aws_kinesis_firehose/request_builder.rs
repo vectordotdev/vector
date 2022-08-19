@@ -58,6 +58,10 @@ impl ByteSizeOf for KinesisRequest {
     fn allocated_bytes(&self) -> usize {
         0
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        0
+    }
 }
 
 impl RequestBuilder<LogEvent> for KinesisRequestBuilder {

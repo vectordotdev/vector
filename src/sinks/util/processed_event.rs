@@ -36,4 +36,8 @@ where
     fn allocated_bytes(&self) -> usize {
         self.event.allocated_bytes() + self.metadata.allocated_bytes()
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        self.event.estimated_json_encoded_size_of()
+    }
 }

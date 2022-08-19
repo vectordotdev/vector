@@ -60,6 +60,14 @@ impl ByteSizeOf for Event {
             Event::Trace(trace_event) => trace_event.allocated_bytes(),
         }
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        match self {
+            Event::Log(log_event) => log_event.estimated_json_encoded_size_of(),
+            Event::Metric(metric_event) => metric_event.estimated_json_encoded_size_of(),
+            Event::Trace(trace_event) => trace_event.estimated_json_encoded_size_of(),
+        }
+    }
 }
 
 impl EventCount for Event {

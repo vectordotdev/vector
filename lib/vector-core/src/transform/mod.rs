@@ -392,6 +392,15 @@ impl ByteSizeOf for TransformOutputsBuf {
                 .map(|(_, buf)| buf.size_of())
                 .sum::<usize>()
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        self.primary_buffer.estimated_json_encoded_size_of()
+            + self
+                .named_buffers
+                .iter()
+                .map(|(_, buf)| buf.estimated_json_encoded_size_of())
+                .sum::<usize>()
+    }
 }
 
 #[derive(Debug, Default, Clone)]
@@ -474,6 +483,13 @@ impl OutputBuffer {
 impl ByteSizeOf for OutputBuffer {
     fn allocated_bytes(&self) -> usize {
         self.0.iter().map(ByteSizeOf::size_of).sum()
+    }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        self.0
+            .iter()
+            .map(ByteSizeOf::estimated_json_encoded_size_of)
+            .sum()
     }
 }
 

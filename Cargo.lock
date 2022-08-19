@@ -8615,6 +8615,7 @@ dependencies = [
  "nom",
  "ordered-float 3.0.0",
  "pin-project",
+ "ryu",
  "serde",
  "serde_json",
  "smallvec",

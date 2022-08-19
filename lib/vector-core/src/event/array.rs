@@ -228,6 +228,14 @@ impl ByteSizeOf for EventArray {
             Self::Traces(a) => a.allocated_bytes(),
         }
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        match self {
+            Self::Logs(a) => a.estimated_json_encoded_size_of(),
+            Self::Metrics(a) => a.estimated_json_encoded_size_of(),
+            Self::Traces(a) => a.estimated_json_encoded_size_of(),
+        }
+    }
 }
 
 impl EventCount for EventArray {
