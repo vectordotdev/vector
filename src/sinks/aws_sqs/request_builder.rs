@@ -129,6 +129,10 @@ impl ByteSizeOf for SendMessageEntry {
             + self.message_group_id.size_of()
             + self.message_deduplication_id.size_of()
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        todo!()
+    }
 }
 
 impl EncodedLength for SendMessageEntry {

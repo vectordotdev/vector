@@ -27,6 +27,10 @@ impl ByteSizeOf for DatadogEventsRequest {
     fn allocated_bytes(&self) -> usize {
         self.body.allocated_bytes() + self.metadata.finalizers.allocated_bytes()
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        todo!()
+    }
 }
 
 impl ElementCount for DatadogEventsRequest {

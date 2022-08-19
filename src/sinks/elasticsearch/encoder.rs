@@ -28,6 +28,10 @@ impl ByteSizeOf for ProcessedEvent {
     fn allocated_bytes(&self) -> usize {
         self.index.allocated_bytes() + self.log.allocated_bytes() + self.id.allocated_bytes()
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        todo!()
+    }
 }
 
 #[derive(PartialEq, Eq, Default, Clone, Debug)]

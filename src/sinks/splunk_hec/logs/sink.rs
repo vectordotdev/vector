@@ -224,6 +224,10 @@ impl ByteSizeOf for HecLogsProcessedEventMetadata {
             + self.host.allocated_bytes()
             + self.fields.allocated_bytes()
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        todo!()
+    }
 }
 
 pub type HecProcessedEvent = ProcessedEvent<LogEvent, HecLogsProcessedEventMetadata>;

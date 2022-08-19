@@ -275,6 +275,10 @@ impl ByteSizeOf for RedisKvEntry {
     fn allocated_bytes(&self) -> usize {
         self.key.len() + self.value.len()
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        todo!()
+    }
 }
 
 fn encode_event(

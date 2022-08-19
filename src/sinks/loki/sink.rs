@@ -271,6 +271,10 @@ impl ByteSizeOf for FilteredRecord {
     fn size_of(&self) -> usize {
         self.inner.size_of()
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        self.inner.estimated_json_encoded_size_of()
+    }
 }
 
 struct RecordFilter {

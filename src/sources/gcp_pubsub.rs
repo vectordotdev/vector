@@ -65,11 +65,19 @@ mod proto {
         fn allocated_bytes(&self) -> usize {
             self.received_messages.size_of()
         }
+
+        fn estimated_json_encoded_size_of(&self) -> usize {
+            todo!()
+        }
     }
 
     impl ByteSizeOf for ReceivedMessage {
         fn allocated_bytes(&self) -> usize {
             self.ack_id.size_of() + self.message.as_ref().map_or(0, ByteSizeOf::size_of)
+        }
+
+        fn estimated_json_encoded_size_of(&self) -> usize {
+            todo!()
         }
     }
 
@@ -79,6 +87,10 @@ mod proto {
                 + self.message_id.len()
                 + self.ordering_key.len()
                 + self.attributes.size_of()
+        }
+
+        fn estimated_json_encoded_size_of(&self) -> usize {
+            todo!()
         }
     }
 }

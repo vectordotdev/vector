@@ -36,6 +36,10 @@ impl ByteSizeOf for BatchedEvents {
     fn allocated_bytes(&self) -> usize {
         self.events.size_of()
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        todo!()
+    }
 }
 
 pub struct ElasticsearchSink<S> {

@@ -25,6 +25,10 @@ impl ByteSizeOf for HecRequest {
     fn allocated_bytes(&self) -> usize {
         self.body.allocated_bytes() + self.finalizers.allocated_bytes()
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        todo!()
+    }
 }
 
 impl ElementCount for HecRequest {

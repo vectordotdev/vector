@@ -124,6 +124,10 @@ impl ByteSizeOf for HecMetricsProcessedEventMetadata {
             + self.metric_name.allocated_bytes()
             + self.templated_field_keys.allocated_bytes()
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        todo!()
+    }
 }
 
 impl HecMetricsProcessedEventMetadata {

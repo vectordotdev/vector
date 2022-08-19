@@ -3,7 +3,6 @@ use std::{collections::HashMap, io};
 use bytes::Bytes;
 use serde::{ser::SerializeSeq, Serialize};
 use vector_buffers::EventCount;
-use vector_common::byte_size_of::{self, ByteSizeOf};
 use vector_core::{
     event::{EventFinalizers, Finalizable},
     ByteSizeOf,
@@ -108,6 +107,10 @@ impl ByteSizeOf for LokiRecord {
             })
             + self.event.allocated_bytes()
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        todo!()
+    }
 }
 
 impl EventCount for LokiRecord {
@@ -136,6 +139,10 @@ impl ByteSizeOf for PartitionKey {
             .map(|value| value.allocated_bytes())
             .unwrap_or(0)
             + self.labels.allocated_bytes()
+    }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        todo!()
     }
 }
 
