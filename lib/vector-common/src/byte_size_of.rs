@@ -360,12 +360,14 @@ impl ByteSizeOf for DateTime<Utc> {
     }
 }
 
+#[must_use]
 pub fn string_like_estimated_json_byte_size(len: usize) -> usize {
     const QUOTES_SIZE: usize = 2;
 
     len + QUOTES_SIZE
 }
 
+#[must_use]
 pub fn array_like_estimated_json_byte_size<T, V>(iter: T) -> usize
 where
     T: Iterator<Item = V>,
@@ -386,6 +388,7 @@ where
     size
 }
 
+#[must_use]
 pub fn object_like_estimated_json_byte_size<T, K, V>(iter: T) -> usize
 where
     T: Iterator<Item = (K, V)>,
