@@ -8546,6 +8546,7 @@ dependencies = [
  "warp",
  "windows-service",
  "wiremock",
+ "zstd",
 ]
 
 [[package]]

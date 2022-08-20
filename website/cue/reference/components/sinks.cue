@@ -136,6 +136,7 @@ components: sinks: [Name=string]: {
 					description: """
 						The compression strategy used to compress the encoded event data before transmission.
 
+						The default compression level of the chosen algorithm is used.
 						Some cloud storage API clients and browsers will handle decompression transparently,
 						so files may not always appear to be compressed depending how they are accessed.
 						"""
@@ -148,7 +149,7 @@ components: sinks: [Name=string]: {
 									none: "No compression."
 								}
 								if algo == "gzip" {
-									gzip: "[Gzip](\(urls.gzip)) standard DEFLATE compression."
+									gzip: "[Gzip](\(urls.gzip)) standard DEFLATE compression. Compression level is `6` unless otherwise specified."
 								}
 								if algo == "snappy" {
 									snappy: "[Snappy](\(urls.snappy)) compression."
@@ -157,7 +158,7 @@ components: sinks: [Name=string]: {
 									lz4: "[lz4](\(urls.lz4)) compression."
 								}
 								if algo == "zstd" {
-									zstd: "[zstd](\(urls.zstd)) compression."
+									zstd: "[zstd](\(urls.zstd)) compression. Compression level is `3` unless otherwise specified. Dictionaries are not supported."
 								}
 							}
 						}
