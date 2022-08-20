@@ -251,7 +251,6 @@ impl<'input> Lexer<'input> {
             // We don't advance the internal iterator, because this token does not
             // represent a physical character, instead it is a boundary marker.
             let query_start_result = self.query_start(start);
-            // println!("Query start result({:?}): {:?}", start, query_start_result);
             match query_start_result {
                 Err(err) => return Some(Err(err)),
                 Ok(true) => {

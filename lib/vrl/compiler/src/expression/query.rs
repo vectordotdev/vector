@@ -182,7 +182,7 @@ impl fmt::Display for Target {
             Internal(v) => v.fmt(f),
             External(prefix) => match prefix {
                 PathPrefix::Event => write!(f, "."),
-                PathPrefix::Metadata => write!(f, "&"),
+                PathPrefix::Metadata => write!(f, "@"),
             },
             FunctionCall(v) => v.fmt(f),
             Container(v) => v.fmt(f),

@@ -187,7 +187,6 @@ fn main() {
 
         // Set some read-only paths that can be tested
         for (path, recursive) in &test.read_only_paths {
-            println!("Read only path: {:?}", path);
             config.set_read_only_path(path.clone(), *recursive);
         }
 
