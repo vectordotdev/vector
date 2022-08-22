@@ -1,6 +1,6 @@
 ///! Contains backwards compatibility with lookup "v1"
 ///! This is all temporary and will be deleted when migration to the V2 lookup code is complete.
-use crate::lookup_v2::{BorrowedSegment, OwnedPath, OwnedSegment, Path};
+use crate::lookup_v2::{BorrowedSegment, OwnedSegment, OwnedValuePath, Path};
 use crate::{FieldBuf, LookupBuf, SegmentBuf};
 use std::borrow::Cow;
 
@@ -16,7 +16,7 @@ impl<'a> Path<'a> for &'a LookupBuf {
     }
 }
 
-impl From<LookupBuf> for OwnedPath {
+impl From<LookupBuf> for OwnedValuePath {
     fn from(lookup: LookupBuf) -> Self {
         let segments = lookup
             .segments
@@ -35,8 +35,8 @@ impl From<LookupBuf> for OwnedPath {
 }
 
 // This should only be used if the `OwnedPath` has already been verified to be valid.
-impl From<OwnedPath> for LookupBuf {
-    fn from(path: OwnedPath) -> Self {
+impl From<OwnedValuePath> for LookupBuf {
+    fn from(path: OwnedValuePath) -> Self {
         let segments = path
             .segments
             .into_iter()

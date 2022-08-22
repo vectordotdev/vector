@@ -7,11 +7,11 @@ use vector_config::configurable_component;
 #[configurable_component]
 #[derive(Debug, Clone, PartialEq, Eq, Default, Hash, PartialOrd, Ord)]
 #[serde(from = "String", into = "String")]
-pub struct OwnedPath {
+pub struct OwnedValuePath {
     pub segments: Vec<OwnedSegment>,
 }
 
-impl OwnedPath {
+impl OwnedValuePath {
     pub fn is_root(&self) -> bool {
         self.segments.is_empty()
     }
@@ -99,20 +99,20 @@ impl OwnedPath {
     }
 }
 
-impl Display for OwnedPath {
+impl Display for OwnedValuePath {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", String::from(self.clone()))
     }
 }
 
-impl From<String> for OwnedPath {
+impl From<String> for OwnedValuePath {
     fn from(raw_path: String) -> Self {
         parse_path(raw_path.as_str())
     }
 }
 
-impl From<OwnedPath> for String {
-    fn from(owned: OwnedPath) -> Self {
+impl From<OwnedValuePath> for String {
+    fn from(owned: OwnedValuePath) -> Self {
         let mut coalesce_i = 0;
 
         owned
@@ -188,7 +188,7 @@ fn serialize_field(field: &str, separator: Option<&str>) -> String {
     }
 }
 
-impl From<Vec<OwnedSegment>> for OwnedPath {
+impl From<Vec<OwnedSegment>> for OwnedValuePath {
     fn from(segments: Vec<OwnedSegment>) -> Self {
         Self { segments }
     }
@@ -287,7 +287,7 @@ impl<'a> Path<'a> for &'a Vec<OwnedSegment> {
     }
 }
 
-impl<'a> Path<'a> for &'a OwnedPath {
+impl<'a> Path<'a> for &'a OwnedValuePath {
     type Iter = OwnedSegmentSliceIter<'a>;
 
     fn segment_iter(&self) -> Self::Iter {

@@ -13,13 +13,13 @@ use std::str::CharIndices;
 use crate::lookup_v2::{BorrowedSegment, Path};
 
 #[derive(Clone)]
-pub struct JitPath<'a> {
+pub struct JitValuePath<'a> {
     path: &'a str,
 }
 
-impl JitPath<'_> {
-    pub fn new(path: &str) -> JitPath {
-        JitPath { path }
+impl JitValuePath<'_> {
+    pub fn new(path: &str) -> JitValuePath {
+        JitValuePath { path }
     }
 }
 
@@ -46,7 +46,7 @@ impl<'a> JitLookup<'a> {
     }
 }
 
-impl<'a> Path<'a> for JitPath<'a> {
+impl<'a> Path<'a> for JitValuePath<'a> {
     type Iter = JitLookup<'a>;
 
     fn segment_iter(&self) -> Self::Iter {
@@ -376,12 +376,12 @@ impl<'a> Iterator for JitLookup<'a> {
 
 #[cfg(test)]
 mod test {
-    use crate::lookup_v2::{OwnedPath, OwnedSegment, Path};
+    use crate::lookup_v2::{OwnedSegment, OwnedValuePath, Path};
     use crate::owned_path;
 
     #[test]
     fn parsing() {
-        let test_cases: Vec<(_, OwnedPath)> = vec![
+        let test_cases: Vec<(_, OwnedValuePath)> = vec![
             ("", owned_path!(OwnedSegment::Invalid)),
             (".", owned_path!()),
             ("]", owned_path!(OwnedSegment::Invalid)),

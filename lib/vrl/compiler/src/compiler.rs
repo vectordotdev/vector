@@ -1,5 +1,5 @@
 use diagnostic::{DiagnosticList, DiagnosticMessage, Severity, Span};
-use lookup::{OwnedPath, PathPrefix, TargetPath};
+use lookup::{OwnedValuePath, PathPrefix, TargetPath};
 use parser::ast::{self, Node, QueryTarget};
 
 use crate::state::TypeState;
@@ -39,7 +39,7 @@ pub struct Compiler<'a> {
     ///
     /// This list allows us to avoid printing "undefined variable" compilation
     /// errors when the reason for it being undefined is another compiler error.
-    skip_missing_query_target: Vec<(QueryTarget, OwnedPath)>,
+    skip_missing_query_target: Vec<(QueryTarget, OwnedValuePath)>,
 
     /// Track which expression in a chain of expressions is fallible.
     ///
@@ -753,7 +753,7 @@ impl<'a> Compiler<'a> {
 
         if self
             .skip_missing_query_target
-            .contains(&(QueryTarget::Internal(ident.clone()), OwnedPath::root()))
+            .contains(&(QueryTarget::Internal(ident.clone()), OwnedValuePath::root()))
         {
             return None;
         }
@@ -838,11 +838,11 @@ impl<'a> Compiler<'a> {
             }
             ast::AssignmentTarget::Internal(ident, path) => (
                 QueryTarget::Internal(ident.clone()),
-                path.clone().unwrap_or_else(OwnedPath::root),
+                path.clone().unwrap_or_else(OwnedValuePath::root),
             ),
             ast::AssignmentTarget::External(path) => {
                 let prefix = path.as_ref().map_or(PathPrefix::Event, |x| x.prefix);
-                let path = path.clone().map_or_else(OwnedPath::root, |x| x.path);
+                let path = path.clone().map_or_else(OwnedValuePath::root, |x| x.path);
                 (QueryTarget::External(prefix), path)
             }
         };

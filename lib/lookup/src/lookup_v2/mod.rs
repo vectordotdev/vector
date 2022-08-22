@@ -4,12 +4,12 @@ mod concat;
 mod jit;
 mod owned;
 
-use self::jit::{JitLookup, JitPath};
+use self::jit::{JitLookup, JitValuePath};
 use std::fmt::{Debug, Display, Formatter};
 
 pub use borrowed::BorrowedSegment;
 pub use concat::PathConcat;
-pub use owned::{OwnedPath, OwnedSegment};
+pub use owned::{OwnedSegment, OwnedValuePath};
 
 /// Syntactic sugar for creating a pre-parsed path.
 ///
@@ -30,14 +30,14 @@ macro_rules! path {
 #[macro_export]
 macro_rules! owned_path {
     ($($segment:expr),*) => {{
-           $crate::lookup_v2::OwnedPath::from(vec![$($crate::lookup_v2::OwnedSegment::from($segment),)*])
+           $crate::lookup_v2::OwnedValuePath::from(vec![$($crate::lookup_v2::OwnedSegment::from($segment),)*])
     }};
 }
 
 /// Use if you want to pre-parse paths so it can be used multiple times.
 /// The return value (when borrowed) implements `Path` so it can be used directly.
-pub fn parse_path(path: &str) -> OwnedPath {
-    JitPath::new(path).to_owned_path()
+pub fn parse_path(path: &str) -> OwnedValuePath {
+    JitValuePath::new(path).to_owned_path()
 }
 
 /// A path is simply the data describing how to look up a value.
@@ -74,12 +74,12 @@ pub trait Path<'a>: Clone {
         true
     }
 
-    fn to_owned_path(&self) -> OwnedPath {
-        let mut owned_path = OwnedPath::root();
+    fn to_owned_path(&self) -> OwnedValuePath {
+        let mut owned_path = OwnedValuePath::root();
         let mut coalesce = vec![];
         for segment in self.segment_iter() {
             match segment {
-                BorrowedSegment::Invalid => return OwnedPath::invalid(),
+                BorrowedSegment::Invalid => return OwnedValuePath::invalid(),
                 BorrowedSegment::Index(i) => owned_path.push(OwnedSegment::Index(i)),
                 BorrowedSegment::Field(field) => {
                     owned_path.push(OwnedSegment::Field(field.to_string()))
@@ -101,7 +101,7 @@ impl<'a> Path<'a> for &'a str {
     type Iter = JitLookup<'a>;
 
     fn segment_iter(&self) -> Self::Iter {
-        JitPath::new(self).segment_iter()
+        JitValuePath::new(self).segment_iter()
     }
 }
 
@@ -114,7 +114,7 @@ pub enum PathPrefix {
 #[derive(Hash, Eq, PartialEq, Clone, PartialOrd, Ord)]
 pub struct TargetPath {
     pub prefix: PathPrefix,
-    pub path: OwnedPath,
+    pub path: OwnedValuePath,
 }
 
 impl TargetPath {
@@ -128,18 +128,18 @@ impl TargetPath {
     pub fn root(prefix: PathPrefix) -> Self {
         Self {
             prefix,
-            path: OwnedPath::root(),
+            path: OwnedValuePath::root(),
         }
     }
 
-    pub fn event(path: OwnedPath) -> Self {
+    pub fn event(path: OwnedValuePath) -> Self {
         Self {
             prefix: PathPrefix::Event,
             path,
         }
     }
 
-    pub fn metadata(path: OwnedPath) -> Self {
+    pub fn metadata(path: OwnedValuePath) -> Self {
         Self {
             prefix: PathPrefix::Metadata,
             path,

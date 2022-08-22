@@ -157,7 +157,7 @@ impl Kind {
 
 #[cfg(test)]
 mod tests {
-    use lookup::lookup_v2::{parse_path, OwnedPath};
+    use lookup::lookup_v2::{parse_path, OwnedValuePath};
     use lookup::owned_path;
     use std::collections::BTreeMap;
 
@@ -168,7 +168,7 @@ mod tests {
     fn test_at_path() {
         struct TestCase {
             kind: Kind,
-            path: OwnedPath,
+            path: OwnedValuePath,
             want: Kind,
         }
 

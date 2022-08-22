@@ -6,25 +6,25 @@ use crate::{
     type_def::Details,
     Context, Expression,
 };
-use lookup::{LookupBuf, OwnedPath, PathPrefix, TargetPath};
+use lookup::{LookupBuf, OwnedValuePath, PathPrefix, TargetPath};
 use std::fmt;
 use value::{kind::remove, Kind, Value};
 
 #[derive(Clone, PartialEq)]
 pub struct Query {
     target: Target,
-    path: OwnedPath,
+    path: OwnedValuePath,
 }
 
 impl Query {
     // TODO:
     // - error when trying to index into object
     // - error when trying to path into array
-    pub fn new(target: Target, path: OwnedPath) -> Self {
+    pub fn new(target: Target, path: OwnedValuePath) -> Self {
         Query { target, path }
     }
 
-    pub fn path(&self) -> &OwnedPath {
+    pub fn path(&self) -> &OwnedValuePath {
         &self.path
     }
 
@@ -213,7 +213,7 @@ mod tests {
     fn test_type_def() {
         let query = Query {
             target: Target::External(PathPrefix::Event),
-            path: OwnedPath::root(),
+            path: OwnedValuePath::root(),
         };
 
         let state = TypeState::default();

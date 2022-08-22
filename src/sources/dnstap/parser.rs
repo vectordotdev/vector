@@ -30,7 +30,7 @@ use dnstap_proto::{
     message::Type as DnstapMessageType, Dnstap, Message as DnstapMessage, SocketFamily,
     SocketProtocol,
 };
-use lookup::lookup_v2::OwnedPath;
+use lookup::lookup_v2::OwnedValuePath;
 
 use super::{
     dns_message::{
@@ -78,7 +78,7 @@ static DNSTAP_MESSAGE_RESPONSE_TYPE_IDS: Lazy<HashSet<i32>> = Lazy::new(|| {
 
 pub struct DnstapParser<'a> {
     event_schema: &'a DnstapEventSchema,
-    parent_key_path: OwnedPath,
+    parent_key_path: OwnedValuePath,
     log_event: &'a mut LogEvent,
 }
 

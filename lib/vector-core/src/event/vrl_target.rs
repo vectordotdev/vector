@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, convert::TryFrom, marker::PhantomData};
 
 use lookup::lookup_v2::OwnedSegment;
-use lookup::{OwnedPath, PathPrefix, TargetPath};
+use lookup::{OwnedValuePath, PathPrefix, TargetPath};
 use snafu::Snafu;
 use vrl_lib::{prelude::VrlValueConvert, ProgramInfo, SecretTarget};
 
@@ -362,7 +362,10 @@ impl SecretTarget for VrlTarget {
 /// - type
 ///
 /// Any other paths result in a `MetricPathError::InvalidPath` being returned.
-fn target_get_metric<'a>(path: &OwnedPath, value: &'a Value) -> Result<Option<&'a Value>, String> {
+fn target_get_metric<'a>(
+    path: &OwnedValuePath,
+    value: &'a Value,
+) -> Result<Option<&'a Value>, String> {
     if path.is_root() {
         return Ok(Some(value));
     }
@@ -393,7 +396,7 @@ fn target_get_metric<'a>(path: &OwnedPath, value: &'a Value) -> Result<Option<&'
 }
 
 fn target_get_mut_metric<'a>(
-    path: &OwnedPath,
+    path: &OwnedValuePath,
     value: &'a mut Value,
 ) -> Result<Option<&'a mut Value>, String> {
     if path.is_root() {

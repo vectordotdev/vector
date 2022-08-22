@@ -1,5 +1,5 @@
 use ::value::Value;
-use lookup_lib::{OwnedPath, TargetPath};
+use lookup_lib::{OwnedValuePath, TargetPath};
 use vrl::prelude::*;
 
 fn unnest(path: &expression::Query, ctx: &mut Context) -> Resolved {
@@ -16,23 +16,23 @@ fn unnest(path: &expression::Query, ctx: &mut Context) -> Resolved {
         }
         expression::Target::Internal(v) => {
             let value = ctx.state().variable(v.ident()).unwrap_or(&Value::Null);
-            let root = value.get(&OwnedPath::root()).expect("always a value");
+            let root = value.get(&OwnedValuePath::root()).expect("always a value");
             unnest_root(root, lookup_buf)
         }
         expression::Target::Container(expr) => {
             let value = expr.resolve(ctx)?;
-            let root = value.get(&OwnedPath::root()).expect("always a value");
+            let root = value.get(&OwnedValuePath::root()).expect("always a value");
             unnest_root(root, lookup_buf)
         }
         expression::Target::FunctionCall(expr) => {
             let value = expr.resolve(ctx)?;
-            let root = value.get(&OwnedPath::root()).expect("always a value");
+            let root = value.get(&OwnedValuePath::root()).expect("always a value");
             unnest_root(root, lookup_buf)
         }
     }
 }
 
-fn unnest_root(root: &Value, path: &OwnedPath) -> Resolved {
+fn unnest_root(root: &Value, path: &OwnedValuePath) -> Resolved {
     let mut trimmed = root.clone();
     let values = trimmed
         .remove(path, true)
@@ -182,7 +182,7 @@ impl FunctionExpression for UnnestFn {
 ///    { "a" => { "b" => { "c" => 3 } } },
 ///  ]`
 ///
-pub(crate) fn invert_array_at_path(typedef: &TypeDef, path: &OwnedPath) -> TypeDef {
+pub(crate) fn invert_array_at_path(typedef: &TypeDef, path: &OwnedValuePath) -> TypeDef {
     let kind = typedef.kind().at_path(path);
 
     let mut array = if let Some(array) = kind.into_array() {

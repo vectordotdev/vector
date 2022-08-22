@@ -1,15 +1,15 @@
 use std::ops::{Deref, DerefMut};
 
 use ::value::Value;
-use lookup::OwnedPath;
+use lookup::OwnedValuePath;
 use vrl::state::TypeState;
 use vrl::{diagnostic::Label, prelude::*};
 
 #[derive(Debug, Default, Clone)]
-pub struct MeaningList(pub BTreeMap<String, OwnedPath>);
+pub struct MeaningList(pub BTreeMap<String, OwnedValuePath>);
 
 impl Deref for MeaningList {
-    type Target = BTreeMap<String, OwnedPath>;
+    type Target = BTreeMap<String, OwnedValuePath>;
 
     fn deref(&self) -> &Self::Target {
         &self.0

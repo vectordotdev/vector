@@ -5,7 +5,7 @@ use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use http::{uri::PathAndQuery, Request, StatusCode, Uri};
 use hyper::{body::to_bytes as body_to_bytes, Body};
-use lookup::lookup_v2::{parse_path, OwnedPath};
+use lookup::lookup_v2::{parse_path, OwnedValuePath};
 use once_cell::sync::Lazy;
 use serde::Deserialize;
 use snafu::ResultExt as _;
@@ -112,7 +112,7 @@ pub struct Ec2MetadataTransform {
 
 #[derive(Debug, Clone)]
 struct MetadataKey {
-    log_path: OwnedPath,
+    log_path: OwnedValuePath,
     metric_tag: String,
 }
 
@@ -536,7 +536,7 @@ fn create_key(namespace: &Option<String>, key: &str) -> MetadataKey {
         }
     } else {
         MetadataKey {
-            log_path: OwnedPath::single_field(key),
+            log_path: OwnedValuePath::single_field(key),
             metric_tag: key.to_owned(),
         }
     }
@@ -592,7 +592,7 @@ enum Ec2MetadataError {
 #[cfg(test)]
 mod integration_tests {
     use futures::{SinkExt, StreamExt};
-    use lookup::lookup_v2::{parse_path, BorrowedSegment, OwnedPath, OwnedSegment};
+    use lookup::lookup_v2::{parse_path, BorrowedSegment, OwnedSegment, OwnedValuePath};
 
     use super::*;
     use crate::{
@@ -605,7 +605,7 @@ mod integration_tests {
         std::env::var("EC2_METADATA_ADDRESS").unwrap_or_else(|_| "http://localhost:8111".into())
     }
 
-    fn expected_log_fields() -> Vec<(OwnedPath, &'static str)> {
+    fn expected_log_fields() -> Vec<(OwnedValuePath, &'static str)> {
         vec![
             (
                 vec![OwnedSegment::field(AVAILABILITY_ZONE_KEY)].into(),
