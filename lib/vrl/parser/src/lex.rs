@@ -689,9 +689,10 @@ impl<'input> Iterator for Lexer<'input> {
         if let Some(Ok((_, token, _))) = &result {
             self.coalesce_state = match (&self.coalesce_state, token) {
                 (None, Token::Dot) => Some(CoalesceState::Dot),
-                (Some(CoalesceState::Dot), Token::LParen) => Some(CoalesceState::Coalesce),
                 (Some(CoalesceState::Coalesce), Token::RParen) => None,
-                (Some(CoalesceState::Coalesce), _) => Some(CoalesceState::Coalesce),
+                (Some(CoalesceState::Coalesce), _) | (Some(CoalesceState::Dot), Token::LParen) => {
+                    Some(CoalesceState::Coalesce)
+                }
                 _ => None,
             };
         }
