@@ -131,7 +131,7 @@ where
                     debug!(message = "Endpoint is on probation.", endpoint = %&self.endpoint);
 
                     // Using Tripwire will let us be notified when the request is done.
-                    // This can't be done through counters since a requests can end without changing them.
+                    // This can't be done through counters since a request can end without changing them.
                     let (permit, done) = Tripwire::new();
 
                     CircuitState::HalfOpen {
