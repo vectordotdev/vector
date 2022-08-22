@@ -1,10 +1,10 @@
 ///! Contains backwards compatibility with lookup "v1"
 ///! This is all temporary and will be deleted when migration to the V2 lookup code is complete.
-use crate::lookup_v2::{BorrowedSegment, OwnedSegment, OwnedValuePath, Path};
+use crate::lookup_v2::{BorrowedSegment, OwnedSegment, OwnedValuePath, ValuePath};
 use crate::{FieldBuf, LookupBuf, SegmentBuf};
 use std::borrow::Cow;
 
-impl<'a> Path<'a> for &'a LookupBuf {
+impl<'a> ValuePath<'a> for &'a LookupBuf {
     type Iter = LookupBufPathIter<'a>;
 
     fn segment_iter(&self) -> Self::Iter {
@@ -103,7 +103,7 @@ impl<'a> Iterator for LookupBufPathIter<'a> {
 
 #[cfg(test)]
 mod test {
-    use crate::lookup_v2::Path;
+    use crate::lookup_v2::ValuePath;
     use crate::LookupBuf;
 
     #[test]
@@ -120,7 +120,7 @@ mod test {
 
         for test in tests {
             let lookup_buf = LookupBuf::from_str(test).unwrap();
-            if !Path::eq(&test, &lookup_buf) {
+            if !ValuePath::eq(&test, &lookup_buf) {
                 panic!("Equality failed. Path={:?}", test);
             }
         }

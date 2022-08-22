@@ -3,7 +3,7 @@
 use core::fmt::Debug;
 
 use lookup::{
-    lookup_v2::{parse_path, OwnedValuePath},
+    lookup_v2::{parse_value_path, OwnedValuePath},
     path,
 };
 use serde::{Deserialize, Deserializer};
@@ -99,7 +99,7 @@ impl Transformer {
     ) -> crate::Result<()> {
         if let (Some(only_fields), Some(except_fields)) = (only_fields, except_fields) {
             if except_fields.iter().any(|f| {
-                let path_iter = parse_path(f);
+                let path_iter = parse_value_path(f);
                 only_fields.iter().any(|v| v == &path_iter)
             }) {
                 return Err(
@@ -126,7 +126,7 @@ impl Transformer {
             let mut to_remove = match log.keys() {
                 Some(keys) => keys
                     .filter(|field| {
-                        let field_path = parse_path(field);
+                        let field_path = parse_value_path(field);
                         !only_fields
                             .iter()
                             .any(|only| field_path.segments.starts_with(&only.segments[..]))

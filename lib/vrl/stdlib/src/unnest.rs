@@ -1,5 +1,5 @@
 use ::value::Value;
-use lookup_lib::{OwnedValuePath, TargetPath};
+use lookup_lib::{OwnedTargetPath, OwnedValuePath};
 use vrl::prelude::*;
 
 fn unnest(path: &expression::Query, ctx: &mut Context) -> Resolved {
@@ -9,7 +9,7 @@ fn unnest(path: &expression::Query, ctx: &mut Context) -> Resolved {
         expression::Target::External(prefix) => {
             let root = ctx
                 .target()
-                .target_get(&TargetPath::root(*prefix))
+                .target_get(&OwnedTargetPath::root(*prefix))
                 .expect("must never fail")
                 .expect("always a value");
             unnest_root(root, lookup_buf)
@@ -140,12 +140,12 @@ struct UnnestFn {
 impl UnnestFn {
     #[cfg(test)]
     fn new(path: &str) -> Self {
-        use lookup_lib::{lookup_v2::parse_path, PathPrefix};
+        use lookup_lib::{lookup_v2::parse_value_path, PathPrefix};
 
         Self {
             path: expression::Query::new(
                 expression::Target::External(PathPrefix::Event),
-                parse_path(path),
+                parse_value_path(path),
             ),
         }
     }
@@ -213,7 +213,7 @@ pub(crate) fn invert_array_at_path(typedef: &TypeDef, path: &OwnedValuePath) -> 
 
 #[cfg(test)]
 mod tests {
-    use lookup_lib::lookup_v2::parse_path;
+    use lookup_lib::lookup_v2::parse_value_path;
     use vector_common::{btreemap, TimeZone};
     use vrl::state::TypeState;
 
@@ -424,7 +424,7 @@ mod tests {
         ];
 
         for case in cases {
-            let path = parse_path(case.path);
+            let path = parse_value_path(case.path);
             let new = invert_array_at_path(&case.old, &path);
             assert_eq!(case.new, new, "{}", path);
         }

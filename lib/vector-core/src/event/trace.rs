@@ -9,7 +9,6 @@ use super::{
     BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable, LogEvent, Value,
 };
 use crate::ByteSizeOf;
-use lookup::path;
 
 /// Traces are a newtype of `LogEvent`
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, PartialOrd, Serialize)]
@@ -80,9 +79,9 @@ impl TraceEvent {
         self.0.lookup_mut(path)
     }
 
-    pub fn get_flat(&self, key: impl AsRef<str>) -> Option<&Value> {
-        self.0.get(path!(key.as_ref()))
-    }
+    // pub fn get_flat(&self, key: impl AsRef<str>) -> Option<&Value> {
+    //     self.0.get(path!(key.as_ref()))
+    // }
 
     pub fn get_mut(&mut self, key: impl AsRef<str>) -> Option<&mut Value> {
         self.0.get_mut(key.as_ref())

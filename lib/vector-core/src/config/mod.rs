@@ -9,7 +9,7 @@ pub mod proxy;
 use crate::event::LogEvent;
 pub use global_options::GlobalOptions;
 pub use log_schema::{init_log_schema, log_schema, LogSchema};
-use lookup::lookup_v2::Path;
+use lookup::lookup_v2::ValuePath;
 use lookup::path;
 use serde::{Deserialize, Serialize};
 use value::Value;
@@ -220,8 +220,8 @@ impl LogNamespace {
         &self,
         source_name: &'a str,
         log: &mut LogEvent,
-        legacy_key: impl Path<'a>,
-        metadata_key: impl Path<'a>,
+        legacy_key: impl ValuePath<'a>,
+        metadata_key: impl ValuePath<'a>,
         value: impl Into<Value>,
     ) {
         match self {
@@ -243,8 +243,8 @@ impl LogNamespace {
     pub fn insert_vector_metadata<'a>(
         &self,
         log: &mut LogEvent,
-        legacy_key: impl Path<'a>,
-        metadata_key: impl Path<'a>,
+        legacy_key: impl ValuePath<'a>,
+        metadata_key: impl ValuePath<'a>,
         value: impl Into<Value>,
     ) {
         match self {

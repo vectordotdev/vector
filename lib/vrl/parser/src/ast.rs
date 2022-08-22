@@ -10,7 +10,7 @@ use std::{
 #[cfg(feature = "fuzz")]
 use arbitrary::Arbitrary;
 use diagnostic::Span;
-use lookup::lookup_v2::{OwnedValuePath, PathPrefix, TargetPath};
+use lookup::lookup_v2::{OwnedTargetPath, OwnedValuePath, PathPrefix};
 use ordered_float::NotNan;
 
 use crate::{template_string::TemplateString, Error};
@@ -855,7 +855,7 @@ pub enum AssignmentTarget {
     Noop,
     Query(Query),
     Internal(Ident, Option<OwnedValuePath>),
-    External(Option<TargetPath>),
+    External(Option<OwnedTargetPath>),
 }
 
 impl AssignmentTarget {

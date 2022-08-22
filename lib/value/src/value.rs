@@ -30,7 +30,7 @@ pub use crate::value::regex::ValueRegex;
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, SecondsFormat, Utc};
 pub use iter::IterItem;
-use lookup::lookup_v2::Path;
+use lookup::lookup_v2::ValuePath;
 use ordered_float::NotNan;
 
 /// A boxed `std::error::Error`.
@@ -221,7 +221,7 @@ impl Value {
     #[allow(clippy::needless_pass_by_value)]
     pub fn insert<'a>(
         &mut self,
-        path: impl Path<'a>,
+        path: impl ValuePath<'a>,
         insert_value: impl Into<Self>,
     ) -> Option<Self> {
         let insert_value = insert_value.into();
@@ -235,25 +235,25 @@ impl Value {
     /// A special case worth mentioning: if there is a nested array and an item is removed
     /// from the middle of this array, then it is just replaced by `Value::Null`.
     #[allow(clippy::needless_pass_by_value)]
-    pub fn remove<'a>(&mut self, path: impl Path<'a>, prune: bool) -> Option<Self> {
+    pub fn remove<'a>(&mut self, path: impl ValuePath<'a>, prune: bool) -> Option<Self> {
         crud::remove(self, &(), path.segment_iter(), prune)
             .map(|(prev_value, _is_empty)| prev_value)
     }
 
     /// Returns a reference to a field value specified by a path iter.
     #[allow(clippy::needless_pass_by_value)]
-    pub fn get<'a>(&self, path: impl Path<'a>) -> Option<&Self> {
+    pub fn get<'a>(&self, path: impl ValuePath<'a>) -> Option<&Self> {
         crud::get(self, path.segment_iter())
     }
 
     /// Get a mutable borrow of the value by path
     #[allow(clippy::needless_pass_by_value)]
-    pub fn get_mut<'a>(&mut self, path: impl Path<'a>) -> Option<&mut Self> {
+    pub fn get_mut<'a>(&mut self, path: impl ValuePath<'a>) -> Option<&mut Self> {
         crud::get_mut(self, path.segment_iter())
     }
 
     /// Determine if the lookup is contained within the value.
-    pub fn contains<'a>(&self, path: impl Path<'a>) -> bool {
+    pub fn contains<'a>(&self, path: impl ValuePath<'a>) -> bool {
         self.get(path).is_some()
     }
 }

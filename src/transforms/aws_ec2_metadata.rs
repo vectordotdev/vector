@@ -5,7 +5,7 @@ use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use http::{uri::PathAndQuery, Request, StatusCode, Uri};
 use hyper::{body::to_bytes as body_to_bytes, Body};
-use lookup::lookup_v2::{parse_path, OwnedValuePath};
+use lookup::lookup_v2::{parse_value_path, OwnedValuePath};
 use once_cell::sync::Lazy;
 use serde::Deserialize;
 use snafu::ResultExt as _;
@@ -531,7 +531,7 @@ impl MetadataClient {
 fn create_key(namespace: &Option<String>, key: &str) -> MetadataKey {
     if let Some(namespace) = namespace {
         MetadataKey {
-            log_path: parse_path(namespace).with_field_appended(key),
+            log_path: parse_value_path(namespace).with_field_appended(key),
             metric_tag: format!("{}.{}", namespace, key),
         }
     } else {
@@ -592,7 +592,7 @@ enum Ec2MetadataError {
 #[cfg(test)]
 mod integration_tests {
     use futures::{SinkExt, StreamExt};
-    use lookup::lookup_v2::{parse_path, BorrowedSegment, OwnedSegment, OwnedValuePath};
+    use lookup::lookup_v2::{parse_value_path, BorrowedSegment, OwnedSegment, OwnedValuePath};
 
     use super::*;
     use crate::{
@@ -649,7 +649,7 @@ mod integration_tests {
                 vec![OwnedSegment::field(SUBNET_ID_KEY)].into(),
                 "mock-subnet-id",
             ),
-            (parse_path("\"role-name\"[0]"), "mock-user"),
+            (parse_value_path("\"role-name\"[0]"), "mock-user"),
         ]
     }
 

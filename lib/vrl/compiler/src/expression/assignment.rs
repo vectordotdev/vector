@@ -1,7 +1,7 @@
 use std::{convert::TryFrom, fmt};
 
 use diagnostic::{DiagnosticMessage, Label, Note};
-use lookup::lookup_v2::TargetPath;
+use lookup::lookup_v2::OwnedTargetPath;
 use lookup::{LookupBuf, OwnedValuePath, PathPrefix, SegmentBuf};
 use value::{Kind, Value};
 
@@ -322,7 +322,7 @@ impl fmt::Debug for Assignment {
 pub(crate) enum Target {
     Noop,
     Internal(Ident, OwnedValuePath),
-    External(TargetPath),
+    External(OwnedTargetPath),
 }
 
 impl Target {
@@ -453,7 +453,9 @@ impl TryFrom<ast::AssignmentTarget> for Target {
 
                 match target {
                     ast::QueryTarget::Internal(ident) => Internal(ident, path),
-                    ast::QueryTarget::External(prefix) => External(TargetPath { prefix, path }),
+                    ast::QueryTarget::External(prefix) => {
+                        External(OwnedTargetPath { prefix, path })
+                    }
                     _ => {
                         return Err(Error {
                             variant: ErrorVariant::InvalidTarget(span),
@@ -467,7 +469,7 @@ impl TryFrom<ast::AssignmentTarget> for Target {
                 Internal(ident, path.unwrap_or_else(OwnedValuePath::root))
             }
             ast::AssignmentTarget::External(path) => {
-                External(path.unwrap_or_else(TargetPath::event_root))
+                External(path.unwrap_or_else(OwnedTargetPath::event_root))
             }
         };
 

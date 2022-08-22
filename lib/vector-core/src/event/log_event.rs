@@ -12,7 +12,8 @@ use std::{
 };
 
 use crossbeam_utils::atomic::AtomicCell;
-use lookup::{lookup_v2::Path, LookupBuf};
+use lookup::lookup_v2::TargetPath;
+use lookup::{lookup_v2::ValuePath, LookupBuf, PathPrefix};
 use serde::{Deserialize, Serialize, Serializer};
 use vector_common::EventDataEq;
 
@@ -230,8 +231,11 @@ impl LogEvent {
         self.metadata.add_finalizer(finalizer);
     }
 
-    pub fn get<'a>(&self, key: impl Path<'a>) -> Option<&Value> {
-        self.inner.fields.get(key)
+    pub fn get<'a>(&self, key: impl TargetPath<'a>) -> Option<&Value> {
+        match key.prefix() {
+            PathPrefix::Event => self.inner.fields.get(key),
+            PathPrefix::Metadata => self.metadata.value().get(key),
+        }
     }
 
     pub fn lookup(&self, path: &LookupBuf) -> Option<&Value> {
@@ -257,20 +261,24 @@ impl LogEvent {
             .map(std::string::ToString::to_string)
     }
 
-    pub fn get_mut<'a>(&mut self, path: impl Path<'a>) -> Option<&mut Value> {
+    pub fn get_mut<'a>(&mut self, path: impl ValuePath<'a>) -> Option<&mut Value> {
         self.value_mut().get_mut(path)
     }
 
-    pub fn contains<'a>(&self, path: impl Path<'a>) -> bool {
+    pub fn contains<'a>(&self, path: impl ValuePath<'a>) -> bool {
         self.value().get(path).is_some()
     }
 
-    pub fn insert<'a>(&mut self, path: impl Path<'a>, value: impl Into<Value>) -> Option<Value> {
+    pub fn insert<'a>(
+        &mut self,
+        path: impl ValuePath<'a>,
+        value: impl Into<Value>,
+    ) -> Option<Value> {
         self.value_mut().insert(path, value.into())
     }
 
     // deprecated - using this means the schema is unknown
-    pub fn try_insert<'a>(&mut self, path: impl Path<'a>, value: impl Into<Value>) {
+    pub fn try_insert<'a>(&mut self, path: impl ValuePath<'a>, value: impl Into<Value>) {
         if !self.contains(path.clone()) {
             self.insert(path, value);
         }
@@ -279,17 +287,17 @@ impl LogEvent {
     /// Rename a key
     ///
     /// If `to_key` already exists in the structure its value will be overwritten.
-    pub fn rename_key<'a>(&mut self, from: impl Path<'a>, to: impl Path<'a>) {
+    pub fn rename_key<'a>(&mut self, from: impl ValuePath<'a>, to: impl ValuePath<'a>) {
         if let Some(val) = self.remove(from) {
             self.insert(to, val);
         }
     }
 
-    pub fn remove<'a>(&mut self, path: impl Path<'a>) -> Option<Value> {
+    pub fn remove<'a>(&mut self, path: impl ValuePath<'a>) -> Option<Value> {
         self.remove_prune(path, false)
     }
 
-    pub fn remove_prune<'a>(&mut self, path: impl Path<'a>, prune: bool) -> Option<Value> {
+    pub fn remove_prune<'a>(&mut self, path: impl ValuePath<'a>, prune: bool) -> Option<Value> {
         self.value_mut().remove(path, prune)
     }
 

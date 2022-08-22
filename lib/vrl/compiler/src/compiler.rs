@@ -1,5 +1,5 @@
 use diagnostic::{DiagnosticList, DiagnosticMessage, Severity, Span};
-use lookup::{OwnedValuePath, PathPrefix, TargetPath};
+use lookup::{OwnedTargetPath, OwnedValuePath, PathPrefix};
 use parser::ast::{self, Node, QueryTarget};
 
 use crate::state::TypeState;
@@ -31,8 +31,8 @@ pub struct Compiler<'a> {
     diagnostics: Diagnostics,
     fallible: bool,
     abortable: bool,
-    external_queries: Vec<TargetPath>,
-    external_assignments: Vec<TargetPath>,
+    external_queries: Vec<OwnedTargetPath>,
+    external_assignments: Vec<OwnedTargetPath>,
 
     /// A list of variables that are missing, because the rhs expression of the
     /// assignment failed to compile.
@@ -563,7 +563,7 @@ impl<'a> Compiler<'a> {
         // This data is exposed to the caller of the compiler, to allow any
         // potential external optimizations.
         if let Target::External(prefix) = target {
-            let target_path = TargetPath {
+            let target_path = OwnedTargetPath {
                 prefix,
                 path: path.clone(),
             };
@@ -626,7 +626,7 @@ impl<'a> Compiler<'a> {
         //
         // See: https://github.com/vectordotdev/vector/issues/12547
         if ident.as_deref() == "get" {
-            self.external_queries.push(TargetPath::event_root());
+            self.external_queries.push(OwnedTargetPath::event_root());
         }
 
         let arguments = arguments

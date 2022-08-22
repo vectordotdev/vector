@@ -6,7 +6,7 @@ use std::{
     path::PathBuf,
 };
 
-use lookup::lookup_v2::Path;
+use lookup::lookup_v2::ValuePath;
 use lookup::path;
 use snafu::{ResultExt, Snafu};
 use value::Kind;

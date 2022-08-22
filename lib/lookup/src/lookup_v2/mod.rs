@@ -4,7 +4,7 @@ mod concat;
 mod jit;
 mod owned;
 
-use self::jit::{JitLookup, JitValuePath};
+use self::jit::{JitTargetPath, JitValuePath, JitValuePathIter};
 use std::fmt::{Debug, Display, Formatter};
 
 pub use borrowed::BorrowedSegment;
@@ -28,7 +28,7 @@ macro_rules! path {
 ///
 /// Example: `owned_path!("foo", 4, "bar")` is the pre-parsed path of `foo[4].bar`
 #[macro_export]
-macro_rules! owned_path {
+macro_rules! owned_value_path {
     ($($segment:expr),*) => {{
            $crate::lookup_v2::OwnedValuePath::from(vec![$($crate::lookup_v2::OwnedSegment::from($segment),)*])
     }};
@@ -36,32 +36,39 @@ macro_rules! owned_path {
 
 /// Use if you want to pre-parse paths so it can be used multiple times.
 /// The return value (when borrowed) implements `Path` so it can be used directly.
-pub fn parse_path(path: &str) -> OwnedValuePath {
-    JitValuePath::new(path).to_owned_path()
+pub fn parse_value_path(path: &str) -> OwnedValuePath {
+    JitValuePath::new(path).to_owned_value_path()
 }
 
-/// A path is simply the data describing how to look up a value.
+pub trait TargetPath<'a>: Clone {
+    type ValuePath: Path<'a>;
+
+    fn prefix(&self) -> PathPrefix;
+    fn value_path(&self) -> Self::ValuePath;
+}
+
+/// A path is simply the data describing how to look up a field from a value.
 /// This should only be implemented for types that are very cheap to clone, such as references.
-pub trait Path<'a>: Clone {
+pub trait ValuePath<'a>: Clone {
     type Iter: Iterator<Item = BorrowedSegment<'a>> + Clone;
 
     /// Iterates over the raw "Borrowed" segments.
     fn segment_iter(&self) -> Self::Iter;
 
-    fn concat<T: Path<'a>>(&self, path: T) -> PathConcat<Self, T> {
+    fn concat<T: ValuePath<'a>>(&self, path: T) -> PathConcat<Self, T> {
         PathConcat {
             a: self.clone(),
             b: path,
         }
     }
 
-    fn eq(&self, other: impl Path<'a>) -> bool {
+    fn eq(&self, other: impl ValuePath<'a>) -> bool {
         self.segment_iter().eq(other.segment_iter())
     }
 
-    fn can_start_with(&self, prefix: impl Path<'a>) -> bool {
-        let mut self_segments = self.to_owned_path().segments.into_iter();
-        for prefix_segment in prefix.to_owned_path().segments.iter() {
+    fn can_start_with(&self, prefix: impl ValuePath<'a>) -> bool {
+        let mut self_segments = self.to_owned_value_path().segments.into_iter();
+        for prefix_segment in prefix.to_owned_value_path().segments.iter() {
             match self_segments.next() {
                 None => return false,
                 Some(self_segment) => {
@@ -74,7 +81,7 @@ pub trait Path<'a>: Clone {
         true
     }
 
-    fn to_owned_path(&self) -> OwnedValuePath {
+    fn to_owned_value_path(&self) -> OwnedValuePath {
         let mut owned_path = OwnedValuePath::root();
         let mut coalesce = vec![];
         for segment in self.segment_iter() {
@@ -97,12 +104,41 @@ pub trait Path<'a>: Clone {
     }
 }
 
-impl<'a> Path<'a> for &'a str {
-    type Iter = JitLookup<'a>;
+impl<'a> ValuePath<'a> for &'a str {
+    type Iter = JitValuePathIter<'a>;
 
     fn segment_iter(&self) -> Self::Iter {
         JitValuePath::new(self).segment_iter()
     }
+}
+
+impl<'a> TargetPath<'a> for &'a str {
+    type ValuePath = JitValuePath<'a>;
+
+    fn prefix(&self) -> PathPrefix {
+        todo!()
+    }
+
+    fn value_path(&self) -> Self::ValuePath {
+        todo!()
+    }
+}
+
+fn get_target_prefix(path: &str) -> (PathPrefix, &str) {
+    let (prefix, path) = match path.chars().next() {
+        Some('.') => {
+            // For backwards compatibility, the "ValuePath" parser still allows an optional
+            // starting ".". To prevent ".." from being a valid path, it is _not_ removed
+            // here. This should be changed once "ValuePath" no longer allows a leading ".".
+            (PathPrefix::Event, path)
+        }
+        Some('@') => (PathPrefix::Metadata, &path[1..]),
+        _ => {
+            // This shouldn't be allowed in the future, but is currently
+            // used for backwards compatibility.
+            (PathPrefix::Event, path)
+        }
+    };
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -112,12 +148,12 @@ pub enum PathPrefix {
 }
 
 #[derive(Hash, Eq, PartialEq, Clone, PartialOrd, Ord)]
-pub struct TargetPath {
+pub struct OwnedTargetPath {
     pub prefix: PathPrefix,
     pub path: OwnedValuePath,
 }
 
-impl TargetPath {
+impl OwnedTargetPath {
     pub fn event_root() -> Self {
         Self::root(PathPrefix::Event)
     }
@@ -154,7 +190,7 @@ impl TargetPath {
     }
 }
 
-impl Display for TargetPath {
+impl Display for OwnedTargetPath {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self.prefix {
             PathPrefix::Event => write!(f, ".{}", self.path),
@@ -163,7 +199,7 @@ impl Display for TargetPath {
     }
 }
 
-impl Debug for TargetPath {
+impl Debug for OwnedTargetPath {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         Display::fmt(self, f)
     }

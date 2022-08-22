@@ -6,7 +6,7 @@ use crate::{
     type_def::Details,
     Context, Expression,
 };
-use lookup::{LookupBuf, OwnedValuePath, PathPrefix, TargetPath};
+use lookup::{LookupBuf, OwnedTargetPath, OwnedValuePath, PathPrefix};
 use std::fmt;
 use value::{kind::remove, Kind, Value};
 
@@ -36,9 +36,9 @@ impl Query {
         matches!(self.target, Target::External(_))
     }
 
-    pub fn external_path(&self) -> Option<TargetPath> {
+    pub fn external_path(&self) -> Option<OwnedTargetPath> {
         match self.target {
-            Target::External(prefix) => Some(TargetPath {
+            Target::External(prefix) => Some(OwnedTargetPath {
                 prefix,
                 path: self.path.clone(),
             }),
@@ -95,7 +95,7 @@ impl Expression for Query {
 
         let value = match &self.target {
             External(prefix) => {
-                let path = TargetPath {
+                let path = OwnedTargetPath {
                     prefix: *prefix,
                     path: self.path.clone(),
                 };

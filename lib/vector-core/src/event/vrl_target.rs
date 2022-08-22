@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, convert::TryFrom, marker::PhantomData};
 
 use lookup::lookup_v2::OwnedSegment;
-use lookup::{OwnedValuePath, PathPrefix, TargetPath};
+use lookup::{OwnedTargetPath, OwnedValuePath, PathPrefix};
 use snafu::Snafu;
 use vrl_lib::{prelude::VrlValueConvert, ProgramInfo, SecretTarget};
 
@@ -165,7 +165,7 @@ impl VrlTarget {
 impl vrl_lib::Target for VrlTarget {
     fn target_insert(
         &mut self,
-        target_path: &TargetPath,
+        target_path: &OwnedTargetPath,
         value: ::value::Value,
     ) -> Result<(), String> {
         let path = &target_path.path;
@@ -256,7 +256,7 @@ impl vrl_lib::Target for VrlTarget {
     }
 
     #[allow(clippy::redundant_closure_for_method_calls)] // false positive
-    fn target_get(&self, target_path: &TargetPath) -> Result<Option<&Value>, String> {
+    fn target_get(&self, target_path: &OwnedTargetPath) -> Result<Option<&Value>, String> {
         match target_path.prefix {
             PathPrefix::Event => match self {
                 VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => {
@@ -268,7 +268,10 @@ impl vrl_lib::Target for VrlTarget {
         }
     }
 
-    fn target_get_mut(&mut self, target_path: &TargetPath) -> Result<Option<&mut Value>, String> {
+    fn target_get_mut(
+        &mut self,
+        target_path: &OwnedTargetPath,
+    ) -> Result<Option<&mut Value>, String> {
         match target_path.prefix {
             PathPrefix::Event => match self {
                 VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => {
@@ -282,7 +285,7 @@ impl vrl_lib::Target for VrlTarget {
 
     fn target_remove(
         &mut self,
-        target_path: &TargetPath,
+        target_path: &OwnedTargetPath,
         compact: bool,
     ) -> Result<Option<::value::Value>, String> {
         match target_path.prefix {
@@ -444,7 +447,7 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo) -> Value {
 
     for target_path in &info.target_queries {
         // Accessing a root path requires us to pre-populate all fields.
-        if target_path == &TargetPath::event_root() {
+        if target_path == &OwnedTargetPath::event_root() {
             if !set_name {
                 map.insert("name".to_owned(), metric.name().to_owned().into());
             }
@@ -545,7 +548,7 @@ enum MetricPathError<'a> {
 #[cfg(test)]
 mod test {
     use chrono::{offset::TimeZone, Utc};
-    use lookup::owned_path;
+    use lookup::owned_value_path;
     use pretty_assertions::assert_eq;
     use vector_common::btreemap;
     use vrl_lib::Target;
@@ -562,32 +565,32 @@ mod test {
         let cases = vec![
             (
                 BTreeMap::new(),
-                owned_path!(),
+                owned_value_path!(),
                 Ok(Some(BTreeMap::new().into())),
             ),
             (
                 BTreeMap::from([("foo".into(), "bar".into())]),
-                owned_path!(),
+                owned_value_path!(),
                 Ok(Some(BTreeMap::from([("foo".into(), "bar".into())]).into())),
             ),
             (
                 BTreeMap::from([("foo".into(), "bar".into())]),
-                owned_path!("foo"),
+                owned_value_path!("foo"),
                 Ok(Some("bar".into())),
             ),
             (
                 BTreeMap::from([("foo".into(), "bar".into())]),
-                owned_path!("bar"),
+                owned_value_path!("bar"),
                 Ok(None),
             ),
             (
                 btreemap! { "foo" => vec![btreemap! { "bar" => true }] },
-                owned_path!("foo", 0, "bar"),
+                owned_value_path!("foo", 0, "bar"),
                 Ok(Some(true.into())),
             ),
             (
                 btreemap! { "foo" => btreemap! { "bar baz" => btreemap! { "baz" => 2 } } },
-                owned_path!("foo", vec!["qux", r#"bar baz"#], "baz"),
+                owned_value_path!("foo", vec!["qux", r#"bar baz"#], "baz"),
                 Ok(Some(2.into())),
             ),
         ];
@@ -601,7 +604,7 @@ mod test {
                 target_assignments: vec![],
             };
             let target = VrlTarget::new(Event::Log(LogEvent::from(value)), &info);
-            let path = TargetPath::event(path);
+            let path = OwnedTargetPath::event(path);
 
             assert_eq!(
                 vrl_lib::Target::target_get(&target, &path).map(Option::<&Value>::cloned),
@@ -618,21 +621,21 @@ mod test {
         let cases = vec![
             (
                 BTreeMap::from([("foo".into(), "bar".into())]),
-                owned_path!(0),
+                owned_value_path!(0),
                 btreemap! { "baz" => "qux" }.into(),
                 btreemap! { "baz" => "qux" },
                 Ok(()),
             ),
             (
                 BTreeMap::from([("foo".into(), "bar".into())]),
-                owned_path!("foo"),
+                owned_value_path!("foo"),
                 "baz".into(),
                 btreemap! { "foo" => "baz" },
                 Ok(()),
             ),
             (
                 BTreeMap::from([("foo".into(), "bar".into())]),
-                owned_path!("foo", 2, "bar baz", "a", "b"),
+                owned_value_path!("foo", 2, "bar baz", "a", "b"),
                 true.into(),
                 btreemap! {
                     "foo" => vec![
@@ -647,7 +650,7 @@ mod test {
             ),
             (
                 btreemap! { "foo" => vec![0, 1, 2] },
-                owned_path!("foo", 5),
+                owned_value_path!("foo", 5),
                 "baz".into(),
                 btreemap! {
                     "foo" => vec![
@@ -663,35 +666,35 @@ mod test {
             ),
             (
                 BTreeMap::from([("foo".into(), "bar".into())]),
-                owned_path!("foo", 0),
+                owned_value_path!("foo", 0),
                 "baz".into(),
                 btreemap! { "foo" => vec!["baz"] },
                 Ok(()),
             ),
             (
                 btreemap! { "foo" => Value::Array(vec![]) },
-                owned_path!("foo", 0),
+                owned_value_path!("foo", 0),
                 "baz".into(),
                 btreemap! { "foo" => vec!["baz"] },
                 Ok(()),
             ),
             (
                 btreemap! { "foo" => Value::Array(vec![0.into()]) },
-                owned_path!("foo", 0),
+                owned_value_path!("foo", 0),
                 "baz".into(),
                 btreemap! { "foo" => vec!["baz"] },
                 Ok(()),
             ),
             (
                 btreemap! { "foo" => Value::Array(vec![0.into(), 1.into()]) },
-                owned_path!("foo", 0),
+                owned_value_path!("foo", 0),
                 "baz".into(),
                 btreemap! { "foo" => Value::Array(vec!["baz".into(), 1.into()]) },
                 Ok(()),
             ),
             (
                 btreemap! { "foo" => Value::Array(vec![0.into(), 1.into()]) },
-                owned_path!("foo", 1),
+                owned_value_path!("foo", 1),
                 "baz".into(),
                 btreemap! { "foo" => Value::Array(vec![0.into(), "baz".into()]) },
                 Ok(()),
@@ -709,7 +712,7 @@ mod test {
             let mut target = VrlTarget::new(Event::Log(LogEvent::from(object)), &info);
             let expect = LogEvent::from(expect);
             let value: ::value::Value = value;
-            let path = TargetPath::event(path);
+            let path = OwnedTargetPath::event(path);
 
             assert_eq!(
                 vrl_lib::Target::target_insert(&mut target, &path, value.clone()),
@@ -740,37 +743,37 @@ mod test {
         let cases = vec![
             (
                 BTreeMap::from([("foo".into(), "bar".into())]),
-                owned_path!("foo"),
+                owned_value_path!("foo"),
                 false,
                 Some(BTreeMap::new().into()),
             ),
             (
                 BTreeMap::from([("foo".into(), "bar".into())]),
-                owned_path!(vec![r#"foo bar"#, "foo"]),
+                owned_value_path!(vec![r#"foo bar"#, "foo"]),
                 false,
                 Some(BTreeMap::new().into()),
             ),
             (
                 btreemap! { "foo" => "bar", "baz" => "qux" },
-                owned_path!(),
+                owned_value_path!(),
                 false,
                 Some(BTreeMap::new().into()),
             ),
             (
                 btreemap! { "foo" => "bar", "baz" => "qux" },
-                owned_path!(),
+                owned_value_path!(),
                 true,
                 Some(BTreeMap::new().into()),
             ),
             (
                 btreemap! { "foo" => vec![0] },
-                owned_path!("foo", 0),
+                owned_value_path!("foo", 0),
                 false,
                 Some(btreemap! { "foo" => Value::Array(vec![]) }.into()),
             ),
             (
                 btreemap! { "foo" => vec![0] },
-                owned_path!("foo", 0),
+                owned_value_path!("foo", 0),
                 true,
                 Some(BTreeMap::new().into()),
             ),
@@ -779,7 +782,7 @@ mod test {
                     "foo" => btreemap! { "bar baz" => vec![0] },
                     "bar" => "baz",
                 },
-                owned_path!("foo", r#"bar baz"#, 0),
+                owned_value_path!("foo", r#"bar baz"#, 0),
                 false,
                 Some(
                     btreemap! {
@@ -794,7 +797,7 @@ mod test {
                     "foo" => btreemap! { "bar baz" => vec![0] },
                     "bar" => "baz",
                 },
-                owned_path!("foo", r#"bar baz"#, 0),
+                owned_value_path!("foo", r#"bar baz"#, 0),
                 true,
                 Some(btreemap! { "bar" => "baz" }.into()),
             ),
@@ -808,7 +811,7 @@ mod test {
                 target_assignments: vec![],
             };
             let mut target = VrlTarget::new(Event::Log(LogEvent::from(object)), &info);
-            let path = TargetPath::event(path);
+            let path = OwnedTargetPath::event(path);
             let removed = vrl_lib::Target::target_get(&target, &path)
                 .unwrap()
                 .cloned();
@@ -818,7 +821,7 @@ mod test {
                 Ok(removed)
             );
             assert_eq!(
-                vrl_lib::Target::target_get(&target, &TargetPath::event_root())
+                vrl_lib::Target::target_get(&target, &OwnedTargetPath::event_root())
                     .map(Option::<&Value>::cloned),
                 Ok(expect)
             );
@@ -872,7 +875,7 @@ mod test {
                 &info,
             );
 
-            ::vrl_lib::Target::target_insert(&mut target, &TargetPath::event_root(), value)
+            ::vrl_lib::Target::target_insert(&mut target, &OwnedTargetPath::event_root(), value)
                 .unwrap();
 
             assert_eq!(
@@ -908,12 +911,12 @@ mod test {
             fallible: false,
             abortable: false,
             target_queries: vec![
-                TargetPath::event(owned_path!("name")),
-                TargetPath::event(owned_path!("namespace")),
-                TargetPath::event(owned_path!("timestamp")),
-                TargetPath::event(owned_path!("kind")),
-                TargetPath::event(owned_path!("type")),
-                TargetPath::event(owned_path!("tags")),
+                OwnedTargetPath::event(owned_value_path!("name")),
+                OwnedTargetPath::event(owned_value_path!("namespace")),
+                OwnedTargetPath::event(owned_value_path!("timestamp")),
+                OwnedTargetPath::event(owned_value_path!("kind")),
+                OwnedTargetPath::event(owned_value_path!("type")),
+                OwnedTargetPath::event(owned_value_path!("tags")),
             ],
             target_assignments: vec![],
         };
@@ -932,7 +935,7 @@ mod test {
                 .into()
             )),
             target
-                .target_get(&TargetPath::event_root())
+                .target_get(&OwnedTargetPath::event_root())
                 .map(Option::<&Value>::cloned)
         );
     }
@@ -952,42 +955,52 @@ mod test {
 
         let cases = vec![
             (
-                owned_path!("name"),                // Path
+                owned_value_path!("name"),          // Path
                 Some(::value::Value::from("name")), // Current value
                 ::value::Value::from("namefoo"),    // New value
                 false,                              // Test deletion
             ),
-            (owned_path!("namespace"), None, "namespacefoo".into(), true),
             (
-                owned_path!("timestamp"),
+                owned_value_path!("namespace"),
+                None,
+                "namespacefoo".into(),
+                true,
+            ),
+            (
+                owned_value_path!("timestamp"),
                 None,
                 Utc.ymd(2020, 12, 8).and_hms(12, 0, 0).into(),
                 true,
             ),
             (
-                owned_path!("kind"),
+                owned_value_path!("kind"),
                 Some(::value::Value::from("absolute")),
                 "incremental".into(),
                 false,
             ),
-            (owned_path!("tags", "thing"), None, "footag".into(), true),
+            (
+                owned_value_path!("tags", "thing"),
+                None,
+                "footag".into(),
+                true,
+            ),
         ];
 
         let info = ProgramInfo {
             fallible: false,
             abortable: false,
             target_queries: vec![
-                TargetPath::event(owned_path!("name")),
-                TargetPath::event(owned_path!("namespace")),
-                TargetPath::event(owned_path!("timestamp")),
-                TargetPath::event(owned_path!("kind")),
+                OwnedTargetPath::event(owned_value_path!("name")),
+                OwnedTargetPath::event(owned_value_path!("namespace")),
+                OwnedTargetPath::event(owned_value_path!("timestamp")),
+                OwnedTargetPath::event(owned_value_path!("kind")),
             ],
             target_assignments: vec![],
         };
         let mut target = VrlTarget::new(Event::Metric(metric), &info);
 
         for (path, current, new, delete) in cases {
-            let path = TargetPath::event(path);
+            let path = OwnedTargetPath::event(path);
 
             assert_eq!(
                 Ok(current),
@@ -1041,7 +1054,7 @@ mod test {
                 "invalid path zork: expected one of {}",
                 validpaths_get.join(", ")
             )),
-            target.target_get(&TargetPath::event(owned_path!("zork")))
+            target.target_get(&OwnedTargetPath::event(owned_value_path!("zork")))
         );
 
         assert_eq!(
@@ -1049,7 +1062,10 @@ mod test {
                 "invalid path zork: expected one of {}",
                 validpaths_set.join(", ")
             )),
-            target.target_insert(&TargetPath::event(owned_path!("zork")), "thing".into())
+            target.target_insert(
+                &OwnedTargetPath::event(owned_value_path!("zork")),
+                "thing".into()
+            )
         );
 
         assert_eq!(
@@ -1057,7 +1073,7 @@ mod test {
                 "invalid path zork: expected one of {}",
                 validpaths_set.join(", ")
             )),
-            target.target_remove(&TargetPath::event(owned_path!("zork")), true)
+            target.target_remove(&OwnedTargetPath::event(owned_value_path!("zork")), true)
         );
 
         assert_eq!(
@@ -1065,7 +1081,9 @@ mod test {
                 "invalid path tags.foo.flork: expected one of {}",
                 validpaths_get.join(", ")
             )),
-            target.target_get(&TargetPath::event(owned_path!("tags", "foo", "flork")))
+            target.target_get(&OwnedTargetPath::event(owned_value_path!(
+                "tags", "foo", "flork"
+            )))
         );
     }
 }
