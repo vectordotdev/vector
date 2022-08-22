@@ -195,7 +195,7 @@ impl DiagnosticMessage for Error {
 }
 
 #[derive(Debug)]
-enum QueryState {
+enum CoalesceState {
     Dot,
     Coalesce,
 }
@@ -215,8 +215,8 @@ pub(crate) struct Lexer<'input> {
     open_parens: usize,
     query_start: Option<usize>,
 
-    // prev_tokens: VecDeque<Tok<'input>>,
-    query_state: Option<QueryState>,
+    // used to track if the lexer is inside a coalesce (to differentiate a '@' path prefix from a coalesce field starting with '@')
+    coalesce_state: Option<CoalesceState>,
 
     /// Keep track of when the lexer is supposed to emit an `RQuery` token.
     ///
@@ -687,11 +687,11 @@ impl<'input> Iterator for Lexer<'input> {
     fn next(&mut self) -> Option<Self::Item> {
         let result = self.next_token();
         if let Some(Ok((_, token, _))) = &result {
-            self.query_state = match (&self.query_state, token) {
-                (None, Token::Dot) => Some(QueryState::Dot),
-                (Some(QueryState::Dot), Token::LParen) => Some(QueryState::Coalesce),
-                (Some(QueryState::Coalesce), Token::RParen) => None,
-                (Some(QueryState::Coalesce), _) => Some(QueryState::Coalesce),
+            self.coalesce_state = match (&self.coalesce_state, token) {
+                (None, Token::Dot) => Some(CoalesceState::Dot),
+                (Some(CoalesceState::Dot), Token::LParen) => Some(CoalesceState::Coalesce),
+                (Some(CoalesceState::Coalesce), Token::RParen) => None,
+                (Some(CoalesceState::Coalesce), _) => Some(CoalesceState::Coalesce),
                 _ => None,
             };
         }
@@ -738,15 +738,6 @@ impl<'input> Lexer<'input> {
     }
 
     fn query_start(&mut self, start: usize) -> Result<bool, Error> {
-        // if !self.rquery_indices.is_empty() {
-        //     println!(
-        //         "Query already opened at {:?}. Current pos = {}",
-        //         self.rquery_indices, start
-        //     );
-        //     // cannot have multiple nested queries?
-        //     return Ok(false);
-        // }
-
         // If we already opened a query for the current position, we don't want
         // to open another one.
         if self.rquery_indices.last() == Some(&start) {
@@ -759,7 +750,7 @@ impl<'input> Lexer<'input> {
         }
 
         // If we are in the middle of a coalesce query, this can't be the start of another query
-        if matches!(self.query_state, Some(QueryState::Coalesce)) {
+        if matches!(self.coalesce_state, Some(CoalesceState::Coalesce)) {
             return Ok(false);
         }
 
@@ -1002,7 +993,6 @@ impl<'input> Lexer<'input> {
                 }
 
                 '.' | '@' if last_char.is_none() => valid = true,
-                // '@' => valid = false,
                 '.' if last_char == Some(')') => valid = true,
                 '.' if last_char == Some('}') => valid = true,
                 '.' if last_char == Some(']') => valid = true,
@@ -1198,8 +1188,7 @@ impl<'input> Lexer<'input> {
             open_parens: 0,
             rquery_indices: vec![],
             query_start: None,
-            query_state: None,
-            // prev_tokens: VecDeque::new(),
+            coalesce_state: None,
         }
     }
 

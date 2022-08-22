@@ -99,7 +99,6 @@ impl Expression for Query {
                     prefix: *prefix,
                     path: self.path.clone(),
                 };
-                // TODO: fix
                 return Ok(ctx
                     .target()
                     .target_get(&path)
