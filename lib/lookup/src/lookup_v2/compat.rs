@@ -1,5 +1,5 @@
 ///! Contains backwards compatibility with lookup "v1"
-///! This is all temporary and will be deleted with migration to the V2 lookup code is complete.
+///! This is all temporary and will be deleted when migration to the V2 lookup code is complete.
 use crate::lookup_v2::{BorrowedSegment, OwnedPath, OwnedSegment, Path};
 use crate::{FieldBuf, LookupBuf, SegmentBuf};
 use std::borrow::Cow;
