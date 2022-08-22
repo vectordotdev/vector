@@ -54,6 +54,7 @@ async fn bytes_decoding() {
         headers: HashMap::new(),
         tls: None,
         auth: None,
+        log_namespace: None,
     })
     .await;
 }
@@ -82,6 +83,7 @@ async fn json_decoding_newline_delimited() {
         headers: HashMap::new(),
         tls: None,
         auth: None,
+        log_namespace: None,
     })
     .await;
 }
@@ -113,6 +115,7 @@ async fn json_decoding_character_delimited() {
         headers: HashMap::new(),
         tls: None,
         auth: None,
+        log_namespace: None,
     })
     .await;
 }
@@ -144,6 +147,7 @@ async fn request_query_applied() {
         headers: HashMap::new(),
         tls: None,
         auth: None,
+        log_namespace: None,
     })
     .await;
 
@@ -207,6 +211,7 @@ async fn headers_applied() {
         )]),
         auth: None,
         tls: None,
+        log_namespace: None,
     })
     .await;
 }
@@ -233,6 +238,7 @@ async fn accept_header_override() {
         headers: HashMap::from([("ACCEPT".to_string(), vec!["application/json".to_string()])]),
         auth: None,
         tls: None,
+        log_namespace: None,
     })
     .await;
 }

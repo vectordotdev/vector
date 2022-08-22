@@ -76,6 +76,10 @@ pub struct HttpScrapeConfig {
     /// HTTP Authentication.
     #[configurable(derived)]
     pub auth: Option<Auth>,
+
+    /// The namespace to use for logs. This overrides the global setting
+    #[serde(default)]
+    pub log_namespace: Option<bool>,
 }
 
 impl Default for HttpScrapeConfig {
@@ -89,6 +93,7 @@ impl Default for HttpScrapeConfig {
             headers: HashMap::new(),
             tls: None,
             auth: None,
+            log_namespace: None,
         }
     }
 }
@@ -113,18 +118,19 @@ impl SourceConfig for HttpScrapeConfig {
 
         let tls = TlsSettings::from_options(&self.tls)?;
 
+        let log_namespace = cx.log_namespace(self.log_namespace);
+
         // build the decoder
-        let decoder = DecodingConfig::new(
-            self.framing.clone(),
-            self.decoding.clone(),
-            LogNamespace::Vector,
-        )
-        .build();
+        let decoder =
+            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
 
         let content_type = self.decoding.content_type(&self.framing).to_string();
 
         // the only specific context needed is the codec decoding
-        let context = HttpScrapeContext { decoder };
+        let context = HttpScrapeContext {
+            decoder,
+            log_namespace,
+        };
 
         let inputs = GenericHttpScrapeInputs {
             urls,
@@ -140,8 +146,17 @@ impl SourceConfig for HttpScrapeConfig {
         Ok(http_scrape(inputs, context, cx.out).boxed())
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(self.decoding.output_type())]
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        // There is a global and per-source `log_namespace` config. The source config overrides the global setting,
+        // and is merged here.
+        let log_namespace = global_log_namespace.merge(self.log_namespace);
+
+        let schema_definition = self
+            .decoding
+            .schema_definition(log_namespace)
+            .with_standard_vector_source_metadata();
+
+        vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -156,6 +171,7 @@ impl SourceConfig for HttpScrapeConfig {
 #[derive(Clone)]
 struct HttpScrapeContext {
     decoder: Decoder,
+    log_namespace: LogNamespace,
 }
 
 impl HttpScrapeContext {
@@ -180,21 +196,31 @@ impl HttpScrapeContext {
         }
         events
     }
-}
 
-/// Enriches events with source_type, timestamp
-fn enrich_events(events: &mut Vec<Event>) {
-    for event in events {
-        match event {
-            Event::Log(ref mut log) => {
-                log.try_insert(log_schema().source_type_key(), Bytes::from(NAME));
-                log.try_insert(log_schema().timestamp_key(), Utc::now());
-            }
-            Event::Metric(ref mut metric) => {
-                metric.insert_tag(log_schema().source_type_key().to_string(), NAME.to_string());
-            }
-            Event::Trace(ref mut trace) => {
-                trace.insert(log_schema().source_type_key(), Bytes::from(NAME));
+    /// Enriches events with source_type, timestamp
+    fn enrich_events(&self, events: &mut Vec<Event>) {
+        for event in events {
+            match event {
+                Event::Log(ref mut log) => {
+                    self.log_namespace.insert_vector_metadata(
+                        log,
+                        log_schema().source_type_key(),
+                        "source_type",
+                        NAME,
+                    );
+                    self.log_namespace.insert_vector_metadata(
+                        log,
+                        log_schema().timestamp_key(),
+                        "ingest_timestamp",
+                        Utc::now(),
+                    );
+                }
+                Event::Metric(ref mut metric) => {
+                    metric.insert_tag(log_schema().source_type_key().to_string(), NAME.to_string());
+                }
+                Event::Trace(ref mut trace) => {
+                    trace.insert(log_schema().source_type_key(), Bytes::from(NAME));
+                }
             }
         }
     }
@@ -219,7 +245,7 @@ impl HttpScraper for HttpScrapeContext {
 
         // decode and enrich
         let mut events = self.decode_events(&mut buf);
-        enrich_events(&mut events);
+        self.enrich_events(&mut events);
 
         Some(events)
     }
