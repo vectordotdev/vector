@@ -1,0 +1,33 @@
+============================================
+Integers
+============================================
+   0
+   1
+   -1
+   42
+   100_0000
+   1_1_1_1
+---
+
+(program
+  (exprs
+    (expr (literal (integer_literal)))
+    (expr (literal (integer_literal)))
+    (expr (literal (integer_literal)))
+    (expr (literal (integer_literal)))
+    (expr (literal (integer_literal)))
+    (expr (literal (integer_literal)))
+  )
+)
+
+============================================
+Floats
+============================================
+   0.0
+---
+
+(program
+  (exprs
+    (expr (literal (float_literal)))
+  )
+)

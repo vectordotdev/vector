@@ -7984,6 +7984,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "tree-sitter"
+version = "0.20.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "268bf3e3ca0c09e5d21b59c2638e12cb6dcf7ea2681250a696a2d0936cb57ba0"
+dependencies = [
+ "cc",
+ "regex",
+]
+
+[[package]]
 name = "treediff"
 version = "3.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8857,6 +8867,7 @@ name = "vrl-parser"
 version = "0.1.0"
 dependencies = [
  "arbitrary",
+ "cc",
  "lalrpop",
  "lalrpop-util",
  "lookup",
@@ -8864,6 +8875,7 @@ dependencies = [
  "paste",
  "test-case",
  "thiserror",
+ "tree-sitter",
  "vrl-diagnostic",
 ]
 

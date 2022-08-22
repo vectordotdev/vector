@@ -39,6 +39,7 @@ mod arbitrary_depth;
 pub mod ast;
 mod lex;
 mod template_string;
+mod tree_sitter;
 
 pub use ast::{Literal, Program};
 pub use diagnostic::Span;

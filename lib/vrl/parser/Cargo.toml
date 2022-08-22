@@ -15,12 +15,14 @@ lalrpop-util = "0.19"
 ordered-float = "3"
 paste = "1"
 thiserror = "1"
+tree-sitter = "0.20.8"
 
 [dev-dependencies]
 test-case = "2"
 
 [build-dependencies]
 lalrpop = { version = "0.19.8", default-features = false }
+cc = "1.0.73"
 
 [features]
 fuzz = ["dep:arbitrary"]
