@@ -21,7 +21,7 @@ use tokio::{
 };
 use tokio_stream::wrappers::IntervalStream;
 use tokio_util::codec::FramedRead;
-use vector_config::configurable_component;
+use vector_config::{configurable_component, NamedComponent};
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -166,7 +166,6 @@ fn get_hostname() -> Option<String> {
     crate::get_hostname().ok()
 }
 
-const EXEC: &str = "exec";
 const STDOUT: &str = "stdout";
 const STDERR: &str = "stderr";
 const STREAM_KEY: &str = "stream";
@@ -570,12 +569,14 @@ fn handle_event(
     pid: Option<u32>,
     event: &mut Event,
 ) {
+    let source_type = Bytes::from_static(ExecConfig::NAME.as_bytes());
+
     if let Event::Log(log) = event {
         // Add timestamp
         log.try_insert(log_schema().timestamp_key(), Utc::now());
 
         // Add source type
-        log.try_insert(log_schema().source_type_key(), Bytes::from(EXEC));
+        log.try_insert(log_schema().source_type_key(), source_type);
 
         // Add data stream of stdin or stderr (if needed)
         if let Some(data_stream) = data_stream {

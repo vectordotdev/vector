@@ -220,12 +220,12 @@ impl Options {
         self.typed_component.clone()
     }
 
-    fn should_derive_ser(&self) -> bool {
-        !self.no_ser
+    fn skip_derive_ser(&self) -> bool {
+        self.no_ser
     }
 
-    fn should_derive_deser(&self) -> bool {
-        !self.no_deser
+    fn skip_derive_deser(&self) -> bool {
+        self.no_deser
     }
 }
 
@@ -267,13 +267,13 @@ pub fn configurable_component_impl(args: TokenStream, item: TokenStream) -> Toke
         ::vector_config_macros::Configurable
     });
 
-    if options.should_derive_ser() {
+    if !options.skip_derive_ser() {
         derives.push(parse_quote_spanned! {input.ident.span()=>
             ::serde::Serialize
         });
     }
 
-    if options.should_derive_deser() {
+    if !options.skip_derive_deser() {
         derives.push(parse_quote_spanned! {input.ident.span()=>
             ::serde::Deserialize
         });

@@ -1,7 +1,7 @@
 use std::io;
 
 use codecs::decoding::{DeserializerConfig, FramingConfig};
-use vector_config::configurable_component;
+use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::LogNamespace;
 
 use crate::{
@@ -10,8 +10,6 @@ use crate::{
 };
 
 use super::FileDescriptorConfig;
-
-const NAME: &str = "stdin";
 
 /// Configuration for the `stdin` source.
 #[configurable_component(source("stdin"))]
@@ -45,17 +43,17 @@ impl FileDescriptorConfig for StdinConfig {
     fn host_key(&self) -> Option<String> {
         self.host_key.clone()
     }
+
     fn framing(&self) -> Option<FramingConfig> {
         self.framing.clone()
     }
+
     fn decoding(&self) -> DeserializerConfig {
         self.decoding.clone()
     }
-    fn name(&self) -> String {
-        NAME.to_string()
-    }
+
     fn description(&self) -> String {
-        NAME.to_string()
+        StdinConfig::NAME.to_string()
     }
 }
 

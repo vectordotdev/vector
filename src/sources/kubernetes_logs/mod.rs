@@ -25,7 +25,7 @@ use kube::{
     Client, Config as ClientConfig,
 };
 use vector_common::TimeZone;
-use vector_config::configurable_component;
+use vector_config::{configurable_component, NamedComponent};
 use vector_core::{transform::TaskTransform, ByteSizeOf};
 
 use crate::{
@@ -187,8 +187,6 @@ impl Default for Config {
         }
     }
 }
-
-const COMPONENT_ID: &str = "kubernetes_logs";
 
 #[async_trait::async_trait]
 impl SourceConfig for Config {
@@ -569,7 +567,10 @@ fn create_event(line: Bytes, file: &str, ingestion_timestamp_field: Option<&str>
     let mut event = LogEvent::from_bytes_legacy(&line);
 
     // Add source type.
-    event.insert(log_schema().source_type_key(), COMPONENT_ID.to_owned());
+    event.insert(
+        log_schema().source_type_key(),
+        Bytes::from_static(Config::NAME.as_bytes()),
+    );
 
     // Add file.
     event.insert(FILE_KEY, file.to_owned());

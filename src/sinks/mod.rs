@@ -175,10 +175,6 @@ pub enum Sinks {
     #[cfg(feature = "sinks-console")]
     Console(#[configurable(derived)] console::ConsoleSinkConfig),
 
-    /// Datadog Archives.
-    #[cfg(feature = "sinks-datadog_archives")]
-    DatadogArchives(#[configurable(derived)] datadog_archives::DatadogArchivesSinkConfig),
-
     /// Datadog Events.
     #[cfg(feature = "sinks-datadog_events")]
     DatadogEvents(#[configurable(derived)] datadog::events::DatadogEventsConfig),

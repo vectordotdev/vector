@@ -39,7 +39,6 @@ impl SourceConfig for UnitTestSourceConfig {
             let mut out = cx.out;
             let _shutdown = cx.shutdown;
             out.send_batch(events).await.map_err(|_| ())?;
-            //shutdown.await;
             Ok(())
         }))
     }
@@ -55,7 +54,7 @@ impl SourceConfig for UnitTestSourceConfig {
 
 #[derive(Clone)]
 pub enum UnitTestSinkCheck {
-    /// Check all events that are received againstthe list of conditions.
+    /// Check all events that are received against the list of conditions.
     Checks(Vec<Vec<Condition>>),
 
     /// Check that no events were received.

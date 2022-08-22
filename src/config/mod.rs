@@ -524,8 +524,6 @@ pub struct TestOutput<T = OutputId> {
 mod tests {
     use std::{collections::HashMap, path::PathBuf};
 
-    use tokio::runtime::Builder;
-
     use crate::{config, topology};
     use indoc::indoc;
 
@@ -644,45 +642,29 @@ mod tests {
         assert!(errors[0].starts_with(expected_prefix));
     }
 
-    #[test]
+    #[tokio::test]
     #[cfg(unix)]
-    fn conflicting_fd_resources() {
-        let runtime = Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .expect("should not fail to build runtime");
-
-        let errors = runtime.block_on(async {
-            load(
-                r#"
-                [sources.file_descriptor1]
-                type = "file_descriptor"
-                fd = 10
-
-                [sources.file_descriptor2]
-                type = "file_descriptor"
-                fd = 10
-
-                [sinks.out]
-                type = "test_basic"
-                inputs = ["file_descriptor1", "file_descriptor2"]
-                "#,
-                Format::Toml,
-            )
-            .await
-            .unwrap_err()
-        });
+    async fn conflicting_fd_resources() {
+        let errors = load(
+            r#"
+            [sources.file_descriptor1]
+            type = "file_descriptor"
+            fd = 10
+            [sources.file_descriptor2]
+            type = "file_descriptor"
+            fd = 10
+            [sinks.out]
+            type = "test_basic"
+            inputs = ["file_descriptor1", "file_descriptor2"]
+            "#,
+            Format::Toml,
+        )
+        .await
+        .unwrap_err();
 
         assert_eq!(errors.len(), 1);
         let expected_prefix = "Resource `file descriptor: 10` is claimed by multiple components:";
         assert!(errors[0].starts_with(expected_prefix));
-
-        // We have to manually shutdown the runtime in this way, versus using the normal
-        // `#[tokio::test]` attribute macro, because otherwise the runtime will block on drop,
-        // waiting for blocking tasks to complete... and by definition, reading from STDIN will
-        // block on reading forever until there's a key press to drive a read such that other logic
-        // like "is it time to shutdown?" would be given a chance to run.
-        runtime.shutdown_background();
     }
 
     #[tokio::test]

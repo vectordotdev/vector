@@ -8,8 +8,6 @@ use indoc::indoc;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
-const NAME: &str = "file_descriptor";
-
 use crate::{
     config::{GenerateConfig, Output, Resource, SourceConfig, SourceContext},
     serde::default_decoding,
@@ -47,15 +45,15 @@ impl FileDescriptorConfig for FileDescriptorSourceConfig {
     fn host_key(&self) -> Option<String> {
         self.host_key.clone()
     }
+
     fn framing(&self) -> Option<FramingConfig> {
         self.framing.clone()
     }
+
     fn decoding(&self) -> DeserializerConfig {
         self.decoding.clone()
     }
-    fn name(&self) -> String {
-        NAME.to_string()
-    }
+
     fn description(&self) -> String {
         format!("file descriptor {}", self.fd)
     }
