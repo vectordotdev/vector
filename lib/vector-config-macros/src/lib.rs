@@ -34,7 +34,7 @@ mod configurable_component;
 /// Additionally, callers can specify the component type, when being used directly on the top-level configuration object
 /// for a component by specifying the component type (`source`, `transform`, or `sink`) as the sole parameter:
 ///
-/// ```no_run
+/// ```ignore
 /// use vector_config::configurable_component;
 /// use serde;
 ///
