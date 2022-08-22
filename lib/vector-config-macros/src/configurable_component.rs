@@ -245,7 +245,7 @@ pub fn configurable_component_impl(args: TokenStream, item: TokenStream) -> Toke
     // - we add an attribute so the component's configuration type becomes "named", which drives
     //   the component config trait impl (i.e. `SourceConfig`) and will eventually drive the value
     //   that `serde` uses to deserialize the given component variant in the Big Enum model
-    // - we automatically generate the call to register the component config type via `inventory`p
+    // - we automatically generate the call to register the component config type via `inventory`
     //   which powers the `vector generate` subcommand by maintaining a name -> config type map
     let component_type = options.typed_component().map(|tc| {
         let component_type = tc.as_type_str();
