@@ -14,9 +14,10 @@ impl InternalEvent for DatadogMetricsEncodingError {
     fn emit(self) {
         error!(
             message = "Failed to encode Datadog metrics.",
-            error = %self.message,
+            reason = %self.message,
             error_code = %self.error_code,
             error_type = error_type::ENCODER_FAILED,
+            intentional = "false",
             stage = error_stage::PROCESSING,
         );
         counter!(
@@ -31,6 +32,7 @@ impl InternalEvent for DatadogMetricsEncodingError {
                 "component_discarded_events_total", self.dropped_events,
                 "error_code" => self.error_code,
                 "error_type" => error_type::ENCODER_FAILED,
+                "intentional" => "false",
                 "stage" => error_stage::PROCESSING,
             );
         }
