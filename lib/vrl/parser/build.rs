@@ -2,7 +2,7 @@ extern crate lalrpop;
 
 fn main() {
     build_larlpop();
-    build_tree_sitter();
+    // build_tree_sitter();
 }
 
 fn build_larlpop() {

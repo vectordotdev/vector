@@ -7994,6 +7994,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "tree-sitter-vrl"
+version = "0.0.1"
+dependencies = [
+ "cc",
+ "tree-sitter",
+]
+
+[[package]]
 name = "treediff"
 version = "3.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"

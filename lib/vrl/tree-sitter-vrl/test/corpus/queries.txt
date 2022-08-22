@@ -22,11 +22,18 @@ Local Queries
 ============================================
    foo.x
    foo.@bar
+   foo.x.y
+   foo.(x|y)
+   foo.( x | y )
+   foo."content-type"
 ---
 
 (program
   (exprs
-    (expr (query (local_query (local_variable) (query_segments (query_segment)))))
-    (expr (query (local_query (local_variable) (query_segments (query_segment)))))
+    (expr (query (local_query (local_variable) (query_segments (query_field)))))
+    (expr (query (local_query (local_variable) (query_segments (query_field)))))
+    (expr (query (local_query (local_variable) (query_segments (query_field) (query_field)))))
+    (expr (query (local_query (local_variable) (query_segments (query_coalesce (query_field) (query_field))))))
+    (expr (query (local_query (local_variable) (query_segments (query_coalesce (query_field) (query_field))))))
   )
 )
