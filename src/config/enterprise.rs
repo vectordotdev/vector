@@ -159,7 +159,7 @@ struct PipelinesAuth<'a> {
 struct PipelinesStrFields<'a> {
     configuration_version_hash: &'a str,
     vector_version: &'a str,
-    hostname: &'a str,
+    hostname: Option<&'a str>,
 }
 
 /// Top-level struct representing the field structure for reporting a config to Datadog OP.
@@ -178,7 +178,7 @@ struct PipelinesData<'a> {
 struct PipelinesAttributes<'a> {
     config_hash: &'a str,
     vector_version: &'a str,
-    hostname: &'a str,
+    hostname: Option<&'a str>,
     config: &'a toml::value::Table,
 }
 
@@ -628,9 +628,9 @@ pub(crate) fn report_configuration(
         // Get the machine hostname to avoid reporting the same configuration several time
         // for a given instance of vector.
         // If running on kubernetes, we take the pod name instead.
-        let hostname = env::var("VECTOR_SELF_NODE_NAME").unwrap_or_else(|_| {
-            crate::get_hostname().expect("Couldn't read the current hostname.")
-        });
+        let hostname = env::var("VECTOR_SELF_POD_NAME")
+            .ok()
+            .or_else(|| crate::get_hostname().ok());
 
         // Get the Vector version. This is reported to Pipelines along with a config hash.
         let vector_version = crate::get_version();
@@ -646,7 +646,7 @@ pub(crate) fn report_configuration(
         let fields = PipelinesStrFields {
             configuration_version_hash: &configuration_version_hash,
             vector_version: &vector_version,
-            hostname: &hostname,
+            hostname: hostname.as_deref(),
         };
 
         // Set the Datadog authorization fields. There's an API and app key, to allow read/write
@@ -832,7 +832,7 @@ mod test {
     const fn get_pipelines_fields() -> PipelinesStrFields<'static> {
         PipelinesStrFields {
             configuration_version_hash: "configuration_version_hash",
-            hostname: "hostname",
+            hostname: Some("hostname"),
             vector_version: "vector_version",
         }
     }
