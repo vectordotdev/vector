@@ -1171,9 +1171,6 @@ mod integration_tests {
         );
         assert!(data["value"][0].as_f64().unwrap() >= start as f64);
         assert_eq!(data["value"][1], Value::String("123.4".into()));
-
-        /*drop(tx);
-        sink_handle.await.unwrap();*/
     }
 
     async fn reset_on_flush_period() {
