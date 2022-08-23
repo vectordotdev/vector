@@ -18,7 +18,7 @@ vector-config-macros = { path = "../vector-config-macros" }
 
 [dev-dependencies]
 criterion = { version = "0.3.6", features = ["html_reports", "async_tokio"] }
-serde_json = { version = "1.0.83", features = ["raw_value"] }
+serde_json = { version = "1.0.85", features = ["raw_value"] }
 tracing = { version = "0.1", default-features = false, features = ["attributes"] }
 quickcheck = { version = "1.0.3" }
 
