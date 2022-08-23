@@ -53,7 +53,7 @@ impl FileDescriptorConfig for StdinConfig {
     }
 
     fn description(&self) -> String {
-        StdinConfig::NAME.to_string()
+        Self::NAME.to_string()
     }
 }
 
