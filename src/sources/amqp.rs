@@ -190,16 +190,20 @@ pub(crate) async fn amqp_source(
     )))
 }
 
+struct Keys<'a> {
+    routing_key: &'a str,
+    routing: &'a str,
+    exchange_key: &'a str,
+    exchange: &'a str,
+    offset_key: &'a str,
+    delivery_tag: i64,
+}
+
 /// Populates the decoded event with extra metadata.
 fn populate_event(
     event: &mut Event,
     timestamp: chrono::DateTime<Utc>,
-    routing_key: &str,
-    routing: &str,
-    exchange_key: &str,
-    exchange: &str,
-    offset_key: &str,
-    delivery_tag: i64,
+    keys: &Keys<'_>,
     log_namespace: LogNamespace,
 ) {
     let log = event.as_mut_log();
@@ -218,17 +222,17 @@ fn populate_event(
         "amqp",
     );
 
-    log_namespace.insert_source_metadata("amqp", log, routing_key, "routing", routing.to_string());
+    log_namespace.insert_source_metadata("amqp", log, keys.routing_key, "routing", keys.routing.to_string());
 
     log_namespace.insert_source_metadata(
         "amqp",
         log,
-        exchange_key,
+        keys.exchange_key,
         "exchange",
-        exchange.to_string(),
+        keys.exchange.to_string(),
     );
 
-    log_namespace.insert_source_metadata("amqp", log, offset_key, "offset", delivery_tag);
+    log_namespace.insert_source_metadata("amqp", log, keys.offset_key, "offset", keys.delivery_tag);
 }
 
 /// Runs the AMQP source involving the main loop pulling data from the server.
@@ -291,12 +295,16 @@ async fn run_amqp_source(
                                 .and_then(|millis| Utc.timestamp_millis_opt(millis as _).latest())
                                 .unwrap_or_else(Utc::now);
 
-                            let routing_key = config.routing_key.as_str();
-                            let exchange_key = config.exchange_key.as_str();
-                            let offset_key = config.offset_key.as_str();
                             let routing = msg.routing_key.to_string();
                             let exchange = msg.exchange.to_string();
-                            let delivery_tag = msg.delivery_tag as i64;
+                            let keys = Keys {
+                                routing_key: config.routing_key.as_str(),
+                                exchange_key: config.exchange_key.as_str(),
+                                offset_key: config.offset_key.as_str(),
+                                routing: &routing,
+                                exchange: &exchange,
+                                delivery_tag: msg.delivery_tag as i64,
+                            };
 
                             let out = &mut out;
 
@@ -307,12 +315,7 @@ async fn run_amqp_source(
                                             for mut event in events {
                                                 populate_event(&mut event,
                                                                timestamp,
-                                                               routing_key,
-                                                               &routing,
-                                                               exchange_key,
-                                                               &exchange,
-                                                               offset_key,
-                                                               delivery_tag,
+                                                               &keys,
                                                                log_namespace);
 
                                                 yield event;
