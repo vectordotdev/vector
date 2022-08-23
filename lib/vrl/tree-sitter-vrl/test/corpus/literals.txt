@@ -24,10 +24,14 @@ Integers
 Floats
 ============================================
    0.0
+   1.0
+   -42.2334
 ---
 
 (program
   (exprs
-    (expr (literal (float_literal)))
+    (expr (literal (float)))
+    (expr (literal (float)))
+    (expr (literal (float)))
   )
 )

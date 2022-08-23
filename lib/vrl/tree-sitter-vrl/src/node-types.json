@@ -10,6 +10,10 @@
         {
           "type": "literal",
           "named": true
+        },
+        {
+          "type": "query",
+          "named": true
         }
       ]
     }
@@ -32,36 +36,12 @@
   {
     "type": "float",
     "named": true,
-    "fields": {},
-    "children": {
-      "multiple": true,
-      "required": true,
-      "types": [
-        {
-          "type": "integer",
-          "named": true
-        },
-        {
-          "type": "whole_number",
-          "named": true
-        }
-      ]
-    }
+    "fields": {}
   },
   {
     "type": "integer",
     "named": true,
-    "fields": {},
-    "children": {
-      "multiple": false,
-      "required": false,
-      "types": [
-        {
-          "type": "whole_number",
-          "named": true
-        }
-      ]
-    }
+    "fields": {}
   },
   {
     "type": "literal",
@@ -83,6 +63,25 @@
     }
   },
   {
+    "type": "local_query",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "local_variable",
+          "named": true
+        },
+        {
+          "type": "query_segments",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "program",
     "named": true,
     "fields": {},
@@ -98,6 +97,78 @@
     }
   },
   {
+    "type": "query",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "local_query",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "query_coalesce",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "query_field",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "query_field",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": false,
+      "types": [
+        {
+          "type": "quoted_field",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "query_segments",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "query_coalesce",
+          "named": true
+        },
+        {
+          "type": "query_field",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "(",
+    "named": false
+  },
+  {
+    "type": ")",
+    "named": false
+  },
+  {
     "type": "-",
     "named": false
   },
@@ -110,7 +181,15 @@
     "named": false
   },
   {
-    "type": "whole_number",
+    "type": "local_variable",
     "named": true
+  },
+  {
+    "type": "quoted_field",
+    "named": true
+  },
+  {
+    "type": "|",
+    "named": false
   }
 ]
