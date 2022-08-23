@@ -77,8 +77,39 @@ pub struct FileConfig {
     /// 1. One of the built-in-formats listed in the `Timestamp Formats` table below.
     /// 2. The [time format specifiers][chrono_fmt] from Rust’s `chrono` library.
     ///
-    /// <add timestamp formats table here>
+    /// ### Types
     ///
+    /// - **`bool`**
+    /// - **`string`**
+    /// - **`float`**
+    /// - **`integer`**
+    /// - **`date`**
+    /// - **`timestamp`** (see the table below for formats)
+    ///
+    /// ### Timestamp Formats
+    ///
+    /// | Format               | Description                                                                      | Example                          |
+    /// |----------------------|----------------------------------------------------------------------------------|----------------------------------|
+    /// | `%F %T`              | `YYYY-MM-DD HH:MM:SS`                                                            | `2020-12-01 02:37:54`            |
+    /// | `%v %T`              | `DD-Mmm-YYYY HH:MM:SS`                                                           | `01-Dec-2020 02:37:54`           |
+    /// | `%FT%T`              | [ISO 8601][iso8601]/[RFC 3339][rfc3339], without time zone                       | `2020-12-01T02:37:54`            |
+    /// | `%FT%TZ`             | [ISO 8601][iso8601]/[RFC 3339][rfc3339], UTC                                     | `2020-12-01T09:37:54Z`           |
+    /// | `%+`                 | [ISO 8601][iso8601]/[RFC 3339][rfc3339], UTC, with time zone                     | `2020-12-01T02:37:54-07:00`      |
+    /// | `%a, %d %b %Y %T`    | [RFC 822][rfc822]/[RFC 2822][rfc2822], without time zone                         | `Tue, 01 Dec 2020 02:37:54`      |
+    /// | `%a %b %e %T %Y`     | [ctime][ctime] format                                                            | `Tue Dec 1 02:37:54 2020`        |
+    /// | `%s`                 | [UNIX timestamp][unix_ts]                                                        | `1606790274`                     |
+    /// | `%a %d %b %T %Y`     | [date][date] command, without time zone                                          | `Tue 01 Dec 02:37:54 2020`       |
+    /// | `%a %d %b %T %Z %Y`  | [date][date] command, with time zone                                             | `Tue 01 Dec 02:37:54 PST 2020`   |
+    /// | `%a %d %b %T %z %Y`  | [date][date] command, with numeric time zone                                     | `Tue 01 Dec 02:37:54 -0700 2020` |
+    /// | `%a %d %b %T %#z %Y` | [date][date] command, with numeric time zone (minutes can be missing or present) | `Tue 01 Dec 02:37:54 -07 2020`   |
+    ///
+    /// [date]: https://man7.org/linux/man-pages/man1/date.1.html
+    /// [ctime]: https://www.cplusplus.com/reference/ctime
+    /// [unix_ts]: https://en.wikipedia.org/wiki/Unix_time
+    /// [rfc822]: https://tools.ietf.org/html/rfc822#section-5
+    /// [rfc2822]: https://tools.ietf.org/html/rfc2822#section-3.3
+    /// [iso8601]: https://en.wikipedia.org/wiki/ISO_8601
+    /// [rfc3339]: https://tools.ietf.org/html/rfc3339
     /// [chrono_fmt]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
     #[serde(default)]
     schema: HashMap<String, String>,
