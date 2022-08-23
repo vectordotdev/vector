@@ -3,11 +3,12 @@ use crate::{
     codecs::{Decoder, DecodingConfig},
     config::SourceContext,
     config::{log_schema, Output, SourceConfig, SourceDescription},
+    event::{BatchNotifier, BatchStatus},
     internal_events::{
         source::{AMQPEventError, AMQPEventReceived},
         StreamClosedError,
     },
-    serde::{default_decoding, default_framing_message_based},
+    serde::{bool_or_struct, default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     SourceSender,
 };
@@ -16,12 +17,16 @@ use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use futures::{FutureExt, StreamExt};
-use lapin::{message::Delivery, Channel};
+use lapin::{acker::Acker, message::Delivery, Channel};
 use snafu::Snafu;
 use std::io::Cursor;
 use tokio_util::codec::FramedRead;
+use vector_common::finalizer::UnorderedFinalizer;
 use vector_config::configurable_component;
-use vector_core::{config::LogNamespace, event::Event};
+use vector_core::{
+    config::{AcknowledgementsConfig, LogNamespace},
+    event::Event,
+};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -72,6 +77,10 @@ pub struct AMQPSourceConfig {
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     pub(crate) decoding: DeserializerConfig,
+
+    #[configurable(derived)]
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    pub(crate) acknowledgements: AcknowledgementsConfig,
 }
 
 fn default_routing_key() -> String {
@@ -98,6 +107,7 @@ impl Default for AMQPSourceConfig {
             framing: default_framing_message_based(),
             decoding: default_decoding(),
             log_namespace: None,
+            acknowledgements: AcknowledgementsConfig::default(),
         }
     }
 }
@@ -119,7 +129,9 @@ impl AMQPSourceConfig {
 impl SourceConfig for AMQPSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
-        amqp_source(self, cx.shutdown, cx.out, log_namespace).await
+        let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
+
+        amqp_source(self, cx.shutdown, cx.out, log_namespace, acknowledgements).await
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
@@ -137,7 +149,20 @@ impl SourceConfig for AMQPSourceConfig {
     }
 
     fn can_acknowledge(&self) -> bool {
-        false
+        true
+    }
+}
+
+#[derive(Debug)]
+struct FinalizerEntry {
+    acker: Acker,
+}
+
+impl From<Delivery> for FinalizerEntry {
+    fn from(delivery: Delivery) -> Self {
+        Self {
+            acker: delivery.acker,
+        }
     }
 }
 
@@ -146,6 +171,7 @@ pub(crate) async fn amqp_source(
     shutdown: ShutdownSignal,
     out: SourceSender,
     log_namespace: LogNamespace,
+    acknowledgements: bool,
 ) -> crate::Result<super::Source> {
     let config = config.clone();
     let (_conn, channel) = config
@@ -160,26 +186,23 @@ pub(crate) async fn amqp_source(
         out,
         channel,
         log_namespace,
+        acknowledgements,
     )))
 }
 
 /// Populates the decoded event with extra metadata.
 fn populate_event(
     event: &mut Event,
-    msg: &Delivery,
+    timestamp: chrono::DateTime<Utc>,
     routing_key: &str,
+    routing: &str,
     exchange_key: &str,
+    exchange: &str,
     offset_key: &str,
+    delivery_tag: i64,
     log_namespace: LogNamespace,
 ) {
     let log = event.as_mut_log();
-
-    // Extract timestamp from amqp message
-    let timestamp = msg
-        .properties
-        .timestamp()
-        .and_then(|millis| Utc.timestamp_millis_opt(millis as _).latest())
-        .unwrap_or_else(Utc::now);
 
     log_namespace.insert_vector_metadata(
         log,
@@ -195,29 +218,17 @@ fn populate_event(
         "amqp",
     );
 
-    log_namespace.insert_source_metadata(
-        "amqp",
-        log,
-        routing_key,
-        "routing",
-        msg.routing_key.to_string(),
-    );
+    log_namespace.insert_source_metadata("amqp", log, routing_key, "routing", routing.to_string());
 
     log_namespace.insert_source_metadata(
         "amqp",
         log,
         exchange_key,
         "exchange",
-        msg.exchange.to_string(),
+        exchange.to_string(),
     );
 
-    log_namespace.insert_source_metadata(
-        "amqp",
-        log,
-        offset_key,
-        "offset",
-        msg.delivery_tag as i64,
-    );
+    log_namespace.insert_source_metadata("amqp", log, offset_key, "offset", delivery_tag);
 }
 
 /// Runs the AMQP source involving the main loop pulling data from the server.
@@ -227,8 +238,11 @@ async fn run_amqp_source(
     mut out: SourceSender,
     channel: Channel,
     log_namespace: LogNamespace,
+    acknowledgements: bool,
 ) -> Result<(), ()> {
-    let ack_options = lapin::options::BasicAckOptions::default();
+    let (finalizer, mut ack_stream) =
+        UnorderedFinalizer::<FinalizerEntry>::maybe_new(acknowledgements, shutdown.clone());
+
     debug!("Starting amqp source, listening to queue {}", config.queue);
     let mut consumer = channel
         .basic_consume(
@@ -244,8 +258,13 @@ async fn run_amqp_source(
         .fuse();
     let mut shutdown = shutdown.fuse();
     loop {
-        let should_break = futures::select! {
-            _ = shutdown => true,
+        tokio::select! {
+            _ = &mut shutdown => break,
+            entry = ack_stream.next() => {
+                if let Some((status, entry)) = entry {
+                    handle_ack(status, entry).await;
+                }
+            },
             opt_m = consumer.next() => {
                 if let Some(try_m) = opt_m {
                     match try_m {
@@ -265,9 +284,20 @@ async fn run_amqp_source(
                             let payload = Cursor::new(Bytes::copy_from_slice(&msg.data));
                             let mut stream = FramedRead::new(payload, config.decoder(log_namespace));
 
+                            // Extract timestamp from amqp message
+                            let timestamp = msg
+                                .properties
+                                .timestamp()
+                                .and_then(|millis| Utc.timestamp_millis_opt(millis as _).latest())
+                                .unwrap_or_else(Utc::now);
+
                             let routing_key = config.routing_key.as_str();
                             let exchange_key = config.exchange_key.as_str();
                             let offset_key = config.offset_key.as_str();
+                            let routing = msg.routing_key.to_string();
+                            let exchange = msg.exchange.to_string();
+                            let delivery_tag = msg.delivery_tag as i64;
+
                             let out = &mut out;
 
                             let mut stream = stream! {
@@ -276,15 +306,14 @@ async fn run_amqp_source(
                                         Ok((events, _byte_size)) => {
                                             for mut event in events {
                                                 populate_event(&mut event,
-                                                               &msg,
+                                                               timestamp,
                                                                routing_key,
+                                                               &routing,
                                                                exchange_key,
+                                                               &exchange,
                                                                offset_key,
+                                                               delivery_tag,
                                                                log_namespace);
-
-                                                if let Err(error) = msg.acker.ack(ack_options).await {
-                                                    error!(message = "Unable to ack", error = ?error, internal_log_rate_secs = 10);
-                                                }
 
                                                 yield event;
                                             }
@@ -303,27 +332,69 @@ async fn run_amqp_source(
                             }
                             .boxed();
 
-                            match out.send_event_stream(&mut stream).await {
-                                Err(error) => {
-                                    emit!(StreamClosedError { error, count: 1 });
+                            match finalizer {
+                                Some(ref finalizer) => {
+                                    let (batch, receiver) = BatchNotifier::new_with_receiver();
+                                    let mut stream = stream.map(|event| event.with_batch_notifier(&batch));
+
+                                    match out.send_event_stream(&mut stream).await {
+                                        Err(error) => {
+                                            emit!(StreamClosedError { error, count: 1 });
+                                        }
+                                        Ok(_) => {
+                                            // TODO Is this needed?
+                                            // drop(stream);
+                                            finalizer.add(msg.into(), receiver);
+                                        }
+                                    }
                                 }
-                                Ok(_) => ()
+                                None => {
+                                    match out.send_event_stream(&mut stream).await {
+                                        Err(error) => {
+                                            emit!(StreamClosedError { error, count: 1 });
+                                        }
+                                        Ok(_) => {
+                                            let ack_options = lapin::options::BasicAckOptions::default();
+                                            if let Err(error) = msg.acker.ack(ack_options).await {
+                                                error!(message = "Unable to ack", error = ?error, internal_log_rate_secs = 10);
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
-                    false
                 } else {
-                    true
+                    break
                 }
             }
         };
-
-        if should_break {
-            break;
-        }
     }
 
     Ok(())
+}
+
+async fn handle_ack(status: BatchStatus, entry: FinalizerEntry) {
+    match status {
+        BatchStatus::Delivered => {
+            let ack_options = lapin::options::BasicAckOptions::default();
+            if let Err(error) = entry.acker.ack(ack_options).await {
+                error!(message = "Unable to ack", error = ?error, internal_log_rate_secs = 10);
+            }
+        }
+        BatchStatus::Errored => {
+            let ack_options = lapin::options::BasicRejectOptions::default();
+            if let Err(error) = entry.acker.reject(ack_options).await {
+                error!(message = "Unable to reject", error = ?error, internal_log_rate_secs = 10);
+            }
+        }
+        BatchStatus::Rejected => {
+            let ack_options = lapin::options::BasicRejectOptions::default();
+            if let Err(error) = entry.acker.reject(ack_options).await {
+                error!(message = "Unable to reject", error = ?error, internal_log_rate_secs = 10);
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -370,7 +441,8 @@ mod integration_test {
             &config,
             ShutdownSignal::noop(),
             SourceSender::new_test().0,
-            LogNamespace::Legacy
+            LogNamespace::Legacy,
+            false,
         )
         .await
         .is_ok());
@@ -468,9 +540,15 @@ mod integration_test {
         trace!("Receiving event...");
         let (tx, rx) = SourceSender::new_test();
         tokio::spawn(
-            amqp_source(&config, ShutdownSignal::noop(), tx, LogNamespace::Legacy)
-                .await
-                .unwrap(),
+            amqp_source(
+                &config,
+                ShutdownSignal::noop(),
+                tx,
+                LogNamespace::Legacy,
+                false,
+            )
+            .await
+            .unwrap(),
         );
         let events = collect_n(rx, 1).await;
 

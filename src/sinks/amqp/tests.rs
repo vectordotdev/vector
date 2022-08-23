@@ -174,6 +174,7 @@ mod integration_tests {
             framing: default_framing_message_based(),
             decoding: default_decoding(),
             log_namespace: Some(true),
+            acknowledgements: true.into(),
         };
         let (tx, rx) = SourceSender::new_test();
         let amqp_source = crate::sources::amqp::amqp_source(
@@ -181,6 +182,7 @@ mod integration_tests {
             ShutdownSignal::noop(),
             tx,
             LogNamespace::Legacy,
+            true,
         )
         .await
         .unwrap();

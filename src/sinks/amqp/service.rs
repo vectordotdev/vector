@@ -100,7 +100,13 @@ impl Service<AMQPRequest> for AMQPService {
 
     fn call(&mut self, req: AMQPRequest) -> Self::Future {
         let channel = Arc::clone(&self.channel);
+
         Box::pin(async move {
+            channel
+                .confirm_select(lapin::options::ConfirmSelectOptions::default())
+                .await
+                .unwrap();
+
             let byte_size = req.body.len();
             let f = channel
                 .basic_publish(

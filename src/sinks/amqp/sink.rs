@@ -5,6 +5,7 @@ use crate::{
 use async_trait::async_trait;
 use futures::StreamExt;
 use futures_util::stream::BoxStream;
+use lapin::options::ConfirmSelectOptions;
 use snafu::ResultExt;
 use std::{convert::TryFrom, sync::Arc};
 use tower::ServiceBuilder;
@@ -41,6 +42,11 @@ impl AMQPSink {
             .connect()
             .await
             .map_err(|e| BuildError::AMQPCreateFailed { source: e })?;
+
+        channel
+            .confirm_select(ConfirmSelectOptions::default())
+            .await
+            .map_err(|e| BuildError::AMQPCreateFailed { source: Box::new(e) })?;
 
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build()?;
