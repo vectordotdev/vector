@@ -32,6 +32,7 @@ use crate::{
         host_metrics::{Collector, HostMetricsConfig},
         internal_logs::InternalLogsConfig,
         internal_metrics::InternalMetricsConfig,
+        Sources,
     },
     transforms::{filter::FilterConfig, remap::RemapConfig},
 };
@@ -433,9 +434,9 @@ fn setup_logs_reporting(
     let internal_logs_id = OutputId::from(ComponentKey::from(INTERNAL_LOGS_KEY));
     let datadog_logs_id = ComponentKey::from(DATADOG_LOGS_KEY);
 
-    let internal_logs = InternalLogsConfig {
+    let internal_logs = Sources::InternalLogs(InternalLogsConfig {
         ..Default::default()
-    };
+    });
 
     let custom_logs_tags_vrl = datadog
         .tags
@@ -504,7 +505,7 @@ fn setup_metrics_reporting(
     // By default, host_metrics generates many metrics and some with high
     // cardinality which can negatively impact customers' costs and downstream
     // systems' performance. To avoid this, we explicitly set `collectors`.
-    let host_metrics = HostMetricsConfig {
+    let host_metrics = Sources::HostMetrics(HostMetricsConfig {
         namespace: Some("vector.host".to_owned()),
         scrape_interval_secs: datadog.reporting_interval_secs,
         collectors: Some(vec![
@@ -516,16 +517,16 @@ fn setup_metrics_reporting(
             Collector::Network,
         ]),
         ..Default::default()
-    };
+    });
 
-    let internal_metrics = InternalMetricsConfig {
+    let internal_metrics = Sources::InternalMetrics(InternalMetricsConfig {
         // While the default namespace for internal metrics is already "vector",
         // setting the namespace here is meant for clarity and resistance
         // against any future or accidental changes.
         namespace: Some("vector".to_owned()),
         scrape_interval_secs: datadog.reporting_interval_secs,
         ..Default::default()
-    };
+    });
 
     let custom_metric_tags_vrl = datadog
         .tags

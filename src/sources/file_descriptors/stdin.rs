@@ -1,20 +1,18 @@
 use std::io;
 
 use codecs::decoding::{DeserializerConfig, FramingConfig};
-use vector_config::configurable_component;
+use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::LogNamespace;
 
 use crate::{
-    config::{Output, Resource, SourceConfig, SourceContext, SourceDescription},
+    config::{Output, Resource, SourceConfig, SourceContext},
     serde::default_decoding,
 };
 
 use super::FileDescriptorConfig;
 
-const NAME: &str = "stdin";
-
 /// Configuration for the `stdin` source.
-#[configurable_component(source)]
+#[configurable_component(source("stdin"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct StdinConfig {
@@ -45,17 +43,17 @@ impl FileDescriptorConfig for StdinConfig {
     fn host_key(&self) -> Option<String> {
         self.host_key.clone()
     }
+
     fn framing(&self) -> Option<FramingConfig> {
         self.framing.clone()
     }
+
     fn decoding(&self) -> DeserializerConfig {
         self.decoding.clone()
     }
-    fn name(&self) -> String {
-        NAME.to_string()
-    }
+
     fn description(&self) -> String {
-        NAME.to_string()
+        Self::NAME.to_string()
     }
 }
 
@@ -70,14 +68,9 @@ impl Default for StdinConfig {
     }
 }
 
-inventory::submit! {
-    SourceDescription::new::<StdinConfig>(NAME)
-}
-
 impl_generate_config_from_default!(StdinConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "stdin")]
 impl SourceConfig for StdinConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
         self.source(io::BufReader::new(io::stdin()), cx.shutdown, cx.out)
@@ -85,10 +78,6 @@ impl SourceConfig for StdinConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(self.decoding.output_type())]
-    }
-
-    fn source_type(&self) -> &'static str {
-        NAME
     }
 
     fn resources(&self) -> Vec<Resource> {

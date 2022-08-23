@@ -14,9 +14,7 @@ use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    config::{
-        self, GenerateConfig, Output, ProxyConfig, SourceConfig, SourceContext, SourceDescription,
-    },
+    config::{self, GenerateConfig, Output, ProxyConfig, SourceConfig, SourceContext},
     event::metric::{Metric, MetricKind, MetricValue},
     http::HttpClient,
     internal_events::{
@@ -33,7 +31,7 @@ pub use parser::ParseError;
 use vector_core::config::LogNamespace;
 
 /// Configuration for the `apache_metrics` source.
-#[configurable_component(source)]
+#[configurable_component(source("apache_metrics"))]
 #[derive(Clone, Debug)]
 pub struct ApacheMetricsConfig {
     /// The list of `mod_status` endpoints to scrape metrics from.
@@ -58,10 +56,6 @@ pub fn default_namespace() -> String {
     "apache".to_string()
 }
 
-inventory::submit! {
-    SourceDescription::new::<ApacheMetricsConfig>("apache_metrics")
-}
-
 impl GenerateConfig for ApacheMetricsConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
@@ -74,7 +68,6 @@ impl GenerateConfig for ApacheMetricsConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "apache_metrics")]
 impl SourceConfig for ApacheMetricsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let urls = self
@@ -98,10 +91,6 @@ impl SourceConfig for ApacheMetricsConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(config::DataType::Metric)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "apache_metrics"
     }
 
     fn can_acknowledge(&self) -> bool {

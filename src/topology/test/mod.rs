@@ -26,18 +26,13 @@ use tokio::{
 };
 use vector_buffers::{BufferConfig, BufferType, WhenFull};
 
+mod backpressure;
+mod compliance;
 #[cfg(all(feature = "sinks-socket", feature = "sources-socket"))]
 mod crash;
-
+mod doesnt_reload;
 #[cfg(all(feature = "sources-http", feature = "sinks-http"))]
 mod end_to_end;
-
-#[cfg(all(feature = "sinks-blackhole", feature = "sources-stdin"))]
-mod transient_state;
-
-#[cfg(all(feature = "sinks-console", feature = "sources-demo_logs"))]
-mod source_finished;
-
 #[cfg(all(
     feature = "sources-prometheus",
     feature = "sinks-prometheus",
@@ -45,12 +40,9 @@ mod source_finished;
     feature = "sources-splunk_hec"
 ))]
 mod reload;
-
-#[cfg(all(feature = "sinks-console", feature = "sources-socket"))]
-mod doesnt_reload;
-
-mod backpressure;
-mod compliance;
+#[cfg(all(feature = "sinks-console", feature = "sources-demo_logs"))]
+mod source_finished;
+mod transient_state;
 
 fn basic_config() -> Config {
     trace_init();
@@ -86,8 +78,7 @@ fn into_message_stream(array: EventArray) -> impl futures::Stream<Item = String>
 async fn topology_shutdown_while_active() {
     trace_init();
 
-    let (mut in1, mut source1, counter) = basic_source_with_event_counter();
-    source1.set_force_shutdown(true);
+    let (mut in1, source1, counter) = basic_source_with_event_counter(true);
 
     let transform1 = basic_transform(" transformed", 0.0);
     let (out1, sink1) = basic_sink(10);

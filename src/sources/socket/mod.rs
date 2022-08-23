@@ -11,16 +11,13 @@ use vector_core::config::LogNamespace;
 use crate::serde::default_framing_message_based;
 use crate::{
     codecs::DecodingConfig,
-    config::{
-        log_schema, DataType, GenerateConfig, Output, Resource, SourceConfig, SourceContext,
-        SourceDescription,
-    },
+    config::{log_schema, DataType, GenerateConfig, Output, Resource, SourceConfig, SourceContext},
     sources::util::TcpSource,
     tls::MaybeTlsSettings,
 };
 
 /// Configuration for the `socket` source.
-#[configurable_component(source)]
+#[configurable_component(source("socket"))]
 #[derive(Clone, Debug)]
 pub struct SocketConfig {
     #[serde(flatten)]
@@ -86,10 +83,6 @@ impl From<udp::UdpConfig> for SocketConfig {
     }
 }
 
-inventory::submit! {
-    SourceDescription::new::<SocketConfig>("socket")
-}
-
 impl GenerateConfig for SocketConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(
@@ -101,7 +94,6 @@ impl GenerateConfig for SocketConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "socket")]
 impl SourceConfig for SocketConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         match self.mode.clone() {
@@ -227,10 +219,6 @@ impl SourceConfig for SocketConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(self.output_type())]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "socket"
     }
 
     fn resources(&self) -> Vec<Resource> {

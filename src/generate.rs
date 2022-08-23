@@ -9,12 +9,12 @@ use colored::*;
 use indexmap::IndexMap;
 use serde::Serialize;
 use toml::{map::Map, Value};
+use vector_config::component::{
+    ExampleError, SinkDescription, SourceDescription, TransformDescription,
+};
 use vector_core::{buffers::BufferConfig, config::GlobalOptions, default_data_dir};
 
-use crate::config::{
-    component::ExampleError, SinkDescription, SinkHealthcheckOptions, SourceDescription,
-    TransformDescription,
-};
+use crate::config::SinkHealthcheckOptions;
 
 #[derive(Parser, Debug)]
 #[clap(rename_all = "kebab-case")]
@@ -42,8 +42,8 @@ pub struct Opts {
     /// can optionally specify the names of components by prefixing them with
     /// `<name>:`, e.g.:
     ///
-    /// `foo:stdin/bar:basic_transform/baz:http` prints a `stdin` source called
-    /// `foo`, a `basic_transform` transform called `bar`, and an `http` sink
+    /// `foo:stdin/bar:test_basic/baz:http` prints a `stdin` source called
+    /// `foo`, a `test_basic` transform called `bar`, and an `http` sink
     /// called `baz`.
     ///
     /// Vector makes a best attempt at constructing a sensible topology. The
@@ -459,7 +459,7 @@ mod tests {
         let filepath = tempdir.path().join("./config.example.toml");
         let cfg = generate_example(
             true,
-            "stdin/basic_transform/console",
+            "stdin/test_basic/console",
             &Some(filepath.clone()),
             TransformInputsStrategy::Auto,
         );
@@ -477,7 +477,7 @@ mod tests {
         assert_eq!(
             generate_example(
                 true,
-                "stdin/basic_transform/console",
+                "stdin/test_basic/console",
                 &None,
                 TransformInputsStrategy::Auto
             ),
@@ -494,7 +494,7 @@ mod tests {
                 inputs = ["source0"]
                 increase = 0.0
                 suffix = ""
-                type = "basic_transform"
+                type = "test_basic"
 
                 [sinks.sink0]
                 inputs = ["transform0"]
@@ -518,7 +518,7 @@ mod tests {
         assert_eq!(
             generate_example(
                 true,
-                "stdin|basic_transform|console",
+                "stdin|test_basic|console",
                 &None,
                 TransformInputsStrategy::Auto
             ),
@@ -535,7 +535,7 @@ mod tests {
                 inputs = ["source0"]
                 increase = 0.0
                 suffix = ""
-                type = "basic_transform"
+                type = "test_basic"
 
                 [sinks.sink0]
                 inputs = ["transform0"]
@@ -612,7 +612,7 @@ mod tests {
         assert_eq!(
             generate_example(
                 true,
-                "/basic_transform,basic_transform,basic_transform",
+                "/test_basic,test_basic,test_basic",
                 &None,
                 TransformInputsStrategy::Auto
             ),
@@ -622,19 +622,19 @@ mod tests {
                 inputs = []
                 increase = 0.0
                 suffix = ""
-                type = "basic_transform"
+                type = "test_basic"
 
                 [transforms.transform1]
                 inputs = ["transform0"]
                 increase = 0.0
                 suffix = ""
-                type = "basic_transform"
+                type = "test_basic"
 
                 [transforms.transform2]
                 inputs = ["transform1"]
                 increase = 0.0
                 suffix = ""
-                type = "basic_transform"
+                type = "test_basic"
             "#}
             .to_string())
         );
@@ -642,7 +642,7 @@ mod tests {
         assert_eq!(
             generate_example(
                 false,
-                "/basic_transform,basic_transform,basic_transform",
+                "/test_basic,test_basic,test_basic",
                 &None,
                 TransformInputsStrategy::Auto
             ),
@@ -652,19 +652,19 @@ mod tests {
                 inputs = []
                 increase = 0.0
                 suffix = ""
-                type = "basic_transform"
+                type = "test_basic"
 
                 [transforms.transform1]
                 inputs = ["transform0"]
                 increase = 0.0
                 suffix = ""
-                type = "basic_transform"
+                type = "test_basic"
 
                 [transforms.transform2]
                 inputs = ["transform1"]
                 increase = 0.0
                 suffix = ""
-                type = "basic_transform"
+                type = "test_basic"
             "#}
             .to_string())
         );
