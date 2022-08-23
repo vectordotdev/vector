@@ -12,7 +12,10 @@ use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
-    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
+        SinkDescription,
+    },
     event::{Event, EventStatus, Finalizable},
     internal_events::{NatsEventSendError, TemplateRenderingError},
     nats::{from_tls_auth_config, NatsAuthConfig, NatsConfigError},
@@ -40,7 +43,7 @@ enum BuildError {
  */
 
 /// Configuration for the `nats` sink.
-#[configurable_component(sink("nats"))]
+#[configurable_component(sink)]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct NatsSinkConfig {
@@ -77,6 +80,10 @@ pub struct NatsSinkConfig {
 
 fn default_name() -> String {
     String::from("vector")
+}
+
+inventory::submit! {
+    SinkDescription::new::<NatsSinkConfig>("nats")
 }
 
 impl GenerateConfig for NatsSinkConfig {

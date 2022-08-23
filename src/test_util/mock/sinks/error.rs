@@ -18,7 +18,7 @@ use crate::{
 };
 
 /// Configuration for the `test_error` sink.
-#[configurable_component(sink("test_error"))]
+#[configurable_component(sink)]
 #[derive(Clone, Debug, Default)]
 pub struct ErrorSinkConfig {
     /// Dummy field used for generating unique configurations to trigger reloads.

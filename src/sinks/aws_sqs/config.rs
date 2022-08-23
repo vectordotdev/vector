@@ -33,7 +33,7 @@ pub(super) enum BuildError {
 }
 
 /// Configuration for the `aws_sqs` sink.
-#[configurable_component(sink("aws_sqs"))]
+#[configurable_component(sink)]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct SqsSinkConfig {

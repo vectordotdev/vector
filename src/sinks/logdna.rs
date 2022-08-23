@@ -9,7 +9,9 @@ use vector_config::configurable_component;
 
 use crate::{
     codecs::Transformer,
-    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+    },
     event::Event,
     http::{Auth, HttpClient},
     sinks::util::{
@@ -25,7 +27,7 @@ static HOST: Lazy<Uri> = Lazy::new(|| Uri::from_static("https://logs.logdna.com"
 const PATH: &str = "/logs/ingest";
 
 /// Configuration for the `logdna` sink.
-#[configurable_component(sink("logdna"))]
+#[configurable_component(sink)]
 #[derive(Clone, Debug)]
 pub struct LogdnaConfig {
     /// The Ingestion API key.
@@ -77,6 +79,10 @@ pub struct LogdnaConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     acknowledgements: AcknowledgementsConfig,
+}
+
+inventory::submit! {
+    SinkDescription::new::<LogdnaConfig>("logdna")
 }
 
 impl GenerateConfig for LogdnaConfig {

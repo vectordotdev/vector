@@ -97,7 +97,7 @@ impl DatadogMetricsEndpointConfiguration {
 }
 
 /// Configuration for the `datadog_metrics` sink.
-#[configurable_component(sink("datadog_metrics"))]
+#[configurable_component(sink)]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogMetricsConfig {

@@ -48,34 +48,56 @@ fn path_matches(path: &Path, haystack: &[AttributeIdent]) -> bool {
 #[derive(Clone, Debug)]
 struct TypedComponent {
     component_type: ComponentType,
-    component_name: String,
+    component_name: Option<String>,
 }
 
 impl TypedComponent {
-    pub fn get_registration_block(&self, input: &DeriveInput) -> proc_macro2::TokenStream {
-        let config_ty = &input.ident;
-        let component_name = self.component_name.as_str();
-        let desc_ty: syn::Type = match self.component_type {
-            ComponentType::EnrichmentTable => {
-                parse_quote! { ::vector_config::component::EnrichmentTableDescription }
-            }
-            ComponentType::Provider => {
-                parse_quote! { ::vector_config::component::ProviderDescription }
-            }
-            ComponentType::Sink => parse_quote! { ::vector_config::component::SinkDescription },
-            ComponentType::Source => {
-                parse_quote! { ::vector_config::component::SourceDescription }
-            }
-            ComponentType::Transform => {
-                parse_quote! { ::vector_config::component::TransformDescription }
-            }
-        };
+    /// Creates the component description registration code based on the original derive input.
+    ///
+    /// If this typed component does not have a name, `None` will be returned, as only named
+    /// components can be described.
+    pub fn get_component_desc_registration(
+        &self,
+        input: &DeriveInput,
+    ) -> Option<proc_macro2::TokenStream> {
+        self.component_name.as_ref().map(|name| {
+            let config_ty = &input.ident;
+            let component_name = name.as_str();
+            let desc_ty: syn::Type = match self.component_type {
+                ComponentType::EnrichmentTable => {
+                    parse_quote! { ::vector_config::component::EnrichmentTableDescription }
+                }
+                ComponentType::Provider => {
+                    parse_quote! { ::vector_config::component::ProviderDescription }
+                }
+                ComponentType::Sink => parse_quote! { ::vector_config::component::SinkDescription },
+                ComponentType::Source => {
+                    parse_quote! { ::vector_config::component::SourceDescription }
+                }
+                ComponentType::Transform => {
+                    parse_quote! { ::vector_config::component::TransformDescription }
+                }
+            };
 
-        quote! {
-            ::inventory::submit! {
-                #desc_ty::new::<#config_ty>(#component_name)
+            quote! {
+                ::inventory::submit! {
+                    #desc_ty::new::<#config_ty>(#component_name)
+                }
             }
-        }
+        })
+    }
+
+    /// Creates the component name registration code.
+    ///
+    /// If this typed component does not have a name, `None` will be returned, as only named
+    /// components can be registered.
+    pub fn get_component_name_registration(&self) -> Option<proc_macro2::TokenStream> {
+        self.component_name.as_ref().map(|name| {
+            let component_name = name.as_str();
+            quote! {
+                #[::vector_config::component_name(#component_name)]
+            }
+        })
     }
 }
 
@@ -104,10 +126,18 @@ impl<'a> From<&'a Path> for ComponentType {
 
 impl TypedComponent {
     /// Creates a new `TypedComponent`.
-    pub const fn new(component_type: ComponentType, component_name: String) -> Self {
+    pub const fn new(component_type: ComponentType) -> Self {
         Self {
             component_type,
-            component_name,
+            component_name: None,
+        }
+    }
+
+    /// Creates a new `TypedComponent` with the given name.
+    pub const fn with_name(component_type: ComponentType, component_name: String) -> Self {
+        Self {
+            component_type,
+            component_name: Some(component_name),
         }
     }
 
@@ -120,11 +150,6 @@ impl TypedComponent {
             ComponentType::Source => "source",
             ComponentType::Transform => "transform",
         }
-    }
-
-    /// Gets the name of this component.
-    fn as_name_str(&self) -> &str {
-        self.component_name.as_str()
     }
 }
 
@@ -172,19 +197,18 @@ impl FromMeta for Options {
                     }
                 }
 
-                // Marked as a component.
+                // Marked as a typed component that requires a name.
                 NestedMeta::Meta(Meta::List(ml))
-                    if path_matches(
-                        &ml.path,
-                        &[ENRICHMENT_TABLE, PROVIDER, SINK, SOURCE, TRANSFORM],
-                    ) =>
+                    if path_matches(&ml.path, &[ENRICHMENT_TABLE, PROVIDER, SOURCE]) =>
                 {
                     if typed_component.is_some() {
-                        errors.push(Error::custom("already marked as a typed component; `source(..)`, `transform(..)`, and `sink(..)` are mutually exclusive").with_span(ml));
+                        errors.push(
+                            Error::custom("already marked as a typed component").with_span(ml),
+                        );
                     } else {
                         match ml.nested.first() {
                             Some(NestedMeta::Lit(Lit::Str(component_name))) => {
-                                typed_component = Some(TypedComponent::new(
+                                typed_component = Some(TypedComponent::with_name(
                                     ComponentType::from(&ml.path),
                                     component_name.value(),
                                 ));
@@ -198,8 +222,19 @@ impl FromMeta for Options {
                     }
                 }
 
+                // Marked as a typed component that does not require a name.
+                NestedMeta::Meta(Meta::Path(p)) if path_matches(p, &[SINK, TRANSFORM]) => {
+                    if typed_component.is_some() {
+                        errors.push(
+                            Error::custom("already marked as a typed component").with_span(p),
+                        );
+                    } else {
+                        typed_component = Some(TypedComponent::new(ComponentType::from(p)));
+                    }
+                }
+
                 NestedMeta::Meta(m) => {
-                    let error = "expected one of: `source(\"...\")`, `transform(\"..\")`, `sink(\"..\")`, `no_ser`, or `no_deser`";
+                    let error = "expected one of: `enrichment_table(\"...\")`, `provider(\"...\")`, `source(\"...\")`, `transform`, `sink`, `no_ser`, or `no_deser`";
                     errors.push(Error::custom(error).with_span(m));
                 }
 
@@ -240,26 +275,29 @@ pub fn configurable_component_impl(args: TokenStream, item: TokenStream) -> Toke
         }
     };
 
-    // If the component is typed -- source, transform, sink -- we do a few additional things:
+    // If the component is typed (see `TypedComponent`/`ComponentType`), we do a few additional
+    // things:
     // - we add a metadata attribute to indicate the component type
-    // - we add an attribute so the component's configuration type becomes "named", which drives
-    //   the component config trait impl (i.e. `SourceConfig`) and will eventually drive the value
-    //   that `serde` uses to deserialize the given component variant in the Big Enum model
+    // - we potentially add an attribute so the component's configuration type becomes "named",
+    //   which drives the component config trait impl (i.e. `SourceConfig`) and will eventually
+    //   drive the value that `serde` uses to deserialize the given component variant in the Big
+    //   Enum model. this only happens if the component is actually named, and only sources are
+    //   named at the moment.
     // - we automatically generate the call to register the component config type via `inventory`
     //   which powers the `vector generate` subcommand by maintaining a name -> config type map
     let component_type = options.typed_component().map(|tc| {
         let component_type = tc.as_type_str();
-        let component_name = tc.as_name_str();
+        let maybe_component_name_registration = tc.get_component_name_registration();
 
         quote! {
             #[configurable(metadata(component_type = #component_type))]
-            #[::vector_config::component_name(#component_name)]
+            #maybe_component_name_registration
         }
     });
 
     let maybe_component_desc = options
         .typed_component()
-        .map(|tc| tc.get_registration_block(&input));
+        .map(|tc| tc.get_component_desc_registration(&input));
 
     // Generate and apply all of the necessary derives.
     let mut derives = Punctuated::<Path, Comma>::new();

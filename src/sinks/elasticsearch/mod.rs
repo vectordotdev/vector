@@ -24,6 +24,7 @@ use vector_config::configurable_component;
 
 use crate::aws::AwsAuthentication;
 use crate::{
+    config::SinkDescription,
     event::{EventRef, LogEvent},
     internal_events::TemplateRenderingError,
     template::{Template, TemplateParseError},
@@ -107,6 +108,10 @@ impl TryFrom<&str> for BulkAction {
             _ => Err(format!("Invalid bulk action: {}", input)),
         }
     }
+}
+
+inventory::submit! {
+    SinkDescription::new::<ElasticsearchConfig>("elasticsearch")
 }
 
 impl_generate_config_from_default!(ElasticsearchConfig);

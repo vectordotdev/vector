@@ -204,7 +204,7 @@ fn default_simple_source_listen_addr() -> SocketListenAddr {
 
 /// A sink for sending events to the `simple` service.
 #[derive(Clone)]
-#[configurable_component(sink("simple"))]
+#[configurable_component(sink)]
 #[configurable(metadata(status = "beta"))]
 pub struct SimpleSinkConfig {
     /// The endpoint to send events to.
@@ -263,7 +263,7 @@ fn default_simple_sink_endpoint() -> String {
 
 /// A sink for sending events to the `advanced` service.
 #[derive(Clone)]
-#[configurable_component(sink("advanced"))]
+#[configurable_component(sink)]
 #[configurable(metadata(status = "stable"))]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AdvancedSinkConfig {

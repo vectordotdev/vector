@@ -12,7 +12,10 @@ use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
-    config::{self, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{
+        self, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
+        SinkDescription,
+    },
     event::Event,
     internal_events::{RedisSendEventError, TemplateRenderingError},
     sinks::util::{
@@ -24,6 +27,10 @@ use crate::{
     },
     template::{Template, TemplateParseError},
 };
+
+inventory::submit! {
+    SinkDescription::new::<RedisSinkConfig>("redis")
+}
 
 #[derive(Debug, Snafu)]
 enum RedisSinkError {
@@ -107,7 +114,7 @@ impl SinkBatchSettings for RedisDefaultBatchSettings {
 }
 
 /// Configuration for the `redis` sink.
-#[configurable_component(sink("redis"))]
+#[configurable_component(sink)]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct RedisSinkConfig {

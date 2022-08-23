@@ -10,7 +10,7 @@ use vector_core::ByteSizeOf;
 
 use super::collector::{self, MetricCollector as _};
 use crate::{
-    config::{self, AcknowledgementsConfig, Input, SinkConfig},
+    config::{self, AcknowledgementsConfig, Input, SinkConfig, SinkDescription},
     event::{Event, Metric},
     http::{Auth, HttpClient},
     internal_events::TemplateRenderingError,
@@ -44,7 +44,7 @@ enum Errors {
 }
 
 /// Configuration for the `prometheus_remote_write` sink.
-#[configurable_component(sink("prometheus_remote_write"))]
+#[configurable_component(sink)]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct RemoteWriteConfig {
@@ -103,6 +103,10 @@ pub struct RemoteWriteConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+}
+
+inventory::submit! {
+    SinkDescription::new::<RemoteWriteConfig>("prometheus_remote_write")
 }
 
 impl_generate_config_from_default!(RemoteWriteConfig);

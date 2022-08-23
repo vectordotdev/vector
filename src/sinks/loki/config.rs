@@ -17,7 +17,7 @@ use crate::{
 };
 
 /// Configuration for the `loki` sink.
-#[configurable_component(sink("loki"))]
+#[configurable_component(sink)]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct LokiConfig {

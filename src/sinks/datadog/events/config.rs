@@ -22,7 +22,7 @@ use crate::{
 };
 
 /// Configuration for the `datadog_events` sink.
-#[configurable_component(sink("datadog_events"))]
+#[configurable_component(sink)]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogEventsConfig {

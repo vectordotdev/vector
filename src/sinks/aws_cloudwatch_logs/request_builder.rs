@@ -6,13 +6,12 @@ use vector_core::{
     ByteSizeOf,
 };
 
+use super::TemplateRenderingError;
 use crate::{
     codecs::{Encoder, Transformer},
     config::LogSchema,
     event::{Event, Value},
-    internal_events::{
-        AwsCloudwatchLogsEncoderError, AwsCloudwatchLogsMessageSizeError, TemplateRenderingError,
-    },
+    internal_events::{AwsCloudwatchLogsEncoderError, AwsCloudwatchLogsMessageSizeError},
     sinks::aws_cloudwatch_logs::CloudwatchKey,
     template::Template,
 };

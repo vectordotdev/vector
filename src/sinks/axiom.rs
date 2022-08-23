@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
-use vector_config::configurable_component;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig,
-        SinkContext,
+        SinkContext, SinkDescription,
     },
     sinks::{
         elasticsearch::{ElasticsearchAuth, ElasticsearchConfig},
@@ -17,44 +17,28 @@ use crate::{
 
 static CLOUD_URL: &str = "https://cloud.axiom.co";
 
-/// Configuration for the `axiom` sink.
-#[configurable_component(sink("axiom"))]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub(self) struct AxiomConfig {
-    /// API endpoint.
-    ///
-    /// Only required if not using Axiom Cloud.
     url: Option<String>,
-
-    /// Organization ID.
-    ///
-    /// Only required if using a personal token.
     org_id: Option<String>,
-
-    /// API token.
     token: String,
-
-    /// Dataset name.
     dataset: String,
 
-    #[configurable(derived)]
     #[serde(default)]
     request: RequestConfig,
-
-    #[configurable(derived)]
     #[serde(default)]
     compression: Compression,
-
-    #[configurable(derived)]
     tls: Option<TlsConfig>,
-
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     acknowledgements: AcknowledgementsConfig,
+}
+
+inventory::submit! {
+    SinkDescription::new::<AxiomConfig>("axiom")
 }
 
 impl GenerateConfig for AxiomConfig {
@@ -144,7 +128,6 @@ mod integration_tests {
     use chrono::{DateTime, Duration, Utc};
     use futures::stream;
     use http::StatusCode;
-    use serde::{Deserialize, Serialize};
     use std::env;
     use tokio::time;
     use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};

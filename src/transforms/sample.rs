@@ -3,7 +3,10 @@ use vector_config::configurable_component;
 
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext},
+    config::{
+        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
+    },
     event::Event,
     internal_events::SampleEventDiscarded,
     schema,
@@ -11,7 +14,7 @@ use crate::{
 };
 
 /// Configuration for the `sample` transform.
-#[configurable_component(transform("sample"))]
+#[configurable_component(transform)]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct SampleConfig {
@@ -29,6 +32,15 @@ pub struct SampleConfig {
 
     /// A logical condition used to exclude events from sampling.
     pub exclude: Option<AnyCondition>,
+}
+
+// TODO: Deprecate the name `sampler`
+inventory::submit! {
+    TransformDescription::new::<SampleConfig>("sampler")
+}
+
+inventory::submit! {
+    TransformDescription::new::<SampleConfig>("sample")
 }
 
 impl GenerateConfig for SampleConfig {

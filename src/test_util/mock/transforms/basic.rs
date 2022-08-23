@@ -14,7 +14,7 @@ use vector_core::{
 };
 
 /// Configuration for the `test_basic` transform.
-#[configurable_component(transform("test_basic"))]
+#[configurable_component(transform)]
 #[derive(Clone, Debug, Default)]
 pub struct BasicTransformConfig {
     /// Suffix to add to the message of any log event.

@@ -7,6 +7,7 @@ use vector_config::configurable_component;
 use crate::{
     config::{
         log_schema, DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
     },
     event::{self, Event, LogEvent, Metric},
     internal_events::MetricToLogSerializeError,
@@ -16,7 +17,7 @@ use crate::{
 };
 
 /// Configuration for the `metric_to_log` transform.
-#[configurable_component(transform("metric_to_log"))]
+#[configurable_component(transform)]
 #[derive(Clone, Debug, Default)]
 #[serde(default, deny_unknown_fields)]
 pub struct MetricToLogConfig {
@@ -33,6 +34,10 @@ pub struct MetricToLogConfig {
     /// database](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones), or `local` to indicate system local
     /// time.
     pub timezone: Option<TimeZone>,
+}
+
+inventory::submit! {
+    TransformDescription::new::<MetricToLogConfig>("metric_to_log")
 }
 
 impl GenerateConfig for MetricToLogConfig {

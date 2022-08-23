@@ -6,7 +6,10 @@ use vector_config::configurable_component;
 
 use crate::{
     codecs::Transformer,
-    config::{log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{
+        log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
+        SinkDescription,
+    },
     event::{Event, Value},
     http::HttpClient,
     sinks::util::{
@@ -16,7 +19,7 @@ use crate::{
 };
 
 /// Configuration for the `honeycomb` sink.
-#[configurable_component(sink("honeycomb"))]
+#[configurable_component(sink)]
 #[derive(Clone, Debug)]
 pub struct HoneycombConfig {
     #[serde(skip, default = "default_endpoint")]
@@ -65,6 +68,10 @@ impl SinkBatchSettings for HoneycombDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = None;
     const MAX_BYTES: Option<usize> = Some(100_000);
     const TIMEOUT_SECS: f64 = 1.0;
+}
+
+inventory::submit! {
+    SinkDescription::new::<HoneycombConfig>("honeycomb")
 }
 
 impl GenerateConfig for HoneycombConfig {

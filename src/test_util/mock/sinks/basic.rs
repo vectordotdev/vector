@@ -17,7 +17,7 @@ use crate::{
 };
 
 /// Configuration for the `test_basic` sink.
-#[configurable_component(sink("test_basic"))]
+#[configurable_component(sink)]
 #[derive(Clone, Debug, Default)]
 pub struct BasicSinkConfig {
     #[serde(skip)]

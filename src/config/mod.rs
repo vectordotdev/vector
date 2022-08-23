@@ -9,7 +9,7 @@ use std::{
 use async_trait::async_trait;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
 use serde::{Deserialize, Serialize};
-pub use vector_config::component::GenerateConfig;
+pub use vector_config::component::{GenerateConfig, SinkDescription, TransformDescription};
 pub use vector_core::config::{AcknowledgementsConfig, DataType, GlobalOptions, Input, Output};
 pub use vector_core::transform::{TransformConfig, TransformContext};
 

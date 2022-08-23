@@ -12,7 +12,9 @@ mod integration_tests;
 
 use crate::{
     codecs::Transformer,
-    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+    },
     event::Event,
     http::HttpClient,
     sinks::util::{
@@ -23,7 +25,7 @@ use crate::{
 };
 
 /// Configuration for the `apex` sink.
-#[configurable_component(sink("apex"))]
+#[configurable_component(sink)]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct ApexSinkConfig {
@@ -53,6 +55,10 @@ pub struct ApexSinkConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     acknowledgements: AcknowledgementsConfig,
+}
+
+inventory::submit! {
+    SinkDescription::new::<ApexSinkConfig>("apex")
 }
 
 impl GenerateConfig for ApexSinkConfig {

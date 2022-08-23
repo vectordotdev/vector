@@ -10,7 +10,10 @@ use vector_config::configurable_component;
 
 use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
-    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
+        SinkDescription,
+    },
     event::Event,
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope, PUBSUB_URL},
     http::HttpClient,
@@ -44,7 +47,7 @@ impl SinkBatchSettings for PubsubDefaultBatchSettings {
 }
 
 /// Configuration for the `gcp_pubsub` sink.
-#[configurable_component(sink("gcp_pubsub"))]
+#[configurable_component(sink)]
 #[derive(Clone, Debug)]
 pub struct PubsubConfig {
     /// The project name to which to publish events.
@@ -82,6 +85,10 @@ pub struct PubsubConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     acknowledgements: AcknowledgementsConfig,
+}
+
+inventory::submit! {
+    SinkDescription::new::<PubsubConfig>("gcp_pubsub")
 }
 
 impl GenerateConfig for PubsubConfig {

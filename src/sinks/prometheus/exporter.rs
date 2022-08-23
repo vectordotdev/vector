@@ -28,7 +28,10 @@ use vector_core::{
 
 use super::collector::{MetricCollector, StringCollector};
 use crate::{
-    config::{AcknowledgementsConfig, GenerateConfig, Input, Resource, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, Resource, SinkConfig, SinkContext,
+        SinkDescription,
+    },
     event::{
         metric::{Metric, MetricData, MetricKind, MetricSeries, MetricValue},
         Event, EventStatus, Finalizable,
@@ -55,7 +58,7 @@ enum BuildError {
 
 /// Configuration for the `prometheus_exporter` sink.
 #[serde_as]
-#[configurable_component(sink("prometheus_exporter"))]
+#[configurable_component(sink)]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct PrometheusExporterConfig {
@@ -162,6 +165,14 @@ const fn default_flush_period_secs() -> Duration {
 
 const fn default_suppress_timestamp() -> bool {
     false
+}
+
+inventory::submit! {
+    SinkDescription::new::<PrometheusExporterConfig>("prometheus")
+}
+
+inventory::submit! {
+    SinkDescription::new::<PrometheusExporterConfig>("prometheus_exporter")
 }
 
 impl GenerateConfig for PrometheusExporterConfig {

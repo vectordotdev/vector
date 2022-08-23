@@ -8,3 +8,9 @@ mod integration_tests;
 mod test;
 
 pub use self::config::AzureBlobSinkConfig;
+
+use crate::config::SinkDescription;
+
+inventory::submit! {
+    SinkDescription::new::<AzureBlobSinkConfig>("azure_blob")
+}

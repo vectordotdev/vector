@@ -27,7 +27,7 @@ pub enum Target {
 }
 
 /// Configuration for the `console` sink.
-#[configurable_component(sink("console"))]
+#[configurable_component(sink)]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct ConsoleSinkConfig {

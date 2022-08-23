@@ -26,7 +26,7 @@ use crate::{
 };
 
 /// Configuration of the `splunk_hec_metrics` sink.
-#[configurable_component(sink("splunk_hec_metrics"))]
+#[configurable_component(sink)]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct HecMetricsSinkConfig {

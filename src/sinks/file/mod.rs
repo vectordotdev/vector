@@ -22,7 +22,10 @@ use vector_core::{internal_event::EventsSent, ByteSizeOf};
 
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
-    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
+        SinkDescription,
+    },
     event::{Event, EventStatus, Finalizable},
     expiring_hash_map::ExpiringHashMap,
     internal_events::{FileBytesSent, FileIoError, FileOpen, TemplateRenderingError},
@@ -35,7 +38,7 @@ use std::convert::TryFrom;
 use bytes_path::BytesPath;
 
 /// Configuration for the `file` sink.
-#[configurable_component(sink("file"))]
+#[configurable_component(sink)]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct FileSinkConfig {
@@ -65,6 +68,10 @@ pub struct FileSinkConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+}
+
+inventory::submit! {
+    SinkDescription::new::<FileSinkConfig>("file")
 }
 
 impl GenerateConfig for FileSinkConfig {

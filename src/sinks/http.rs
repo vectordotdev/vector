@@ -16,7 +16,10 @@ use vector_config::configurable_component;
 
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
-    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
+        SinkDescription,
+    },
     event::Event,
     http::{Auth, HttpClient, MaybeAuth},
     sinks::util::{
@@ -43,7 +46,7 @@ enum BuildError {
 }
 
 /// Configuration for the `http` sink.
-#[configurable_component(sink("http"))]
+#[configurable_component(sink)]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct HttpSinkConfig {
@@ -125,6 +128,10 @@ pub enum HttpMethod {
 
     /// PATCH.
     Patch,
+}
+
+inventory::submit! {
+    SinkDescription::new::<HttpSinkConfig>("http")
 }
 
 impl GenerateConfig for HttpSinkConfig {

@@ -46,7 +46,7 @@ impl SinkBatchSettings for DatadogLogsDefaultBatchSettings {
 }
 
 /// Configuration for the `datadog_logs` sink.
-#[configurable_component(sink("datadog_logs"))]
+#[configurable_component(sink)]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogLogsConfig {

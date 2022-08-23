@@ -14,7 +14,10 @@ use tracing::Instrument;
 use vector_config::configurable_component;
 
 use crate::{
-    config::{DataType, Input, Output, ProxyConfig, TransformConfig, TransformContext},
+    config::{
+        DataType, Input, Output, ProxyConfig, TransformConfig, TransformContext,
+        TransformDescription,
+    },
     event::Event,
     http::HttpClient,
     internal_events::{AwsEc2MetadataRefreshError, AwsEc2MetadataRefreshSuccessful},
@@ -72,7 +75,7 @@ static TOKEN_HEADER: Lazy<Bytes> = Lazy::new(|| Bytes::from("X-aws-ec2-metadata-
 static HOST: Lazy<Uri> = Lazy::new(|| Uri::from_static("http://169.254.169.254"));
 
 /// Configuration for the `aws_ec2_metadata` transform.
-#[configurable_component(transform("aws_ec2_metadata"))]
+#[configurable_component(transform)]
 #[derive(Clone, Debug, Default)]
 pub struct Ec2Metadata {
     /// Overrides the default EC2 metadata endpoint.
@@ -128,6 +131,10 @@ struct Keys {
     subnet_id_key: MetadataKey,
     vpc_id_key: MetadataKey,
     role_name_key: MetadataKey,
+}
+
+inventory::submit! {
+    TransformDescription::new::<Ec2Metadata>("aws_ec2_metadata")
 }
 
 impl_generate_config_from_default!(Ec2Metadata);

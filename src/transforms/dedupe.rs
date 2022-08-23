@@ -8,6 +8,7 @@ use vector_config::configurable_component;
 use crate::{
     config::{
         log_schema, DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
     },
     event::{Event, Value},
     internal_events::DedupeEventDiscarded,
@@ -43,7 +44,7 @@ pub struct CacheConfig {
 }
 
 /// Configuration for the `dedupe` transform.
-#[configurable_component(transform("dedupe"))]
+#[configurable_component(transform)]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct DedupeConfig {
@@ -80,6 +81,10 @@ impl DedupeConfig {
 pub struct Dedupe {
     fields: FieldMatchConfig,
     cache: LruCache<CacheEntry, bool>,
+}
+
+inventory::submit! {
+    TransformDescription::new::<DedupeConfig>("dedupe")
 }
 
 impl GenerateConfig for DedupeConfig {

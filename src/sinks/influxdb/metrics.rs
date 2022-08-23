@@ -15,7 +15,7 @@ use vector_core::{
 };
 
 use crate::{
-    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::{
         metric::{Metric, MetricValue, Sample, StatisticKind},
         Event,
@@ -55,7 +55,7 @@ impl SinkBatchSettings for InfluxDbDefaultBatchSettings {
 }
 
 /// Configuration for the `influxdb_metrics` sink.
-#[configurable_component(sink("influxdb_metrics"))]
+#[configurable_component(sink)]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct InfluxDbConfig {
@@ -110,6 +110,10 @@ pub fn default_summary_quantiles() -> Vec<f64> {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 struct InfluxDbRequest {
     series: Vec<String>,
+}
+
+inventory::submit! {
+    SinkDescription::new::<InfluxDbConfig>("influxdb_metrics")
 }
 
 impl_generate_config_from_default!(InfluxDbConfig);

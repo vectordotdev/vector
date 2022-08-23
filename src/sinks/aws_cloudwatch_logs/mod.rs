@@ -9,6 +9,11 @@ mod sink;
 mod integration_tests;
 
 pub use self::config::CloudwatchLogsSinkConfig;
+use crate::{config::SinkDescription, internal_events::TemplateRenderingError};
+
+inventory::submit! {
+    SinkDescription::new::<CloudwatchLogsSinkConfig>("aws_cloudwatch_logs")
+}
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct CloudwatchKey {

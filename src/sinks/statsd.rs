@@ -16,7 +16,9 @@ use super::util::SinkBatchSettings;
 #[cfg(unix)]
 use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
-    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+    },
     event::{
         metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind},
         Event,
@@ -36,7 +38,7 @@ pub struct StatsdSvc {
 }
 
 /// Configuration for the `statsd` sink.
-#[configurable_component(sink("statsd"))]
+#[configurable_component(sink)]
 #[derive(Clone, Debug)]
 pub struct StatsdSinkConfig {
     /// Sets the default namespace for any metrics sent.
@@ -93,6 +95,10 @@ pub struct StatsdUdpConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<StatsdDefaultBatchSettings>,
+}
+
+inventory::submit! {
+    SinkDescription::new::<StatsdSinkConfig>("statsd")
 }
 
 fn default_address() -> SocketAddr {

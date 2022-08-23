@@ -18,7 +18,7 @@ use crate::{
 };
 
 /// Configuration for the `test_panic` sink.
-#[configurable_component(sink("test_panic"))]
+#[configurable_component(sink)]
 #[derive(Clone, Debug, Default)]
 pub struct PanicSinkConfig {
     /// Dummy field used for generating unique configurations to trigger reloads.
