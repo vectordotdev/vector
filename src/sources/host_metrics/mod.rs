@@ -753,3 +753,33 @@ pub(self) mod tests {
         }
     }
 }
+
+#[cfg(feature = "host-metrics-integration-tests")]
+#[cfg(test)]
+mod integration_tests {
+
+    use crate::test_util::components::{run_and_assert_source_compliance, SOURCE_TAGS};
+
+    use super::*;
+    use tokio::time::Duration;
+
+    #[tokio::test]
+    async fn source_compliance() {
+        let mut config = HostMetricsConfig::default();
+        //let cfg = HostMetricsConfig {
+        //    scrape_interval_secs: 0.2,
+        //    collectors: None,
+        //    namespace: None,
+        //    cgroups: todo!(),
+        //    disk: todo!(),
+        //    filesystem: todo!(),
+        //    network: todo!(),
+        //};
+        config.scrape_interval_secs = 1.0;
+
+        let events =
+            run_and_assert_source_compliance(config, Duration::from_secs(2), &SOURCE_TAGS).await;
+
+        assert!(!events.is_empty());
+    }
+}
