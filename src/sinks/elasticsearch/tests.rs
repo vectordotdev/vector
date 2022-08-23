@@ -341,10 +341,13 @@ async fn allows_using_only_fields() {
             index: Some(String::from("{{ idx }}")),
         }),
         encoding: Transformer::new(Some(vec!["foo".to_string().into()]), None, None).unwrap(),
-        endpoint: String::from("https://example.com"),
+        endpoint: String::from("https://example.com").into(),
         ..Default::default()
     };
-    let es = ElasticsearchCommon::parse_config(&config).await.unwrap();
+    let es = ElasticsearchCommon::parse_endpoints(&config)
+        .await
+        .unwrap()
+        .remove(0);
 
     let mut log = LogEvent::from("hello there");
     log.insert("foo", "bar");

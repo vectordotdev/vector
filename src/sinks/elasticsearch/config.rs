@@ -39,7 +39,6 @@ use lookup::path;
 
 /// The field name for the timestamp required by data stream mode
 pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
-pub const ENDPOINT_RETRY_TIMEOUT_SECONDS_DEFAULT: u64 = 5; // 5 seconds
 
 /// Configuration for the `elasticsearch` sink.
 #[configurable_component(sink)]
