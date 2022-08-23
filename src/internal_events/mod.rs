@@ -27,7 +27,7 @@ mod conditions;
 mod datadog_metrics;
 #[cfg(feature = "sinks-datadog_traces")]
 mod datadog_traces;
-mod decoder;
+mod codecs;
 #[cfg(feature = "transforms-dedupe")]
 mod dedupe;
 #[cfg(feature = "sources-demo_logs")]
@@ -151,7 +151,7 @@ pub(crate) use self::aws_sqs::*;
 pub(crate) use self::datadog_metrics::*;
 #[cfg(feature = "sinks-datadog_traces")]
 pub(crate) use self::datadog_traces::*;
-pub(crate) use self::decoder::*;
+pub(crate) use self::codecs::*;
 #[cfg(feature = "transforms-dedupe")]
 pub(crate) use self::dedupe::*;
 #[cfg(feature = "sources-demo_logs")]
