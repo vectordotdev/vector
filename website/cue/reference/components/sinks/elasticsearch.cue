@@ -222,7 +222,7 @@ components: sinks: elasticsearch: {
 			required:    false
 			type: object: {
 				examples: []
-				options: {	
+				options: {
 					retry_initial_backoff_secs: {
 						common:      false
 						description: "Initial timeout, in seconds, between attempts to reactivate endpoints once they become unhealthy."
