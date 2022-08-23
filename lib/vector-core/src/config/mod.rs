@@ -10,7 +10,7 @@ use crate::event::LogEvent;
 pub use global_options::GlobalOptions;
 pub use log_schema::{init_log_schema, log_schema, LogSchema};
 use lookup::lookup_v2::ValuePath;
-use lookup::path;
+use lookup::{path, PathPrefix};
 use serde::{Deserialize, Serialize};
 use value::Value;
 pub use vector_common::config::ComponentKey;
@@ -253,7 +253,7 @@ impl LogNamespace {
                     .value_mut()
                     .insert(path!("vector").concat(metadata_key), value);
             }
-            LogNamespace::Legacy => log.try_insert(legacy_key, value),
+            LogNamespace::Legacy => log.try_insert((PathPrefix::Metadata, legacy_key), value),
         }
     }
 

@@ -41,7 +41,7 @@ pub fn parse_value_path(path: &str) -> OwnedValuePath {
 }
 
 pub trait TargetPath<'a>: Clone {
-    type ValuePath: Path<'a>;
+    type ValuePath: ValuePath<'a>;
 
     fn prefix(&self) -> PathPrefix;
     fn value_path(&self) -> Self::ValuePath;
@@ -124,8 +124,10 @@ impl<'a> TargetPath<'a> for &'a str {
     }
 }
 
+/// Determines the prefix of a "TargetPath", and also returns the remaining
+/// "ValuePath" portion of the string.
 fn get_target_prefix(path: &str) -> (PathPrefix, &str) {
-    let (prefix, path) = match path.chars().next() {
+    match path.chars().next() {
         Some('.') => {
             // For backwards compatibility, the "ValuePath" parser still allows an optional
             // starting ".". To prevent ".." from being a valid path, it is _not_ removed
@@ -138,7 +140,7 @@ fn get_target_prefix(path: &str) -> (PathPrefix, &str) {
             // used for backwards compatibility.
             (PathPrefix::Event, path)
         }
-    };
+    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
