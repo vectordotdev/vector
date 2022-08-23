@@ -17,11 +17,11 @@ use vector_core::config::LogNamespace;
 use vector_core::schema::Definition;
 
 use vector_vrl_functions::set_semantic_meaning::MeaningList;
-use vrl::state::LocalEnv;
+use vrl::prelude::state::TypeState;
 use vrl::{
     diagnostic::{Formatter, Note},
     prelude::{DiagnosticMessage, ExpressionError},
-    Program, Runtime, Terminate, VrlRuntime,
+    CompileConfig, Program, Runtime, Terminate, VrlRuntime,
 };
 
 use crate::{
@@ -113,7 +113,7 @@ impl RemapConfig {
         vrl::Program,
         String,
         Vec<Box<dyn vrl::Function>>,
-        vrl::state::ExternalEnv,
+        CompileConfig,
     )> {
         let source = match (&self.source, &self.file) {
             (Some(source), None) => source.to_owned(),
@@ -134,26 +134,31 @@ impl RemapConfig {
         functions.append(&mut enrichment::vrl_functions());
         functions.append(&mut vector_vrl_functions::vrl_functions());
 
-        let mut state = vrl::state::ExternalEnv::new_with_kind(
-            merged_schema_definition.event_kind().clone(),
-            merged_schema_definition.metadata_kind().clone(),
-        );
-        state.set_external_context(enrichment_tables);
-        state.set_external_context(MeaningList::default());
+        let state = TypeState {
+            local: Default::default(),
+            external: vrl::state::ExternalEnv::new_with_kind(
+                merged_schema_definition.event_kind().clone(),
+                merged_schema_definition.metadata_kind().clone(),
+            ),
+        };
+        let mut config = CompileConfig::default();
 
-        compile_vrl(&source, &functions, &mut state, LocalEnv::default())
+        config.set_custom(enrichment_tables);
+        config.set_custom(MeaningList::default());
+
+        compile_vrl(&source, &functions, &state, config)
             .map_err(|diagnostics| {
                 Formatter::new(&source, diagnostics)
                     .colored()
                     .to_string()
                     .into()
             })
-            .map(|(program, diagnostics)| {
+            .map(|result| {
                 (
-                    program,
-                    Formatter::new(&source, diagnostics).to_string(),
+                    result.program,
+                    Formatter::new(&source, result.warnings).to_string(),
                     functions,
-                    state,
+                    result.config,
                 )
             })
     }
@@ -200,15 +205,17 @@ impl TransformConfig for RemapConfig {
                 enrichment::TableRegistry::default(),
                 input_definition.clone(),
             )
-            .map(|(_, _, _, state)| {
-                let meaning = state
-                    .get_external_context::<MeaningList>()
+            .map(|(program, _, _, external_context)| {
+                let meaning = external_context
+                    .get_custom::<MeaningList>()
                     .cloned()
                     .expect("context exists")
                     .0;
 
-                let mut new_type_def = Definition::new(
-                    state.target_kind().clone(),
+                let state = program.final_type_state();
+
+                let mut new_type_def = Definition::new_with_default_metadata(
+                    state.external.target_kind().clone(),
                     input_definition.log_namespaces().clone(),
                 );
                 for (id, path) in meaning {
@@ -217,7 +224,7 @@ impl TransformConfig for RemapConfig {
                 new_type_def
             })
             .unwrap_or_else(|_| {
-                Definition::new(
+                Definition::new_with_default_metadata(
                     // The program failed to compile, so it can "never" return a value
                     Kind::never(),
                     input_definition.log_namespaces().clone(),
@@ -226,8 +233,10 @@ impl TransformConfig for RemapConfig {
 
         // When a message is dropped and re-routed, we keep the original event, but also annotate
         // it with additional metadata.
-        let mut dropped_definition =
-            Definition::new(Kind::never(), input_definition.log_namespaces().clone());
+        let mut dropped_definition = Definition::new_with_default_metadata(
+            Kind::never(),
+            input_definition.log_namespaces().clone(),
+        );
 
         if input_definition
             .log_namespaces()
@@ -1014,7 +1023,7 @@ mod tests {
         let context = TransformContext {
             key: Some(ComponentKey::from("remapper")),
             schema_definitions,
-            merged_schema_definition: schema::Definition::new(
+            merged_schema_definition: schema::Definition::new_with_default_metadata(
                 Kind::any_object(),
                 [LogNamespace::Legacy],
             )
@@ -1263,12 +1272,15 @@ mod tests {
             ..Default::default()
         };
 
-        let schema_definition = schema::Definition::new(Kind::any_object(), [LogNamespace::Legacy])
-            .with_field("foo", Kind::any(), None)
-            .with_field("tags", Kind::any(), None);
+        let schema_definition = schema::Definition::new_with_default_metadata(
+            Kind::any_object(),
+            [LogNamespace::Legacy],
+        )
+        .with_field("foo", Kind::any(), None)
+        .with_field("tags", Kind::any(), None);
 
         assert_eq!(
-            conf.outputs(&schema::Definition::new(
+            conf.outputs(&schema::Definition::new_with_default_metadata(
                 Kind::any_object(),
                 [LogNamespace::Legacy]
             )),

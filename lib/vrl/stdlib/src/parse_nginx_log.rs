@@ -58,7 +58,7 @@ impl Function for ParseNginxLog {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -70,11 +70,12 @@ impl Function for ParseNginxLog {
 
         let timestamp_format = arguments.optional("timestamp_format");
 
-        Ok(Box::new(ParseNginxLogFn {
+        Ok(ParseNginxLogFn {
             value,
             format,
             timestamp_format,
-        }))
+        }
+        .as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -148,7 +149,7 @@ struct ParseNginxLogFn {
     timestamp_format: Option<Box<dyn Expression>>,
 }
 
-impl Expression for ParseNginxLogFn {
+impl FunctionExpression for ParseNginxLogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?;
         let timestamp_format = self
@@ -161,7 +162,7 @@ impl Expression for ParseNginxLogFn {
         parse_nginx_log(bytes, timestamp_format, format, ctx)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::object(match self.format.as_ref() {
             b"combined" => kind_combined(),
             b"error" => kind_error(),

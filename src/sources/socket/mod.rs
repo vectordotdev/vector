@@ -31,6 +31,7 @@ pub struct SocketConfig {
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case")]
+#[allow(clippy::large_enum_variant)] // just used for configuration
 pub enum Mode {
     /// Listen on TCP.
     Tcp(#[configurable(derived)] tcp::TcpConfig),

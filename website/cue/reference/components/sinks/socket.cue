@@ -13,7 +13,7 @@ components: sinks: socket: {
 	}
 
 	features: {
-		acknowledgements: false
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			compression: enabled: false
@@ -36,6 +36,7 @@ components: sinks: socket: {
 				can_verify_certificate: true
 				can_verify_hostname:    true
 				enabled_default:        false
+				enabled_by_scheme:      false
 			}
 			to: {
 				service: services.socket_receiver

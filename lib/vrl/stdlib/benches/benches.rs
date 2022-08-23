@@ -15,6 +15,7 @@ criterion_group!(
               assert_eq,
               r#bool,
               ceil,
+              chunks,
               compact,
               contains,
               decode_base64,
@@ -57,6 +58,8 @@ criterion_group!(
               is_empty,
               is_float,
               is_integer,
+              is_ipv4,
+              is_ipv6,
               is_json,
               is_null,
               is_nullish,
@@ -210,6 +213,15 @@ bench_function! {
     literal {
         args: func_args![value: 1234.56725, precision: 4],
         want: Ok(1234.5673),
+    }
+}
+
+bench_function! {
+    chunks => vrl_stdlib::Chunks;
+
+    literal {
+        args: func_args![value: "abcdefgh", chunk_size: 4],
+        want: Ok(value!(["abcd", "efgh"])),
     }
 }
 
@@ -749,6 +761,54 @@ bench_function! {
 
     object {
         args: func_args![value: value!({"foo": "bar"})],
+        want: Ok(false),
+    }
+}
+
+bench_function! {
+    is_ipv4 => vrl_stdlib::IsIpv4;
+
+    not_string {
+        args: func_args![value: 42],
+        want: Ok(false),
+    }
+
+    ipv4 {
+        args: func_args![value: "192.168.0.1"],
+        want: Ok(true),
+    }
+
+    invalid_ipv4 {
+        args: func_args![value: "192.168.0.299"],
+        want: Ok(false),
+    }
+
+    ipv6 {
+        args: func_args![value: "2404:6800:4003:c02::64"],
+        want: Ok(false),
+    }
+}
+
+bench_function! {
+    is_ipv6 => vrl_stdlib::IsIpv6;
+
+    not_string {
+        args: func_args![value: 42],
+        want: Ok(false),
+    }
+
+    ipv4 {
+        args: func_args![value: "192.168.0.1"],
+        want: Ok(false),
+    }
+
+    ipv6 {
+        args: func_args![value: "2404:6800:4003:c02::64"],
+        want: Ok(true),
+    }
+
+    invalid_ipv6 {
+        args: func_args![value: "2404:6800:goat:c02::64"],
         want: Ok(false),
     }
 }

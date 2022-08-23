@@ -38,6 +38,7 @@ use crate::{
     codecs::{Encoder, Transformer},
     dns, emit,
     event::{Event, EventStatus, Finalizable},
+    http::Auth,
     internal_events::{
         ConnectionOpen, OpenGauge, WsConnectionError, WsConnectionEstablished,
         WsConnectionFailedError, WsConnectionShutdown,
@@ -66,10 +67,15 @@ pub struct WebSocketConnector {
     host: String,
     port: u16,
     tls: MaybeTlsSettings,
+    auth: Option<Auth>,
 }
 
 impl WebSocketConnector {
-    pub fn new(uri: String, tls: MaybeTlsSettings) -> Result<Self, WebSocketError> {
+    pub fn new(
+        uri: String,
+        tls: MaybeTlsSettings,
+        auth: Option<Auth>,
+    ) -> Result<Self, WebSocketError> {
         let request = (&uri).into_client_request().context(CreateFailedSnafu)?;
         let (host, port) = Self::extract_host_and_port(&request).context(CreateFailedSnafu)?;
 
@@ -78,6 +84,7 @@ impl WebSocketConnector {
             host,
             port,
             tls,
+            auth,
         })
     }
 
@@ -118,9 +125,14 @@ impl WebSocketConnector {
     }
 
     async fn connect(&self) -> Result<WsStream<MaybeTlsStream<TcpStream>>, WebSocketError> {
-        let request = (&self.uri)
+        let mut request = (&self.uri)
             .into_client_request()
             .context(CreateFailedSnafu)?;
+
+        if let Some(auth) = &self.auth {
+            auth.apply(&mut request);
+        }
+
         let maybe_tls = self.tls_connect().await?;
 
         let ws_config = WebSocketConfig {
@@ -372,8 +384,9 @@ mod tests {
     use serde_json::Value as JsonValue;
     use tokio::time::timeout;
     use tokio_tungstenite::{
-        accept_async,
+        accept_async, accept_hdr_async,
         tungstenite::error::{Error as WsError, ProtocolError},
+        tungstenite::handshake::server::{Request, Response},
     };
 
     use super::*;
@@ -398,10 +411,34 @@ mod tests {
             ping_interval: None,
             ping_timeout: None,
             acknowledgements: Default::default(),
+            auth: None,
         };
         let tls = MaybeTlsSettings::Raw(());
 
-        send_events_and_assert(addr, config, tls).await;
+        send_events_and_assert(addr, config, tls, None).await;
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_auth_websocket() {
+        trace_init();
+
+        let auth = Some(Auth::Bearer {
+            token: "OiJIUzI1NiIsInR5cCI6IkpXVCJ".to_string(),
+        });
+        let auth_clone = auth.clone();
+        let addr = next_addr();
+        let config = WebSocketSinkConfig {
+            uri: format!("ws://{}", addr),
+            tls: None,
+            encoding: JsonSerializerConfig::new().into(),
+            ping_interval: None,
+            ping_timeout: None,
+            acknowledgements: Default::default(),
+            auth,
+        };
+        let tls = MaybeTlsSettings::Raw(());
+
+        send_events_and_assert(addr, config, tls, auth_clone).await;
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -427,9 +464,10 @@ mod tests {
             ping_timeout: None,
             ping_interval: None,
             acknowledgements: Default::default(),
+            auth: None,
         };
 
-        send_events_and_assert(addr, config, tls).await;
+        send_events_and_assert(addr, config, tls, None).await;
     }
 
     #[tokio::test]
@@ -444,10 +482,11 @@ mod tests {
             ping_interval: None,
             ping_timeout: None,
             acknowledgements: Default::default(),
+            auth: None,
         };
         let tls = MaybeTlsSettings::Raw(());
 
-        let mut receiver = create_count_receiver(addr, tls.clone(), true);
+        let mut receiver = create_count_receiver(addr, tls.clone(), true, None);
 
         let context = SinkContext::new_test();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
@@ -463,7 +502,7 @@ mod tests {
         time::sleep(Duration::from_millis(500)).await;
         assert!(!receiver.await.is_empty());
 
-        let mut receiver = create_count_receiver(addr, tls, false);
+        let mut receiver = create_count_receiver(addr, tls, false, None);
         assert!(timeout(Duration::from_secs(10), receiver.connected())
             .await
             .is_ok());
@@ -473,8 +512,9 @@ mod tests {
         addr: SocketAddr,
         config: WebSocketSinkConfig,
         tls: MaybeTlsSettings,
+        auth: Option<Auth>,
     ) {
-        let mut receiver = create_count_receiver(addr, tls, false);
+        let mut receiver = create_count_receiver(addr, tls, false, auth);
 
         let context = SinkContext::new_test();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
@@ -498,6 +538,7 @@ mod tests {
         addr: SocketAddr,
         tls: MaybeTlsSettings,
         interrupt_stream: bool,
+        auth: Option<Auth>,
     ) -> CountReceiver<String> {
         CountReceiver::receive_items_stream(move |tripwire, connected| async move {
             let listener = tls.bind(&addr).await.unwrap();
@@ -509,25 +550,58 @@ mod tests {
 
             let stream = stream
                 .take_until(tripwire)
-                .filter_map(|maybe_tls_stream| async move {
-                    let maybe_tls_stream = maybe_tls_stream.unwrap();
-                    let ws_stream = accept_async(maybe_tls_stream).await.unwrap();
+                .filter_map(move |maybe_tls_stream| {
+                    let au = auth.clone();
+                    async move {
+                        let maybe_tls_stream = maybe_tls_stream.unwrap();
+                        let ws_stream = match au {
+                            Some(a) => {
+                                let auth_callback = |req: &Request, res: Response| {
+                                    let hdr = req.headers().get("Authorization");
+                                    if let Some(h) = hdr {
+                                        match a {
+                                            Auth::Bearer { token } => {
+                                                if format!("Bearer {}", token)
+                                                    != h.to_str().unwrap()
+                                                {
+                                                    return Err(
+                                                        http::Response::<Option<String>>::new(None),
+                                                    );
+                                                }
+                                            }
+                                            Auth::Basic {
+                                                user: _user,
+                                                password: _password,
+                                            } => { /* Not needed for tests at the moment */ }
+                                        }
+                                    }
+                                    Ok(res)
+                                };
+                                accept_hdr_async(maybe_tls_stream, auth_callback)
+                                    .await
+                                    .unwrap()
+                            }
+                            None => accept_async(maybe_tls_stream).await.unwrap(),
+                        };
 
-                    Some(
-                        ws_stream
-                            .filter_map(|msg| {
-                                future::ready(match msg {
-                                    Ok(msg) if msg.is_text() => Some(Ok(msg.into_text().unwrap())),
-                                    Err(WsError::Protocol(
-                                        ProtocolError::ResetWithoutClosingHandshake,
-                                    )) => None,
-                                    Err(e) => Some(Err(e)),
-                                    _ => None,
+                        Some(
+                            ws_stream
+                                .filter_map(|msg| {
+                                    future::ready(match msg {
+                                        Ok(msg) if msg.is_text() => {
+                                            Some(Ok(msg.into_text().unwrap()))
+                                        }
+                                        Err(WsError::Protocol(
+                                            ProtocolError::ResetWithoutClosingHandshake,
+                                        )) => None,
+                                        Err(e) => Some(Err(e)),
+                                        _ => None,
+                                    })
                                 })
-                            })
-                            .take_while(|msg| future::ready(msg.is_ok()))
-                            .filter_map(|msg| future::ready(msg.ok())),
-                    )
+                                .take_while(|msg| future::ready(msg.is_ok()))
+                                .filter_map(|msg| future::ready(msg.ok())),
+                        )
+                    }
                 })
                 .map(move |ws_stream| {
                     connected.take().map(|trigger| trigger.send(()));

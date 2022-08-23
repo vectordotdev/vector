@@ -76,7 +76,7 @@ pub(self) async fn load_enrichment_tables<'a>(
     'tables: for (name, table) in config.enrichment_tables.iter() {
         let table_name = name.to_string();
         if ENRICHMENT_TABLES.needs_reload(&table_name) {
-            let indexes = if !diff.enrichment_tables.contains_new(name) {
+            let indexes = if !diff.enrichment_tables.is_added(name) {
                 // If this is an existing enrichment table, we need to store the indexes to reapply
                 // them again post load.
                 Some(ENRICHMENT_TABLES.index_fields(&table_name))
@@ -169,7 +169,10 @@ pub async fn build_pieces(
         );
         let task_name = format!(">> {} ({}, pump) >>", source.inner.source_type(), key.id());
 
-        let mut builder = SourceSender::builder().with_buffer(*SOURCE_SENDER_BUFFER_SIZE);
+        let mut builder = {
+            let _span = span.enter();
+            SourceSender::builder().with_buffer(*SOURCE_SENDER_BUFFER_SIZE)
+        };
         let mut pumps = Vec::new();
         let mut controls = HashMap::new();
         let mut schema_definitions = HashMap::with_capacity(source_outputs.len());
@@ -332,7 +335,7 @@ pub async fn build_pieces(
         let typetag = sink.inner.sink_type();
         let input_type = sink.inner.input().data_type();
 
-        if config.schema.enabled {
+        if config.schema.validation {
             // At this point, we've validated that all transforms are valid, including any
             // transform that mutates the schema provided by their sources. We can now validate the
             // schema expectations of each individual sink.
@@ -694,7 +697,7 @@ impl Runner {
                                 }
                                 outputs_buf
                             }.in_current_span());
-                            in_flight.push(task);
+                            in_flight.push_back(task);
                         }
                         None => {
                             shutting_down = true;

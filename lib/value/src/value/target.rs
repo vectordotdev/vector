@@ -219,11 +219,11 @@ impl Value {
             Some(segments) => segments,
             None => {
                 return match self {
-                    Value::Object(v) => {
+                    Self::Object(v) => {
                         let v = std::mem::take(v);
                         Some(Self::Object(v))
                     }
-                    Value::Array(v) => {
+                    Self::Array(v) => {
                         let v = std::mem::take(v);
                         Some(Self::Array(v))
                     }
@@ -243,8 +243,8 @@ impl Value {
             let removed_value = value.remove_by_segments(segments, compact);
 
             match value {
-                Value::Object(v) if compact & v.is_empty() => self.remove_by_segment(segment),
-                Value::Array(v) if compact & v.is_empty() => self.remove_by_segment(segment),
+                Self::Object(v) if compact & v.is_empty() => self.remove_by_segment(segment),
+                Self::Array(v) if compact & v.is_empty() => self.remove_by_segment(segment),
                 _ => None,
             };
 
@@ -321,12 +321,12 @@ impl Value {
 
             // `handle_field` is used to update map values, if the current value
             // isn't a map, we need to make it one.
-            if !matches!(self, Value::Object(_)) {
+            if !matches!(self, Self::Object(_)) {
                 *self = BTreeMap::default().into();
             }
 
             let map = match self {
-                Value::Object(map) => map,
+                Self::Object(map) => map,
                 _ => unreachable!("see invariant above"),
             };
 
@@ -368,7 +368,7 @@ impl Value {
             }
             SegmentBuf::Index(index) => {
                 let array = match self {
-                    Value::Array(array) => array,
+                    Self::Array(array) => array,
                     _ => {
                         *self = Self::Array(vec![]);
                         self.as_array_mut().unwrap()

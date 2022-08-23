@@ -1,4 +1,5 @@
 #![allow(clippy::clone_on_ref_ptr)]
+#![allow(warnings)]
 
 tonic::include_proto!("vector");
 

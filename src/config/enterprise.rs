@@ -8,7 +8,7 @@ use http::Request;
 use hyper::{header::LOCATION, Body, StatusCode};
 use indexmap::IndexMap;
 use rand::Rng;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use tokio::{
     sync::mpsc::{self},
     time::{sleep, Duration},
@@ -35,16 +35,17 @@ use crate::{
     },
     transforms::{filter::FilterConfig, remap::RemapConfig},
 };
+use vector_config::configurable_component;
 
-static HOST_METRICS_KEY: &str = "#datadog_host_metrics";
-static TAG_METRICS_KEY: &str = "#datadog_tag_metrics";
-static TAG_LOGS_KEY: &str = "#datadog_tag_logs";
-static FILTER_METRICS_KEY: &str = "#datadog_filter_metrics";
-static PIPELINES_NAMESPACE_METRICS_KEY: &str = "#datadog_pipelines_namespace_metrics";
-static INTERNAL_METRICS_KEY: &str = "#datadog_internal_metrics";
-static INTERNAL_LOGS_KEY: &str = "#datadog_internal_logs";
-static DATADOG_METRICS_KEY: &str = "#datadog_metrics";
-static DATADOG_LOGS_KEY: &str = "#datadog_logs";
+static HOST_METRICS_KEY: &str = "_datadog_host_metrics";
+static TAG_METRICS_KEY: &str = "_datadog_tag_metrics";
+static TAG_LOGS_KEY: &str = "_datadog_tag_logs";
+static FILTER_METRICS_KEY: &str = "_datadog_filter_metrics";
+static PIPELINES_NAMESPACE_METRICS_KEY: &str = "_datadog_pipelines_namespace_metrics";
+static INTERNAL_METRICS_KEY: &str = "_datadog_internal_metrics";
+static INTERNAL_LOGS_KEY: &str = "_datadog_internal_logs";
+static DATADOG_METRICS_KEY: &str = "_datadog_metrics";
+static DATADOG_LOGS_KEY: &str = "_datadog_logs";
 
 static DATADOG_REPORTING_PRODUCT: &str = "Datadog Observability Pipelines";
 static DATADOG_REPORTING_PATH_STUB: &str = "/api/unstable/observability_pipelines/configuration";
@@ -54,38 +55,53 @@ static DATADOG_REPORTING_PATH_STUB: &str = "/api/unstable/observability_pipeline
 pub static DATADOG_API_KEY_ENV_VAR_SHORT: &str = "DD_API_KEY";
 pub static DATADOG_API_KEY_ENV_VAR_FULL: &str = "DATADOG_API_KEY";
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
+#[configurable_component]
 #[serde(deny_unknown_fields)]
+/// Observability Pipelines config options.
 pub struct Options {
     #[serde(default = "default_enabled")]
+    /// Enables Observability Pipelines.
     pub enabled: bool,
 
     #[serde(default = "default_enable_logs_reporting")]
+    /// Enables reporting of internal component logs to Datadog.
     pub enable_logs_reporting: bool,
 
     #[serde(default)]
+    /// Datadog site (e.g. datadoghq.eu).
     site: Option<String>,
+    /// Datadog region, used to derive a default site for a given region.
     region: Option<Region>,
+    #[configurable(derived)]
+    /// Datadog endpoint, takes precedence over the region and the site. Used mainly for dev environments.
     endpoint: Option<String>,
 
     #[serde(default)]
+    /// Datadog API key.
     pub api_key: Option<String>,
-
-    pub application_key: String,
+    #[configurable(deprecated)]
+    /// Datadog application key (deprecated).
+    pub application_key: Option<String>,
+    /// Observability Pipeline's configuration key.
     pub configuration_key: String,
 
     #[serde(default = "default_reporting_interval_secs")]
+    /// A time interval to scrap and report host metrics.
     pub reporting_interval_secs: f64,
 
     #[serde(default = "default_max_retries")]
+    /// The maximum number of retries to report a Vector configuration at startup.
     pub max_retries: u32,
 
     #[serde(
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
+    #[configurable(derived)]
     proxy: ProxyConfig,
 
+    /// Additional tags, added to generated Datadog metrics.
     tags: Option<IndexMap<String, String>>,
 }
 
@@ -98,7 +114,7 @@ impl Default for Options {
             region: None,
             endpoint: None,
             api_key: None,
-            application_key: "".to_owned(),
+            application_key: None,
             configuration_key: "".to_owned(),
             reporting_interval_secs: default_reporting_interval_secs(),
             max_retries: default_max_retries(),
@@ -137,7 +153,6 @@ pub enum EnterpriseError {
 /// Holds data required to authorize a request to the Datadog OP reporting endpoint.
 struct PipelinesAuth<'a> {
     api_key: &'a str,
-    application_key: &'a str,
 }
 
 /// Holds the relevant fields for reporting a configuration to Datadog Observability Pipelines.
@@ -294,6 +309,12 @@ impl TryFrom<&Config> for EnterpriseMetadata {
             },
         };
 
+        if opts.application_key.is_some() {
+            warn!(
+                "Datadog application key is deprecated. You can safely remove `application_key` from the config."
+            );
+        }
+
         info!(
             "Datadog API key provided. Integration with {} is enabled.",
             DATADOG_REPORTING_PRODUCT
@@ -328,7 +349,7 @@ where
                 tokio::select! {
                     maybe_report = reporting_rx.recv() => {
                         match maybe_report {
-                            Some(report) => pending_reports.push(report),
+                            Some(report) => pending_reports.push_back(report),
                             None => break,
                         }
                     }
@@ -619,10 +640,7 @@ pub(crate) fn report_configuration(
 
         // Set the Datadog authorization fields. There's an API and app key, to allow read/write
         // access in tandem with RBAC on the Datadog side.
-        let auth = PipelinesAuth {
-            api_key: &api_key,
-            application_key: &opts.application_key,
-        };
+        let auth = PipelinesAuth { api_key: &api_key };
 
         // Create a HTTP client for posting a Vector version to Datadog OP. This will
         // respect any proxy settings provided in top-level config.
@@ -689,7 +707,6 @@ fn build_request<'a>(
 ) -> Request<Body> {
     Request::post(endpoint.to_string())
         .header("DD-API-KEY", auth.api_key)
-        .header("DD-APPLICATION-KEY", auth.application_key)
         .body(Body::from(payload.json_string()))
         .unwrap_or_else(|_| {
             panic!(
@@ -784,6 +801,7 @@ mod test {
     use vector_common::btreemap;
     use vector_core::config::proxy::ProxyConfig;
     use vrl::prelude::Collection;
+    use vrl::CompileConfig;
     use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
 
     use super::{
@@ -797,10 +815,7 @@ mod test {
     };
 
     const fn get_pipelines_auth() -> PipelinesAuth<'static> {
-        PipelinesAuth {
-            api_key: "api_key",
-            application_key: "application_key",
-        }
+        PipelinesAuth { api_key: "api_key" }
     }
 
     const fn get_pipelines_fields() -> PipelinesStrFields<'static> {
@@ -953,16 +968,19 @@ mod test {
         // We need to set up some state here to inform the VRL compiler that
         // .tags is an object and merge() is thus a safe operation (mimicking
         // the environment this code will actually run in).
-        let mut state = vrl::state::ExternalEnv::new_with_kind(
+        let state = vrl::state::ExternalEnv::new_with_kind(
             Kind::object(btreemap! {
                 "tags" => Kind::object(BTreeMap::new()),
             }),
             Kind::object(Collection::empty()),
         );
-        assert!(
-            vrl::compile_with_external(vrl.as_str(), vrl_stdlib::all().as_ref(), &mut state)
-                .is_ok()
-        );
+        assert!(vrl::compile_with_external(
+            vrl.as_str(),
+            vrl_stdlib::all().as_ref(),
+            &state,
+            CompileConfig::default()
+        )
+        .is_ok());
     }
 
     #[test]

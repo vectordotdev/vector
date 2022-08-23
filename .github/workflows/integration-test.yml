@@ -21,6 +21,7 @@ on:
       - "Makefile"
       - "rust-toolchain"
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
 
 concurrency:
   # For pull requests, cancel running workflows, for master, run all
@@ -55,6 +56,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - test: 'apex'
           - test: 'aws'
           - test: 'axiom'
           - test: 'azure'
@@ -77,6 +79,7 @@ jobs:
           - test: 'mongodb'
           - test: 'nats'
           - test: 'nginx'
+          - test: 'opentelemetry'
           - test: 'postgres'
           - test: 'prometheus'
           - test: 'pulsar'

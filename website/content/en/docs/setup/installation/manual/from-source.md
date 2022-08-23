@@ -124,13 +124,13 @@ And then build Vector using [cross]:
 
 ```shell
 # Linux (x86_64)
-PASS_FEATURES=default-cmake make package-x86_64-unknown-linux-musl-all
+make package-x86_64-unknown-linux-musl-all
 
 # Linux (ARM64)
-PASS_FEATURES=default-cmake make package-aarch64-unknown-linux-musl-all
+make package-aarch64-unknown-linux-musl-all
 
 # Linux (ARMv7)
-PASS_FEATURES=default-cmake make package-armv7-unknown-linux-muslueabihf-all
+make package-armv7-unknown-linux-muslueabihf-all
 ```
 
 The command above builds a Docker image with a Rust toolchain for a Linux target for the corresponding architecture using `musl` as the C library, then starts a container from this image, and then builds inside the container. The target binary is located at `target/<target triple>/release/vector` as in the previous case.

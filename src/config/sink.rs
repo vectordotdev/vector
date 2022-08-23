@@ -144,7 +144,7 @@ pub trait SinkConfig: core::fmt::Debug + Send + Sync {
         Vec::new()
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig>;
+    fn acknowledgements(&self) -> &AcknowledgementsConfig;
 }
 
 #[derive(Debug, Clone)]

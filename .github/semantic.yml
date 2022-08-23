@@ -134,11 +134,13 @@ scopes:
   - docker_logs source # Anything `docker_logs` source related
   - exec source # Anything `exec` source related
   - file source # Anything `file` source related
+  - file_descriptor source # Anything `file_descriptor` source related
   - fluent source # Anything `fluent` source related
   - gcp_pubsub source # Anything `gcp_pubsub` source related
   - heroku_logs source # Anything `heroku_logs` source related
   - host_metrics source # Anything `host_metrics` source related
   - http source # Anything `http` source related
+  - http_scrape source # Anything `http_scrape` source related
   - internal_logs source # Anything `internal_logs` source related
   - internal_metrics source # Anything `internal_metrics` source related
   - journald source # Anything `journald` source related
@@ -146,6 +148,7 @@ scopes:
   - kubernetes_logs source # Anything `kubernetes_logs` source related
   - logstash source # Anything `logstash` source related
   - mongodb_metrics source # Anything `mongodb_metrics` source related
+  - new source # A request for a new source
   - nginx_metrics source # Anything `nginx_metrics` source related
   - opentelemetry source # Anything `opentelemetry` source related
   - postgresql_metrics source # Anything `postgresql_metrics` source related
@@ -167,6 +170,7 @@ scopes:
   - log_to_metric transform # Anything `log_to_metric` transform related
   - lua transform # Anything `lua` transform related
   - metric_to_log transform # Anything `metric_to_log` transform related
+  - new transform # A request for a new transform
   - pipelines transform # Anything `pipelines` transform related
   - reduce transform # Anything `reduce` transform related
   - remap transform # Anything `remap` transform related
@@ -176,6 +180,7 @@ scopes:
   - throttle transform # Anything `throttle` transform related
 
   # sinks
+  - apex sink # Anything `apex` sink related
   - aws_cloudwatch_logs sink # Anything `aws_cloudwatch_logs` sink related
   - aws_cloudwatch_metrics sink # Anything `aws_cloudwatch_metrics` sink related
   - aws_kinesis_firehose sink # Anything `aws_kinesis_firehose` sink related
@@ -193,6 +198,7 @@ scopes:
   - datadog_metrics sink # Anything `datadog_metrics` sink related
   - elasticsearch sink # Anything `elasticsearch` sink related
   - file sink # Anything `file` sink related
+  - gcp_chronicle sink # Anything `gcp_chronicle` sink related
   - gcp_cloud_storage sink # Anything `gcp_cloud_storage` sink related
   - gcp_pubsub sink # Anything `gcp_pubsub` sink related
   - gcp_stackdriver_logs sink # Anything `gcp_stackdriver_logs` sink related
@@ -207,6 +213,7 @@ scopes:
   - logdna sink # Anything `logdna` sink related
   - loki sink # Anything `loki` sink related
   - nats sink # Anything `nats` sink related
+  - new sink # A request for a new sink
   - new_relic sink # Anything `new_relic` sink related
   - new_relic_logs sink # Anything `new_relic_logs` sink related
   - opentelemetry sink # Anything `opentelemetry` sink related

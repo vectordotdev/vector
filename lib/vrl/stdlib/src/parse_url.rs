@@ -66,7 +66,7 @@ impl Function for ParseUrl {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -75,10 +75,11 @@ impl Function for ParseUrl {
             .optional("default_known_ports")
             .unwrap_or_else(|| expr!(false));
 
-        Ok(Box::new(ParseUrlFn {
+        Ok(ParseUrlFn {
             value,
             default_known_ports,
-        }))
+        }
+        .as_expr())
     }
 }
 
@@ -88,7 +89,7 @@ struct ParseUrlFn {
     default_known_ports: Box<dyn Expression>,
 }
 
-impl Expression for ParseUrlFn {
+impl FunctionExpression for ParseUrlFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let string = value.try_bytes_utf8_lossy()?;
@@ -100,7 +101,7 @@ impl Expression for ParseUrlFn {
             .map(|url| url_to_value(url, default_known_ports))
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::object(inner_kind()).fallible()
     }
 }

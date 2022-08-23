@@ -2,6 +2,7 @@ use std::result::Result;
 
 use ::value::Value;
 use vector_common::encode_key_value;
+use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
 
 /// Also used by `encode_logfmt`.
@@ -71,7 +72,7 @@ impl Function for EncodeKeyValue {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -90,13 +91,14 @@ impl Function for EncodeKeyValue {
             .optional("flatten_boolean")
             .unwrap_or_else(|| expr!(false));
 
-        Ok(Box::new(EncodeKeyValueFn {
+        Ok(EncodeKeyValueFn {
             value,
             fields,
             key_value_delimiter,
             field_delimiter,
             flatten_boolean,
-        }))
+        }
+        .as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -141,7 +143,7 @@ fn resolve_fields(fields: Value) -> Result<Vec<String>, ExpressionError> {
         .collect()
 }
 
-impl Expression for EncodeKeyValueFn {
+impl FunctionExpression for EncodeKeyValueFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let fields = self
@@ -162,7 +164,7 @@ impl Expression for EncodeKeyValueFn {
         )
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::bytes().with_fallibility(self.fields.is_some())
     }
 }

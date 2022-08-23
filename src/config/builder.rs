@@ -173,7 +173,8 @@ impl From<Config> for ConfigBuilder {
             transforms,
             tests,
             secret,
-            ..
+            version: _,
+            expansions: _,
         } = config;
 
         let transforms = transforms
@@ -287,8 +288,6 @@ impl ConfigBuilder {
             errors.push(error);
         }
 
-        self.schema = with.schema;
-
         #[cfg(feature = "enterprise")]
         {
             match (self.enterprise.as_ref(), with.enterprise) {
@@ -320,15 +319,9 @@ impl ConfigBuilder {
 
         self.global.proxy = self.global.proxy.merge(&with.global.proxy);
 
-        if self.schema.log_namespace.is_some()
-            && with.schema.log_namespace.is_some()
-            && self.schema.log_namespace != with.schema.log_namespace
-        {
-            errors.push(
-                format!("conflicting values for 'log_namespace' found. Both {:?} and {:?} used in the same component",
-                                self.schema.log_namespace(), with.schema.log_namespace())
-            );
-        }
+        self.global.expire_metrics = self.global.expire_metrics.or(with.global.expire_metrics);
+
+        self.schema.append(with.schema, &mut errors);
 
         self.schema.log_namespace = self.schema.log_namespace.or(with.schema.log_namespace);
 
@@ -474,7 +467,7 @@ mod tests {
     /// should ideally be able to fix so that the original hash passes!
     fn version_hash_match() {
         assert_eq!(
-            "53dff3cdc4bcf9ac23a04746b253b2f3ba8b1120e483e13d586b3643a4e066de",
+            "bc0825487e137ee1d1fc76c616795d041c4825b4ca5a7236455ea4515238885c",
             ConfigBuilder::default().sha256_hash()
         );
     }
@@ -503,14 +496,12 @@ mod tests {
 
     #[test]
     fn append_overwrites_enterprise() {
-        let mut base_ent = enterprise::Options::default();
-        base_ent.application_key = "base".to_string();
+        let base_ent = enterprise::Options::default();
         let mut base = ConfigBuilder {
             enterprise: Some(base_ent),
             ..Default::default()
         };
-        let mut other_ent = enterprise::Options::default();
-        other_ent.application_key = "other".to_string();
+        let other_ent = enterprise::Options::default();
         let other = ConfigBuilder {
             enterprise: Some(other_ent),
             ..Default::default()
@@ -528,7 +519,6 @@ mod tests {
             r#"
         [enterprise]
         api_key = "apikey"
-        application_key = "appkey"
         configuration_key = "configkey"
 
         [sources.foo]
@@ -559,7 +549,6 @@ mod tests {
                 r#"
             [enterprise]
             api_key = "apikey"
-            application_key = "appkey"
             configuration_key = "configkey"
 
             [sources.foo]

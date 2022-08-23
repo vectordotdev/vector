@@ -23,7 +23,10 @@ releases: "0.23.0": {
 		},
 	]
 
-	known_issues: []
+	known_issues: [
+		"Vector shuts down when a configured source codec (`decoding.codec`) receives invalid data. Fixed in v0.23.1.",
+		"The `elasticsearch` sink doesn't evaluate templated configuration options like the `index` configuration before applying the `only_fields` and `except_fields` options, causing templates to fail to be evaluated if they used a field that was dropped. Fixed in v0.23.1.",
+	]
 
 	description: """
 		The Vector team is pleased to announce version 0.23.0!
@@ -490,6 +493,28 @@ releases: "0.23.0": {
 				details.
 				"""
 			pr_numbers: [12433]
+		},
+		{
+			type:     "chore"
+			breaking: true
+			scopes: ["releasing"]
+			breaking: true
+			description: """
+				Due to changes to the [tool we use for cross-compiling Vector](https://github.com/cross-rs/cross),
+				support for operating systems with old versions of `libc` and `libstdc++` were dropped for the
+				`x86-uknown_linux-gnu` target. Vector now requires that the host system has `libc` >= 2.18 and
+				`libstdc++` >= 3.4.21 with support for ABI version 1.3.8.
+
+				Known OSes that this affects:
+
+				- Amazon Linux 1
+				- Ubuntu 14.04
+				- CentOS 7
+
+				We will be looking at options to [re-add support for these
+				OSes](http://github.com/vectordotdev/vector/issues/13183) in the future.
+				"""
+			pr_numbers: []
 		},
 	]
 

@@ -95,7 +95,7 @@ fn experiment(actions: Vec<FileWatcherAction>) {
                         Err(_) => {
                             unreachable!();
                         }
-                        Ok(Some(line)) if line.is_empty() => {
+                        Ok(Some(line)) if line.bytes.is_empty() => {
                             attempts -= 1;
                             continue;
                         }

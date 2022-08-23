@@ -114,8 +114,8 @@ impl SinkConfig for UnitTestSinkConfig {
         Input::all()
     }
 
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        None
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &AcknowledgementsConfig::DEFAULT
     }
 }
 

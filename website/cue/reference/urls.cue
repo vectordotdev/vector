@@ -1,6 +1,7 @@
 package metadata
 
 urls: {
+	apex:                                       "https://apex.sh/logs/"
 	azure_blob_storage:                         "https://azure.microsoft.com/en-us/services/storage/blobs/"
 	affine_type_system:                         "\(wikipedia)/wiki/Substructural_type_system#Affine_type_systems"
 	adaptive_request_concurrency_post:          "/blog/adaptive-request-concurrency/"
@@ -184,6 +185,7 @@ urls: {
 	fail_safe:                                  "\(wikipedia)/wiki/Fail-safe"
 	ffi:                                        "\(wikipedia)/wiki/Foreign_function_interface"
 	file:                                       "\(wikipedia)/wiki/Computer_file"
+	file_descriptor:                            "\(wikipedia)/wiki/File_descriptor"
 	file_system:                                "\(wikipedia)/wiki/File_system"
 	fluent:                                     "https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1"
 	fluentd:                                    "https://www.fluentd.org/"
@@ -361,7 +363,8 @@ urls: {
 	nixos:                                      "https://nixos.org/"
 	nixpkgs_9682:                               "\(github)/NixOS/nixpkgs/issues/9682"
 	openssl:                                    "https://www.openssl.org/"
-	opentelemetry:                              "https://opentelemetry.io/"
+	opentelemetry:                              "https://opentelemetry.io"
+	opentelemetry_protocol:                     "\(opentelemetry)/docs/reference/specification/protocol/otlp/"
 	order_of_ops:                               "\(wikipedia)/wiki/Order_of_operations"
 	papertrail:                                 "https://www.papertrail.com/"
 	papertrail_syslog:                          "https://help.papertrailapp.com/kb/how-it-works/http-api/#submitting-log-messages"

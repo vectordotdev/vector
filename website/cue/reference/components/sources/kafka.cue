@@ -12,6 +12,7 @@ components: sources: kafka: {
 				can_verify_certificate: false
 				can_verify_hostname:    false
 				enabled_default:        false
+				enabled_by_scheme:      false
 			}
 			from: components._kafka.features.collect.from
 		}
@@ -212,6 +213,13 @@ components: sources: kafka: {
 				required:    true
 				type: string: {
 					examples: ["partition"]
+				}
+			}
+			source_type: {
+				description: "The name of the source type."
+				required:    true
+				type: string: {
+					examples: ["kafka"]
 				}
 			}
 			timestamp: fields._current_timestamp & {

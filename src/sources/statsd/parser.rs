@@ -193,7 +193,7 @@ fn convert_to_statistic(unit: &str) -> StatisticKind {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ParseError {
     InvalidUtf8(Utf8Error),
     Malformed(&'static str),

@@ -2,8 +2,8 @@ use std::fmt;
 
 use crate::{
     expression::{Not, Resolved},
-    state::{ExternalEnv, LocalEnv},
-    Context, Expression, TypeDef,
+    state::{TypeInfo, TypeState},
+    Context, Expression,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -32,12 +32,15 @@ impl Expression for Unary {
         }
     }
 
-    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
+    fn type_info(&self, state: &TypeState) -> TypeInfo {
         use Variant::Not;
 
-        match &self.variant {
-            Not(v) => v.type_def(state),
-        }
+        let mut state = state.clone();
+
+        let result = match &self.variant {
+            Not(v) => v.apply_type_info(&mut state),
+        };
+        TypeInfo::new(state, result)
     }
 }
 

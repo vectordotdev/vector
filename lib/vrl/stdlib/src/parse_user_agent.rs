@@ -87,7 +87,7 @@ impl Function for ParseUserAgent {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -134,11 +134,12 @@ impl Function for ParseUserAgent {
             }
         };
 
-        Ok(Box::new(ParseUserAgentFn {
+        Ok(ParseUserAgentFn {
             value,
             mode,
             parser,
-        }))
+        }
+        .as_expr())
     }
 
     fn compile_argument(
@@ -223,7 +224,7 @@ struct ParseUserAgentFn {
     parser: Arc<dyn Fn(&str) -> Value + Send + Sync>,
 }
 
-impl Expression for ParseUserAgentFn {
+impl FunctionExpression for ParseUserAgentFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let string = value.try_bytes_utf8_lossy()?;
@@ -231,7 +232,7 @@ impl Expression for ParseUserAgentFn {
         Ok((self.parser)(&string))
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         self.mode.type_def()
     }
 }

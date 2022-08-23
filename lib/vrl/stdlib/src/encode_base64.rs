@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use ::value::Value;
+use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
 
 use crate::util::Base64Charset;
@@ -52,7 +53,7 @@ impl Function for EncodeBase64 {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -60,11 +61,12 @@ impl Function for EncodeBase64 {
         let padding = arguments.optional("padding");
         let charset = arguments.optional("charset");
 
-        Ok(Box::new(EncodeBase64Fn {
+        Ok(EncodeBase64Fn {
             value,
             padding,
             charset,
-        }))
+        }
+        .as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -83,7 +85,7 @@ struct EncodeBase64Fn {
     charset: Option<Box<dyn Expression>>,
 }
 
-impl Expression for EncodeBase64Fn {
+impl FunctionExpression for EncodeBase64Fn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let padding = self.padding.as_ref().map(|p| p.resolve(ctx)).transpose()?;
@@ -92,7 +94,7 @@ impl Expression for EncodeBase64Fn {
         encode_base64(value, padding, charset)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::bytes().infallible()
     }
 }

@@ -68,7 +68,7 @@ const DOCKER_MESSAGE_SPLIT_THRESHOLD: usize = 16 * 1024; // 16 Kib
 
 fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
     // Parse and rename timestamp.
-    let time = log.remove(&*TIME).context(TimeFieldMissingSnafu)?;
+    let time = log.remove(TIME).context(TimeFieldMissingSnafu)?;
     let time = match time {
         Value::Bytes(val) => val,
         _ => return Err(NormalizationError::TimeValueUnexpectedType),
@@ -78,7 +78,7 @@ fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
     log.insert(log_schema().timestamp_key(), time.with_timezone(&Utc));
 
     // Parse message, remove trailing newline and detect if it's partial.
-    let message = log.remove(&*LOG).context(LogFieldMissingSnafu)?;
+    let message = log.remove(LOG).context(LogFieldMissingSnafu)?;
     let mut message = match message {
         Value::Bytes(val) => val,
         _ => return Err(NormalizationError::LogValueUnexpectedType),
@@ -103,7 +103,7 @@ fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
 
     // For partial messages add a partial event indicator.
     if is_partial {
-        log.insert(&*event::PARTIAL, true);
+        log.insert(event::PARTIAL, true);
     }
 
     Ok(())
