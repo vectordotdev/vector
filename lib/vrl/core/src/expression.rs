@@ -18,6 +18,7 @@ pub enum ExpressionError {
 }
 
 impl ExpressionError {
+    #[must_use]
     pub fn abort(span: Span, message: Option<&str>) -> ExpressionError {
         let message = if let Some(message) = message {
             format!("explicit abort at {}: {}", span, message)
@@ -32,6 +33,7 @@ impl ExpressionError {
         }
     }
 
+    #[must_use]
     pub fn function_abort(
         span: Span,
         ident: &str,
@@ -74,6 +76,7 @@ impl ExpressionError {
         }
     }
 
+    #[must_use]
     pub fn is_abort(&self) -> bool {
         matches!(self, ExpressionError::Abort { .. })
     }
@@ -100,8 +103,7 @@ impl DiagnosticMessage for ExpressionError {
         use ExpressionError::{Abort, Error};
 
         match self {
-            Abort { message, .. } => message.clone(),
-            Error { message, .. } => message.clone(),
+            Abort { message, .. } | Error { message, .. } => message.clone(),
         }
     }
 
@@ -109,8 +111,7 @@ impl DiagnosticMessage for ExpressionError {
         use ExpressionError::{Abort, Error};
 
         match self {
-            Abort { labels, .. } => labels.clone(),
-            Error { labels, .. } => labels.clone(),
+            Abort { labels, .. } | Error { labels, .. } => labels.clone(),
         }
     }
 
