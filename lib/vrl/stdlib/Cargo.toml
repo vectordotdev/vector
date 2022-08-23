@@ -139,6 +139,7 @@ default = [
     "match_datadog_query",
     "md5",
     "merge",
+    "mod",
     "now",
     "object",
     "parse_aws_alb_log",
@@ -279,6 +280,7 @@ match_array = ["dep:regex"]
 match_datadog_query = ["dep:datadog-search-syntax", "dep:datadog-filter", "dep:once_cell", "dep:regex", "dep:lookup_lib"]
 md5 = ["dep:md-5", "dep:hex"]
 merge = []
+mod = []
 now = ["dep:chrono"]
 object = []
 parse_apache_log = ["dep:chrono", "dep:once_cell", "dep:regex", "vector-common/conversion"]
