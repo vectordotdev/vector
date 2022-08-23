@@ -1,6 +1,6 @@
 [
   {
-    "type": "dx",
+    "type": "expr",
     "named": true,
     "fields": {},
     "children": {
@@ -8,14 +8,14 @@
       "required": true,
       "types": [
         {
-          "type": "x",
+          "type": "literal",
           "named": true
         }
       ]
     }
   },
   {
-    "type": "dxx",
+    "type": "exprs",
     "named": true,
     "fields": {},
     "children": {
@@ -23,14 +23,14 @@
       "required": true,
       "types": [
         {
-          "type": "x",
+          "type": "expr",
           "named": true
         }
       ]
     }
   },
   {
-    "type": "dxy",
+    "type": "float",
     "named": true,
     "fields": {},
     "children": {
@@ -38,11 +38,45 @@
       "required": true,
       "types": [
         {
-          "type": "x",
+          "type": "integer",
           "named": true
         },
         {
-          "type": "y",
+          "type": "whole_number",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "integer",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": false,
+      "types": [
+        {
+          "type": "whole_number",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "literal",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "float",
+          "named": true
+        },
+        {
+          "type": "integer",
           "named": true
         }
       ]
@@ -53,30 +87,30 @@
     "named": true,
     "fields": {},
     "children": {
-      "multiple": true,
-      "required": false,
+      "multiple": false,
+      "required": true,
       "types": [
         {
-          "type": "dx",
-          "named": true
-        },
-        {
-          "type": "dxx",
-          "named": true
-        },
-        {
-          "type": "dxy",
+          "type": "exprs",
           "named": true
         }
       ]
     }
   },
   {
-    "type": "x",
-    "named": true
+    "type": "-",
+    "named": false
   },
   {
-    "type": "y",
+    "type": ".",
+    "named": false
+  },
+  {
+    "type": ";",
+    "named": false
+  },
+  {
+    "type": "whole_number",
     "named": true
   }
 ]

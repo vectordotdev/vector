@@ -11,12 +11,12 @@ Integers
 
 (program
   (exprs
-    (expr (literal (integer_literal)))
-    (expr (literal (integer_literal)))
-    (expr (literal (integer_literal)))
-    (expr (literal (integer_literal)))
-    (expr (literal (integer_literal)))
-    (expr (literal (integer_literal)))
+    (expr (literal (integer)))
+    (expr (literal (integer)))
+    (expr (literal (integer)))
+    (expr (literal (integer)))
+    (expr (literal (integer)))
+    (expr (literal (integer)))
   )
 )
 
