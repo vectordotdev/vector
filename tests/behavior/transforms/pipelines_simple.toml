@@ -18,6 +18,7 @@ filter.source = """contains(.message, "hello", case_sensitive: false) ?? false""
 
 [[transforms.pipelines_processing.logs.transforms]]
 type = "remap"
+drop_on_abort = false
 source = ". |= parse_syslog!(.message)"
 
 [[transforms.pipelines_processing.logs.transforms]]

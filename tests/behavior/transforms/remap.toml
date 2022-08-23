@@ -353,6 +353,7 @@
 [transforms.remap_bang_function]
   inputs = []
   type = "remap"
+  drop_on_abort = false
   source = """
     .val = parse_json!("{ INVALID }")
   """
