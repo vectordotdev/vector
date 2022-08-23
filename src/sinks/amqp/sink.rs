@@ -46,7 +46,9 @@ impl AMQPSink {
         channel
             .confirm_select(ConfirmSelectOptions::default())
             .await
-            .map_err(|e| BuildError::AMQPCreateFailed { source: Box::new(e) })?;
+            .map_err(|e| BuildError::AMQPCreateFailed {
+                source: Box::new(e),
+            })?;
 
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build()?;
