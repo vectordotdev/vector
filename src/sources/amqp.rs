@@ -222,7 +222,13 @@ fn populate_event(
         "amqp",
     );
 
-    log_namespace.insert_source_metadata("amqp", log, keys.routing_key, "routing", keys.routing.to_string());
+    log_namespace.insert_source_metadata(
+        "amqp",
+        log,
+        keys.routing_key,
+        "routing",
+        keys.routing.to_string(),
+    );
 
     log_namespace.insert_source_metadata(
         "amqp",
