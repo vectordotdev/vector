@@ -1078,8 +1078,8 @@ mod integration_tests {
     use tokio_stream::wrappers::UnboundedReceiverStream;
 
     use super::*;
-    use crate::{config::ProxyConfig, http::HttpClient, test_util::trace_init};
     use crate::test_util::components::{run_and_assert_sink_compliance, SINK_TAGS};
+    use crate::{config::ProxyConfig, http::HttpClient, test_util::trace_init};
 
     fn sink_exporter_address() -> String {
         std::env::var("SINK_EXPORTER_ADDRESS").unwrap_or_else(|_| "127.0.0.1:9101".into())
@@ -1150,11 +1150,16 @@ mod integration_tests {
         let (name, event) = tests::create_metric_gauge(None, 123.4);
         let (_, delayed_event) = tests::create_metric_gauge(Some("delayed".to_string()), 123.4);
 
-        run_and_assert_sink_compliance(sink, stream::once(ready(event)).chain(stream::once(async move {
-            // Wait a bit for the prometheus server to scrape the metrics
-            time::sleep(time::Duration::from_secs(2)).await;
-            delayed_event
-        })), &SINK_TAGS).await;
+        run_and_assert_sink_compliance(
+            sink,
+            stream::once(ready(event)).chain(stream::once(async move {
+                // Wait a bit for the prometheus server to scrape the metrics
+                time::sleep(time::Duration::from_secs(2)).await;
+                delayed_event
+            })),
+            &SINK_TAGS,
+        )
+        .await;
 
         // Now try to download them from prometheus
         let result = prometheus_query(&name).await;
