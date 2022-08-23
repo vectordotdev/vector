@@ -19,13 +19,6 @@ impl<'a> InternalEvent for TemplateRenderingError<'a> {
         msg.push('.');
         if self.drop_event {
             error!(
-                message = %msg,
-                error = %self.error,
-                error_type = error_type::TEMPLATE_FAILED,
-                stage = error_stage::PROCESSING,
-            )
-        } else {
-            error!(
                 message = "Events dropped.",
                 count = 1,
                 error = %self.error,
@@ -34,6 +27,13 @@ impl<'a> InternalEvent for TemplateRenderingError<'a> {
                 reason = %msg,
                 stage = error_stage::PROCESSING,
             );
+        } else {
+            error!(
+                message = %msg,
+                error = %self.error,
+                error_type = error_type::TEMPLATE_FAILED,
+                stage = error_stage::PROCESSING,
+            )
         }
         counter!(
             "component_errors_total", 1,
