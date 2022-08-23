@@ -37,7 +37,7 @@ prost = { version = "0.10.4", default-features = false, features = ["std"] }
 prost-types = { version = "0.10.1", default-features = false }
 quanta = { version = "0.10.1", default-features = false }
 regex = { version = "1.6.0", default-features = false, features = ["std", "perf"] }
-serde = { version = "1.0.143", default-features = false, features = ["derive", "rc"] }
+serde = { version = "1.0.144", default-features = false, features = ["derive", "rc"] }
 serde_json = { version = "1.0.85", default-features = false }
 snafu = { version = "0.7.1", default-features = false }
 tokio = { version = "1.20.1", default-features = false }
