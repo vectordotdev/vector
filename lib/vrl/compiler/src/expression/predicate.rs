@@ -2,31 +2,29 @@ use std::fmt;
 
 use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 
+use crate::expression::Block;
 use crate::{
     expression::{Expr, Resolved},
     parser::Node,
-    state::{ExternalEnv, LocalEnv},
+    state::{TypeInfo, TypeState},
     value::Kind,
-    Context, Expression, Span, TypeDef,
+    Context, Expression, Span,
 };
 
 pub(crate) type Result = std::result::Result<Predicate, Error>;
 
 #[derive(Clone, PartialEq)]
 pub struct Predicate {
-    inner: Vec<Expr>,
+    inner: Block,
 }
 
 impl Predicate {
     pub(crate) fn new(
         node: Node<Vec<Expr>>,
-        state: (&LocalEnv, &ExternalEnv),
+        state: &TypeState,
         fallible_predicate: Option<&dyn DiagnosticMessage>,
     ) -> Result {
         let (span, exprs) = node.take();
-        let type_def = exprs
-            .last()
-            .map_or_else(TypeDef::null, |expr| expr.type_def(state));
 
         if let Some(error) = fallible_predicate {
             return Err(Error::Fallible {
@@ -36,6 +34,8 @@ impl Predicate {
             });
         }
 
+        let block = Block::new_inline(exprs);
+        let type_def = block.type_info(state).result;
         if !type_def.is_boolean() {
             return Err(Error::NonBoolean {
                 kind: type_def.into(),
@@ -43,51 +43,34 @@ impl Predicate {
             });
         }
 
-        Ok(Self { inner: exprs })
+        Ok(Self { inner: block })
     }
 
     #[must_use]
     pub fn new_unchecked(inner: Vec<Expr>) -> Self {
-        Self { inner }
+        Self {
+            inner: Block::new_inline(inner),
+        }
     }
 }
 
 impl Expression for Predicate {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let (last, other) = self.inner.split_last().expect("at least one expression");
-
-        other
-            .iter()
-            .try_for_each(|expr| expr.resolve(ctx).map(|_| ()))?;
-
-        last.resolve(ctx)
+        self.inner.resolve(ctx)
     }
 
-    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
-        let mut type_defs = self
-            .inner
-            .iter()
-            .map(|expr| expr.type_def(state))
-            .collect::<Vec<_>>();
-
-        // If any of the stored expressions is fallible, the entire predicate is
-        // fallible.
-        let fallible = type_defs.iter().any(TypeDef::is_fallible);
-
-        // The last expression determines the resulting value of the predicate.
-        let type_def = type_defs.pop().unwrap_or_else(TypeDef::boolean);
-
-        type_def.with_fallibility(fallible)
+    fn type_info(&self, state: &TypeState) -> TypeInfo {
+        self.inner.type_info(state)
     }
 }
 
 impl fmt::Display for Predicate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.inner.len() > 1 {
+        if self.inner.exprs().len() > 1 {
             f.write_str("(")?;
         }
 
-        let mut iter = self.inner.iter().peekable();
+        let mut iter = self.inner.exprs().iter().peekable();
         while let Some(expr) = iter.next() {
             expr.fmt(f)?;
 
@@ -96,7 +79,7 @@ impl fmt::Display for Predicate {
             }
         }
 
-        if self.inner.len() > 1 {
+        if self.inner.exprs().len() > 1 {
             f.write_str("(")?;
         }
 
@@ -108,7 +91,7 @@ impl fmt::Debug for Predicate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("Predicate(")?;
 
-        let mut iter = self.inner.iter().peekable();
+        let mut iter = self.inner.exprs().iter().peekable();
         while let Some(expr) = iter.next() {
             expr.fmt(f)?;
 

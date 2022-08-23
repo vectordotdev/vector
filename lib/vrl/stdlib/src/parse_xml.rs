@@ -113,7 +113,7 @@ impl Function for ParseXml {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -128,7 +128,7 @@ impl Function for ParseXml {
         let parse_null = arguments.optional("parse_null");
         let parse_number = arguments.optional("parse_number");
 
-        Ok(Box::new(ParseXmlFn {
+        Ok(ParseXmlFn {
             value,
             trim,
             include_attr,
@@ -138,7 +138,8 @@ impl Function for ParseXml {
             parse_bool,
             parse_null,
             parse_number,
-        }))
+        }
+        .as_expr())
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -206,7 +207,7 @@ struct ParseXmlFn {
     parse_number: Option<Box<dyn Expression>>,
 }
 
-impl Expression for ParseXmlFn {
+impl FunctionExpression for ParseXmlFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
 
@@ -263,14 +264,14 @@ impl Expression for ParseXmlFn {
         parse_xml(value, options)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         type_def()
     }
 }
 
 fn type_def() -> TypeDef {
     TypeDef::bytes()
-        .add_object(Collection::from_unknown(inner_kind()))
+        .or_object(Collection::from_unknown(inner_kind()))
         .fallible()
 }
 
@@ -681,8 +682,7 @@ mod tests {
 
     #[test]
     fn test_kind() {
-        let local = state::LocalEnv::default();
-        let external = state::ExternalEnv::default();
+        let state = state::TypeState::default();
 
         let func = ParseXmlFn {
             value: value!(true).into_expression(),
@@ -696,7 +696,7 @@ mod tests {
             parse_number: None,
         };
 
-        let type_def = func.type_def((&local, &external));
+        let type_def = func.type_def(&state);
 
         assert!(type_def.is_fallible());
         assert!(!type_def.is_exact());

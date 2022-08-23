@@ -118,7 +118,7 @@ impl<'bound, 'lc> Slot<'bound, 'lc> {
     /// shutdown via the signal passed from the corresponding
     /// [`ShutdownHandle`].
     pub fn bind(self, future: BoxFuture<'bound, ()>) {
-        self.lifecycle.futs.push(future);
+        self.lifecycle.futs.push_back(future);
         self.lifecycle.fut_shutdowns.push(self.shutdown_trigger);
     }
 }

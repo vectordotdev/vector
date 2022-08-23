@@ -62,14 +62,14 @@ impl Function for ParseAwsVpcFlowLog {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let format = arguments.optional("format");
 
-        Ok(Box::new(ParseAwsVpcFlowLogFn::new(value, format)))
+        Ok(ParseAwsVpcFlowLogFn::new(value, format).as_expr())
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -100,7 +100,7 @@ impl ParseAwsVpcFlowLogFn {
     }
 }
 
-impl Expression for ParseAwsVpcFlowLogFn {
+impl FunctionExpression for ParseAwsVpcFlowLogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let format = self
@@ -112,7 +112,7 @@ impl Expression for ParseAwsVpcFlowLogFn {
         parse_aws_vpc_flow_log(value, format)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::object(inner_kind()).fallible(/* log parsing error */)
     }
 }

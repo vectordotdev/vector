@@ -20,6 +20,7 @@ use self::{
 };
 
 #[derive(Debug, Clone)]
+#[allow(clippy::large_enum_variant)]
 pub enum Condition {
     /// Matches an event if it is a log.
     IsLog,

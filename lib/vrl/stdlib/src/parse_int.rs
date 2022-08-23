@@ -78,14 +78,14 @@ impl Function for ParseInt {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let base = arguments.optional("base");
 
-        Ok(Box::new(ParseIntFn { value, base }))
+        Ok(ParseIntFn { value, base }.as_expr())
     }
 }
 
@@ -95,7 +95,7 @@ struct ParseIntFn {
     base: Option<Box<dyn Expression>>,
 }
 
-impl Expression for ParseIntFn {
+impl FunctionExpression for ParseIntFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let base = self
@@ -107,7 +107,7 @@ impl Expression for ParseIntFn {
         parse_int(value, base)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::integer().fallible()
     }
 }

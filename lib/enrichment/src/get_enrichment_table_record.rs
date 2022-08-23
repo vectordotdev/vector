@@ -1,6 +1,8 @@
 use std::collections::BTreeMap;
 
 use value::{kind::Collection, Kind, Value};
+use vrl::prelude::FunctionExpression;
+use vrl::state::TypeState;
 use vrl::{
     function::{
         ArgumentList, Compiled, CompiledArgument, Example, FunctionCompileContext, Parameter,
@@ -8,7 +10,6 @@ use vrl::{
     prelude::{
         expression, DiagnosticMessage, FunctionArgument, Resolved, Result, TypeDef, VrlValueConvert,
     },
-    state,
     value::kind,
     Context, Expression, Function,
 };
@@ -91,7 +92,7 @@ impl Function for GetEnrichmentTableRecord {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &TypeState,
         ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -134,14 +135,15 @@ impl Function for GetEnrichmentTableRecord {
                 .map_err(|err| Box::new(err) as Box<_>)?,
         );
 
-        Ok(Box::new(GetEnrichmentTableRecordFn {
+        Ok(GetEnrichmentTableRecordFn {
             table,
             condition,
             index,
             select,
             case_sensitive,
             enrichment_tables: registry.as_readonly(),
-        }))
+        }
+        .as_expr())
     }
 
     fn compile_argument(
@@ -189,7 +191,7 @@ pub struct GetEnrichmentTableRecordFn {
     enrichment_tables: TableSearch,
 }
 
-impl Expression for GetEnrichmentTableRecordFn {
+impl FunctionExpression for GetEnrichmentTableRecordFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let condition = self
             .condition
@@ -221,7 +223,7 @@ impl Expression for GetEnrichmentTableRecordFn {
         )
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &TypeState) -> TypeDef {
         TypeDef::object(Collection::any()).fallible()
     }
 }

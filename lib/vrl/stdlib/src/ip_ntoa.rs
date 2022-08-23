@@ -38,13 +38,13 @@ impl Function for IpNtoa {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(IpNtoaFn { value }))
+        Ok(IpNtoaFn { value }.as_expr())
     }
 }
 
@@ -53,13 +53,13 @@ struct IpNtoaFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for IpNtoaFn {
+impl FunctionExpression for IpNtoaFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         ip_ntoa(value)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::bytes().fallible()
     }
 }

@@ -48,14 +48,14 @@ impl Function for Floor {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let precision = arguments.optional("precision");
 
-        Ok(Box::new(FloorFn { value, precision }))
+        Ok(FloorFn { value, precision }.as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -73,7 +73,7 @@ struct FloorFn {
     precision: Option<Box<dyn Expression>>,
 }
 
-impl Expression for FloorFn {
+impl FunctionExpression for FloorFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let precision = self
             .precision
@@ -85,7 +85,7 @@ impl Expression for FloorFn {
         floor(precision, value)
     }
 
-    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &state::TypeState) -> TypeDef {
         match Kind::from(self.value.type_def(state)) {
             v if v.is_float() || v.is_integer() => v.into(),
             _ => Kind::integer().or_float().into(),

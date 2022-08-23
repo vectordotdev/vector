@@ -697,7 +697,7 @@ impl Runner {
                                 }
                                 outputs_buf
                             }.in_current_span());
-                            in_flight.push(task);
+                            in_flight.push_back(task);
                         }
                         None => {
                             shutting_down = true;

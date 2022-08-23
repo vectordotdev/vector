@@ -63,13 +63,13 @@ impl Function for IsEmpty {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(IsEmptyFn { value }))
+        Ok(IsEmptyFn { value }.as_expr())
     }
 }
 
@@ -78,13 +78,13 @@ struct IsEmptyFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for IsEmptyFn {
+impl FunctionExpression for IsEmptyFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         is_empty(value)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::boolean().infallible()
     }
 }

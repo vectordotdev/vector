@@ -52,13 +52,13 @@ impl Function for IpNtop {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(IpNtopFn { value }))
+        Ok(IpNtopFn { value }.as_expr())
     }
 }
 
@@ -67,13 +67,13 @@ struct IpNtopFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for IpNtopFn {
+impl FunctionExpression for IpNtopFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         ip_ntop(value)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::bytes().fallible()
     }
 }

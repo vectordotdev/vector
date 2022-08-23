@@ -48,7 +48,7 @@ pub fn filter_from_function(f: &Function) -> Result<GrokFilter, GrokStaticError>
                 FunctionArgument::Arg(Value::Bytes(ref bytes)) => {
                     let mut re_str = String::new();
                     re_str.push_str(r"^[\w.\-_@");
-                    re_str.push_str(&String::from_utf8_lossy(bytes).to_string());
+                    re_str.push_str(&String::from_utf8_lossy(bytes));
                     re_str.push_str("]+");
                     Regex::new(re_str.as_str())
                         .map_err(|_e| GrokStaticError::InvalidFunctionArguments(f.name.clone()))?
