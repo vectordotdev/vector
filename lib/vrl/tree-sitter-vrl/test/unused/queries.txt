@@ -1,10 +1,10 @@
 ============================================
 Local Variables
 ============================================
-   foo
-   _foo
-   0123foo
-   f_o_o
+  foo
+ _foo
+0123foo
+f_o_o
 ---
 
 (program
@@ -35,5 +35,6 @@ Local Queries
     (expr (query (local_query (local_variable) (query_segments (query_field) (query_field)))))
     (expr (query (local_query (local_variable) (query_segments (query_coalesce (query_field) (query_field))))))
     (expr (query (local_query (local_variable) (query_segments (query_coalesce (query_field) (query_field))))))
+    (expr (query (local_query (local_variable) (query_segments (query_field)))))
   )
 )

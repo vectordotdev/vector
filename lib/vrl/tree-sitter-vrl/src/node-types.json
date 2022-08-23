@@ -1,6 +1,6 @@
 [
   {
-    "type": "expr",
+    "type": "dx",
     "named": true,
     "fields": {},
     "children": {
@@ -8,18 +8,14 @@
       "required": true,
       "types": [
         {
-          "type": "literal",
-          "named": true
-        },
-        {
-          "type": "query",
+          "type": "x",
           "named": true
         }
       ]
     }
   },
   {
-    "type": "exprs",
+    "type": "dxx",
     "named": true,
     "fields": {},
     "children": {
@@ -27,43 +23,14 @@
       "required": true,
       "types": [
         {
-          "type": "expr",
+          "type": "x",
           "named": true
         }
       ]
     }
   },
   {
-    "type": "float_literal",
-    "named": true,
-    "fields": {}
-  },
-  {
-    "type": "integer_literal",
-    "named": true,
-    "fields": {}
-  },
-  {
-    "type": "literal",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": false,
-      "required": true,
-      "types": [
-        {
-          "type": "float_literal",
-          "named": true
-        },
-        {
-          "type": "integer_literal",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
-    "type": "local_query",
+    "type": "dxy",
     "named": true,
     "fields": {},
     "children": {
@@ -71,11 +38,11 @@
       "required": true,
       "types": [
         {
-          "type": "local_variable",
+          "type": "x",
           "named": true
         },
         {
-          "type": "query_segments",
+          "type": "y",
           "named": true
         }
       ]
@@ -86,108 +53,30 @@
     "named": true,
     "fields": {},
     "children": {
-      "multiple": false,
-      "required": true,
-      "types": [
-        {
-          "type": "exprs",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
-    "type": "query",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": false,
-      "required": true,
-      "types": [
-        {
-          "type": "local_query",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
-    "type": "query_coalesce",
-    "named": true,
-    "fields": {},
-    "children": {
       "multiple": true,
-      "required": true,
+      "required": false,
       "types": [
         {
-          "type": "query_field",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
-    "type": "query_field",
-    "named": true,
-    "fields": {}
-  },
-  {
-    "type": "query_segments",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": true,
-      "required": true,
-      "types": [
-        {
-          "type": "query_coalesce",
+          "type": "dx",
           "named": true
         },
         {
-          "type": "query_field",
+          "type": "dxx",
+          "named": true
+        },
+        {
+          "type": "dxy",
           "named": true
         }
       ]
     }
   },
   {
-    "type": "\n",
-    "named": false
-  },
-  {
-    "type": "\"",
-    "named": false
-  },
-  {
-    "type": "(",
-    "named": false
-  },
-  {
-    "type": ")",
-    "named": false
-  },
-  {
-    "type": "-",
-    "named": false
-  },
-  {
-    "type": ".",
-    "named": false
-  },
-  {
-    "type": "1",
-    "named": false
-  },
-  {
-    "type": ";",
-    "named": false
-  },
-  {
-    "type": "local_variable",
+    "type": "x",
     "named": true
   },
   {
-    "type": "|",
-    "named": false
+    "type": "y",
+    "named": true
   }
 ]
