@@ -46,17 +46,67 @@ fn path_matches(path: &Path, haystack: &[AttributeIdent]) -> bool {
 }
 
 #[derive(Clone, Debug)]
+enum ComponentType {
+    EnrichmentTable,
+    Provider,
+    Sink,
+    Source,
+    Transform,
+}
+
+impl<'a> From<&'a Path> for ComponentType {
+    fn from(path: &'a Path) -> Self {
+        let path_str = path_to_string(path);
+        match path_str.as_str() {
+            "enrichment_table" => Self::EnrichmentTable,
+            "provider" => Self::Provider,
+            "sink" => Self::Sink,
+            "source" => Self::Source,
+            "transform" => Self::Transform,
+            _ => unreachable!("should not be used unless path is validated"),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 struct TypedComponent {
     component_type: ComponentType,
     component_name: Option<String>,
 }
 
 impl TypedComponent {
+    /// Creates a new `TypedComponent`.
+    const fn new(component_type: ComponentType) -> Self {
+        Self {
+            component_type,
+            component_name: None,
+        }
+    }
+
+    /// Creates a new `TypedComponent` with the given name.
+    const fn with_name(component_type: ComponentType, component_name: String) -> Self {
+        Self {
+            component_type,
+            component_name: Some(component_name),
+        }
+    }
+
+    /// Gets the type of this component as a string.
+    fn as_type_str(&self) -> &'static str {
+        match self.component_type {
+            ComponentType::EnrichmentTable => "enrichment_table",
+            ComponentType::Provider => "provider",
+            ComponentType::Sink => "sink",
+            ComponentType::Source => "source",
+            ComponentType::Transform => "transform",
+        }
+    }
+
     /// Creates the component description registration code based on the original derive input.
     ///
     /// If this typed component does not have a name, `None` will be returned, as only named
     /// components can be described.
-    pub fn get_component_desc_registration(
+    fn get_component_desc_registration(
         &self,
         input: &DeriveInput,
     ) -> Option<proc_macro2::TokenStream> {
@@ -91,65 +141,13 @@ impl TypedComponent {
     ///
     /// If this typed component does not have a name, `None` will be returned, as only named
     /// components can be registered.
-    pub fn get_component_name_registration(&self) -> Option<proc_macro2::TokenStream> {
+    fn get_component_name_registration(&self) -> Option<proc_macro2::TokenStream> {
         self.component_name.as_ref().map(|name| {
             let component_name = name.as_str();
             quote! {
                 #[::vector_config::component_name(#component_name)]
             }
         })
-    }
-}
-
-#[derive(Clone, Debug)]
-enum ComponentType {
-    EnrichmentTable,
-    Provider,
-    Sink,
-    Source,
-    Transform,
-}
-
-impl<'a> From<&'a Path> for ComponentType {
-    fn from(path: &'a Path) -> Self {
-        let path_str = path_to_string(path);
-        match path_str.as_str() {
-            "enrichment_table" => Self::EnrichmentTable,
-            "provider" => Self::Provider,
-            "sink" => Self::Sink,
-            "source" => Self::Source,
-            "transform" => Self::Transform,
-            _ => unreachable!("should not be used unless path is validated"),
-        }
-    }
-}
-
-impl TypedComponent {
-    /// Creates a new `TypedComponent`.
-    pub const fn new(component_type: ComponentType) -> Self {
-        Self {
-            component_type,
-            component_name: None,
-        }
-    }
-
-    /// Creates a new `TypedComponent` with the given name.
-    pub const fn with_name(component_type: ComponentType, component_name: String) -> Self {
-        Self {
-            component_type,
-            component_name: Some(component_name),
-        }
-    }
-
-    /// Gets the type of this component as a string.
-    fn as_type_str(&self) -> &'static str {
-        match self.component_type {
-            ComponentType::EnrichmentTable => "enrichment_table",
-            ComponentType::Provider => "provider",
-            ComponentType::Sink => "sink",
-            ComponentType::Source => "source",
-            ComponentType::Transform => "transform",
-        }
     }
 }
 
@@ -172,8 +170,8 @@ struct Options {
 impl FromMeta for Options {
     fn from_list(items: &[syn::NestedMeta]) -> darling::Result<Self> {
         let mut typed_component = None;
-        let mut no_ser = None;
-        let mut no_deser = None;
+        let mut no_ser = false;
+        let mut no_deser = false;
 
         let mut errors = Error::accumulator();
 
@@ -181,19 +179,19 @@ impl FromMeta for Options {
             match nm {
                 // Disable automatically deriving `serde::Serialize`.
                 NestedMeta::Meta(Meta::Path(p)) if p == NO_SER => {
-                    if no_ser.is_some() {
+                    if no_ser {
                         errors.push(Error::duplicate_field_path(p));
                     } else {
-                        no_ser = Some(());
+                        no_ser = true;
                     }
                 }
 
                 // Disable automatically deriving `serde::Deserialize`.
                 NestedMeta::Meta(Meta::Path(p)) if p == NO_DESER => {
-                    if no_deser.is_some() {
+                    if no_deser {
                         errors.push(Error::duplicate_field_path(p));
                     } else {
-                        no_deser = Some(());
+                        no_deser = true;
                     }
                 }
 
@@ -244,8 +242,8 @@ impl FromMeta for Options {
 
         errors.finish().map(|()| Self {
             typed_component,
-            no_ser: no_ser.is_some(),
-            no_deser: no_deser.is_some(),
+            no_ser,
+            no_deser,
         })
     }
 }
