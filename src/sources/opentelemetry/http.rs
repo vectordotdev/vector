@@ -21,7 +21,6 @@ use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Rep
 use crate::{
     event::Event,
     internal_events::{EventsReceived, StreamClosedError},
-    opentelemetry::LogService::{ExportLogsServiceRequest, ExportLogsServiceResponse},
     shutdown::ShutdownSignal,
     sources::util::{decode, ErrorMessage},
     tls::MaybeTlsSettings,
