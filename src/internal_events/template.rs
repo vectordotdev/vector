@@ -16,17 +16,25 @@ impl<'a> InternalEvent for TemplateRenderingError<'a> {
             use std::fmt::Write;
             let _ = write!(msg, " for \"{}\"", field);
         }
-        if self.drop_event {
-            msg.push_str("; discarding event");
-        }
         msg.push('.');
-        error!(
-            message = %msg,
-            error = %self.error,
-            error_type = error_type::TEMPLATE_FAILED,
-            stage = error_stage::PROCESSING,
-            internal_log_rate_secs = 30,
-        );
+        if self.drop_event {
+            error!(
+                message = "Events dropped.",
+                count = 1,
+                error = %self.error,
+                error_type = error_type::TEMPLATE_FAILED,
+                intentional = "false",
+                reason = %msg,
+                stage = error_stage::PROCESSING,
+            );
+        } else {
+            error!(
+                message = %msg,
+                error = %self.error,
+                error_type = error_type::TEMPLATE_FAILED,
+                stage = error_stage::PROCESSING,
+            )
+        }
         counter!(
             "component_errors_total", 1,
             "error_type" => error_type::TEMPLATE_FAILED,
@@ -39,6 +47,7 @@ impl<'a> InternalEvent for TemplateRenderingError<'a> {
             counter!(
                 "component_discarded_events_total", 1,
                 "error_type" => error_type::TEMPLATE_FAILED,
+                "intentional" => "false",
                 "stage" => error_stage::PROCESSING,
             );
             // deprecated
