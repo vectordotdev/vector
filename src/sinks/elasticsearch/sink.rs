@@ -21,6 +21,8 @@ use crate::{
     transforms::metric_to_log::MetricToLog,
 };
 
+use super::{ElasticsearchCommon, ElasticsearchConfig};
+
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub struct PartitionKey {
     pub index: String,
@@ -46,6 +48,26 @@ pub struct ElasticsearchSink<S> {
     pub metric_to_log: MetricToLog,
     pub mode: ElasticsearchCommonMode,
     pub id_key_field: Option<String>,
+}
+
+impl<S> ElasticsearchSink<S> {
+    pub fn new(
+        common: &ElasticsearchCommon,
+        config: &ElasticsearchConfig,
+        service: S,
+    ) -> crate::Result<Self> {
+        let batch_settings = config.batch.into_batcher_settings()?;
+
+        Ok(ElasticsearchSink {
+            batch_settings,
+            request_builder: common.request_builder.clone(),
+            transformer: config.encoding.clone(),
+            service,
+            metric_to_log: common.metric_to_log.clone(),
+            mode: common.mode.clone(),
+            id_key_field: config.id_key.clone(),
+        })
+    }
 }
 
 impl<S> ElasticsearchSink<S>

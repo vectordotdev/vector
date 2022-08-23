@@ -74,7 +74,7 @@ impl SinkConfig for AxiomConfig {
         // This configuration wraps the Elasticsearch config to minimize the
         // amount of code.
         let elasticsearch_config = ElasticsearchConfig {
-            endpoint: self.build_endpoint(),
+            endpoint: self.build_endpoint().into(),
             compression: self.compression,
             auth: Some(ElasticsearchAuth::Basic {
                 user: "axiom".to_string(),

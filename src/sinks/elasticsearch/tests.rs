@@ -24,10 +24,13 @@ async fn sets_create_action_when_configured() {
             action: Some(String::from("{{ action }}te")),
             index: Some(String::from("vector")),
         }),
-        endpoint: String::from("https://example.com"),
+        endpoint: String::from("https://example.com").into(),
         ..Default::default()
     };
-    let es = ElasticsearchCommon::parse_config(&config).await.unwrap();
+    let es = ElasticsearchCommon::parse_endpoints(&config)
+        .await
+        .unwrap()
+        .remove(0);
 
     let mut log = LogEvent::from("hello there");
     log.insert(
@@ -71,11 +74,14 @@ async fn encode_datastream_mode() {
             action: None,
             index: Some(String::from("vector")),
         }),
-        endpoint: String::from("https://example.com"),
+        endpoint: String::from("https://example.com").into(),
         mode: ElasticsearchMode::DataStream,
         ..Default::default()
     };
-    let es = ElasticsearchCommon::parse_config(&config).await.unwrap();
+    let es = ElasticsearchCommon::parse_endpoints(&config)
+        .await
+        .unwrap()
+        .remove(0);
 
     let mut log = LogEvent::from("hello there");
     log.insert(
@@ -112,7 +118,7 @@ async fn encode_datastream_mode_no_routing() {
             action: None,
             index: Some(String::from("vector")),
         }),
-        endpoint: String::from("https://example.com"),
+        endpoint: String::from("https://example.com").into(),
         mode: ElasticsearchMode::DataStream,
         data_stream: Some(DataStreamConfig {
             auto_routing: false,
@@ -121,7 +127,10 @@ async fn encode_datastream_mode_no_routing() {
         }),
         ..Default::default()
     };
-    let es = ElasticsearchCommon::parse_config(&config).await.unwrap();
+    let es = ElasticsearchCommon::parse_endpoints(&config)
+        .await
+        .unwrap()
+        .remove(0);
 
     let mut log = LogEvent::from("hello there");
     log.insert("data_stream", data_stream_body());
@@ -153,10 +162,13 @@ async fn handle_metrics() {
             action: Some(String::from("create")),
             index: Some(String::from("vector")),
         }),
-        endpoint: String::from("https://example.com"),
+        endpoint: String::from("https://example.com").into(),
         ..Default::default()
     };
-    let es = ElasticsearchCommon::parse_config(&config).await.unwrap();
+    let es = ElasticsearchCommon::parse_endpoints(&config)
+        .await
+        .unwrap()
+        .remove(0);
 
     let metric = Metric::new(
         "cpu",
@@ -194,10 +206,13 @@ async fn decode_bulk_action_error() {
             action: Some(String::from("{{ action }}")),
             index: Some(String::from("vector")),
         }),
-        endpoint: String::from("https://example.com"),
+        endpoint: String::from("https://example.com").into(),
         ..Default::default()
     };
-    let es = ElasticsearchCommon::parse_config(&config).await.unwrap();
+    let es = ElasticsearchCommon::parse_endpoints(&config)
+        .await
+        .unwrap()
+        .remove(0);
 
     let mut log = LogEvent::from("hello world");
     log.insert("foo", "bar");
@@ -213,10 +228,13 @@ async fn decode_bulk_action() {
             action: Some(String::from("create")),
             index: Some(String::from("vector")),
         }),
-        endpoint: String::from("https://example.com"),
+        endpoint: String::from("https://example.com").into(),
         ..Default::default()
     };
-    let es = ElasticsearchCommon::parse_config(&config).await.unwrap();
+    let es = ElasticsearchCommon::parse_endpoints(&config)
+        .await
+        .unwrap()
+        .remove(0);
 
     let log = LogEvent::from("hello there");
     let action = es.mode.bulk_action(&log).unwrap();
@@ -234,7 +252,7 @@ async fn encode_datastream_mode_no_sync() {
             action: None,
             index: Some(String::from("vector")),
         }),
-        endpoint: String::from("https://example.com"),
+        endpoint: String::from("https://example.com").into(),
         mode: ElasticsearchMode::DataStream,
         data_stream: Some(DataStreamConfig {
             namespace: Template::try_from("something").unwrap(),
@@ -244,7 +262,10 @@ async fn encode_datastream_mode_no_sync() {
         ..Default::default()
     };
 
-    let es = ElasticsearchCommon::parse_config(&config).await.unwrap();
+    let es = ElasticsearchCommon::parse_endpoints(&config)
+        .await
+        .unwrap()
+        .remove(0);
 
     let mut log = LogEvent::from("hello there");
     log.insert("data_stream", data_stream_body());
@@ -283,10 +304,13 @@ async fn allows_using_except_fields() {
             None,
         )
         .unwrap(),
-        endpoint: String::from("https://example.com"),
+        endpoint: String::from("https://example.com").into(),
         ..Default::default()
     };
-    let es = ElasticsearchCommon::parse_config(&config).await.unwrap();
+    let es = ElasticsearchCommon::parse_endpoints(&config)
+        .await
+        .unwrap()
+        .remove(0);
 
     let mut log = LogEvent::from("hello there");
     log.insert("foo", "bar");

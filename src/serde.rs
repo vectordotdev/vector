@@ -4,6 +4,7 @@ use codecs::{
 };
 use indexmap::map::IndexMap;
 use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 pub use vector_core::serde::{bool_or_struct, skip_serializing_if_default};
 
 pub const fn default_true() -> bool {
@@ -97,11 +98,14 @@ impl<V: 'static> Fields<V> {
 
 /// Structure to handle when a configuration field can be a value
 /// or a list of values.
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, Hash)]
+#[configurable_component]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[serde(untagged)]
 pub enum OneOrMany<T> {
-    One(T),
-    Many(Vec<T>),
+    /// A single value.
+    One(#[configurable(derived)] T),
+    /// A list of values.
+    Many(#[configurable(derived)] Vec<T>),
 }
 
 impl<T: ToString> OneOrMany<T> {
@@ -135,5 +139,11 @@ impl<T> From<T> for OneOrMany<T> {
 impl<T> From<Vec<T>> for OneOrMany<T> {
     fn from(value: Vec<T>) -> Self {
         Self::Many(value)
+    }
+}
+
+impl<T: Default> Default for OneOrMany<T> {
+    fn default() -> Self {
+        Self::One(T::default())
     }
 }

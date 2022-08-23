@@ -12,6 +12,7 @@ use snafu::ResultExt;
 use super::{
     request_builder::ElasticsearchRequestBuilder, ElasticsearchEncoder, InvalidHostSnafu, Request,
 };
+use crate::serde::OneOrMany;
 use crate::{
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
@@ -25,7 +26,7 @@ use crate::{
     transforms::metric_to_log::MetricToLog,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ElasticsearchCommon {
     pub base_url: String,
     pub bulk_uri: Uri,
@@ -41,15 +42,15 @@ pub struct ElasticsearchCommon {
 }
 
 impl ElasticsearchCommon {
-    pub async fn parse_config(config: &ElasticsearchConfig) -> crate::Result<Self> {
+    pub async fn parse_config(config: &ElasticsearchConfig, endpoint: &str) -> crate::Result<Self> {
         // Test the configured host, but ignore the result
-        let uri = format!("{}/_test", &config.endpoint);
-        let uri = uri.parse::<Uri>().with_context(|_| InvalidHostSnafu {
-            host: &config.endpoint,
-        })?;
+        let uri = format!("{}/_test", endpoint);
+        let uri = uri
+            .parse::<Uri>()
+            .with_context(|_| InvalidHostSnafu { host: endpoint })?;
         if uri.host().is_none() {
             return Err(ParseError::HostMustIncludeHostname {
-                host: config.endpoint.clone(),
+                host: endpoint.to_string(),
             }
             .into());
         }
@@ -61,7 +62,7 @@ impl ElasticsearchCommon {
             }),
             _ => None,
         };
-        let uri = config.endpoint.parse::<UriSerde>()?;
+        let uri = endpoint.parse::<UriSerde>()?;
         let http_auth = authorization.choose_one(&uri.auth)?;
         let base_url = uri.uri.to_string().trim_end_matches('/').to_owned();
 
@@ -137,6 +138,24 @@ impl ElasticsearchCommon {
             region,
             tls_settings,
             metric_to_log,
+        })
+    }
+
+    /// Parses endpoints.
+    /// Not empty.
+    pub async fn parse_endpoints(config: &ElasticsearchConfig) -> crate::Result<Vec<Self>> {
+        Ok(match config.endpoint {
+            OneOrMany::One(ref endpoint) => vec![Self::parse_config(config, endpoint).await?],
+            OneOrMany::Many(ref endpoints) if endpoints.is_empty() => {
+                return Err(ParseError::EndpointRequired.into())
+            }
+            OneOrMany::Many(ref endpoints) => {
+                let mut commons = Vec::new();
+                for endpoint in endpoints {
+                    commons.push(Self::parse_config(config, endpoint).await?);
+                }
+                commons
+            }
         })
     }
 

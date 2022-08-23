@@ -77,7 +77,7 @@ async fn firehose_put_records() {
         auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
             load_timeout_secs: Some(5),
         })),
-        endpoint: elasticsearch_address(),
+        endpoint: elasticsearch_address().into(),
         bulk: Some(BulkConfig {
             index: Some(stream.clone()),
             action: None,
@@ -85,9 +85,10 @@ async fn firehose_put_records() {
         aws: Some(region),
         ..Default::default()
     };
-    let common = ElasticsearchCommon::parse_config(&config)
+    let common = ElasticsearchCommon::parse_endpoints(&config)
         .await
-        .expect("Config error");
+        .expect("Config error")
+        .remove(0);
 
     let client = reqwest::Client::builder()
         .build()

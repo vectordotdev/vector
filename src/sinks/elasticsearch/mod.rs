@@ -1,6 +1,7 @@
 mod common;
 mod config;
 mod encoder;
+mod health;
 mod request_builder;
 mod retry;
 mod service;
@@ -187,4 +188,6 @@ pub enum ParseError {
     BatchActionTemplate { source: TemplateParseError },
     #[snafu(display("aws.region required when AWS authentication is in use"))]
     RegionRequired,
+    #[snafu(display("Endpoint option must be specified"))]
+    EndpointRequired,
 }
