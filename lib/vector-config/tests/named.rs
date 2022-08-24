@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use serde::Serialize;
-use vector_config::component_name;
+use vector_config::NamedComponent;
 
 // Essentially, this just derives an impl of `vector_config::NamedComponent` where the component
 // name comes from the attribute value i.e. the name of a component annotated with
@@ -10,15 +10,18 @@ use vector_config::component_name;
 // We've run through the different possible combinations of generics, bounds, etc, to ensure that
 // the macro is correctly rebuilding the output token stream.
 
-#[component_name("basic")]
+#[derive(NamedComponent)]
+#[source_component("basic")]
 pub struct Basic;
 
-#[component_name("generics")]
+#[derive(NamedComponent)]
+#[transform_component("generics")]
 pub struct Generics<T> {
     inner: T,
 }
 
-#[component_name("bounds")]
+#[derive(NamedComponent)]
+#[provider_component("bounds_abound")]
 pub struct Bounds<T>
 where
     T: AsRef<u64>,
@@ -26,7 +29,8 @@ where
     inner: T,
 }
 
-#[component_name("existing_attrs")]
+#[derive(NamedComponent)]
+#[enrichment_table_component("existing_attrs")]
 #[derive(Serialize)]
 pub struct ExistingAttributes {
     foo: String,
