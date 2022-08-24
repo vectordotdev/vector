@@ -112,6 +112,10 @@ An `<Namespace>EventsDropped` event MUST be emitted when events are dropped.
 If events are dropped due to an error, then the error event should drive the
 emission of this event, meeting the below requirements.
 
+This event MUST NOT be emitted before events have been created in Vector. For
+example a source failing to decode incoming data would simply emit the
+`ComponentError` event but would not emit the `ComponentEventsDropped` event.
+
 **You MUST NOT emit this event for retriable operations that can recover and
 prevent data loss. For example, a failed HTTP request that will be retried does
 not result in data loss if the retry succeeds.**
