@@ -49,4 +49,53 @@ Block
   )
 )
 
+============================================
+Array
+============================================
+[]
+
+[
+ ]
+
+ [1]
+
+[ 1 ]
+
+[
+1
+]
+
+[1,2,3]
+[ 1 , 2 , 3 ]
+
+[
+1
+,
+2
+,
+3
+]
+
+[1, {true}, "three"]
+
+---
+
+(program
+  (exprs
+    (expr (container (array)))
+    (expr (container (array)))
+    (expr (container (array (expr (literal (integer))))))
+    (expr (container (array (expr (literal (integer))))))
+    (expr (container (array (expr (literal (integer))))))
+    (expr (container (array (expr (literal (integer))) (expr (literal (integer))) (expr (literal (integer))))))
+    (expr (container (array (expr (literal (integer))) (expr (literal (integer))) (expr (literal (integer))))))
+    (expr (container (array (expr (literal (integer))) (expr (literal (integer))) (expr (literal (integer))))))
+    (expr (container (array
+      (expr (literal (integer)))
+      (expr (container (block (exprs (expr (literal (boolean)))))))
+      (expr (literal (string)))
+    )))
+  )
+)
+
 
