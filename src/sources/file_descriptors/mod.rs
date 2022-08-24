@@ -10,6 +10,7 @@ use codecs::{
 use futures::{channel::mpsc, executor, SinkExt, StreamExt};
 use tokio::task;
 use tokio_util::{codec::FramedRead, io::StreamReader};
+use vector_config::NamedComponent;
 use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
@@ -26,11 +27,10 @@ pub mod file_descriptor;
 #[cfg(feature = "sources-stdin")]
 pub mod stdin;
 
-pub trait FileDescriptorConfig {
+pub trait FileDescriptorConfig: NamedComponent {
     fn host_key(&self) -> Option<String>;
     fn framing(&self) -> Option<FramingConfig>;
     fn decoding(&self) -> DeserializerConfig;
-    fn name(&self) -> String;
     fn description(&self) -> String;
 
     fn source<R>(
@@ -46,8 +46,9 @@ pub trait FileDescriptorConfig {
             .host_key()
             .unwrap_or_else(|| log_schema().host_key().to_string());
         let hostname = crate::get_hostname().ok();
+
+        let source_type = Bytes::from_static(Self::NAME.as_bytes());
         let description = self.description();
-        let name = self.name();
 
         let decoding = self.decoding();
         let framing = self
@@ -68,7 +69,13 @@ pub trait FileDescriptorConfig {
         });
 
         Ok(Box::pin(process_stream(
-            receiver, decoder, out, shutdown, host_key, name, hostname,
+            receiver,
+            decoder,
+            out,
+            shutdown,
+            host_key,
+            source_type,
+            hostname,
         )))
     }
 }
@@ -96,13 +103,14 @@ where
 }
 
 type Receiver = mpsc::Receiver<std::result::Result<bytes::Bytes, std::io::Error>>;
+
 async fn process_stream(
     receiver: Receiver,
     decoder: Decoder,
     mut out: SourceSender,
     shutdown: ShutdownSignal,
     host_key: String,
-    name: String,
+    source_type: Bytes,
     hostname: Option<String>,
 ) -> Result<(), ()> {
     let stream = StreamReader::new(receiver);
@@ -123,7 +131,7 @@ async fn process_stream(
                     for mut event in events {
                         let log = event.as_mut_log();
 
-                        log.try_insert(log_schema().source_type_key(), Bytes::from(name.clone()));
+                        log.try_insert(log_schema().source_type_key(), source_type.clone());
                         log.try_insert(log_schema().timestamp_key(), now);
 
                         if let Some(hostname) = &hostname {

@@ -1,13 +1,17 @@
 use std::sync::{atomic::AtomicUsize, Arc};
 
 use futures_util::Stream;
+use stream_cancel::Trigger;
 use vector_core::event::EventArray;
 
-use crate::SourceSender;
+use crate::{sources::Sources, SourceSender};
 
 use self::{
     sinks::{BasicSinkConfig, ErrorSinkConfig, PanicSinkConfig},
-    sources::{BasicSourceConfig, ErrorSourceConfig, PanicSourceConfig},
+    sources::{
+        BackpressureSourceConfig, BasicSourceConfig, ErrorSourceConfig, PanicSourceConfig,
+        TripwireSourceConfig,
+    },
     transforms::BasicTransformConfig,
 };
 
@@ -15,31 +19,46 @@ pub mod sinks;
 pub mod sources;
 pub mod transforms;
 
-pub fn basic_source() -> (SourceSender, BasicSourceConfig) {
+pub fn backpressure_source(counter: &Arc<AtomicUsize>) -> Sources {
+    Sources::TestBackpressure(BackpressureSourceConfig {
+        counter: Arc::clone(counter),
+    })
+}
+
+pub fn basic_source() -> (SourceSender, Sources) {
     let (tx, rx) = SourceSender::new_with_buffer(1);
-    let source = BasicSourceConfig::new(rx);
+    let source = Sources::TestBasic(BasicSourceConfig::new(rx));
     (tx, source)
 }
 
-pub fn basic_source_with_data(data: &str) -> (SourceSender, BasicSourceConfig) {
+pub fn basic_source_with_data(data: &str) -> (SourceSender, Sources) {
     let (tx, rx) = SourceSender::new_with_buffer(1);
-    let source = BasicSourceConfig::new_with_data(rx, data);
+    let source = Sources::TestBasic(BasicSourceConfig::new_with_data(rx, data));
     (tx, source)
 }
 
-pub fn basic_source_with_event_counter() -> (SourceSender, BasicSourceConfig, Arc<AtomicUsize>) {
+pub fn basic_source_with_event_counter(
+    force_shutdown: bool,
+) -> (SourceSender, Sources, Arc<AtomicUsize>) {
     let event_counter = Arc::new(AtomicUsize::new(0));
     let (tx, rx) = SourceSender::new_with_buffer(1);
-    let source = BasicSourceConfig::new_with_event_counter(rx, Arc::clone(&event_counter));
-    (tx, source, event_counter)
+    let mut source = BasicSourceConfig::new_with_event_counter(rx, Arc::clone(&event_counter));
+    source.set_force_shutdown(force_shutdown);
+
+    (tx, Sources::TestBasic(source), event_counter)
 }
 
-pub fn error_source() -> ErrorSourceConfig {
-    ErrorSourceConfig::default()
+pub fn error_source() -> Sources {
+    Sources::TestError(ErrorSourceConfig::default())
 }
 
-pub fn panic_source() -> PanicSourceConfig {
-    PanicSourceConfig::default()
+pub fn panic_source() -> Sources {
+    Sources::TestPanic(PanicSourceConfig::default())
+}
+
+pub fn tripwire_source() -> (Trigger, Sources) {
+    let (trigger, source) = TripwireSourceConfig::new();
+    (trigger, Sources::TestTripwire(source))
 }
 
 pub fn basic_transform(suffix: &str, increase: f64) -> BasicTransformConfig {

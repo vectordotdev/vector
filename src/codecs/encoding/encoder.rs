@@ -7,7 +7,7 @@ use tokio_util::codec::Encoder as _;
 
 use crate::{
     event::Event,
-    internal_events::{EncoderFramingFailed, EncoderSerializeFailed},
+    internal_events::{EncoderFramingError, EncoderSerializeError},
 };
 
 #[derive(Debug, Clone)]
@@ -57,7 +57,7 @@ where
     /// Serialize the event without applying framing, at the start of the provided buffer.
     fn serialize_at_start(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Error> {
         self.serializer.encode(event, buffer).map_err(|error| {
-            emit!(EncoderSerializeFailed { error: &error });
+            emit!(EncoderSerializeError { error: &error });
             Error::SerializingError(error)
         })
     }
@@ -155,7 +155,7 @@ impl tokio_util::codec::Encoder<Event> for Encoder<Framer> {
 
         // Frame the serialized event.
         self.framer.encode((), &mut payload).map_err(|error| {
-            emit!(EncoderFramingFailed { error: &error });
+            emit!(EncoderFramingError { error: &error });
             Error::FramingError(error)
         })?;
 

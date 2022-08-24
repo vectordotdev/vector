@@ -50,8 +50,8 @@ suitable for complex data definitions.
 
 Vector has some CUE-related CI checks that are run whenever changes are made to
 the `docs` directory. This includes checks to make sure that the CUE sources are
-properly formatted. To run CUE's autoformatting, run this command from the
-`vector` root:
+properly formatted. To run CUE's autoformatting, first [install cue](https://cuelang.org/docs/install/),
+then run this command from the `vector` root:
 
 ```bash
 cue fmt ./docs/**/*.cue

@@ -1,0 +1,15 @@
+#!/bin/sh
+set -e
+
+# Add vector:vector user & group
+id --user vector >/dev/null 2>&1 || \
+  useradd --system --shell /sbin/nologin --home-dir /var/lib/vector --user-group \
+    --comment "Vector observability data router" vector
+
+# Create default Vector data directory
+mkdir -p /var/lib/vector
+
+# Make vector:vector the owner of the Vector data directory
+chown -R vector:vector /var/lib/vector
+
+#DEBHELPER#

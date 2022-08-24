@@ -18,7 +18,7 @@ use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    config::{self, Output, SourceConfig, SourceContext, SourceDescription},
+    config::{self, Output, SourceConfig, SourceContext},
     event::metric::{Metric, MetricKind, MetricValue},
     internal_events::{
         CollectionCompleted, EndpointBytesReceived, MongoDbMetricsBsonParseError,
@@ -74,7 +74,7 @@ enum CollectError {
 }
 
 /// Configuration for the `mongodb_metrics` source.
-#[configurable_component(source)]
+#[configurable_component(source("mongodb_metrics"))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct MongoDbMetricsConfig {
@@ -112,14 +112,9 @@ pub fn default_namespace() -> String {
     "mongodb".to_string()
 }
 
-inventory::submit! {
-    SourceDescription::new::<MongoDbMetricsConfig>("mongodb_metrics")
-}
-
 impl_generate_config_from_default!(MongoDbMetricsConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "mongodb_metrics")]
 impl SourceConfig for MongoDbMetricsConfig {
     async fn build(&self, mut cx: SourceContext) -> crate::Result<super::Source> {
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
@@ -158,10 +153,6 @@ impl SourceConfig for MongoDbMetricsConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(config::DataType::Metric)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "mongodb_metrics"
     }
 
     fn can_acknowledge(&self) -> bool {

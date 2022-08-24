@@ -1,7 +1,7 @@
-use super::{
-    Common::{any_value::Value as PBValue, KeyValue},
-    Logs::{LogRecord, ResourceLogs, SeverityNumber},
-    Resource as OtelResource,
+use super::proto::{
+    common::v1::{any_value::Value as PBValue, KeyValue},
+    logs::v1::{LogRecord, ResourceLogs, SeverityNumber},
+    resource::v1::Resource,
 };
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
@@ -63,7 +63,7 @@ impl From<PBValue> for Value {
 }
 
 struct ResourceLog {
-    resource: Option<OtelResource>,
+    resource: Option<Resource>,
     log_record: LogRecord,
 }
 

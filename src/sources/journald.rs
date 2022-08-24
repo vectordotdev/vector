@@ -10,10 +10,7 @@ use std::{
 };
 
 use crate::{
-    config::{
-        log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext,
-        SourceDescription,
-    },
+    config::{log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, LogEvent, Value},
     internal_events::{
         BytesReceived, JournaldInvalidRecordError, JournaldNegativeAcknowledgmentError,
@@ -85,7 +82,7 @@ enum BuildError {
 type Matches = HashMap<String, HashSet<String>>;
 
 /// Configuration for the `journald` source.
-#[configurable_component(source)]
+#[configurable_component(source("journald"))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields, default)]
 pub struct JournaldConfig {
@@ -180,16 +177,11 @@ impl JournaldConfig {
     }
 }
 
-inventory::submit! {
-    SourceDescription::new::<JournaldConfig>("journald")
-}
-
 impl_generate_config_from_default!(JournaldConfig);
 
 type Record = HashMap<String, String>;
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "journald")]
 impl SourceConfig for JournaldConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         if self.remap_priority {
@@ -252,10 +244,6 @@ impl SourceConfig for JournaldConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "journald"
     }
 
     fn can_acknowledge(&self) -> bool {

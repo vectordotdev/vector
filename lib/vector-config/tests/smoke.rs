@@ -14,7 +14,10 @@ use std::{
 
 use serde::{de, Deserialize, Deserializer};
 use serde_with::serde_as;
-use vector_config::{configurable_component, schema::generate_root_schema, ConfigurableString};
+use vector_config::{
+    component::GenerateConfig, configurable_component, schema::generate_root_schema,
+    ConfigurableString,
+};
 
 /// A templated string.
 #[configurable_component]
@@ -164,7 +167,7 @@ where
 
 /// A source for collecting events over TCP.
 #[serde_as]
-#[configurable_component(source)]
+#[configurable_component(source("simple"))]
 #[derive(Clone)]
 #[configurable(metadata(status = "beta"))]
 pub struct SimpleSourceConfig {
@@ -176,6 +179,16 @@ pub struct SimpleSourceConfig {
     #[serde(default = "default_simple_source_timeout")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     timeout: Duration,
+}
+
+impl GenerateConfig for SimpleSourceConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            listen_addr: default_simple_source_listen_addr(),
+            timeout: default_simple_source_timeout(),
+        })
+        .unwrap()
+    }
 }
 
 const fn default_simple_source_timeout() -> Duration {
@@ -216,6 +229,20 @@ pub struct SimpleSinkConfig {
 
     #[serde(skip)]
     meaningless_field: String,
+}
+
+impl GenerateConfig for SimpleSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            endpoint: default_simple_sink_endpoint(),
+            batch: default_simple_sink_batch(),
+            encoding: default_simple_sink_encoding(),
+            output_path: Template::try_from("basic".to_string()).expect("should not fail to parse"),
+            tags: HashMap::new(),
+            meaningless_field: "foo".to_string(),
+        })
+        .unwrap()
+    }
 }
 
 fn default_simple_sink_batch() -> BatchConfig {
@@ -273,6 +300,21 @@ pub struct AdvancedSinkConfig {
     tags: HashMap<Template, Template>,
 }
 
+impl GenerateConfig for AdvancedSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            endpoint: default_advanced_sink_endpoint(),
+            agent_version: String::from("v1.2.3"),
+            batch: default_advanced_sink_batch(),
+            encoding: default_advanced_sink_encoding(),
+            tls: None,
+            partition_key: default_partition_key(),
+            tags: HashMap::new(),
+        })
+        .unwrap()
+    }
+}
+
 fn default_advanced_sink_batch() -> BatchConfig {
     BatchConfig {
         max_events: Some(NonZeroU64::new(5678).expect("must be nonzero")),
@@ -326,7 +368,7 @@ pub mod vector_v1 {
 pub mod vector_v2 {
     use std::net::SocketAddr;
 
-    use vector_config::configurable_component;
+    use vector_config::{component::GenerateConfig, configurable_component};
 
     /// Configuration for version two of the `vector` source.
     #[configurable_component]
@@ -345,6 +387,16 @@ pub mod vector_v2 {
 
     const fn default_shutdown_timeout_secs() -> u64 {
         30
+    }
+
+    impl GenerateConfig for VectorConfig {
+        fn generate_config() -> toml::Value {
+            toml::Value::try_from(Self {
+                address: "0.0.0.0:6000".parse().unwrap(),
+                shutdown_timeout_secs: default_shutdown_timeout_secs(),
+            })
+            .unwrap()
+        }
     }
 }
 
@@ -389,7 +441,7 @@ pub struct VectorConfigV2 {
 }
 
 /// Configurable for the `vector` source.
-#[configurable_component(source)]
+#[configurable_component(source("vector"))]
 #[derive(Clone, Debug)]
 #[serde(untagged)]
 pub enum VectorSourceConfig {
@@ -398,6 +450,20 @@ pub enum VectorSourceConfig {
 
     /// Configuration for version two.
     V2(#[configurable(derived)] VectorConfigV2),
+}
+
+impl GenerateConfig for VectorSourceConfig {
+    fn generate_config() -> toml::Value {
+        let config = toml::Value::try_into::<self::vector_v2::VectorConfig>(
+            self::vector_v2::VectorConfig::generate_config(),
+        )
+        .unwrap();
+        toml::Value::try_from(VectorConfigV2 {
+            version: Some(V2::V2),
+            config,
+        })
+        .unwrap()
+    }
 }
 
 /// Collection of various sources available in Vector.

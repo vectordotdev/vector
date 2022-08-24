@@ -11,7 +11,7 @@ use tokio_util::codec::Decoder as _;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{SourceConfig, SourceContext, SourceDescription},
+    config::{SourceConfig, SourceContext},
     http::Auth,
     serde::default_decoding,
     serde::default_framing_message_based,
@@ -37,7 +37,7 @@ use vector_core::{
 pub(crate) const NAME: &str = "http_scrape";
 
 /// Configuration for the `http_scrape` source.
-#[configurable_component(source)]
+#[configurable_component(source("http_scrape"))]
 #[derive(Clone, Debug)]
 pub struct HttpScrapeConfig {
     /// Endpoint to scrape events from. The full path must be specified.
@@ -99,14 +99,9 @@ impl Default for HttpScrapeConfig {
     }
 }
 
-inventory::submit! {
-    SourceDescription::new::<HttpScrapeConfig>(NAME)
-}
-
 impl_generate_config_from_default!(HttpScrapeConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "http_scrape")]
 impl SourceConfig for HttpScrapeConfig {
     async fn build(&self, cx: SourceContext) -> Result<sources::Source> {
         // build the url
@@ -158,10 +153,6 @@ impl SourceConfig for HttpScrapeConfig {
             .with_standard_vector_source_metadata();
 
         vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        NAME
     }
 
     fn can_acknowledge(&self) -> bool {

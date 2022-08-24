@@ -1,6 +1,10 @@
-use std::{hash::Hash, marker::PhantomData, sync::Arc, time::Duration};
+use std::{hash::Hash, marker::PhantomData, pin::Pin, sync::Arc, time::Duration};
 
+use futures_util::stream::{self, BoxStream};
 use tower::{
+    balance::p2c::Balance,
+    buffer::{Buffer, BufferLayer},
+    discover::Change,
     layer::{util::Stack, Layer},
     limit::RateLimit,
     retry::Retry,
@@ -11,24 +15,38 @@ use vector_config::configurable_component;
 
 pub use crate::sinks::util::service::{
     concurrency::{concurrency_is_none, Concurrency},
+    health::{HealthConfig, HealthLogic, HealthService},
     map::Map,
 };
-use crate::sinks::util::{
-    adaptive_concurrency::{
-        AdaptiveConcurrencyLimit, AdaptiveConcurrencyLimitLayer, AdaptiveConcurrencySettings,
+use crate::{
+    internal_events::OpenGauge,
+    sinks::util::{
+        adaptive_concurrency::{
+            AdaptiveConcurrencyLimit, AdaptiveConcurrencyLimitLayer, AdaptiveConcurrencySettings,
+        },
+        retries::{FixedRetryPolicy, RetryLogic},
+        service::map::MapLayer,
+        sink::Response,
+        Batch, BatchSink, Partition, PartitionBatchSink,
     },
-    retries::{FixedRetryPolicy, RetryLogic},
-    service::map::MapLayer,
-    sink::Response,
-    Batch, BatchSink, Partition, PartitionBatchSink,
 };
 
 mod concurrency;
+mod health;
 mod map;
 
 pub type Svc<S, L> = RateLimit<AdaptiveConcurrencyLimit<Retry<FixedRetryPolicy<L>, Timeout<S>>, L>>;
 pub type TowerBatchedSink<S, B, RL> = BatchSink<Svc<S, RL>, B>;
 pub type TowerPartitionSink<S, B, RL, K> = PartitionBatchSink<Svc<S, RL>, B, K>;
+
+// Distributed service types
+pub type DistributedService<S, RL, HL, K, Req> = RateLimit<
+    Retry<FixedRetryPolicy<RL>, Buffer<Balance<DiscoveryService<S, RL, HL, K>, Req>, Req>>,
+>;
+pub type DiscoveryService<S, RL, HL, K> =
+    BoxStream<'static, Result<Change<K, SingleDistributedService<S, RL, HL>>, crate::Error>>;
+pub type SingleDistributedService<S, RL, HL> =
+    AdaptiveConcurrencyLimit<HealthService<Timeout<S>, HL>, RL>;
 
 pub trait ServiceBuilderExt<L> {
     fn map<R1, R2, F>(self, f: F) -> ServiceBuilder<Stack<MapLayer<R1, R2>, L>>
@@ -270,6 +288,64 @@ impl TowerRequestSettings {
             .settings(self.clone(), retry_logic)
             .service(service);
         BatchSink::new(service, batch, batch_timeout)
+    }
+
+    /// Distributes requests to services [(Endpoint, service, healthcheck)]
+    pub fn distributed_service<Req, RL, HL, S>(
+        self,
+        retry_logic: RL,
+        services: Vec<(String, S)>,
+        health_config: HealthConfig,
+        health_logic: HL,
+    ) -> DistributedService<S, RL, HL, usize, Req>
+    where
+        Req: Clone + Send + 'static,
+        RL: RetryLogic<Response = S::Response>,
+        HL: HealthLogic<Response = S::Response, Error = crate::Error>,
+        S: Service<Req> + Clone + Send + 'static,
+        S::Error: Into<crate::Error> + Send + Sync + 'static,
+        S::Response: Send,
+        S::Future: Send + 'static,
+    {
+        let policy = self.retry_policy(retry_logic.clone());
+        let settings = self.clone();
+
+        // Build services
+        let open = OpenGauge::new();
+        let max_concurrency = services.len() * AdaptiveConcurrencySettings::max_concurrency();
+        let services = services
+            .into_iter()
+            .map(|(endpoint, inner)| {
+                // Build individual service
+                ServiceBuilder::new()
+                    .layer(AdaptiveConcurrencyLimitLayer::new(
+                        settings.concurrency,
+                        settings.adaptive_concurrency,
+                        retry_logic.clone(),
+                    ))
+                    .service(
+                        health_config.build(
+                            health_logic.clone(),
+                            ServiceBuilder::new()
+                                .timeout(settings.timeout)
+                                .service(inner),
+                            open.clone(),
+                            endpoint,
+                        ), // NOTE: there is a version conflict for crate `tracing` between `tracing_tower` crate
+                           // and Vector. Once that is resolved, this can be used instead of passing endpoint everywhere.
+                           // .trace_service(|_| info_span!("endpoint", %endpoint)),
+                    )
+            })
+            .enumerate()
+            .map(|(i, service)| Ok(Change::Insert(i, service)))
+            .collect::<Vec<_>>();
+
+        // Build sink service
+        ServiceBuilder::new()
+            .rate_limit(self.rate_limit_num, self.rate_limit_duration)
+            .retry(policy)
+            .layer(BufferLayer::new(max_concurrency))
+            .service(Balance::new(Box::pin(stream::iter(services)) as Pin<Box<_>>))
     }
 }
 
