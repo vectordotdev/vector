@@ -461,7 +461,7 @@ pub enum MetricKind {
 }
 
 impl MetricKind {
-    fn as_str(&self) -> &'static str {
+    fn as_str(self) -> &'static str {
         match self {
             MetricKind::Incremental => "incremental",
             MetricKind::Absolute => "absolute",

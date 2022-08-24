@@ -334,6 +334,7 @@ impl ByteSizeOf for MetricValue {
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     fn estimated_json_encoded_size_of(&self) -> usize {
         const BRACES_SIZE: usize = 2;
         const COMMA_SIZE: usize = 1;

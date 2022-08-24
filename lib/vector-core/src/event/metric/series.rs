@@ -82,7 +82,7 @@ impl ByteSizeOf for MetricSeries {
         if let Some(tags) = &self.tags {
             size += COMMA_SIZE
                 + byte_size_of::string_like_estimated_json_byte_size(METRIC_TAGS_KEY_SIZE)
-                + byte_size_of::object_like_estimated_json_byte_size(tags.iter())
+                + byte_size_of::object_like_estimated_json_byte_size(tags.iter());
         }
 
         size
@@ -161,7 +161,7 @@ impl ByteSizeOf for MetricName {
             size += COMMA_SIZE
                 + byte_size_of::string_like_estimated_json_byte_size(METRIC_NAMESPACE_KEY_SIZE)
                 + COLON_SIZE
-                + byte_size_of::string_like_estimated_json_byte_size(namespace.len())
+                + byte_size_of::string_like_estimated_json_byte_size(namespace.len());
         }
 
         size
