@@ -766,15 +766,6 @@ mod integration_tests {
     #[tokio::test]
     async fn source_compliance() {
         let mut config = HostMetricsConfig::default();
-        //let cfg = HostMetricsConfig {
-        //    scrape_interval_secs: 0.2,
-        //    collectors: None,
-        //    namespace: None,
-        //    cgroups: todo!(),
-        //    disk: todo!(),
-        //    filesystem: todo!(),
-        //    network: todo!(),
-        //};
         config.scrape_interval_secs = 1.0;
 
         let events =

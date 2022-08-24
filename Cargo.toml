@@ -715,6 +715,8 @@ all-integration-tests = [
   "gcp-cloud-storage-integration-tests",
   "gcp-integration-tests",
   "gcp-pubsub-integration-tests",
+  "host-metrics-integration-tests",
+  "humio-integration-tests",
   "humio-integration-tests",
   "influxdb-integration-tests",
   "kafka-integration-tests",
@@ -771,6 +773,7 @@ fluent-integration-tests = ["docker", "sources-fluent"]
 gcp-cloud-storage-integration-tests = ["sinks-gcp"]
 gcp-integration-tests = ["sinks-gcp"]
 gcp-pubsub-integration-tests = ["sinks-gcp", "sources-gcp_pubsub"]
+host-metrics-integration-tests = ["sources-host_metrics"]
 humio-integration-tests = ["sinks-humio"]
 influxdb-integration-tests = ["sinks-influxdb"]
 kafka-integration-tests = ["sinks-kafka", "sources-kafka"]

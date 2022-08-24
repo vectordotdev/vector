@@ -71,6 +71,7 @@ jobs:
           - test: 'eventstoredb'
           - test: 'fluent'
           - test: 'gcp'
+          - test: 'host-metrics'
           - test: 'humio'
           - test: 'influxdb'
           - test: 'kafka'
