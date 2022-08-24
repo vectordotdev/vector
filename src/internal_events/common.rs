@@ -127,27 +127,3 @@ impl InternalEvent for CollectionCompleted {
         histogram!("collect_duration_seconds", self.end - self.start);
     }
 }
-
-#[derive(Debug)]
-pub struct ComponentEventsDropped {
-    pub count: u64,
-    pub intentional: bool,
-    pub reason: &'static str,
-}
-
-impl InternalEvent for ComponentEventsDropped {
-    fn emit(self) {
-        let intent = if self.intentional { "true" } else { "false" };
-        error!(
-            message = "Events dropped.",
-            intentional = intent,
-            reason = self.reason,
-        );
-        counter!(
-            "component_discarded_events_total",
-            self.count,
-            "count" => self.count.to_string(),
-            "intentional" => intent,
-        );
-    }
-}
