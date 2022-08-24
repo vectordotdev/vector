@@ -11,6 +11,7 @@ use futures::future::BoxFuture;
 use http::{Response, Uri};
 use hyper::{service::Service, Body, Request};
 use tower::ServiceExt;
+use vector_common::byte_size_of;
 use vector_core::{internal_event::EventsSent, stream::DriverResponse, ByteSizeOf};
 
 use crate::sinks::elasticsearch::sign_request;
@@ -38,7 +39,7 @@ impl ByteSizeOf for ElasticsearchRequest {
     }
 
     fn estimated_json_encoded_size_of(&self) -> usize {
-        byte_size_of::object_like_estimated_json_byte_size([
+        byte_size_of::struct_estimated_json_byte_size(&[
             ("payload", &self.payload),
             ("batch_size", self.batch_size),
             ("events_byte_size", &self.events_byte_size),

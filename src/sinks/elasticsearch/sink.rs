@@ -3,6 +3,7 @@ use std::{fmt, num::NonZeroUsize};
 use async_trait::async_trait;
 use futures::{future, stream::BoxStream, StreamExt};
 use tower::Service;
+use vector_common::byte_size_of;
 use vector_core::{
     stream::{BatcherSettings, DriverResponse},
     ByteSizeOf,
@@ -38,7 +39,7 @@ impl ByteSizeOf for BatchedEvents {
     }
 
     fn estimated_json_encoded_size_of(&self) -> usize {
-        byte_size_of::object_like_estimated_json_byte_size([
+        byte_size_of::struct_estimated_json_byte_size(&[
             ("key", &self.key),
             ("events", &self.events),
         ])

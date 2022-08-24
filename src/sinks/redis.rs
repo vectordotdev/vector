@@ -277,10 +277,7 @@ impl ByteSizeOf for RedisKvEntry {
     }
 
     fn estimated_json_encoded_size_of(&self) -> usize {
-        byte_size_of::object_like_estimated_json_byte_size([
-            ("key", &self.key),
-            ("value", &self.value),
-        ])
+        byte_size_of::struct_estimated_json_byte_size(&[("key", &self.key), ("value", &self.value)])
     }
 }
 

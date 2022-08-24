@@ -31,7 +31,7 @@ impl ByteSizeOf for ProcessedEvent {
     }
 
     fn estimated_json_encoded_size_of(&self) -> usize {
-        byte_size_of::object_like_estimated_json_byte_size([
+        byte_size_of::struct_estimated_json_byte_size(&[
             ("index", &self.key),
             ("bulk_action", self.bulk_action.as_str()),
             ("log", &self.log),
