@@ -6,7 +6,7 @@ data_dir = "/var/lib/vector"
 
 # Ingest
 [sources.prometheus]
-type = "prometheus"
+type = "prometheus_scrape"
 hosts = ["http://127.0.0.1:9090", "http://127.0.0.1:9090"]
 scrape_interval_secs = 2
 

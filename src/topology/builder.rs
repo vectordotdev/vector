@@ -14,6 +14,7 @@ use tokio::{
     time::{timeout, Duration},
 };
 use tracing::Instrument;
+use vector_config::NamedComponent;
 use vector_core::{
     buffers::{
         topology::{
@@ -35,8 +36,8 @@ use super::{
 };
 use crate::{
     config::{
-        ComponentKey, DataType, Input, Output, OutputId, ProxyConfig, SinkContext, SourceContext,
-        TransformContext, TransformOuter,
+        ComponentKey, DataType, Input, Output, OutputId, ProxyConfig, SinkContext, SourceConfig,
+        SourceContext, TransformContext, TransformOuter,
     },
     event::{EventArray, EventContainer},
     internal_events::EventsReceived,
@@ -156,18 +157,22 @@ pub async fn build_pieces(
     {
         debug!(component = %key, "Building new source.");
 
-        let typetag = source.inner.source_type();
+        let typetag = source.inner.get_component_name();
         let source_outputs = source.inner.outputs(config.schema.log_namespace());
 
         let span = error_span!(
             "source",
             component_kind = "source",
             component_id = %key.id(),
-            component_type = %source.inner.source_type(),
+            component_type = %source.inner.get_component_name(),
             // maintained for compatibility
             component_name = %key.id(),
         );
-        let task_name = format!(">> {} ({}, pump) >>", source.inner.source_type(), key.id());
+        let task_name = format!(
+            ">> {} ({}, pump) >>",
+            source.inner.get_component_name(),
+            key.id()
+        );
 
         let mut builder = {
             let _span = span.enter();

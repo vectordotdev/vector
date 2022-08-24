@@ -4,9 +4,7 @@ pub mod v2;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
-use crate::config::{
-    GenerateConfig, Output, Resource, SourceConfig, SourceContext, SourceDescription,
-};
+use crate::config::{GenerateConfig, Output, Resource, SourceConfig, SourceContext};
 
 /// Marker type for the version one of the configuration for the `vector` source.
 #[configurable_component]
@@ -49,7 +47,7 @@ pub struct VectorConfigV2 {
 }
 
 /// Configurable for the `vector` source.
-#[configurable_component(source)]
+#[configurable_component(source("vector"))]
 #[derive(Clone, Debug)]
 #[serde(untagged)]
 pub enum VectorConfig {
@@ -58,10 +56,6 @@ pub enum VectorConfig {
 
     /// Configuration for version two.
     V2(#[configurable(derived)] VectorConfigV2),
-}
-
-inventory::submit! {
-    SourceDescription::new::<VectorConfig>("vector")
 }
 
 impl GenerateConfig for VectorConfig {
@@ -77,7 +71,6 @@ impl GenerateConfig for VectorConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "vector")]
 impl SourceConfig for VectorConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         match self {
@@ -90,13 +83,6 @@ impl SourceConfig for VectorConfig {
         match self {
             VectorConfig::V1(v1) => v1.config.outputs(),
             VectorConfig::V2(v2) => v2.config.outputs(),
-        }
-    }
-
-    fn source_type(&self) -> &'static str {
-        match self {
-            VectorConfig::V1(v1) => v1.config.source_type(),
-            VectorConfig::V2(v2) => v2.config.source_type(),
         }
     }
 

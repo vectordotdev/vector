@@ -83,6 +83,18 @@ impl<L> Controller<L> {
         }
     }
 
+    /// An estimate of current load on service managed by this controller.
+    ///
+    /// 0.0 is no load, while 1.0 is max load.
+    pub(super) fn load(&self) -> f64 {
+        let inner = self.inner.lock().expect("Controller mutex is poisoned");
+        if inner.current_limit > 0 {
+            inner.in_flight as f64 / inner.current_limit as f64
+        } else {
+            1.0
+        }
+    }
+
     pub(super) fn acquire(&self) -> impl Future<Output = OwnedSemaphorePermit> + Send + 'static {
         Arc::clone(&self.semaphore).acquire()
     }

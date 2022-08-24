@@ -6,7 +6,6 @@ use std::{
 
 use futures::{stream, FutureExt, StreamExt, TryFutureExt};
 use hyper::{Body, Request};
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio_stream::wrappers::IntervalStream;
 use vector_config::configurable_component;
@@ -15,9 +14,7 @@ use vector_core::ByteSizeOf;
 
 use super::parser;
 use crate::{
-    config::{
-        self, GenerateConfig, Output, ProxyConfig, SourceConfig, SourceContext, SourceDescription,
-    },
+    config::{self, GenerateConfig, Output, ProxyConfig, SourceConfig, SourceContext},
     http::{Auth, HttpClient},
     internal_events::{
         EndpointBytesReceived, PrometheusEventsReceived, PrometheusHttpError,
@@ -44,7 +41,7 @@ enum ConfigError {
 }
 
 /// Configuration for the `prometheus_scrape` source.
-#[configurable_component(source)]
+#[configurable_component(source("prometheus_scrape"))]
 #[derive(Clone, Debug)]
 pub struct PrometheusScrapeConfig {
     /// Endpoints to scrape metrics from.
@@ -96,14 +93,6 @@ pub(crate) const fn default_scrape_interval_secs() -> u64 {
     15
 }
 
-inventory::submit! {
-    SourceDescription::new::<PrometheusScrapeConfig>("prometheus")
-}
-
-inventory::submit! {
-    SourceDescription::new::<PrometheusScrapeConfig>("prometheus_scrape")
-}
-
 impl GenerateConfig for PrometheusScrapeConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
@@ -121,7 +110,6 @@ impl GenerateConfig for PrometheusScrapeConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "prometheus_scrape")]
 impl SourceConfig for PrometheusScrapeConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let urls = self
@@ -172,66 +160,10 @@ impl SourceConfig for PrometheusScrapeConfig {
         vec![Output::default(config::DataType::Metric)]
     }
 
-    fn source_type(&self) -> &'static str {
-        "prometheus_scrape"
-    }
-
     fn can_acknowledge(&self) -> bool {
         false
     }
 }
-
-// Add a compatibility alias to avoid breaking existing configs
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-struct PrometheusCompatConfig {
-    // Clone of PrometheusScrapeConfig to work around serde bug
-    // https://github.com/serde-rs/serde/issues/1504
-    #[serde(alias = "hosts")]
-    endpoints: Vec<String>,
-    instance_tag: Option<String>,
-    endpoint_tag: Option<String>,
-    #[serde(default = "crate::serde::default_false")]
-    honor_labels: bool,
-    query: Option<HashMap<String, Vec<String>>>,
-    #[serde(default = "default_scrape_interval_secs")]
-    scrape_interval_secs: u64,
-    tls: Option<TlsConfig>,
-    auth: Option<Auth>,
-}
-
-#[async_trait::async_trait]
-#[typetag::serde(name = "prometheus")]
-impl SourceConfig for PrometheusCompatConfig {
-    async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
-        // Workaround for serde bug
-        // https://github.com/serde-rs/serde/issues/1504
-        let config = PrometheusScrapeConfig {
-            endpoints: self.endpoints.clone(),
-            instance_tag: self.instance_tag.clone(),
-            endpoint_tag: self.endpoint_tag.clone(),
-            honor_labels: self.honor_labels,
-            query: self.query.clone(),
-            scrape_interval_secs: self.scrape_interval_secs,
-            tls: self.tls.clone(),
-            auth: self.auth.clone(),
-        };
-        config.build(cx).await
-    }
-
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(config::DataType::Metric)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "prometheus_scrape"
-    }
-
-    fn can_acknowledge(&self) -> bool {
-        false
-    }
-}
-
 // InstanceInfo stores the scraped instance info and the tag to insert into the log event with. It
 // is used to join these two pieces of info to avoid storing the instance if instance_tag is not
 // configured
@@ -452,6 +384,7 @@ mod test {
     use crate::{
         config,
         sinks::prometheus::exporter::PrometheusExporterConfig,
+        sources::Sources,
         test_util::{
             components::{
                 assert_source_compliance, run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS,
@@ -733,7 +666,7 @@ mod test {
         let mut config = config::Config::builder();
         config.add_source(
             "in",
-            PrometheusScrapeConfig {
+            Sources::PrometheusScrape(PrometheusScrapeConfig {
                 endpoints: vec![format!("http://{}", in_addr)],
                 instance_tag: None,
                 endpoint_tag: None,
@@ -742,7 +675,7 @@ mod test {
                 scrape_interval_secs: 1,
                 tls: None,
                 auth: None,
-            },
+            }),
         );
         config.add_sink(
             "out",

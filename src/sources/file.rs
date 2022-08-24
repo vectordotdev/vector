@@ -19,10 +19,7 @@ use vector_core::config::LogNamespace;
 
 use super::util::{EncodingConfig, MultilineConfig};
 use crate::{
-    config::{
-        log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext,
-        SourceDescription,
-    },
+    config::{log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext},
     encoding_transcode::{Decoder, Encoder},
     event::{BatchNotifier, BatchStatus, LogEvent},
     internal_events::{
@@ -67,7 +64,7 @@ enum BuildError {
 }
 
 /// Configuration for the `file` source.
-#[configurable_component(source)]
+#[configurable_component(source("file"))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[serde(deny_unknown_fields, default)]
 pub struct FileConfig {
@@ -317,14 +314,9 @@ impl Default for FileConfig {
     }
 }
 
-inventory::submit! {
-    SourceDescription::new::<FileConfig>("file")
-}
-
 impl_generate_config_from_default!(FileConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "file")]
 impl SourceConfig for FileConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         // add the source name as a subdir, so that multiple sources can
@@ -362,10 +354,6 @@ impl SourceConfig for FileConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "file"
     }
 
     fn can_acknowledge(&self) -> bool {

@@ -2,7 +2,8 @@ use indexmap::{set::IndexSet, IndexMap};
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use super::{
-    schema, ComponentKey, DataType, Output, OutputId, SinkOuter, SourceOuter, TransformOuter,
+    schema, ComponentKey, DataType, Output, OutputId, SinkOuter, SourceConfig, SourceOuter,
+    TransformOuter,
 };
 
 #[derive(Debug, Clone)]

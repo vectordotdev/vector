@@ -8,14 +8,12 @@ use indoc::indoc;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
-const NAME: &str = "file_descriptor";
-
 use crate::{
-    config::{GenerateConfig, Output, Resource, SourceConfig, SourceContext, SourceDescription},
+    config::{GenerateConfig, Output, Resource, SourceConfig, SourceContext},
     serde::default_decoding,
 };
 /// Configuration for the `file_descriptor` source.
-#[configurable_component(source)]
+#[configurable_component(source("file_descriptor"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct FileDescriptorSourceConfig {
@@ -47,22 +45,18 @@ impl FileDescriptorConfig for FileDescriptorSourceConfig {
     fn host_key(&self) -> Option<String> {
         self.host_key.clone()
     }
+
     fn framing(&self) -> Option<FramingConfig> {
         self.framing.clone()
     }
+
     fn decoding(&self) -> DeserializerConfig {
         self.decoding.clone()
     }
-    fn name(&self) -> String {
-        NAME.to_string()
-    }
+
     fn description(&self) -> String {
         format!("file descriptor {}", self.fd)
     }
-}
-
-inventory::submit! {
-    SourceDescription::new::<FileDescriptorSourceConfig>(NAME)
 }
 
 impl GenerateConfig for FileDescriptorSourceConfig {
@@ -75,7 +69,6 @@ impl GenerateConfig for FileDescriptorSourceConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "file_descriptor")]
 impl SourceConfig for FileDescriptorSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
         let pipe = io::BufReader::new(unsafe { File::from_raw_fd(self.fd as i32) });
@@ -84,10 +77,6 @@ impl SourceConfig for FileDescriptorSourceConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(self.decoding.output_type())]
-    }
-
-    fn source_type(&self) -> &'static str {
-        NAME
     }
 
     fn resources(&self) -> Vec<Resource> {
