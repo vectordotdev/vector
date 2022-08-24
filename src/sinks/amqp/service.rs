@@ -1,6 +1,4 @@
-use crate::internal_events::sink::{
-    AMQPAcknowledgementError, AMQPDeliveryError, AMQPNoAcknowledgement,
-};
+use crate::internal_events::sink::{AMQPAcknowledgementError, AMQPDeliveryError};
 use bytes::Bytes;
 use futures::future::BoxFuture;
 use lapin::{options::BasicPublishOptions, BasicProperties};

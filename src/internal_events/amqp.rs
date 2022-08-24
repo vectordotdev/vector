@@ -41,7 +41,7 @@ pub mod source {
 
 #[cfg(feature = "sinks-amqp")]
 pub mod sink {
-    use crate::internal_events::prelude::error_type;
+    use crate::internal_events::prelude::{error_stage, error_type};
     use metrics::counter;
     use vector_core::internal_event::InternalEvent;
 
