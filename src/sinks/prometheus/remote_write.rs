@@ -289,7 +289,7 @@ fn snap_block(data: Bytes) -> Vec<u8> {
 
 #[cfg(test)]
 mod tests {
-    use futures::StreamExt;
+    use futures::{stream, StreamExt};
     use http::HeaderMap;
     use indoc::indoc;
     use prometheus_parser::proto;
@@ -300,6 +300,7 @@ mod tests {
         event::{MetricKind, MetricValue},
         sinks::util::test::build_test_server,
         test_util,
+        test_util::components::{run_and_assert_sink_compliance, SINK_TAGS},
     };
 
     #[test]
@@ -436,7 +437,8 @@ mod tests {
         let cx = SinkContext::new_test();
 
         let (sink, _) = config.build(cx).await.unwrap();
-        sink.run_events(events).await.unwrap();
+
+        run_and_assert_sink_compliance(sink, stream::iter(events), &SINK_TAGS).await;
 
         drop(trigger);
 
