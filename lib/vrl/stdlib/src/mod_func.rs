@@ -18,12 +18,12 @@ impl Function for Mod {
         &[
             Parameter {
                 keyword: "value",
-                kind: kind::ANY,
+                kind: kind::INTEGER | kind::FLOAT,
                 required: true,
             },
             Parameter {
                 keyword: "modulus",
-                kind: kind::ANY,
+                kind: kind::INTEGER | kind::FLOAT,
                 required: true,
             },
         ]

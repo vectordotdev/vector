@@ -1,6 +1,6 @@
 package metadata
 
-remap: functions: encrypt: {
+remap: functions: mod: {
 	category: "Number"
 	description: """
 		Calculates the remainder of `value` divided by `modulus`.
@@ -11,13 +11,13 @@ remap: functions: encrypt: {
 			name:        "value"
 			description: "The value the `modulus` is applied to."
 			required:    true
-			type: ["any"]
+			type: ["number"]
 		},
 		{
 			name:        "modulus"
 			description: "The `modulus` value."
 			required:    true
-			type: ["any"]
+			type: ["number"]
 		}
 	]
 	internal_failure_reasons: [

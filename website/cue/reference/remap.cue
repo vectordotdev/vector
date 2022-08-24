@@ -29,7 +29,7 @@ package metadata
 		skip_test?: bool
 	}
 
-	#Type: "any" | "array" | "boolean" | "float" | "integer" | "object" | "null" | "path" | "string" | "regex" | "timestamp"
+	#Type: "any" | "array" | "boolean" | "float" | "integer" | "object" | "null" | "path" | "string" | "regex" | "timestamp" | "number"
 
 	concepts: _
 	errors:   _

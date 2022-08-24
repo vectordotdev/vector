@@ -173,7 +173,7 @@ mod md5;
 #[cfg(feature = "merge")]
 mod merge;
 #[cfg(feature = "mod")]
-mod r#mod;
+mod mod_func;
 #[cfg(feature = "now")]
 mod now;
 #[cfg(feature = "object")]
@@ -445,6 +445,8 @@ pub use match_array::MatchArray;
 pub use match_datadog_query::MatchDatadogQuery;
 #[cfg(feature = "merge")]
 pub use merge::Merge;
+#[cfg(feature = "mod")]
+pub use mod_func::Mod;
 #[cfg(feature = "now")]
 pub use now::Now;
 #[cfg(feature = "object")]
@@ -509,8 +511,6 @@ pub use parse_xml::ParseXml;
 pub use push::Push;
 #[cfg(feature = "match")]
 pub use r#match::Match;
-#[cfg(feature = "mod")]
-pub use r#mod::Mod;
 #[cfg(feature = "random_bytes")]
 pub use random_bytes::RandomBytes;
 #[cfg(feature = "redact")]
