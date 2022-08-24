@@ -460,6 +460,15 @@ pub enum MetricKind {
     Absolute,
 }
 
+impl MetricKind {
+    fn as_str(&self) -> &'static str {
+        match self {
+            MetricKind::Incremental => "incremental",
+            MetricKind::Absolute => "absolute",
+        }
+    }
+}
+
 #[cfg(feature = "vrl")]
 impl TryFrom<::value::Value> for MetricKind {
     type Error = String;

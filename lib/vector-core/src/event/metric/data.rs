@@ -2,7 +2,7 @@ use std::num::NonZeroU32;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use vector_common::byte_size_of::ByteSizeOf;
+use vector_common::byte_size_of::{self, ByteSizeOf};
 
 use super::{MetricKind, MetricValue};
 
@@ -24,6 +24,35 @@ pub struct MetricTime {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub interval_ms: Option<NonZeroU32>,
+}
+
+impl ByteSizeOf for MetricTime {
+    fn allocated_bytes(&self) -> usize {
+        0
+    }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        const BRACES_SIZE: usize = 2;
+        const COMMA_SIZE: usize = 1;
+
+        let mut size = BRACES_SIZE;
+
+        if let Some(timestamp) = &self.timestamp {
+            const TIMESTAMP_KEY_SIZE: usize = 9;
+            size += TIMESTAMP_KEY_SIZE + timestamp.estimated_json_encoded_size_of();
+
+            if self.interval_ms.is_some() {
+                size += COMMA_SIZE;
+            }
+        }
+
+        if let Some(interval) = self.interval_ms {
+            const INTERVAL_KEY_SIZE: usize = 8;
+            size += INTERVAL_KEY_SIZE + interval.get().estimated_json_encoded_size_of();
+        }
+
+        size
+    }
 }
 
 impl MetricData {
@@ -156,6 +185,25 @@ impl ByteSizeOf for MetricData {
     }
 
     fn estimated_json_encoded_size_of(&self) -> usize {
-        todo!()
+        const BRACES_SIZE: usize = 2;
+        const COMMA_SIZE: usize = 1;
+        const COLON_SIZE: usize = 1;
+        const KIND_KEY_SIZE: usize = 4;
+
+        let mut size = BRACES_SIZE;
+
+        let time_size = self.time.estimated_json_encoded_size_of();
+
+        // It could be an empty object, which gets flattened into nothing.
+        if time_size > 2 {
+            // Flattening, so no need for nested braces.
+            size += time_size - BRACES_SIZE + COMMA_SIZE;
+        }
+
+        size + self.value.estimated_json_encoded_size_of() - BRACES_SIZE
+            + COMMA_SIZE
+            + byte_size_of::string_like_estimated_json_byte_size(KIND_KEY_SIZE)
+            + COLON_SIZE
+            + self.kind.as_str().len()
     }
 }
