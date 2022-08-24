@@ -7,7 +7,6 @@ use crate::{
     conditions::{AnyCondition, Condition},
     config::{
         DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
-        TransformDescription,
     },
     event::Event,
     schema,
@@ -54,16 +53,18 @@ impl SyncTransform for Route {
 }
 
 /// Configuration for the `route` transform.
-#[configurable_component(transform)]
+#[configurable_component(transform("route"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct RouteConfig {
     /// A table of route identifiers to logical conditions representing the filter of the route.
     ///
-    /// Each route can then be referenced as an input by other components with the name `<transform_name>.<route_id>`. If
-    /// an event doesn’t match any route, it will be sent to the `<transform_name>._unmatched` output.
+    /// Each route can then be referenced as an input by other components with the name
+    /// `<transform_name>.<route_id>`. If an event doesn’t match any route, it will be sent to the
+    /// `<transform_name>._unmatched` output.
     ///
-    /// Both `_unmatched`, as well as `_default`, are reserved output names and cannot be used as a route name.
+    /// Both `_unmatched`, as well as `_default`, are reserved output names and cannot be used as a
+    /// route name.
     #[serde(alias = "lanes")]
     route: IndexMap<String, AnyCondition>,
 }
@@ -73,14 +74,6 @@ impl RouteConfig {
     pub(crate) const fn new(route: IndexMap<String, AnyCondition>) -> Self {
         Self { route }
     }
-}
-
-inventory::submit! {
-    TransformDescription::new::<RouteConfig>("swimlanes")
-}
-
-inventory::submit! {
-    TransformDescription::new::<RouteConfig>("route")
 }
 
 impl GenerateConfig for RouteConfig {
@@ -93,7 +86,6 @@ impl GenerateConfig for RouteConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "route")]
 impl TransformConfig for RouteConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         let route = Route::new(self, context)?;
@@ -122,10 +114,6 @@ impl TransformConfig for RouteConfig {
             .collect();
         result.push(Output::default(DataType::all()).with_port(UNMATCHED_ROUTE));
         result
-    }
-
-    fn transform_type(&self) -> &'static str {
-        "route"
     }
 
     fn enable_concurrency(&self) -> bool {

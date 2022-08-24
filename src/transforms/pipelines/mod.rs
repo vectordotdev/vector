@@ -111,26 +111,19 @@ use config::EventTypeConfig;
 use indexmap::IndexMap;
 use vector_config::configurable_component;
 use vector_core::{
-    config::{ComponentKey, DataType, Input, Output},
-    transform::{
-        InnerTopology, InnerTopologyTransform, Transform, TransformConfig, TransformContext,
-    },
+    config::{ComponentKey, DataType, Input, Output}, transform::Transform,
 };
 
 use crate::{
     conditions::AnyCondition,
     conditions::ConditionConfig,
-    config::{GenerateConfig, TransformDescription},
+    config::GenerateConfig,
     schema,
     transforms::route::{RouteConfig, UNMATCHED_ROUTE},
 };
 
-inventory::submit! {
-    TransformDescription::new::<PipelinesConfig>("pipelines")
-}
-
 /// Configuration for the `pipelines` transform.
-#[configurable_component(transform)]
+#[configurable_component(transform("pipelines"))]
 #[derive(Clone, Debug, Default)]
 pub struct PipelinesConfig {
     /// Configuration for the logs-specific side of the pipeline.
@@ -166,7 +159,7 @@ impl PipelinesConfig {
 
 impl PipelinesConfig {
     fn validate_nesting(&self) -> crate::Result<()> {
-        let parents = &[self.transform_type()].into_iter().collect::<HashSet<_>>();
+        let parents = &[self.get_component_name()].into_iter().collect::<HashSet<_>>();
         self.logs.validate_nesting(parents)?;
         self.metrics.validate_nesting(parents)?;
         self.traces.validate_nesting(parents)?;
@@ -175,7 +168,6 @@ impl PipelinesConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "pipelines")]
 impl TransformConfig for PipelinesConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Err("this transform must be expanded".into())
@@ -255,10 +247,6 @@ impl TransformConfig for PipelinesConfig {
 
     fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::all())]
-    }
-
-    fn transform_type(&self) -> &'static str {
-        "pipelines"
     }
 
     fn nestable(&self, parents: &HashSet<&'static str>) -> bool {

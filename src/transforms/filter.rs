@@ -6,7 +6,6 @@ use crate::{
     conditions::{AnyCondition, Condition},
     config::{
         DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
-        TransformDescription,
     },
     event::Event,
     internal_events::FilterEventDiscarded,
@@ -15,7 +14,7 @@ use crate::{
 };
 
 /// Configuration for the `filter` transform.
-#[configurable_component(transform)]
+#[configurable_component(transform("filter"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct FilterConfig {
@@ -29,10 +28,6 @@ impl From<AnyCondition> for FilterConfig {
     }
 }
 
-inventory::submit! {
-    TransformDescription::new::<FilterConfig>("filter")
-}
-
 impl GenerateConfig for FilterConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(
@@ -44,7 +39,6 @@ impl GenerateConfig for FilterConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "filter")]
 impl TransformConfig for FilterConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(Filter::new(
@@ -62,10 +56,6 @@ impl TransformConfig for FilterConfig {
 
     fn enable_concurrency(&self) -> bool {
         true
-    }
-
-    fn transform_type(&self) -> &'static str {
-        "filter"
     }
 }
 
