@@ -51,11 +51,12 @@ const ACK_QUEUE_SIZE: usize = 8;
 
 type Finalizer = UnorderedFinalizer<Vec<String>>;
 
+// prost emits some generated code that includes clones on `Arc`
+// objects, which causes a clippy ding on this block. We don't
+// directly control the generated code, so allow this lint here.
+#[allow(clippy::clone_on_ref_ptr)]
+#[allow(warnings)]
 mod proto {
-    // prost emits some generated code that includes clones on `Arc`
-    // objects, which causes a clippy ding on this block. We don't
-    // directly control the generated code, so allow this lint here.
-    #[allow(warnings, clippy::clone_on_ref_ptr)]
     include!(concat!(env!("OUT_DIR"), "/google.pubsub.v1.rs"));
 
     use vector_core::ByteSizeOf;
