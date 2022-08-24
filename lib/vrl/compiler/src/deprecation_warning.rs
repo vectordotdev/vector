@@ -42,7 +42,7 @@ impl Display for DeprecationWarning {
 
 impl DiagnosticMessage for DeprecationWarning {
     fn code(&self) -> usize {
-        9999
+        801
     }
 
     fn message(&self) -> String {
