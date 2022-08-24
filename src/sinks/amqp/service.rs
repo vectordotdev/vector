@@ -121,7 +121,7 @@ impl Service<AMQPRequest> for AMQPService {
             match f {
                 Ok(result) => match result.await {
                     Ok(lapin::publisher_confirm::Confirmation::Nack(_)) => {
-                        emit!(AMQPNoAcknowledgement::default());
+                        warn!("Received Negative Acknowledgement from AMQP server.");
                         Ok(AMQPResponse { byte_size })
                     }
                     Err(error) => {

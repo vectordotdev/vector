@@ -1,5 +1,6 @@
 #[cfg(feature = "sources-amqp")]
 pub mod source {
+    use crate::internal_events::prelude::{error_stage, error_type};
     use metrics::counter;
     use vector_core::internal_event::InternalEvent;
 
@@ -23,8 +24,17 @@ pub mod source {
 
     impl InternalEvent for AMQPEventError {
         fn emit(self) {
-            error!(message = "Failed to read message.", error = ?self.error, internal_log_rate_secs = 10);
-            counter!("events_failed_total", 1);
+            error!(message = "Failed to read message.",
+                   error = ?self.error,
+                   error_type = error_type::REQUEST_FAILED,
+                   stage = error_stage::RECEIVING,
+                   internal_log_rate_secs = 10
+            );
+            counter!(
+                "component_errors_total", 1,
+                "error_type" => error_type::REQUEST_FAILED,
+                "stage" => error_stage::RECEIVING,
+            );
         }
     }
 }
@@ -42,18 +52,21 @@ pub mod sink {
 
     impl InternalEvent for AMQPDeliveryError<'_> {
         fn emit(self) {
-            error!(message = "Unable to deliver",
+            error!(message = "Unable to deliver.",
                    error = ?self.error,
                    error_type = error_type::REQUEST_FAILED,
+                   stage = error_stage::SENDING,
                    internal_log_rate_secs = 10
             );
             counter!(
                 "component_errors_total", 1,
                 "error_type" => error_type::REQUEST_FAILED,
+                "stage" => error_stage::SENDING,
             );
             counter!(
                 "component_discarded_events_total", 1,
                 "error_type" => error_type::REQUEST_FAILED,
+                "stage" => error_stage::SENDING,
                 "intentional" => "false",
             );
         }
@@ -66,33 +79,27 @@ pub mod sink {
 
     impl InternalEvent for AMQPAcknowledgementError<'_> {
         fn emit(self) {
-            error!(message = "Acknowledgement failed",
+            error!(message = "Acknowledgement failed.",
                    error = ?self.error,
                    error_type = error_type::REQUEST_FAILED,
-                   internal_log_rate_secs = 10);
+                   stage = error_stage::SENDING,
+                   internal_log_rate_secs = 10
+            );
             counter!(
                 "component_errors_total", 1,
                 "error_type" => error_type::REQUEST_FAILED,
+                "stage" => error_stage::SENDING,
             );
             counter!(
                 "component_discarded_events_total", 1,
                 "error_type" => error_type::REQUEST_FAILED,
+                "stage" => error_stage::SENDING,
                 "intentional" => "false",
             );
         }
 
         fn name(&self) -> Option<&'static str> {
             None
-        }
-    }
-
-    #[derive(Debug, Default)]
-    pub struct AMQPNoAcknowledgement;
-
-    impl InternalEvent for AMQPNoAcknowledgement {
-        fn emit(self) {
-            error!(message = "No acknowledgement", internal_log_rate_secs = 10);
-            counter!("events_acknowledgement_failed_total", 1);
         }
     }
 }

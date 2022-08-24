@@ -253,7 +253,7 @@ async fn run_amqp_source(
     let (finalizer, mut ack_stream) =
         UnorderedFinalizer::<FinalizerEntry>::maybe_new(acknowledgements, shutdown.clone());
 
-    debug!("Starting amqp source, listening to queue {}", config.queue);
+    debug!("Starting amqp source, listening to queue {}.", config.queue);
     let mut consumer = channel
         .basic_consume(
             &config.queue,
@@ -365,7 +365,7 @@ async fn run_amqp_source(
                                         Ok(_) => {
                                             let ack_options = lapin::options::BasicAckOptions::default();
                                             if let Err(error) = msg.acker.ack(ack_options).await {
-                                                error!(message = "Unable to ack", error = ?error, internal_log_rate_secs = 10);
+                                                error!(message = "Unable to ack.", error = ?error, internal_log_rate_secs = 10);
                                             }
                                         }
                                     }
@@ -388,19 +388,19 @@ async fn handle_ack(status: BatchStatus, entry: FinalizerEntry) {
         BatchStatus::Delivered => {
             let ack_options = lapin::options::BasicAckOptions::default();
             if let Err(error) = entry.acker.ack(ack_options).await {
-                error!(message = "Unable to ack", error = ?error, internal_log_rate_secs = 10);
+                error!(message = "Unable to ack.", error = ?error, internal_log_rate_secs = 10);
             }
         }
         BatchStatus::Errored => {
             let ack_options = lapin::options::BasicRejectOptions::default();
             if let Err(error) = entry.acker.reject(ack_options).await {
-                error!(message = "Unable to reject", error = ?error, internal_log_rate_secs = 10);
+                error!(message = "Unable to reject.", error = ?error, internal_log_rate_secs = 10);
             }
         }
         BatchStatus::Rejected => {
             let ack_options = lapin::options::BasicRejectOptions::default();
             if let Err(error) = entry.acker.reject(ack_options).await {
-                error!(message = "Unable to reject", error = ?error, internal_log_rate_secs = 10);
+                error!(message = "Unable to reject.", error = ?error, internal_log_rate_secs = 10);
             }
         }
     }
@@ -466,7 +466,7 @@ mod integration_test {
     ) {
         let payload = text.as_bytes();
         let payload_len = payload.len();
-        trace!("Sending message of length {} to {}", payload_len, exchange,);
+        trace!("Sending message of length {} to {}.", payload_len, exchange,);
 
         channel
             .basic_publish(
@@ -487,7 +487,7 @@ mod integration_test {
         let exchange = format!("test-{}-exchange", random_string(10));
         let queue = format!("test-{}-queue", random_string(10));
         let routing_key = "my_key";
-        trace!("Test exchange name: {}", exchange);
+        trace!("Test exchange name: {}.", exchange);
         let consumer = format!("test-consumer-{}", random_string(10));
 
         let mut config = make_config();
