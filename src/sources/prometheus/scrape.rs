@@ -17,7 +17,7 @@ use crate::{
         self,
         util::http_scrape::{
             build_url, default_scrape_interval_secs, http_scrape, GenericHttpScrapeInputs,
-            HttpScraper,
+            HttpScraperBuilder, HttpScraperContext,
         },
     },
     tls::{TlsConfig, TlsSettings},
@@ -124,12 +124,10 @@ impl SourceConfig for PrometheusScrapeConfig {
             .collect::<std::result::Result<Vec<Uri>, sources::BuildError>>()?;
         let tls = TlsSettings::from_options(&self.tls)?;
 
-        let context = PrometheusScrapeContext {
+        let builder = PrometheusScrapeBuilder {
             honor_labels: self.honor_labels,
             instance_tag: self.instance_tag.clone(),
             endpoint_tag: self.endpoint_tag.clone(),
-            instance_info: None,
-            endpoint_info: None,
         };
 
         let inputs = GenericHttpScrapeInputs {
@@ -143,7 +141,7 @@ impl SourceConfig for PrometheusScrapeConfig {
             shutdown: cx.shutdown,
         };
 
-        Ok(http_scrape(inputs, context, cx.out).boxed())
+        Ok(http_scrape(inputs, builder, cx.out).boxed())
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
@@ -231,18 +229,19 @@ struct EndpointInfo {
     honor_label: bool,
 }
 
+/// Captures the configuration options required to build request-specific context.
 #[derive(Clone)]
-struct PrometheusScrapeContext {
+struct PrometheusScrapeBuilder {
     honor_labels: bool,
     instance_tag: Option<String>,
     endpoint_tag: Option<String>,
-    instance_info: Option<InstanceInfo>,
-    endpoint_info: Option<EndpointInfo>,
 }
 
-impl HttpScraper for PrometheusScrapeContext {
-    /// Expands the context with the instance info and endpoint info for the current request
-    fn build(self, url: &Uri) -> PrometheusScrapeContext {
+impl HttpScraperBuilder for PrometheusScrapeBuilder {
+    type Context = PrometheusScrapeContext;
+
+    /// Expands the context with the instance info and endpoint info for the current request.
+    fn build(self, url: &Uri) -> Self::Context {
         let instance_info = self.instance_tag.as_ref().map(|tag| {
             let instance = format!(
                 "{}:{}",
@@ -265,14 +264,19 @@ impl HttpScraper for PrometheusScrapeContext {
             honor_label: self.honor_labels,
         });
         PrometheusScrapeContext {
-            honor_labels: self.honor_labels,
-            instance_tag: self.instance_tag,
-            endpoint_tag: self.endpoint_tag,
             instance_info,
             endpoint_info,
         }
     }
+}
 
+/// Request-specific context required for decoding into events.
+struct PrometheusScrapeContext {
+    instance_info: Option<InstanceInfo>,
+    endpoint_info: Option<EndpointInfo>,
+}
+
+impl HttpScraperContext for PrometheusScrapeContext {
     /// Parses the Prometheus HTTP response into metric events
     fn on_response(&mut self, url: &Uri, _header: &Parts, body: &Bytes) -> Option<Vec<Event>> {
         let body = String::from_utf8_lossy(body);

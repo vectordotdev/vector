@@ -49,11 +49,17 @@ pub(crate) const fn default_scrape_interval_secs() -> u64 {
     15
 }
 
-/// Methods that allow context-specific behavior during the scraping procedure.
-pub(crate) trait HttpScraper {
-    /// Called before the HTTP request is made, allows expanding context.
-    fn build(self, url: &Uri) -> Self;
+/// Builds the context, allowing the source-specific implementation to leverage data from the
+/// config and the current HTTP request.
+pub(crate) trait HttpScraperBuilder {
+    type Context: HttpScraperContext;
 
+    /// Called before the HTTP request is made to build out the context.
+    fn build(self, url: &Uri) -> Self::Context;
+}
+
+/// Methods that allow context-specific behavior during the scraping procedure.
+pub(crate) trait HttpScraperContext {
     /// Called after the HTTP request succeeds and returns the decoded/parsed Event array.
     fn on_response(&mut self, url: &Uri, header: &Parts, body: &Bytes) -> Option<Vec<Event>>;
 
@@ -92,9 +98,12 @@ pub(crate) fn build_url(uri: &Uri, query: &HashMap<String, Vec<String>>) -> Uri 
 ///   - The HTTP request is built per the options in provided generic inputs.
 ///   - The HTTP response is decoded/parsed into events by the specific context.
 ///   - The events are then sent to the output stream.
-pub(crate) async fn http_scrape<H: HttpScraper + std::marker::Send + Clone>(
+pub(crate) async fn http_scrape<
+    B: HttpScraperBuilder<Context = C> + std::marker::Send + Clone,
+    C: HttpScraperContext + std::marker::Send,
+>(
     inputs: GenericHttpScrapeInputs,
-    context: H,
+    context_builder: B,
     mut out: SourceSender,
 ) -> Result<(), ()> {
     let mut stream = IntervalStream::new(tokio::time::interval(Duration::from_secs(
@@ -110,8 +119,8 @@ pub(crate) async fn http_scrape<H: HttpScraper + std::marker::Send + Clone>(
             .expect("Building HTTP client failed");
         let endpoint = url.to_string();
 
-        let mut context = context.clone();
-        context = context.build(&url);
+        let context_builder = context_builder.clone();
+        let mut context = context_builder.build(&url);
 
         let mut builder = Request::get(&url);
 

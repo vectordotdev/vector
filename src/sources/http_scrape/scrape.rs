@@ -17,7 +17,8 @@ use crate::{
     serde::default_framing_message_based,
     sources,
     sources::util::http_scrape::{
-        build_url, default_scrape_interval_secs, http_scrape, GenericHttpScrapeInputs, HttpScraper,
+        build_url, default_scrape_interval_secs, http_scrape, GenericHttpScrapeInputs,
+        HttpScraperBuilder, HttpScraperContext,
     },
     tls::{TlsConfig, TlsSettings},
     Result,
@@ -168,6 +169,7 @@ impl SourceConfig for HttpScrapeConfig {
     }
 }
 
+/// Captures the configuration options required to decode the incoming requests into events.
 #[derive(Clone)]
 struct HttpScrapeContext {
     decoder: Decoder,
@@ -226,11 +228,16 @@ impl HttpScrapeContext {
     }
 }
 
-impl HttpScraper for HttpScrapeContext {
-    fn build(self, _uri: &Uri) -> HttpScrapeContext {
+impl HttpScraperBuilder for HttpScrapeContext {
+    type Context = HttpScrapeContext;
+
+    /// No additional context from request data is needed from this particular scraper.
+    fn build(self, _uri: &Uri) -> Self::Context {
         self
     }
+}
 
+impl HttpScraperContext for HttpScrapeContext {
     /// Decodes the HTTP response body into events per the decoder configured.
     fn on_response(
         &mut self,
