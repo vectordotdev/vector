@@ -33,7 +33,7 @@ remap: functions: mod: {
 			source: #"""
 				remainder = mod(5, 2)
 				"""#
-			return: "1"
+			return: 1
 		},
 	]
 }
