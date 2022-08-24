@@ -303,7 +303,7 @@ fn add_headers(events: &mut [Event], headers_config: &[String], headers: HeaderM
 
 #[cfg(test)]
 mod tests {
-    use lookup::path;
+    use lookup::event_path;
     use std::str::FromStr;
     use std::{collections::BTreeMap, io::Write, net::SocketAddr};
 
@@ -705,7 +705,10 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log.get(path!("dotted.key")).unwrap(), &Value::from("value"));
+            assert_eq!(
+                log.get(event_path!("dotted.key")).unwrap(),
+                &Value::from("value")
+            );
         }
         {
             let event = events.remove(0);
