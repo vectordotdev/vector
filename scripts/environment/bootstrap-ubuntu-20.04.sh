@@ -63,16 +63,6 @@ tar \
     -C "${TEMP}"
 cp "${TEMP}/cue" /usr/bin/cue
 
-# Grease
-# Grease is used for the `make release-github` task.
-TEMP=$(mktemp -d)
-curl \
-    -L https://github.com/vectordotdev/grease/releases/download/v1.0.1/grease-1.0.1-linux-amd64.tar.gz \
-    -o "${TEMP}/grease-1.0.1-linux-amd64.tar.gz"
-tar \
-    -xvf "${TEMP}/grease-1.0.1-linux-amd64.tar.gz" \
-    -C "${TEMP}"
-cp "${TEMP}/grease/bin/grease" /usr/bin/grease
 
 # Locales
 locale-gen en_US.UTF-8
@@ -115,7 +105,16 @@ fi
 # Protoc. No guard because we want to override Ubuntu's old version in
 # case it is already installed by a dependency.
 PROTOC_VERSION=3.19.4 # also update soaks/Dockerfile
-PROTOC_ZIP=protoc-${PROTOC_VERSION}-linux-x86_64.zip
+
+if [ "$TARGETARCH" = "arm64" ]; then \
+    PROTOC_ARCH_ABBREVIATION="aarch_64"
+elif [ "$TARGETARCH" = "amd64" ]; then \  
+    PROTOC_ARCH_ABBREVIATION="x86_64"
+fi ;
+
+PROTOC_ZIP=protoc-${PROTOC_VERSION}-linux-${PROTOC_ARCH_ABBREVIATION}.zip
+
+PROTOC_ARCH=
 curl -fsSL https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOC_VERSION/$PROTOC_ZIP \
      --output "$TEMP/$PROTOC_ZIP"
 unzip "$TEMP/$PROTOC_ZIP" bin/protoc -d "$TEMP"
@@ -143,7 +142,12 @@ if [ -z "${DISABLE_MOLD:-""}" ] ; then
     # first when trying to load the shared object, so we can dodge having to care about the "right" lib folder to put it in.
     TEMP=$(mktemp -d)
     MOLD_VERSION=1.2.1
-    MOLD_TARGET=mold-${MOLD_VERSION}-x86_64-linux
+    if [ "$TARGETARCH" = "arm64" ]; then \
+        MOLD_ARCH="aarch_64"
+    elif [ "$TARGETARCH" = "amd64" ]; then \  
+        MOLD_ARCH="x86_64"
+    fi ;    
+    MOLD_TARGET=mold-${MOLD_VERSION}-${MOLD_ARCH}-linux
     curl -fsSL "https://github.com/rui314/mold/releases/download/v${MOLD_VERSION}/${MOLD_TARGET}.tar.gz" \
         --output "$TEMP/${MOLD_TARGET}.tar.gz"
     tar \
