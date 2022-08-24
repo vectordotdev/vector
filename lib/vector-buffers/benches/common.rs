@@ -41,6 +41,10 @@ impl<const N: usize> ByteSizeOf for Message<N> {
     fn allocated_bytes(&self) -> usize {
         0
     }
+
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        0
+    }
 }
 
 impl<const N: usize> EventCount for Message<N> {
