@@ -1,8 +1,42 @@
 [
   {
+    "type": "block",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "exprs",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "boolean",
     "named": true,
     "fields": {}
+  },
+  {
+    "type": "container",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "block",
+          "named": true
+        },
+        {
+          "type": "group",
+          "named": true
+        }
+      ]
+    }
   },
   {
     "type": "expr",
@@ -12,6 +46,10 @@
       "multiple": false,
       "required": true,
       "types": [
+        {
+          "type": "container",
+          "named": true
+        },
         {
           "type": "literal",
           "named": true
@@ -44,6 +82,21 @@
     "fields": {}
   },
   {
+    "type": "group",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "expr",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "integer",
     "named": true,
     "fields": {}
@@ -73,15 +126,19 @@
           "named": true
         },
         {
-          "type": "raw_regex",
-          "named": true
-        },
-        {
           "type": "raw_string",
           "named": true
         },
         {
+          "type": "regex",
+          "named": true
+        },
+        {
           "type": "string",
+          "named": true
+        },
+        {
+          "type": "timestamp",
           "named": true
         }
       ]
@@ -195,7 +252,7 @@
     "fields": {}
   },
   {
-    "type": "raw_regex",
+    "type": "raw_string",
     "named": true,
     "fields": {},
     "children": {
@@ -210,7 +267,7 @@
     }
   },
   {
-    "type": "raw_string",
+    "type": "regex",
     "named": true,
     "fields": {},
     "children": {
@@ -252,6 +309,21 @@
     "type": "target_query_prefix",
     "named": true,
     "fields": {}
+  },
+  {
+    "type": "timestamp",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "raw",
+          "named": true
+        }
+      ]
+    }
   },
   {
     "type": "%",
@@ -310,11 +382,23 @@
     "named": false
   },
   {
+    "type": "t",
+    "named": false
+  },
+  {
     "type": "true",
     "named": false
   },
   {
+    "type": "{",
+    "named": false
+  },
+  {
     "type": "|",
+    "named": false
+  },
+  {
+    "type": "}",
     "named": false
   }
 ]

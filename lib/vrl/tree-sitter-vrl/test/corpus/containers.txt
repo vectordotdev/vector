@@ -1,0 +1,52 @@
+============================================
+Group
+============================================
+(1)
+---
+
+(program
+  (exprs
+    (expr (container (group (expr (literal (integer))))))
+  )
+)
+
+
+============================================
+Block
+============================================
+{1}
+{1;false}
+
+{
+   1
+   false
+}
+
+{
+   {1;true}
+   false
+}
+---
+
+(program
+  (exprs
+    (expr (container (block (exprs (expr (literal (integer)))))))
+    (expr (container (block (exprs
+      (expr (literal (integer)))
+      (expr (literal (boolean)))
+    ))))
+    (expr (container (block (exprs
+      (expr (literal (integer)))
+      (expr (literal (boolean)))
+    ))))
+    (expr (container (block (exprs
+      (expr (container (block (exprs
+        (expr (literal (integer)))
+        (expr (literal (boolean)))
+      ))))
+      (expr (literal (boolean)))
+    ))))
+  )
+)
+
+
