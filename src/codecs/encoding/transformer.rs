@@ -3,8 +3,8 @@
 use core::fmt::Debug;
 
 use lookup::{
+    event_path,
     lookup_v2::{parse_value_path, OwnedValuePath},
-    path,
 };
 use serde::{Deserialize, Deserializer};
 use value::Value;
@@ -176,7 +176,7 @@ impl Transformer {
                             None
                         };
                         if let Some(ts) = timestamp {
-                            log.insert(path!(), Value::Integer(ts));
+                            log.insert(event_path!(), Value::Integer(ts));
                         }
                     }
                 }

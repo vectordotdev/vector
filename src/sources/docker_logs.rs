@@ -13,6 +13,7 @@ use bytes::{Buf, Bytes};
 use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
 use futures::{Stream, StreamExt};
 use lookup::lookup_v2::{parse_value_path, OwnedSegment};
+use lookup::PathPrefix;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
@@ -974,7 +975,7 @@ impl ContainerLogInfo {
                 for (key, value) in self.metadata.labels.iter() {
                     let mut path = prefix_path.clone().segments;
                     path.push(OwnedSegment::Field(key.clone()));
-                    log_event.insert(&path, value.clone());
+                    log_event.insert((PathPrefix::Event, &path), value.clone());
                 }
             }
 

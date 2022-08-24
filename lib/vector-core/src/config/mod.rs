@@ -231,7 +231,7 @@ impl LogNamespace {
                     .insert(path!(source_name).concat(metadata_key), value);
             }
             LogNamespace::Legacy => {
-                log.try_insert(legacy_key, value);
+                log.try_insert((PathPrefix::Event, legacy_key), value);
             }
         }
     }

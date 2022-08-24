@@ -33,7 +33,7 @@ use crate::{
     tls::TlsConfig,
     transforms::metric_to_log::MetricToLogConfig,
 };
-use lookup::path;
+use lookup::event_path;
 
 /// The field name for the timestamp required by data stream mode
 pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
@@ -263,7 +263,7 @@ impl DataStreamConfig {
         }
 
         if let Some(value) = log.remove(timestamp_key) {
-            log.insert(path!(DATA_STREAM_TIMESTAMP_KEY), value);
+            log.insert(event_path!(DATA_STREAM_TIMESTAMP_KEY), value);
         }
     }
 

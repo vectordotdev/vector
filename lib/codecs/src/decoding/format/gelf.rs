@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use chrono::{DateTime, NaiveDateTime, Utc};
-use lookup::path;
+use lookup::event_path;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use std::collections::HashMap;
@@ -154,7 +154,7 @@ impl GelfDeserializer {
                 // per GELF spec, Additional field values must be either strings or numbers
                 if val.is_string() || val.is_number() {
                     let vector_val: value::Value = val.into();
-                    log.insert(path!(key.as_str()), vector_val);
+                    log.insert(event_path!(key.as_str()), vector_val);
                 } else {
                     let type_ = match val {
                         serde_json::Value::Null => "null",

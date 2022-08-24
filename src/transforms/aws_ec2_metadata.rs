@@ -6,6 +6,7 @@ use futures::{Stream, StreamExt};
 use http::{uri::PathAndQuery, Request, StatusCode, Uri};
 use hyper::{body::to_bytes as body_to_bytes, Body};
 use lookup::lookup_v2::{parse_value_path, OwnedValuePath};
+use lookup::PathPrefix;
 use once_cell::sync::Lazy;
 use serde::Deserialize;
 use snafu::ResultExt as _;
@@ -242,7 +243,7 @@ impl Ec2MetadataTransform {
         match event {
             Event::Log(ref mut log) => {
                 state.iter().for_each(|(k, v)| {
-                    log.insert(&k.log_path, v.clone());
+                    log.insert((PathPrefix::Event, &k.log_path), v.clone());
                 });
             }
             Event::Metric(ref mut metric) => {

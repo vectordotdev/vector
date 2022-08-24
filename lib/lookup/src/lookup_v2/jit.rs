@@ -11,32 +11,6 @@ use std::borrow::Cow;
 use std::str::CharIndices;
 
 use crate::lookup_v2::{BorrowedSegment, ValuePath};
-use crate::PathPrefix;
-
-pub struct JitTargetPath<'a> {
-    prefix: PathPrefix,
-    path: &'a str,
-}
-
-impl JitTargetPath<'_> {
-    pub fn new(path: &str) -> JitTargetPath {
-        let (prefix, path) = match path.chars().next() {
-            Some('.') => {
-                // For backwards compatibility, the "ValuePath" parser still allows an optional
-                // starting ".". To prevent ".." from being a valid path, it is _not_ removed
-                // here. This should be changed once "ValuePath" no longer allows a leading ".".
-                (PathPrefix::Event, path)
-            }
-            Some('@') => (PathPrefix::Metadata, &path[1..]),
-            _ => {
-                // This shouldn't be allowed in the future, but is currently
-                // used for backwards compatibility.
-                (PathPrefix::Event, path)
-            }
-        };
-        JitTargetPath { prefix, path }
-    }
-}
 
 #[derive(Clone)]
 pub struct JitValuePath<'a> {

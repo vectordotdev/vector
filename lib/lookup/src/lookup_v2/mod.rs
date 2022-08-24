@@ -4,7 +4,7 @@ mod concat;
 mod jit;
 mod owned;
 
-use self::jit::{JitTargetPath, JitValuePath, JitValuePathIter};
+use self::jit::{JitValuePath, JitValuePathIter};
 use std::fmt::{Debug, Display, Formatter};
 
 pub use borrowed::BorrowedSegment;
@@ -18,6 +18,24 @@ pub use owned::{OwnedSegment, OwnedValuePath};
 macro_rules! path {
     ($($segment:expr),*) => {{
            &[$($crate::lookup_v2::BorrowedSegment::from($segment),)*]
+    }};
+}
+
+/// Syntactic sugar for creating a pre-parsed path.
+/// This path points at an event (as opposed to metadata).
+#[macro_export]
+macro_rules! event_path {
+    ($($segment:expr),*) => {{
+           ($crate::lookup_v2::PathPrefix::Event, &[$($crate::lookup_v2::BorrowedSegment::from($segment),)*])
+    }};
+}
+
+/// Syntactic sugar for creating a pre-parsed path.
+/// This path points at metadata (as opposed to the event).
+#[macro_export]
+macro_rules! metadata_path {
+    ($($segment:expr),*) => {{
+           ($crate::lookup_v2::PathPrefix::Metadata, &[$($crate::lookup_v2::BorrowedSegment::from($segment),)*])
     }};
 }
 
@@ -113,14 +131,26 @@ impl<'a> ValuePath<'a> for &'a str {
 }
 
 impl<'a> TargetPath<'a> for &'a str {
-    type ValuePath = JitValuePath<'a>;
+    type ValuePath = &'a str;
 
     fn prefix(&self) -> PathPrefix {
-        todo!()
+        get_target_prefix(self).0
     }
 
     fn value_path(&self) -> Self::ValuePath {
-        todo!()
+        get_target_prefix(self).1
+    }
+}
+
+impl<'a, T: ValuePath<'a>> TargetPath<'a> for (PathPrefix, T) {
+    type ValuePath = T;
+
+    fn prefix(&self) -> PathPrefix {
+        self.0
+    }
+
+    fn value_path(&self) -> Self::ValuePath {
+        self.1.clone()
     }
 }
 
@@ -134,7 +164,7 @@ fn get_target_prefix(path: &str) -> (PathPrefix, &str) {
             // here. This should be changed once "ValuePath" no longer allows a leading ".".
             (PathPrefix::Event, path)
         }
-        Some('@') => (PathPrefix::Metadata, &path[1..]),
+        Some('%') => (PathPrefix::Metadata, &path[1..]),
         _ => {
             // This shouldn't be allowed in the future, but is currently
             // used for backwards compatibility.

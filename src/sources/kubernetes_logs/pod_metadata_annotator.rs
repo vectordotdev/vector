@@ -8,6 +8,7 @@ use k8s_openapi::{
 };
 use kube::runtime::reflector::{store::Store, ObjectRef};
 use lookup::lookup_v2::{parse_value_path, OwnedSegment};
+use lookup::PathPrefix;
 use vector_config::configurable_component;
 
 use super::path_helpers::{parse_log_file_path, LogFileInfo};
@@ -169,7 +170,7 @@ fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata
         for (key, val) in labels.iter() {
             let mut path = prefix_path.clone().segments;
             path.push(OwnedSegment::Field(key.clone()));
-            log.insert(&path, val.to_owned());
+            log.insert((PathPrefix::Event, &path), val.to_owned());
         }
     }
 
@@ -178,7 +179,7 @@ fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata
         for (key, val) in annotations.iter() {
             let mut path = prefix_path.clone().segments;
             path.push(OwnedSegment::Field(key.clone()));
-            log.insert(&path, val.to_owned());
+            log.insert((PathPrefix::Event, &path), val.to_owned());
         }
     }
 }

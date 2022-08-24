@@ -19,7 +19,7 @@ use chrono::{SecondsFormat, Utc};
 use codecs::{encoding::Framer, JsonSerializer, NewlineDelimitedEncoder};
 use goauth::scopes::Scope;
 use http::header::{HeaderName, HeaderValue};
-use lookup::path;
+use lookup::event_path;
 use rand::{thread_rng, Rng};
 use snafu::Snafu;
 use tower::ServiceBuilder;
@@ -549,8 +549,8 @@ impl crate::sinks::util::encoding::Encoder<Vec<Event>> for DatadogArchivesEncodi
                     .unwrap_or_else(chrono::Utc::now)
                     .to_rfc3339_opts(SecondsFormat::Millis, true),
             );
-            log_event.rename_key(self.log_schema.message_key(), path!("message"));
-            log_event.rename_key(self.log_schema.host_key(), path!("host"));
+            log_event.rename_key(self.log_schema.message_key(), event_path!("message"));
+            log_event.rename_key(self.log_schema.host_key(), event_path!("host"));
 
             let mut attributes = BTreeMap::new();
 
