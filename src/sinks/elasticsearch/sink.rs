@@ -3,7 +3,6 @@ use std::{fmt, num::NonZeroUsize};
 use async_trait::async_trait;
 use futures::{future, stream::BoxStream, StreamExt};
 use tower::Service;
-use vector_common::byte_size_of;
 use vector_core::{
     stream::{BatcherSettings, DriverResponse},
     ByteSizeOf,
