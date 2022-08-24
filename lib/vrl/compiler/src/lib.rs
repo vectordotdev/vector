@@ -31,6 +31,7 @@
 mod compile_config;
 mod compiler;
 mod context;
+mod deprecation_warning;
 mod program;
 mod test_util;
 
@@ -41,11 +42,14 @@ pub mod type_def;
 pub mod value;
 
 pub use self::compile_config::CompileConfig;
+pub use self::deprecation_warning::DeprecationWarning;
 pub use compiler::{CompilationResult, Compiler};
 pub use core::{
     value, ExpressionError, MetadataTarget, Resolved, SecretTarget, Target, TargetValue,
     TargetValueRef,
 };
+
+use std::fmt::Debug;
 use std::{fmt::Display, str::FromStr};
 
 pub use context::Context;
