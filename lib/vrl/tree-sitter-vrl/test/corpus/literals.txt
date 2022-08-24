@@ -35,3 +35,84 @@ Floats
     (expr (literal (float)))
   )
 )
+
+
+============================================
+Strings
+============================================
+"foo"
+"p9872q4ht"
+"foo\r\n\'\"\t\{\}"
+---
+
+(program
+  (exprs
+    (expr (literal (string)))
+    (expr (literal (string)))
+    (expr (literal (string)))
+  )
+)
+
+============================================
+Raw Strings
+============================================
+s'foo'
+
+s'
+test with newlines
+'
+
+s''
+s'\\'
+s'\''
+---
+
+(program
+  (exprs
+    (expr (literal (raw_string (raw))))
+    (expr (literal (raw_string (raw))))
+    (expr (literal (raw_string (raw))))
+    (expr (literal (raw_string (raw))))
+    (expr (literal (raw_string (raw))))
+  )
+)
+
+============================================
+Raw Regex
+============================================
+r'.*'
+r'[^{}]'
+---
+
+(program
+  (exprs
+    (expr (literal (raw_regex (raw))))
+    (expr (literal (raw_regex (raw))))
+  )
+)
+
+============================================
+Boolean
+============================================
+true
+false
+---
+
+(program
+  (exprs
+    (expr (literal (boolean)))
+    (expr (literal (boolean)))
+  )
+)
+
+============================================
+Null
+============================================
+null
+---
+
+(program
+  (exprs
+    (expr (literal (null)))
+  )
+)

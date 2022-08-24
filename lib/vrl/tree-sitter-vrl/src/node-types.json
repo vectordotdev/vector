@@ -1,5 +1,10 @@
 [
   {
+    "type": "boolean",
+    "named": true,
+    "fields": {}
+  },
+  {
     "type": "expr",
     "named": true,
     "fields": {},
@@ -52,11 +57,31 @@
       "required": true,
       "types": [
         {
+          "type": "boolean",
+          "named": true
+        },
+        {
           "type": "float",
           "named": true
         },
         {
           "type": "integer",
+          "named": true
+        },
+        {
+          "type": "null",
+          "named": true
+        },
+        {
+          "type": "raw_regex",
+          "named": true
+        },
+        {
+          "type": "raw_string",
+          "named": true
+        },
+        {
+          "type": "string",
           "named": true
         }
       ]
@@ -106,6 +131,10 @@
       "types": [
         {
           "type": "local_query",
+          "named": true
+        },
+        {
+          "type": "target_query",
           "named": true
         }
       ]
@@ -161,6 +190,78 @@
     }
   },
   {
+    "type": "raw",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "raw_regex",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "raw",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "raw_string",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "raw",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "string",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "target_query",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "query_segments",
+          "named": true
+        },
+        {
+          "type": "target_query_prefix",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "target_query_prefix",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "%",
+    "named": false
+  },
+  {
+    "type": "'",
+    "named": false
+  },
+  {
     "type": "(",
     "named": false
   },
@@ -181,12 +282,36 @@
     "named": false
   },
   {
+    "type": "\\",
+    "named": false
+  },
+  {
+    "type": "false",
+    "named": false
+  },
+  {
     "type": "local_variable",
+    "named": true
+  },
+  {
+    "type": "null",
     "named": true
   },
   {
     "type": "quoted_field",
     "named": true
+  },
+  {
+    "type": "r",
+    "named": false
+  },
+  {
+    "type": "s",
+    "named": false
+  },
+  {
+    "type": "true",
+    "named": false
   },
   {
     "type": "|",

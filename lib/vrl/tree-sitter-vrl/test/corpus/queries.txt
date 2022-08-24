@@ -26,6 +26,7 @@ Local Queries
    foo.(x|y)
    foo.( x | y )
    foo."content-type"
+   foo.("@($&" | "bar")
 ---
 
 (program
@@ -36,5 +37,43 @@ Local Queries
     (expr (query (local_query (local_variable) (query_segments (query_coalesce (query_field) (query_field))))))
     (expr (query (local_query (local_variable) (query_segments (query_coalesce (query_field) (query_field))))))
     (expr (query (local_query (local_variable) (query_segments (query_field (quoted_field))))))
+    (expr (query (local_query (local_variable) (query_segments (query_coalesce (query_field (quoted_field)) (query_field (quoted_field)))))))
+  )
+)
+
+
+============================================
+Event Queries
+============================================
+   .
+   .foo
+   .foo.bar
+   .@foo.b@r
+---
+
+(program
+  (exprs
+    (expr (query (target_query (target_query_prefix))))
+    (expr (query (target_query (target_query_prefix) (query_segments (query_field)))))
+    (expr (query (target_query (target_query_prefix) (query_segments (query_field) (query_field)))))
+    (expr (query (target_query (target_query_prefix) (query_segments (query_field) (query_field)))))
+  )
+)
+
+============================================
+Target Queries
+============================================
+   %
+   %foo
+   %foo.bar
+   %@foo.b@r
+---
+
+(program
+  (exprs
+    (expr (query (target_query (target_query_prefix))))
+    (expr (query (target_query (target_query_prefix) (query_segments (query_field)))))
+    (expr (query (target_query (target_query_prefix) (query_segments (query_field) (query_field)))))
+    (expr (query (target_query (target_query_prefix) (query_segments (query_field) (query_field)))))
   )
 )
