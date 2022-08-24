@@ -22,7 +22,6 @@ chrono = { version = "0.4", optional = true }
 cidr-utils = { version = "0.5", optional = true }
 csv = { version = "1.1", optional = true }
 dns-lookup = { version = "1.0.8", optional = true }
-grok = { version = "2", optional = true }
 hex = { version = "0.4", optional = true }
 hostname = { version = "0.3", optional = true }
 indexmap = { version = "~1.9.1", default-features = false, optional = true}
@@ -289,8 +288,8 @@ parse_common_log = ["dep:chrono", "dep:once_cell", "dep:regex", "vector-common/c
 parse_csv = ["dep:csv"]
 parse_duration = ["dep:rust_decimal", "dep:once_cell", "dep:regex"]
 parse_glog = ["dep:chrono", "dep:once_cell", "dep:regex"]
-parse_grok = ["dep:grok"]
-parse_groks = ["dep:grok", "dep:datadog-grok"]
+parse_grok = ["parse_groks"]
+parse_groks = ["dep:datadog-grok"]
 parse_int = []
 parse_json = ["dep:serde_json", "value/json"]
 parse_key_value = ["dep:nom"]

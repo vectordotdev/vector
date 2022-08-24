@@ -2952,16 +2952,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "grok"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "273797968160270573071022613fc4aa28b91fe68f3eef6c96a1b2a1947ddfbd"
-dependencies = [
- "glob",
- "onig",
-]
-
-[[package]]
 name = "h2"
 version = "0.3.13"
 source = "git+https://github.com/hyperium/h2.git?rev=f6aa3be6719270cd7b4094ee1940751b5f4ec88e#f6aa3be6719270cd7b4094ee1940751b5f4ec88e"
@@ -8411,7 +8401,6 @@ dependencies = [
  "glob",
  "goauth",
  "governor",
- "grok",
  "h2",
  "hash_hasher",
  "headers",
@@ -8882,7 +8871,6 @@ dependencies = [
  "datadog-grok",
  "datadog-search-syntax",
  "dns-lookup",
- "grok",
  "hex",
  "hostname",
  "indexmap",
