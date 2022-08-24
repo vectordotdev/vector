@@ -38,7 +38,11 @@ impl ByteSizeOf for ElasticsearchRequest {
     }
 
     fn estimated_json_encoded_size_of(&self) -> usize {
-        todo!()
+        byte_size_of::object_like_estimated_json_byte_size([
+            ("payload", &self.payload),
+            ("batch_size", self.batch_size),
+            ("events_byte_size", &self.events_byte_size),
+        ])
     }
 }
 

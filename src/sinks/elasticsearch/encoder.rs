@@ -1,5 +1,6 @@
 use std::{io, io::Write};
 
+use vector_common::byte_size_of;
 use vector_core::{event::Event, ByteSizeOf};
 
 use crate::{
@@ -30,7 +31,12 @@ impl ByteSizeOf for ProcessedEvent {
     }
 
     fn estimated_json_encoded_size_of(&self) -> usize {
-        todo!()
+        byte_size_of::object_like_estimated_json_byte_size([
+            ("index", &self.key),
+            ("bulk_action", self.bulk_action.as_str()),
+            ("log", &self.log),
+            ("id", &self.id),
+        ])
     }
 }
 

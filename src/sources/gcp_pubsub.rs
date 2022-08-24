@@ -51,12 +51,11 @@ const ACK_QUEUE_SIZE: usize = 8;
 
 type Finalizer = UnorderedFinalizer<Vec<String>>;
 
-// prost emits some generated code that includes clones on `Arc`
-// objects, which causes a clippy ding on this block. We don't
-// directly control the generated code, so allow this lint here.
-#[allow(clippy::clone_on_ref_ptr)]
-#[allow(warnings)]
 mod proto {
+    // prost emits some generated code that includes clones on `Arc`
+    // objects, which causes a clippy ding on this block. We don't
+    // directly control the generated code, so allow this lint here.
+    #[allow(warnings, clippy::clone_on_ref_ptr)]
     include!(concat!(env!("OUT_DIR"), "/google.pubsub.v1.rs"));
 
     use vector_core::ByteSizeOf;
@@ -67,7 +66,7 @@ mod proto {
         }
 
         fn estimated_json_encoded_size_of(&self) -> usize {
-            todo!()
+            self.received_messages.estimated_json_encoded_size_of()
         }
     }
 
@@ -77,7 +76,11 @@ mod proto {
         }
 
         fn estimated_json_encoded_size_of(&self) -> usize {
-            todo!()
+            self.ack_id.estimated_json_encoded_size_of()
+                + self
+                    .message
+                    .as_ref()
+                    .map_or(0, ByteSizeOf::estimated_json_encoded_size_of)
         }
     }
 
@@ -90,7 +93,10 @@ mod proto {
         }
 
         fn estimated_json_encoded_size_of(&self) -> usize {
-            todo!()
+            self.data.estimated_json_encoded_size_of()
+                + self.message_id.estimated_json_encoded_size_of()
+                + self.ordering_key.estimated_json_encoded_size_of()
+                + self.attributes.estimated_json_encoded_size_of()
         }
     }
 }

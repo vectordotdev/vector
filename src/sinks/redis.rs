@@ -6,7 +6,7 @@ use redis::{aio::ConnectionManager, RedisError, RedisResult};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
 use tower::{Service, ServiceBuilder};
-use vector_common::internal_event::BytesSent;
+use vector_common::{byte_size_of, internal_event::BytesSent};
 use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
@@ -277,7 +277,10 @@ impl ByteSizeOf for RedisKvEntry {
     }
 
     fn estimated_json_encoded_size_of(&self) -> usize {
-        todo!()
+        byte_size_of::object_like_estimated_json_byte_size([
+            ("key", &self.key),
+            ("value", &self.value),
+        ])
     }
 }
 

@@ -27,7 +27,7 @@ impl ByteSizeOf for HecRequest {
     }
 
     fn estimated_json_encoded_size_of(&self) -> usize {
-        todo!()
+        0 // Does not implement `serde::Serialize`.
     }
 }
 

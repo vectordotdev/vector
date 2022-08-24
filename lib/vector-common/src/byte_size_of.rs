@@ -413,3 +413,20 @@ where
 
     size
 }
+
+pub fn struct_estimated_json_byte_size(fields: &[(&'static str, usize)]) -> usize {
+    const BRACES_SIZE: usize = 2;
+    const COLON_SIZE: usize = 1;
+    const COMMA_SIZE: usize = 1;
+
+    let mut size = fields.iter().fold(BRACES_SIZE, |acc, (k, v)| {
+        acc + string_like_estimated_json_byte_size(k.len()) + COLON_SIZE + v + COMMA_SIZE
+    });
+
+    // no trailing comma
+    if size > BRACES_SIZE {
+        size -= COMMA_SIZE;
+    }
+
+    size
+}

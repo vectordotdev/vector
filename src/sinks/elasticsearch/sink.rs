@@ -38,7 +38,10 @@ impl ByteSizeOf for BatchedEvents {
     }
 
     fn estimated_json_encoded_size_of(&self) -> usize {
-        todo!()
+        byte_size_of::object_like_estimated_json_byte_size([
+            ("key", &self.key),
+            ("events", &self.events),
+        ])
     }
 }
 
