@@ -3,8 +3,8 @@ use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
 use quote::{quote, quote_spanned};
 use syn::{
-    parse_macro_input, parse_quote, parse_quote_spanned, punctuated::Punctuated, token::Comma,
-    AttributeArgs, DeriveInput, Lit, LitStr, Meta, NestedMeta, Path, spanned::Spanned, MetaList,
+    parse_macro_input, parse_quote, parse_quote_spanned, punctuated::Punctuated, spanned::Spanned,
+    token::Comma, AttributeArgs, DeriveInput, Lit, LitStr, Meta, MetaList, NestedMeta, Path,
 };
 
 use crate::attrs;
@@ -120,8 +120,10 @@ impl TypedComponent {
         ComponentType::try_from(&ml.path)
             .ok()
             .map(|component_type| match ml.nested.first() {
-                Some(NestedMeta::Lit(Lit::Str(component_name))) => (component_type, Some(component_name.clone())),
-                _ => (component_type, None)
+                Some(NestedMeta::Lit(Lit::Str(component_name))) => {
+                    (component_type, Some(component_name.clone()))
+                }
+                _ => (component_type, None),
             })
             .map(|(component_type, component_name)| Self {
                 span: ml.span(),
@@ -228,7 +230,9 @@ impl FromMeta for Options {
                 }
 
                 // Marked as a typed component that requires a name.
-                NestedMeta::Meta(Meta::List(ml)) if ComponentType::is_valid_named_type(&ml.path) => {
+                NestedMeta::Meta(Meta::List(ml))
+                    if ComponentType::is_valid_named_type(&ml.path) =>
+                {
                     if typed_component.is_some() {
                         errors.push(
                             Error::custom("already marked as a typed component").with_span(ml),
@@ -236,7 +240,7 @@ impl FromMeta for Options {
                     } else {
                         let result = TypedComponent::from_meta_list(ml);
                         if result.is_none() {
-                            return Err(Error::custom("meta list matched named component type, but failed to parse into TypedComponent").with_span(&ml))
+                            return Err(Error::custom("meta list matched named component type, but failed to parse into TypedComponent").with_span(&ml));
                         }
 
                         typed_component = result;
@@ -261,7 +265,7 @@ impl FromMeta for Options {
                     } else {
                         let result = TypedComponent::from_path(p);
                         if result.is_none() {
-                            return Err(Error::custom("path matched component type, but failed to parse into TypedComponent").with_span(p))
+                            return Err(Error::custom("path matched component type, but failed to parse into TypedComponent").with_span(p));
                         }
 
                         typed_component = result;

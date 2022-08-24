@@ -1,13 +1,10 @@
 use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
 use vector_config::configurable_component;
 use vector_core::transform::SyncTransform;
 
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{
-        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
-    },
+    config::{DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext},
     event::Event,
     schema,
     transforms::Transform,
@@ -118,30 +115,6 @@ impl TransformConfig for RouteConfig {
 
     fn enable_concurrency(&self) -> bool {
         true
-    }
-}
-
-// Add a compatibility alias to avoid breaking existing configs
-#[derive(Deserialize, Serialize, Debug, Clone)]
-struct RouteCompatConfig(RouteConfig);
-
-#[async_trait::async_trait]
-#[typetag::serde(name = "swimlanes")]
-impl TransformConfig for RouteCompatConfig {
-    async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        self.0.build(context).await
-    }
-
-    fn input(&self) -> Input {
-        self.0.input()
-    }
-
-    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
-        self.0.outputs(merged_definition)
-    }
-
-    fn transform_type(&self) -> &'static str {
-        self.0.transform_type()
     }
 }
 

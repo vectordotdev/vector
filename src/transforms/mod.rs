@@ -35,7 +35,7 @@ pub mod tag_cardinality_limit;
 #[cfg(feature = "transforms-throttle")]
 pub mod throttle;
 
-use vector_config::configurable_component;
+use vector_config::{configurable_component, NamedComponent};
 pub use vector_core::transform::{
     FunctionTransform, OutputBuffer, SyncTransform, TaskTransform, Transform, TransformOutputs,
     TransformOutputsBuf,
@@ -43,8 +43,9 @@ pub use vector_core::transform::{
 use vector_core::{
     config::{Input, Output},
     schema,
-    transform::{TransformConfig, TransformContext},
 };
+
+use crate::config::{TransformConfig, TransformContext};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -106,17 +107,23 @@ pub enum Transforms {
 
     /// Route.
     #[cfg(feature = "transforms-route")]
-    #[serde(alias = "swimlanes")]
     Route(#[configurable(derived)] route::RouteConfig),
 
     /// Sample.
     #[cfg(feature = "transforms-sample")]
-    #[serde(alias = "sampler")]
     Sample(#[configurable(derived)] sample::SampleConfig),
 
     /// Tag cardinality limit.
     #[cfg(feature = "transforms-tag_cardinality_limit")]
     TagCardinalityLimit(#[configurable(derived)] tag_cardinality_limit::TagCardinalityLimitConfig),
+
+    /// Test (basic).
+    #[cfg(test)]
+    TestBasic(#[configurable(derived)] crate::test_util::mock::transforms::BasicTransformConfig),
+
+    /// Test (noop).
+    #[cfg(test)]
+    TestNoop(#[configurable(derived)] crate::test_util::mock::transforms::NoopTransformConfig),
 
     /// Throttle.
     #[cfg(feature = "transforms-throttle")]
@@ -129,74 +136,78 @@ impl TransformConfig for Transforms {
     async fn build(&self, globals: &TransformContext) -> crate::Result<Transform> {
         match self {
             #[cfg(feature = "transforms-aggregate")]
-            Transforms::Aggregate(inner) => inner.build(globals).await,
+            Transforms::Aggregate(config) => config.build(globals).await,
             #[cfg(feature = "transforms-aws_ec2_metadata")]
-            Transforms::AwsEc2Metadata(inner) => inner.build(globals).await,
+            Transforms::AwsEc2Metadata(config) => config.build(globals).await,
             #[cfg(feature = "transforms-dedupe")]
-            Transforms::Dedupe(inner) => inner.build(globals).await,
+            Transforms::Dedupe(config) => config.build(globals).await,
             #[cfg(feature = "transforms-filter")]
-            Transforms::Filter(inner) => inner.build(globals).await,
+            Transforms::Filter(config) => config.build(globals).await,
             #[cfg(feature = "transforms-geoip")]
-            Transforms::Geoip(inner) => inner.build(globals).await,
+            Transforms::Geoip(config) => config.build(globals).await,
             #[cfg(feature = "transforms-log_to_metric")]
-            Transforms::LogToMetric(inner) => inner.build(globals).await,
+            Transforms::LogToMetric(config) => config.build(globals).await,
             #[cfg(feature = "transforms-lua")]
-            Transforms::Lua(inner) => inner.build(globals).await,
+            Transforms::Lua(config) => config.build(globals).await,
             #[cfg(feature = "transforms-metric_to_log")]
-            Transforms::MetricToLog(inner) => inner.build(globals).await,
+            Transforms::MetricToLog(config) => config.build(globals).await,
             #[cfg(feature = "transforms-pipelines")]
-            Transforms::Pipelines(inner) => inner.build(globals).await,
+            Transforms::Pipelines(config) => config.build(globals).await,
             #[cfg(feature = "transforms-reduce")]
-            Transforms::Reduce(inner) => inner.build(globals).await,
+            Transforms::Reduce(config) => config.build(globals).await,
             #[cfg(feature = "transforms-remap")]
-            Transforms::Remap(inner) => inner.build(globals).await,
+            Transforms::Remap(config) => config.build(globals).await,
             #[cfg(feature = "transforms-route")]
-            Transforms::Route(inner) => inner.build(globals).await,
+            Transforms::Route(config) => config.build(globals).await,
             #[cfg(feature = "transforms-sample")]
-            Transforms::Sample(inner) => inner.build(globals).await,
+            Transforms::Sample(config) => config.build(globals).await,
             #[cfg(feature = "transforms-tag_cardinality_limit")]
-            Transforms::TagCardinalityLimit(inner) => inner.build(globals).await,
+            Transforms::TagCardinalityLimit(config) => config.build(globals).await,
+            #[cfg(test)]
+            Transforms::TestBasic(config) => config.build(globals).await,
+            #[cfg(test)]
+            Transforms::TestNoop(config) => config.build(globals).await,
             #[cfg(feature = "transforms-throttle")]
-            Transforms::Throttle(inner) => inner.build(globals).await,
-            #[allow(unreachable_patterns)]
-            _ => unimplemented!(),
+            Transforms::Throttle(config) => config.build(globals).await,
         }
     }
 
     fn input(&self) -> Input {
         match self {
             #[cfg(feature = "transforms-aggregate")]
-            Transforms::Aggregate(inner) => inner.input(),
+            Transforms::Aggregate(config) => config.input(),
             #[cfg(feature = "transforms-aws_ec2_metadata")]
-            Transforms::AwsEc2Metadata(inner) => inner.input(),
+            Transforms::AwsEc2Metadata(config) => config.input(),
             #[cfg(feature = "transforms-dedupe")]
-            Transforms::Dedupe(inner) => inner.input(),
+            Transforms::Dedupe(config) => config.input(),
             #[cfg(feature = "transforms-filter")]
-            Transforms::Filter(inner) => inner.input(),
+            Transforms::Filter(config) => config.input(),
             #[cfg(feature = "transforms-geoip")]
-            Transforms::Geoip(inner) => inner.input(),
+            Transforms::Geoip(config) => config.input(),
             #[cfg(feature = "transforms-log_to_metric")]
-            Transforms::LogToMetric(inner) => inner.input(),
+            Transforms::LogToMetric(config) => config.input(),
             #[cfg(feature = "transforms-lua")]
-            Transforms::Lua(inner) => inner.input(),
+            Transforms::Lua(config) => config.input(),
             #[cfg(feature = "transforms-metric_to_log")]
-            Transforms::MetricToLog(inner) => inner.input(),
+            Transforms::MetricToLog(config) => config.input(),
             #[cfg(feature = "transforms-pipelines")]
-            Transforms::Pipelines(inner) => inner.input(),
+            Transforms::Pipelines(config) => config.input(),
             #[cfg(feature = "transforms-reduce")]
-            Transforms::Reduce(inner) => inner.input(),
+            Transforms::Reduce(config) => config.input(),
             #[cfg(feature = "transforms-remap")]
-            Transforms::Remap(inner) => inner.input(),
+            Transforms::Remap(config) => config.input(),
             #[cfg(feature = "transforms-route")]
-            Transforms::Route(inner) => inner.input(),
+            Transforms::Route(config) => config.input(),
             #[cfg(feature = "transforms-sample")]
-            Transforms::Sample(inner) => inner.input(),
+            Transforms::Sample(config) => config.input(),
             #[cfg(feature = "transforms-tag_cardinality_limit")]
-            Transforms::TagCardinalityLimit(inner) => inner.input(),
+            Transforms::TagCardinalityLimit(config) => config.input(),
+            #[cfg(test)]
+            Transforms::TestBasic(config) => config.input(),
+            #[cfg(test)]
+            Transforms::TestNoop(config) => config.input(),
             #[cfg(feature = "transforms-throttle")]
-            Transforms::Throttle(inner) => inner.input(),
-            #[allow(unreachable_patterns)]
-            _ => unimplemented!(),
+            Transforms::Throttle(config) => config.input(),
         }
     }
 
@@ -204,148 +215,39 @@ impl TransformConfig for Transforms {
     fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
         match self {
             #[cfg(feature = "transforms-aggregate")]
-            Transforms::Aggregate(inner) => inner.outputs(merged_definition),
+            Transforms::Aggregate(config) => config.outputs(merged_definition),
             #[cfg(feature = "transforms-aws_ec2_metadata")]
-            Transforms::AwsEc2Metadata(inner) => inner.outputs(merged_definition),
+            Transforms::AwsEc2Metadata(config) => config.outputs(merged_definition),
             #[cfg(feature = "transforms-dedupe")]
-            Transforms::Dedupe(inner) => inner.outputs(merged_definition),
+            Transforms::Dedupe(config) => config.outputs(merged_definition),
             #[cfg(feature = "transforms-filter")]
-            Transforms::Filter(inner) => inner.outputs(merged_definition),
+            Transforms::Filter(config) => config.outputs(merged_definition),
             #[cfg(feature = "transforms-geoip")]
-            Transforms::Geoip(inner) => inner.outputs(merged_definition),
+            Transforms::Geoip(config) => config.outputs(merged_definition),
             #[cfg(feature = "transforms-log_to_metric")]
-            Transforms::LogToMetric(inner) => inner.outputs(merged_definition),
+            Transforms::LogToMetric(config) => config.outputs(merged_definition),
             #[cfg(feature = "transforms-lua")]
-            Transforms::Lua(inner) => inner.outputs(merged_definition),
+            Transforms::Lua(config) => config.outputs(merged_definition),
             #[cfg(feature = "transforms-metric_to_log")]
-            Transforms::MetricToLog(inner) => inner.outputs(merged_definition),
+            Transforms::MetricToLog(config) => config.outputs(merged_definition),
             #[cfg(feature = "transforms-pipelines")]
-            Transforms::Pipelines(inner) => inner.outputs(merged_definition),
+            Transforms::Pipelines(config) => config.outputs(merged_definition),
             #[cfg(feature = "transforms-reduce")]
-            Transforms::Reduce(inner) => inner.outputs(merged_definition),
+            Transforms::Reduce(config) => config.outputs(merged_definition),
             #[cfg(feature = "transforms-remap")]
-            Transforms::Remap(inner) => inner.outputs(merged_definition),
+            Transforms::Remap(config) => config.outputs(merged_definition),
             #[cfg(feature = "transforms-route")]
-            Transforms::Route(inner) => inner.outputs(merged_definition),
+            Transforms::Route(config) => config.outputs(merged_definition),
             #[cfg(feature = "transforms-sample")]
-            Transforms::Sample(inner) => inner.outputs(merged_definition),
+            Transforms::Sample(config) => config.outputs(merged_definition),
             #[cfg(feature = "transforms-tag_cardinality_limit")]
-            Transforms::TagCardinalityLimit(inner) => inner.outputs(merged_definition),
+            Transforms::TagCardinalityLimit(config) => config.outputs(merged_definition),
+            #[cfg(test)]
+            Transforms::TestBasic(config) => config.outputs(merged_definition),
+            #[cfg(test)]
+            Transforms::TestNoop(config) => config.outputs(merged_definition),
             #[cfg(feature = "transforms-throttle")]
-            Transforms::Throttle(inner) => inner.outputs(merged_definition),
-            #[allow(unreachable_patterns)]
-            _ => unimplemented!(),
-        }
-    }
-
-    fn transform_type(&self) -> &'static str {
-        match self {
-            #[cfg(feature = "transforms-aggregate")]
-            Transforms::Aggregate(inner) => inner.transform_type(),
-            #[cfg(feature = "transforms-aws_ec2_metadata")]
-            Transforms::AwsEc2Metadata(inner) => inner.transform_type(),
-            #[cfg(feature = "transforms-dedupe")]
-            Transforms::Dedupe(inner) => inner.transform_type(),
-            #[cfg(feature = "transforms-filter")]
-            Transforms::Filter(inner) => inner.transform_type(),
-            #[cfg(feature = "transforms-geoip")]
-            Transforms::Geoip(inner) => inner.transform_type(),
-            #[cfg(feature = "transforms-log_to_metric")]
-            Transforms::LogToMetric(inner) => inner.transform_type(),
-            #[cfg(feature = "transforms-lua")]
-            Transforms::Lua(inner) => inner.transform_type(),
-            #[cfg(feature = "transforms-metric_to_log")]
-            Transforms::MetricToLog(inner) => inner.transform_type(),
-            #[cfg(feature = "transforms-pipelines")]
-            Transforms::Pipelines(inner) => inner.transform_type(),
-            #[cfg(feature = "transforms-reduce")]
-            Transforms::Reduce(inner) => inner.transform_type(),
-            #[cfg(feature = "transforms-remap")]
-            Transforms::Remap(inner) => inner.transform_type(),
-            #[cfg(feature = "transforms-route")]
-            Transforms::Route(inner) => inner.transform_type(),
-            #[cfg(feature = "transforms-sample")]
-            Transforms::Sample(inner) => inner.transform_type(),
-            #[cfg(feature = "transforms-tag_cardinality_limit")]
-            Transforms::TagCardinalityLimit(inner) => inner.transform_type(),
-            #[cfg(feature = "transforms-throttle")]
-            Transforms::Throttle(inner) => inner.transform_type(),
-            #[allow(unreachable_patterns)]
-            _ => unimplemented!(),
-        }
-    }
-
-    fn typetag_name(&self) -> &'static str {
-        match self {
-            #[cfg(feature = "transforms-aggregate")]
-            Transforms::Aggregate(inner) => inner.typetag_name(),
-            #[cfg(feature = "transforms-aws_ec2_metadata")]
-            Transforms::AwsEc2Metadata(inner) => inner.typetag_name(),
-            #[cfg(feature = "transforms-dedupe")]
-            Transforms::Dedupe(inner) => inner.typetag_name(),
-            #[cfg(feature = "transforms-filter")]
-            Transforms::Filter(inner) => inner.typetag_name(),
-            #[cfg(feature = "transforms-geoip")]
-            Transforms::Geoip(inner) => inner.typetag_name(),
-            #[cfg(feature = "transforms-log_to_metric")]
-            Transforms::LogToMetric(inner) => inner.typetag_name(),
-            #[cfg(feature = "transforms-lua")]
-            Transforms::Lua(inner) => inner.typetag_name(),
-            #[cfg(feature = "transforms-metric_to_log")]
-            Transforms::MetricToLog(inner) => inner.typetag_name(),
-            #[cfg(feature = "transforms-pipelines")]
-            Transforms::Pipelines(inner) => inner.typetag_name(),
-            #[cfg(feature = "transforms-reduce")]
-            Transforms::Reduce(inner) => inner.typetag_name(),
-            #[cfg(feature = "transforms-remap")]
-            Transforms::Remap(inner) => inner.typetag_name(),
-            #[cfg(feature = "transforms-route")]
-            Transforms::Route(inner) => inner.typetag_name(),
-            #[cfg(feature = "transforms-sample")]
-            Transforms::Sample(inner) => inner.typetag_name(),
-            #[cfg(feature = "transforms-tag_cardinality_limit")]
-            Transforms::TagCardinalityLimit(inner) => inner.typetag_name(),
-            #[cfg(feature = "transforms-throttle")]
-            Transforms::Throttle(inner) => inner.typetag_name(),
-            #[allow(unreachable_patterns)]
-            _ => unimplemented!(),
-        }
-    }
-
-    fn typetag_deserialize(&self) {
-        match self {
-            #[cfg(feature = "transforms-aggregate")]
-            Transforms::Aggregate(inner) => inner.typetag_deserialize(),
-            #[cfg(feature = "transforms-aws_ec2_metadata")]
-            Transforms::AwsEc2Metadata(inner) => inner.typetag_deserialize(),
-            #[cfg(feature = "transforms-dedupe")]
-            Transforms::Dedupe(inner) => inner.typetag_deserialize(),
-            #[cfg(feature = "transforms-filter")]
-            Transforms::Filter(inner) => inner.typetag_deserialize(),
-            #[cfg(feature = "transforms-geoip")]
-            Transforms::Geoip(inner) => inner.typetag_deserialize(),
-            #[cfg(feature = "transforms-log_to_metric")]
-            Transforms::LogToMetric(inner) => inner.typetag_deserialize(),
-            #[cfg(feature = "transforms-lua")]
-            Transforms::Lua(inner) => inner.typetag_deserialize(),
-            #[cfg(feature = "transforms-metric_to_log")]
-            Transforms::MetricToLog(inner) => inner.typetag_deserialize(),
-            #[cfg(feature = "transforms-pipelines")]
-            Transforms::Pipelines(inner) => inner.typetag_deserialize(),
-            #[cfg(feature = "transforms-reduce")]
-            Transforms::Reduce(inner) => inner.typetag_deserialize(),
-            #[cfg(feature = "transforms-remap")]
-            Transforms::Remap(inner) => inner.typetag_deserialize(),
-            #[cfg(feature = "transforms-route")]
-            Transforms::Route(inner) => inner.typetag_deserialize(),
-            #[cfg(feature = "transforms-sample")]
-            Transforms::Sample(inner) => inner.typetag_deserialize(),
-            #[cfg(feature = "transforms-tag_cardinality_limit")]
-            Transforms::TagCardinalityLimit(inner) => inner.typetag_deserialize(),
-            #[cfg(feature = "transforms-throttle")]
-            Transforms::Throttle(inner) => inner.typetag_deserialize(),
-            #[allow(unreachable_patterns)]
-            _ => unimplemented!(),
+            Transforms::Throttle(config) => config.outputs(merged_definition),
         }
     }
 
@@ -353,37 +255,82 @@ impl TransformConfig for Transforms {
     fn nestable(&self, parents: &HashSet<&'static str>) -> bool {
         match self {
             #[cfg(feature = "transforms-aggregate")]
-            Transforms::Aggregate(inner) => inner.nestable(parents),
+            Transforms::Aggregate(config) => config.nestable(parents),
             #[cfg(feature = "transforms-aws_ec2_metadata")]
-            Transforms::AwsEc2Metadata(inner) => inner.nestable(parents),
+            Transforms::AwsEc2Metadata(config) => config.nestable(parents),
             #[cfg(feature = "transforms-dedupe")]
-            Transforms::Dedupe(inner) => inner.nestable(parents),
+            Transforms::Dedupe(config) => config.nestable(parents),
             #[cfg(feature = "transforms-filter")]
-            Transforms::Filter(inner) => inner.nestable(parents),
+            Transforms::Filter(config) => config.nestable(parents),
             #[cfg(feature = "transforms-geoip")]
-            Transforms::Geoip(inner) => inner.nestable(parents),
+            Transforms::Geoip(config) => config.nestable(parents),
             #[cfg(feature = "transforms-log_to_metric")]
-            Transforms::LogToMetric(inner) => inner.nestable(parents),
+            Transforms::LogToMetric(config) => config.nestable(parents),
             #[cfg(feature = "transforms-lua")]
-            Transforms::Lua(inner) => inner.nestable(parents),
+            Transforms::Lua(config) => config.nestable(parents),
             #[cfg(feature = "transforms-metric_to_log")]
-            Transforms::MetricToLog(inner) => inner.nestable(parents),
+            Transforms::MetricToLog(config) => config.nestable(parents),
             #[cfg(feature = "transforms-pipelines")]
-            Transforms::Pipelines(inner) => inner.nestable(parents),
+            Transforms::Pipelines(config) => config.nestable(parents),
             #[cfg(feature = "transforms-reduce")]
-            Transforms::Reduce(inner) => inner.nestable(parents),
+            Transforms::Reduce(config) => config.nestable(parents),
             #[cfg(feature = "transforms-remap")]
-            Transforms::Remap(inner) => inner.nestable(parents),
+            Transforms::Remap(config) => config.nestable(parents),
             #[cfg(feature = "transforms-route")]
-            Transforms::Route(inner) => inner.nestable(parents),
+            Transforms::Route(config) => config.nestable(parents),
             #[cfg(feature = "transforms-sample")]
-            Transforms::Sample(inner) => inner.nestable(parents),
+            Transforms::Sample(config) => config.nestable(parents),
             #[cfg(feature = "transforms-tag_cardinality_limit")]
-            Transforms::TagCardinalityLimit(inner) => inner.nestable(parents),
+            Transforms::TagCardinalityLimit(config) => config.nestable(parents),
+            #[cfg(test)]
+            Transforms::TestBasic(config) => config.nestable(parents),
+            #[cfg(test)]
+            Transforms::TestNoop(config) => config.nestable(parents),
             #[cfg(feature = "transforms-throttle")]
-            Transforms::Throttle(inner) => inner.nestable(parents),
-            #[allow(unreachable_patterns)]
-            _ => unimplemented!(),
+            Transforms::Throttle(config) => config.nestable(parents),
+        }
+    }
+}
+
+impl NamedComponent for Transforms {
+    const NAME: &'static str = "_invalid_usage";
+
+    fn get_component_name(&self) -> &'static str {
+        match self {
+            #[cfg(feature = "transforms-aggregate")]
+            Transforms::Aggregate(config) => config.get_component_name(),
+            #[cfg(feature = "transforms-aws_ec2_metadata")]
+            Transforms::AwsEc2Metadata(config) => config.get_component_name(),
+            #[cfg(feature = "transforms-dedupe")]
+            Transforms::Dedupe(config) => config.get_component_name(),
+            #[cfg(feature = "transforms-filter")]
+            Transforms::Filter(config) => config.get_component_name(),
+            #[cfg(feature = "transforms-geoip")]
+            Transforms::Geoip(config) => config.get_component_name(),
+            #[cfg(feature = "transforms-log_to_metric")]
+            Transforms::LogToMetric(config) => config.get_component_name(),
+            #[cfg(feature = "transforms-lua")]
+            Transforms::Lua(config) => config.get_component_name(),
+            #[cfg(feature = "transforms-metric_to_log")]
+            Transforms::MetricToLog(config) => config.get_component_name(),
+            #[cfg(feature = "transforms-pipelines")]
+            Transforms::Pipelines(config) => config.get_component_name(),
+            #[cfg(feature = "transforms-reduce")]
+            Transforms::Reduce(config) => config.get_component_name(),
+            #[cfg(feature = "transforms-remap")]
+            Transforms::Remap(config) => config.get_component_name(),
+            #[cfg(feature = "transforms-route")]
+            Transforms::Route(config) => config.get_component_name(),
+            #[cfg(feature = "transforms-sample")]
+            Transforms::Sample(config) => config.get_component_name(),
+            #[cfg(feature = "transforms-tag_cardinality_limit")]
+            Transforms::TagCardinalityLimit(config) => config.get_component_name(),
+            #[cfg(test)]
+            Transforms::TestBasic(config) => config.get_component_name(),
+            #[cfg(test)]
+            Transforms::TestNoop(config) => config.get_component_name(),
+            #[cfg(feature = "transforms-throttle")]
+            Transforms::Throttle(config) => config.get_component_name(),
         }
     }
 }

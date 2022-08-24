@@ -4,9 +4,7 @@ pub mod v2;
 use vector_config::configurable_component;
 
 use crate::{
-    config::{
-        GenerateConfig, Input, Output, TransformConfig, TransformContext,
-    },
+    config::{GenerateConfig, Input, Output, TransformConfig, TransformContext},
     schema,
     transforms::Transform,
 };

@@ -34,7 +34,7 @@ use crate::{
         internal_metrics::InternalMetricsConfig,
         Sources,
     },
-    transforms::{filter::FilterConfig, remap::RemapConfig},
+    transforms::{filter::FilterConfig, remap::RemapConfig, Transforms},
 };
 use vector_config::configurable_component;
 
@@ -445,7 +445,7 @@ fn setup_logs_reporting(
 
     let configuration_key = &datadog.configuration_key;
     let vector_version = crate::vector_version();
-    let tag_logs = RemapConfig {
+    let tag_logs = Transforms::Remap(RemapConfig {
         source: Some(format!(
             r#"
             .ddsource = "vector"
@@ -457,7 +457,7 @@ fn setup_logs_reporting(
             custom_logs_tags_vrl,
         )),
         ..Default::default()
-    };
+    });
 
     // Create a Datadog logs sink to consume and emit internal logs.
     let datadog_logs = DatadogLogsConfig {
@@ -535,7 +535,7 @@ fn setup_metrics_reporting(
 
     let configuration_key = &datadog.configuration_key;
     let vector_version = crate::vector_version();
-    let tag_metrics = RemapConfig {
+    let tag_metrics = Transforms::Remap(RemapConfig {
         source: Some(format!(
             r#"
             .tags.configuration_version_hash = "{configuration_version_hash}"
@@ -546,17 +546,17 @@ fn setup_metrics_reporting(
             custom_metric_tags_vrl
         )),
         ..Default::default()
-    };
+    });
 
     // Preserve the `pipelines` namespace for specific metrics
-    let filter_metrics = FilterConfig::from(AnyCondition::String(
+    let filter_metrics = Transforms::Filter(FilterConfig::from(AnyCondition::String(
         r#".name == "component_received_bytes_total""#.to_string(),
-    ));
+    )));
 
-    let pipelines_namespace_metrics = RemapConfig {
+    let pipelines_namespace_metrics = Transforms::Remap(RemapConfig {
         source: Some(r#".namespace = "pipelines""#.to_string()),
         ..Default::default()
-    };
+    });
 
     // Create a Datadog metrics sink to consume and emit internal + host metrics.
     let datadog_metrics = DatadogMetricsConfig {

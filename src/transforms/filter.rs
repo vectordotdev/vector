@@ -4,9 +4,7 @@ use vector_config::configurable_component;
 
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{
-        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
-    },
+    config::{DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext},
     event::Event,
     internal_events::FilterEventDiscarded,
     schema,

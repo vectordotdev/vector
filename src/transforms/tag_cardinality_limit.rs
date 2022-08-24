@@ -11,9 +11,7 @@ use futures::{Stream, StreamExt};
 use vector_config::configurable_component;
 
 use crate::{
-    config::{
-        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
-    },
+    config::{DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext},
     event::Event,
     internal_events::{
         TagCardinalityLimitRejectingEvent, TagCardinalityLimitRejectingTag,

@@ -10,8 +10,10 @@ use vector_core::{
         Event, MetricValue,
     },
     schema,
-    transform::{FunctionTransform, OutputBuffer, Transform, TransformConfig, TransformContext},
+    transform::{FunctionTransform, OutputBuffer, Transform},
 };
+
+use crate::config::{TransformConfig, TransformContext};
 
 /// Configuration for the `test_basic` transform.
 #[configurable_component(transform("test_basic"))]

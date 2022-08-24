@@ -1,11 +1,8 @@
-use serde::{Deserialize, Serialize};
 use vector_config::configurable_component;
 
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{
-        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
-    },
+    config::{DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext},
     event::Event,
     internal_events::SampleEventDiscarded,
     schema,
@@ -65,30 +62,6 @@ impl TransformConfig for SampleConfig {
 
     fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log | DataType::Trace)]
-    }
-}
-
-// Add a compatibility alias to avoid breaking existing configs
-#[derive(Deserialize, Serialize, Debug, Clone)]
-struct SampleCompatConfig(SampleConfig);
-
-#[async_trait::async_trait]
-#[typetag::serde(name = "sampler")]
-impl TransformConfig for SampleCompatConfig {
-    async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        self.0.build(context).await
-    }
-
-    fn input(&self) -> Input {
-        self.0.input()
-    }
-
-    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
-        self.0.outputs(merged_definition)
-    }
-
-    fn transform_type(&self) -> &'static str {
-        self.0.transform_type()
     }
 }
 

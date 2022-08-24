@@ -109,18 +109,23 @@ use std::{collections::HashSet, fmt::Debug};
 
 use config::EventTypeConfig;
 use indexmap::IndexMap;
-use vector_config::configurable_component;
+use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
-    config::{ComponentKey, DataType, Input, Output}, transform::Transform,
+    config::{ComponentKey, DataType, Input, Output},
+    transform::Transform,
 };
 
 use crate::{
     conditions::AnyCondition,
     conditions::ConditionConfig,
-    config::GenerateConfig,
+    config::{
+        GenerateConfig, InnerTopology, InnerTopologyTransform, TransformConfig, TransformContext,
+    },
     schema,
     transforms::route::{RouteConfig, UNMATCHED_ROUTE},
 };
+
+use super::Transforms;
 
 /// Configuration for the `pipelines` transform.
 #[configurable_component(transform("pipelines"))]
@@ -159,7 +164,9 @@ impl PipelinesConfig {
 
 impl PipelinesConfig {
     fn validate_nesting(&self) -> crate::Result<()> {
-        let parents = &[self.get_component_name()].into_iter().collect::<HashSet<_>>();
+        let parents = &[self.get_component_name()]
+            .into_iter()
+            .collect::<HashSet<_>>();
         self.logs.validate_nesting(parents)?;
         self.metrics.validate_nesting(parents)?;
         self.traces.validate_nesting(parents)?;
@@ -235,7 +242,7 @@ impl TransformConfig for PipelinesConfig {
             router_name,
             InnerTopologyTransform {
                 inputs: inputs.to_vec(),
-                inner: Box::new(RouteConfig::new(conditions)),
+                inner: Transforms::Route(RouteConfig::new(conditions)),
             },
         );
         Ok(Some(result))
@@ -251,7 +258,7 @@ impl TransformConfig for PipelinesConfig {
 
     fn nestable(&self, parents: &HashSet<&'static str>) -> bool {
         // The pipelines transform shouldn't be embedded in another pipelines transform.
-        !parents.contains(&self.transform_type())
+        !parents.contains(self.get_component_name())
     }
 }
 
@@ -291,7 +298,10 @@ mod tests {
     use indexmap::IndexMap;
 
     use super::{GenerateConfig, PipelinesConfig};
-    use crate::config::{ComponentKey, TransformOuter};
+    use crate::{
+        config::{ComponentKey, TransformOuter},
+        transforms::Transforms,
+    };
 
     #[test]
     fn generate_config() {
@@ -315,7 +325,7 @@ mod tests {
         let config: PipelinesConfig = config.try_into().unwrap();
         let outer = TransformOuter {
             inputs: vec!["source".to_string()],
-            inner: Box::new(config),
+            inner: Transforms::Pipeline(config),
         };
         let name = ComponentKey::from("foo");
         let mut transforms = IndexMap::new();

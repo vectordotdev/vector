@@ -1,19 +1,19 @@
 use std::collections::HashSet;
 
-use vector_config::configurable_component;
+use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
     config::Input,
     event::{Event, EventArray, EventContainer},
     schema,
-    transform::{
-        InnerTopology, InnerTopologyTransform, SyncTransform, Transform, TransformContext,
-        TransformOutputsBuf,
-    },
+    transform::{SyncTransform, Transform, TransformOutputsBuf},
 };
 
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{ComponentKey, DataType, Output, TransformConfig},
+    config::{
+        ComponentKey, DataType, InnerTopology, InnerTopologyTransform, Output, TransformConfig,
+        TransformContext,
+    },
     transforms::Transforms,
 };
 
@@ -44,8 +44,14 @@ impl PipelineConfig {
     }
 }
 
+// We're implementing `NamedComponent` by hand because `pipeline` isn't meant to be a top-level
+// transform, so we don't want the baggage associated with declaring it as a transform via
+// `#[configurable_component]`, but we still need to satisfy `TransformConfig`.
+impl NamedComponent for PipelineConfig {
+    const NAME: &'static str = "pipeline";
+}
+
 #[async_trait::async_trait]
-#[typetag::serde(name = "pipeline")]
 impl TransformConfig for PipelineConfig {
     async fn build(&self, ctx: &TransformContext) -> crate::Result<Transform> {
         let condition = match &self.filter {
@@ -82,7 +88,7 @@ impl TransformConfig for PipelineConfig {
                 return Err(format!(
                     "pipeline {} has transform of type {} with a named output, unsupported",
                     self.name,
-                    transform.transform_type()
+                    transform.get_component_name()
                 )
                 .into());
             }
@@ -127,15 +133,6 @@ impl TransformConfig for PipelineConfig {
         }
     }
 
-    fn transform_type(&self) -> &'static str {
-        // NOTE It'd be nice to avoid this boilerplate for transforms that are
-        // not meant to be directly user-configurable. In this case, we're
-        // really only implementing TransformConfig because we're ultimately
-        // returning this from an expansion, so it's likely this probably goes
-        // away when expansion goes away.
-        "pipeline"
-    }
-
     fn enable_concurrency(&self) -> bool {
         true
     }
@@ -153,7 +150,7 @@ impl PipelineConfig {
             name.clone(),
             InnerTopologyTransform {
                 inputs: inputs.to_vec(),
-                inner: Box::new(self.clone()),
+                inner: self.clone(),
             },
         );
         result

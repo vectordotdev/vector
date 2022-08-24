@@ -14,9 +14,7 @@ use tracing::Instrument;
 use vector_config::configurable_component;
 
 use crate::{
-    config::{
-        DataType, Input, Output, ProxyConfig, TransformConfig, TransformContext,
-    },
+    config::{DataType, Input, Output, ProxyConfig, TransformConfig, TransformContext},
     event::Event,
     http::HttpClient,
     internal_events::{AwsEc2MetadataRefreshError, AwsEc2MetadataRefreshSuccessful},
