@@ -175,9 +175,9 @@ fn convert_dd_tracer_payload(payload: ddtrace_proto::TracerPayload) -> Vec<Trace
             trace_event.insert("priority", trace.priority as i64);
             trace_event.insert("origin", trace.origin);
             trace_event.insert("dropped", trace.dropped_trace);
-            let mut span_tags = convert_tags(trace.tags);
-            span_tags.extend(tags.clone());
-            trace_event.insert("tags", Value::from(span_tags));
+            let mut trace_tags = convert_tags(trace.tags);
+            trace_tags.extend(tags.clone());
+            trace_event.insert("tags", Value::from(trace_tags));
             trace_event.insert(
                 "spans",
                 trace
