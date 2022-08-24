@@ -110,7 +110,7 @@ of these events:
 
 #### ComponentEventsReceived
 
-*All components* MUST emit a `ComponentEventsReceived` event that represents
+_All components_ MUST emit a `ComponentEventsReceived` event that represents
 the reception of Vector events from an upstream component.
 
 - Emission
@@ -130,11 +130,11 @@ the reception of Vector events from an upstream component.
 
 #### ComponentEventsSent
 
-*All components* MUST emit an `ComponentEventsSent` event that represents the
+_All components_ MUST emit an `ComponentEventsSent` event that represents the
 emission of Vector events to the next downstream component(s).
 
 - Emission
-  - MUST emit immediately after *successful* transmission of Vector events.
+  - MUST emit immediately after _successful_ transmission of Vector events.
     MUST NOT emit if the transmission was unsuccessful.
   - MUST NOT emit for pull-based sinks since they do not send events. For
     example, the `prometheus_exporter` sink MUST NOT emit this event.
@@ -158,7 +158,7 @@ emission of Vector events to the next downstream component(s).
 
 **Extends the [Error event].**
 
-*All components* MUST emit error events in accordance with the [Error event]
+_All components_ MUST emit error events in accordance with the [Error event]
 requirements.
 
 This specification does not list a standard set of errors that components must
@@ -168,20 +168,20 @@ implement since errors are specific to the component.
 
 **Extends the [EventsDropped event].**
 
-*All components* that can drop events MUST emit a `ComponentEventsDropped`
+_All components_ that can drop events MUST emit a `ComponentEventsDropped`
 event in accordance with the [EventsDropped event] requirements.
 
 #### SinkNetworkBytesSent
 
-*Sinks* MUST emit a `SinkNetworkBytesSent` that represents the egress of
-*raw network bytes*.
+_Sinks_ MUST emit a `SinkNetworkBytesSent` that represents the egress of
+_raw network bytes_.
 
 - Emission
   - MUST emit immediately after egress of raw network bytes regardless
     of whether the transmission was successful or not.
     - This includes pull-based sinks, such as the `prometheus_exporter` sink,
       and SHOULD reflect the bytes sent to the client when requested (pulled).
-  - MUST emit *after* processing of the bytes (encryption, compression,
+  - MUST emit _after_ processing of the bytes (encryption, compression,
     filtering, etc.)
 - Properties
   - `byte_size` - The number of raw network bytes sent after processing.
@@ -199,12 +199,12 @@ event in accordance with the [EventsDropped event] requirements.
 
 #### SourceNetworkBytesReceived
 
-*Sources* MUST emit a `SourceNetworkBytesReceived` event that represents the
-ingress of *raw network bytes*.
+_Sources_ MUST emit a `SourceNetworkBytesReceived` event that represents the
+ingress of _raw network bytes_.
 
 - Emission
   - MUST emit immediately after ingress of raw network bytes.
-  - MUST emit *before* processing of the bytes (decryption, decompression,
+  - MUST emit _before_ processing of the bytes (decryption, decompression,
     filtering, etc.).
     - This includes pull-based sources that issue requests to ingest bytes.
 - Properties
@@ -251,14 +251,14 @@ Further to the above, all sink components MUST support acknowledgements. This re
 configuration option named `acknowledgements` conforming to the `AcknowledgementsConfig` type, as
 well as updating the status of all finalizers deferred above after delivery of the events is
 completed. This update is automatically handled for all sinks that use the newer `StreamSink`
-framework.  Additionally, unit tests for the sink SHOULD ensure through unit tests that delivered
+framework. Additionally, unit tests for the sink SHOULD ensure through unit tests that delivered
 batches have their status updated properly for both normal delivery and delivery errors.
 
-[Configuration Specification]: configuration.md
-[Error event]: instrumentation.md#Error
-[EventsDropped event]: instrumentation.md#EventsDropped
+[configuration specification]: configuration.md
+[error event]: instrumentation.md#Error
+[eventsdropped event]: instrumentation.md#EventsDropped
 [high user experience expectations]: https://github.com/vectordotdev/vector/blob/master/docs/USER_EXPERIENCE_DESIGN.md
 [health checks]: ../DEVELOPING.md#sink-healthchecks
-[Instrumentation Specification]: instrumentation.md
+[instrumentation specification]: instrumentation.md
 [logical boundaries of components]: ../USER_EXPERIENCE_DESIGN.md#logical-boundaries
-[RFC 2119]: https://datatracker.ietf.org/doc/html/rfc2119
+[rfc 2119]: https://datatracker.ietf.org/doc/html/rfc2119
