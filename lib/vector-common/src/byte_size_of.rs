@@ -270,11 +270,13 @@ num!(u16);
 num!(u32);
 num!(u64);
 num!(u128);
+num!(usize);
 num!(i8);
 num!(i16);
 num!(i32);
 num!(i64);
 num!(i128);
+num!(isize);
 fnum!(f32);
 fnum!(f64);
 

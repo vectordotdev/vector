@@ -39,10 +39,7 @@ impl ByteSizeOf for BatchedEvents {
     }
 
     fn estimated_json_encoded_size_of(&self) -> usize {
-        byte_size_of::struct_estimated_json_byte_size(&[
-            ("key", &self.key),
-            ("events", &self.events),
-        ])
+        0 // Does not implement `serde::Serialize`.
     }
 }
 
