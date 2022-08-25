@@ -25,6 +25,7 @@ impl DeprecationWarning {
         self
     }
 
+    #[must_use]
     pub fn with_notes(mut self, mut notes: Vec<Note>) -> Self {
         self.notes.append(&mut notes);
         self

@@ -390,11 +390,7 @@ impl<'a> Compiler<'a> {
                 DeprecationWarning::new("modulo operator")
                     .with_notes(Note::solution(
                         "using the 'mod' function",
-                        vec![format!(
-                            "mod({}, {})",
-                            lhs.inner().to_string(),
-                            rhs.to_string()
-                        )],
+                        vec![format!("mod({}, {})", lhs, rhs)],
                     ))
                     .with_span(opcode.span()),
             ));
