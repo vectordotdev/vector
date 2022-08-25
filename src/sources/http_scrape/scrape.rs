@@ -223,8 +223,8 @@ impl HttpScraperBuilder for HttpScrapeContext {
     type Context = HttpScrapeContext;
 
     /// No additional context from request data is needed from this particular scraper.
-    fn build(self, _uri: &Uri) -> Self::Context {
-        self
+    fn build(&self, _uri: &Uri) -> Self::Context {
+        self.clone()
     }
 }
 

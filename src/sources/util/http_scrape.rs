@@ -55,7 +55,7 @@ pub(crate) trait HttpScraperBuilder {
     type Context: HttpScraperContext;
 
     /// Called before the HTTP request is made to build out the context.
-    fn build(self, url: &Uri) -> Self::Context;
+    fn build(&self, url: &Uri) -> Self::Context;
 }
 
 /// Methods that allow context-specific behavior during the scraping procedure.

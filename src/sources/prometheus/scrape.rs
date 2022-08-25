@@ -176,7 +176,7 @@ impl HttpScraperBuilder for PrometheusScrapeBuilder {
     type Context = PrometheusScrapeContext;
 
     /// Expands the context with the instance info and endpoint info for the current request.
-    fn build(self, url: &Uri) -> Self::Context {
+    fn build(&self, url: &Uri) -> Self::Context {
         let instance_info = self.instance_tag.as_ref().map(|tag| {
             let instance = format!(
                 "{}:{}",
