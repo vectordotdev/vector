@@ -752,16 +752,6 @@ pub(self) mod tests {
             );
         }
     }
-}
-
-#[cfg(feature = "host-metrics-integration-tests")]
-#[cfg(test)]
-mod integration_tests {
-
-    use crate::test_util::components::{run_and_assert_source_compliance, SOURCE_TAGS};
-
-    use super::*;
-    use tokio::time::Duration;
 
     #[tokio::test]
     async fn source_compliance() {

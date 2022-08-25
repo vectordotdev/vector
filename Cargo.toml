@@ -716,7 +716,6 @@ all-integration-tests = [
   "gcp-integration-tests",
   "gcp-pubsub-integration-tests",
   "humio-integration-tests",
-  "humio-integration-tests",
   "influxdb-integration-tests",
   "kafka-integration-tests",
   "logstash-integration-tests",
