@@ -334,7 +334,7 @@ impl ByteSizeOf for Value {
         const NULL_SIZE: usize = 4;
 
         match self {
-            Value::Bytes(bytes) => bytes.len(),
+            Value::Bytes(bytes) => string_like_estimated_json_byte_size(bytes.len()),
             Value::Object(map) => map.estimated_json_encoded_size_of(),
             Value::Array(arr) => arr.estimated_json_encoded_size_of(),
             Value::Boolean(v) => v.estimated_json_encoded_size_of(),
@@ -444,4 +444,45 @@ pub fn struct_estimated_json_byte_size(fields: &[(&'static str, &dyn ByteSizeOf)
     }
 
     size
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_estimated_json_encoded_size_of() {
+        use serde::Serialize;
+
+        fn case<T: ByteSizeOf + Serialize>(value: T, expected_size: usize) {
+            let json = serde_json::to_string(&value).unwrap();
+            let size = value.estimated_json_encoded_size_of();
+            assert_eq!(size, expected_size);
+            assert_eq!(size, json.len());
+        }
+
+        case("foo", 5);
+        case("foo bar", 9);
+        case(Value::Bytes("foo".into()), 5);
+
+        case(true, 4);
+        case(false, 5);
+        case(Value::Boolean(true), 4);
+        case(Value::Boolean(false), 5);
+        case(
+            BTreeMap::from([("foo", Value::from(true)), ("bar", Value::from("baz"))]),
+            24,
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_object_like_estimated_json_byte_size() {
+        let data: BTreeMap<_, Value> = [("foo", true.into()), ("bar", "baz".into())].into();
+        let json = serde_json::to_string(&data).unwrap();
+        let size = object_like_estimated_json_byte_size(data.iter());
+
+        assert_eq!(size, json.len());
+    }
 }

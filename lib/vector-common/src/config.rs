@@ -114,12 +114,14 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(feature = "serde")]
     fn deserialize_string() {
         let result: ComponentKey = serde_json::from_str("\"foo\"").unwrap();
         assert_eq!(result.id(), "foo");
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serialize_string() {
         let item = ComponentKey::from("foo");
         let result = serde_json::to_string(&item).unwrap();
