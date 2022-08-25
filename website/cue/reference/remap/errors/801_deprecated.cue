@@ -11,7 +11,6 @@ remap: errors: "801": {
 		"""
 
 	resolution: """
-
 		Apply the suggested alternative.
 		"""
 }
