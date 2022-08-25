@@ -170,6 +170,8 @@ mod match_datadog_query;
 mod md5;
 #[cfg(feature = "merge")]
 mod merge;
+#[cfg(feature = "mod")]
+mod mod_func;
 #[cfg(feature = "now")]
 mod now;
 #[cfg(feature = "object")]
@@ -439,6 +441,8 @@ pub use match_array::MatchArray;
 pub use match_datadog_query::MatchDatadogQuery;
 #[cfg(feature = "merge")]
 pub use merge::Merge;
+#[cfg(feature = "mod")]
+pub use mod_func::Mod;
 #[cfg(feature = "now")]
 pub use now::Now;
 #[cfg(feature = "object")]
@@ -722,6 +726,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Md5),
         #[cfg(feature = "merge")]
         Box::new(Merge),
+        #[cfg(feature = "mod")]
+        Box::new(Mod),
         #[cfg(feature = "now")]
         Box::new(Now),
         // We are not sure if this is the way we want to expose this functionality yet
