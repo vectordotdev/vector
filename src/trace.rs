@@ -121,7 +121,7 @@ fn get_early_buffer() -> MutexGuard<'static, Option<Vec<LogEvent>>> {
 ///
 /// Checks if [`BUFFER`] is set or if a trace sender exists
 fn should_process_tracing_event() -> bool {
-    maybe_get_trace_sender().is_some()
+    get_early_buffer().is_some() || maybe_get_trace_sender().is_some()
 }
 
 /// Attempts to buffer an event into the early buffer.
