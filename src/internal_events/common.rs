@@ -1,5 +1,6 @@
 use std::time::Instant;
 
+use crate::emit;
 use metrics::{counter, histogram};
 use vector_core::internal_event::InternalEvent;
 pub use vector_core::internal_event::{EventsReceived, OldEventsReceived};
@@ -76,11 +77,9 @@ pub struct StreamClosedError {
 impl InternalEvent for StreamClosedError {
     fn emit(self) {
         error!(
-            message = "Events dropped.",
-            reason = "Downstream is closed.",
+            message = "Failed to forward event(s), downstream is closed.",
             error_code = STREAM_CLOSED,
             error_type = error_type::WRITER_FAILED,
-            intentional = "false",
             stage = error_stage::SENDING,
             count = %self.count,
         );
@@ -90,13 +89,11 @@ impl InternalEvent for StreamClosedError {
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
         );
-        counter!(
-            "component_discarded_events_total", self.count as u64,
-            "error_code" => STREAM_CLOSED,
-            "error_type" => error_type::WRITER_FAILED,
-            "intentional" => "false",
-            "stage" => error_stage::SENDING,
-        );
+        emit!(ComponentEventsDropped {
+            count: self.count as u64,
+            intentional: false,
+            reason: "Downstream is closed.",
+        });
     }
 }
 
