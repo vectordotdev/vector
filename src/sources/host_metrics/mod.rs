@@ -756,8 +756,10 @@ pub(self) mod tests {
 
     #[tokio::test]
     async fn source_compliance() {
-        let mut config = HostMetricsConfig::default();
-        config.scrape_interval_secs = 1.0;
+        let config = HostMetricsConfig {
+            scrape_interval_secs: 1.0,
+            ..Default::default()
+        };
 
         let events =
             run_and_assert_source_compliance(config, Duration::from_secs(2), &SOURCE_TAGS).await;
