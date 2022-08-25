@@ -155,35 +155,71 @@ class Event
       end
     end
 
-    has_errors = handle.logs.one? { |type, _, _| type == 'error' }
+    evt_name_events_dropped = 'component_discarded_events_total'
+    evt_name_error = 'component_errors_total'
 
-    # Make sure Error events output an error
-    if has_errors or @name.end_with? 'Error'
+    has_error_logs = handle.logs.one? { |type, _, _| type == 'error' }
+
+    is_events_dropped_evt = (@name.end_with? 'EventsDropped' or @counters.include? evt_name_events_dropped)
+
+    # Validate <Name>Error events
+    if (has_error_logs and !is_events_dropped_evt) or @name.end_with? 'Error'
+
+      # Name check
       append('Error events MUST be named "___Error".') unless @name.end_with? 'Error'
+      # Outputs an error log
       handle.logs_should_have('error')
-      counters_must_include('component_errors_total', ['error_type', 'stage'])
-    end
+      # Metric check
+      counters_must_include(evt_name_error, ['error_type', 'stage'])
 
-    # Make sure error events contain the right parameters
-    handle.logs.each do |type, message, parameters|
-      if type == 'error'
-        ['error_type', 'stage'].each do |parameter|
-          unless parameters.include? parameter
-            @reports.append("Error log MUST include parameter \"#{parameter}\".")
+      # Make sure Error events contain the required parameters
+      handle.logs.each do |type, message, parameters|
+        if type == 'error'
+          ['error_type', 'stage'].each do |parameter|
+            unless parameters.include? parameter
+              @reports.append("Error log for Error event MUST include parameter \"#{parameter}\".")
+            end
           end
-        end
 
-        ['component_errors_total', 'component_discarded_events_total'].each do |event_name|
-          if @counters[event_name]
-            ['error_code', 'error_type', 'stage'].each do |parameter|
-              if parameters.include? parameter and !@counters[event_name].include? parameter
-                @reports.append("Counter \"#{event_name}\" must include \"#{parameter}\" to match error log.")
-              end
+          ['error_code', 'error_type', 'stage'].each do |parameter|
+            if parameters.include? parameter and !@counters[evt_name_error].include? parameter
+              @reports.append("Counter \"#{evt_name_error}\" must include \"#{parameter}\" to match error log.")
             end
           end
         end
       end
     end
+
+    # TODO enable below checks (entire if block) after DroppedEvents audit is complete
+    # (https://github.com/vectordotdev/vector/issues/13995)
+
+    # Validate <Namespace>EventsDropped events
+    #if is_events_dropped_evt
+
+    #  # Name check
+    #  append('EventsDropped events MUST be named "___EventsDropped".') unless @name.end_with? 'EventsDropped'
+    #  # Outputs an error log
+    #  handle.logs_should_have('error')
+    #  # Metric check
+    #  #counters_must_include(evt_name_events_dropped, ['intentional'])
+
+    #  # Make sure EventsDropped events contain the required parameters
+    #  handle.logs.each do |type, message, parameters|
+    #    if type == 'error'
+    #      ['intentional', 'reason'].each do |parameter|
+    #        unless parameters.include? parameter
+    #          @reports.append("Error log for EventsDropped event MUST include parameter \"#{parameter}\".")
+    #        end
+    #      end
+
+    #      ['intentional'].each do |parameter|
+    #        if parameters.include? parameter and !@counters[evt_name_events_dropped].include? parameter
+    #          @reports.append("Counter \"#{evt_name_events_dropped}\" must include \"#{parameter}\" to match error log.")
+    #        end
+    #      end
+    #    end
+    #  end
+    #end
 
     @counters.each do |name, tags|
       # Only component_errors_total and component_discarded_events_total metrics are considered
