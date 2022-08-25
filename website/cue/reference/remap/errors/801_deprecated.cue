@@ -14,6 +14,4 @@ remap: errors: "801": {
 
 		Apply the suggested alternative.
 		"""
-
-	examples: []
 }
