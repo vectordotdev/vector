@@ -1003,6 +1003,9 @@ async fn decode_traces() {
             tracer_version: "v577".to_string(),
             runtime_id: "123abc".to_string(),
             chunks: vec![chunk],
+            env: "env".to_string(),
+            tags: BTreeMap::from_iter([("another".to_string(), "tag".to_string())].into_iter()),
+            hostname: "hostname".to_string(),
             app_version: "v314".to_string(),
         };
 
@@ -1109,6 +1112,18 @@ async fn decode_traces() {
             let trace_v2 = events[2].as_trace();
             assert_eq!(trace_v2.as_map()["host"], "a_hostname".into());
             assert_eq!(trace_v2.as_map()["env"], "env".into());
+
+            assert_eq!(
+                trace_v2.as_map()["tags"],
+                Value::Object(BTreeMap::from_iter(
+                    [
+                        ("a".to_string(), "tag".into()),
+                        ("another".to_string(), "tag".into())
+                    ]
+                    .into_iter()
+                ))
+            );
+
             assert_eq!(trace_v2.as_map()["language_name"], "plop".into());
             assert_eq!(trace_v2.as_map()["language_version"], "v33".into());
             assert_eq!(trace_v2.as_map()["container_id"], "an_id".into());

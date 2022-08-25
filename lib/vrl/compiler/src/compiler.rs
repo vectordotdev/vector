@@ -1,4 +1,4 @@
-use diagnostic::{DiagnosticList, DiagnosticMessage, Severity, Span};
+use diagnostic::{DiagnosticList, DiagnosticMessage, Note, Severity, Span};
 use lookup::LookupBuf;
 use parser::ast::{self, Node, QueryTarget};
 
@@ -11,7 +11,7 @@ use crate::{
     },
     parser::ast::RootExpr,
     program::ProgramInfo,
-    CompileConfig, Function, Program, TypeDef,
+    CompileConfig, DeprecationWarning, Function, Program, TypeDef,
 };
 
 pub(crate) type Diagnostics = Vec<Box<dyn DiagnosticMessage>>;
@@ -384,6 +384,17 @@ impl<'a> Compiler<'a> {
 
         let rhs_span = rhs.span();
         let rhs = Node::new(rhs_span, self.compile_expr(*rhs, state)?);
+
+        if opcode.inner() == &Opcode::Rem {
+            self.diagnostics.push(Box::new(
+                DeprecationWarning::new("modulo operator")
+                    .with_notes(Note::solution(
+                        "using the 'mod' function",
+                        vec![format!("mod({}, {})", lhs, rhs)],
+                    ))
+                    .with_span(opcode.span()),
+            ));
+        }
 
         let op = Op::new(lhs, opcode, rhs, state)
             .map_err(|err| self.diagnostics.push(Box::new(err)))
