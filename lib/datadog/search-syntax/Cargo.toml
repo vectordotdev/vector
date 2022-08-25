@@ -9,5 +9,5 @@ publish = false
 itertools = { version = "0.10.3", default-features = false }
 once_cell = { version = "1.13", default-features = false, features = ["std"] }
 pest = { version = "2.3.0", default-features = false, features = ["std"] }
-pest_derive = { version = "2.2.1", default-features = false, features = ["std"] }
+pest_derive = { version = "2.3.0", default-features = false, features = ["std"] }
 regex = { version = "1", default-features = false, features = ["std"] }
