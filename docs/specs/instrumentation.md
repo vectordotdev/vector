@@ -139,13 +139,12 @@ not result in data loss if the retry succeeds.**
   - If `intentional` is `false`, MUST log at the `error` level.
   - SHOULD NOT be rate limited.
 
-
 [camelcase]: https://en.wikipedia.org/wiki/Camel_case
-[`EventsDropped`]: #EventsDropped
-[Issue 10658]: https://github.com/vectordotdev/vector/issues/10658
-[Prometheus metric naming standards]: https://prometheus.io/docs/practices/naming/
+[`eventsdropped`]: #EventsDropped
+[issue 10658]: https://github.com/vectordotdev/vector/issues/10658
+[prometheus metric naming standards]: https://prometheus.io/docs/practices/naming/
 [pull request #8383]: https://github.com/vectordotdev/vector/pull/8383/
-[RFC 2064]: https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
-[RFC 9480]: https://github.com/vectordotdev/vector/blob/master/rfcs/2021-10-22-9480-processing-arrays-of-events.md
+[rfc 2064]: https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
+[rfc 9480]: https://github.com/vectordotdev/vector/blob/master/rfcs/2021-10-22-9480-processing-arrays-of-events.md
 [single base unit]: https://en.wikipedia.org/wiki/SI_base_unit
 [snakecase]: https://en.wikipedia.org/wiki/Snake_case

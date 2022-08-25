@@ -23,9 +23,9 @@ introduced in a release without being announced in a prior release.
 
 Examples of possible deprecations in Vector:
 
-* Removal or rename of a configuration option
-* Removal or rename of a metric
-* Removal of a feature
+- Removal or rename of a configuration option
+- Removal or rename of a metric
+- Removal of a feature
 
 ## Lifecycle of a deprecation
 
@@ -37,11 +37,11 @@ A configuration option or feature in Vector is marked as deprecated.
 
 When this happens, we will notify by:
 
-* Listing the deprecation in the Deprecations section of the upgrade guide for the release the deprecation was
+- Listing the deprecation in the Deprecations section of the upgrade guide for the release the deprecation was
   introduced in. This will include instructions on how to transition if applicable.
-* Adding a deprecation note to the [documentation site][configuration] alongside the configuration or feature being
+- Adding a deprecation note to the [documentation site][configuration] alongside the configuration or feature being
   deprecated.
-* Output a log at the `WARN` level if Vector detects deprecated configuration or features being used on start-up, during
+- Output a log at the `WARN` level if Vector detects deprecated configuration or features being used on start-up, during
   `vector validate`, or at runtime, when possible. This log message will lead with the text `DEPRECATED` to make it easy
   to filter for.
 
@@ -56,7 +56,7 @@ A deprecated configuration option or feature in Vector is removed.
 
 When this happens, we will notify by:
 
-* Listing the removal in the Breaking Changes section of upgrade guide for that release. This will include directions on
+- Listing the removal in the Breaking Changes section of upgrade guide for that release. This will include directions on
   how to transition if applicable.
 
 When possible, Vector will error at start-up when a removed configuration option or feature is used.
@@ -67,17 +67,17 @@ When possible, Vector will error at start-up when a removed configuration option
 
 When introducing a deprecation into Vector, the pull request introducing the deprecation should:
 
-* Add a note to the Deprecations section of the upgrade guide for the next release with a description and
+- Add a note to the Deprecations section of the upgrade guide for the next release with a description and
   directions for transitioning if applicable.
-* Add a deprecation note to the docs. Typically this means adding `deprecation: "description of the deprecation"`
-  to the `cue` data for the option or feature. If the `cue` schema does not support `deprecation`  for whatever you
+- Add a deprecation note to the docs. Typically this means adding `deprecation: "description of the deprecation"`
+  to the `cue` data for the option or feature. If the `cue` schema does not support `deprecation` for whatever you
   are deprecating yet, add it to the schema and open an issue to have it rendered on the website.
-* Add a log message to Vector that is logged at the `WARN` level starting with the word `DEPRECATION` if Vector detects
+- Add a log message to Vector that is logged at the `WARN` level starting with the word `DEPRECATION` if Vector detects
   the deprecated configuration or feature being used (when possible).
 
 When removing a deprecation in a subsequent release, the pull request should:
 
-* Indicate that it is a breaking change by including `!` in the title after the type/scope
-* Remove the deprecation from the documentation
-* Add a note to the Breaking Changes section of the upgrade guide for the next release with a description and directions
+- Indicate that it is a breaking change by including `!` in the title after the type/scope
+- Remove the deprecation from the documentation
+- Add a note to the Breaking Changes section of the upgrade guide for the next release with a description and directions
   for transitioning if applicable.
