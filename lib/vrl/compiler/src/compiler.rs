@@ -1,4 +1,4 @@
-use diagnostic::{DiagnosticList, DiagnosticMessage, Severity, Span};
+use diagnostic::{DiagnosticList, DiagnosticMessage, Note, Severity, Span};
 use lookup::LookupBuf;
 use parser::ast::{self, Node, QueryTarget};
 
@@ -388,7 +388,14 @@ impl<'a> Compiler<'a> {
         if opcode.inner() == &Opcode::Rem {
             self.diagnostics.push(Box::new(
                 DeprecationWarning::new("modulo operator")
-                    .with_alternative("Use the 'mod' function instead.")
+                    .with_notes(Note::solution(
+                        "using the 'mod' function",
+                        vec![format!(
+                            "mod({}, {})",
+                            lhs.inner().to_string(),
+                            rhs.to_string()
+                        )],
+                    ))
                     .with_span(opcode.span()),
             ));
         }

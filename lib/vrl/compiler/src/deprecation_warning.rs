@@ -5,7 +5,7 @@ use std::fmt::{Display, Formatter};
 #[derive(Debug)]
 pub struct DeprecationWarning {
     item: String,
-    alternatives: Vec<String>,
+    notes: Vec<Note>,
     span: Option<Span>,
 }
 
@@ -14,14 +14,19 @@ impl DeprecationWarning {
     pub fn new(item: &str) -> Self {
         DeprecationWarning {
             item: item.to_string(),
-            alternatives: vec![],
+            notes: vec![],
             span: None,
         }
     }
 
     #[must_use]
-    pub fn with_alternative(mut self, alternative: &str) -> Self {
-        self.alternatives.push(alternative.to_string());
+    pub fn with_note(mut self, note: Note) -> Self {
+        self.notes.push(note);
+        self
+    }
+
+    pub fn with_notes(mut self, mut notes: Vec<Note>) -> Self {
+        self.notes.append(&mut notes);
         self
     }
 
@@ -46,7 +51,7 @@ impl DiagnosticMessage for DeprecationWarning {
     }
 
     fn message(&self) -> String {
-        format!("{} is deprecated.", self.item)
+        format!("{} is deprecated", self.item)
     }
 
     fn labels(&self) -> Vec<Label> {
@@ -58,10 +63,7 @@ impl DiagnosticMessage for DeprecationWarning {
     }
 
     fn notes(&self) -> Vec<Note> {
-        self.alternatives
-            .iter()
-            .map(|alternative| Note::Hint(alternative.to_string()))
-            .collect()
+        self.notes.clone()
     }
 
     fn severity(&self) -> Severity {
