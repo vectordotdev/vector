@@ -132,7 +132,8 @@ remap: expressions: arithmetic: {
 		{
 			title: "Remainder"
 			source: #"""
-				3 % 2
+			    # There is no dedicated syntax for this, but a `mod` function exists
+				mod(3, 2)
 				"""#
 			return: 1
 		},
