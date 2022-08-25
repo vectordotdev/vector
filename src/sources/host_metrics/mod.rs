@@ -473,7 +473,8 @@ impl From<PatternWrapper> for String {
 
 #[cfg(test)]
 pub(self) mod tests {
-    use std::{collections::HashSet, future::Future};
+    use crate::test_util::components::{run_and_assert_source_compliance, SOURCE_TAGS};
+    use std::{collections::HashSet, future::Future, time::Duration};
 
     use super::*;
 
