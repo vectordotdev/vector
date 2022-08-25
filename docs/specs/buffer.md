@@ -36,7 +36,7 @@ Vector buffers MUST be instrumented for optimal observability and monitoring.
 
 #### BufferCreated
 
-*All buffers* MUST emit a `BufferCreated` event upon creation. To avoid stale metrics, this event MUST be regularly emitted at an interval.
+_All buffers_ MUST emit a `BufferCreated` event upon creation. To avoid stale metrics, this event MUST be regularly emitted at an interval.
 
 - Properties
   - `max_size_bytes` - the max size of the buffer in bytes if relevant
@@ -47,7 +47,7 @@ Vector buffers MUST be instrumented for optimal observability and monitoring.
 
 #### BufferEventsReceived
 
-*All buffers* MUST emit a `BufferEventsReceived` event after receiving one or more Vector events. *All buffers- MUST emit a `BufferEventsReceived` event upon startup if there are existing events in the buffer.
+_All buffers_ MUST emit a `BufferEventsReceived` event after receiving one or more Vector events. \*All buffers- MUST emit a `BufferEventsReceived` event upon startup if there are existing events in the buffer.
 
 - Properties
   - `count` - the number of received events
@@ -60,7 +60,7 @@ Vector buffers MUST be instrumented for optimal observability and monitoring.
 
 #### BufferEventsSent
 
-*All buffers* MUST emit a `BufferEventsSent` event after sending one or more Vector events.
+_All buffers_ MUST emit a `BufferEventsSent` event after sending one or more Vector events.
 
 - Properties
   - `count` - the number of sent events
@@ -75,7 +75,7 @@ Vector buffers MUST be instrumented for optimal observability and monitoring.
 
 **Extends the [Error event].**
 
-*All buffers* MUST emit error events in accordance with the [Error event]
+_All buffers_ MUST emit error events in accordance with the [Error event]
 requirements.
 
 This specification does not list a standard set of errors that components must
@@ -85,9 +85,9 @@ implement since errors are specific to the buffer and operation.
 
 **Extends the [EventsDropped event].**
 
-*All buffers* that can drop events MUST emit a `BufferEventsDropped` event in
+_All buffers_ that can drop events MUST emit a `BufferEventsDropped` event in
 accordance with the [EventsDropped event] requirements.
 
-[Error event]: instrumentation.md#Error
-[EventsDropped event]: instrumentation.md#EventsDropped
-[Instrumentation Specification]: instrumentation.md
+[error event]: instrumentation.md#Error
+[eventsdropped event]: instrumentation.md#EventsDropped
+[instrumentation specification]: instrumentation.md

@@ -179,12 +179,12 @@ azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git",
 # Tower
 tower = { version = "0.4.13", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util", "balance", "discover"] }
 # Serde
-serde = { version = "1.0.143", default-features = false, features = ["derive"] }
+serde = { version = "1.0.144", default-features = false, features = ["derive"] }
 serde-toml-merge = { version = "0.3.0", default-features = false }
 serde_bytes = { version = "0.11.7", default-features = false, features = ["std"], optional = true }
 serde_json = { version = "1.0.85", default-features = false, features = ["raw_value"] }
 serde_with = { version = "2.0.0", default-features = false, features = ["macros", "std"], optional = true }
-serde_yaml = { version = "0.8.26", default-features = false }
+serde_yaml = { version = "0.9.4", default-features = false }
 
 # Messagepack
 rmp-serde = { version = "1.1.0", default-features = false, optional = true }
@@ -199,8 +199,8 @@ goauth = { version = "0.13.1", optional = true }
 smpl_jwt = { version = "0.7.1", default-features = false, optional = true }
 
 # API
-async-graphql = { version = "4.0.6", default-features = false, optional = true, features = ["chrono"] }
-async-graphql-warp = { version = "4.0.6", default-features = false, optional = true }
+async-graphql = { version = "4.0.11", default-features = false, optional = true, features = ["chrono"] }
+async-graphql-warp = { version = "4.0.11", default-features = false, optional = true }
 itertools = { version = "0.10.3", default-features = false, optional = true }
 
 # API client
@@ -281,7 +281,7 @@ pulsar = { version = "4.1.2", default-features = false, features = ["tokio-runti
 rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
 rand_distr = { version = "0.4.3", default-features = false }
 rdkafka = { version = "0.28.0", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
-redis = { version = "0.21.5", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
+redis = { version = "0.21.6", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
 regex = { version = "1.6.0", default-features = false, features = ["std", "perf"] }
 roaring = { version = "0.9.0", default-features = false, optional = true }
 seahash = { version = "4.1.0", default-features = false, optional = true }
@@ -883,3 +883,4 @@ name = "codecs"
 path = "benches/codecs/main.rs"
 harness = false
 required-features = ["codecs-benches"]
+

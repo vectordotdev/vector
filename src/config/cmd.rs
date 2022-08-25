@@ -200,12 +200,10 @@ mod tests {
         SeedableRng,
     };
     use serde_json::json;
+    use vector_config::component::{SinkDescription, SourceDescription, TransformDescription};
 
     use crate::{
-        config::{
-            cmd::serialize_to_json, vars, ConfigBuilder, SinkDescription, SourceDescription,
-            TransformDescription,
-        },
+        config::{cmd::serialize_to_json, vars, ConfigBuilder},
         generate::{generate_example, TransformInputsStrategy},
     };
 

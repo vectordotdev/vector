@@ -1,10 +1,9 @@
 use async_trait::async_trait;
-use component::ComponentDescription;
 use serde::{Deserialize, Serialize};
 use vector_buffers::{BufferConfig, BufferType};
 use vector_core::config::{AcknowledgementsConfig, GlobalOptions, Input};
 
-use super::{component, schema, ComponentKey, ProxyConfig, Resource};
+use super::{schema, ComponentKey, ProxyConfig, Resource};
 use crate::sinks::{self, util::UriSerde};
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -174,7 +173,3 @@ impl SinkContext {
         &self.proxy
     }
 }
-
-pub type SinkDescription = ComponentDescription<Box<dyn SinkConfig>>;
-
-inventory::collect!(SinkDescription);

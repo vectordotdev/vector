@@ -5,11 +5,10 @@ use futures_util::{stream::BoxStream, Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot::{channel, Receiver, Sender};
 use vector_core::{
-    config::{AcknowledgementsConfig, DataType, Input, LogNamespace, Output},
+    config::{AcknowledgementsConfig, DataType, Input, Output},
     event::{Event, EventArray, EventContainer, LogEvent},
     schema::Definition,
     sink::{StreamSink, VectorSink},
-    source::Source,
     transform::{
         FunctionTransform, OutputBuffer, TaskTransform, Transform, TransformConfig,
         TransformContext,
@@ -17,8 +16,9 @@ use vector_core::{
 };
 
 use crate::{
-    config::{ConfigBuilder, SinkConfig, SinkContext, SourceConfig, SourceContext},
+    config::{unit_test::UnitTestSourceConfig, ConfigBuilder, SinkConfig, SinkContext},
     sinks::Healthcheck,
+    sources::Sources,
     test_util::{components::assert_transform_compliance, start_topology},
     topology::RunningTopology,
 };
@@ -62,40 +62,6 @@ impl TransformConfig for NoopTransformConfig {
 impl From<TransformType> for NoopTransformConfig {
     fn from(transform_type: TransformType) -> Self {
         Self { transform_type }
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct OneshotSourceConfig {
-    #[serde(skip)]
-    event: Option<Event>,
-}
-
-#[async_trait]
-#[typetag::serde(name = "oneshot")]
-impl SourceConfig for OneshotSourceConfig {
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::all())]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "oneshot"
-    }
-
-    fn can_acknowledge(&self) -> bool {
-        false
-    }
-
-    async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
-        let event = self.event.clone();
-        let mut out = cx.out;
-        let shutdown = cx.shutdown;
-        Ok(Box::pin(async move {
-            let event = event.expect("event must not be none");
-            out.send_event(event).await.unwrap();
-            shutdown.await;
-            Ok(())
-        }))
     }
 }
 
@@ -180,7 +146,12 @@ async fn create_topology(
 
     let (tx, rx) = channel();
 
-    builder.add_source("in", OneshotSourceConfig { event: Some(event) });
+    builder.add_source(
+        "in",
+        Sources::UnitTest(UnitTestSourceConfig {
+            events: vec![event],
+        }),
+    );
     builder.add_transform(
         "transform",
         &["in"],

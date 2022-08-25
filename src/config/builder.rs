@@ -8,14 +8,16 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use vector_core::{config::GlobalOptions, default_data_dir, transform::TransformConfig};
 
+use crate::sources::Sources;
+
 #[cfg(feature = "api")]
 use super::api;
 #[cfg(feature = "enterprise")]
 use super::enterprise;
 use super::{
     compiler, provider, schema, ComponentKey, Config, EnrichmentTableConfig, EnrichmentTableOuter,
-    HealthcheckOptions, SecretBackend, SinkConfig, SinkOuter, SourceConfig, SourceOuter,
-    TestDefinition, TransformOuter,
+    HealthcheckOptions, SecretBackend, SinkConfig, SinkOuter, SourceOuter, TestDefinition,
+    TransformOuter,
 };
 
 #[derive(Deserialize, Serialize, Debug, Default)]
@@ -234,7 +236,7 @@ impl ConfigBuilder {
         );
     }
 
-    pub fn add_source<S: SourceConfig + 'static, T: Into<String>>(&mut self, id: T, source: S) {
+    pub fn add_source<T: Into<String>>(&mut self, id: T, source: Sources) {
         self.sources
             .insert(ComponentKey::from(id.into()), SourceOuter::new(source));
     }

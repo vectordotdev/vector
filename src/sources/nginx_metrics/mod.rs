@@ -12,7 +12,7 @@ use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    config::{DataType, Output, SourceConfig, SourceContext, SourceDescription},
+    config::{DataType, Output, SourceConfig, SourceContext},
     event::metric::{Metric, MetricKind, MetricValue},
     http::{Auth, HttpClient},
     internal_events::{
@@ -55,7 +55,7 @@ enum NginxError {
 }
 
 /// Configuration for the `nginx_metrics` source.
-#[configurable_component(source)]
+#[configurable_component(source("nginx_metrics"))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct NginxMetricsConfig {
@@ -92,14 +92,9 @@ pub fn default_namespace() -> String {
     "nginx".to_string()
 }
 
-inventory::submit! {
-    SourceDescription::new::<NginxMetricsConfig>("nginx_metrics")
-}
-
 impl_generate_config_from_default!(NginxMetricsConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "nginx_metrics")]
 impl SourceConfig for NginxMetricsConfig {
     async fn build(&self, mut cx: SourceContext) -> crate::Result<super::Source> {
         let tls = TlsSettings::from_options(&self.tls)?;
@@ -143,10 +138,6 @@ impl SourceConfig for NginxMetricsConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Metric)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "nginx_metrics"
     }
 
     fn can_acknowledge(&self) -> bool {

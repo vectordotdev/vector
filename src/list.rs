@@ -1,7 +1,7 @@
 use clap::Parser;
 use serde::Serialize;
 
-use crate::config::{SinkDescription, SourceDescription, TransformDescription};
+use vector_config::component::{SinkDescription, SourceDescription, TransformDescription};
 
 #[derive(Parser, Debug)]
 #[clap(rename_all = "kebab-case")]

@@ -112,6 +112,10 @@ An `<Namespace>EventsDropped` event MUST be emitted when events are dropped.
 If events are dropped due to an error, then the error event should drive the
 emission of this event, meeting the below requirements.
 
+This event MUST NOT be emitted before events have been created in Vector. For
+example a source failing to decode incoming data would simply emit the
+`ComponentError` event but would not emit the `ComponentEventsDropped` event.
+
 **You MUST NOT emit this event for retriable operations that can recover and
 prevent data loss. For example, a failed HTTP request that will be retried does
 not result in data loss if the retry succeeds.**
@@ -127,7 +131,7 @@ not result in data loss if the retry succeeds.**
 - Metrics
   - MUST increment the `<namespace>_discarded_events_total` counter by the
     number of events discarded.
-  - MUST include the listed properties as tags except the `reason` property.
+  - MUST include the listed properties as tags except the `count` and `reason` properties.
 - Logs
   - MUST log a `Events dropped` message.
   - MUST include the defined properties as key-value pairs.
@@ -135,13 +139,12 @@ not result in data loss if the retry succeeds.**
   - If `intentional` is `false`, MUST log at the `error` level.
   - SHOULD NOT be rate limited.
 
-
 [camelcase]: https://en.wikipedia.org/wiki/Camel_case
-[`EventsDropped`]: #EventsDropped
-[Issue 10658]: https://github.com/vectordotdev/vector/issues/10658
-[Prometheus metric naming standards]: https://prometheus.io/docs/practices/naming/
+[`eventsdropped`]: #EventsDropped
+[issue 10658]: https://github.com/vectordotdev/vector/issues/10658
+[prometheus metric naming standards]: https://prometheus.io/docs/practices/naming/
 [pull request #8383]: https://github.com/vectordotdev/vector/pull/8383/
-[RFC 2064]: https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
-[RFC 9480]: https://github.com/vectordotdev/vector/blob/master/rfcs/2021-10-22-9480-processing-arrays-of-events.md
+[rfc 2064]: https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
+[rfc 9480]: https://github.com/vectordotdev/vector/blob/master/rfcs/2021-10-22-9480-processing-arrays-of-events.md
 [single base unit]: https://en.wikipedia.org/wiki/SI_base_unit
 [snakecase]: https://en.wikipedia.org/wiki/Snake_case

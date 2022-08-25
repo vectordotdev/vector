@@ -21,20 +21,19 @@ documentation in tandem with code changes.
 
 <!-- /MarkdownTOC -->
 
-
 ## Responsibilities
 
 As a Vector contributor you _are_ responsible for coupling the following user
 experience related changes with your code:
 
-* Reference docs changes located in the [`/website/cue` folder](../website/cue) (generally configuration changes)
-* Existing guide changes located in the [`/website/content` folder](../website/content)
-* If relevant, [highlighting](../website/content/en/highlights) your change for future release notes
+- Reference docs changes located in the [`/website/cue` folder](../website/cue) (generally configuration changes)
+- Existing guide changes located in the [`/website/content` folder](../website/content)
+- If relevant, [highlighting](../website/content/en/highlights) your change for future release notes
 
 By default, you are _not_ responsible for:
 
-* Writing new guides related to your change (unless assigned)
-* Writing a blog post on your change (unless assigned)
+- Writing new guides related to your change (unless assigned)
+- Writing a blog post on your change (unless assigned)
 
 ## Reference documentation
 
@@ -62,7 +61,7 @@ CI failures.
 
 ### Validating
 
-In addition to proper formatting, the CUE sources need to be *valid*, that is,
+In addition to proper formatting, the CUE sources need to be _valid_, that is,
 the provided data needs to conform to various CUE schemas. To check the validity
 of the CUE sources:
 
