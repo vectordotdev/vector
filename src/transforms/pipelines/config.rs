@@ -24,7 +24,7 @@ const INTERIOR_BUFFER_SIZE: usize = 64;
 /// A single pipeline.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
-pub(crate) struct PipelineConfig {
+pub struct PipelineConfig {
     /// The name of the pipeline.
     name: String,
 
@@ -150,7 +150,7 @@ impl PipelineConfig {
             name.clone(),
             InnerTopologyTransform {
                 inputs: inputs.to_vec(),
-                inner: self.clone(),
+                inner: Transforms::Pipeline(self.clone()),
             },
         );
         result

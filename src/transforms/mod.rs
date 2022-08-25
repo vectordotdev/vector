@@ -35,6 +35,7 @@ pub mod tag_cardinality_limit;
 #[cfg(feature = "transforms-throttle")]
 pub mod throttle;
 
+use vector_common::config::ComponentKey;
 use vector_config::{configurable_component, NamedComponent};
 pub use vector_core::transform::{
     FunctionTransform, OutputBuffer, SyncTransform, TaskTransform, Transform, TransformOutputs,
@@ -45,7 +46,7 @@ use vector_core::{
     schema,
 };
 
-use crate::config::{TransformConfig, TransformContext};
+use crate::config::{InnerTopology, TransformConfig, TransformContext};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -92,6 +93,11 @@ pub enum Transforms {
     /// Metric to log.
     #[cfg(feature = "transforms-metric_to_log")]
     MetricToLog(#[configurable(derived)] metric_to_log::MetricToLogConfig),
+
+    /// Pipelines. (inner)
+    #[cfg(feature = "transforms-pipelines")]
+    #[serde(skip)]
+    Pipeline(pipelines::PipelineConfig),
 
     /// Pipelines.
     #[cfg(feature = "transforms-pipelines")]
@@ -152,6 +158,8 @@ impl TransformConfig for Transforms {
             #[cfg(feature = "transforms-metric_to_log")]
             Transforms::MetricToLog(config) => config.build(globals).await,
             #[cfg(feature = "transforms-pipelines")]
+            Transforms::Pipeline(config) => config.build(globals).await,
+            #[cfg(feature = "transforms-pipelines")]
             Transforms::Pipelines(config) => config.build(globals).await,
             #[cfg(feature = "transforms-reduce")]
             Transforms::Reduce(config) => config.build(globals).await,
@@ -169,6 +177,8 @@ impl TransformConfig for Transforms {
             Transforms::TestNoop(config) => config.build(globals).await,
             #[cfg(feature = "transforms-throttle")]
             Transforms::Throttle(config) => config.build(globals).await,
+            #[allow(unreachable_patterns)]
+            _ => unimplemented!(),
         }
     }
 
@@ -191,6 +201,8 @@ impl TransformConfig for Transforms {
             #[cfg(feature = "transforms-metric_to_log")]
             Transforms::MetricToLog(config) => config.input(),
             #[cfg(feature = "transforms-pipelines")]
+            Transforms::Pipeline(config) => config.input(),
+            #[cfg(feature = "transforms-pipelines")]
             Transforms::Pipelines(config) => config.input(),
             #[cfg(feature = "transforms-reduce")]
             Transforms::Reduce(config) => config.input(),
@@ -208,6 +220,8 @@ impl TransformConfig for Transforms {
             Transforms::TestNoop(config) => config.input(),
             #[cfg(feature = "transforms-throttle")]
             Transforms::Throttle(config) => config.input(),
+            #[allow(unreachable_patterns)]
+            _ => unimplemented!(),
         }
     }
 
@@ -231,6 +245,8 @@ impl TransformConfig for Transforms {
             #[cfg(feature = "transforms-metric_to_log")]
             Transforms::MetricToLog(config) => config.outputs(merged_definition),
             #[cfg(feature = "transforms-pipelines")]
+            Transforms::Pipeline(config) => config.outputs(merged_definition),
+            #[cfg(feature = "transforms-pipelines")]
             Transforms::Pipelines(config) => config.outputs(merged_definition),
             #[cfg(feature = "transforms-reduce")]
             Transforms::Reduce(config) => config.outputs(merged_definition),
@@ -248,6 +264,8 @@ impl TransformConfig for Transforms {
             Transforms::TestNoop(config) => config.outputs(merged_definition),
             #[cfg(feature = "transforms-throttle")]
             Transforms::Throttle(config) => config.outputs(merged_definition),
+            #[allow(unreachable_patterns)]
+            _ => unimplemented!(),
         }
     }
 
@@ -271,6 +289,8 @@ impl TransformConfig for Transforms {
             #[cfg(feature = "transforms-metric_to_log")]
             Transforms::MetricToLog(config) => config.nestable(parents),
             #[cfg(feature = "transforms-pipelines")]
+            Transforms::Pipeline(config) => config.nestable(parents),
+            #[cfg(feature = "transforms-pipelines")]
             Transforms::Pipelines(config) => config.nestable(parents),
             #[cfg(feature = "transforms-reduce")]
             Transforms::Reduce(config) => config.nestable(parents),
@@ -288,6 +308,56 @@ impl TransformConfig for Transforms {
             Transforms::TestNoop(config) => config.nestable(parents),
             #[cfg(feature = "transforms-throttle")]
             Transforms::Throttle(config) => config.nestable(parents),
+            #[allow(unreachable_patterns)]
+            _ => unimplemented!(),
+        }
+    }
+
+    #[allow(unused_variables)]
+    fn expand(
+        &mut self,
+        name: &ComponentKey,
+        inputs: &[String],
+    ) -> crate::Result<Option<InnerTopology>> {
+        match self {
+            #[cfg(feature = "transforms-aggregate")]
+            Transforms::Aggregate(config) => config.expand(name, inputs),
+            #[cfg(feature = "transforms-aws_ec2_metadata")]
+            Transforms::AwsEc2Metadata(config) => config.expand(name, inputs),
+            #[cfg(feature = "transforms-dedupe")]
+            Transforms::Dedupe(config) => config.expand(name, inputs),
+            #[cfg(feature = "transforms-filter")]
+            Transforms::Filter(config) => config.expand(name, inputs),
+            #[cfg(feature = "transforms-geoip")]
+            Transforms::Geoip(config) => config.expand(name, inputs),
+            #[cfg(feature = "transforms-log_to_metric")]
+            Transforms::LogToMetric(config) => config.expand(name, inputs),
+            #[cfg(feature = "transforms-lua")]
+            Transforms::Lua(config) => config.expand(name, inputs),
+            #[cfg(feature = "transforms-metric_to_log")]
+            Transforms::MetricToLog(config) => config.expand(name, inputs),
+            #[cfg(feature = "transforms-pipelines")]
+            Transforms::Pipeline(config) => config.expand(name, inputs),
+            #[cfg(feature = "transforms-pipelines")]
+            Transforms::Pipelines(config) => config.expand(name, inputs),
+            #[cfg(feature = "transforms-reduce")]
+            Transforms::Reduce(config) => config.expand(name, inputs),
+            #[cfg(feature = "transforms-remap")]
+            Transforms::Remap(config) => config.expand(name, inputs),
+            #[cfg(feature = "transforms-route")]
+            Transforms::Route(config) => config.expand(name, inputs),
+            #[cfg(feature = "transforms-sample")]
+            Transforms::Sample(config) => config.expand(name, inputs),
+            #[cfg(feature = "transforms-tag_cardinality_limit")]
+            Transforms::TagCardinalityLimit(config) => config.expand(name, inputs),
+            #[cfg(test)]
+            Transforms::TestBasic(config) => config.expand(name, inputs),
+            #[cfg(test)]
+            Transforms::TestNoop(config) => config.expand(name, inputs),
+            #[cfg(feature = "transforms-throttle")]
+            Transforms::Throttle(config) => config.expand(name, inputs),
+            #[allow(unreachable_patterns)]
+            _ => unimplemented!(),
         }
     }
 }
@@ -314,6 +384,8 @@ impl NamedComponent for Transforms {
             #[cfg(feature = "transforms-metric_to_log")]
             Transforms::MetricToLog(config) => config.get_component_name(),
             #[cfg(feature = "transforms-pipelines")]
+            Transforms::Pipeline(config) => config.get_component_name(),
+            #[cfg(feature = "transforms-pipelines")]
             Transforms::Pipelines(config) => config.get_component_name(),
             #[cfg(feature = "transforms-reduce")]
             Transforms::Reduce(config) => config.get_component_name(),
@@ -331,6 +403,8 @@ impl NamedComponent for Transforms {
             Transforms::TestNoop(config) => config.get_component_name(),
             #[cfg(feature = "transforms-throttle")]
             Transforms::Throttle(config) => config.get_component_name(),
+            #[allow(unreachable_patterns)]
+            _ => unimplemented!(),
         }
     }
 }

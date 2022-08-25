@@ -104,6 +104,7 @@
 //! # any sink configuration
 //! ```
 mod config;
+pub use self::config::PipelineConfig;
 
 use std::{collections::HashSet, fmt::Debug};
 
@@ -325,7 +326,7 @@ mod tests {
         let config: PipelinesConfig = config.try_into().unwrap();
         let outer = TransformOuter {
             inputs: vec!["source".to_string()],
-            inner: Transforms::Pipeline(config),
+            inner: Transforms::Pipelines(config),
         };
         let name = ComponentKey::from("foo");
         let mut transforms = IndexMap::new();
