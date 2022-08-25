@@ -73,6 +73,18 @@ Single Expression, trailing whitespace with semicolon
 )
 
 ============================================
+Single Expression, comment terminator
+============================================
+1 #
+------
+
+(program
+  (exprs
+    (expr (literal (integer)))
+  )
+)
+
+============================================
 Two Expressions, comma, single line
 ============================================
 1;2;

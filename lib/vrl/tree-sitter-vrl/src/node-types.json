@@ -8,6 +8,10 @@
       "required": false,
       "types": [
         {
+          "type": "comment",
+          "named": true
+        },
+        {
           "type": "expr",
           "named": true
         }
@@ -19,9 +23,13 @@
     "named": true,
     "fields": {},
     "children": {
-      "multiple": false,
+      "multiple": true,
       "required": true,
       "types": [
+        {
+          "type": "comment",
+          "named": true
+        },
         {
           "type": "exprs",
           "named": true
@@ -31,6 +39,11 @@
   },
   {
     "type": "boolean",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "comment",
     "named": true,
     "fields": {}
   },
@@ -52,6 +65,29 @@
         },
         {
           "type": "group",
+          "named": true
+        },
+        {
+          "type": "object",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "container_query",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "container",
+          "named": true
+        },
+        {
+          "type": "query_segments",
           "named": true
         }
       ]
@@ -89,6 +125,10 @@
       "required": true,
       "types": [
         {
+          "type": "comment",
+          "named": true
+        },
+        {
           "type": "expr",
           "named": true
         }
@@ -105,9 +145,13 @@
     "named": true,
     "fields": {},
     "children": {
-      "multiple": false,
+      "multiple": true,
       "required": true,
       "types": [
+        {
+          "type": "comment",
+          "named": true
+        },
         {
           "type": "expr",
           "named": true
@@ -183,13 +227,59 @@
     }
   },
   {
+    "type": "object",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "comment",
+          "named": true
+        },
+        {
+          "type": "object_entry",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "object_entry",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "comment",
+          "named": true
+        },
+        {
+          "type": "expr",
+          "named": true
+        },
+        {
+          "type": "string",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "program",
     "named": true,
     "fields": {},
     "children": {
-      "multiple": false,
+      "multiple": true,
       "required": true,
       "types": [
+        {
+          "type": "comment",
+          "named": true
+        },
         {
           "type": "exprs",
           "named": true
@@ -205,6 +295,10 @@
       "multiple": false,
       "required": true,
       "types": [
+        {
+          "type": "container_query",
+          "named": true
+        },
         {
           "type": "local_query",
           "named": true
@@ -224,6 +318,10 @@
       "multiple": true,
       "required": true,
       "types": [
+        {
+          "type": "comment",
+          "named": true
+        },
         {
           "type": "query_field",
           "named": true
@@ -247,6 +345,25 @@
     }
   },
   {
+    "type": "query_index",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "comment",
+          "named": true
+        },
+        {
+          "type": "integer",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "query_segments",
     "named": true,
     "fields": {},
@@ -260,6 +377,10 @@
         },
         {
           "type": "query_field",
+          "named": true
+        },
+        {
+          "type": "query_index",
           "named": true
         }
       ]
@@ -345,6 +466,10 @@
     }
   },
   {
+    "type": "#",
+    "named": false
+  },
+  {
     "type": "%",
     "named": false
   },
@@ -370,6 +495,10 @@
   },
   {
     "type": ".",
+    "named": false
+  },
+  {
+    "type": ":",
     "named": false
   },
   {
@@ -421,15 +550,7 @@
     "named": false
   },
   {
-    "type": "{",
-    "named": false
-  },
-  {
     "type": "|",
-    "named": false
-  },
-  {
-    "type": "}",
     "named": false
   }
 ]

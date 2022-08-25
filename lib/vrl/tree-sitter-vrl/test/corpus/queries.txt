@@ -1,5 +1,5 @@
 ============================================
-Local Variables
+Local Variable
 ============================================
   foo
  _foo
@@ -18,7 +18,7 @@ f_o_o
 
 
 ============================================
-Local Queries
+Local Query
 ============================================
    foo.x
    foo.@bar
@@ -27,6 +27,9 @@ Local Queries
    foo.( x | y )
    foo."content-type"
    foo.("@($&" | "bar")
+   foo[0]
+   foo[0][-1]
+   foo.x[0]
 ---
 
 (program
@@ -38,12 +41,15 @@ Local Queries
     (expr (query (local_query (local_variable) (query_segments (query_coalesce (query_field) (query_field))))))
     (expr (query (local_query (local_variable) (query_segments (query_field (quoted_field))))))
     (expr (query (local_query (local_variable) (query_segments (query_coalesce (query_field (quoted_field)) (query_field (quoted_field)))))))
+    (expr (query (local_query (local_variable) (query_segments (query_index (integer))))))
+    (expr (query (local_query (local_variable) (query_segments (query_index (integer)) (query_index (integer))))))
+    (expr (query (local_query (local_variable) (query_segments (query_field) (query_index (integer))))))
   )
 )
 
 
 ============================================
-Event Queries
+Event Query
 ============================================
    .
    .foo
@@ -61,7 +67,7 @@ Event Queries
 )
 
 ============================================
-Target Queries
+Target Query
 ============================================
    %
    %foo
@@ -75,5 +81,56 @@ Target Queries
     (expr (query (target_query (target_query_prefix) (query_segments (query_field)))))
     (expr (query (target_query (target_query_prefix) (query_segments (query_field) (query_field)))))
     (expr (query (target_query (target_query_prefix) (query_segments (query_field) (query_field)))))
+  )
+)
+
+
+============================================
+Object Query
+============================================
+{}.foo
+{"foo": true}.foo
+---
+
+(program
+  (exprs
+    (expr (query (container_query (container (object)) (query_segments (query_field)))))
+    (expr (query (container_query (container (object (object_entry (string) (expr (literal (boolean)))))) (query_segments (query_field)))))
+  )
+)
+
+============================================
+Block Query
+============================================
+{true}.foo
+---
+
+(program
+  (exprs
+    (expr (query (container_query (container (block (exprs (expr (literal (boolean)))))) (query_segments (query_field)))))
+  )
+)
+
+============================================
+Group Query
+============================================
+(true).foo
+---
+
+(program
+  (exprs
+    (expr (query (container_query (container (group (expr (literal (boolean))))) (query_segments (query_field)))))
+  )
+)
+
+============================================
+Array Query
+============================================
+[].foo
+---
+
+(program
+  (exprs
+    (expr (query (container_query (container (array)) (query_segments (query_field)))))
   )
 )
