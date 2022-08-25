@@ -45,6 +45,7 @@ impl Function for Mod {
     ) -> Compiled {
         let value = arguments.required("value");
         let modulus = arguments.required("modulus");
+        // TODO: return a compile-time error if modulus is 0
 
         Ok(ModFn { value, modulus }.as_expr())
     }
