@@ -4451,9 +4451,9 @@ dependencies = [
 
 [[package]]
 name = "ndarray-stats"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22877ad014bafa2f7dcfa5d556b0c7a52b0546cc98061a1ebef6d1834957b069"
+checksum = "af5a8477ac96877b5bd1fd67e0c28736c12943aba24eda92b127e036b0c8f400"
 dependencies = [
  "indexmap",
  "itertools 0.10.3",
