@@ -25,20 +25,14 @@ use super::{
 
 const PEM_START_MARKER: &str = "-----BEGIN ";
 
-#[cfg(test)]
 pub const TEST_PEM_CA_PATH: &str = "tests/data/ca/certs/ca.cert.pem";
-#[cfg(all(test, feature = "kafka-integration-tests"))]
 pub const TEST_PEM_INTERMEDIATE_CA_PATH: &str =
     "tests/data/ca/intermediate_server/certs/ca-chain.cert.pem";
-#[cfg(test)]
 pub const TEST_PEM_CRT_PATH: &str =
     "tests/data/ca/intermediate_server/certs/localhost-chain.cert.pem";
-#[cfg(test)]
 pub const TEST_PEM_KEY_PATH: &str = "tests/data/ca/intermediate_server/private/localhost.key.pem";
-#[cfg(all(test, feature = "sources-socket"))]
 pub const TEST_PEM_CLIENT_CRT_PATH: &str =
     "tests/data/ca/intermediate_client/certs/localhost-chain.cert.pem";
-#[cfg(all(test, feature = "sources-socket"))]
 pub const TEST_PEM_CLIENT_KEY_PATH: &str =
     "tests/data/ca/intermediate_client/private/localhost.key.pem";
 
@@ -63,7 +57,6 @@ impl TlsEnableableConfig {
         }
     }
 
-    #[cfg(test)]
     pub fn test_config() -> Self {
         Self {
             enabled: Some(true),
@@ -143,7 +136,6 @@ pub struct TlsConfig {
 }
 
 impl TlsConfig {
-    #[cfg(test)]
     pub fn test_config() -> Self {
         Self {
             ca_file: Some(TEST_PEM_CA_PATH.into()),
@@ -165,7 +157,7 @@ pub struct TlsSettings {
 }
 
 #[derive(Clone)]
-pub struct IdentityStore(Vec<u8>, String);
+pub(super) struct IdentityStore(Vec<u8>, String);
 
 impl TlsSettings {
     /// Generate a filled out settings struct from the given optional
@@ -212,7 +204,6 @@ impl TlsSettings {
         })
     }
 
-    #[cfg(feature = "sources-gcp_pubsub")]
     pub fn identity_pem(&self) -> Option<(Vec<u8>, Vec<u8>)> {
         self.identity().map(|identity| {
             let mut cert = identity.cert.to_pem().expect("Invalid stored identity");
@@ -233,7 +224,6 @@ impl TlsSettings {
         })
     }
 
-    #[cfg(feature = "sources-gcp_pubsub")]
     pub fn authorities_pem(&self) -> impl Iterator<Item = Vec<u8>> + '_ {
         self.authorities.iter().map(|authority| {
             authority
@@ -263,7 +253,15 @@ impl TlsSettings {
                 }
             }
         }
-        if !self.authorities.is_empty() {
+        if self.authorities.is_empty() {
+            debug!("Fetching system root certs.");
+
+            #[cfg(windows)]
+            load_windows_certs(context).unwrap();
+
+            #[cfg(target_os = "macos")]
+            load_mac_certs(context).unwrap();
+        } else {
             let mut store = X509StoreBuilder::new().context(NewStoreBuilderSnafu)?;
             for authority in &self.authorities {
                 store
@@ -273,14 +271,6 @@ impl TlsSettings {
             context
                 .set_verify_cert_store(store.build())
                 .context(SetVerifyCertSnafu)?;
-        } else {
-            debug!("Fetching system root certs.");
-
-            #[cfg(windows)]
-            load_windows_certs(context).unwrap();
-
-            #[cfg(target_os = "macos")]
-            load_mac_certs(context).unwrap();
         }
 
         if let Some(alpn) = &self.alpn_protocols {
@@ -326,7 +316,7 @@ impl TlsConfig {
                 der_or_pem(
                     data,
                     |der| self.parse_pkcs12_identity(der),
-                    |pem| self.parse_pem_identity(pem, &filename),
+                    |pem| self.parse_pem_identity(&pem, &filename),
                 )
             }
         }
@@ -342,7 +332,7 @@ impl TlsConfig {
                 let mut data: Vec<u8> = Vec::new();
                 for str in protocols.iter() {
                     data.push(str.len().try_into().context(EncodeAlpnProtocolsSnafu)?);
-                    data.append(&mut str.to_owned().into_bytes());
+                    data.append(&mut str.clone().into_bytes());
                 }
                 Ok(Some(data))
             }
@@ -350,7 +340,7 @@ impl TlsConfig {
     }
 
     /// Parse identity from a PEM encoded certificate + key pair of files
-    fn parse_pem_identity(&self, pem: String, crt_file: &Path) -> Result<Option<IdentityStore>> {
+    fn parse_pem_identity(&self, pem: &str, crt_file: &Path) -> Result<Option<IdentityStore>> {
         match &self.key_file {
             None => Err(TlsError::MissingKey),
             Some(key_file) => {
@@ -598,9 +588,9 @@ mod test {
 
     const TEST_PKCS12_PATH: &str = "tests/data/ca/intermediate_client/private/localhost.p12";
     const TEST_PEM_CRT_BYTES: &[u8] =
-        include_bytes!("../../tests/data/ca/intermediate_server/certs/localhost.cert.pem");
+        include_bytes!("../../../../tests/data/ca/intermediate_server/certs/localhost.cert.pem");
     const TEST_PEM_KEY_BYTES: &[u8] =
-        include_bytes!("../../tests/data/ca/intermediate_server/private/localhost.key.pem");
+        include_bytes!("../../../../tests/data/ca/intermediate_server/private/localhost.key.pem");
 
     #[test]
     fn parse_alpn_protocols() {
@@ -668,9 +658,10 @@ mod test {
 
     #[test]
     fn from_options_inline_ca() {
-        let ca =
-            String::from_utf8(include_bytes!("../../tests/data/ca/certs/ca.cert.pem").to_vec())
-                .unwrap();
+        let ca = String::from_utf8(
+            include_bytes!("../../../../tests/data/ca/certs/ca.cert.pem").to_vec(),
+        )
+        .unwrap();
         let options = TlsConfig {
             ca_file: Some(ca.into()),
             ..Default::default()

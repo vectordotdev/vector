@@ -1,11 +1,7 @@
 use std::net::SocketAddr;
 
 use futures::TryFutureExt;
-use tokio::net::TcpStream;
-use tonic::{
-    transport::{server::Connected, Certificate},
-    Request, Response, Status,
-};
+use tonic::{Request, Response, Status};
 use vector_config::configurable_component;
 use vector_core::{
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
@@ -18,7 +14,7 @@ use crate::{
     proto::vector as proto,
     serde::bool_or_struct,
     sources::{util::grpc::run_grpc_server, Source},
-    tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsEnableableConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
     SourceSender,
 };
 
@@ -151,31 +147,6 @@ impl VectorConfig {
 
     pub(super) fn resources(&self) -> Vec<Resource> {
         vec![Resource::tcp(self.address)]
-    }
-}
-
-#[derive(Clone)]
-pub struct MaybeTlsConnectInfo {
-    pub remote_addr: SocketAddr,
-    pub peer_certs: Option<Vec<Certificate>>,
-}
-
-impl Connected for MaybeTlsIncomingStream<TcpStream> {
-    type ConnectInfo = MaybeTlsConnectInfo;
-
-    fn connect_info(&self) -> Self::ConnectInfo {
-        MaybeTlsConnectInfo {
-            remote_addr: self.peer_addr(),
-            peer_certs: self
-                .ssl_stream()
-                .and_then(|s| s.ssl().peer_cert_chain())
-                .map(|s| {
-                    s.into_iter()
-                        .filter_map(|c| c.to_pem().ok())
-                        .map(Certificate::from_pem)
-                        .collect()
-                }),
-        }
     }
 }
 
