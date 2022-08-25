@@ -137,32 +137,6 @@ impl Function for ParseKeyValue {
         }
         .as_expr())
     }
-
-    fn compile_argument(
-        &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        match (name, expr) {
-            ("whitespace", Some(expr)) => match expr.as_value() {
-                None => Ok(None),
-                Some(value) => Ok(Some(
-                    Whitespace::from_str(
-                        &value.try_bytes_utf8_lossy().expect("whitespace not bytes"),
-                    )
-                    .map(|whitespace| Box::new(whitespace) as Box<dyn std::any::Any + Send + Sync>)
-                    .map_err(|_| vrl::function::Error::InvalidEnumVariant {
-                        keyword: "whitespace",
-                        value,
-                        variants: Whitespace::all_value(),
-                    })?,
-                )),
-            },
-            _ => Ok(None),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

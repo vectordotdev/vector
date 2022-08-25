@@ -5,7 +5,7 @@ use vrl::prelude::*;
 use vrl::state::TypeState;
 
 use crate::{
-    vrl_util::{self, add_index, evaluate_condition, index_from_args},
+    vrl_util::{self, add_index, evaluate_condition},
     Case, Condition, IndexHandle, TableRegistry, TableSearch,
 };
 
@@ -142,40 +142,6 @@ impl Function for FindEnrichmentTableRecords {
             enrichment_tables: registry.as_readonly(),
         }
         .as_expr())
-    }
-
-    fn compile_argument(
-        &self,
-        args: &[(&'static str, Option<FunctionArgument>)],
-        ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        match (name, expr) {
-            ("table", Some(expr)) => {
-                let registry =
-                    ctx.get_external_context_mut::<TableRegistry>()
-                        .ok_or(Box::new(vrl_util::Error::TablesNotLoaded)
-                            as Box<dyn DiagnosticMessage>)?;
-
-                let tables = registry
-                    .table_ids()
-                    .into_iter()
-                    .map(Value::from)
-                    .collect::<Vec<_>>();
-
-                let table = expr
-                    .as_enum("table", tables)?
-                    .try_bytes_utf8_lossy()
-                    .expect("table is not valid utf8")
-                    .into_owned();
-
-                let record = index_from_args(table, registry, args)?;
-
-                Ok(Some(Box::new(record) as _))
-            }
-            _ => Ok(None),
-        }
     }
 }
 

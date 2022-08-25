@@ -61,33 +61,6 @@ impl Function for ParseGrok {
 
         ParseGroks::compile(value, patterns, aliases)
     }
-
-    fn compile_argument(
-        &self,
-        args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        match (name, expr) {
-            ("pattern", Some(expr)) => {
-                let pattern = expr.as_literal("pattern")?;
-                let patterns = vec![pattern];
-
-                let aliases = args.iter().find_map::<&FunctionArgument, _>(|(name, arg)| {
-                    if *name == "aliases" {
-                        arg.as_ref()
-                    } else {
-                        None
-                    }
-                });
-
-                ParseGroks::compile_pattern_argument(patterns, aliases)
-            }
-            ("aliases", Some(_)) => Ok(None),
-            _ => Ok(None),
-        }
-    }
 }
 
 #[cfg(test)]

@@ -73,37 +73,6 @@ impl Function for MatchAny {
 
         Ok(MatchAnyFn { value, regex_set }.as_expr())
     }
-
-    fn compile_argument(
-        &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        match (name, expr) {
-            ("patterns", Some(expr)) => {
-                let patterns = expr
-                    .as_value()
-                    .and_then(|value| value.try_array().ok())
-                    .ok_or_else(|| vrl::function::Error::ExpectedStaticExpression {
-                        keyword: "patterns",
-                        expr: expr.clone(),
-                    })?;
-                let mut re_strings = Vec::with_capacity(patterns.len());
-                for value in patterns {
-                    let re = value
-                        .try_regex()
-                        .map_err(|e| Box::new(e) as Box<dyn DiagnosticMessage>)?;
-                    re_strings.push(re.to_string());
-                }
-
-                let regex_set = RegexSet::new(re_strings).expect("regex were already valid");
-                Ok(Some(Box::new(regex_set) as _))
-            }
-            _ => Ok(None),
-        }
-    }
 }
 
 #[derive(Clone, Debug)]
