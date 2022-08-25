@@ -73,14 +73,14 @@ impl Function for IpSubnet {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let subnet = arguments.required("subnet");
 
-        Ok(Box::new(IpSubnetFn { value, subnet }))
+        Ok(IpSubnetFn { value, subnet }.as_expr())
     }
 }
 
@@ -90,7 +90,7 @@ struct IpSubnetFn {
     subnet: Box<dyn Expression>,
 }
 
-impl Expression for IpSubnetFn {
+impl FunctionExpression for IpSubnetFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let mask = self.subnet.resolve(ctx)?;
@@ -98,7 +98,7 @@ impl Expression for IpSubnetFn {
         ip_subnet(value, mask)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::bytes().fallible()
     }
 }

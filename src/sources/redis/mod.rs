@@ -13,7 +13,7 @@ use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{log_schema, GenerateConfig, Output, SourceConfig, SourceContext, SourceDescription},
+    config::{log_schema, GenerateConfig, Output, SourceConfig, SourceContext},
     event::Event,
     internal_events::{BytesReceived, EventsReceived, StreamClosedError},
     serde::{default_decoding, default_framing_message_based},
@@ -88,7 +88,7 @@ impl From<&redis::ConnectionInfo> for ConnectionInfo {
 }
 
 /// Configuration for the `redis` source.
-#[configurable_component(source)]
+#[configurable_component(source("redis"))]
 #[derive(Clone, Debug, Derivative)]
 #[serde(deny_unknown_fields)]
 pub struct RedisSourceConfig {
@@ -140,12 +140,7 @@ impl GenerateConfig for RedisSourceConfig {
     }
 }
 
-inventory::submit! {
-    SourceDescription::new::<RedisSourceConfig>("redis")
-}
-
 #[async_trait::async_trait]
-#[typetag::serde(name = "redis")]
 impl SourceConfig for RedisSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         // A key must be specified to actually query i.e. the list to pop from, or the channel to subscribe to.
@@ -192,10 +187,6 @@ impl SourceConfig for RedisSourceConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(self.decoding.output_type())]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "redis"
     }
 
     fn can_acknowledge(&self) -> bool {

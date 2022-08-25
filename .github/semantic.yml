@@ -134,11 +134,13 @@ scopes:
   - docker_logs source # Anything `docker_logs` source related
   - exec source # Anything `exec` source related
   - file source # Anything `file` source related
+  - file_descriptor source # Anything `file_descriptor` source related
   - fluent source # Anything `fluent` source related
   - gcp_pubsub source # Anything `gcp_pubsub` source related
   - heroku_logs source # Anything `heroku_logs` source related
   - host_metrics source # Anything `host_metrics` source related
   - http source # Anything `http` source related
+  - http_scrape source # Anything `http_scrape` source related
   - internal_logs source # Anything `internal_logs` source related
   - internal_metrics source # Anything `internal_metrics` source related
   - journald source # Anything `journald` source related
@@ -178,6 +180,7 @@ scopes:
   - throttle transform # Anything `throttle` transform related
 
   # sinks
+  - apex sink # Anything `apex` sink related
   - aws_cloudwatch_logs sink # Anything `aws_cloudwatch_logs` sink related
   - aws_cloudwatch_metrics sink # Anything `aws_cloudwatch_metrics` sink related
   - aws_kinesis_firehose sink # Anything `aws_kinesis_firehose` sink related

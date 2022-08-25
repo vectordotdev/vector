@@ -36,13 +36,13 @@ impl Function for ParseAwsAlbLog {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(ParseAwsAlbLogFn::new(value)))
+        Ok(ParseAwsAlbLogFn::new(value).as_expr())
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -65,13 +65,13 @@ impl ParseAwsAlbLogFn {
     }
 }
 
-impl Expression for ParseAwsAlbLogFn {
+impl FunctionExpression for ParseAwsAlbLogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?;
         parse_aws_alb_log(bytes)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::object(inner_kind()).fallible(/* log parsing error */)
     }
 }

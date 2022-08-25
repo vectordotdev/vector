@@ -435,7 +435,7 @@ fn close_socket(socket: &MaybeTlsIncomingStream<TcpStream>) -> bool {
 
 /// A listening address that can be given directly or be managed via `systemd` socket activation.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum SocketListenAddr {
     /// An IPv4/IPv6 address and port.

@@ -427,6 +427,7 @@ components: {
 			can_verify_certificate: bool
 			if Args.mode == "connect" {
 				can_verify_hostname: bool
+				enabled_by_scheme:   bool
 			}
 			if Args.mode == "accept" {
 				can_add_client_metadata: bool | *false
@@ -691,6 +692,7 @@ components: {
 					can_verify_certificate: bool | *true
 					can_verify_hostname:    bool | *false
 					enabled_default:        bool
+					enabled_by_scheme:      bool
 				}
 				let Args = _args
 
@@ -698,11 +700,15 @@ components: {
 				description: "Configures the TLS options for outgoing connections."
 				required:    false
 				type: object: options: {
-					enabled: {
-						common:      true
-						description: "Enable TLS during connections to the remote."
-						required:    false
-						type: bool: default: Args.enabled_default
+					if Args.enabled_by_scheme != _|_ {
+						if !Args.enabled_by_scheme {
+							enabled: {
+								common:      true
+								description: "Enable TLS during connections to the remote."
+								required:    false
+								type: bool: default: Args.enabled_default
+							}
+						}
 					}
 
 					ca_file: {
@@ -739,6 +745,18 @@ components: {
 						type: string: {
 							default: null
 							examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
+						}
+					}
+					alpn_protocols: {
+						common:      false
+						description: "Sets the list of supported ALPN protolols, which are used during negotiation with peer. Prioritized in the order they are defined."
+						required:    false
+						type: array: {
+							default: null
+							items: type: string: {
+								examples: ["h2"]
+								syntax: "literal"
+							}
 						}
 					}
 

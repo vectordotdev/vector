@@ -21,6 +21,7 @@ on:
       - "Makefile"
       - "rust-toolchain"
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
 
 concurrency:
   # For pull requests, cancel running workflows, for master, run all
@@ -31,7 +32,6 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  AUTOINSTALL: true
   AWS_ACCESS_KEY_ID: "dummy"
   AWS_SECRET_ACCESS_KEY: "dummy"
   CONTAINER_TOOL: "docker"

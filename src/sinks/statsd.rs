@@ -315,7 +315,7 @@ mod test {
     use crate::{
         event::Metric,
         test_util::{
-            components::{assert_sink_compliance, SINK_TAGS},
+            components::{run_and_assert_sink_compliance, SINK_TAGS},
             *,
         },
     };
@@ -509,6 +509,9 @@ mod test {
             acknowledgements: Default::default(),
         };
 
+        let context = SinkContext::new_test();
+        let (sink, _healthcheck) = config.build(context).await.unwrap();
+
         let events = vec![
             Event::Metric(
                 Metric::new(
@@ -533,26 +536,18 @@ mod test {
         ];
         let (mut tx, rx) = mpsc::channel(0);
 
-        let context = SinkContext::new_test();
-        assert_sink_compliance(&SINK_TAGS, async move {
-            let (sink, _healthcheck) = config.build(context).await.unwrap();
+        let socket = UdpSocket::bind(addr).await.unwrap();
+        tokio::spawn(async move {
+            let mut stream = UdpFramed::new(socket, BytesCodec::new())
+                .map_err(|error| error!(message = "Error reading line.", %error))
+                .map_ok(|(bytes, _addr)| bytes.freeze());
 
-            let socket = UdpSocket::bind(addr).await.unwrap();
-            tokio::spawn(async move {
-                let mut stream = UdpFramed::new(socket, BytesCodec::new())
-                    .map_err(|error| error!(message = "Error reading line.", %error))
-                    .map_ok(|(bytes, _addr)| bytes.freeze());
+            while let Some(Ok(item)) = stream.next().await {
+                tx.send(item).await.unwrap();
+            }
+        });
 
-                while let Some(Ok(item)) = stream.next().await {
-                    tx.send(item).await.unwrap();
-                }
-            });
-
-            sink.run(stream::iter(events).map(Into::into))
-                .await
-                .expect("Running sink failed")
-        })
-        .await;
+        run_and_assert_sink_compliance(sink, stream::iter(events), &SINK_TAGS).await;
 
         let messages = collect_n(rx, 1).await;
         assert_eq!(

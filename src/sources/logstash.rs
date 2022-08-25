@@ -19,7 +19,7 @@ use super::util::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
-        SourceConfig, SourceContext, SourceDescription,
+        SourceConfig, SourceContext,
     },
     event::{Event, LogEvent, Value},
     serde::bool_or_struct,
@@ -29,7 +29,7 @@ use crate::{
 };
 
 /// Configuration for the `logstash` source.
-#[configurable_component(source)]
+#[configurable_component(source("logstash"))]
 #[derive(Clone, Debug)]
 pub struct LogstashConfig {
     /// The address to listen for connections on.
@@ -54,10 +54,6 @@ pub struct LogstashConfig {
     acknowledgements: AcknowledgementsConfig,
 }
 
-inventory::submit! {
-    SourceDescription::new::<LogstashConfig>("logstash")
-}
-
 impl GenerateConfig for LogstashConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
@@ -73,7 +69,6 @@ impl GenerateConfig for LogstashConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "logstash")]
 impl SourceConfig for LogstashConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let source = LogstashSource {
@@ -101,10 +96,6 @@ impl SourceConfig for LogstashConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "logstash"
     }
 
     fn resources(&self) -> Vec<Resource> {

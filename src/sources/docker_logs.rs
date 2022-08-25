@@ -14,7 +14,6 @@ use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
 use futures::{Stream, StreamExt};
 use lookup::lookup_v2::{parse_path, OwnedSegment};
 use once_cell::sync::Lazy;
-use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tracing_futures::Instrument;
 use vector_config::configurable_component;
@@ -23,7 +22,7 @@ use vector_core::ByteSizeOf;
 
 use super::util::MultilineConfig;
 use crate::{
-    config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
+    config::{log_schema, DataType, Output, SourceConfig, SourceContext},
     docker::{docker, DockerTlsConfig},
     event::{self, merge_state::LogEventMergeState, LogEvent, Value},
     internal_events::{
@@ -50,7 +49,7 @@ static STDOUT: Lazy<Bytes> = Lazy::new(|| "stdout".into());
 static CONSOLE: Lazy<Bytes> = Lazy::new(|| "console".into());
 
 /// Configuration for the `docker_logs` source.
-#[configurable_component(source)]
+#[configurable_component(source("docker_logs"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct DockerLogsConfig {
@@ -186,14 +185,9 @@ impl DockerLogsConfig {
     }
 }
 
-inventory::submit! {
-    SourceDescription::new::<DockerLogsConfig>("docker_logs")
-}
-
 impl_generate_config_from_default!(DockerLogsConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "docker_logs")]
 impl SourceConfig for DockerLogsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let source = DockerLogsSource::new(
@@ -227,38 +221,6 @@ impl SourceConfig for DockerLogsConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "docker_logs"
-    }
-
-    fn can_acknowledge(&self) -> bool {
-        false
-    }
-}
-
-// Add a compatibility alias to avoid breaking existing configs
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-struct DockerCompatConfig {
-    #[serde(flatten)]
-    config: DockerLogsConfig,
-}
-
-#[async_trait::async_trait]
-#[typetag::serde(name = "docker")]
-impl SourceConfig for DockerCompatConfig {
-    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        self.config.build(cx).await
-    }
-
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
-        self.config.outputs(global_log_namespace)
-    }
-
-    fn source_type(&self) -> &'static str {
-        "docker"
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -1086,7 +1048,7 @@ fn line_agg_adapter(
             .remove(log_schema().message_key())
             .expect("message must exist in the event");
         let stream_value = log_event
-            .get(&*STREAM)
+            .get(STREAM)
             .expect("stream must exist in the event");
 
         let stream = stream_value.coerce_to_bytes();
@@ -1420,9 +1382,9 @@ mod integration_tests {
 
         let log = events[0].as_log();
         assert_eq!(log[log_schema().message_key()], message.into());
-        assert_eq!(log[&*super::CONTAINER], id.into());
-        assert!(log.get(&*super::CREATED_AT).is_some());
-        assert_eq!(log[&*super::IMAGE], "busybox".into());
+        assert_eq!(log[super::CONTAINER], id.into());
+        assert!(log.get(super::CREATED_AT).is_some());
+        assert_eq!(log[super::IMAGE], "busybox".into());
         assert!(log.get(format!("label.{}", label).as_str()).is_some());
         assert_eq!(events[0].as_log()[&super::NAME], name.into());
         assert_eq!(
@@ -1563,9 +1525,9 @@ mod integration_tests {
 
         let log = events[0].as_log();
         assert_eq!(log[log_schema().message_key()], message.into());
-        assert_eq!(log[&*super::CONTAINER], id.into());
-        assert!(log.get(&*super::CREATED_AT).is_some());
-        assert_eq!(log[&*super::IMAGE], "busybox".into());
+        assert_eq!(log[super::CONTAINER], id.into());
+        assert!(log.get(super::CREATED_AT).is_some());
+        assert_eq!(log[super::IMAGE], "busybox".into());
         assert!(log.get(format!("label.{}", label).as_str()).is_some());
         assert_eq!(events[0].as_log()[&super::NAME], name.into());
         assert_eq!(
@@ -1668,9 +1630,9 @@ mod integration_tests {
 
         let log = events[0].as_log();
         assert_eq!(log[log_schema().message_key()], message.into());
-        assert_eq!(log[&*super::CONTAINER], id.into());
-        assert!(log.get(&*super::CREATED_AT).is_some());
-        assert_eq!(log[&*super::IMAGE], "busybox".into());
+        assert_eq!(log[super::CONTAINER], id.into());
+        assert!(log.get(super::CREATED_AT).is_some());
+        assert_eq!(log[super::IMAGE], "busybox".into());
         assert!(log
             .get("label")
             .unwrap()
@@ -1757,7 +1719,7 @@ mod integration_tests {
             .map(|event| {
                 event
                     .into_log()
-                    .remove(&*crate::config::log_schema().message_key())
+                    .remove(crate::config::log_schema().message_key())
                     .unwrap()
                     .to_string_lossy()
             })

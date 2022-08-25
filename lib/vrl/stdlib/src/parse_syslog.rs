@@ -57,13 +57,13 @@ impl Function for ParseSyslog {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(ParseSyslogFn { value }))
+        Ok(ParseSyslogFn { value }.as_expr())
     }
 }
 
@@ -72,14 +72,14 @@ pub(crate) struct ParseSyslogFn {
     pub(crate) value: Box<dyn Expression>,
 }
 
-impl Expression for ParseSyslogFn {
+impl FunctionExpression for ParseSyslogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
 
         parse_syslog(value, ctx)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::object(inner_kind()).fallible()
     }
 }

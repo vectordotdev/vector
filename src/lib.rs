@@ -65,9 +65,6 @@ pub mod line_agg;
 pub mod list;
 #[cfg(any(feature = "sources-nats", feature = "sinks-nats"))]
 pub(crate) mod nats;
-#[cfg(feature = "opentelemetry")]
-#[allow(unreachable_pub)]
-pub mod opentelemetry;
 #[allow(unreachable_pub)]
 pub(crate) mod proto;
 pub mod providers;
@@ -137,7 +134,7 @@ pub fn get_version() -> String {
     format!("{} ({})", pkg_version, build_string)
 }
 
-#[allow(unused)]
+#[allow(warnings)]
 pub mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }

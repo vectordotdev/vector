@@ -11,9 +11,9 @@ use std::{
 use async_graphql::{Enum, InputObject, Interface, Object, Subscription};
 use once_cell::sync::Lazy;
 use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
+use vector_config::NamedComponent;
 use vector_core::internal_event::DEFAULT_OUTPUT;
 
-use crate::topology::schema::merged_definition;
 use crate::{
     api::schema::{
         components::state::component_by_component_key,
@@ -23,6 +23,7 @@ use crate::{
     config::{ComponentKey, Config},
     filter_check,
 };
+use crate::{config::SourceConfig, topology::schema::merged_definition};
 
 #[derive(Debug, Clone, Interface)]
 #[graphql(
@@ -262,7 +263,7 @@ pub fn update_config(config: &Config) {
             component_key.clone(),
             Component::Source(source::Source(source::Data {
                 component_key: component_key.clone(),
-                component_type: source.inner.source_type().to_string(),
+                component_type: source.inner.get_component_name().to_string(),
                 // TODO(#10745): This is obviously wrong, but there are a lot of assumptions in the
                 // API modules about `output_type` as it's a sortable field, etc. This is a stopgap
                 // until we decide how we want to change the rest of the usages.

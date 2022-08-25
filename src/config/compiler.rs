@@ -4,6 +4,7 @@ use indexmap::{IndexMap, IndexSet};
 
 use super::{
     builder::ConfigBuilder, graph::Graph, schema, validation, ComponentKey, Config, OutputId,
+    SourceConfig,
 };
 
 /// to handle the expansions when building the graph we need to be able to get the list of inputs
@@ -249,100 +250,19 @@ fn expand_globs_inner(inputs: &mut Vec<String>, id: &str, candidates: &IndexSet<
 
 #[cfg(test)]
 mod test {
-    use async_trait::async_trait;
-    use serde::{Deserialize, Serialize};
-    use vector_core::config::LogNamespace;
-
     use super::*;
-    use crate::{
-        config::{
-            AcknowledgementsConfig, DataType, Input, Output, SinkConfig, SinkContext, SourceConfig,
-            SourceContext, TransformConfig, TransformContext,
-        },
-        sinks::{Healthcheck, VectorSink},
-        sources::Source,
-        transforms::Transform,
-    };
-
-    #[derive(Debug, Serialize, Deserialize)]
-    struct MockSourceConfig;
-
-    #[derive(Debug, Clone, Serialize, Deserialize)]
-    struct MockTransformConfig;
-
-    #[derive(Debug, Serialize, Deserialize)]
-    struct MockSinkConfig;
-
-    #[async_trait]
-    #[typetag::serde(name = "mock")]
-    impl SourceConfig for MockSourceConfig {
-        async fn build(&self, _cx: SourceContext) -> crate::Result<Source> {
-            unimplemented!()
-        }
-
-        fn source_type(&self) -> &'static str {
-            "mock"
-        }
-
-        fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-            vec![Output::default(DataType::all())]
-        }
-
-        fn can_acknowledge(&self) -> bool {
-            false
-        }
-    }
-
-    #[async_trait]
-    #[typetag::serde(name = "mock")]
-    impl TransformConfig for MockTransformConfig {
-        async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
-            unimplemented!()
-        }
-
-        fn transform_type(&self) -> &'static str {
-            "mock"
-        }
-
-        fn input(&self) -> Input {
-            Input::all()
-        }
-
-        fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
-            vec![Output::default(DataType::all())]
-        }
-    }
-
-    #[async_trait]
-    #[typetag::serde(name = "mock")]
-    impl SinkConfig for MockSinkConfig {
-        async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-            unimplemented!()
-        }
-
-        fn sink_type(&self) -> &'static str {
-            "mock"
-        }
-
-        fn input(&self) -> Input {
-            Input::all()
-        }
-
-        fn acknowledgements(&self) -> &AcknowledgementsConfig {
-            &AcknowledgementsConfig::DEFAULT
-        }
-    }
+    use crate::test_util::mock::{basic_sink, basic_source, basic_transform};
 
     #[test]
     fn glob_expansion() {
         let mut builder = ConfigBuilder::default();
-        builder.add_source("foo1", MockSourceConfig);
-        builder.add_source("foo2", MockSourceConfig);
-        builder.add_source("bar", MockSourceConfig);
-        builder.add_transform("foos", &["foo*"], MockTransformConfig);
-        builder.add_sink("baz", &["foos*", "b*"], MockSinkConfig);
-        builder.add_sink("quix", &["*oo*"], MockSinkConfig);
-        builder.add_sink("quux", &["*"], MockSinkConfig);
+        builder.add_source("foo1", basic_source().1);
+        builder.add_source("foo2", basic_source().1);
+        builder.add_source("bar", basic_source().1);
+        builder.add_transform("foos", &["foo*"], basic_transform("", 1.0));
+        builder.add_sink("baz", &["foos*", "b*"], basic_sink(1).1);
+        builder.add_sink("quix", &["*oo*"], basic_sink(1).1);
+        builder.add_sink("quux", &["*"], basic_sink(1).1);
 
         let config = builder.build().expect("build should succeed");
 

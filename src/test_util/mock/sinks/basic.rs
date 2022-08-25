@@ -1,9 +1,9 @@
 use async_trait::async_trait;
 use futures_util::{stream::BoxStream, FutureExt, StreamExt};
-use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tokio::sync::oneshot;
 use vector_common::finalization::Finalizable;
+use vector_config::configurable_component;
 use vector_core::{
     config::{AcknowledgementsConfig, Input},
     event::Event,
@@ -11,27 +11,26 @@ use vector_core::{
 };
 
 use crate::{
-    config::{SinkConfig, SinkContext, SinkDescription},
+    config::{SinkConfig, SinkContext},
     sinks::Healthcheck,
     SourceSender,
 };
 
-/// A test sink.
-#[derive(Debug, Default, Deserialize, Serialize)]
+/// Configuration for the `test_basic` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug, Default)]
 pub struct BasicSinkConfig {
     #[serde(skip)]
     sink: Mode,
+
     #[serde(skip)]
     healthy: bool,
-    // something for serde to use, so we can trigger rebuilds
+
+    /// Dummy field used for generating unique configurations to trigger reloads.
     data: Option<String>,
 }
 
 impl_generate_config_from_default!(BasicSinkConfig);
-
-inventory::submit! {
-    SinkDescription::new::<BasicSinkConfig>("basic_sink")
-}
 
 #[derive(Debug, Clone)]
 enum Mode {
@@ -70,7 +69,7 @@ enum HealthcheckError {
 }
 
 #[async_trait]
-#[typetag::serde(name = "basic_sink")]
+#[typetag::serde(name = "test_basic")]
 impl SinkConfig for BasicSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         // If this sink is set to not be healthy, just send the healthcheck error immediately over
@@ -100,7 +99,7 @@ impl SinkConfig for BasicSinkConfig {
     }
 
     fn sink_type(&self) -> &'static str {
-        "basic_sink"
+        "test_basic"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

@@ -47,7 +47,7 @@ impl Function for MatchAny {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -71,7 +71,7 @@ impl Function for MatchAny {
 
         let regex_set = RegexSet::new(re_strings).expect("regex were already valid");
 
-        Ok(Box::new(MatchAnyFn { value, regex_set }))
+        Ok(MatchAnyFn { value, regex_set }.as_expr())
     }
 
     fn compile_argument(
@@ -112,13 +112,13 @@ struct MatchAnyFn {
     regex_set: RegexSet,
 }
 
-impl Expression for MatchAnyFn {
+impl FunctionExpression for MatchAnyFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         match_any(value, &self.regex_set)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::boolean().infallible()
     }
 }

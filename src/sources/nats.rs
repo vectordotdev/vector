@@ -11,7 +11,7 @@ use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{log_schema, GenerateConfig, Output, SourceConfig, SourceContext, SourceDescription},
+    config::{log_schema, GenerateConfig, Output, SourceConfig, SourceContext},
     event::Event,
     internal_events::{BytesReceived, OldEventsReceived, StreamClosedError},
     nats::{from_tls_auth_config, NatsAuthConfig, NatsConfigError},
@@ -32,7 +32,7 @@ enum BuildError {
 }
 
 /// Configuration for the `nats` source.
-#[configurable_component(source)]
+#[configurable_component(source("nats"))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
@@ -47,8 +47,7 @@ pub struct NatsSourceConfig {
     connection_name: String,
 
     /// The NATS subject to publish messages to.
-    // TODO: We will eventually be able to add metadata on a per-field basis, such that we can add metadata for marking
-    // this field as being capable of using Vector's templating syntax.
+    #[configurable(metadata(templateable))]
     subject: String,
 
     /// NATS Queue Group to join.
@@ -71,10 +70,6 @@ pub struct NatsSourceConfig {
     decoding: DeserializerConfig,
 }
 
-inventory::submit! {
-    SourceDescription::new::<NatsSourceConfig>("nats")
-}
-
 impl GenerateConfig for NatsSourceConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(
@@ -88,7 +83,6 @@ impl GenerateConfig for NatsSourceConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "nats")]
 impl SourceConfig for NatsSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let (connection, subscription) = create_subscription(self).await?;
@@ -110,10 +104,6 @@ impl SourceConfig for NatsSourceConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(self.decoding.output_type())]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "nats"
     }
 
     fn can_acknowledge(&self) -> bool {

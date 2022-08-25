@@ -105,13 +105,13 @@ impl Function for ToFloat {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(ToFloatFn { value }))
+        Ok(ToFloatFn { value }.as_expr())
     }
 }
 
@@ -120,14 +120,14 @@ struct ToFloatFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ToFloatFn {
+impl FunctionExpression for ToFloatFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
 
         to_float(value)
     }
 
-    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &state::TypeState) -> TypeDef {
         let td = self.value.type_def(state);
 
         TypeDef::float().with_fallibility(

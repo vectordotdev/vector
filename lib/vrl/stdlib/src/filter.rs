@@ -72,14 +72,14 @@ impl Function for Filter {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let closure = arguments.required_closure()?;
 
-        Ok(Box::new(FilterFn { value, closure }))
+        Ok(FilterFn { value, closure }.as_expr())
     }
 
     fn closure(&self) -> Option<closure::Definition> {
@@ -115,16 +115,20 @@ struct FilterFn {
     closure: FunctionClosure,
 }
 
-impl Expression for FilterFn {
+impl FunctionExpression for FilterFn {
     fn resolve(&self, ctx: &mut Context) -> Result<Value> {
         let value = self.value.resolve(ctx)?;
-        let FunctionClosure { variables, block } = &self.closure;
+        let FunctionClosure {
+            variables,
+            block,
+            block_type_def: _,
+        } = &self.closure;
         let runner = closure::Runner::new(variables, |ctx| block.resolve(ctx));
 
         filter(value, ctx, runner)
     }
 
-    fn type_def(&self, ctx: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, ctx: &state::TypeState) -> TypeDef {
         let mut type_def = self.value.type_def(ctx);
 
         // Erase any type information from the array or object, as we can't know

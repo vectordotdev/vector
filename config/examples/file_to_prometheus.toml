@@ -60,6 +60,6 @@ encoding.codec = "text"
 
 [sinks.prometheus]
 inputs = ["log_to_metric"]
-type = "prometheus"
+type = "prometheus_exporter"
 default_namespace = "vector"
 buckets = [0.0, 10.0, 100.0, 1000.0, 10000.0, 100001.0]

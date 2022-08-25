@@ -100,4 +100,5 @@ impl Protocol {
     pub const NONE: Protocol = Protocol(SharedString::const_str("none"));
     pub const TCP: Protocol = Protocol(SharedString::const_str("tcp"));
     pub const UDP: Protocol = Protocol(SharedString::const_str("udp"));
+    pub const UNIX: Protocol = Protocol(SharedString::const_str("unix"));
 }
