@@ -32,6 +32,7 @@ impl Arbitrary for Action {
 }
 
 #[test]
+#[allow(clippy::print_stderr)]
 fn log_operation_maintains_size() {
     // Asserts that the stated size of a LogEvent only changes by the amount
     // that we insert / remove from it and that read-only operations do not
@@ -41,11 +42,9 @@ fn log_operation_maintains_size() {
         let start_event = log_event.clone();
         let mut processed_actions = vec![];
 
-        let mut iter = actions.into_iter();
-
         let mut remove_trailing_comma = false;
 
-        while let Some(action) = iter.next() {
+        for action in actions {
             processed_actions.push(action.clone());
 
             match action {
