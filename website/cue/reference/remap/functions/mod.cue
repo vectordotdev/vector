@@ -11,13 +11,13 @@ remap: functions: mod: {
 			name:        "value"
 			description: "The value the `modulus` is applied to."
 			required:    true
-			type: ["number"]
+			type: ["integer", "float"]
 		},
 		{
 			name:        "modulus"
 			description: "The `modulus` value."
 			required:    true
-			type: ["number"]
+			type: ["integer", "float"]
 		},
 	]
 	internal_failure_reasons: [
