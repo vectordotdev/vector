@@ -6,7 +6,7 @@ use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    config::{DataType, Output, SourceConfig, SourceContext, SourceDescription},
+    config::{DataType, Output, SourceConfig, SourceContext},
     internal_events::{EventsReceived, StreamClosedError},
     metrics::Controller,
     shutdown::ShutdownSignal,
@@ -14,7 +14,7 @@ use crate::{
 };
 
 /// Configuration for the `internal_metrics` source.
-#[configurable_component(source)]
+#[configurable_component(source("internal_metrics"))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields, default)]
@@ -60,14 +60,9 @@ pub struct TagsConfig {
     pub pid_key: Option<String>,
 }
 
-inventory::submit! {
-    SourceDescription::new::<InternalMetricsConfig>("internal_metrics")
-}
-
 impl_generate_config_from_default!(InternalMetricsConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "internal_metrics")]
 impl SourceConfig for InternalMetricsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         if self.scrape_interval_secs == 0.0 {
@@ -104,10 +99,6 @@ impl SourceConfig for InternalMetricsConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Metric)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "internal_metrics"
     }
 
     fn can_acknowledge(&self) -> bool {

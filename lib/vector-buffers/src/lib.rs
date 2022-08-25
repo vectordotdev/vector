@@ -36,7 +36,7 @@ use quickcheck::{Arbitrary, Gen};
 use serde::{Deserialize, Serialize};
 use vector_common::{byte_size_of::ByteSizeOf, finalization::AddBatchNotifier};
 
-#[derive(Deserialize, Serialize, Debug, PartialEq, Copy, Clone)]
+#[derive(Deserialize, Serialize, Debug, PartialEq, Eq, Copy, Clone)]
 #[serde(rename_all = "snake_case")]
 pub enum WhenFull {
     Block,

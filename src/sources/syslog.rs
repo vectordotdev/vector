@@ -19,10 +19,7 @@ use crate::codecs::Decoder;
 #[cfg(unix)]
 use crate::sources::util::build_unix_stream_source;
 use crate::{
-    config::{
-        log_schema, DataType, GenerateConfig, Output, Resource, SourceConfig, SourceContext,
-        SourceDescription,
-    },
+    config::{log_schema, DataType, GenerateConfig, Output, Resource, SourceConfig, SourceContext},
     event::Event,
     internal_events::SyslogUdpReadError,
     shutdown::ShutdownSignal,
@@ -33,7 +30,7 @@ use crate::{
 };
 
 /// Configuration for the `syslog` source.
-#[configurable_component(source)]
+#[configurable_component(source("syslog"))]
 #[derive(Clone, Debug)]
 pub struct SyslogConfig {
     #[serde(flatten)]
@@ -118,10 +115,6 @@ impl SyslogConfig {
     }
 }
 
-inventory::submit! {
-    SourceDescription::new::<SyslogConfig>("syslog")
-}
-
 impl GenerateConfig for SyslogConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
@@ -140,7 +133,6 @@ impl GenerateConfig for SyslogConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "syslog")]
 impl SourceConfig for SyslogConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let host_key = self
@@ -214,10 +206,6 @@ impl SourceConfig for SyslogConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "syslog"
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -1131,7 +1119,7 @@ mod test {
     }
 
     #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
-    #[derive(Copy, Clone, Deserialize, PartialEq, Debug)]
+    #[derive(Copy, Clone, Deserialize, PartialEq, Eq, Debug)]
     pub enum Severity {
         #[serde(rename(deserialize = "emergency"))]
         LOG_EMERG,
@@ -1175,7 +1163,7 @@ mod test {
     }
 
     #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
-    #[derive(Copy, Clone, PartialEq, Deserialize, Debug)]
+    #[derive(Copy, Clone, PartialEq, Eq, Deserialize, Debug)]
     pub enum Facility {
         #[serde(rename(deserialize = "kernel"))]
         LOG_KERN = 0 << 3,

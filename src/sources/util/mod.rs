@@ -16,7 +16,7 @@ mod http;
 #[cfg(any(feature = "sources-aws_sqs", feature = "sources-gcp_pubsub"))]
 mod message_decoding;
 pub mod multiline_config;
-#[cfg(all(feature = "sources-utils-tls", feature = "listenfd"))]
+#[cfg(feature = "listenfd")]
 mod tcp;
 #[cfg(all(unix, any(feature = "sources-socket", feature = "sources-utils-unix",)))]
 mod unix;
@@ -24,17 +24,12 @@ mod unix;
 mod unix_datagram;
 #[cfg(all(unix, feature = "sources-utils-unix"))]
 mod unix_stream;
-#[cfg(any(
-    feature = "sources-utils-tls",
-    feature = "sources-vector",
-    feature = "sources-gcp_pubsub"
-))]
 mod wrappers;
 
 #[cfg(feature = "sources-file")]
 pub use encoding_config::EncodingConfig;
 pub use multiline_config::MultilineConfig;
-#[cfg(all(feature = "sources-utils-tls", feature = "listenfd"))]
+#[cfg(feature = "listenfd")]
 pub use tcp::{SocketListenAddr, TcpNullAcker, TcpSource, TcpSourceAck, TcpSourceAcker};
 #[cfg(all(unix, any(feature = "sources-socket", feature = "sources-utils-unix",)))]
 pub use unix::change_socket_permissions;
@@ -42,11 +37,6 @@ pub use unix::change_socket_permissions;
 pub use unix_datagram::build_unix_datagram_source;
 #[cfg(all(unix, feature = "sources-utils-unix",))]
 pub use unix_stream::build_unix_stream_source;
-#[cfg(any(
-    feature = "sources-utils-tls",
-    feature = "sources-vector",
-    feature = "sources-gcp_pubsub"
-))]
 pub use wrappers::{AfterRead, AfterReadExt};
 
 #[cfg(any(feature = "sources-http"))]

@@ -14,7 +14,7 @@ use crate::{
 
 /// A condition that uses the [Vector Remap Language](https://vector.dev/docs/reference/vrl) (VRL) [boolean expression](https://vector.dev/docs/reference/vrl#boolean-expressions) against an event.
 #[configurable_component]
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct VrlConfig {
     /// The VRL boolean expression.
     pub(crate) source: String,

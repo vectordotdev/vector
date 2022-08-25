@@ -27,10 +27,7 @@ use vector_common::{byte_size_of::ByteSizeOf, finalizer::OrderedFinalizer};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{
-        log_schema, AcknowledgementsConfig, LogSchema, Output, SourceConfig, SourceContext,
-        SourceDescription,
-    },
+    config::{log_schema, AcknowledgementsConfig, LogSchema, Output, SourceConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, Event, Value},
     internal_events::{
         KafkaBytesReceived, KafkaEventsReceived, KafkaNegativeAcknowledgmentError,
@@ -51,7 +48,7 @@ enum BuildError {
 }
 
 /// Configuration for the `kafka` source.
-#[configurable_component(source)]
+#[configurable_component(source("kafka"))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
@@ -197,14 +194,9 @@ fn default_headers_key() -> String {
     "headers".into()
 }
 
-inventory::submit! {
-    SourceDescription::new::<KafkaSourceConfig>("kafka")
-}
-
 impl_generate_config_from_default!(KafkaSourceConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "kafka")]
 impl SourceConfig for KafkaSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let consumer = create_consumer(self)?;
@@ -228,10 +220,6 @@ impl SourceConfig for KafkaSourceConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(self.decoding.output_type())]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "kafka"
     }
 
     fn can_acknowledge(&self) -> bool {

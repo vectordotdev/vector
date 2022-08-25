@@ -107,19 +107,19 @@ impl Hash for Value {
     fn hash<H: Hasher>(&self, state: &mut H) {
         core::mem::discriminant(self).hash(state);
         match self {
-            Value::Array(v) => {
+            Self::Array(v) => {
                 v.hash(state);
             }
-            Value::Boolean(v) => {
+            Self::Boolean(v) => {
                 v.hash(state);
             }
-            Value::Bytes(v) => {
+            Self::Bytes(v) => {
                 v.hash(state);
             }
-            Value::Regex(regex) => {
+            Self::Regex(regex) => {
                 regex.as_bytes_slice().hash(state);
             }
-            Value::Float(v) => {
+            Self::Float(v) => {
                 // This hashes floats with the following rules:
                 // * NaNs hash as equal (covered by above discriminant hash)
                 // * Positive and negative infinity has to different values
@@ -133,16 +133,16 @@ impl Hash for Value {
                     v.is_sign_negative().hash(state);
                 } //else covered by discriminant hash
             }
-            Value::Integer(v) => {
+            Self::Integer(v) => {
                 v.hash(state);
             }
-            Value::Object(v) => {
+            Self::Object(v) => {
                 v.hash(state);
             }
             Self::Null => {
                 //covered by discriminant hash
             }
-            Value::Timestamp(v) => {
+            Self::Timestamp(v) => {
                 v.hash(state);
             }
         }
@@ -153,13 +153,13 @@ impl Value {
     /// Returns a string description of the value type
     pub const fn kind_str(&self) -> &str {
         match self {
-            Value::Bytes(_) | Value::Regex(_) => "string",
-            Value::Timestamp(_) => "timestamp",
-            Value::Integer(_) => "integer",
-            Value::Float(_) => "float",
-            Value::Boolean(_) => "boolean",
-            Value::Object(_) => "map",
-            Value::Array(_) => "array",
+            Self::Bytes(_) | Self::Regex(_) => "string",
+            Self::Timestamp(_) => "timestamp",
+            Self::Integer(_) => "integer",
+            Self::Float(_) => "float",
+            Self::Boolean(_) => "boolean",
+            Self::Object(_) => "map",
+            Self::Array(_) => "array",
             Self::Null => "null",
         }
     }
@@ -169,7 +169,7 @@ impl Value {
     /// Will concatenate `Bytes` and overwrite the rest value kinds.
     pub fn merge(&mut self, incoming: Self) {
         match (self, incoming) {
-            (Value::Bytes(self_bytes), Value::Bytes(ref incoming)) => {
+            (Self::Bytes(self_bytes), Self::Bytes(ref incoming)) => {
                 let mut bytes = BytesMut::with_capacity(self_bytes.len() + incoming.len());
                 bytes.extend_from_slice(&self_bytes[..]);
                 bytes.extend_from_slice(&incoming[..]);
@@ -205,15 +205,15 @@ impl Value {
     /// ```
     pub fn is_empty(&self) -> bool {
         match &self {
-            Value::Boolean(_)
-            | Value::Bytes(_)
-            | Value::Regex(_)
-            | Value::Timestamp(_)
-            | Value::Float(_)
-            | Value::Integer(_) => false,
+            Self::Boolean(_)
+            | Self::Bytes(_)
+            | Self::Regex(_)
+            | Self::Timestamp(_)
+            | Self::Float(_)
+            | Self::Integer(_) => false,
             Self::Null => true,
-            Value::Object(v) => v.is_empty(),
-            Value::Array(v) => v.is_empty(),
+            Self::Object(v) => v.is_empty(),
+            Self::Array(v) => v.is_empty(),
         }
     }
 

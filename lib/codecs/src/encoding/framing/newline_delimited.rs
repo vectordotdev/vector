@@ -5,7 +5,7 @@ use tokio_util::codec::Encoder;
 use super::{BoxedFramingError, CharacterDelimitedEncoder};
 
 /// Config used to build a `NewlineDelimitedEncoder`.
-#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
 pub struct NewlineDelimitedEncoderConfig;
 
 impl NewlineDelimitedEncoderConfig {

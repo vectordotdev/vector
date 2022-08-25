@@ -284,7 +284,7 @@ async fn handle_stream<T>(
         .get_ref()
         .ssl_stream()
         .and_then(|stream| stream.ssl().peer_certificate())
-        .map(CertificateMetadata::from_x509);
+        .map(CertificateMetadata::from);
 
     let reader = FramedRead::new(socket, source.decoder());
     let mut reader = ReadyFrames::new(reader);
@@ -435,7 +435,7 @@ fn close_socket(socket: &MaybeTlsIncomingStream<TcpStream>) -> bool {
 
 /// A listening address that can be given directly or be managed via `systemd` socket activation.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum SocketListenAddr {
     /// An IPv4/IPv6 address and port.

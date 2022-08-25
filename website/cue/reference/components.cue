@@ -747,6 +747,18 @@ components: {
 							examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
 						}
 					}
+					alpn_protocols: {
+						common:      false
+						description: "Sets the list of supported ALPN protolols, which are used during negotiation with peer. Prioritized in the order they are defined."
+						required:    false
+						type: array: {
+							default: null
+							items: type: string: {
+								examples: ["h2"]
+								syntax: "literal"
+							}
+						}
+					}
 
 					if Args.can_verify_certificate {
 						verify_certificate: {

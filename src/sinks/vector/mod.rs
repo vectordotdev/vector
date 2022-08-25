@@ -50,7 +50,7 @@ pub struct VectorConfigV2 {
 }
 
 /// Configurable for the `vector` sink.
-#[configurable_component(source)]
+#[configurable_component(sink)]
 #[derive(Clone, Debug)]
 #[serde(untagged)]
 pub enum VectorConfig {

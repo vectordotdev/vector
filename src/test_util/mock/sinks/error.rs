@@ -5,7 +5,7 @@ use std::{
 
 use async_trait::async_trait;
 use futures_util::{future::ok, FutureExt, Sink};
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 use vector_core::{
     config::{AcknowledgementsConfig, Input},
     event::Event,
@@ -13,24 +13,22 @@ use vector_core::{
 };
 
 use crate::{
-    config::{SinkConfig, SinkContext, SinkDescription},
+    config::{SinkConfig, SinkContext},
     sinks::Healthcheck,
 };
 
-/// A test sink that immediately returns an error.
-#[derive(Debug, Default, Deserialize, Serialize)]
+/// Configuration for the `test_error` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug, Default)]
 pub struct ErrorSinkConfig {
+    /// Dummy field used for generating unique configurations to trigger reloads.
     dummy: Option<String>,
 }
 
 impl_generate_config_from_default!(ErrorSinkConfig);
 
-inventory::submit! {
-    SinkDescription::new::<ErrorSinkConfig>("error_sink")
-}
-
 #[async_trait]
-#[typetag::serde(name = "error_sink")]
+#[typetag::serde(name = "test_error")]
 impl SinkConfig for ErrorSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         Ok((VectorSink::from_event_sink(ErrorSink), ok(()).boxed()))
@@ -41,7 +39,7 @@ impl SinkConfig for ErrorSinkConfig {
     }
 
     fn sink_type(&self) -> &'static str {
-        "error_sink"
+        "test_error"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

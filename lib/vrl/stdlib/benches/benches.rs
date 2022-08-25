@@ -15,6 +15,7 @@ criterion_group!(
               assert_eq,
               r#bool,
               ceil,
+              chunks,
               compact,
               contains,
               decode_base64,
@@ -75,6 +76,7 @@ criterion_group!(
               match_datadog_query,
               md5,
               merge,
+              r#mod,
               // TODO: value is dynamic so we cannot assert equality
               //now,
               object,
@@ -212,6 +214,15 @@ bench_function! {
     literal {
         args: func_args![value: 1234.56725, precision: 4],
         want: Ok(1234.5673),
+    }
+}
+
+bench_function! {
+    chunks => vrl_stdlib::Chunks;
+
+    literal {
+        args: func_args![value: "abcdefgh", chunk_size: 4],
+        want: Ok(value!(["abcd", "efgh"])),
     }
 }
 
@@ -1122,6 +1133,18 @@ bench_function! {
     literal {
         args: func_args![value: "foo"],
         want: Ok("acbd18db4cc2f85cedef654fccc4a4d8"),
+    }
+}
+
+bench_function! {
+    r#mod => vrl_stdlib::Mod;
+
+    simple {
+        args: func_args![
+            value: value!(5),
+            modulus: value!(2),
+        ],
+        want: Ok(value!(1))
     }
 }
 
