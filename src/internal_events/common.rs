@@ -146,7 +146,6 @@ impl InternalEvent for ComponentEventsDropped {
         counter!(
             "component_discarded_events_total",
             self.count,
-            "count" => self.count.to_string(),
             "intentional" => intent,
         );
     }
