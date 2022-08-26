@@ -42,6 +42,7 @@ use crate::{
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, LogEvent, Value},
     internal_events::{
         JournaldInvalidRecordError, JournaldNegativeAcknowledgmentError, OldEventsReceived,
+        StreamClosedError,
     },
     serde::bool_or_struct,
     shutdown::ShutdownSignal,
@@ -447,8 +448,9 @@ impl<'a> Batch<'a> {
         }
 
         if !self.events.is_empty() {
+            let count = self.events.len();
             emit!(OldEventsReceived {
-                count: self.events.len(),
+                count,
                 byte_size: self.events.size_of(),
             });
 
@@ -459,7 +461,7 @@ impl<'a> Batch<'a> {
                     }
                 }
                 Err(error) => {
-                    error!(message = "Could not send journald log.", %error);
+                    emit!(StreamClosedError { error, count });
                     // `out` channel is closed, don't restart journalctl.
                     self.exiting = Some(false);
                 }
