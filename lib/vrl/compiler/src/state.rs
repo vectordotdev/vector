@@ -133,10 +133,6 @@ impl ExternalEnv {
         &self.target
     }
 
-    pub(crate) fn target_mut(&mut self) -> &mut Details {
-        &mut self.target
-    }
-
     pub fn target_kind(&self) -> &Kind {
         self.target().type_def.kind()
     }

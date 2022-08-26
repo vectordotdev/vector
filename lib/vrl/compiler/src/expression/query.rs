@@ -8,7 +8,7 @@ use crate::{
 };
 use lookup::{LookupBuf, OwnedPath, PathPrefix, TargetPath};
 use std::fmt;
-use value::{kind::remove, Kind, Value};
+use value::{kind::remove, Value};
 
 #[derive(Clone, PartialEq)]
 pub struct Query {
@@ -68,8 +68,8 @@ impl Query {
         }
     }
 
-    /// Not all deletions are supported yet, errors are ignored here.
-    /// see: https://github.com/vectordotdev/vector/issues/11264
+    // Not all deletions are supported yet, errors are ignored here.
+    // see: https://github.com/vectordotdev/vector/issues/13460
     pub fn delete_type_def(&self, external: &mut ExternalEnv) {
         let strategy = remove::Strategy {
             coalesced_path: remove::CoalescedPath::Reject,
@@ -81,7 +81,7 @@ impl Query {
             match target_path.prefix {
                 PathPrefix::Event => {
                     let mut type_def = external.target().type_def.clone();
-                    type_def.remove_at_path(&lookup_buf.to_lookup(), strategy);
+                    let _ = type_def.remove_at_path(&lookup_buf.to_lookup(), strategy);
                     external.update_target(Details {
                         type_def,
                         value: None,
@@ -89,7 +89,7 @@ impl Query {
                 }
                 PathPrefix::Metadata => {
                     let mut kind = external.metadata_kind().clone();
-                    kind.remove_at_path(&lookup_buf.to_lookup(), strategy);
+                    let _ = kind.remove_at_path(&lookup_buf.to_lookup(), strategy);
                     external.update_metadata(kind);
                 }
             }
