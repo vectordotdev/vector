@@ -52,15 +52,24 @@ pub struct ParserMissingFieldError<'a> {
 impl InternalEvent for ParserMissingFieldError<'_> {
     fn emit(self) {
         error!(
-            message = "Field does not exist.",
+            message = "Events dropped.",
+            count = 1,
             field = %self.field,
             error_code = "field_not_found",
             error_type = error_type::CONDITION_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_secs = 10
+            internal_log_rate_secs = 10,
+            reason = "Field does not exist.",
         );
         counter!(
             "component_errors_total", 1,
+            "error_code" => "field_not_found",
+            "error_type" => error_type::CONDITION_FAILED,
+            "stage" => error_stage::PROCESSING,
+            "field" => self.field.to_string(),
+        );
+        counter!(
+            "component_discarded_events_total", 1,
             "error_code" => "field_not_found",
             "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::PROCESSING,

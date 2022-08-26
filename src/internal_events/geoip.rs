@@ -14,12 +14,14 @@ pub struct GeoipIpAddressParseError<'a> {
 impl<'a> InternalEvent for GeoipIpAddressParseError<'a> {
     fn emit(self) {
         error!(
-            message = %format!("IP Address not parsed correctly: {:?}", self.error),
+            message = "Events dropped.",
+            count = 1,
             error_code = "invalid_ip_address",
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
             address = %self.address,
-            internal_log_rate_secs = 30
+            intentional = false,
+            reason = %format!("IP Address not parsed correctly: {:?}.", self.error),
         );
         counter!(
             "component_errors_total", 1,
@@ -27,6 +29,14 @@ impl<'a> InternalEvent for GeoipIpAddressParseError<'a> {
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
             "address" => self.address.to_string(),
+        );
+        counter!(
+            "component_discarded_events_total", 1,
+            "error_code" => "invalid_ip_address",
+            "error_type" => error_type::PARSER_FAILED,
+            "stage" => error_stage::PROCESSING,
+            "address" => self.address.to_string(),
+            "intentional" => "false",
         );
         // deprecated
         counter!(
