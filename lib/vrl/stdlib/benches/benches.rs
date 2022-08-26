@@ -76,6 +76,7 @@ criterion_group!(
               match_datadog_query,
               md5,
               merge,
+              r#mod,
               // TODO: value is dynamic so we cannot assert equality
               //now,
               object,
@@ -1132,6 +1133,18 @@ bench_function! {
     literal {
         args: func_args![value: "foo"],
         want: Ok("acbd18db4cc2f85cedef654fccc4a4d8"),
+    }
+}
+
+bench_function! {
+    r#mod => vrl_stdlib::Mod;
+
+    simple {
+        args: func_args![
+            value: value!(5),
+            modulus: value!(2),
+        ],
+        want: Ok(value!(1))
     }
 }
 

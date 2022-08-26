@@ -1,13 +1,15 @@
-use std::sync::Arc;
 use std::{
+    collections::HashMap,
     future::Future,
     net::SocketAddr,
     pin::Pin,
+    sync::Arc,
     task::{Context, Poll},
 };
 
 use futures::{future::BoxFuture, stream, FutureExt, Stream};
 use openssl::ssl::{Ssl, SslAcceptor, SslMethod};
+use openssl::x509::X509;
 use snafu::ResultExt;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio::{
@@ -15,18 +17,16 @@ use tokio::{
     net::{TcpListener, TcpStream},
 };
 use tokio_openssl::SslStream;
+use tonic::transport::{server::Connected, Certificate};
 
 use super::{
     CreateAcceptorSnafu, HandshakeSnafu, IncomingListenerSnafu, MaybeTlsSettings, MaybeTlsStream,
     SslBuildSnafu, TcpBindSnafu, TlsError, TlsSettings,
 };
-#[cfg(feature = "sources-utils-tcp-keepalive")]
-use crate::tcp::TcpKeepaliveConfig;
-#[cfg(feature = "sources-utils-tcp-socket")]
-use {crate::tcp, openssl::x509::X509, std::collections::HashMap};
+use crate::tcp::{self, TcpKeepaliveConfig};
 
 impl TlsSettings {
-    pub(crate) fn acceptor(&self) -> crate::tls::Result<SslAcceptor> {
+    pub fn acceptor(&self) -> crate::tls::Result<SslAcceptor> {
         match self.identity {
             None => Err(TlsError::MissingRequiredIdentity),
             Some(_) => {
@@ -40,7 +40,7 @@ impl TlsSettings {
 }
 
 impl MaybeTlsSettings {
-    pub(crate) async fn bind(&self, addr: &SocketAddr) -> crate::tls::Result<MaybeTlsListener> {
+    pub async fn bind(&self, addr: &SocketAddr) -> crate::tls::Result<MaybeTlsListener> {
         let listener = TcpListener::bind(addr).await.context(TcpBindSnafu)?;
 
         let acceptor = match self {
@@ -58,7 +58,7 @@ pub struct MaybeTlsListener {
 }
 
 impl MaybeTlsListener {
-    pub(crate) async fn accept(&mut self) -> crate::tls::Result<MaybeTlsIncomingStream<TcpStream>> {
+    pub async fn accept(&mut self) -> crate::tls::Result<MaybeTlsIncomingStream<TcpStream>> {
         self.listener
             .accept()
             .await
@@ -74,8 +74,7 @@ impl MaybeTlsListener {
         (self.accept().await, self)
     }
 
-    #[allow(unused)]
-    pub(crate) fn accept_stream(
+    pub fn accept_stream(
         self,
     ) -> impl Stream<Item = crate::tls::Result<MaybeTlsIncomingStream<TcpStream>>> {
         let mut accept = Box::pin(self.into_accept());
@@ -88,8 +87,7 @@ impl MaybeTlsListener {
         })
     }
 
-    #[allow(unused)]
-    pub(crate) fn accept_stream_limited(
+    pub fn accept_stream_limited(
         self,
         max_connections: Option<u32>,
     ) -> impl Stream<
@@ -98,18 +96,18 @@ impl MaybeTlsListener {
             Option<OwnedSemaphorePermit>,
         ),
     > {
-        let connection_semaphore =
-            max_connections.map(|max| Arc::new(Semaphore::new(max as usize)));
+        let mut connection_semaphore_future = max_connections.map(|max| {
+            let semaphore = Arc::new(Semaphore::new(max as usize));
+            let future = Box::pin(semaphore.clone().acquire_owned());
+            (semaphore, future)
+        });
 
-        let mut semaphore_future = connection_semaphore
-            .clone()
-            .map(|x| Box::pin(x.acquire_owned()));
         let mut accept = Box::pin(self.into_accept());
         stream::poll_fn(move |context| {
-            let permit = match semaphore_future.as_mut() {
-                Some(semaphore) => match semaphore.as_mut().poll(context) {
+            let permit = match connection_semaphore_future.as_mut() {
+                Some((semaphore, future)) => match future.as_mut().poll(context) {
                     Poll::Ready(permit) => {
-                        semaphore.set(connection_semaphore.clone().unwrap().acquire_owned());
+                        future.set(semaphore.clone().acquire_owned());
                         permit.ok()
                     }
                     Poll::Pending => return Poll::Pending,
@@ -126,8 +124,7 @@ impl MaybeTlsListener {
         })
     }
 
-    #[cfg(feature = "listenfd")]
-    pub(crate) fn local_addr(&self) -> Result<SocketAddr, std::io::Error> {
+    pub fn local_addr(&self) -> Result<SocketAddr, std::io::Error> {
         self.listener.local_addr()
     }
 }
@@ -157,17 +154,11 @@ enum StreamState<S> {
 }
 
 impl<S> MaybeTlsIncomingStream<S> {
-    #[cfg_attr(not(feature = "listenfd"), allow(dead_code))]
     pub const fn peer_addr(&self) -> SocketAddr {
         self.peer_addr
     }
 
     /// None if connection still hasn't been established.
-    #[cfg(any(
-        feature = "listenfd",
-        feature = "sources-utils-tcp-keepalive",
-        feature = "sources-utils-tcp-socket"
-    ))]
     pub fn get_ref(&self) -> Option<&S> {
         use super::MaybeTls;
 
@@ -176,14 +167,11 @@ impl<S> MaybeTlsIncomingStream<S> {
                 MaybeTls::Raw(s) => s,
                 MaybeTls::Tls(s) => s.get_ref(),
             }),
-            StreamState::Accepting(_) => None,
-            StreamState::AcceptError(_) => None,
-            StreamState::Closed => None,
+            StreamState::Accepting(_) | StreamState::AcceptError(_) | StreamState::Closed => None,
         }
     }
 
-    #[cfg(feature = "sources-utils-tcp-socket")]
-    pub(crate) const fn ssl_stream(&self) -> Option<&SslStream<S>> {
+    pub const fn ssl_stream(&self) -> Option<&SslStream<S>> {
         use super::MaybeTls;
 
         match &self.state {
@@ -195,12 +183,6 @@ impl<S> MaybeTlsIncomingStream<S> {
         }
     }
 
-    #[cfg(all(
-        test,
-        feature = "sinks-socket",
-        feature = "sources-utils-tls",
-        feature = "listenfd"
-    ))]
     pub fn get_mut(&mut self) -> Option<&mut S> {
         use super::MaybeTls;
 
@@ -209,9 +191,7 @@ impl<S> MaybeTlsIncomingStream<S> {
                 MaybeTls::Raw(ref mut s) => s,
                 MaybeTls::Tls(s) => s.get_mut(),
             }),
-            StreamState::Accepting(_) => None,
-            StreamState::AcceptError(_) => None,
-            StreamState::Closed => None,
+            StreamState::Accepting(_) | StreamState::AcceptError(_) | StreamState::Closed => None,
         }
     }
 }
@@ -241,8 +221,7 @@ impl MaybeTlsIncomingStream<TcpStream> {
     }
 
     // Explicit handshake method
-    #[cfg(feature = "listenfd")]
-    pub(crate) async fn handshake(&mut self) -> crate::tls::Result<()> {
+    pub async fn handshake(&mut self) -> crate::tls::Result<()> {
         if let StreamState::Accepting(fut) = &mut self.state {
             let stream = fut.await?;
             self.state = StreamState::Accepted(MaybeTlsStream::Tls(stream));
@@ -251,8 +230,7 @@ impl MaybeTlsIncomingStream<TcpStream> {
         Ok(())
     }
 
-    #[cfg(feature = "sources-utils-tcp-keepalive")]
-    pub(crate) fn set_keepalive(&mut self, keepalive: TcpKeepaliveConfig) -> io::Result<()> {
+    pub fn set_keepalive(&mut self, keepalive: TcpKeepaliveConfig) -> io::Result<()> {
         let stream = self.get_ref().ok_or_else(|| {
             io::Error::new(
                 io::ErrorKind::NotConnected,
@@ -270,8 +248,7 @@ impl MaybeTlsIncomingStream<TcpStream> {
         Ok(())
     }
 
-    #[cfg(feature = "sources-utils-tcp-socket")]
-    pub(crate) fn set_receive_buffer_bytes(&mut self, bytes: usize) -> std::io::Result<()> {
+    pub fn set_receive_buffer_bytes(&mut self, bytes: usize) -> std::io::Result<()> {
         let stream = self.get_ref().ok_or_else(|| {
             io::Error::new(
                 io::ErrorKind::NotConnected,
@@ -302,7 +279,7 @@ impl MaybeTlsIncomingStream<TcpStream> {
                     }
                 },
                 StreamState::AcceptError(error) => {
-                    Poll::Ready(Err(io::Error::new(io::ErrorKind::Other, error.to_owned())))
+                    Poll::Ready(Err(io::Error::new(io::ErrorKind::Other, error.clone())))
                 }
                 StreamState::Closed => Poll::Ready(Err(io::ErrorKind::BrokenPipe.into())),
             };
@@ -326,7 +303,7 @@ impl AsyncWrite for MaybeTlsIncomingStream<TcpStream> {
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context) -> Poll<io::Result<()>> {
-        self.poll_io(cx, |s, cx| s.poll_flush(cx))
+        self.poll_io(cx, AsyncWrite::poll_flush)
     }
 
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context) -> Poll<io::Result<()>> {
@@ -351,14 +328,13 @@ impl AsyncWrite for MaybeTlsIncomingStream<TcpStream> {
                 }
             },
             StreamState::AcceptError(error) => {
-                Poll::Ready(Err(io::Error::new(io::ErrorKind::Other, error.to_owned())))
+                Poll::Ready(Err(io::Error::new(io::ErrorKind::Other, error.clone())))
             }
             StreamState::Closed => Poll::Ready(Ok(())),
         }
     }
 }
 
-#[cfg(feature = "sources-utils-tcp-socket")]
 #[derive(Debug)]
 pub struct CertificateMetadata {
     pub country_name: Option<String>,
@@ -369,28 +345,8 @@ pub struct CertificateMetadata {
     pub common_name: Option<String>,
 }
 
-#[cfg(feature = "sources-utils-tcp-socket")]
 impl CertificateMetadata {
-    pub(crate) fn from_x509(cert: X509) -> CertificateMetadata {
-        let mut subject_metadata: HashMap<String, String> = HashMap::new();
-        for entry in cert.subject_name().entries() {
-            let data_string = match entry.data().as_utf8() {
-                Ok(data) => data.to_string(),
-                Err(_) => "".to_string(),
-            };
-            subject_metadata.insert(entry.object().to_string(), data_string);
-        }
-        return CertificateMetadata {
-            country_name: subject_metadata.get("countryName").cloned(),
-            state_or_province_name: subject_metadata.get("stateOrProvinceName").cloned(),
-            locality_name: subject_metadata.get("localityName").cloned(),
-            organization_name: subject_metadata.get("organizationName").cloned(),
-            organizational_unit_name: subject_metadata.get("organizationalUnitName").cloned(),
-            common_name: subject_metadata.get("commonName").cloned(),
-        };
-    }
-
-    pub(crate) fn subject(&self) -> String {
+    pub fn subject(&self) -> String {
         let mut components = Vec::<String>::with_capacity(6);
         if let Some(cn) = &self.common_name {
             components.push(format!("CN={}", cn));
@@ -414,7 +370,53 @@ impl CertificateMetadata {
     }
 }
 
-#[cfg(all(test, feature = "sources-utils-tcp-socket"))]
+impl From<X509> for CertificateMetadata {
+    fn from(cert: X509) -> Self {
+        let mut subject_metadata: HashMap<String, String> = HashMap::new();
+        for entry in cert.subject_name().entries() {
+            let data_string = match entry.data().as_utf8() {
+                Ok(data) => data.to_string(),
+                Err(_) => "".to_string(),
+            };
+            subject_metadata.insert(entry.object().to_string(), data_string);
+        }
+        Self {
+            country_name: subject_metadata.get("countryName").cloned(),
+            state_or_province_name: subject_metadata.get("stateOrProvinceName").cloned(),
+            locality_name: subject_metadata.get("localityName").cloned(),
+            organization_name: subject_metadata.get("organizationName").cloned(),
+            organizational_unit_name: subject_metadata.get("organizationalUnitName").cloned(),
+            common_name: subject_metadata.get("commonName").cloned(),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct MaybeTlsConnectInfo {
+    pub remote_addr: SocketAddr,
+    pub peer_certs: Option<Vec<Certificate>>,
+}
+
+impl Connected for MaybeTlsIncomingStream<TcpStream> {
+    type ConnectInfo = MaybeTlsConnectInfo;
+
+    fn connect_info(&self) -> Self::ConnectInfo {
+        MaybeTlsConnectInfo {
+            remote_addr: self.peer_addr(),
+            peer_certs: self
+                .ssl_stream()
+                .and_then(|s| s.ssl().peer_cert_chain())
+                .map(|s| {
+                    s.into_iter()
+                        .filter_map(|c| c.to_pem().ok())
+                        .map(Certificate::from_pem)
+                        .collect()
+                }),
+        }
+    }
+}
+
+#[cfg(test)]
 mod test {
     use super::*;
 
@@ -438,7 +440,7 @@ mod test {
             example_meta.state_or_province_name.as_ref().unwrap(),
             example_meta.country_name.as_ref().unwrap()
         );
-        assert_eq!(expected, example_meta.subject())
+        assert_eq!(expected, example_meta.subject());
     }
 
     #[test]
@@ -459,6 +461,6 @@ mod test {
             example_meta.organization_name.as_ref().unwrap(),
             example_meta.country_name.as_ref().unwrap()
         );
-        assert_eq!(expected, example_meta.subject())
+        assert_eq!(expected, example_meta.subject());
     }
 }

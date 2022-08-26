@@ -13,7 +13,7 @@ use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    config::{DataType, Output, SourceConfig, SourceContext, SourceDescription},
+    config::{DataType, Output, SourceConfig, SourceContext},
     event::metric::{Metric, MetricKind, MetricTags, MetricValue},
     internal_events::{BytesReceived, EventsReceived, StreamClosedError},
     shutdown::ShutdownSignal,
@@ -71,7 +71,7 @@ pub(self) struct FilterList {
 }
 
 /// Configuration for the `host_metrics` source.
-#[configurable_component(source)]
+#[configurable_component(source("host_metrics"))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
@@ -118,14 +118,9 @@ fn default_namespace() -> Option<String> {
     Some(String::from("host"))
 }
 
-inventory::submit! {
-    SourceDescription::new::<HostMetricsConfig>("host_metrics")
-}
-
 impl_generate_config_from_default!(HostMetricsConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "host_metrics")]
 impl SourceConfig for HostMetricsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         init_roots();
@@ -138,10 +133,6 @@ impl SourceConfig for HostMetricsConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Metric)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "host_metrics"
     }
 
     fn can_acknowledge(&self) -> bool {

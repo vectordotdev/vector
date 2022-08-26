@@ -8,7 +8,7 @@ use vector_config::configurable_component;
 #[serde(deny_unknown_fields)]
 pub struct TcpKeepaliveConfig {
     /// The time to wait, in seconds, before starting to send TCP keepalive probes on an idle connection.
-    pub(crate) time_secs: Option<u64>,
+    pub time_secs: Option<u64>,
 }
 
 // This function will be obsolete after tokio/mio internally use `socket2` and expose the methods to

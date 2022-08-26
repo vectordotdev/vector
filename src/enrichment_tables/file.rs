@@ -8,19 +8,30 @@ use std::{
 
 use bytes::Bytes;
 use enrichment::{Case, Condition, IndexHandle, Table};
-use serde::{Deserialize, Serialize};
 use tracing::trace;
 use value::Value;
 use vector_common::{conversion::Conversion, datetime::TimeZone};
+use vector_config::configurable_component;
 
-use crate::config::{EnrichmentTableConfig, EnrichmentTableDescription};
+use crate::config::EnrichmentTableConfig;
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
+/// File encoding options.
+#[configurable_component]
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 enum Encoding {
+    /// Comma-separated values.
     Csv {
+        /// Whether or not the file contains column headers.
+        ///
+        /// When set to `true`, the first row of the CSV file will be read as the header row, and
+        /// the values will be used for the names of each column. This is the default behavior.
+        ///
+        /// When set to `false`, columns are referred to by their numerical index.
         #[serde(default = "crate::serde::default_true")]
         include_headers: bool,
+
+        /// The delimiter used to separate fields in each row of the CSV file.
         #[serde(default = "default_delimiter")]
         delimiter: char,
     },
@@ -35,15 +46,71 @@ impl Default for Encoding {
     }
 }
 
-#[derive(Deserialize, Serialize, Default, Debug, Eq, PartialEq, Clone)]
-struct FileC {
+/// File-specific settings.
+#[configurable_component]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+struct FileSettings {
+    /// The path of the enrichment table file.
+    ///
+    /// Currently, only [CSV][csv] files are supported.
+    ///
+    /// [csv]: https://en.wikipedia.org/wiki/Comma-separated_values
     path: PathBuf,
+
+    #[configurable(derived)]
     encoding: Encoding,
 }
 
-#[derive(Serialize, Deserialize, Default, Debug, Clone, PartialEq, Eq)]
+/// Configuration for the `file` enrichment table.
+#[configurable_component(enrichment_table("file"))]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct FileConfig {
-    file: FileC,
+    #[configurable(derived)]
+    file: FileSettings,
+
+    /// Key/value pairs representing mapped log field names and types.
+    ///
+    /// This is used to coerce log fields from strings into their proper types. The available types are listed in the `Types` list below.
+    ///
+    /// Timestamp coercions need to be prefaced with `timestamp|`, for example `"timestamp|%F"`. Timestamp specifiers can use either of the following:
+    ///
+    /// 1. One of the built-in-formats listed in the `Timestamp Formats` table below.
+    /// 2. The [time format specifiers][chrono_fmt] from Rust’s `chrono` library.
+    ///
+    /// ### Types
+    ///
+    /// - **`bool`**
+    /// - **`string`**
+    /// - **`float`**
+    /// - **`integer`**
+    /// - **`date`**
+    /// - **`timestamp`** (see the table below for formats)
+    ///
+    /// ### Timestamp Formats
+    ///
+    /// | Format               | Description                                                                      | Example                          |
+    /// |----------------------|----------------------------------------------------------------------------------|----------------------------------|
+    /// | `%F %T`              | `YYYY-MM-DD HH:MM:SS`                                                            | `2020-12-01 02:37:54`            |
+    /// | `%v %T`              | `DD-Mmm-YYYY HH:MM:SS`                                                           | `01-Dec-2020 02:37:54`           |
+    /// | `%FT%T`              | [ISO 8601][iso8601]/[RFC 3339][rfc3339], without time zone                       | `2020-12-01T02:37:54`            |
+    /// | `%FT%TZ`             | [ISO 8601][iso8601]/[RFC 3339][rfc3339], UTC                                     | `2020-12-01T09:37:54Z`           |
+    /// | `%+`                 | [ISO 8601][iso8601]/[RFC 3339][rfc3339], UTC, with time zone                     | `2020-12-01T02:37:54-07:00`      |
+    /// | `%a, %d %b %Y %T`    | [RFC 822][rfc822]/[RFC 2822][rfc2822], without time zone                         | `Tue, 01 Dec 2020 02:37:54`      |
+    /// | `%a %b %e %T %Y`     | [ctime][ctime] format                                                            | `Tue Dec 1 02:37:54 2020`        |
+    /// | `%s`                 | [UNIX timestamp][unix_ts]                                                        | `1606790274`                     |
+    /// | `%a %d %b %T %Y`     | [date][date] command, without time zone                                          | `Tue 01 Dec 02:37:54 2020`       |
+    /// | `%a %d %b %T %Z %Y`  | [date][date] command, with time zone                                             | `Tue 01 Dec 02:37:54 PST 2020`   |
+    /// | `%a %d %b %T %z %Y`  | [date][date] command, with numeric time zone                                     | `Tue 01 Dec 02:37:54 -0700 2020` |
+    /// | `%a %d %b %T %#z %Y` | [date][date] command, with numeric time zone (minutes can be missing or present) | `Tue 01 Dec 02:37:54 -07 2020`   |
+    ///
+    /// [date]: https://man7.org/linux/man-pages/man1/date.1.html
+    /// [ctime]: https://www.cplusplus.com/reference/ctime
+    /// [unix_ts]: https://en.wikipedia.org/wiki/Unix_time
+    /// [rfc822]: https://tools.ietf.org/html/rfc822#section-5
+    /// [rfc2822]: https://tools.ietf.org/html/rfc2822#section-3.3
+    /// [iso8601]: https://en.wikipedia.org/wiki/ISO_8601
+    /// [rfc3339]: https://tools.ietf.org/html/rfc3339
+    /// [chrono_fmt]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
     #[serde(default)]
     schema: HashMap<String, String>,
 }
@@ -173,10 +240,6 @@ impl EnrichmentTableConfig for FileConfig {
 
         Ok(Box::new(File::new(self.clone(), modified, data, headers)))
     }
-}
-
-inventory::submit! {
-    EnrichmentTableDescription::new::<FileConfig>("file")
 }
 
 impl_generate_config_from_default!(FileConfig);

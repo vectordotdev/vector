@@ -1,3 +1,5 @@
+#![allow(clippy::missing_errors_doc)]
+
 use std::{fmt::Debug, net::SocketAddr, path::PathBuf, time::Duration};
 
 use openssl::{
@@ -11,24 +13,18 @@ use tokio_openssl::SslStream;
 
 use crate::tcp::{self, TcpKeepaliveConfig};
 
-#[cfg(feature = "sources-utils-tls")]
 mod incoming;
 mod maybe_tls;
 mod outgoing;
 mod settings;
 
-#[cfg(all(feature = "sources-utils-tls", feature = "listenfd"))]
-pub(crate) use incoming::{CertificateMetadata, MaybeTlsIncomingStream, MaybeTlsListener};
-pub(crate) use maybe_tls::MaybeTls;
-#[cfg(all(test, feature = "kafka-integration-tests"))]
-pub use settings::TEST_PEM_INTERMEDIATE_CA_PATH;
+pub use incoming::{CertificateMetadata, MaybeTlsIncomingStream, MaybeTlsListener};
+pub use maybe_tls::MaybeTls;
 pub use settings::{
     MaybeTlsSettings, TlsConfig, TlsEnableableConfig, TlsSettings, TlsSourceConfig,
+    TEST_PEM_CA_PATH, TEST_PEM_CLIENT_CRT_PATH, TEST_PEM_CLIENT_KEY_PATH, TEST_PEM_CRT_PATH,
+    TEST_PEM_INTERMEDIATE_CA_PATH, TEST_PEM_KEY_PATH,
 };
-#[cfg(test)]
-pub use settings::{TEST_PEM_CA_PATH, TEST_PEM_CRT_PATH, TEST_PEM_KEY_PATH};
-#[cfg(all(test, feature = "sources-socket"))]
-pub use settings::{TEST_PEM_CLIENT_CRT_PATH, TEST_PEM_CLIENT_KEY_PATH};
 
 pub type Result<T> = std::result::Result<T, TlsError>;
 
@@ -178,7 +174,7 @@ impl MaybeTlsStream<TcpStream> {
     }
 }
 
-pub(crate) fn tls_connector_builder(settings: &MaybeTlsSettings) -> Result<SslConnectorBuilder> {
+pub fn tls_connector_builder(settings: &MaybeTlsSettings) -> Result<SslConnectorBuilder> {
     let mut builder = SslConnector::builder(SslMethod::tls()).context(TlsBuildConnectorSnafu)?;
     if let Some(settings) = settings.tls() {
         settings.apply_context(&mut builder)?;
@@ -189,8 +185,7 @@ pub(crate) fn tls_connector_builder(settings: &MaybeTlsSettings) -> Result<SslCo
 fn tls_connector(settings: &MaybeTlsSettings) -> Result<ConnectConfiguration> {
     let verify_hostname = settings
         .tls()
-        .map(|settings| settings.verify_hostname)
-        .unwrap_or(true);
+        .map_or(true, |settings| settings.verify_hostname);
     let configure = tls_connector_builder(settings)?
         .build()
         .configure()

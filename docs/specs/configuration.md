@@ -111,5 +111,5 @@ buffer.disk.max_bytes = 1_000_000_000
 
 [component specification]: component.md
 [external tagging]: https://docs.rs/serde_tagged/0.2.0/serde_tagged/ser/external/index.html
-[JSON types]: http://json-schema.org/understanding-json-schema/reference/type.html
+[json types]: http://json-schema.org/understanding-json-schema/reference/type.html
 [user_experience]: ../USER_EXPERIENCE_DESIGN.md

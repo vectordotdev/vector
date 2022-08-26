@@ -1,8 +1,8 @@
 use std::collections::BTreeSet;
 
 use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
 use value::Value;
+use vector_config::configurable_component;
 use vector_core::{
     config::{DataType, Input, Output},
     event::{
@@ -13,19 +13,18 @@ use vector_core::{
     transform::{FunctionTransform, OutputBuffer, Transform, TransformConfig, TransformContext},
 };
 
-use crate::config::TransformDescription;
-
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+/// Configuration for the `test_basic` transform.
+#[configurable_component(transform)]
+#[derive(Clone, Debug, Default)]
 pub struct BasicTransformConfig {
+    /// Suffix to add to the message of any log event.
     suffix: String,
+
+    /// Amount to increase any metric by.
     increase: f64,
 }
 
 impl_generate_config_from_default!(BasicTransformConfig);
-
-inventory::submit! {
-    TransformDescription::new::<BasicTransformConfig>("basic_transform")
-}
 
 impl BasicTransformConfig {
     pub const fn new(suffix: String, increase: f64) -> Self {
@@ -34,7 +33,7 @@ impl BasicTransformConfig {
 }
 
 #[async_trait]
-#[typetag::serde(name = "basic_transform")]
+#[typetag::serde(name = "test_basic")]
 impl TransformConfig for BasicTransformConfig {
     async fn build(&self, _globals: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(BasicTransform {
@@ -52,7 +51,7 @@ impl TransformConfig for BasicTransformConfig {
     }
 
     fn transform_type(&self) -> &'static str {
-        "basic_transform"
+        "test_basic"
     }
 }
 

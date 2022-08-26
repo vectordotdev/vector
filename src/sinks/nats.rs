@@ -183,7 +183,7 @@ impl StreamSink<Event> for NatsSink {
                         field: Some("subject"),
                         drop_event: true,
                     });
-                    finalizers.update_status(EventStatus::Errored);
+                    finalizers.update_status(EventStatus::Rejected);
                     continue;
                 }
             };
@@ -195,7 +195,7 @@ impl StreamSink<Event> for NatsSink {
             let mut bytes = BytesMut::new();
             if self.encoder.encode(event, &mut bytes).is_err() {
                 // Error is handled by `Encoder`.
-                finalizers.update_status(EventStatus::Errored);
+                finalizers.update_status(EventStatus::Rejected);
                 continue;
             }
 

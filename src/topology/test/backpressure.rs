@@ -5,9 +5,9 @@ use tokio::time::Duration;
 use vector_buffers::{BufferConfig, BufferType, WhenFull};
 use vector_core::config::MEMORY_BUFFER_DEFAULT_MAX_EVENTS;
 
-use crate::config::SinkOuter;
 use crate::topology::builder::SOURCE_SENDER_BUFFER_SIZE;
 use crate::{config::Config, test_util, test_util::start_topology};
+use crate::{config::SinkOuter, test_util::mock::backpressure_source};
 
 // Based on how we pump events from `SourceSender` into `Fanout`, there's always one extra event we
 // may pull out of `SourceSender` but can't yet send into `Fanout`, so we account for that here.
@@ -29,12 +29,7 @@ async fn serial_backpressure() {
         + EXTRA_SOURCE_PUMP_EVENT;
 
     let source_counter = Arc::new(AtomicUsize::new(0));
-    config.add_source(
-        "in",
-        test_source::TestBackpressureSourceConfig {
-            counter: Arc::clone(&source_counter),
-        },
-    );
+    config.add_source("in", backpressure_source(&source_counter));
     config.add_sink(
         "out",
         &["in"],
@@ -69,12 +64,7 @@ async fn default_fan_out() {
         + EXTRA_SOURCE_PUMP_EVENT;
 
     let source_counter = Arc::new(AtomicUsize::new(0));
-    config.add_source(
-        "in",
-        test_source::TestBackpressureSourceConfig {
-            counter: Arc::clone(&source_counter),
-        },
-    );
+    config.add_source("in", backpressure_source(&source_counter));
     config.add_sink(
         "out1",
         &["in"],
@@ -118,12 +108,7 @@ async fn buffer_drop_fan_out() {
         + EXTRA_SOURCE_PUMP_EVENT;
 
     let source_counter = Arc::new(AtomicUsize::new(0));
-    config.add_source(
-        "in",
-        test_source::TestBackpressureSourceConfig {
-            counter: Arc::clone(&source_counter),
-        },
-    );
+    config.add_source("in", backpressure_source(&source_counter));
     config.add_sink(
         "out1",
         &["in"],
@@ -186,18 +171,8 @@ async fn multiple_inputs_backpressure() {
         + EXTRA_SOURCE_PUMP_EVENT * 2;
 
     let source_counter = Arc::new(AtomicUsize::new(0));
-    config.add_source(
-        "in1",
-        test_source::TestBackpressureSourceConfig {
-            counter: Arc::clone(&source_counter),
-        },
-    );
-    config.add_source(
-        "in2",
-        test_source::TestBackpressureSourceConfig {
-            counter: Arc::clone(&source_counter),
-        },
-    );
+    config.add_source("in1", backpressure_source(&source_counter));
+    config.add_source("in2", backpressure_source(&source_counter));
     config.add_sink(
         "out",
         &["in1", "in2"],
@@ -275,65 +250,6 @@ mod test_sink {
 
         fn acknowledgements(&self) -> &AcknowledgementsConfig {
             &AcknowledgementsConfig::DEFAULT
-        }
-    }
-}
-
-mod test_source {
-    use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::sync::Arc;
-
-    use async_trait::async_trait;
-    use futures::FutureExt;
-    use serde::{Deserialize, Serialize};
-    use vector_core::config::LogNamespace;
-
-    use crate::config::{DataType, Output, SourceConfig, SourceContext};
-    use crate::event::{Event, LogEvent};
-    use crate::sources::Source;
-
-    #[derive(Debug, Serialize, Deserialize)]
-    pub struct TestBackpressureSourceConfig {
-        // The number of events that have been sent.
-        #[serde(skip)]
-        pub counter: Arc<AtomicUsize>,
-    }
-
-    #[async_trait]
-    #[typetag::serde(name = "test-backpressure-source")]
-    impl SourceConfig for TestBackpressureSourceConfig {
-        async fn build(&self, mut cx: SourceContext) -> crate::Result<Source> {
-            let counter = Arc::clone(&self.counter);
-            Ok(async move {
-                for i in 0.. {
-                    let _result = cx
-                        .out
-                        .send_event(Event::Log(LogEvent::from(format!("event-{}", i))))
-                        .await;
-                    counter.fetch_add(1, Ordering::AcqRel);
-                    // Place ourselves at the back of tokio's task queue, giving downstream
-                    // components a chance to process the event we just sent before sending more.
-                    // This helps the backpressure tests behave more deterministically when we use
-                    // opportunistic batching at the topology level. Yielding here makes it very
-                    // unlikely that a `ready_chunks` or similar will have a chance to see more
-                    // than one event available at a time.
-                    tokio::task::yield_now().await;
-                }
-                Ok(())
-            }
-            .boxed())
-        }
-
-        fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-            vec![Output::default(DataType::all())]
-        }
-
-        fn source_type(&self) -> &'static str {
-            "test-backpressure-source"
-        }
-
-        fn can_acknowledge(&self) -> bool {
-            false
         }
     }
 }

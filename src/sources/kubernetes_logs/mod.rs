@@ -25,13 +25,13 @@ use kube::{
     Client, Config as ClientConfig,
 };
 use vector_common::TimeZone;
-use vector_config::configurable_component;
+use vector_config::{configurable_component, NamedComponent};
 use vector_core::{transform::TaskTransform, ByteSizeOf};
 
 use crate::{
     config::{
         log_schema, ComponentKey, DataType, GenerateConfig, GlobalOptions, Output, SourceConfig,
-        SourceContext, SourceDescription,
+        SourceContext,
     },
     event::{Event, LogEvent},
     internal_events::{
@@ -74,7 +74,7 @@ const FILE_KEY: &str = "file";
 const SELF_NODE_NAME_ENV_KEY: &str = "VECTOR_SELF_NODE_NAME";
 
 /// Configuration for the `kubernetes_logs` source.
-#[configurable_component(source)]
+#[configurable_component(source("kubernetes_logs"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct Config {
@@ -152,10 +152,6 @@ pub struct Config {
     delay_deletion_ms: usize,
 }
 
-inventory::submit! {
-    SourceDescription::new::<Config>(COMPONENT_ID)
-}
-
 impl GenerateConfig for Config {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(&Self {
@@ -192,10 +188,7 @@ impl Default for Config {
     }
 }
 
-const COMPONENT_ID: &str = "kubernetes_logs";
-
 #[async_trait::async_trait]
-#[typetag::serde(name = "kubernetes_logs")]
 impl SourceConfig for Config {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let source = Source::new(self, &cx.globals, &cx.key).await?;
@@ -208,10 +201,6 @@ impl SourceConfig for Config {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        COMPONENT_ID
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -578,7 +567,10 @@ fn create_event(line: Bytes, file: &str, ingestion_timestamp_field: Option<&str>
     let mut event = LogEvent::from_bytes_legacy(&line);
 
     // Add source type.
-    event.insert(log_schema().source_type_key(), COMPONENT_ID.to_owned());
+    event.insert(
+        log_schema().source_type_key(),
+        Bytes::from_static(Config::NAME.as_bytes()),
+    );
 
     // Add file.
     event.insert(FILE_KEY, file.to_owned());

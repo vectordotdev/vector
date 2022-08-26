@@ -30,7 +30,7 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tracing::Span;
 use value::Kind;
-use vector_config::configurable_component;
+use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::LogNamespace;
 use vector_core::event::{BatchNotifier, BatchStatus};
 use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Reply};
@@ -39,7 +39,7 @@ use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
-        SourceConfig, SourceContext, SourceDescription,
+        SourceConfig, SourceContext,
     },
     event::Event,
     internal_events::{HttpBytesReceived, HttpDecompressError, StreamClosedError},
@@ -55,7 +55,7 @@ pub const METRICS: &str = "metrics";
 pub const TRACES: &str = "traces";
 
 /// Configuration for the `datadog_agent` source.
-#[configurable_component(source)]
+#[configurable_component(source("datadog_agent"))]
 #[derive(Clone, Debug)]
 pub struct DatadogAgentConfig {
     /// The address to accept connections on.
@@ -126,12 +126,7 @@ impl GenerateConfig for DatadogAgentConfig {
     }
 }
 
-inventory::submit! {
-    SourceDescription::new::<DatadogAgentConfig>("datadog_agent")
-}
-
 #[async_trait::async_trait]
-#[typetag::serde(name = "datadog_agent")]
 impl SourceConfig for DatadogAgentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
@@ -199,49 +194,49 @@ impl SourceConfig for DatadogAgentConfig {
             .decoding
             .schema_definition(global_log_namespace.merge(self.log_namespace))
             .with_source_metadata(
-                self.source_type(),
+                self.get_component_name(),
                 "message",
                 "message",
                 Kind::bytes(),
                 Some("message"),
             )
             .with_source_metadata(
-                self.source_type(),
+                self.get_component_name(),
                 "status",
                 "status",
                 Kind::bytes(),
                 Some("severity"),
             )
             .with_source_metadata(
-                self.source_type(),
+                self.get_component_name(),
                 "timestamp",
                 "timestamp",
                 Kind::timestamp(),
                 Some("timestamp"),
             )
             .with_source_metadata(
-                self.source_type(),
+                self.get_component_name(),
                 "hostname",
                 "hostname",
                 Kind::bytes(),
                 Some("host"),
             )
             .with_source_metadata(
-                self.source_type(),
+                self.get_component_name(),
                 "service",
                 "service",
                 Kind::bytes(),
                 Some("service"),
             )
             .with_source_metadata(
-                self.source_type(),
+                self.get_component_name(),
                 "ddsource",
                 "ddsource",
                 Kind::bytes(),
                 Some("source"),
             )
             .with_source_metadata(
-                self.source_type(),
+                self.get_component_name(),
                 "ddtags",
                 "ddtags",
                 Kind::bytes(),
@@ -260,10 +255,6 @@ impl SourceConfig for DatadogAgentConfig {
         } else {
             vec![Output::default(DataType::all()).with_schema_definition(definition)]
         }
-    }
-
-    fn source_type(&self) -> &'static str {
-        "datadog_agent"
     }
 
     fn resources(&self) -> Vec<Resource> {

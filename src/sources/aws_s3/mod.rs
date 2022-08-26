@@ -18,10 +18,7 @@ use crate::common::sqs::SqsClientBuilder;
 use crate::tls::TlsConfig;
 use crate::{
     aws::auth::AwsAuthentication,
-    config::{
-        AcknowledgementsConfig, DataType, Output, ProxyConfig, SourceConfig, SourceContext,
-        SourceDescription,
-    },
+    config::{AcknowledgementsConfig, DataType, Output, ProxyConfig, SourceConfig, SourceContext},
     line_agg,
     serde::bool_or_struct,
 };
@@ -67,7 +64,7 @@ enum Strategy {
 // when there's required fields.
 //
 // Maybe showing defaults at all, when there are required properties, doesn't actually make sense? :thinkies:
-#[configurable_component(source)]
+#[configurable_component(source("aws_s3"))]
 #[derive(Clone, Debug, Default)]
 #[serde(default, deny_unknown_fields)]
 pub struct AwsS3Config {
@@ -108,14 +105,9 @@ pub struct AwsS3Config {
     tls_options: Option<TlsConfig>,
 }
 
-inventory::submit! {
-    SourceDescription::new::<AwsS3Config>("aws_s3")
-}
-
 impl_generate_config_from_default!(AwsS3Config);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "aws_s3")]
 impl SourceConfig for AwsS3Config {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let multiline_config: Option<line_agg::Config> = self
@@ -135,10 +127,6 @@ impl SourceConfig for AwsS3Config {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "aws_s3"
     }
 
     fn can_acknowledge(&self) -> bool {

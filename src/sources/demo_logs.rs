@@ -16,7 +16,7 @@ use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{log_schema, Output, SourceConfig, SourceContext, SourceDescription},
+    config::{log_schema, Output, SourceConfig, SourceContext},
     internal_events::{BytesReceived, DemoLogsEventProcessed, EventsReceived, StreamClosedError},
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
@@ -24,7 +24,7 @@ use crate::{
 };
 
 /// Configuration for the `demo_logs` source.
-#[configurable_component(source)]
+#[configurable_component(source("demo_logs"))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(default)]
@@ -246,18 +246,9 @@ async fn demo_logs_source(
     Ok(())
 }
 
-inventory::submit! {
-    SourceDescription::new::<DemoLogsConfig>("demo_logs")
-}
-
-inventory::submit! {
-    SourceDescription::new::<DemoLogsConfig>("generator")
-}
-
 impl_generate_config_from_default!(DemoLogsConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "demo_logs")]
 impl SourceConfig for DemoLogsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
@@ -287,38 +278,6 @@ impl SourceConfig for DemoLogsConfig {
             .with_standard_vector_source_metadata();
 
         vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "demo_logs"
-    }
-
-    fn can_acknowledge(&self) -> bool {
-        false
-    }
-}
-
-/// Configuration for the `generator` source.
-// Add a compatibility alias to avoid breaking existing configs
-//
-// TODO: Is this old enough now that we could actually remove it?
-#[configurable_component(source)]
-#[derive(Clone, Debug)]
-pub struct DemoLogsCompatConfig(#[configurable(transparent)] DemoLogsConfig);
-
-#[async_trait::async_trait]
-#[typetag::serde(name = "generator")]
-impl SourceConfig for DemoLogsCompatConfig {
-    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        self.0.build(cx).await
-    }
-
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
-        self.0.outputs(global_log_namespace)
-    }
-
-    fn source_type(&self) -> &'static str {
-        self.0.source_type()
     }
 
     fn can_acknowledge(&self) -> bool {
