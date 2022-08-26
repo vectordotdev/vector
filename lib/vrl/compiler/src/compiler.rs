@@ -617,14 +617,70 @@ impl<'a> Compiler<'a> {
             if let Ok(key) = get_metadata_key(args) {
                 match key {
                     MetadataKey::Query(target_path) => self.diagnostics.push(Box::new(
-                        DeprecationWarning::new("\"get_metadata_field\" function")
+                        DeprecationWarning::new("the \"get_metadata_field\" function")
                             .with_span(func.span)
                             .with_notes(Note::solution(
-                                "using a metadata query instead",
+                                "using the metadata path syntax instead",
                                 vec![format!("{}", target_path)],
                             )),
                     )),
-                    MetadataKey::Legacy(_) => {}
+                    MetadataKey::Legacy(secret_key) => self.diagnostics.push(Box::new(
+                        DeprecationWarning::new("the \"get_metadata_field\" function")
+                            .with_span(func.span)
+                            .with_notes(Note::solution(
+                                "using the \"get_secret\" function instead",
+                                vec![format!("get_secret(\"{}\")", secret_key)],
+                            )),
+                    )),
+                }
+            }
+        }
+        if func.ident == "set_metadata_field" {
+            if let Ok(key) = get_metadata_key(args) {
+                match key {
+                    MetadataKey::Query(target_path) => self.diagnostics.push(Box::new(
+                        DeprecationWarning::new("the \"set_metadata_field\" function")
+                            .with_span(func.span)
+                            .with_notes(Note::solution(
+                                "using the metadata path syntax instead",
+                                vec![format!("{} = {}", target_path, args.required_expr("value"))],
+                            )),
+                    )),
+                    MetadataKey::Legacy(secret_key) => self.diagnostics.push(Box::new(
+                        DeprecationWarning::new("the \"set_metadata_field\" function")
+                            .with_span(func.span)
+                            .with_notes(Note::solution(
+                                "using the \"set_secret\" function instead",
+                                vec![format!(
+                                    "set_secret(\"{}\", {})",
+                                    secret_key,
+                                    args.required_expr("value")
+                                )],
+                            )),
+                    )),
+                }
+            }
+        }
+
+        if func.ident == "remove_metadata_field" {
+            if let Ok(key) = get_metadata_key(args) {
+                match key {
+                    MetadataKey::Query(target_path) => self.diagnostics.push(Box::new(
+                        DeprecationWarning::new("the \"remove_metadata_field\" function")
+                            .with_span(func.span)
+                            .with_notes(Note::solution(
+                                "using the metadata path syntax instead",
+                                vec![format!("del({})", target_path)],
+                            )),
+                    )),
+                    MetadataKey::Legacy(secret_key) => self.diagnostics.push(Box::new(
+                        DeprecationWarning::new("the \"remove_metadata_field\" function")
+                            .with_span(func.span)
+                            .with_notes(Note::solution(
+                                "using the \"remove_secret\" function instead",
+                                vec![format!("remove_secret(\"{}\")", secret_key)],
+                            )),
+                    )),
                 }
             }
         }

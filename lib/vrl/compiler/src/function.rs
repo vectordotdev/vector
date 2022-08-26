@@ -424,7 +424,7 @@ impl ArgumentList {
         self.arguments.get(keyword).cloned()
     }
 
-    pub fn required_expr(&mut self, keyword: &'static str) -> Expr {
+    pub fn required_expr(&self, keyword: &'static str) -> Expr {
         required(self.optional_expr(keyword))
     }
 }
