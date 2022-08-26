@@ -8,7 +8,7 @@ use crate::{
 
 #[allow(warnings)] // Ignore some clippy warnings
 #[allow(clippy::all)]
-#[allow(clippy::doc_markdown)]
+#[allow(clippy::pedantic)]
 mod proto_event {
     include!(concat!(env!("OUT_DIR"), "/event.rs"));
 }

@@ -95,6 +95,7 @@ enum BuildError {
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[allow(clippy::large_enum_variant)]
 pub enum Sources {
     /// Apache HTTP Server (HTTPD) Metrics.
     #[cfg(feature = "sources-apache_metrics")]

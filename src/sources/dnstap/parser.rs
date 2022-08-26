@@ -21,7 +21,7 @@ use crate::{
     Error, Result,
 };
 
-#[allow(warnings)]
+#[allow(warnings, clippy::all, clippy::pedantic, clippy::nursery)]
 mod dnstap_proto {
     include!(concat!(env!("OUT_DIR"), "/dnstap.rs"));
 }
