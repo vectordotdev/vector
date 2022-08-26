@@ -15,5 +15,12 @@
   },
   "scripts": {
     "test": "tree-sitter test"
-  }
+  },
+  "tree-sitter": [{
+    "scope": "source.vrl",
+    "file-types": ["vrl"],
+    "highlights": [
+      "queries/highlights.scm"
+    ]
+  }]
 }

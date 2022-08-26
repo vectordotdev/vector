@@ -1,0 +1,25 @@
+============================================
+Abort
+============================================
+abort
+abort "message"
+abort abort
+abort abort "message"
+abort {1; "msg"}
+
+abort
+"msg" # this is NOT part of the abort expression
+---
+
+(program
+  (exprs
+    (expr (abort))
+    (expr (abort (expr (literal (string)))))
+    (expr (abort (expr (abort))))
+    (expr (abort (expr (abort (expr (literal (string)))))))
+    (expr (abort (expr (container (block (exprs (expr (literal (integer))) (expr (literal (string)))))))))
+
+    (expr (abort))
+    (expr (literal (string)))
+  )
+)

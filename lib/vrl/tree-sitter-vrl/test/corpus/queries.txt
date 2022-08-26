@@ -5,10 +5,12 @@ Local Variable
  _foo
 0123foo
 f_o_o
+abortable # variable starting with a keyword
 ---
 
 (program
   (exprs
+    (expr (query (local_query (local_variable))))
     (expr (query (local_query (local_variable))))
     (expr (query (local_query (local_variable))))
     (expr (query (local_query (local_variable))))

@@ -7994,6 +7994,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "tree-sitter-highlight"
+version = "0.20.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "042342584c5a7a0b833d9fc4e2bdab3f9868ddc6c4b339a1e01451c6720868bc"
+dependencies = [
+ "regex",
+ "thiserror",
+ "tree-sitter",
+]
+
+[[package]]
 name = "tree-sitter-vrl"
 version = "0.0.1"
 dependencies = [
@@ -8868,6 +8879,15 @@ version = "0.1.0"
 dependencies = [
  "codespan-reporting",
  "termcolor",
+]
+
+[[package]]
+name = "vrl-highlighter"
+version = "0.1.0"
+dependencies = [
+ "tree-sitter",
+ "tree-sitter-highlight",
+ "tree-sitter-vrl",
 ]
 
 [[package]]

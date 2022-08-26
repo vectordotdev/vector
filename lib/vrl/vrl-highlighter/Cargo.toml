@@ -1,0 +1,11 @@
+[package]
+name = "vrl-highlighter"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tree-sitter-highlight = "0.20.1"
+tree-sitter-vrl = {path = "../tree-sitter-vrl"}
+tree-sitter = "0.20.8"

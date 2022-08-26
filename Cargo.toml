@@ -104,6 +104,7 @@ members = [
   "lib/vrl/diagnostic",
   "lib/vrl/parser",
   "lib/vrl/tree-sitter-vrl",
+  "lib/vrl/vrl-highlighter",
   "lib/vrl/stdlib",
   "lib/vrl/tests",
   "lib/vrl/proptests",
