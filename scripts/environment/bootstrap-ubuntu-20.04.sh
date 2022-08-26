@@ -50,6 +50,7 @@ apt install --yes \
     ruby-bundler \
     shellcheck \
     sudo \
+    unzip \
     wget \
     yarn
 

@@ -19,7 +19,8 @@ apt-get update
 # needed by onig_sys
 apt-get install -y \
       libclang1-9 \
-      llvm-9
+      llvm-9 \
+      unzip
 
 # Protoc. No guard because we want to override Ubuntu's old version in
 # case it is already installed by a dependency.
