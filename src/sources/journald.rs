@@ -9,17 +9,6 @@ use std::{
     time::Duration,
 };
 
-use crate::{
-    config::{log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext},
-    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, LogEvent, Value},
-    internal_events::{
-        BytesReceived, JournaldInvalidRecordError, JournaldNegativeAcknowledgmentError,
-        OldEventsReceived,
-    },
-    serde::bool_or_struct,
-    shutdown::ShutdownSignal,
-    SourceSender,
-};
 use bytes::Bytes;
 use chrono::TimeZone;
 use codecs::{decoding::BoxedFramingError, CharacterDelimitedDecoder};
@@ -41,9 +30,23 @@ use tokio::{
     time::sleep,
 };
 use tokio_util::codec::FramedRead;
+use vector_common::internal_event::{
+    ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
+};
 use vector_common::{byte_size_of::ByteSizeOf, finalizer::OrderedFinalizer};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
+
+use crate::{
+    config::{log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext},
+    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, LogEvent, Value},
+    internal_events::{
+        JournaldInvalidRecordError, JournaldNegativeAcknowledgmentError, OldEventsReceived,
+    },
+    serde::bool_or_struct,
+    shutdown::ShutdownSignal,
+    SourceSender,
+};
 
 const DEFAULT_BATCH_SIZE: usize = 16;
 const BATCH_TIMEOUT: Duration = Duration::from_millis(10);
@@ -329,6 +332,8 @@ impl JournaldSource {
         finalizer: &'a Finalizer,
         shutdown: &'a mut BoxFuture<'static, ()>,
     ) -> bool {
+        let bytes_received = register!(BytesReceived::from(Protocol::from("journald")));
+
         let batch_size = self.batch_size;
         loop {
             let mut batch = Batch::new(self);
@@ -356,7 +361,7 @@ impl JournaldSource {
                     }
                 }
             }
-            if let Some(x) = batch.finish(finalizer).await {
+            if let Some(x) = batch.finish(finalizer, &bytes_received).await {
                 break x;
             }
         }
@@ -430,14 +435,15 @@ impl<'a> Batch<'a> {
         }
     }
 
-    async fn finish(mut self, finalizer: &Finalizer) -> Option<bool> {
+    async fn finish(
+        mut self,
+        finalizer: &Finalizer,
+        bytes_received: &'a Registered<BytesReceived>,
+    ) -> Option<bool> {
         drop(self.batch);
 
         if self.record_size > 0 {
-            emit!(BytesReceived {
-                byte_size: self.record_size,
-                protocol: "journald",
-            });
+            bytes_received.emit(ByteSize(self.record_size));
         }
 
         if !self.events.is_empty() {

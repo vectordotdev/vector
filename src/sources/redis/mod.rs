@@ -7,6 +7,9 @@ use codecs::{
 use futures::StreamExt;
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
+use vector_common::internal_event::{
+    ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
+};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
@@ -15,7 +18,7 @@ use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{log_schema, GenerateConfig, Output, SourceConfig, SourceContext},
     event::Event,
-    internal_events::{BytesReceived, EventsReceived, StreamClosedError},
+    internal_events::{EventsReceived, StreamClosedError},
     serde::{default_decoding, default_framing_message_based},
     SourceSender,
 };
@@ -149,7 +152,7 @@ impl SourceConfig for RedisSourceConfig {
         }
 
         let client = redis::Client::open(self.url.as_str()).context(ClientSnafu {})?;
-        let connection_info = client.get_connection_info().into();
+        let connection_info = ConnectionInfo::from(client.get_connection_info());
         let decoder = DecodingConfig::new(
             self.framing.clone(),
             self.decoding.clone(),
@@ -157,12 +160,16 @@ impl SourceConfig for RedisSourceConfig {
         )
         .build();
 
+        let bytes_received = register!(BytesReceived::from(Protocol::from(
+            connection_info.protocol
+        )));
+
         match self.data_type {
             DataTypeConfig::List => {
                 let list = self.list.unwrap_or_default();
                 list::watch(
                     client,
-                    connection_info,
+                    bytes_received.clone(),
                     self.key.clone(),
                     self.redis_key.clone(),
                     list.method,
@@ -175,6 +182,7 @@ impl SourceConfig for RedisSourceConfig {
                 channel::subscribe(
                     client,
                     connection_info,
+                    bytes_received.clone(),
                     self.key.clone(),
                     self.redis_key.clone(),
                     decoder,
@@ -195,19 +203,16 @@ impl SourceConfig for RedisSourceConfig {
 }
 
 async fn handle_line(
-    connection_info: &ConnectionInfo,
     line: String,
     key: &str,
     redis_key: Option<&str>,
     decoder: Decoder,
+    bytes_received: &Registered<BytesReceived>,
     out: &mut SourceSender,
 ) -> Result<(), ()> {
     let now = Utc::now();
 
-    emit!(BytesReceived {
-        byte_size: line.len(),
-        protocol: connection_info.protocol,
-    });
+    bytes_received.emit(ByteSize(line.len()));
 
     let mut stream = FramedRead::new(line.as_ref(), decoder.clone());
     while let Some(next) = stream.next().await {

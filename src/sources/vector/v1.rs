@@ -1,3 +1,5 @@
+use std::fmt::{self, Debug, Formatter};
+
 use bytes::Bytes;
 use codecs::{
     decoding::{self, Deserializer, Framer},
@@ -5,6 +7,9 @@ use codecs::{
 };
 use prost::Message;
 use smallvec::{smallvec, SmallVec};
+use vector_common::internal_event::{
+    ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
+};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
@@ -13,7 +18,7 @@ use crate::{
     codecs::Decoder,
     config::{DataType, GenerateConfig, Output, Resource, SourceContext},
     event::{proto, Event},
-    internal_events::{BytesReceived, OldEventsReceived, VectorProtoDecodeError},
+    internal_events::{OldEventsReceived, VectorProtoDecodeError},
     sources::{
         util::{SocketListenAddr, TcpNullAcker, TcpSource},
         Source,
@@ -112,8 +117,16 @@ impl VectorConfig {
     }
 }
 
-#[derive(Debug, Clone)]
-struct VectorDeserializer;
+#[derive(Clone)]
+struct VectorDeserializer {
+    bytes_received: Registered<BytesReceived>,
+}
+
+impl Debug for VectorDeserializer {
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+        fmt.debug_struct("VectorDeserializer").finish()
+    }
+}
 
 impl decoding::format::Deserializer for VectorDeserializer {
     fn parse(
@@ -121,11 +134,7 @@ impl decoding::format::Deserializer for VectorDeserializer {
         bytes: Bytes,
         _log_namespace: LogNamespace,
     ) -> crate::Result<SmallVec<[Event; 1]>> {
-        let byte_size = bytes.len();
-        emit!(BytesReceived {
-            byte_size,
-            protocol: "tcp",
-        });
+        self.bytes_received.emit(ByteSize(bytes.len()));
 
         match proto::EventWrapper::decode(bytes).map(Event::from) {
             Ok(event) => {
@@ -153,9 +162,10 @@ impl TcpSource for VectorSource {
     type Acker = TcpNullAcker;
 
     fn decoder(&self) -> Self::Decoder {
+        let bytes_received = register!(BytesReceived::from(Protocol::TCP));
         Decoder::new(
             Framer::LengthDelimited(LengthDelimitedDecoder::new()),
-            Deserializer::Boxed(Box::new(VectorDeserializer)),
+            Deserializer::Boxed(Box::new(VectorDeserializer { bytes_received })),
         )
     }
 
