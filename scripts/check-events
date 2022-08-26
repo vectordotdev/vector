@@ -200,8 +200,13 @@ class Event
 
       # Name check
       append('EventsDropped events MUST be named "___EventsDropped".') unless @name.end_with? 'EventsDropped'
+
+      # TODO: Fix the following check.
+      # The event should log with debug level when intentional=true and otherwise use the error level.
+      #
       # Outputs an error log
-      handle.logs_should_have('error')
+      # handle.logs_should_have('error')
+
       # Metric check
       counters_must_include_exclude_tags(METRIC_NAME_EVENTS_DROPPED, ['intentional'], ['reason', 'count'])
 

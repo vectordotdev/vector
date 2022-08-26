@@ -2,13 +2,23 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct DedupeEventDiscarded {
-    pub event: crate::event::Event,
+pub struct DedupeEventsDropped {
+    pub count: u64,
 }
 
-impl InternalEvent for DedupeEventDiscarded {
+impl InternalEvent for DedupeEventsDropped {
     fn emit(self) {
-        trace!(message = "Encountered duplicate event; discarding.", event = ?self.event);
-        counter!("events_discarded_total", 1);
+        debug!(
+            message = "Events dropped.",
+            count = self.count,
+            intentional = true,
+            reason = "Events have been found in cache for deduplication.",
+        );
+        counter!(
+            "component_discarded_events_total",
+            self.count,
+            "intentional" => "true",
+        );
+        counter!("events_discarded_total", self.count); // Deprecated
     }
 }
