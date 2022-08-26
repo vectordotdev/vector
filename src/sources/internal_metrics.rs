@@ -176,7 +176,6 @@ mod tests {
             self,
             components::{run_and_assert_source_compliance, SOURCE_TAGS},
         },
-        //SourceSender,
     };
 
     #[test]
