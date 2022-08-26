@@ -47,12 +47,14 @@ struct ByteCountWriter {
 }
 
 impl std::io::Write for ByteCountWriter {
+    #[inline]
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         let bytes = buf.len();
         self.bytes += bytes;
         Ok(bytes)
     }
 
+    #[inline]
     fn flush(&mut self) -> std::io::Result<()> {
         Ok(())
     }
@@ -66,6 +68,7 @@ impl<T> JsonEncodedSizeOf for T
 where
     T: serde::Serialize,
 {
+    #[inline]
     fn json_encoded_size_of(&self) -> usize {
         let mut writer = ByteCountWriter::default();
         let _ = serde_json::to_writer(&mut writer, self);
