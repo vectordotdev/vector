@@ -2,6 +2,8 @@ use diagnostic::{DiagnosticList, DiagnosticMessage, Severity, Span};
 use lookup::{OwnedPath, PathPrefix, TargetPath};
 use parser::ast::{self, Node, QueryTarget};
 
+use crate::function::ArgumentList;
+use crate::parser::Ident;
 use crate::state::TypeState;
 use crate::{
     expression::{
@@ -11,7 +13,7 @@ use crate::{
     },
     parser::ast::RootExpr,
     program::ProgramInfo,
-    CompileConfig, Function, Program, TypeDef,
+    CompileConfig, DeprecationWarning, Function, Program, TypeDef,
 };
 
 pub(crate) type Diagnostics = Vec<Box<dyn DiagnosticMessage>>;
@@ -608,6 +610,15 @@ impl<'a> Compiler<'a> {
     }
 
     #[cfg(feature = "expr-function_call")]
+    fn check_metadata_function_deprecations(&mut self, func: &FunctionCall, args: &ArgumentList) {
+        if func.ident == "get_metadata_field" {
+            self.diagnostics.push(Box::new(
+                DeprecationWarning::new("get_metadata_field function").with_span(func.span),
+            ))
+        }
+    }
+
+    #[cfg(feature = "expr-function_call")]
     fn compile_function_call(
         &mut self,
         node: Node<ast::FunctionCall>,
@@ -629,7 +640,7 @@ impl<'a> Compiler<'a> {
             self.external_queries.push(TargetPath::event_root());
         }
 
-        let arguments = arguments
+        let arguments: Vec<_> = arguments
             .into_iter()
             .map(|node| {
                 Some(Node::new(
@@ -666,11 +677,11 @@ impl<'a> Compiler<'a> {
 
         // First, we create a new function-call builder to validate the
         // expression.
-        let function = function_call::Builder::new(
+        let function_info = function_call::Builder::new(
             call_span,
-            ident,
+            ident.clone(),
             abort_on_error,
-            arguments,
+            arguments.clone(),
             self.fns,
             &state_before_function,
             state,
@@ -692,6 +703,8 @@ impl<'a> Compiler<'a> {
                 }
             };
 
+            let arg_list = builder.get_arg_list().clone();
+
             builder
                 .compile(
                     &state_before_function,
@@ -703,14 +716,17 @@ impl<'a> Compiler<'a> {
                 )
                 .map_err(|err| self.diagnostics.push(Box::new(err)))
                 .ok()
+                .map(|func| (arg_list, func))
         });
 
-        if let Some(function) = &function {
+        if let Some((args, function)) = &function_info {
+            self.check_metadata_function_deprecations(&function, args);
+
             // Update the final state using the function expression to make sure it's accurate.
             *state = function.type_info(&original_state).state;
         }
 
-        function
+        function_info.map(|info| info.1)
     }
 
     #[cfg(feature = "expr-function_call")]
