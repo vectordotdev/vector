@@ -4,6 +4,7 @@ use futures::{FutureExt, StreamExt};
 use http::Uri;
 use hyper::{Body, Request};
 use tokio_stream::wrappers::IntervalStream;
+use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
@@ -13,8 +14,8 @@ use crate::{
     config::{self, Output, SourceConfig, SourceContext},
     http::HttpClient,
     internal_events::{
-        BytesReceived, EventStoreDbMetricsHttpError, EventStoreDbStatsParsingError,
-        OldEventsReceived, StreamClosedError,
+        EventStoreDbMetricsHttpError, EventStoreDbStatsParsingError, OldEventsReceived,
+        StreamClosedError,
     },
     tls::TlsSettings,
 };
@@ -81,6 +82,8 @@ fn eventstoredb(
     let client = HttpClient::new(tls_settings, &cx.proxy)?;
     let url: Uri = endpoint.as_str().parse()?;
 
+    let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
+
     Ok(Box::pin(
         async move {
             while ticks.next().await.is_some() {
@@ -107,10 +110,7 @@ fn eventstoredb(
                                 continue;
                             }
                         };
-                        emit!(BytesReceived {
-                            byte_size: bytes.len(),
-                            protocol: "http",
-                        });
+                        bytes_received.emit(ByteSize(bytes.len()));
 
                         match serde_json::from_slice::<Stats>(bytes.as_ref()) {
                             Err(error) => {

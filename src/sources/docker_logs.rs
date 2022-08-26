@@ -16,6 +16,9 @@ use lookup::lookup_v2::{parse_path, OwnedSegment};
 use once_cell::sync::Lazy;
 use tokio::sync::mpsc;
 use tracing_futures::Instrument;
+use vector_common::internal_event::{
+    ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
+};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
@@ -26,7 +29,7 @@ use crate::{
     docker::{docker, DockerTlsConfig},
     event::{self, merge_state::LogEventMergeState, LogEvent, Value},
     internal_events::{
-        BytesReceived, DockerLogsCommunicationError, DockerLogsContainerEventReceived,
+        DockerLogsCommunicationError, DockerLogsContainerEventReceived,
         DockerLogsContainerMetadataFetchError, DockerLogsContainerUnwatch,
         DockerLogsContainerWatch, DockerLogsEventsReceived,
         DockerLogsLoggingDriverUnsupportedError, DockerLogsTimestampParseError, StreamClosedError,
@@ -619,6 +622,8 @@ impl EventStreamBuilder {
 
         let core = Arc::clone(&self.core);
 
+        let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
+
         let mut error = None;
         let events_stream = stream
             .map(|value| {
@@ -628,6 +633,7 @@ impl EventStreamBuilder {
                         core.config.partial_event_marker_field.clone(),
                         core.config.auto_partial_merge,
                         &mut partial_event_merge_state,
+                        &bytes_received,
                     )),
                     Err(error) => {
                         // On any error, restart connection
@@ -829,6 +835,7 @@ impl ContainerLogInfo {
         partial_event_marker_field: Option<String>,
         auto_partial_merge: bool,
         partial_event_merge_state: &mut Option<LogEventMergeState>,
+        bytes_received: &Registered<BytesReceived>,
     ) -> Option<LogEvent> {
         let (stream, mut bytes_message) = match log_output {
             LogOutput::StdErr { message } => (STDERR.clone(), message),
@@ -837,10 +844,7 @@ impl ContainerLogInfo {
             LogOutput::StdIn { message: _ } => return None,
         };
 
-        emit!(BytesReceived {
-            byte_size: bytes_message.len(),
-            protocol: "http"
-        });
+        bytes_received.emit(ByteSize(bytes_message.len()));
 
         let message = String::from_utf8_lossy(&bytes_message);
         let mut splitter = message.splitn(2, char::is_whitespace);

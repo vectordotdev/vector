@@ -13,6 +13,7 @@ use std::net::SocketAddr;
 use futures::{future::join, FutureExt, TryFutureExt};
 
 use opentelemetry_proto::proto::collector::logs::v1::logs_service_server::LogsServiceServer;
+use vector_common::internal_event::{BytesReceived, Protocol};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
@@ -119,7 +120,8 @@ impl SourceConfig for OpentelemetryConfig {
 
         let http_tls_settings = MaybeTlsSettings::from_config(&self.http.tls, true)?;
         let protocol = http_tls_settings.http_protocol_name();
-        let filters = build_warp_filter(acknowledgements, cx.out, protocol);
+        let bytes_received = register!(BytesReceived::from(Protocol::from(protocol)));
+        let filters = build_warp_filter(acknowledgements, cx.out, bytes_received);
         let http_source =
             run_http_server(self.http.address, http_tls_settings, filters, cx.shutdown);
 

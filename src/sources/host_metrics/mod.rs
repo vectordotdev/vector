@@ -8,6 +8,7 @@ use heim::units::ratio::ratio;
 use heim::units::time::second;
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
+use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
@@ -15,7 +16,7 @@ use vector_core::ByteSizeOf;
 use crate::{
     config::{DataType, Output, SourceConfig, SourceContext},
     event::metric::{Metric, MetricKind, MetricTags, MetricValue},
-    internal_events::{BytesReceived, EventsReceived, StreamClosedError},
+    internal_events::{EventsReceived, StreamClosedError},
     shutdown::ShutdownSignal,
     SourceSender,
 };
@@ -152,11 +153,10 @@ impl HostMetricsConfig {
 
         let generator = HostMetrics::new(self);
 
+        let bytes_received = register!(BytesReceived::from(Protocol::NONE));
+
         while interval.next().await.is_some() {
-            emit!(BytesReceived {
-                byte_size: 0,
-                protocol: "none"
-            });
+            bytes_received.emit(ByteSize(0));
             let metrics = generator.capture_metrics().await;
             let count = metrics.len();
             if let Err(error) = out.send_batch(metrics).await {
