@@ -164,7 +164,7 @@ impl HostMetricsConfig {
             if let Err(error) = out.send_batch(metrics).await {
                 emit!(StreamClosedError {
                     count,
-                    error: error.clone()
+                    error,
                 });
                 return Err(());
             }
