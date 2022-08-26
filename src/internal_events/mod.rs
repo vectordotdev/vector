@@ -53,6 +53,8 @@ mod geoip;
 mod heartbeat;
 mod http;
 pub mod http_client;
+#[cfg(feature = "sources-utils-http-scrape")]
+mod http_scrape;
 #[cfg(feature = "sources-internal_logs")]
 mod internal_logs;
 #[cfg(all(unix, feature = "sources-journald"))]
@@ -187,6 +189,8 @@ pub(crate) use self::geoip::*;
     feature = "sources-splunk_hec",
 ))]
 pub(crate) use self::http::*;
+#[cfg(feature = "sources-utils-http-scrape")]
+pub(crate) use self::http_scrape::*;
 #[cfg(feature = "sources-internal_logs")]
 pub(crate) use self::internal_logs::*;
 #[cfg(all(unix, feature = "sources-journald"))]

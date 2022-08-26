@@ -26,6 +26,9 @@ use crate::{
 /// The most basic set of tags for sources, regardless of whether or not they pull data or have it pushed in.
 pub const SOURCE_TAGS: [&str; 1] = ["protocol"];
 
+/// The most basic set of error tags for sources, regardless of whether or not they pull data or have it pushed in.
+pub const SOURCE_ERROR_TAGS: [&str; 1] = ["error_type"];
+
 /// The standard set of tags for sources that have their data pushed in from an external source.
 pub const PUSH_SOURCE_TAGS: [&str; 2] = ["endpoint", "protocol"];
 
@@ -84,6 +87,13 @@ pub static SOURCE_TESTS: Lazy<ComponentTests> = Lazy::new(|| ComponentTests {
         "component_sent_events_total",
         "component_sent_event_bytes_total",
     ],
+});
+
+/// The component error test specification for all sources.
+pub static SOURCE_TESTS_ERROR: Lazy<ComponentTests> = Lazy::new(|| ComponentTests {
+    events: &["Error"],
+    tagged_counters: &["component_errors_total"],
+    untagged_counters: &[],
 });
 
 /// The component test specification for all transforms.
@@ -236,18 +246,29 @@ impl ComponentTester {
     }
 }
 
-/// Convenience wrapper for running source tests
+/// Runs and returns a future and asserts that the provided test specification passes.
 #[track_caller]
-pub async fn assert_source_compliance<T>(tags: &[&str], f: impl Future<Output = T>) -> T {
+pub async fn assert_source<T>(
+    tests: &Lazy<ComponentTests>,
+    tags: &[&str],
+    f: impl Future<Output = T>,
+) -> T {
     init_test();
 
     let result = f.await;
 
-    SOURCE_TESTS.assert(tags);
+    tests.assert(tags);
 
     result
 }
 
+/// Convenience wrapper for running source tests.
+#[track_caller]
+pub async fn assert_source_compliance<T>(tags: &[&str], f: impl Future<Output = T>) -> T {
+    assert_source(&SOURCE_TESTS, tags, f).await
+}
+
+/// Runs source tests with timeout and asserts happy path compliance.
 #[track_caller]
 pub async fn run_and_assert_source_compliance<SC>(
     source: SC,
@@ -257,9 +278,10 @@ pub async fn run_and_assert_source_compliance<SC>(
 where
     SC: SourceConfig,
 {
-    run_and_assert_source_compliance_advanced(source, |_| {}, Some(timeout), None, tags).await
+    run_and_assert_source_advanced(source, |_| {}, Some(timeout), None, &SOURCE_TESTS, tags).await
 }
 
+/// Runs source tests with an event count limit and asserts happy path compliance.
 #[track_caller]
 pub async fn run_and_assert_source_compliance_n<SC>(
     source: SC,
@@ -269,10 +291,32 @@ pub async fn run_and_assert_source_compliance_n<SC>(
 where
     SC: SourceConfig,
 {
-    run_and_assert_source_compliance_advanced(source, |_| {}, None, Some(event_count), tags).await
+    run_and_assert_source_advanced(source, |_| {}, None, Some(event_count), &SOURCE_TESTS, tags)
+        .await
 }
 
+/// Runs source tests with timeout and asserts error path compliance.
 #[track_caller]
+pub async fn run_and_assert_source_error<SC>(
+    source: SC,
+    timeout: Duration,
+    tags: &[&str],
+) -> Vec<Event>
+where
+    SC: SourceConfig,
+{
+    run_and_assert_source_advanced(
+        source,
+        |_| {},
+        Some(timeout),
+        None,
+        &SOURCE_TESTS_ERROR,
+        tags,
+    )
+    .await
+}
+
+/// Runs source tests with setup, timeout, and event count limit and asserts happy path compliance.
 pub async fn run_and_assert_source_compliance_advanced<SC>(
     source: SC,
     setup: impl FnOnce(&mut SourceContext),
@@ -283,7 +327,22 @@ pub async fn run_and_assert_source_compliance_advanced<SC>(
 where
     SC: SourceConfig,
 {
-    assert_source_compliance(tags, async move {
+    run_and_assert_source_advanced(source, setup, timeout, event_count, &SOURCE_TESTS, tags).await
+}
+
+#[track_caller]
+pub async fn run_and_assert_source_advanced<SC>(
+    source: SC,
+    setup: impl FnOnce(&mut SourceContext),
+    timeout: Option<Duration>,
+    event_count: Option<usize>,
+    tests: &Lazy<ComponentTests>,
+    tags: &[&str],
+) -> Vec<Event>
+where
+    SC: SourceConfig,
+{
+    assert_source(tests, tags, async move {
         // Build the source and set ourselves up to both drive it to completion as well as collect all the events it sends out.
         let (tx, mut rx) = SourceSender::new_test();
         let mut context = SourceContext::new_test(tx, None);

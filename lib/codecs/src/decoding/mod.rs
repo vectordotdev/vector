@@ -324,6 +324,38 @@ impl DeserializerConfig {
             DeserializerConfig::Gelf => GelfDeserializerConfig.schema_definition(log_namespace),
         }
     }
+
+    /// Get the HTTP content type.
+    pub const fn content_type(&self, framer: &FramingConfig) -> &'static str {
+        match (&self, framer) {
+            (
+                DeserializerConfig::Json | DeserializerConfig::NativeJson,
+                FramingConfig::NewlineDelimited { .. },
+            ) => "application/x-ndjson",
+            (
+                DeserializerConfig::Gelf
+                | DeserializerConfig::Json
+                | DeserializerConfig::NativeJson,
+                FramingConfig::CharacterDelimited {
+                    character_delimited:
+                        CharacterDelimitedDecoderOptions {
+                            delimiter: b',',
+                            max_length: Some(usize::MAX),
+                        },
+                },
+            ) => "application/json",
+            (DeserializerConfig::Native, _) => "application/octet-stream",
+            (
+                DeserializerConfig::Json
+                | DeserializerConfig::NativeJson
+                | DeserializerConfig::Bytes
+                | DeserializerConfig::Gelf,
+                _,
+            ) => "text/plain",
+            #[cfg(feature = "syslog")]
+            (DeserializerConfig::Syslog, _) => "text/plain",
+        }
+    }
 }
 
 /// Parse structured events from bytes.
