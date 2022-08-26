@@ -8,7 +8,7 @@ use crate::{
 };
 use lookup::{LookupBuf, OwnedPath, PathPrefix, TargetPath};
 use std::fmt;
-use value::{kind::remove, Kind, Value};
+use value::{kind::remove, Value};
 
 #[derive(Clone, PartialEq)]
 pub struct Query {
@@ -68,24 +68,32 @@ impl Query {
         }
     }
 
-    pub fn delete_type_def(
-        &self,
-        external: &mut ExternalEnv,
-    ) -> Result<Option<Kind>, remove::Error> {
-        let target = external.target_mut();
-        let value = target.value.clone();
-        let mut type_def = target.type_def.clone();
+    // Not all deletions are supported yet, errors are ignored here.
+    // see: https://github.com/vectordotdev/vector/issues/13460
+    pub fn delete_type_def(&self, external: &mut ExternalEnv) {
+        let strategy = remove::Strategy {
+            coalesced_path: remove::CoalescedPath::Reject,
+        };
 
-        let result = type_def.remove_at_path(
-            &LookupBuf::from(self.path.clone()).to_lookup(),
-            remove::Strategy {
-                coalesced_path: remove::CoalescedPath::Reject,
-            },
-        );
+        if let Some(target_path) = self.external_path() {
+            let lookup_buf = LookupBuf::from(target_path.path);
 
-        external.update_target(Details { type_def, value });
-
-        result
+            match target_path.prefix {
+                PathPrefix::Event => {
+                    let mut type_def = external.target().type_def.clone();
+                    let _ = type_def.remove_at_path(&lookup_buf.to_lookup(), strategy);
+                    external.update_target(Details {
+                        type_def,
+                        value: None,
+                    });
+                }
+                PathPrefix::Metadata => {
+                    let mut kind = external.metadata_kind().clone();
+                    let _ = kind.remove_at_path(&lookup_buf.to_lookup(), strategy);
+                    external.update_metadata(kind);
+                }
+            }
+        }
     }
 }
 
