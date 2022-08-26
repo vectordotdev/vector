@@ -19,6 +19,7 @@ mod errors;
 pub use errors::{ClosedError, StreamSendError};
 
 pub(crate) const CHUNK_SIZE: usize = 1000;
+
 #[cfg(test)]
 const TEST_BUFFER_SIZE: usize = 100;
 
@@ -103,7 +104,7 @@ impl SourceSender {
 
     #[cfg(test)]
     pub fn new_test() -> (Self, impl Stream<Item = Event> + Unpin) {
-        let (pipe, recv) = Self::new_with_buffer(TEST_BUFFER_SIZE);
+        let (pipe, recv) = Self::new_with_buffer(4096);
         let recv = recv.into_stream().flat_map(into_event_stream);
         (pipe, recv)
     }
