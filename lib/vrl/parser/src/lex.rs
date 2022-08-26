@@ -239,8 +239,9 @@ pub(crate) struct Lexer<'input> {
 impl<'input> Lexer<'input> {
     fn next_token(&mut self) -> Option<SpannedResult<'input, usize>> {
         use Token::{
-            Ampersand, Arrow, At, Bang, Colon, Comma, Dot, Escape, InvalidToken, LBrace, LBracket,
-            LParen, LQuery, Newline, RBrace, RBracket, RParen, RQuery, SemiColon, Underscore,
+            Ampersand, Arrow, Bang, Colon, Comma, Dot, Escape, InvalidToken, LBrace, LBracket,
+            LParen, LQuery, Newline, Percent, RBrace, RBracket, RParen, RQuery, SemiColon,
+            Underscore,
         };
 
         loop {
@@ -287,7 +288,7 @@ impl<'input> Lexer<'input> {
                     ']' => Some(Ok(self.close(start, RBracket))),
                     ')' => Some(Ok(self.close(start, RParen))),
                     '.' => Some(Ok(self.token(start, Dot))),
-                    '@' if self.query_start == Some(start) => Some(Ok(self.token(start, At))),
+                    '%' => Some(Ok(self.token(start, Percent))),
                     '&' if !matches!(self.peek(), Some((_, '&'))) => {
                         Some(Ok(self.token(start, Ampersand)))
                     }
@@ -387,7 +388,7 @@ pub enum Token<S> {
     Escape,
     Arrow,
     Ampersand,
-    At,
+    Percent,
 
     Equals,
     MergeEquals,
@@ -431,11 +432,11 @@ pub enum Token<S> {
 impl<S> Token<S> {
     pub(crate) fn map<R>(self, f: impl Fn(S) -> R) -> Token<R> {
         use self::Token::{
-            Abort, Ampersand, Arrow, At, Bang, Colon, Comma, Dot, Else, Equals, Escape, False,
+            Abort, Ampersand, Arrow, Bang, Colon, Comma, Dot, Else, Equals, Escape, False,
             FloatLiteral, FunctionCall, Identifier, If, IntegerLiteral, InvalidToken, LBrace,
-            LBracket, LParen, LQuery, MergeEquals, Newline, Null, Operator, PathField, Question,
-            RBrace, RBracket, RParen, RQuery, RawStringLiteral, RegexLiteral, ReservedIdentifier,
-            SemiColon, StringLiteral, TimestampLiteral, True, Underscore,
+            LBracket, LParen, LQuery, MergeEquals, Newline, Null, Operator, PathField, Percent,
+            Question, RBrace, RBracket, RParen, RQuery, RawStringLiteral, RegexLiteral,
+            ReservedIdentifier, SemiColon, StringLiteral, TimestampLiteral, True, Underscore,
         };
 
         match self {
@@ -481,7 +482,7 @@ impl<S> Token<S> {
             Escape => Escape,
             Arrow => Arrow,
             Ampersand => Ampersand,
-            At => At,
+            Percent => Percent,
 
             Equals => Equals,
             MergeEquals => MergeEquals,
@@ -500,11 +501,11 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use self::Token::{
-            Abort, Ampersand, Arrow, At, Bang, Colon, Comma, Dot, Else, Equals, Escape, False,
+            Abort, Ampersand, Arrow, Bang, Colon, Comma, Dot, Else, Equals, Escape, False,
             FloatLiteral, FunctionCall, Identifier, If, IntegerLiteral, InvalidToken, LBrace,
-            LBracket, LParen, LQuery, MergeEquals, Newline, Null, Operator, PathField, Question,
-            RBrace, RBracket, RParen, RQuery, RawStringLiteral, RegexLiteral, ReservedIdentifier,
-            SemiColon, StringLiteral, TimestampLiteral, True, Underscore,
+            LBracket, LParen, LQuery, MergeEquals, Newline, Null, Operator, PathField, Percent,
+            Question, RBrace, RBracket, RParen, RQuery, RawStringLiteral, RegexLiteral,
+            ReservedIdentifier, SemiColon, StringLiteral, TimestampLiteral, True, Underscore,
         };
 
         let s = match *self {
@@ -544,7 +545,7 @@ where
             Escape => "Escape",
             Arrow => "Arrow",
             Ampersand => "Ampersand",
-            At => "At",
+            Percent => "Percent",
 
             Equals => "Equals",
             MergeEquals => "MergeEquals",
@@ -993,7 +994,7 @@ impl<'input> Lexer<'input> {
                     }
                 }
 
-                '.' | '@' if last_char.is_none() => valid = true,
+                '.' | '%' if last_char.is_none() => valid = true,
                 '.' if last_char == Some(')') => valid = true,
                 '.' if last_char == Some('}') => valid = true,
                 '.' if last_char == Some(']') => valid = true,
@@ -1270,7 +1271,7 @@ fn is_ident_continue(ch: char) -> bool {
 
 fn is_query_start(ch: char) -> bool {
     match ch {
-        '@' | '.' | '{' | '[' => true,
+        '%' | '.' | '{' | '[' => true,
         ch => is_ident_start(ch),
     }
 }
@@ -1328,10 +1329,10 @@ mod test {
 
     use super::*;
     use crate::lex::Token::{
-        Arrow, At, Bang, Colon, Comma, Dot, Else, Equals, FloatLiteral, FunctionCall, Identifier,
-        If, IntegerLiteral, LBrace, LBracket, LParen, LQuery, Newline, Operator, PathField, RBrace,
-        RBracket, RParen, RQuery, RawStringLiteral, RegexLiteral, StringLiteral, TimestampLiteral,
-        True,
+        Arrow, Bang, Colon, Comma, Dot, Else, Equals, FloatLiteral, FunctionCall, Identifier, If,
+        IntegerLiteral, LBrace, LBracket, LParen, LQuery, Newline, Operator, PathField, Percent,
+        RBrace, RBracket, RParen, RQuery, RawStringLiteral, RegexLiteral, StringLiteral,
+        TimestampLiteral, True,
     };
 
     fn lexer(input: &str) -> impl Iterator<Item = SpannedResult<'_, usize>> + '_ {
@@ -1366,10 +1367,10 @@ mod test {
     #[test]
     fn test_1() {
         test(
-            data(r#"@foo"#),
+            data(r#"%foo"#),
             vec![
                 (r#"~   "#, LQuery),
-                (r#"~   "#, At),
+                (r#"~   "#, Percent),
                 (r#" ~~~"#, Identifier("foo")),
                 (r#"   ~"#, RQuery),
             ],
@@ -1379,10 +1380,10 @@ mod test {
     #[test]
     fn test_2() {
         test(
-            data(r#"@@foo"#),
+            data(r#"%@foo"#),
             vec![
                 (r#"~    "#, LQuery),
-                (r#"~    "#, At),
+                (r#"~    "#, Percent),
                 (r#" ~~~~"#, PathField("@foo")),
                 (r#"    ~"#, RQuery),
             ],
@@ -1392,14 +1393,14 @@ mod test {
     #[test]
     fn test_3() {
         test(
-            data(r#"@foo[@bar]"#),
+            data(r#"%foo[%bar]"#),
             vec![
                 (r#"~    "#, LQuery),
-                (r#"~    "#, At),
+                (r#"~    "#, Percent),
                 (r#" ~~~ "#, Identifier("foo")),
                 (r#"    ~ "#, LBracket),
                 (r#"     ~ "#, LQuery),
-                (r#"     ~ "#, At),
+                (r#"     ~ "#, Percent),
                 (r#"      ~~~ "#, Identifier("bar")),
                 (r#"        ~"#, RQuery),
                 (r#"         ~ "#, RBracket),
@@ -1411,10 +1412,10 @@ mod test {
     #[test]
     fn test_4() {
         test(
-            data(r#"@foo.@bar"#),
+            data(r#"%foo.@bar"#),
             vec![
                 (r#"~    "#, LQuery),
-                (r#"~    "#, At),
+                (r#"~    "#, Percent),
                 (r#" ~~~ "#, Identifier("foo")),
                 (r#"    ~ "#, Dot),
                 (r#"     ~~~~ "#, PathField("@bar")),

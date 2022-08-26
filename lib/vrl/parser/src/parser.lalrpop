@@ -53,13 +53,12 @@ extern {
         "&" => Token::Ampersand,
         "!" => Token::Bang,
         "->" => Token::Arrow,
-        "@" => Token::At,
+        "%" => Token::Percent,
 
         "+" => Token::Operator("+"),
         "*" => Token::Operator("*"),
         "-" => Token::Operator("-"),
         "/" => Token::Operator("/"),
-        "%" => Token::Operator("%"),
         "<" => Token::Operator("<"),
         "<=" => Token::Operator("<="),
         ">" => Token::Operator(">"),
@@ -329,7 +328,7 @@ pub Query: Query = {
 
         Query { target, path }
     },
-    LQuery <Sp<"@">> RQuery => {
+    LQuery <Sp<"%">> RQuery => {
         let span = <>.span();
         let target = Node::new(span, QueryTarget::External(PathPrefix::Metadata));
         let path = Node::new(span, OwnedPath::root());
@@ -343,7 +342,7 @@ pub Query: Query = {
 QueryTarget: QueryTarget = {
     Ident => QueryTarget::Internal(<>),
     "." => QueryTarget::External(PathPrefix::Event),
-    "@" => QueryTarget::External(PathPrefix::Metadata),
+    "%" => QueryTarget::External(PathPrefix::Metadata),
     FunctionCall => QueryTarget::FunctionCall(<>),
     Container => QueryTarget::Container(<>),
 };
