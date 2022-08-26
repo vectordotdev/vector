@@ -1,119 +1,27 @@
-use std::sync::Arc;
-
-use futures::{future, FutureExt};
-use serde::{Deserialize, Serialize};
-use stream_cancel::{Trigger, Tripwire};
-use tokio::sync::Mutex;
-use vector_core::config::LogNamespace;
-
 use crate::{
-    config::{Config, DataType, Output, SourceConfig, SourceContext},
-    sinks::blackhole::BlackholeConfig,
-    sources::{file_descriptors::stdin::StdinConfig, Source},
-    test_util::{mock::transforms::BasicTransformConfig, start_topology, trace_init},
-    Error,
+    config::Config,
+    test_util::{
+        mock::{basic_sink, basic_source, basic_transform, tripwire_source},
+        start_topology, trace_init,
+    },
 };
-
-#[derive(Debug, Deserialize, Serialize)]
-struct MockSourceConfig {
-    #[serde(skip)]
-    tripwire: Arc<Mutex<Option<Tripwire>>>,
-}
-
-impl MockSourceConfig {
-    pub fn new() -> (Trigger, Self) {
-        let (trigger, tripwire) = Tripwire::new();
-        (
-            trigger,
-            Self {
-                tripwire: Arc::new(Mutex::new(Some(tripwire))),
-            },
-        )
-    }
-}
-
-#[async_trait::async_trait]
-#[typetag::serde(name = "mock")]
-impl SourceConfig for MockSourceConfig {
-    async fn build(&self, cx: SourceContext) -> Result<Source, Error> {
-        let tripwire = self.tripwire.lock().await;
-
-        let out = cx.out;
-        Ok(Box::pin(
-            future::select(
-                cx.shutdown.map(|_| ()).boxed(),
-                tripwire
-                    .clone()
-                    .unwrap()
-                    .then(crate::shutdown::tripwire_handler)
-                    .boxed(),
-            )
-            .map(|_| std::mem::drop(out))
-            .unit_error(),
-        ))
-    }
-
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "mock"
-    }
-
-    fn can_acknowledge(&self) -> bool {
-        false
-    }
-}
 
 #[tokio::test]
 async fn closed_source() {
     trace_init();
 
     let mut old_config = Config::builder();
-    let (trigger_old, source) = MockSourceConfig::new();
+    let (trigger_old, source) = tripwire_source();
     old_config.add_source("in", source);
-    old_config.add_transform(
-        "trans",
-        &["in"],
-        BasicTransformConfig::new("a".to_string(), 0.0),
-    );
-    old_config.add_sink(
-        "out1",
-        &["trans"],
-        BlackholeConfig {
-            print_interval_secs: 10,
-            rate: None,
-            acknowledgements: Default::default(),
-        },
-    );
-    old_config.add_sink(
-        "out2",
-        &["trans"],
-        BlackholeConfig {
-            print_interval_secs: 10,
-            rate: None,
-            acknowledgements: Default::default(),
-        },
-    );
+    old_config.add_transform("trans", &["in"], basic_transform("a", 0.0));
+    old_config.add_sink("out1", &["trans"], basic_sink(1).1);
+    old_config.add_sink("out2", &["trans"], basic_sink(1).1);
 
     let mut new_config = Config::builder();
-    let (_trigger_new, source) = MockSourceConfig::new();
+    let (_trigger_new, source) = tripwire_source();
     new_config.add_source("in", source);
-    new_config.add_transform(
-        "trans",
-        &["in"],
-        BasicTransformConfig::new("a".to_string(), 0.0),
-    );
-    new_config.add_sink(
-        "out1",
-        &["trans"],
-        BlackholeConfig {
-            print_interval_secs: 10,
-            rate: None,
-            acknowledgements: Default::default(),
-        },
-    );
+    new_config.add_transform("trans", &["in"], basic_transform("a", 0.0));
+    new_config.add_sink("out1", &["trans"], basic_sink(1).1);
 
     let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
 
@@ -132,47 +40,15 @@ async fn remove_sink() {
     trace_init();
 
     let mut old_config = Config::builder();
-    old_config.add_source("in", StdinConfig::default());
-    old_config.add_transform(
-        "trans",
-        &["in"],
-        BasicTransformConfig::new("a".to_string(), 0.0),
-    );
-    old_config.add_sink(
-        "out1",
-        &["trans"],
-        BlackholeConfig {
-            print_interval_secs: 10,
-            rate: None,
-            acknowledgements: Default::default(),
-        },
-    );
-    old_config.add_sink(
-        "out2",
-        &["trans"],
-        BlackholeConfig {
-            print_interval_secs: 10,
-            rate: None,
-            acknowledgements: Default::default(),
-        },
-    );
+    old_config.add_source("in", basic_source().1);
+    old_config.add_transform("trans", &["in"], basic_transform("a", 0.0));
+    old_config.add_sink("out1", &["trans"], basic_sink(1).1);
+    old_config.add_sink("out2", &["trans"], basic_sink(1).1);
 
     let mut new_config = Config::builder();
-    new_config.add_source("in", StdinConfig::default());
-    new_config.add_transform(
-        "trans",
-        &["in"],
-        BasicTransformConfig::new("b".to_string(), 0.0),
-    );
-    new_config.add_sink(
-        "out1",
-        &["trans"],
-        BlackholeConfig {
-            print_interval_secs: 10,
-            rate: None,
-            acknowledgements: Default::default(),
-        },
-    );
+    new_config.add_source("in", basic_source().1);
+    new_config.add_transform("trans", &["in"], basic_transform("b", 0.0));
+    new_config.add_sink("out1", &["trans"], basic_sink(1).1);
 
     let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
     assert!(topology
@@ -186,52 +62,16 @@ async fn remove_transform() {
     trace_init();
 
     let mut old_config = Config::builder();
-    old_config.add_source("in", StdinConfig::default());
-    old_config.add_transform(
-        "trans1",
-        &["in"],
-        BasicTransformConfig::new("a".to_string(), 0.0),
-    );
-    old_config.add_transform(
-        "trans2",
-        &["trans1"],
-        BasicTransformConfig::new("a".to_string(), 0.0),
-    );
-    old_config.add_sink(
-        "out1",
-        &["trans1"],
-        BlackholeConfig {
-            print_interval_secs: 10,
-            rate: None,
-            acknowledgements: Default::default(),
-        },
-    );
-    old_config.add_sink(
-        "out2",
-        &["trans2"],
-        BlackholeConfig {
-            print_interval_secs: 10,
-            rate: None,
-            acknowledgements: Default::default(),
-        },
-    );
+    old_config.add_source("in", basic_source().1);
+    old_config.add_transform("trans1", &["in"], basic_transform("a", 0.0));
+    old_config.add_transform("trans2", &["trans1"], basic_transform("a", 0.0));
+    old_config.add_sink("out1", &["trans1"], basic_sink(1).1);
+    old_config.add_sink("out2", &["trans2"], basic_sink(1).1);
 
     let mut new_config = Config::builder();
-    new_config.add_source("in", StdinConfig::default());
-    new_config.add_transform(
-        "trans1",
-        &["in"],
-        BasicTransformConfig::new("b".to_string(), 0.0),
-    );
-    new_config.add_sink(
-        "out1",
-        &["trans1"],
-        BlackholeConfig {
-            print_interval_secs: 10,
-            rate: None,
-            acknowledgements: Default::default(),
-        },
-    );
+    new_config.add_source("in", basic_source().1);
+    new_config.add_transform("trans1", &["in"], basic_transform("b", 0.0));
+    new_config.add_sink("out1", &["trans1"], basic_sink(1).1);
 
     let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
     assert!(topology
@@ -246,40 +86,16 @@ async fn replace_transform() {
 
     // Create a simple source/transform/sink topology:
     let mut old_config = Config::builder();
-    old_config.add_source("in", StdinConfig::default());
-    old_config.add_transform(
-        "trans1",
-        &["in"],
-        BasicTransformConfig::new("a".to_string(), 0.0),
-    );
-    old_config.add_sink(
-        "out1",
-        &["trans1"],
-        BlackholeConfig {
-            print_interval_secs: 10,
-            rate: None,
-            acknowledgements: Default::default(),
-        },
-    );
+    old_config.add_source("in", basic_source().1);
+    old_config.add_transform("trans1", &["in"], basic_transform("a", 0.0));
+    old_config.add_sink("out1", &["trans1"], basic_sink(1).1);
 
     // Now create the same simple source/transform/sink topology, but change the transform so it has
     // to be rebuilt:
     let mut new_config = Config::builder();
-    new_config.add_source("in", StdinConfig::default());
-    new_config.add_transform(
-        "trans1",
-        &["in"],
-        BasicTransformConfig::new("b".to_string(), 0.0),
-    );
-    new_config.add_sink(
-        "out1",
-        &["trans1"],
-        BlackholeConfig {
-            print_interval_secs: 10,
-            rate: None,
-            acknowledgements: Default::default(),
-        },
-    );
+    new_config.add_source("in", basic_source().1);
+    new_config.add_transform("trans1", &["in"], basic_transform("b", 0.0));
+    new_config.add_sink("out1", &["trans1"], basic_sink(1).1);
 
     let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
     assert!(topology

@@ -590,8 +590,7 @@ mod tests {
     use futures::stream;
     use indoc::indoc;
     use pretty_assertions::assert_eq;
-    use tokio::{sync::mpsc, sync::oneshot::error::TryRecvError, time};
-    use tokio_stream::wrappers::UnboundedReceiverStream;
+    use tokio::{sync::oneshot::error::TryRecvError, time};
     use vector_common::finalization::{BatchNotifier, BatchStatus};
     use vector_core::{event::StatisticKind, samples};
 
@@ -601,7 +600,10 @@ mod tests {
         event::metric::{Metric, MetricValue},
         http::HttpClient,
         sinks::prometheus::{distribution_to_agg_histogram, distribution_to_ddsketch},
-        test_util::{next_addr, random_string, trace_init},
+        test_util::{
+            components::{run_and_assert_sink_compliance, SINK_TAGS},
+            next_addr, random_string, trace_init,
+        },
         tls::MaybeTlsSettings,
     };
 
@@ -686,21 +688,22 @@ mod tests {
             suppress_timestamp,
             ..Default::default()
         };
-        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
-        let (tx, rx) = mpsc::unbounded_channel();
-        let input_events = UnboundedReceiverStream::new(rx);
-
-        let input_events = input_events.map(Into::into);
-        let sink_handle = tokio::spawn(async move { sink.run(input_events).await.unwrap() });
 
         // Set up acknowledgement notification
         let mut receiver = BatchNotifier::apply_to(&mut events[..]);
-
         assert_eq!(receiver.try_recv(), Err(TryRecvError::Empty));
 
-        for event in events {
-            tx.send(event).expect("Failed to send event.");
-        }
+        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
+        let (_, delayed_event) = create_metric_gauge(Some("delayed".to_string()), 123.4);
+        let sink_handle = tokio::spawn(run_and_assert_sink_compliance(
+            sink,
+            stream::iter(events).chain(stream::once(async move {
+                // Wait a bit to have time to scrape metrics
+                time::sleep(time::Duration::from_millis(500)).await;
+                delayed_event
+            })),
+            &SINK_TAGS,
+        ));
 
         time::sleep(time::Duration::from_millis(100)).await;
 
@@ -725,7 +728,6 @@ mod tests {
             .expect("Reading body failed");
         let result = String::from_utf8(bytes.to_vec()).unwrap();
 
-        drop(tx);
         sink_handle.await.unwrap();
 
         result
@@ -1072,12 +1074,20 @@ mod integration_tests {
     #![allow(clippy::dbg_macro)] // tests
 
     use chrono::Utc;
+    use futures::{future::ready, stream};
     use serde_json::Value;
     use tokio::{sync::mpsc, time};
     use tokio_stream::wrappers::UnboundedReceiverStream;
 
     use super::*;
-    use crate::{config::ProxyConfig, http::HttpClient, test_util::trace_init};
+    use crate::{
+        config::ProxyConfig,
+        http::HttpClient,
+        test_util::{
+            components::{run_and_assert_sink_compliance, SINK_TAGS},
+            trace_init,
+        },
+    };
 
     fn sink_exporter_address() -> String {
         std::env::var("SINK_EXPORTER_ADDRESS").unwrap_or_else(|_| "127.0.0.1:9101".into())
@@ -1145,17 +1155,19 @@ mod integration_tests {
             ..Default::default()
         };
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
-        let (tx, rx) = mpsc::unbounded_channel();
-        let input_events = UnboundedReceiverStream::new(rx);
-
-        let input_events = input_events.map(Into::into);
-        let sink_handle = tokio::spawn(async move { sink.run(input_events).await.unwrap() });
-
         let (name, event) = tests::create_metric_gauge(None, 123.4);
-        tx.send(event).expect("Failed to send.");
+        let (_, delayed_event) = tests::create_metric_gauge(Some("delayed".to_string()), 123.4);
 
-        // Wait a bit for the prometheus server to scrape the metrics
-        time::sleep(time::Duration::from_secs(2)).await;
+        run_and_assert_sink_compliance(
+            sink,
+            stream::once(ready(event)).chain(stream::once(async move {
+                // Wait a bit for the prometheus server to scrape the metrics
+                time::sleep(time::Duration::from_secs(2)).await;
+                delayed_event
+            })),
+            &SINK_TAGS,
+        )
+        .await;
 
         // Now try to download them from prometheus
         let result = prometheus_query(&name).await;
@@ -1172,9 +1184,6 @@ mod integration_tests {
         );
         assert!(data["value"][0].as_f64().unwrap() >= start as f64);
         assert_eq!(data["value"][1], Value::String("123.4".into()));
-
-        drop(tx);
-        sink_handle.await.unwrap();
     }
 
     async fn reset_on_flush_period() {

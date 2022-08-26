@@ -10,7 +10,7 @@ use std::{
 use value::{kind::Collection, Value};
 
 use crate::{
-    expression::{container::Variant, Block, Container, Expr, Expression, FunctionArgument},
+    expression::{container::Variant, Block, Container, Expr, Expression},
     state::TypeState,
     value::{kind, Kind},
     CompileConfig, Span, TypeDef,
@@ -59,18 +59,6 @@ pub trait Function: Send + Sync + fmt::Debug {
     /// and argument type definition.
     fn parameters(&self) -> &'static [Parameter] {
         &[]
-    }
-
-    /// Implement this function if you need to manipulate and store any function parameters
-    /// at compile time.
-    fn compile_argument(
-        &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &mut FunctionCompileContext,
-        _name: &str,
-        _expr: Option<&Expr>,
-    ) -> Result<Option<Box<dyn std::any::Any + Send + Sync>>, Box<dyn DiagnosticMessage>> {
-        Ok(None)
     }
 
     /// An optional closure definition for the function.
@@ -457,6 +445,7 @@ fn required<T>(argument: Option<T>) -> T {
 #[cfg(any(test, feature = "test"))]
 mod test_impls {
     use super::*;
+    use crate::expression::FunctionArgument;
     use crate::parser::Node;
 
     impl From<HashMap<&'static str, Value>> for ArgumentList {

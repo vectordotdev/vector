@@ -18,7 +18,7 @@ use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
-        SourceConfig, SourceContext, SourceDescription,
+        SourceConfig, SourceContext,
     },
     event::{Event, Value},
     serde::{bool_or_struct, default_decoding},
@@ -55,7 +55,7 @@ pub enum HttpMethod {
 }
 
 /// Configuration for the `http` source.
-#[configurable_component(source)]
+#[configurable_component(source("http"))]
 #[derive(Clone, Debug)]
 pub struct SimpleHttpConfig {
     /// The address to listen for connections on.
@@ -116,10 +116,6 @@ pub struct SimpleHttpConfig {
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
-}
-
-inventory::submit! {
-    SourceDescription::new::<SimpleHttpConfig>("http")
 }
 
 impl GenerateConfig for SimpleHttpConfig {
@@ -204,7 +200,6 @@ impl HttpSource for SimpleHttpSource {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "http")]
 impl SourceConfig for SimpleHttpConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         if self.encoding.is_some() && (self.framing.is_some() || self.decoding.is_some()) {
@@ -265,10 +260,6 @@ impl SourceConfig for SimpleHttpConfig {
                 .map(|d| d.output_type())
                 .unwrap_or(DataType::Log),
         )]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "http"
     }
 
     fn resources(&self) -> Vec<Resource> {

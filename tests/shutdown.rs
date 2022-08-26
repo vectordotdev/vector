@@ -345,7 +345,7 @@ fn timely_shutdown_heroku_logs() {
 
 #[test]
 fn timely_shutdown_docker() {
-    test_timely_shutdown(source_vector(r#"type = "docker""#));
+    test_timely_shutdown(source_vector(r#"type = "docker_logs""#));
 }
 
 #[test]

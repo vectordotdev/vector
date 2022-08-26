@@ -6,7 +6,7 @@ use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
+    config::{log_schema, DataType, Output, SourceConfig, SourceContext},
     event::Event,
     internal_events::{InternalLogsBytesReceived, InternalLogsEventsReceived, StreamClosedError},
     shutdown::ShutdownSignal,
@@ -15,7 +15,7 @@ use crate::{
 };
 
 /// Configuration for the `internal_logs` source.
-#[configurable_component(source)]
+#[configurable_component(source("internal_logs"))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct InternalLogsConfig {
@@ -36,14 +36,9 @@ pub struct InternalLogsConfig {
     pub pid_key: Option<String>,
 }
 
-inventory::submit! {
-    SourceDescription::new::<InternalLogsConfig>("internal_logs")
-}
-
 impl_generate_config_from_default!(InternalLogsConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "internal_logs")]
 impl SourceConfig for InternalLogsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let host_key = self
@@ -66,10 +61,6 @@ impl SourceConfig for InternalLogsConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "internal_logs"
     }
 
     fn can_acknowledge(&self) -> bool {
