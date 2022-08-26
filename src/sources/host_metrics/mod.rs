@@ -16,7 +16,7 @@ use vector_core::ByteSizeOf;
 use crate::{
     config::{DataType, Output, SourceConfig, SourceContext},
     event::metric::{Metric, MetricKind, MetricTags, MetricValue},
-    internal_events::{EventsReceived, StreamClosedError, HostMetricsScrapeDetailError},
+    internal_events::{EventsReceived, HostMetricsScrapeDetailError, StreamClosedError},
     shutdown::ShutdownSignal,
     SourceSender,
 };
@@ -160,10 +160,7 @@ impl HostMetricsConfig {
             let metrics = generator.capture_metrics().await;
             let count = metrics.len();
             if let Err(error) = out.send_batch(metrics).await {
-                emit!(StreamClosedError {
-                    count,
-                    error,
-                });
+                emit!(StreamClosedError { count, error });
                 return Err(());
             }
         }
