@@ -41,6 +41,38 @@ pub trait ByteSizeOf {
     fn estimated_json_encoded_size_of(&self) -> usize;
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+struct ByteCountWriter {
+    bytes: usize,
+}
+
+impl std::io::Write for ByteCountWriter {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let bytes = buf.len();
+        self.bytes += bytes;
+        Ok(bytes)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+pub trait JsonEncodedSizeOf {
+    fn json_encoded_size_of(&self) -> usize;
+}
+
+impl<T> JsonEncodedSizeOf for T
+where
+    T: serde::Serialize,
+{
+    fn json_encoded_size_of(&self) -> usize {
+        let mut writer = ByteCountWriter::default();
+        let _ = serde_json::to_writer(&mut writer, self);
+        writer.bytes
+    }
+}
+
 impl<'a, T> ByteSizeOf for &'a T
 where
     T: ByteSizeOf,
@@ -457,7 +489,7 @@ mod tests {
 
         fn case<T: ByteSizeOf + Serialize>(value: T, expected_size: usize) {
             let json = serde_json::to_string(&value).unwrap();
-            let size = value.estimated_json_encoded_size_of();
+            let size = value.json_encoded_size_of();
             assert_eq!(size, expected_size);
             assert_eq!(size, json.len());
         }

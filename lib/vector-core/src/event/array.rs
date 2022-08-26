@@ -13,7 +13,7 @@ use vector_common::finalization::{AddBatchNotifier, BatchNotifier, EventFinalize
 use super::{
     Event, EventDataEq, EventFinalizer, EventMutRef, EventRef, LogEvent, Metric, TraceEvent,
 };
-use crate::ByteSizeOf;
+use crate::{ByteSizeOf, JsonEncodedSizeOf};
 
 /// The type alias for an array of `LogEvent` elements.
 pub type LogArray = Vec<LogEvent>;
@@ -28,7 +28,7 @@ pub type MetricArray = Vec<Metric>;
 /// of events. This is effectively the same as the standard
 /// `IntoIterator<Item = Event>` implementations, but that would
 /// conflict with the base implementation for the type aliases below.
-pub trait EventContainer: ByteSizeOf {
+pub trait EventContainer: ByteSizeOf + JsonEncodedSizeOf {
     /// The type of `Iterator` used to turn this container into events.
     type IntoIter: Iterator<Item = Event>;
 
@@ -234,6 +234,16 @@ impl ByteSizeOf for EventArray {
             Self::Logs(a) => a.estimated_json_encoded_size_of(),
             Self::Metrics(a) => a.estimated_json_encoded_size_of(),
             Self::Traces(a) => a.estimated_json_encoded_size_of(),
+        }
+    }
+}
+
+impl JsonEncodedSizeOf for EventArray {
+    fn json_encoded_size_of(&self) -> usize {
+        match self {
+            Self::Logs(a) => a.json_encoded_size_of(),
+            Self::Metrics(a) => a.json_encoded_size_of(),
+            Self::Traces(a) => a.json_encoded_size_of(),
         }
     }
 }

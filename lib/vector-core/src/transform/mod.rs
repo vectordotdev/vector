@@ -8,7 +8,7 @@ use crate::{
     config::Output,
     event::{into_event_stream, Event, EventArray, EventContainer, EventRef},
     fanout::{self, Fanout},
-    ByteSizeOf,
+    ByteSizeOf, JsonEncodedSizeOf,
 };
 
 #[cfg(any(feature = "lua"))]
@@ -261,7 +261,7 @@ impl TransformOutputs {
             let byte_size = buf
                 .primary_buffer
                 .as_ref()
-                .map_or(0, ByteSizeOf::estimated_json_encoded_size_of);
+                .map_or(0, JsonEncodedSizeOf::json_encoded_size_of);
             buf.primary_buffer
                 .as_mut()
                 .expect("mismatched outputs")
@@ -275,7 +275,7 @@ impl TransformOutputs {
         }
         for (key, buf) in &mut buf.named_buffers {
             let count = buf.len();
-            let byte_size = buf.estimated_json_encoded_size_of();
+            let byte_size = buf.json_encoded_size_of();
             buf.send(self.named_outputs.get_mut(key).expect("unknown output"))
                 .await;
             emit(EventsSent {
@@ -406,6 +406,19 @@ impl ByteSizeOf for TransformOutputsBuf {
     }
 }
 
+impl JsonEncodedSizeOf for TransformOutputsBuf {
+    fn json_encoded_size_of(&self) -> usize {
+        self.primary_buffer
+            .as_ref()
+            .map_or(0, JsonEncodedSizeOf::json_encoded_size_of)
+            + self
+                .named_buffers
+                .iter()
+                .map(|(_, buf)| buf.json_encoded_size_of())
+                .sum::<usize>()
+    }
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct OutputBuffer(Vec<EventArray>);
 
@@ -492,6 +505,15 @@ impl ByteSizeOf for OutputBuffer {
         self.0
             .iter()
             .map(ByteSizeOf::estimated_json_encoded_size_of)
+            .sum()
+    }
+}
+
+impl JsonEncodedSizeOf for OutputBuffer {
+    fn json_encoded_size_of(&self) -> usize {
+        self.0
+            .iter()
+            .map(JsonEncodedSizeOf::json_encoded_size_of)
             .sum()
     }
 }
