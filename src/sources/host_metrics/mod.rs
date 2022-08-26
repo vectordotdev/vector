@@ -464,7 +464,8 @@ impl From<PatternWrapper> for String {
 
 #[cfg(test)]
 pub(self) mod tests {
-    use std::{collections::HashSet, future::Future};
+    use crate::test_util::components::{run_and_assert_source_compliance, SOURCE_TAGS};
+    use std::{collections::HashSet, future::Future, time::Duration};
 
     use super::*;
 
@@ -742,5 +743,18 @@ pub(self) mod tests {
                 filtered_metrics_with.len() + filtered_metrics_without.len() <= all_metrics.len()
             );
         }
+    }
+
+    #[tokio::test]
+    async fn source_compliance() {
+        let config = HostMetricsConfig {
+            scrape_interval_secs: 1.0,
+            ..Default::default()
+        };
+
+        let events =
+            run_and_assert_source_compliance(config, Duration::from_secs(2), &SOURCE_TAGS).await;
+
+        assert!(!events.is_empty());
     }
 }
