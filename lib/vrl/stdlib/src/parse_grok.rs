@@ -120,32 +120,6 @@ impl Function for ParseGrok {
 
         Ok(ParseGrokFn { value, pattern }.as_expr())
     }
-
-    fn compile_argument(
-        &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        match (name, expr) {
-            ("pattern", Some(expr)) => {
-                let pattern = expr
-                    .as_literal("pattern")?
-                    .try_bytes_utf8_lossy()
-                    .expect("grok pattern not bytes")
-                    .into_owned();
-
-                let mut grok = grok::Grok::with_default_patterns();
-                let pattern = Arc::new(grok.compile(&pattern, true).map_err(|e| {
-                    Box::new(Error::InvalidGrokPattern(e)) as Box<dyn DiagnosticMessage>
-                })?);
-
-                Ok(Some(Box::new(pattern) as _))
-            }
-            _ => Ok(None),
-        }
-    }
 }
 
 #[derive(Clone, Debug)]

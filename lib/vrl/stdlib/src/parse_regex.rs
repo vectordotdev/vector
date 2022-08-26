@@ -1,6 +1,6 @@
 use ::value::Value;
 use regex::Regex;
-use vrl::{function::Error, prelude::*};
+use vrl::prelude::*;
 
 use crate::util;
 
@@ -84,32 +84,6 @@ impl Function for ParseRegex {
             }"# }),
             },
         ]
-    }
-
-    fn compile_argument(
-        &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        match (name, expr) {
-            ("pattern", Some(expr)) => {
-                let regex: regex::Regex = match expr {
-                    expression::Expr::Literal(expression::Literal::Regex(regex)) => {
-                        Ok((**regex).clone())
-                    }
-                    expr => Err(Error::UnexpectedExpression {
-                        keyword: "pattern",
-                        expected: "regex",
-                        expr: expr.clone(),
-                    }),
-                }?;
-
-                Ok(Some(Box::new(regex) as _))
-            }
-            _ => Ok(None),
-        }
     }
 }
 

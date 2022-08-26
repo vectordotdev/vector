@@ -6767,9 +6767,9 @@ dependencies = [
 
 [[package]]
 name = "serde_yaml"
-version = "0.9.4"
+version = "0.9.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "79b7c9017c64a49806c6e8df8ef99b92446d09c92457f85f91835b01a8064ae0"
+checksum = "7a09f551ccc8210268ef848f0bab37b306e87b85b2e017b899e7fb815f5aed62"
 dependencies = [
  "indexmap",
  "itoa 1.0.1",
@@ -8490,16 +8490,14 @@ dependencies = [
  "rmp-serde",
  "rmpv",
  "roaring",
- "schannel",
  "seahash",
- "security-framework",
  "semver 1.0.13",
  "serde",
  "serde-toml-merge",
  "serde_bytes",
  "serde_json",
  "serde_with 2.0.0",
- "serde_yaml 0.9.4",
+ "serde_yaml 0.9.10",
  "sha2 0.10.2",
  "smallvec",
  "smpl_jwt",
@@ -8603,7 +8601,7 @@ dependencies = [
  "rand 0.8.5",
  "rkyv",
  "serde",
- "serde_yaml 0.9.4",
+ "serde_yaml 0.9.10",
  "snafu",
  "temp-dir",
  "tokio",
@@ -8720,6 +8718,7 @@ dependencies = [
  "no-proxy",
  "noisy_float",
  "once_cell",
+ "openssl",
  "ordered-float 3.0.0",
  "pin-project",
  "pretty_assertions",
@@ -8732,14 +8731,19 @@ dependencies = [
  "rand 0.8.5",
  "rand_distr",
  "regex",
+ "schannel",
+ "security-framework",
  "serde",
  "serde_json",
  "snafu",
+ "socket2",
  "tokio",
+ "tokio-openssl",
  "tokio-stream",
  "tokio-test",
  "tokio-util 0.7.1",
  "toml",
+ "tonic 0.7.2",
  "tower",
  "tracing 0.1.34",
  "tracing-core 0.1.28",
