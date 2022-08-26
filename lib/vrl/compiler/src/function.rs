@@ -220,7 +220,7 @@ impl ArgumentList {
 
     #[cfg(feature = "expr-literal")]
     pub fn optional_literal(
-        &mut self,
+        &self,
         keyword: &'static str,
     ) -> Result<Option<crate::expression::Literal>, Error> {
         self.optional_expr(keyword)
@@ -283,7 +283,7 @@ impl ArgumentList {
     }
 
     pub fn optional_enum(
-        &mut self,
+        &self,
         keyword: &'static str,
         variants: &[Value],
     ) -> Result<Option<Value>, Error> {
@@ -303,17 +303,13 @@ impl ArgumentList {
             .transpose()
     }
 
-    pub fn required_enum(
-        &mut self,
-        keyword: &'static str,
-        variants: &[Value],
-    ) -> Result<Value, Error> {
+    pub fn required_enum(&self, keyword: &'static str, variants: &[Value]) -> Result<Value, Error> {
         Ok(required(self.optional_enum(keyword, variants)?))
     }
 
     #[cfg(feature = "expr-query")]
     pub fn optional_query(
-        &mut self,
+        &self,
         keyword: &'static str,
     ) -> Result<Option<crate::expression::Query>, Error> {
         self.optional_expr(keyword)
@@ -424,7 +420,7 @@ impl ArgumentList {
         self.closure = Some(closure);
     }
 
-    pub(crate) fn optional_expr(&mut self, keyword: &'static str) -> Option<Expr> {
+    pub(crate) fn optional_expr(&self, keyword: &'static str) -> Option<Expr> {
         self.arguments.get(keyword).cloned()
     }
 

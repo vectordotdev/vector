@@ -1,0 +1,15 @@
+#result:
+# warning[E801]: "get_metadata_field" function is deprecated
+#   ┌─ :2:1
+#   │
+# 2 │ get_metadata_field(.)
+#   │ ^^^^^^^^^^^^^^^^^^^^^ this is deprecated
+#   │
+#   = try: using a metadata query instead
+#   =
+#   =     %
+#   =
+#   = see language documentation at https://vrl.dev
+#   = try your code in the VRL REPL, learn more at https://vrl.dev/examples
+
+get_metadata_field(.)

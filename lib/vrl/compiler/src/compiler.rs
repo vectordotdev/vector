@@ -1,10 +1,12 @@
-use diagnostic::{DiagnosticList, DiagnosticMessage, Severity, Span};
+use core::Value;
+use diagnostic::{DiagnosticList, DiagnosticMessage, Note, Severity, Span};
 use lookup::{OwnedPath, PathPrefix, TargetPath};
 use parser::ast::{self, Node, QueryTarget};
 
 use crate::function::ArgumentList;
 use crate::parser::Ident;
 use crate::state::TypeState;
+use crate::value::VrlValueConvert;
 use crate::{
     expression::{
         assignment, function_call, literal, predicate, query, Abort, Array, Assignment, Block,
@@ -612,9 +614,19 @@ impl<'a> Compiler<'a> {
     #[cfg(feature = "expr-function_call")]
     fn check_metadata_function_deprecations(&mut self, func: &FunctionCall, args: &ArgumentList) {
         if func.ident == "get_metadata_field" {
-            self.diagnostics.push(Box::new(
-                DeprecationWarning::new("get_metadata_field function").with_span(func.span),
-            ))
+            if let Ok(key) = get_metadata_key(args) {
+                match key {
+                    MetadataKey::Query(target_path) => self.diagnostics.push(Box::new(
+                        DeprecationWarning::new("\"get_metadata_field\" function")
+                            .with_span(func.span)
+                            .with_notes(Note::solution(
+                                "using a metadata query instead",
+                                vec![format!("{}", target_path)],
+                            )),
+                    )),
+                    MetadataKey::Legacy(_) => {}
+                }
+            }
         }
     }
 
@@ -865,4 +877,41 @@ impl<'a> Compiler<'a> {
 
         self.skip_missing_query_target.push(query);
     }
+}
+
+// Everything below is temporarily needed for deprecation warnings for the metadata functions
+
+const LEGACY_METADATA_KEYS: [&str; 2] = ["datadog_api_key", "splunk_hec_token"];
+
+pub(crate) fn legacy_keys() -> Vec<Value> {
+    LEGACY_METADATA_KEYS
+        .iter()
+        .map(|key| (*key).into())
+        .collect()
+}
+
+#[allow(clippy::large_enum_variant)]
+#[derive(Clone, Debug)]
+enum MetadataKey {
+    Legacy(String),
+    Query(TargetPath),
+}
+
+fn get_metadata_key(
+    arguments: &ArgumentList,
+) -> std::result::Result<MetadataKey, Box<dyn DiagnosticMessage>> {
+    if let Ok(Some(query)) = arguments.optional_query("key") {
+        if let Target::External(_) = query.target() {
+            // for backwards compatibility reasons, the query is forced to point at metadata
+            let target_path = TargetPath::metadata(query.path().clone());
+            return Ok(MetadataKey::Query(target_path));
+        }
+    }
+
+    let key = arguments.required_enum("key", &legacy_keys())?;
+    Ok(MetadataKey::Legacy(
+        key.try_bytes_utf8_lossy()
+            .expect("key not bytes")
+            .to_string(),
+    ))
 }
