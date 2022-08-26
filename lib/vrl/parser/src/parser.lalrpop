@@ -289,7 +289,6 @@ Add: Expr = {
 };
 
 Factor: Expr = {
-    Op<Factor, "%", Not>,
     Op<Factor, "*", Not>,
     Op<Factor, "/", Not>,
     Not,
