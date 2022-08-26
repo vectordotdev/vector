@@ -289,7 +289,7 @@ semver = { version = "1.0.13", default-features = false, features = ["serde", "s
 smallvec = { version = "1", default-features = false, features = ["union"] }
 snafu = { version = "0.7.1", default-features = false, features = ["futures"] }
 snap = { version = "1.0.5", default-features = false, optional = true }
-socket2 = { version = "0.4.4", default-features = false }
+socket2 = { version = "0.4.6", default-features = false }
 stream-cancel = { version = "0.8.1", default-features = false }
 strip-ansi-escapes = { version = "0.1.1", default-features = false }
 syslog = { version = "6.0.1", default-features = false, optional = true }
