@@ -689,7 +689,6 @@ pub enum Opcode {
     Div,
     Add,
     Sub,
-    Rem,
     Or,
     And,
     Err,
@@ -711,14 +710,13 @@ impl fmt::Display for Opcode {
 impl Opcode {
     #[must_use]
     pub fn as_str(self) -> &'static str {
-        use Opcode::{Add, And, Div, Eq, Err, Ge, Gt, Le, Lt, Merge, Mul, Ne, Or, Rem, Sub};
+        use Opcode::{Add, And, Div, Eq, Err, Ge, Gt, Le, Lt, Merge, Mul, Ne, Or, Sub};
 
         match self {
             Mul => "*",
             Div => "/",
             Add => "+",
             Sub => "-",
-            Rem => "%",
             Merge => "|",
 
             Or => "||",
@@ -741,14 +739,13 @@ impl FromStr for Opcode {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, ()> {
-        use Opcode::{Add, And, Div, Eq, Err, Ge, Gt, Le, Lt, Merge, Mul, Ne, Or, Rem, Sub};
+        use Opcode::{Add, And, Div, Eq, Err, Ge, Gt, Le, Lt, Merge, Mul, Ne, Or, Sub};
 
         let op = match s {
             "*" => Mul,
             "/" => Div,
             "+" => Add,
             "-" => Sub,
-            "%" => Rem,
 
             "||" => Or,
             "&&" => And,
