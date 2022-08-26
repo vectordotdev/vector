@@ -1,5 +1,5 @@
 //! Utilities shared between both VRL functions.
-use std::{collections::BTreeMap, ops::Deref};
+use std::collections::BTreeMap;
 
 use ::value::Value;
 use vrl::{
@@ -7,7 +7,7 @@ use vrl::{
     prelude::*,
 };
 
-use crate::{Case, Condition, IndexHandle, TableRegistry, TableSearch};
+use crate::{Case, Condition, IndexHandle, TableRegistry};
 
 #[derive(Debug)]
 pub enum Error {
@@ -82,84 +82,6 @@ pub(crate) fn add_index(
     let index = registry.add_index(tablename, case, &fields)?;
 
     Ok(index)
-}
-
-/// Takes a static boolean argument and return the value it resolves to.
-fn arg_to_bool(arg: &FunctionArgument) -> std::result::Result<bool, Box<dyn DiagnosticMessage>> {
-    arg.expr()
-        .as_value()
-        .as_ref()
-        .and_then(|value| match value {
-            Value::Boolean(true) => Some(true),
-            Value::Boolean(false) => Some(false),
-            _ => None,
-        })
-        .ok_or_else(|| {
-            Box::new(vrl::function::Error::ExpectedStaticExpression {
-                keyword: "case_sensitive",
-                expr: arg.expr().clone(),
-            }) as _
-        })
-}
-
-/// Takes a function argument (expected to be a static boolean) and returns a `Case`.
-fn arg_to_case(arg: &FunctionArgument) -> std::result::Result<Case, Box<dyn DiagnosticMessage>> {
-    if arg_to_bool(arg)? {
-        Ok(Case::Sensitive)
-    } else {
-        Ok(Case::Insensitive)
-    }
-}
-
-#[allow(unused)] // will be used by LLVM runtime
-#[derive(Debug)]
-pub(crate) struct EnrichmentTableRecord {
-    pub(crate) table: String,
-    pub(crate) index: Option<IndexHandle>,
-    pub(crate) case_sensitive: Case,
-    pub(crate) enrichment_tables: TableSearch,
-}
-
-/// Create the index into the enrichment table based on the arguments passed into the function..
-pub(crate) fn index_from_args(
-    table: String,
-    registry: &mut TableRegistry,
-    args: &[(&'static str, Option<FunctionArgument>)],
-) -> std::result::Result<EnrichmentTableRecord, Box<dyn DiagnosticMessage>> {
-    let case_sensitive = args
-        .iter()
-        .find(|(name, _)| *name == "case_sensitive")
-        .and_then(|(_, arg)| arg.as_ref())
-        .map(arg_to_case)
-        .transpose()?
-        .unwrap_or(Case::Sensitive);
-
-    let condition = args
-        .iter()
-        .find(|(name, _)| *name == "condition")
-        .and_then(|(_, arg)| {
-            arg.as_ref().and_then(|arg| match arg.inner() {
-                expression::Expr::Container(expression::Container {
-                    variant: expression::Variant::Object(object),
-                }) => Some(object.deref()),
-                _ => None,
-            })
-        })
-        .unwrap();
-
-    let index = Some(
-        add_index(registry, &table, case_sensitive, condition)
-            .map_err(|err| Box::new(err) as Box<_>)?,
-    );
-
-    let record = EnrichmentTableRecord {
-        table,
-        case_sensitive,
-        index,
-        enrichment_tables: registry.as_readonly(),
-    };
-
-    Ok(record)
 }
 
 #[cfg(test)]
