@@ -16,7 +16,6 @@ pub use config_builder::*;
 use glob::glob;
 use loader::process::Process;
 pub use loader::*;
-use once_cell::sync::Lazy;
 pub use secret::*;
 pub use source::*;
 
@@ -25,7 +24,7 @@ use super::{
 };
 use crate::signal;
 
-pub static CONFIG_PATHS: Lazy<Mutex<Vec<ConfigPath>>> = Lazy::new(Mutex::default);
+pub static CONFIG_PATHS: Mutex<Vec<ConfigPath>> = Mutex::new(Vec::new());
 
 pub(super) fn read_dir<P: AsRef<Path> + Debug>(path: P) -> Result<ReadDir, Vec<String>> {
     path.as_ref()

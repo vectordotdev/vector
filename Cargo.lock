@@ -3689,7 +3689,6 @@ version = "0.1.0"
 dependencies = [
  "k8s-openapi",
  "log",
- "once_cell",
  "serde_json",
  "tempfile",
  "tokio",
