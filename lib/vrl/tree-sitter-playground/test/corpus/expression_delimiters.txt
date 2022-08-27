@@ -1,0 +1,145 @@
+============================================
+Single Expression
+============================================
+1
+---
+
+(program
+  (exprs
+    (expr (literal (integer)))
+  )
+)
+
+============================================
+Single Expression, semi-colon terminated
+============================================
+1;
+---
+
+(program
+  (exprs
+    (expr (literal (integer)))
+  )
+)
+
+
+============================================
+Single Expression, newline terminated
+============================================
+1
+
+---
+
+(program
+  (exprs
+    (expr (literal (integer)))
+  )
+)
+
+============================================
+Single Expression, leading whitespace
+============================================
+   1
+---
+
+(program
+  (exprs
+    (expr (literal (integer)))
+  )
+)
+
+============================================
+Single Expression, trailing whitespace
+============================================
+1
+---
+
+(program
+  (exprs
+    (expr (literal (integer)))
+  )
+)
+
+============================================
+Single Expression, trailing whitespace with semicolon
+============================================
+1    ;
+---
+
+(program
+  (exprs
+    (expr (literal (integer)))
+  )
+)
+
+============================================
+Single Expression, comment terminator
+============================================
+1 #
+------
+
+(program
+  (exprs
+    (expr (literal (integer)))
+  )
+)
+
+============================================
+Two Expressions, comma, single line
+============================================
+1;2;
+---
+
+(program
+  (exprs
+    (expr (literal (integer)))
+    (expr (literal (integer)))
+  )
+)
+
+============================================
+Two Expressions, newline
+============================================
+1
+2
+---
+
+(program
+  (exprs
+    (expr (literal (integer)))
+    (expr (literal (integer)))
+  )
+)
+
+============================================
+Two Expressions, mixed
+============================================
+1
+2;
+---
+
+(program
+  (exprs
+    (expr (literal (integer)))
+    (expr (literal (integer)))
+  )
+)
+
+============================================
+Two Expressions, complicated
+============================================
+   1
+
+
+
+  2   ;
+
+
+---
+
+(program
+  (exprs
+    (expr (literal (integer)))
+    (expr (literal (integer)))
+  )
+)

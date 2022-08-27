@@ -1,0 +1,140 @@
+============================================
+Group
+============================================
+(1)
+---
+
+(program
+  (exprs
+    (expr (container (group (expr (literal (integer))))))
+  )
+)
+
+
+============================================
+Block
+============================================
+{1}
+{1;false}
+
+{
+   1
+   false
+}
+
+{
+   {1;true}
+   false
+}
+
+{{"x": "y"}}
+---
+
+(program
+  (exprs
+    (expr (container (block (exprs (expr (literal (integer)))))))
+    (expr (container (block (exprs
+      (expr (literal (integer)))
+      (expr (literal (boolean)))
+    ))))
+    (expr (container (block (exprs
+      (expr (literal (integer)))
+      (expr (literal (boolean)))
+    ))))
+    (expr (container (block (exprs
+      (expr (container (block (exprs
+        (expr (literal (integer)))
+        (expr (literal (boolean)))
+      ))))
+      (expr (literal (boolean)))
+    ))))
+    (expr (container (block (exprs
+      (expr (container (object
+        (object_entry (string) (expr (literal (string))))
+      )))
+    ))))
+  )
+)
+
+============================================
+Array
+============================================
+[]
+
+[
+ ]
+
+ [1]
+
+[ 1 ]
+
+[
+1
+]
+
+[1,2,3]
+[ 1 , 2 , 3 ]
+
+[
+1
+,
+2
+,
+3
+]
+
+[1, {true}, "three"]
+
+---
+
+(program
+  (exprs
+    (expr (container (array)))
+    (expr (container (array)))
+    (expr (container (array (expr (literal (integer))))))
+    (expr (container (array (expr (literal (integer))))))
+    (expr (container (array (expr (literal (integer))))))
+    (expr (container (array (expr (literal (integer))) (expr (literal (integer))) (expr (literal (integer))))))
+    (expr (container (array (expr (literal (integer))) (expr (literal (integer))) (expr (literal (integer))))))
+    (expr (container (array (expr (literal (integer))) (expr (literal (integer))) (expr (literal (integer))))))
+    (expr (container (array
+      (expr (literal (integer)))
+      (expr (container (block (exprs (expr (literal (boolean)))))))
+      (expr (literal (string)))
+    )))
+  )
+)
+
+============================================
+Object
+============================================
+{}
+{ }
+
+{
+}
+
+{"foo": true}
+
+{
+"foo"
+:
+true
+}
+
+{"nested": {"foo": false}}
+
+{"nested_block": {true; 1}}
+
+---
+(program
+  (exprs
+    (expr (container (object)))
+    (expr (container (object)))
+    (expr (container (object)))
+    (expr (container (object (object_entry (string) (expr (literal (boolean)))))))
+    (expr (container (object (object_entry (string) (expr (literal (boolean)))))))
+    (expr (container (object (object_entry (string) (expr (container (object (object_entry (string) (expr (literal (boolean)))))))))))
+    (expr (container (object (object_entry (string) (expr (container (block (exprs (expr (literal (boolean))) (expr (literal (integer)))))))))))
+  )
+)

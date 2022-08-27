@@ -1,0 +1,131 @@
+============================================
+Integer
+============================================
+0
+1
+-1
+42
+100_0000
+1_1_1_1
+---
+
+(program
+  (exprs
+    (expr (literal (integer)))
+    (expr (literal (integer)))
+    (expr (literal (integer)))
+    (expr (literal (integer)))
+    (expr (literal (integer)))
+    (expr (literal (integer)))
+  )
+)
+
+============================================
+Float
+============================================
+   0.0
+   1.0
+   -42.2334
+---
+
+(program
+  (exprs
+    (expr (literal (float)))
+    (expr (literal (float)))
+    (expr (literal (float)))
+  )
+)
+
+
+============================================
+String
+============================================
+"foo"
+"p9872q4ht"
+"foo\r\n\'\"\t\{\}"
+---
+
+(program
+  (exprs
+    (expr (literal (string)))
+    (expr (literal (string)))
+    (expr (literal (string)))
+  )
+)
+
+============================================
+Raw String
+============================================
+s'foo'
+
+s'
+test with newlines
+'
+
+s''
+s'\\'
+s'\''
+---
+
+(program
+  (exprs
+    (expr (literal (raw_string (raw))))
+    (expr (literal (raw_string (raw))))
+    (expr (literal (raw_string (raw))))
+    (expr (literal (raw_string (raw))))
+    (expr (literal (raw_string (raw))))
+  )
+)
+
+============================================
+Raw Regex
+============================================
+r'.*'
+r'[^{}]'
+---
+
+(program
+  (exprs
+    (expr (literal (regex (raw))))
+    (expr (literal (regex (raw))))
+  )
+)
+
+============================================
+Boolean
+============================================
+true
+false
+---
+
+(program
+  (exprs
+    (expr (literal (boolean)))
+    (expr (literal (boolean)))
+  )
+)
+
+============================================
+Null
+============================================
+null
+---
+
+(program
+  (exprs
+    (expr (literal (null)))
+  )
+)
+
+
+============================================
+Timestamp
+============================================
+t'2022-08-24T12:31:01.251644709Z'
+---
+
+(program
+  (exprs
+    (expr (literal (timestamp (raw))))
+  )
+)
