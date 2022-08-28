@@ -20,7 +20,7 @@ pub mod demo_logs;
 #[cfg(all(unix, feature = "sources-dnstap"))]
 pub mod dnstap;
 #[cfg(feature = "sources-docker_logs")]
-pub mod docker_logs;
+pub mod docker;
 #[cfg(feature = "sources-eventstoredb_metrics")]
 pub mod eventstoredb_metrics;
 #[cfg(feature = "sources-exec")]
@@ -144,7 +144,7 @@ pub enum Sources {
 
     /// Docker Logs.
     #[cfg(feature = "sources-docker_logs")]
-    DockerLogs(#[configurable(derived)] docker_logs::DockerLogsConfig),
+    DockerLogs(#[configurable(derived)] docker::logs::DockerLogsConfig),
 
     /// EventStoreDB Metrics.
     #[cfg(feature = "sources-eventstoredb_metrics")]

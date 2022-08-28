@@ -24,7 +24,6 @@ use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
-use super::util::MultilineConfig;
 use crate::{
     config::{log_schema, DataType, Output, SourceConfig, SourceContext},
     docker::{docker, DockerTlsConfig},
@@ -38,6 +37,7 @@ use crate::{
     },
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
+    sources::{util::MultilineConfig, Source},
     SourceSender,
 };
 
@@ -194,7 +194,7 @@ impl_generate_config_from_default!(DockerLogsConfig);
 
 #[async_trait::async_trait]
 impl SourceConfig for DockerLogsConfig {
-    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+    async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let source = DockerLogsSource::new(
             self.clone().with_empty_partial_event_marker_field_as_none(),
             cx.out,
