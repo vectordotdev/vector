@@ -593,7 +593,8 @@ enum Ec2MetadataError {
 #[cfg(test)]
 mod integration_tests {
     use futures::{SinkExt, StreamExt};
-    use lookup::lookup_v2::{parse_value_path, BorrowedSegment, OwnedSegment, OwnedValuePath};
+    use lookup::event_path;
+    use lookup::lookup_v2::{parse_value_path, OwnedSegment, OwnedValuePath};
 
     use super::*;
     use crate::{
@@ -716,7 +717,7 @@ mod integration_tests {
         let log = LogEvent::default();
         let mut expected_log = log.clone();
         for (k, v) in expected_log_fields().iter().cloned() {
-            expected_log.insert(&k, v);
+            expected_log.insert((PathPrefix::Event, &k), v);
         }
 
         tx.send(log.into()).await.unwrap();
@@ -919,9 +920,7 @@ mod integration_tests {
 
             let event = stream.next().await.unwrap();
             assert_eq!(
-                event
-                    .as_log()
-                    .get(&[BorrowedSegment::field(AVAILABILITY_ZONE_KEY)]),
+                event.as_log().get(event_path!(AVAILABILITY_ZONE_KEY)),
                 Some(&"ww-region-1a".into())
             );
         }

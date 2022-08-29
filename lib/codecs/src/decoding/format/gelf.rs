@@ -209,7 +209,7 @@ mod tests {
     use super::*;
     use bytes::Bytes;
     use chrono::{DateTime, NaiveDateTime, Utc};
-    use lookup::path;
+    use lookup::event_path;
     use pretty_assertions::assert_eq;
     use serde_json::json;
     use smallvec::SmallVec;
@@ -291,13 +291,13 @@ mod tests {
             Some(&Value::Bytes(Bytes::from_static(b"/tmp/bar")))
         );
         assert_eq!(
-            log.get(path!(add_on_int_in)),
+            log.get(event_path!(add_on_int_in)),
             Some(&Value::Float(
                 ordered_float::NotNan::new(2001.1002).unwrap()
             ))
         );
         assert_eq!(
-            log.get(path!(add_on_str_in)),
+            log.get(event_path!(add_on_str_in)),
             Some(&Value::Bytes(Bytes::from_static(b"A Space Odyssey")))
         );
     }
