@@ -184,5 +184,6 @@ impl<E: std::fmt::Display> InternalEvent for KubernetesLifecycleError<E> {
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
+        // TODO emit ComponentEventsDropped
     }
 }
