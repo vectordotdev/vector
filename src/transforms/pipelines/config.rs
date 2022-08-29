@@ -21,8 +21,8 @@ use crate::{
 // constant.
 const INTERIOR_BUFFER_SIZE: usize = 64;
 
-/// A single pipeline.
-#[configurable_component]
+/// Configuration for the `pipeline` transform.
+#[configurable_component(transform("pipeline"))]
 #[derive(Clone, Debug, Default)]
 pub struct PipelineConfig {
     /// The name of the pipeline.
@@ -36,19 +36,14 @@ pub struct PipelineConfig {
     transforms: Vec<Transforms>,
 }
 
+impl_generate_config_from_default!(PipelineConfig);
+
 #[cfg(test)]
 impl PipelineConfig {
     #[allow(dead_code)] // for some small subset of feature flags this code is dead
     pub(crate) fn transforms(&self) -> &[Transforms] {
         &self.transforms[..]
     }
-}
-
-// We're implementing `NamedComponent` by hand because `pipeline` isn't meant to be a top-level
-// transform, so we don't want the baggage associated with declaring it as a transform via
-// `#[configurable_component]`, but we still need to satisfy `TransformConfig`.
-impl NamedComponent for PipelineConfig {
-    const NAME: &'static str = "pipeline";
 }
 
 #[async_trait::async_trait]

@@ -96,8 +96,8 @@ pub enum Transforms {
 
     /// Pipelines. (inner)
     #[cfg(feature = "transforms-pipelines")]
-    #[serde(skip)]
-    Pipeline(pipelines::PipelineConfig),
+    #[configurable(metadata(skip_docs))]
+    Pipeline(#[configurable(derived)] pipelines::PipelineConfig),
 
     /// Pipelines.
     #[cfg(feature = "transforms-pipelines")]
