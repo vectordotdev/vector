@@ -10,7 +10,7 @@ pub fn derive_component_name_impl(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let ident = &input.ident;
 
-    // This derive macro has to be a bunch of heavy lifting here, but it mainly boils down to two
+    // This derive macro has to do a bunch of heavy lifting here, but it mainly boils down to two
     // things: validating that a name is given for the component (and only one name), and spitting
     // out a component type-specific error message otherwise.
     //
