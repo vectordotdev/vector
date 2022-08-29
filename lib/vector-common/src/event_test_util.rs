@@ -32,10 +32,11 @@ pub fn debug_print_events() {
 /// events contain the right fields, etc.
 pub fn record_internal_event(event: &str) {
     // Remove leading '&'
-    // Remove trailing '{fields…}'
     let event = event.strip_prefix('&').unwrap_or(event);
+    // Remove trailing '{fields…}'
     let event = event.find('{').map_or(event, |par| &event[..par]);
-    let event = event.trim();
+    // Remove trailing '::from…'
+    let event = event.find(':').map_or(event, |colon| &event[..colon]);
 
-    EVENTS_RECORDED.with(|er| er.borrow_mut().insert(event.into()));
+    EVENTS_RECORDED.with(|er| er.borrow_mut().insert(event.trim().into()));
 }

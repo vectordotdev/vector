@@ -1,6 +1,9 @@
 use std::path::PathBuf;
 
 use bytes::Bytes;
+use vector_common::internal_event::{
+    ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
+};
 use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
@@ -8,7 +11,7 @@ use super::util::framestream::{build_framestream_unix_source, FrameHandler};
 use crate::{
     config::{log_schema, DataType, Output, SourceConfig, SourceContext},
     event::{Event, LogEvent},
-    internal_events::{BytesReceived, DnstapParseError, EventsReceived},
+    internal_events::{DnstapParseError, EventsReceived},
     Result,
 };
 
@@ -138,6 +141,7 @@ pub struct DnstapFrameHandler {
     socket_send_buffer_size: Option<usize>,
     host_key: String,
     timestamp_key: String,
+    bytes_received: Registered<BytesReceived>,
 }
 
 impl DnstapFrameHandler {
@@ -167,6 +171,7 @@ impl DnstapFrameHandler {
             socket_send_buffer_size: config.socket_send_buffer_size,
             host_key,
             timestamp_key: timestamp_key.to_string(),
+            bytes_received: register!(BytesReceived::from(Protocol::from("protobuf"))),
         }
     }
 }
@@ -185,10 +190,8 @@ impl FrameHandler for DnstapFrameHandler {
      * Takes a data frame from the unix socket and turns it into a Vector Event.
      **/
     fn handle_event(&self, received_from: Option<Bytes>, frame: Bytes) -> Option<Event> {
-        emit!(BytesReceived {
-            byte_size: frame.len(),
-            protocol: "protobuf",
-        });
+        self.bytes_received.emit(ByteSize(frame.len()));
+
         let mut log_event = LogEvent::default();
 
         if let Some(host) = received_from {

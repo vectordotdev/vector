@@ -18,6 +18,9 @@ use tonic::{
     transport::{Certificate, ClientTlsConfig, Endpoint, Identity},
     Code, Request, Status,
 };
+use vector_common::internal_event::{
+    ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
+};
 use vector_common::{byte_size_of::ByteSizeOf, finalizer::UnorderedFinalizer};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
@@ -28,7 +31,7 @@ use crate::{
     event::{BatchNotifier, BatchStatus, Event, MaybeAsLogMut, Value},
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope, PUBSUB_URL},
     internal_events::{
-        BytesReceived, GcpPubsubConnectError, GcpPubsubReceiveError, GcpPubsubStreamingPullError,
+        GcpPubsubConnectError, GcpPubsubReceiveError, GcpPubsubStreamingPullError,
         StreamClosedError,
     },
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
@@ -440,6 +443,13 @@ impl PubsubSource {
             Finalizer::maybe_new(self.acknowledgements, self.shutdown.clone());
         let mut pending_acks = 0;
 
+        let protocol = self
+            .uri
+            .scheme()
+            .map(|scheme| Protocol(scheme.to_string().into()))
+            .unwrap_or(Protocol::HTTP);
+        let bytes_received = register!(BytesReceived::from(protocol));
+
         loop {
             tokio::select! {
                 biased;
@@ -460,6 +470,7 @@ impl PubsubSource {
                             &ack_ids_sender,
                             &mut pending_acks,
                             busy_flag,
+                            &bytes_received,
                         ).await;
                     }
                     Some(Err(error)) => break translate_error(error),
@@ -537,14 +548,12 @@ impl PubsubSource {
         ack_ids: &mpsc::Sender<Vec<String>>,
         pending_acks: &mut usize,
         busy_flag: &Arc<AtomicBool>,
+        bytes_received: &Registered<BytesReceived>,
     ) {
         if response.received_messages.len() >= self.full_response_size {
             busy_flag.store(true, Ordering::Relaxed);
         }
-        emit!(BytesReceived {
-            byte_size: response.size_of(),
-            protocol: self.uri.scheme().map(Scheme::as_str).unwrap_or("http"),
-        });
+        bytes_received.emit(ByteSize(response.size_of()));
 
         let (batch, notifier) = BatchNotifier::maybe_new_with_receiver(self.acknowledgements);
         let (events, ids) = self.parse_messages(response.received_messages, batch).await;

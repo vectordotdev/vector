@@ -4,6 +4,7 @@ use futures::StreamExt;
 use hyper::{Body, Client, Request};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
+use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
@@ -12,7 +13,7 @@ use crate::{
     config::{self, GenerateConfig, Output, SourceConfig, SourceContext},
     internal_events::{
         AwsEcsMetricsEventsReceived, AwsEcsMetricsHttpError, AwsEcsMetricsParseError,
-        AwsEcsMetricsResponseError, BytesReceived, RequestCompleted, StreamClosedError,
+        AwsEcsMetricsResponseError, RequestCompleted, StreamClosedError,
     },
     shutdown::ShutdownSignal,
     SourceSender,
@@ -165,6 +166,7 @@ async fn aws_ecs_metrics(
 ) -> Result<(), ()> {
     let interval = time::Duration::from_secs(interval);
     let mut interval = IntervalStream::new(time::interval(interval)).take_until(shutdown);
+    let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
     while interval.next().await.is_some() {
         let client = Client::new();
 
@@ -183,10 +185,7 @@ async fn aws_ecs_metrics(
                             end: Instant::now()
                         });
 
-                        emit!(BytesReceived {
-                            byte_size: body.len(),
-                            protocol: "http",
-                        });
+                        bytes_received.emit(ByteSize(body.len()));
 
                         match parser::parse(body.as_ref(), namespace.clone()) {
                             Ok(metrics) => {

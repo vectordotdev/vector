@@ -7,19 +7,6 @@ pub use vector_core::internal_event::{EventsReceived, OldEventsReceived};
 use super::prelude::{error_stage, error_type};
 
 #[derive(Debug)]
-pub struct BytesReceived<'a> {
-    pub byte_size: usize,
-    pub protocol: &'a str,
-}
-
-impl<'a> InternalEvent for BytesReceived<'a> {
-    fn emit(self) {
-        trace!(message = "Bytes received.", byte_size = %self.byte_size, protocol = %self.protocol);
-        counter!("component_received_bytes_total", self.byte_size as u64, "protocol" => self.protocol.to_string());
-    }
-}
-
-#[derive(Debug)]
 pub struct EndpointBytesReceived<'a> {
     pub byte_size: usize,
     pub protocol: &'a str,
