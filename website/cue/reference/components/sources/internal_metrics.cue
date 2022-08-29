@@ -563,7 +563,8 @@ components: sources: internal_metrics: {
 		}
 		component_received_events_count: {
 			description: """
-				A histogram of Vector the number of events passed in each internal batch in Vector's internal topology.
+				A histogram of the number of events passed in each internal batch in Vector's internal topology.
+
 				Note that this is separate than sink-level batching. It is mostly useful for low level debugging
 				performance issues in Vector due to small internal batches.
 				"""

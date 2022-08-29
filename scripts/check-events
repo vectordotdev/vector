@@ -283,7 +283,7 @@ Find.find('.') do |path|
 
         if trait == 'InternalEvent'
           # Look-aside internal events that defer their implementation to a registered event.
-          if ! block.include? '.register('
+          if ! block.include? 'register('
             event.impl_internal_event = true
             event.scan_metrics(block)
             event.scan_logs(block)

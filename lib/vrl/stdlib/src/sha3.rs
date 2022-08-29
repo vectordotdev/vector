@@ -76,27 +76,6 @@ impl Function for Sha3 {
 
         Ok(Sha3Fn { value, variant }.as_expr())
     }
-
-    fn compile_argument(
-        &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        match (name, expr) {
-            ("variant", Some(expr)) => {
-                let variant = expr
-                    .as_enum("variant", variants())?
-                    .try_bytes()
-                    .expect("variant not bytes");
-
-                Ok(Some(Box::new(variant) as _))
-            }
-            ("variant", None) => Ok(Some(Box::new(Bytes::from("SHA3-512")) as _)),
-            _ => Ok(None),
-        }
-    }
 }
 
 #[derive(Debug, Clone)]

@@ -41,7 +41,7 @@ impl<'a> InternalEvent for EncoderFramingError<'a> {
             error = %self.error,
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::SENDING,
-            intentional = "false",
+            intentional = false,
             reason = "Failed framing bytes.",
         );
         counter!("encoder_framing_errors_total", 1);
@@ -73,7 +73,7 @@ impl<'a> InternalEvent for EncoderSerializeError<'a> {
             error = %self.error,
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::SENDING,
-            intentional = "false",
+            intentional = false,
             reason = "Failed serializing frame.",
         );
         counter!("encoder_serialize_errors_total", 1);

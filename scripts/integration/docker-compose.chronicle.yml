@@ -31,11 +31,13 @@ services:
       - CHRONICLE_ADDRESS=http://chronicle-emulator:3000
     volumes:
       - ${PWD}:/code
+      - target:/code/target
       - cargogit:/usr/local/cargo/git
       - cargoregistry:/usr/local/cargo/registry
       - ${PWD}/scripts/integration/chronicleauth.json:/chronicleauth.json
       - ${PWD}/scripts/integration/invalidchronicleauth.json:/invalidchronicleauth.json
 
 volumes:
+  target: {}
   cargogit: {}
   cargoregistry: {}

@@ -204,7 +204,6 @@ fn opcode() -> impl Strategy<Value = Opcode> {
         Just(Opcode::Mul),
         Just(Opcode::Add),
         Just(Opcode::Sub),
-        Just(Opcode::Rem),
         Just(Opcode::Or),
         Just(Opcode::Div),
         Just(Opcode::And),

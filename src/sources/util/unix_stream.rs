@@ -11,6 +11,7 @@ use tokio::{
 use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::FramedRead;
 use tracing::{field, Instrument};
+use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_core::ByteSizeOf;
 
 use super::AfterReadExt;
@@ -19,8 +20,8 @@ use crate::{
     codecs::Decoder,
     event::Event,
     internal_events::{
-        BytesReceived, ConnectionOpen, OpenGauge, SocketEventsReceived, SocketMode,
-        StreamClosedError, UnixSocketError, UnixSocketFileDeleteError,
+        ConnectionOpen, OpenGauge, SocketEventsReceived, SocketMode, StreamClosedError,
+        UnixSocketError, UnixSocketFileDeleteError,
     },
     shutdown::ShutdownSignal,
     sources::util::change_socket_permissions,
@@ -46,6 +47,8 @@ pub fn build_unix_stream_source(
 
         change_socket_permissions(&listen_path, socket_file_mode)
             .expect("Failed to set socket permssions");
+
+        let bytes_received = register!(BytesReceived::from(Protocol::UNIX));
 
         let connection_open = OpenGauge::new();
         let stream = UnixListenerStream::new(listener).take_until(shutdown.clone());
@@ -77,12 +80,10 @@ pub fn build_unix_stream_source(
             let received_from: Option<Bytes> =
                 path.map(|p| p.to_string_lossy().into_owned().into());
 
+            let bytes_received = bytes_received.clone();
             let stream = socket
-                .after_read(|byte_size| {
-                    emit!(BytesReceived {
-                        protocol: "unix",
-                        byte_size,
-                    });
+                .after_read(move |byte_size| {
+                    bytes_received.emit(ByteSize(byte_size));
                 })
                 .allow_read_until(shutdown.clone().map(|_| ()));
             let mut stream = FramedRead::new(stream, decoder.clone());

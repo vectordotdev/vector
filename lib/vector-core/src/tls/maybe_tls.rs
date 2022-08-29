@@ -39,8 +39,8 @@ impl<R, T> MaybeTls<R, T> {
     }
 }
 
-impl<T> From<Option<T>> for MaybeTls<(), T> {
-    fn from(tls: Option<T>) -> Self {
+impl<O> From<Option<O>> for MaybeTls<(), O> {
+    fn from(tls: Option<O>) -> Self {
         match tls {
             Some(tls) => Self::Tls(tls),
             None => Self::Raw(()),

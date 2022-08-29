@@ -190,8 +190,8 @@ When deprecating functionality in Vector, see [DEPRECATION.md](DEPRECATION.md).
 As discussed in the [`README`](README.md), you should continue to the following
 documents:
 
-2. **[DEVELOPING.md](DEVELOPING.md)** - Everything necessary to develop
-3. **[DOCUMENTING.md](DOCUMENTING.md)** - Preparing your change for Vector users
+1. **[DEVELOPING.md](DEVELOPING.md)** - Everything necessary to develop
+2. **[DOCUMENTING.md](DOCUMENTING.md)** - Preparing your change for Vector users
 3. **[DEPRECATION.md](DEPRECATION.md)** - Deprecating functionality in Vector
 
 ## Legal

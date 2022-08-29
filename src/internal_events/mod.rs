@@ -51,8 +51,12 @@ mod gcp_pubsub;
 #[cfg(feature = "transforms-geoip")]
 mod geoip;
 mod heartbeat;
+#[cfg(feature = "sources-host_metrics")]
+mod host_metrics;
 mod http;
 pub mod http_client;
+#[cfg(feature = "sources-utils-http-scrape")]
+mod http_scrape;
 #[cfg(feature = "sources-internal_logs")]
 mod internal_logs;
 #[cfg(all(unix, feature = "sources-journald"))]
@@ -180,6 +184,8 @@ pub(crate) use self::fluent::*;
 pub(crate) use self::gcp_pubsub::*;
 #[cfg(feature = "transforms-geoip")]
 pub(crate) use self::geoip::*;
+#[cfg(feature = "sources-host_metrics")]
+pub(crate) use self::host_metrics::*;
 #[cfg(any(
     feature = "sources-utils-http",
     feature = "sources-utils-http-encoding",
@@ -187,6 +193,8 @@ pub(crate) use self::geoip::*;
     feature = "sources-splunk_hec",
 ))]
 pub(crate) use self::http::*;
+#[cfg(feature = "sources-utils-http-scrape")]
+pub(crate) use self::http_scrape::*;
 #[cfg(feature = "sources-internal_logs")]
 pub(crate) use self::internal_logs::*;
 #[cfg(all(unix, feature = "sources-journald"))]

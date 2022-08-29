@@ -98,45 +98,6 @@ impl Function for Redact {
         }
         .as_expr())
     }
-
-    fn compile_argument(
-        &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        match (name, expr) {
-            ("filters", Some(expr)) => {
-                let filters = expr.as_value().ok_or_else(|| {
-                    vrl::function::Error::ExpectedStaticExpression {
-                        keyword: "filters",
-                        expr: expr.clone(),
-                    }
-                })?;
-                let filters = filters
-                    .try_array()
-                    .map_err(|_| vrl::function::Error::ExpectedStaticExpression {
-                        keyword: "filters",
-                        expr: expr.clone(),
-                    })?
-                    .into_iter()
-                    .map(|value| {
-                        value.clone().try_into().map_err(|error| {
-                            vrl::function::Error::InvalidArgument {
-                                keyword: "filters",
-                                value,
-                                error,
-                            }
-                        })
-                    })
-                    .collect::<std::result::Result<Vec<Filter>, vrl::function::Error>>()?;
-
-                Ok(Some(Box::new(filters) as _))
-            }
-            _ => Ok(None),
-        }
-    }
 }
 
 //-----------------------------------------------------------------------------
