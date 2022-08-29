@@ -24,7 +24,7 @@ use crate::{
     event::{BatchNotifier, BatchStatus, LogEvent},
     internal_events::{
         FileBytesReceived, FileEventsReceived, FileNegativeAcknowledgementError, FileOpen,
-        FileSourceInternalEventsEmitter,
+        FileSourceInternalEventsEmitter, StreamClosedError,
     },
     line_agg::{self, LineAgg},
     serde::bool_or_struct,
@@ -556,9 +556,21 @@ pub fn file_source(
             event
         });
         tokio::spawn(async move {
-            out.send_event_stream(&mut messages)
+            match out
+                .send_event_stream(&mut messages)
                 .instrument(span.or_current())
                 .await
+            {
+                Ok(()) => {
+                    info!("Finished sending.");
+                    Ok(())
+                }
+                Err(error) => {
+                    let (count, _) = messages.size_hint();
+                    emit!(StreamClosedError { error, count });
+                    Err(())
+                }
+            }
         });
 
         let span = info_span!("file_server");
