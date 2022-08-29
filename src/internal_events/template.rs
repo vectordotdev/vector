@@ -1,3 +1,4 @@
+use crate::{emit, internal_events::ComponentEventsDropped};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -17,39 +18,31 @@ impl<'a> InternalEvent for TemplateRenderingError<'a> {
             let _ = write!(msg, " for \"{}\"", field);
         }
         msg.push('.');
-        if self.drop_event {
-            error!(
-                message = "Events dropped.",
-                count = 1,
-                error = %self.error,
-                error_type = error_type::TEMPLATE_FAILED,
-                intentional = false,
-                reason = %msg,
-                stage = error_stage::PROCESSING,
-            );
-        } else {
-            error!(
-                message = %msg,
-                error = %self.error,
-                error_type = error_type::TEMPLATE_FAILED,
-                stage = error_stage::PROCESSING,
-            )
-        }
+
+        error!(
+            message = %msg,
+            error = %self.error,
+            error_type = error_type::TEMPLATE_FAILED,
+            stage = error_stage::PROCESSING,
+        );
+
         counter!(
             "component_errors_total", 1,
             "error_type" => error_type::TEMPLATE_FAILED,
             "stage" => error_stage::PROCESSING,
         );
+
         // deprecated
         counter!("processing_errors_total", 1,
             "error_type" => "render_error");
+
         if self.drop_event {
-            counter!(
-                "component_discarded_events_total", 1,
-                "error_type" => error_type::TEMPLATE_FAILED,
-                "intentional" => "false",
-                "stage" => error_stage::PROCESSING,
-            );
+            emit!(ComponentEventsDropped {
+                count: 1,
+                intentional: false,
+                reason: "Failed to render template.",
+            });
+
             // deprecated
             counter!("events_discarded_total", 1);
         }
