@@ -563,12 +563,10 @@ pub fn file_source(
             {
                 Ok(()) => {
                     info!("Finished sending.");
-                    Ok(())
                 }
                 Err(error) => {
                     let (count, _) = messages.size_hint();
                     emit!(StreamClosedError { error, count });
-                    Err(())
                 }
             }
         });
