@@ -16,7 +16,7 @@ use vector_core::ByteSizeOf;
 use crate::{
     config::{DataType, Output, SourceConfig, SourceContext},
     event::metric::{Metric, MetricKind, MetricTags, MetricValue},
-    internal_events::{EventsReceived, StreamClosedError},
+    internal_events::{EventsReceived, HostMetricsScrapeDetailError, StreamClosedError},
     shutdown::ShutdownSignal,
     SourceSender,
 };
@@ -160,11 +160,7 @@ impl HostMetricsConfig {
             let metrics = generator.capture_metrics().await;
             let count = metrics.len();
             if let Err(error) = out.send_batch(metrics).await {
-                emit!(StreamClosedError {
-                    count,
-                    error: error.clone()
-                });
-                error!(message = "Error sending host metrics.", %error);
+                emit!(StreamClosedError { count, error });
                 return Err(());
             }
         }
@@ -253,7 +249,10 @@ impl HostMetrics {
                 output.gauge("load15", loadavg.2.get::<ratio>() as f64, BTreeMap::new());
             }
             Err(error) => {
-                error!(message = "Failed to load load average info.", %error, internal_log_rate_secs = 60);
+                emit!(HostMetricsScrapeDetailError {
+                    message: "Failed to load load average info",
+                    error,
+                });
             }
         }
     }
@@ -263,7 +262,10 @@ impl HostMetrics {
         match heim::host::uptime().await {
             Ok(time) => output.gauge("uptime", time.get::<second>() as f64, BTreeMap::default()),
             Err(error) => {
-                error!(message = "Failed to load host uptime info.", %error, internal_log_rate_secs = 60);
+                emit!(HostMetricsScrapeDetailError {
+                    message: "Failed to load host uptime info",
+                    error,
+                });
             }
         }
 
@@ -274,7 +276,10 @@ impl HostMetrics {
                 BTreeMap::default(),
             ),
             Err(error) => {
-                error!(message = "Failed to load host boot time info.", %error, internal_log_rate_secs = 60);
+                emit!(HostMetricsScrapeDetailError {
+                    message: "Failed to load host boot time info",
+                    error,
+                });
             }
         }
     }
@@ -332,7 +337,7 @@ where
     E: std::error::Error,
 {
     result
-        .map_err(|error| error!(message, %error, internal_log_rate_secs = 60))
+        .map_err(|error| emit!(HostMetricsScrapeDetailError { message, error }))
         .ok()
 }
 
