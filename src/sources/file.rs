@@ -1042,16 +1042,16 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn file_file_key_acknowledged() {
-        file_file_key(Acks).await
+    async fn file_key_acknowledged() {
+        file_key(Acks).await
     }
 
     #[tokio::test]
-    async fn file_file_key_nonacknowledged() {
-        file_file_key(NoAcks).await
+    async fn file_key_nonacknowledged() {
+        file_key(NoAcks).await
     }
 
-    async fn file_file_key(acks: AckingMode) {
+    async fn file_key(acks: AckingMode) {
         // Default
         {
             let dir = tempdir().unwrap();
