@@ -1,31 +1,8 @@
+use codecs::decoding::BoxedFramingError;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 use super::prelude::{error_stage, error_type};
-
-#[derive(Debug)]
-pub struct JournaldError<E> {
-    pub message: &'static str,
-    pub error: E,
-    pub error_type: &'static str,
-    pub error_stage: &'static str,
-}
-
-impl<E: std::fmt::Display> InternalEvent for JournaldError<E> {
-    fn emit(self) {
-        error!(
-            message = self.message,
-            error = %self.error,
-            stage = self.error_stage,
-            error_type = self.error_type,
-        );
-        counter!(
-            "component_errors_total", 1,
-            "stage" => self.error_stage,
-            "error_type" => self.error_type,
-        );
-    }
-}
 
 #[derive(Debug)]
 pub struct JournaldInvalidRecordError {
@@ -70,6 +47,49 @@ impl InternalEvent for JournaldNegativeAcknowledgmentError<'_> {
             "error_code" => "negative_acknowledgment",
             "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
             "stage" => error_stage::SENDING,
+        );
+    }
+}
+
+#[derive(Debug)]
+pub struct JournaldStartJournalctlError {
+    pub error: crate::Error,
+}
+
+impl InternalEvent for JournaldStartJournalctlError {
+    fn emit(self) {
+        error!(
+            message = "Error starting journalctl process.",
+            error = %self.error,
+            stage = error_stage::RECEIVING,
+            error_type = error_type::COMMAND_FAILED,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "stage" => error_stage::RECEIVING,
+            "error_type" => error_type::COMMAND_FAILED,
+        );
+    }
+}
+
+#[derive(Debug)]
+pub struct JournaldReadError {
+    pub error: BoxedFramingError,
+}
+
+impl InternalEvent for JournaldReadError {
+    fn emit(self) {
+        error!(
+            message = "Cound not read from journald source.",
+            error = %self.error,
+            stage = error_stage::PROCESSING,
+            error_type = error_type::READER_FAILED,
+        );
+        counter!(
+            "component_errors_total",
+            1,
+            "stage" => error_stage::PROCESSING,
+            "error_type" => error_type::READER_FAILED,
         );
     }
 }

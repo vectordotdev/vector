@@ -41,10 +41,9 @@ use crate::{
     config::{log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, LogEvent, Value},
     internal_events::{
-        prelude::{error_stage, error_type},
-        JournaldCheckpointFileOpenError, JournaldCheckpointSetError, JournaldError,
-        JournaldInvalidRecordError, JournaldNegativeAcknowledgmentError, OldEventsReceived,
-        StreamClosedError,
+        JournaldCheckpointFileOpenError, JournaldCheckpointSetError, JournaldInvalidRecordError,
+        JournaldNegativeAcknowledgmentError, JournaldReadError, JournaldStartJournalctlError,
+        OldEventsReceived, StreamClosedError,
     },
     serde::bool_or_struct,
     shutdown::ShutdownSignal,
@@ -317,12 +316,7 @@ impl JournaldSource {
                     drop(running);
                 }
                 Err(error) => {
-                    emit!(JournaldError {
-                        message: "Error starting journalctl process.",
-                        error,
-                        error_type: error_type::COMMAND_FAILED,
-                        error_stage: error_stage::RECEIVING,
-                    });
+                    emit!(JournaldStartJournalctlError { error });
                 }
             }
 
@@ -411,12 +405,7 @@ impl<'a> Batch<'a> {
                 false
             }
             Some(Err(error)) => {
-                emit!(JournaldError {
-                    message: "Could not read from journald source.",
-                    error,
-                    error_type: error_type::READER_FAILED,
-                    error_stage: error_stage::PROCESSING,
-                });
+                emit!(JournaldReadError { error });
                 false
             }
             Some(Ok(bytes)) => {
