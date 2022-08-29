@@ -41,6 +41,8 @@ use crate::{
     config::{log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, LogEvent, Value},
     internal_events::{
+        prelude::{error_stage, error_type},
+        JournaldCheckpointFileOpenError, JournaldCheckpointSetError, JournaldError,
         JournaldInvalidRecordError, JournaldNegativeAcknowledgmentError, OldEventsReceived,
         StreamClosedError,
     },
@@ -271,11 +273,14 @@ impl JournaldSource {
         let checkpointer = StatefulCheckpointer::new(self.checkpoint_path.clone())
             .await
             .map_err(|error| {
-                error!(
-                    message = "Unable to open checkpoint file.",
-                    path = ?self.checkpoint_path,
-                    %error,
-                );
+                emit!(JournaldCheckpointFileOpenError {
+                    error,
+                    path: self
+                        .checkpoint_path
+                        .to_str()
+                        .unwrap_or("unknown")
+                        .to_string(),
+                });
             })?;
 
         let checkpointer = SharedCheckpointer::new(checkpointer);
@@ -312,7 +317,12 @@ impl JournaldSource {
                     drop(running);
                 }
                 Err(error) => {
-                    error!(message = "Error starting journalctl process.", %error);
+                    emit!(JournaldError {
+                        message: "Error starting journalctl process.",
+                        error,
+                        error_type: error_type::COMMAND_FAILED,
+                        error_stage: error_stage::RECEIVING,
+                    });
                 }
             }
 
@@ -401,10 +411,12 @@ impl<'a> Batch<'a> {
                 false
             }
             Some(Err(error)) => {
-                error!(
-                    message = "Could not read from journald source.",
-                    %error,
-                );
+                emit!(JournaldError {
+                    message: "Could not read from journald source.",
+                    error,
+                    error_type: error_type::READER_FAILED,
+                    error_stage: error_stage::PROCESSING,
+                });
                 false
             }
             Some(Ok(bytes)) => {
@@ -790,11 +802,15 @@ impl StatefulCheckpointer {
 
     async fn set(&mut self, token: String) {
         if let Err(error) = self.checkpointer.set(&token).await {
-            error!(
-                message = "Could not set journald checkpoint.",
-                %error,
-                filename = ?self.checkpointer.filename,
-            );
+            emit!(JournaldCheckpointSetError {
+                error,
+                filename: self
+                    .checkpointer
+                    .filename
+                    .to_str()
+                    .unwrap_or("unknown")
+                    .to_string(),
+            });
         }
         self.cursor = Some(token);
     }

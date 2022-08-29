@@ -4,6 +4,30 @@ use vector_core::internal_event::InternalEvent;
 use super::prelude::{error_stage, error_type};
 
 #[derive(Debug)]
+pub struct JournaldError<E> {
+    pub message: &'static str,
+    pub error: E,
+    pub error_type: &'static str,
+    pub error_stage: &'static str,
+}
+
+impl<E: std::fmt::Display> InternalEvent for JournaldError<E> {
+    fn emit(self) {
+        error!(
+            message = self.message,
+            error = %self.error,
+            stage = self.error_stage,
+            error_type = self.error_type,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "stage" => self.error_stage,
+            "error_type" => self.error_type,
+        );
+    }
+}
+
+#[derive(Debug)]
 pub struct JournaldInvalidRecordError {
     pub error: serde_json::Error,
     pub text: String,
@@ -46,6 +70,52 @@ impl InternalEvent for JournaldNegativeAcknowledgmentError<'_> {
             "error_code" => "negative_acknowledgment",
             "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
             "stage" => error_stage::SENDING,
+        );
+    }
+}
+
+#[derive(Debug)]
+pub struct JournaldCheckpointSetError {
+    pub error: std::io::Error,
+    pub filename: String,
+}
+
+impl InternalEvent for JournaldCheckpointSetError {
+    fn emit(self) {
+        error!(
+            message = "Could not set journald checkpoint.",
+            filename = ?self.filename,
+            error = %self.error,
+            stage = error_stage::PROCESSING,
+            error_type = error_type::IO_FAILED,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "stage" => error_stage::PROCESSING,
+            "error_type" => error_type::IO_FAILED,
+        );
+    }
+}
+
+#[derive(Debug)]
+pub struct JournaldCheckpointFileOpenError {
+    pub error: std::io::Error,
+    pub path: String,
+}
+
+impl InternalEvent for JournaldCheckpointFileOpenError {
+    fn emit(self) {
+        error!(
+            message = "Unable to open checkpoint file.",
+            path = ?self.path,
+            error = %self.error,
+            stage = error_stage::RECEIVING,
+            error_type = error_type::IO_FAILED,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "stage" => error_stage::RECEIVING,
+            "error_type" => error_type::IO_FAILED,
         );
     }
 }
