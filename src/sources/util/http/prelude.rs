@@ -20,7 +20,10 @@ use warp::{
 
 use crate::{
     config::{AcknowledgementsConfig, SourceContext},
-    internal_events::{HttpBadRequest, HttpBytesReceived, HttpEventsReceived},
+    internal_events::{
+        HttpBadRequest, HttpBytesReceived, HttpEventsReceived, HttpInternalError,
+        HttpInvalidRouteError, StreamClosedError,
+    },
     sources::http::HttpMethod,
     tls::{MaybeTlsSettings, TlsEnableableConfig},
     SourceSender,
@@ -82,6 +85,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                         Ok(())
                     } else {
                         debug!(message = "Path rejected.");
+                        emit!(HttpInvalidRouteError {});
                         Err(warp::reject::custom(ErrorMessage::new(
                             StatusCode::NOT_FOUND,
                             "Not found".to_string(),
@@ -138,6 +142,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                     Ok(warp::reply::with_status(json, e_msg.status_code()))
                 } else {
                     //other internal error - will return 500 internal server error
+                    emit!(HttpInternalError {});
                     Err(r)
                 }
             });
@@ -175,12 +180,12 @@ async fn handle_request(
         Ok(mut events) => {
             let receiver = BatchNotifier::maybe_apply_to(acknowledgements, &mut events);
 
+            let count = events.len();
             out.send_batch(events)
                 .map_err(move |error: crate::source_sender::ClosedError| {
                     // can only fail if receiving end disconnected, so we are shutting down,
                     // probably not gracefully.
-                    error!(message = "Failed to forward events, downstream is closed.");
-                    error!(message = "Tried to send the following event.", %error);
+                    emit!(StreamClosedError { error, count });
                     warp::reject::custom(RejectShuttingDown)
                 })
                 .and_then(|_| handle_batch_status(receiver))

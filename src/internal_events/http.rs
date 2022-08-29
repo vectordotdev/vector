@@ -129,3 +129,39 @@ impl<'a> InternalEvent for HttpDecompressError<'a> {
         counter!("parse_errors_total", 1);
     }
 }
+
+pub struct HttpInvalidRouteError {}
+
+impl InternalEvent for HttpInvalidRouteError {
+    fn emit(self) {
+        error!(
+            message = "Invalid route specified.",
+            error_type = error_type::CONFIGURATION_FAILED,
+            stage = error_stage::RECEIVING,
+            internal_log_rate_secs = 10
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => error_type::CONFIGURATION_FAILED,
+            "stage" => error_stage::RECEIVING,
+        );
+    }
+}
+
+pub struct HttpInternalError {}
+
+impl InternalEvent for HttpInternalError {
+    fn emit(self) {
+        error!(
+            message = "Internal error.",
+            error_type = error_type::CONNECTION_FAILED,
+            stage = error_stage::RECEIVING,
+            internal_log_rate_secs = 10
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => error_type::CONNECTION_FAILED,
+            "stage" => error_stage::RECEIVING,
+        );
+    }
+}
