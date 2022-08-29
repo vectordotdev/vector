@@ -116,9 +116,13 @@ This event MUST NOT be emitted before events have been created in Vector. For
 example a source failing to decode incoming data would simply emit the
 `ComponentError` event but would not emit the `ComponentEventsDropped` event.
 
-**You MUST NOT emit this event for retriable operations that can recover and
-prevent data loss. For example, a failed HTTP request that will be retried does
-not result in data loss if the retry succeeds.**
+You MUST NOT emit this event for operations that Vector will retry to prevent data loss. For
+example, a failed HTTP request that will be retried does not result in data loss if the retry
+succeeds.
+
+Note that this event is independent of any clients of Vector that may retry when end-to-end
+acknowledgements are enabled. From Vector's perspective, it has dropped the events and it cannot
+know if the client will retry them.
 
 - Properties
   - `count` - The number of events dropped
