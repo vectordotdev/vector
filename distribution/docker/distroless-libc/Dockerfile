@@ -14,7 +14,7 @@ RUN mkdir -p \
   rootfs/var/lib/vector
 
 # Copy and unpack Vector distribution
-COPY vector-*-unknown-linux-gnu*.tar.gz .
+COPY target/artifacts/vector-*-unknown-linux-gnu*.tar.gz .
 RUN mkdir vector \
     && tar zxvf vector-*-"$(cat /etc/apk/arch)"-unknown-linux-gnu*.tar.gz \
     -C vector --strip-components=2

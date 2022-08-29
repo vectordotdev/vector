@@ -37,13 +37,13 @@ build() {
     docker buildx build \
       --platform="$PLATFORM" \
       --tag "$TAG" \
-      target/artifacts \
+      . \
       -f "$DOCKERFILE" \
       "${ARGS[@]}"
   else
     docker build \
       --tag "$TAG" \
-      target/artifacts \
+      . \
       -f "$DOCKERFILE"
 
       if [[ "$PUSH" == "true" ]]; then

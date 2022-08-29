@@ -13,10 +13,10 @@ RUN mkdir -p \
   rootfs/usr/bin \
   rootfs/var/lib/vector
 
-COPY vector/distribution/docker/docker-entrypoint.sh rootfs/usr/bin/docker-entrypoint.sh
+COPY distribution/docker/docker-entrypoint.sh rootfs/usr/bin/docker-entrypoint.sh
 
 # Copy and unpack Vector distribution
-COPY vector-*-unknown-linux-gnu*.tar.gz .
+COPY target/artifacts/vector-*-unknown-linux-gnu*.tar.gz .
 RUN mkdir vector \
     && tar zxvf vector-*-"$(cat /etc/apk/arch)"-unknown-linux-gnu*.tar.gz \
     -C vector --strip-components=2
