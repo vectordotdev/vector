@@ -18,6 +18,9 @@ use snafu::{ResultExt, Snafu};
 use tokio::{pin, select};
 use tokio_util::codec::FramedRead;
 use tracing::Instrument;
+use vector_common::internal_event::{
+    ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
+};
 use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
@@ -26,7 +29,7 @@ use crate::{
     config::{log_schema, AcknowledgementsConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, LogEvent},
     internal_events::{
-        BytesReceived, OldEventsReceived, SqsMessageDeleteBatchError, SqsMessageDeletePartialError,
+        OldEventsReceived, SqsMessageDeleteBatchError, SqsMessageDeletePartialError,
         SqsMessageDeleteSucceeded, SqsMessageProcessingError, SqsMessageProcessingSucceeded,
         SqsMessageReceiveError, SqsMessageReceiveSucceeded, SqsS3EventRecordInvalidEventIgnored,
         StreamClosedError,
@@ -255,6 +258,7 @@ pub struct IngestorProcess {
     out: SourceSender,
     shutdown: ShutdownSignal,
     acknowledgements: bool,
+    bytes_received: Registered<BytesReceived>,
 }
 
 impl IngestorProcess {
@@ -269,6 +273,7 @@ impl IngestorProcess {
             out,
             shutdown,
             acknowledgements,
+            bytes_received: register!(BytesReceived::from(Protocol::HTTP)),
         }
     }
 
@@ -464,14 +469,12 @@ impl IngestorProcess {
         // the offset of the object that has been read, but this would only be relevant in
         // the case that the same vector instance processes the same message.
         let mut read_error = None;
+        let bytes_received = self.bytes_received.clone();
         let lines: Box<dyn Stream<Item = Bytes> + Send + Unpin> = Box::new(
             FramedRead::new(object_reader, CharacterDelimitedDecoder::new(b'\n'))
                 .map(|res| {
                     res.map(|bytes| {
-                        emit!(BytesReceived {
-                            byte_size: bytes.len(),
-                            protocol: "http",
-                        });
+                        bytes_received.emit(ByteSize(bytes.len()));
                         bytes
                     })
                     .map_err(|err| {

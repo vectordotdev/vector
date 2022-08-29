@@ -1,8 +1,8 @@
 # Vector Internal Documentation
 
-***This folder contains _internal_ documentation for Vector contributors. If
-you're a Vector user, please visit https://vector.dev/docs, which is powered by
-the [website](../website) directory.***
+**_This folder contains internal documentation for Vector contributors. If
+you're a Vector user, please visit <https://vector.dev/docs>, which is powered by
+the [website](../website) directory._**
 
 ## Getting started
 
@@ -19,17 +19,16 @@ development of Vector and ensuring your change gets approved in a timely manner.
 Vector team members have additional responsibilities beyond outside
 contributors:
 
-* **[REVIEWING.md](REVIEWING.md)** - Code review expectations and guidelines.
-* **[USER_EXPERIENCE_DESIGN.md](USER_EXPERIENCE_DESIGN.md)** - User experience
-   principles and guidelines.
+- **[REVIEWING.md](REVIEWING.md)** - Code review expectations and guidelines.
+- **[USER_EXPERIENCE_DESIGN.md](USER_EXPERIENCE_DESIGN.md)** - User experience
+  principles and guidelines.
 
 ## Project policies
 
 Vector's policies are located in the root directory:
 
-* **[CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md)**
-* **[PRIVACY.md](../PRIVACY.md)**
-* **[RELEASES.md](../RELEASES.md)**
-* **[SECURITY.md](../SECURITY.md)**
-* **[VERSIONING.md](../VERSIONING.md)**
-
+- **[CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md)**
+- **[PRIVACY.md](../PRIVACY.md)**
+- **[RELEASES.md](../RELEASES.md)**
+- **[SECURITY.md](../SECURITY.md)**
+- **[VERSIONING.md](../VERSIONING.md)**

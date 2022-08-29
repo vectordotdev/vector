@@ -18,7 +18,7 @@ use uuid::Uuid;
 use value::Kind;
 use vector_core::config::LogNamespace;
 
-use self::unit_test_components::{
+pub use self::unit_test_components::{
     UnitTestSinkCheck, UnitTestSinkConfig, UnitTestSinkResult, UnitTestSourceConfig,
 };
 use super::{compiler::expand_globs, graph::Graph, OutputId};
@@ -32,6 +32,7 @@ use crate::{
     schema,
     serde::OneOrMany,
     signal,
+    sources::Sources,
     topology::{
         self,
         builder::{self, Pieces},
@@ -238,7 +239,10 @@ impl UnitTestBuildMetadata {
                     .get(&insert_at)
                     .expect("Corresponding source must exist")
                     .as_ref();
-                (ComponentKey::from(id), SourceOuter::new(source_config))
+                (
+                    ComponentKey::from(id),
+                    SourceOuter::new(Sources::UnitTest(source_config)),
+                )
             })
             .collect::<IndexMap<_, _>>())
     }

@@ -14,7 +14,7 @@ use crate::{
 };
 
 /// Configuration for the `aws_sqs` source.
-#[configurable_component(source)]
+#[configurable_component(source("aws_sqs"))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
@@ -88,7 +88,6 @@ pub struct AwsSqsConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "aws_sqs")]
 impl SourceConfig for AwsSqsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
         let client = self.build_client(&cx).await?;
@@ -117,10 +116,6 @@ impl SourceConfig for AwsSqsConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(self.decoding.output_type())]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "aws_sqs"
     }
 
     fn can_acknowledge(&self) -> bool {

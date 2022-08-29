@@ -76,6 +76,26 @@ impl Configurable for String {
     }
 }
 
+impl Configurable for char {
+    fn metadata() -> Metadata<Self> {
+        let mut metadata = Metadata::default();
+        if let Some(description) = Self::description() {
+            metadata.set_description(description);
+        }
+        metadata.add_validation(Validation::Length {
+            minimum: Some(1),
+            maximum: Some(1),
+        });
+        metadata
+    }
+
+    fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<Self>) -> SchemaObject {
+        let mut schema = generate_string_schema();
+        finalize_schema(gen, &mut schema, overrides);
+        schema
+    }
+}
+
 // Numbers.
 macro_rules! impl_configuable_numeric {
 	($($ty:ty),+) => {

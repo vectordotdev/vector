@@ -1,5 +1,6 @@
 use futures_util::StreamExt;
 use snafu::{ResultExt, Snafu};
+use vector_common::internal_event::{BytesReceived, Registered};
 
 use crate::{
     codecs,
@@ -22,6 +23,7 @@ enum BuildError {
 pub async fn subscribe(
     client: redis::Client,
     connection_info: ConnectionInfo,
+    bytes_received: Registered<BytesReceived>,
     key: String,
     redis_key: Option<String>,
     decoder: codecs::Decoder,
@@ -31,6 +33,7 @@ pub async fn subscribe(
         .get_async_connection()
         .await
         .context(ConnectionSnafu {})?;
+
     trace!(endpoint = %connection_info.endpoint.as_str(), "Connected.");
 
     let mut pubsub_conn = conn.into_pubsub();
@@ -48,11 +51,11 @@ pub async fn subscribe(
             match msg.get_payload::<String>() {
                 Ok(line) => {
                     if let Err(()) = handle_line(
-                        &connection_info,
                         line,
                         &key,
                         redis_key.as_deref(),
                         decoder.clone(),
+                        &bytes_received,
                         &mut tx,
                     )
                     .await

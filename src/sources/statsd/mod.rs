@@ -16,9 +16,7 @@ use self::parser::ParseError;
 use super::util::{SocketListenAddr, TcpNullAcker, TcpSource};
 use crate::{
     codecs::Decoder,
-    config::{
-        self, GenerateConfig, Output, Resource, SourceConfig, SourceContext, SourceDescription,
-    },
+    config::{self, GenerateConfig, Output, Resource, SourceConfig, SourceContext},
     event::Event,
     internal_events::{
         EventsReceived, SocketBytesReceived, SocketMode, StatsdInvalidRecordError,
@@ -40,7 +38,7 @@ use unix::{statsd_unix, UnixConfig};
 use vector_core::config::LogNamespace;
 
 /// Configuration for the `statsd` source.
-#[configurable_component(source)]
+#[configurable_component(source("statsd"))]
 #[derive(Clone, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum StatsdConfig {
@@ -123,10 +121,6 @@ const fn default_shutdown_timeout_secs() -> u64 {
     30
 }
 
-inventory::submit! {
-    SourceDescription::new::<StatsdConfig>("statsd")
-}
-
 impl GenerateConfig for StatsdConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self::Udp(UdpConfig::from_address(SocketAddr::V4(
@@ -137,7 +131,6 @@ impl GenerateConfig for StatsdConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "statsd")]
 impl SourceConfig for StatsdConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         match self {
@@ -170,10 +163,6 @@ impl SourceConfig for StatsdConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(config::DataType::Metric)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "statsd"
     }
 
     fn resources(&self) -> Vec<Resource> {

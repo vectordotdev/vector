@@ -3,7 +3,7 @@ use std::str::FromStr;
 use ::value::Value;
 use chrono::{TimeZone as _, Utc};
 use vector_common::{conversion::Conversion, TimeZone};
-use vrl::{function::Error, prelude::*};
+use vrl::prelude::*;
 
 fn to_timestamp(value: Value, unit: Unit) -> Resolved {
     use Value::{Bytes, Float, Integer, Timestamp};
@@ -197,33 +197,6 @@ impl Function for ToTimestamp {
             .unwrap_or_default();
 
         Ok(ToTimestampFn { value, unit }.as_expr())
-    }
-
-    fn compile_argument(
-        &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        match (name, expr) {
-            ("unit", Some(expr)) => match expr.as_value() {
-                None => Ok(None),
-                Some(value) => {
-                    let s = value.try_bytes_utf8_lossy().expect("unit not bytes");
-                    Ok(Some(
-                        Unit::from_str(&s)
-                            .map(|unit| Box::new(unit) as Box<dyn std::any::Any + Send + Sync>)
-                            .map_err(|_| Error::InvalidEnumVariant {
-                                keyword: "unit",
-                                value,
-                                variants: Unit::all_value(),
-                            })?,
-                    ))
-                }
-            },
-            _ => Ok(None),
-        }
     }
 }
 

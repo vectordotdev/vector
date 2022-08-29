@@ -66,6 +66,10 @@ impl AdaptiveConcurrencySettings {
             rtt_deviation_scale: 2.5,
         }
     }
+
+    pub const fn max_concurrency() -> usize {
+        MAX_CONCURRENCY
+    }
 }
 
 impl Default for AdaptiveConcurrencySettings {

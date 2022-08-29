@@ -87,25 +87,6 @@ impl Function for ParseApacheLog {
         .as_expr())
     }
 
-    fn compile_argument(
-        &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        match (name, expr) {
-            ("format", Some(expr)) => {
-                let format = expr
-                    .as_enum("format", variants())?
-                    .try_bytes()
-                    .expect("format not bytes");
-                Ok(Some(Box::new(format) as _))
-            }
-            _ => Ok(None),
-        }
-    }
-
     fn examples(&self) -> &'static [Example] {
         &[
             Example {
