@@ -31,6 +31,20 @@ pub trait ByteSizeOf {
     fn allocated_bytes(&self) -> usize;
 }
 
+pub trait JsonEncodedSizeOf {
+    fn json_encoded_size_of(&self) -> usize;
+}
+
+impl<T> JsonEncodedSizeOf for T
+where
+    T: serde::Serialize,
+{
+    #[inline]
+    fn json_encoded_size_of(&self) -> usize {
+        super::json_encoded_size_of::size_of(self).unwrap()
+    }
+}
+
 impl<'a, T> ByteSizeOf for &'a T
 where
     T: ByteSizeOf,
