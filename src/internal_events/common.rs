@@ -67,7 +67,7 @@ impl InternalEvent for StreamClosedError {
             reason = "Downstream is closed.",
             error_code = STREAM_CLOSED,
             error_type = error_type::WRITER_FAILED,
-            intentional = "false",
+            intentional = false,
             stage = error_stage::SENDING,
             count = %self.count,
         );
