@@ -68,7 +68,6 @@ impl InternalEvent for StreamClosedError {
             error_code = STREAM_CLOSED,
             error_type = error_type::WRITER_FAILED,
             stage = error_stage::SENDING,
-            count = %self.count,
         );
         counter!(
             "component_errors_total", 1,
@@ -121,16 +120,15 @@ pub struct ComponentEventsDropped {
 
 impl InternalEvent for ComponentEventsDropped {
     fn emit(self) {
-        let intent = if self.intentional { "true" } else { "false" };
         error!(
             message = "Events dropped.",
-            intentional = intent,
+            intentional = self.intentional,
             reason = self.reason,
         );
         counter!(
             "component_discarded_events_total",
             self.count,
-            "intentional" => intent,
+            "intentional" => if self.intentional { "true" } else { "false" },
         );
     }
 }
