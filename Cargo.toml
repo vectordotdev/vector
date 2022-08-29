@@ -421,6 +421,7 @@ api-client = [
 
 aws-core = [
   "aws-config",
+  "dep:aws-sigv4",
   "dep:aws-types",
   "dep:aws-smithy-async",
   "dep:aws-smithy-client",
@@ -664,7 +665,7 @@ sinks-nats = ["dep:nats", "dep:nkeys"]
 sinks-new_relic_logs = ["sinks-http"]
 sinks-new_relic = []
 sinks-papertrail = ["dep:syslog"]
-sinks-prometheus = ["dep:prometheus-parser", "dep:snap", "dep:serde_with"]
+sinks-prometheus = ["aws-core", "dep:aws-sigv4", "dep:prometheus-parser", "dep:snap", "dep:serde_with"]
 sinks-pulsar = ["dep:avro-rs", "dep:pulsar"]
 sinks-redis = ["dep:redis"]
 sinks-sematext = ["sinks-elasticsearch", "sinks-influxdb"]

@@ -5,6 +5,28 @@ mod collector;
 pub(crate) mod exporter;
 pub(crate) mod remote_write;
 
+use vector_config::configurable_component;
+
+use crate::aws::AwsAuthentication;
+
+/// Authentication strategies.
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
+pub enum PrometheusRemoteWriteAuth {
+    /// HTTP Basic Authentication.
+    Basic {
+        /// Basic authentication username.
+        user: String,
+
+        /// Basic authentication password.
+        password: String,
+    },
+
+    /// Amazon Prometheus Service-specific authentication.
+    Aws(#[configurable(derived)] AwsAuthentication),
+}
+
 fn default_histogram_buckets() -> Vec<f64> {
     vec![
         0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0,
