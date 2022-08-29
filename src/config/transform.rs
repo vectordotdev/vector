@@ -2,8 +2,8 @@ use std::collections::{HashMap, HashSet};
 
 use async_trait::async_trait;
 use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
-use vector_config::NamedComponent;
+use serde::Serialize;
+use vector_config::{configurable_component, Configurable, NamedComponent};
 use vector_core::{
     config::{GlobalOptions, Input, Output},
     schema,
@@ -14,8 +14,14 @@ use crate::transforms::Transforms;
 
 use super::ComponentKey;
 
-#[derive(Deserialize, Serialize, Debug)]
-pub struct TransformOuter<T> {
+/// Fully resolved transform component.
+#[configurable_component]
+#[derive(Clone, Debug)]
+pub struct TransformOuter<T>
+where
+    T: Configurable + Serialize,
+{
+    /// Inputs to the transforms.
     #[serde(default = "Default::default")] // https://github.com/serde-rs/serde/issues/1541
     pub inputs: Vec<T>,
 
@@ -23,18 +29,27 @@ pub struct TransformOuter<T> {
     pub inner: Transforms,
 }
 
-impl<T> TransformOuter<T> {
+impl<T> TransformOuter<T>
+where
+    T: Configurable + Serialize,
+{
     #[cfg(feature = "enterprise")]
     pub(super) fn new(inputs: Vec<T>, inner: Transforms) -> Self {
         TransformOuter { inputs, inner }
     }
 
-    pub(super) fn map_inputs<U>(self, f: impl Fn(&T) -> U) -> TransformOuter<U> {
+    pub(super) fn map_inputs<U>(self, f: impl Fn(&T) -> U) -> TransformOuter<U>
+    where
+        U: Configurable + Serialize,
+    {
         let inputs = self.inputs.iter().map(f).collect();
         self.with_inputs(inputs)
     }
 
-    pub(crate) fn with_inputs<U>(self, inputs: Vec<U>) -> TransformOuter<U> {
+    pub(crate) fn with_inputs<U>(self, inputs: Vec<U>) -> TransformOuter<U>
+    where
+        U: Configurable + Serialize,
+    {
         TransformOuter {
             inputs,
             inner: self.inner,
