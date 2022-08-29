@@ -103,6 +103,8 @@ An `<Name>Error` event MUST be emitted when an error occurs.
     type, they MAY be omitted from being represented explicitly in the
     event fields. However, they MUST still be included in the emitted
     logs and metrics, as specified below, as if they were present.
+  - `stage` - The stage at which the error occurred. This MUST be one of
+    `receiving`, `processing`, or `sending`.
 - Metrics
   - MUST include the defined properties as tags.
   - MUST increment `<namespace>_errors_total` metric.

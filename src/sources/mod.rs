@@ -94,6 +94,7 @@ enum BuildError {
 }
 
 /// Configurable sources in Vector.
+#[allow(clippy::large_enum_variant)]
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "type", rename_all = "snake_case")]
