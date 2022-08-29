@@ -228,10 +228,10 @@ fn verify_overwriteable(
         let (variant, segment_span, valid) = match last {
             segment @ (SegmentBuf::Field(_) | SegmentBuf::Coalesce(_)) => {
                 let segment_str = segment.to_string();
-                let segment_start = parent_span.end() - segment_str.len();
+                let segment_start = parent_span.end().saturating_sub(segment_str.len());
                 let segment_span = Span::new(segment_start, parent_span.end());
 
-                parent_span = Span::new(parent_span.start(), segment_start - 1);
+                parent_span = Span::new(parent_span.start(), segment_start.saturating_sub(1));
                 remainder_str.insert_str(0, &format!(".{}", segment_str));
 
                 ("object", segment_span, parent_kind.contains_object())
