@@ -610,21 +610,29 @@ mod integration_test {
 
     #[tokio::test]
     async fn consumes_event_with_acknowledgements() {
-        send_receive(true, 10).await;
+        send_receive(true, |_| false, 10).await;
     }
 
     #[tokio::test]
     async fn consumes_event_without_acknowledgements() {
-        send_receive(false, 10).await;
+        send_receive(false, |_| false, 10).await;
     }
 
     #[tokio::test]
-    #[ignore]
-    async fn handles_negative_acknowledgements() {
-        send_receive(true, 2).await;
+    async fn handles_one_negative_acknowledgement() {
+        send_receive(true, |n| n == 2, 10).await;
     }
 
-    async fn send_receive(acknowledgements: bool, receive_count: usize) {
+    #[tokio::test]
+    async fn handles_permanent_negative_acknowledgement() {
+        send_receive(true, |n| n >= 2, 2).await;
+    }
+
+    async fn send_receive(
+        acknowledgements: bool,
+        error_at: impl Fn(usize) -> bool,
+        receive_count: usize,
+    ) {
         const SEND_COUNT: usize = 10;
 
         let topic = format!("test-topic-{}", random_string(10));
@@ -646,7 +654,7 @@ mod integration_test {
 
         let events = assert_source_compliance(&["protocol", "topic", "partition"], async move {
             let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
-            let (tx, rx) = SourceSender::new_test_error_after(receive_count);
+            let (tx, rx) = SourceSender::new_test_errors(error_at);
             let consumer = create_consumer(&config).unwrap();
             tokio::spawn(kafka_source(
                 config,
