@@ -256,7 +256,7 @@ impl FromMeta for Options {
                 // that are required to have a name, but did not specify one.
                 //
                 // We don't emit those errors here because errors in attribute macros will cause a
-                // cadcading set of errors that are too noisy.
+                // cascading set of errors that are too noisy.
                 NestedMeta::Meta(Meta::Path(p)) if ComponentType::is_valid_type(p) => {
                     if typed_component.is_some() {
                         errors.push(
