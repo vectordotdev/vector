@@ -1236,7 +1236,7 @@ fn is_digit(ch: char) -> bool {
 pub(crate) fn is_operator(ch: char) -> bool {
     matches!(
         ch,
-        '!' | '%' | '&' | '*' | '+' | '-' | '/' | '<' | '=' | '>' | '?' | '|'
+        '!' | '&' | '*' | '+' | '-' | '/' | '<' | '=' | '>' | '?' | '|'
     )
 }
 

@@ -56,7 +56,6 @@ extern {
         "*" => Token::Operator("*"),
         "-" => Token::Operator("-"),
         "/" => Token::Operator("/"),
-        "%" => Token::Operator("%"),
         "<" => Token::Operator("<"),
         "<=" => Token::Operator("<="),
         ">" => Token::Operator(">"),
@@ -290,7 +289,6 @@ Add: Expr = {
 };
 
 Factor: Expr = {
-    Op<Factor, "%", Not>,
     Op<Factor, "*", Not>,
     Op<Factor, "/", Not>,
     Not,
