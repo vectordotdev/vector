@@ -6,7 +6,7 @@ use snafu::{ResultExt, Snafu};
 use vector_config::configurable_component;
 
 use crate::{
-    config::{DataType, Input, Output, TransformConfig},
+    config::{DataType, Input, Output},
     event::{Event, Value},
     internal_events::{LuaGcTriggered, LuaScriptError},
     schema,
