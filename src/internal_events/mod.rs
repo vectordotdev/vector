@@ -133,7 +133,7 @@ pub(crate) use mongodb_metrics::*;
 
 #[cfg(feature = "transforms-aggregate")]
 pub(crate) use self::aggregate::*;
-#[cfg(feature = "sources-amqp")]
+#[cfg(any(feature = "sources-amqp", feature = "sinks-amqp"))]
 pub(crate) use self::amqp::*;
 #[cfg(feature = "sources-apache_metrics")]
 pub(crate) use self::apache_metrics::*;
