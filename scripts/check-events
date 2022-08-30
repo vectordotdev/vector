@@ -22,8 +22,8 @@ EVENT_CLASSES = {
   ],
 }
 
-EVENT_NAME_EVENTS_DROPPED = 'component_discarded_events_total'
-EVENT_NAME_ERROR = 'component_errors_total'
+METRIC_NAME_EVENTS_DROPPED = 'component_discarded_events_total'
+METRIC_NAME_ERROR = 'component_errors_total'
 
 
 def hash_array_add(hash, key, item)
@@ -162,7 +162,7 @@ class Event
 
     has_error_logs = handle.logs.one? { |type, _, _| type == 'error' }
 
-    is_events_dropped_event = (@name.end_with? 'EventsDropped' or @counters.include? EVENT_NAME_EVENTS_DROPPED)
+    is_events_dropped_event = (@name.end_with? 'EventsDropped' or @counters.include? METRIC_NAME_EVENTS_DROPPED)
 
     # Validate <Name>Error events
     if (has_error_logs and !is_events_dropped_event) or @name.end_with? 'Error'
@@ -172,7 +172,7 @@ class Event
       # Outputs an error log
       handle.logs_should_have('error')
       # Metric check
-      counters_must_include_exclude_tags(EVENT_NAME_ERROR, ['error_type', 'stage'])
+      counters_must_include_exclude_tags(METRIC_NAME_ERROR, ['error_type', 'stage'])
 
       # Make sure Error events contain the required parameters
       handle.logs.each do |type, message, parameters|
@@ -184,8 +184,8 @@ class Event
           end
 
           ['error_code', 'error_type', 'stage'].each do |parameter|
-            if parameters.include? parameter and !@counters[EVENT_NAME_ERROR].include? parameter
-              @reports.append("Counter \"#{EVENT_NAME_ERROR}\" must include \"#{parameter}\" to match error log.")
+            if parameters.include? parameter and !@counters[METRIC_NAME_ERROR].include? parameter
+              @reports.append("Counter \"#{METRIC_NAME_ERROR}\" must include \"#{parameter}\" to match error log.")
             end
           end
         end
@@ -203,7 +203,7 @@ class Event
       # Outputs an error log
       handle.logs_should_have('error')
       # Metric check
-      counters_must_include_exclude_tags(EVENT_NAME_EVENTS_DROPPED, ['intentional'], ['reason', 'count'])
+      counters_must_include_exclude_tags(METRIC_NAME_EVENTS_DROPPED, ['intentional'], ['reason', 'count'])
 
       # Make sure EventsDropped events contain the required parameters
       handle.logs.each do |type, message, parameters|
@@ -215,8 +215,8 @@ class Event
           end
 
           ['intentional'].each do |parameter|
-            if parameters.include? parameter and !@counters[EVENT_NAME_EVENTS_DROPPED].include? parameter
-              @reports.append("Counter \"#{EVENT_NAME_EVENTS_DROPPED}\" must include \"#{parameter}\" to match error log.")
+            if parameters.include? parameter and !@counters[METRIC_NAME_EVENTS_DROPPED].include? parameter
+              @reports.append("Counter \"#{METRIC_NAME_EVENTS_DROPPED}\" must include \"#{parameter}\" to match error log.")
             end
           end
         end
