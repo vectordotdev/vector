@@ -21,8 +21,7 @@ use warp::{
 use crate::{
     config::{AcknowledgementsConfig, SourceContext},
     internal_events::{
-        HttpBadRequest, HttpBytesReceived, HttpEventsReceived, HttpInternalError,
-        HttpInvalidRouteError, StreamClosedError,
+        HttpBadRequest, HttpBytesReceived, HttpEventsReceived, HttpInternalError, StreamClosedError,
     },
     sources::http::HttpMethod,
     tls::{MaybeTlsSettings, TlsEnableableConfig},
@@ -84,8 +83,9 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                     if !strict_path || tail.as_str().is_empty() {
                         Ok(())
                     } else {
-                        debug!(message = "Path rejected.");
-                        emit!(HttpInvalidRouteError {});
+                        emit!(HttpInternalError {
+                            message: "Path not found."
+                        });
                         Err(warp::reject::custom(ErrorMessage::new(
                             StatusCode::NOT_FOUND,
                             "Not found".to_string(),
@@ -142,7 +142,9 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                     Ok(warp::reply::with_status(json, e_msg.status_code()))
                 } else {
                     //other internal error - will return 500 internal server error
-                    emit!(HttpInternalError {});
+                    emit!(HttpInternalError {
+                        message: "Internal error."
+                    });
                     Err(r)
                 }
             });
