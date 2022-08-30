@@ -55,7 +55,7 @@ pub struct LuaBuildError {
 impl InternalEvent for LuaBuildError {
     fn emit(self) {
         error!(
-            message = "Error in lua build script.",
+            message = "Error in building lua script.",
             error = ?self.error,
             error_type = error_type::SCRIPT_FAILED,
             error_code = lua_build_error_code(&self.error),

@@ -22,6 +22,10 @@ EVENT_CLASSES = {
   ],
 }
 
+EVENT_NAME_EVENTS_DROPPED = 'component_discarded_events_total'
+EVENT_NAME_ERROR = 'component_errors_total'
+
+
 def hash_array_add(hash, key, item)
   arr = hash.fetch(key, Array::new)
   arr.append(item)
@@ -151,17 +155,14 @@ class Event
         end
         counters.each do |counter|
           counter = "component_#{counter}_total"
-          counters_must_include(counter, additional_tags - BYTE_SIZE_COUNT)
+          counters_must_include_exclude_tags(counter, additional_tags - BYTE_SIZE_COUNT)
         end
       end
     end
 
-    evt_name_events_dropped = 'component_discarded_events_total'
-    evt_name_error = 'component_errors_total'
-
     has_error_logs = handle.logs.one? { |type, _, _| type == 'error' }
 
-    is_events_dropped_evt = (@name.end_with? 'EventsDropped' or @counters.include? evt_name_events_dropped)
+    is_events_dropped_evt = (@name.end_with? 'EventsDropped' or @counters.include? EVENT_NAME_EVENTS_DROPPED)
 
     # Validate <Name>Error events
     if (has_error_logs and !is_events_dropped_evt) or @name.end_with? 'Error'
@@ -171,7 +172,7 @@ class Event
       # Outputs an error log
       handle.logs_should_have('error')
       # Metric check
-      counters_must_include(evt_name_error, ['error_type', 'stage'])
+      counters_must_include_exclude_tags(EVENT_NAME_ERROR, ['error_type', 'stage'])
 
       # Make sure Error events contain the required parameters
       handle.logs.each do |type, message, parameters|
@@ -183,8 +184,8 @@ class Event
           end
 
           ['error_code', 'error_type', 'stage'].each do |parameter|
-            if parameters.include? parameter and !@counters[evt_name_error].include? parameter
-              @reports.append("Counter \"#{evt_name_error}\" must include \"#{parameter}\" to match error log.")
+            if parameters.include? parameter and !@counters[EVENT_NAME_ERROR].include? parameter
+              @reports.append("Counter \"#{EVENT_NAME_ERROR}\" must include \"#{parameter}\" to match error log.")
             end
           end
         end
@@ -202,8 +203,7 @@ class Event
       # Outputs an error log
       handle.logs_should_have('error')
       # Metric check
-      counters_must_include(evt_name_events_dropped, ['intentional'])
-      counters_must_not_include(evt_name_events_dropped, ['reason', 'count'])
+      counters_must_include_exclude_tags(EVENT_NAME_EVENTS_DROPPED, ['intentional'], ['reason', 'count'])
 
       # Make sure EventsDropped events contain the required parameters
       handle.logs.each do |type, message, parameters|
@@ -215,8 +215,8 @@ class Event
           end
 
           ['intentional'].each do |parameter|
-            if parameters.include? parameter and !@counters[evt_name_events_dropped].include? parameter
-              @reports.append("Counter \"#{evt_name_events_dropped}\" must include \"#{parameter}\" to match error log.")
+            if parameters.include? parameter and !@counters[EVENT_NAME_EVENTS_DROPPED].include? parameter
+              @reports.append("Counter \"#{EVENT_NAME_EVENTS_DROPPED}\" must include \"#{parameter}\" to match error log.")
             end
           end
         end
@@ -256,7 +256,7 @@ class Event
       @reports.append(report)
     end
 
-    def counters_must_include(name, required_tags)
+    def counters_must_include_exclude_tags(name, required_tags, exclude_tags = [])
       unless @counters.include? name
         @reports.append("This event MUST increment counter \"#{name}\".")
       else
@@ -266,14 +266,7 @@ class Event
             @reports.append("Counter \"#{name}\" MUST include tag \"#{tag}\".")
           end
         end
-      end
-    end
 
-    def counters_must_not_include(name, exclude_tags)
-      unless @counters.include? name
-        @reports.append("This event MUST increment counter \"#{name}\".")
-      else
-        tags = @counters[name]
         exclude_tags.each do |tag|
           if tags.include? tag
             @reports.append("Counter \"#{name}\" MUST NOT include tag \"#{tag}\".")
