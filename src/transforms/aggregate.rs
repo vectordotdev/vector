@@ -9,7 +9,7 @@ use futures::{Stream, StreamExt};
 use vector_config::configurable_component;
 
 use crate::{
-    config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, Input, Output, TransformConfig, TransformContext},
     event::{metric, Event, EventMetadata},
     internal_events::{AggregateEventRecorded, AggregateFlushed, AggregateUpdateFailed},
     schema,
@@ -17,7 +17,7 @@ use crate::{
 };
 
 /// Configuration for the `aggregate` transform.
-#[configurable_component(transform)]
+#[configurable_component(transform("aggregate"))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields, default)]
 pub struct AggregateConfig {
@@ -32,14 +32,9 @@ const fn default_interval_ms() -> u64 {
     10 * 1000
 }
 
-inventory::submit! {
-    TransformDescription::new::<AggregateConfig>("aggregate")
-}
-
 impl_generate_config_from_default!(AggregateConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "aggregate")]
 impl TransformConfig for AggregateConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Aggregate::new(self).map(Transform::event_task)
@@ -51,10 +46,6 @@ impl TransformConfig for AggregateConfig {
 
     fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Metric)]
-    }
-
-    fn transform_type(&self) -> &'static str {
-        "aggregate"
     }
 }
 

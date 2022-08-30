@@ -8,7 +8,7 @@ use vector_config::configurable_component;
 
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, Input, Output, TransformConfig, TransformContext},
     event::Event,
     internal_events::{TemplateRenderingError, ThrottleEventDiscarded},
     schema,
@@ -17,7 +17,7 @@ use crate::{
 };
 
 /// Configuration for the `throttle` transform.
-#[configurable_component(transform)]
+#[configurable_component(transform("throttle"))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields, default)]
 pub struct ThrottleConfig {
@@ -29,9 +29,12 @@ pub struct ThrottleConfig {
     /// The time window in which the configured `threshold` is applied, in seconds.
     window_secs: f64,
 
-    /// The name of the log field whose value will be hashed to determine if the event should be rate limited.
+    /// The name of the log field whose value will be hashed to determine if the event should be
+    /// rate limited.
     ///
-    /// Each unique key will create a bucket of related events to be rate limited separately. If left unspecified, or if the event doesn’t have `key_field`, the event be will not be rate limited separately.
+    /// Each unique key will create a bucket of related events to be rate limited separately. If
+    /// left unspecified, or if the event doesn’t have `key_field`, the event be will not be rate
+    /// limited separately.
     #[configurable(metadata(templatable))]
     key_field: Option<Template>,
 
@@ -39,14 +42,9 @@ pub struct ThrottleConfig {
     exclude: Option<AnyCondition>,
 }
 
-inventory::submit! {
-    TransformDescription::new::<ThrottleConfig>("throttle")
-}
-
 impl_generate_config_from_default!(ThrottleConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "throttle")]
 impl TransformConfig for ThrottleConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         Throttle::new(self, context, clock::MonotonicClock).map(Transform::event_task)
@@ -58,10 +56,6 @@ impl TransformConfig for ThrottleConfig {
 
     fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
-    }
-
-    fn transform_type(&self) -> &'static str {
-        "throttle"
     }
 }
 
