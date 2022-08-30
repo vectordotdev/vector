@@ -155,9 +155,9 @@ and filtering bytes from the upstream source and before the creation of a Vector
 
 #### ComponentBytesSent
 
-*Sinks* that send events downstream, and delete them in Vector, MUST emit
-a `ComponentBytesSent` event immediately after sending bytes to the downstream target, if
-the transmission was successful. The reported bytes MUST be before compression.
+*Sinks* that send events downstream, MUST emit a `ComponentBytesSent` event immediately after
+sending bytes to the downstream target, if the transmission was successful. The reported bytes MUST
+be before compression.
 
 Note that for sinks that simply expose data, but don't delete the data after
 sending it, like the `prometheus_exporter` sink, SHOULD NOT publish this metric.
