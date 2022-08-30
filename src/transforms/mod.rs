@@ -269,6 +269,49 @@ impl TransformConfig for Transforms {
         }
     }
 
+    fn enable_concurrency(&self) -> bool {
+        match self {
+            #[cfg(feature = "transforms-aggregate")]
+            Transforms::Aggregate(config) => config.enable_concurrency(),
+            #[cfg(feature = "transforms-aws_ec2_metadata")]
+            Transforms::AwsEc2Metadata(config) => config.enable_concurrency(),
+            #[cfg(feature = "transforms-dedupe")]
+            Transforms::Dedupe(config) => config.enable_concurrency(),
+            #[cfg(feature = "transforms-filter")]
+            Transforms::Filter(config) => config.enable_concurrency(),
+            #[cfg(feature = "transforms-geoip")]
+            Transforms::Geoip(config) => config.enable_concurrency(),
+            #[cfg(feature = "transforms-log_to_metric")]
+            Transforms::LogToMetric(config) => config.enable_concurrency(),
+            #[cfg(feature = "transforms-lua")]
+            Transforms::Lua(config) => config.enable_concurrency(),
+            #[cfg(feature = "transforms-metric_to_log")]
+            Transforms::MetricToLog(config) => config.enable_concurrency(),
+            #[cfg(feature = "transforms-pipelines")]
+            Transforms::Pipeline(config) => config.enable_concurrency(),
+            #[cfg(feature = "transforms-pipelines")]
+            Transforms::Pipelines(config) => config.enable_concurrency(),
+            #[cfg(feature = "transforms-reduce")]
+            Transforms::Reduce(config) => config.enable_concurrency(),
+            #[cfg(feature = "transforms-remap")]
+            Transforms::Remap(config) => config.enable_concurrency(),
+            #[cfg(feature = "transforms-route")]
+            Transforms::Route(config) => config.enable_concurrency(),
+            #[cfg(feature = "transforms-sample")]
+            Transforms::Sample(config) => config.enable_concurrency(),
+            #[cfg(feature = "transforms-tag_cardinality_limit")]
+            Transforms::TagCardinalityLimit(config) => config.enable_concurrency(),
+            #[cfg(test)]
+            Transforms::TestBasic(config) => config.enable_concurrency(),
+            #[cfg(test)]
+            Transforms::TestNoop(config) => config.enable_concurrency(),
+            #[cfg(feature = "transforms-throttle")]
+            Transforms::Throttle(config) => config.enable_concurrency(),
+            #[allow(unreachable_patterns)]
+            _ => unimplemented!(),
+        }
+    }
+
     #[allow(unused_variables)]
     fn nestable(&self, parents: &HashSet<&'static str>) -> bool {
         match self {
