@@ -16,7 +16,7 @@ impl InternalEvent for PulsarSendingError {
             reason = "A Pulsar sink generated an error.",
             error = %self.error,
             error_type = error_type::REQUEST_FAILED,
-            intentional = "false",
+            intentional = false,
             stage = error_stage::SENDING,
             count = %self.count,
         );
@@ -25,14 +25,11 @@ impl InternalEvent for PulsarSendingError {
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::SENDING,
         );
-
-        if self.count > 0 {
-            counter!(
-                "component_discarded_events_total", self.count as u64,
-                "error_type" => error_type::REQUEST_FAILED,
-                "stage" => error_stage::SENDING,
-                "intentional" => "false",
-            );
-        }
+        counter!(
+            "component_discarded_events_total", self.count as u64,
+            "error_type" => error_type::REQUEST_FAILED,
+            "stage" => error_stage::SENDING,
+            "intentional" => "false",
+        );
     }
 }
