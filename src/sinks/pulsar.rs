@@ -359,7 +359,6 @@ impl Sink<Event> for PulsarSink {
                 }
                 Some((Err(error), metadata, finalizers)) => {
                     finalizers.update_status(EventStatus::Errored);
-                    error!(message = "Pulsar sink generated an error.", %error);
                     emit!(PulsarSendingError {
                         error: Box::new(error),
                         count: metadata.event_count(),
