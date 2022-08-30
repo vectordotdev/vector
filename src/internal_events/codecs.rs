@@ -34,15 +34,12 @@ pub struct EncoderFramingError<'a> {
 
 impl<'a> InternalEvent for EncoderFramingError<'a> {
     fn emit(self) {
-        warn!(message = "Failed framing bytes.", error = %self.error, internal_log_rate_secs = 10);
         error!(
-            message = "Events dropped.",
-            count = 1,
+            message = "Failed framing bytes.",
             error = %self.error,
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::SENDING,
-            intentional = false,
-            reason = "Failed framing bytes.",
+            internal_log_rate_secs = 10,
         );
         counter!("encoder_framing_errors_total", 1);
         counter!(
@@ -50,12 +47,7 @@ impl<'a> InternalEvent for EncoderFramingError<'a> {
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::SENDING,
         );
-        counter!(
-            "component_discarded_events_total", 1,
-            "error_type" => error_type::ENCODER_FAILED,
-            "stage" => error_stage::SENDING,
-            "intentional" => "false",
-        );
+        // TODO fire component dropped events here
     }
 }
 
@@ -66,15 +58,12 @@ pub struct EncoderSerializeError<'a> {
 
 impl<'a> InternalEvent for EncoderSerializeError<'a> {
     fn emit(self) {
-        warn!(message = "Failed serializing frame.", error = %self.error, internal_log_rate_secs = 10);
         error!(
-            message = "Events dropped.",
-            count = 1,
+            message = "Failed serializing frame.",
             error = %self.error,
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::SENDING,
-            intentional = false,
-            reason = "Failed serializing frame.",
+            internal_log_rate_secs = 10,
         );
         counter!("encoder_serialize_errors_total", 1);
         counter!(
@@ -82,11 +71,29 @@ impl<'a> InternalEvent for EncoderSerializeError<'a> {
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::SENDING,
         );
+        // TODO fire component dropped events here
+    }
+}
+
+#[derive(Debug)]
+pub struct EncoderWriteAllError<'a, E> {
+    pub error: &'a E,
+}
+
+impl<E: std::fmt::Display> InternalEvent for EncoderWriteAllError<'_, E> {
+    fn emit(self) {
+        error!(
+            message = "Failed writing bytes.",
+            error = %self.error,
+            error_type = error_type::IO_FAILED,
+            stage = error_stage::SENDING,
+            internal_log_rate_secs = 10,
+        );
         counter!(
-            "component_discarded_events_total", 1,
+            "component_errors_total", 1,
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::SENDING,
-            "intentional" => "false",
         );
+        // TODO fire component dropped events here
     }
 }

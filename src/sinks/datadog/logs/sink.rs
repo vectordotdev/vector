@@ -24,6 +24,7 @@ use vector_core::{
 use super::{config::MAX_PAYLOAD_BYTES, service::LogApiRequest};
 use crate::{
     codecs::{Encoder, Transformer},
+    internal_events::SinkRequestBuildError,
     sinks::util::{
         encoding::Encoder as _, request_builder::EncodeResult, Compression, Compressor,
         RequestBuilder, SinkBuilderExt,
@@ -388,8 +389,11 @@ where
                 )
                 .filter_map(|request| async move {
                     match request {
-                        Err(e) => {
-                            error!("Failed to build Datadog Logs request: {:?}.", e);
+                        Err(error) => {
+                            emit!(SinkRequestBuildError {
+                                message: "Failed to build Datadog Logs request.",
+                                error,
+                            });
                             None
                         }
                         Ok(req) => Some(req),
@@ -411,8 +415,11 @@ where
                 )
                 .filter_map(|request| async move {
                     match request {
-                        Err(e) => {
-                            error!("Failed to build Datadog Logs request: {:?}.", e);
+                        Err(error) => {
+                            emit!(SinkRequestBuildError {
+                                message: "Failed to build Datadog Logs request.",
+                                error,
+                            });
                             None
                         }
                         Ok(req) => Some(req),

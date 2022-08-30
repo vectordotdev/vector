@@ -4,7 +4,7 @@ use bytes::BytesMut;
 use codecs::encoding::Framer;
 use tokio_util::codec::Encoder as _;
 
-use crate::{codecs::Transformer, event::Event};
+use crate::{codecs::Transformer, event::Event, internal_events::EncoderWriteAllError};
 
 pub trait Encoder<T> {
     /// Encodes the input into the provided writer.
@@ -33,7 +33,7 @@ impl Encoder<Vec<Event>> for (Transformer, crate::codecs::Encoder<Framer>) {
                 encoder
                     .encode(event, &mut bytes)
                     .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
-                writer.write_all(&bytes)?;
+                write_all(writer, &bytes)?;
                 bytes_written += bytes.len();
             }
             let mut event = last;
@@ -42,11 +42,11 @@ impl Encoder<Vec<Event>> for (Transformer, crate::codecs::Encoder<Framer>) {
             encoder
                 .serialize(event, &mut bytes)
                 .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
-            writer.write_all(&bytes)?;
+            write_all(writer, &bytes)?;
             bytes_written += bytes.len();
         }
         let batch_suffix = encoder.batch_suffix();
-        writer.write_all(batch_suffix)?;
+        write_all(writer, batch_suffix)?;
         bytes_written += batch_suffix.len();
 
         Ok(bytes_written)
@@ -61,9 +61,18 @@ impl Encoder<Event> for (Transformer, crate::codecs::Encoder<()>) {
         encoder
             .serialize(event, &mut bytes)
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
-        writer.write_all(&bytes)?;
+        write_all(writer, &bytes)?;
         Ok(bytes.len())
     }
+}
+
+/// Write the buffer to the writer, emitting an internal event which complies with the
+/// instrumentation spec- as this necessitates both an Error and EventsDropped event.
+fn write_all(writer: &mut dyn io::Write, buf: &[u8]) -> io::Result<()> {
+    writer.write_all(buf).map_err(|error| {
+        emit!(EncoderWriteAllError { error: &error });
+        error
+    })
 }
 
 pub fn as_tracked_write<F, I, E>(inner: &mut dyn io::Write, input: I, f: F) -> io::Result<usize>

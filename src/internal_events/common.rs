@@ -1,4 +1,4 @@
-use std::time::Instant;
+use std::{borrow::Cow, time::Instant};
 
 use metrics::{counter, histogram};
 use vector_core::internal_event::InternalEvent;
@@ -112,5 +112,74 @@ impl InternalEvent for CollectionCompleted {
         debug!(message = "Collection completed.");
         counter!("collect_completed_total", 1);
         histogram!("collect_duration_seconds", self.end - self.start);
+    }
+}
+
+#[derive(Debug)]
+pub struct SinkRequestBuildError<E> {
+    pub message: &'static str,
+    pub error: E,
+}
+
+impl<E: std::fmt::Display> InternalEvent for SinkRequestBuildError<E> {
+    fn emit(self) {
+        error!(
+            message = %self.message,
+            error = %self.error,
+            error_type = error_type::ENCODER_FAILED,
+            stage = error_stage::PROCESSING,
+            rate_limit_secs = 10,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => error_type::ENCODER_FAILED,
+            "stage" => error_stage::PROCESSING,
+        );
+    }
+}
+
+#[derive(Debug)]
+pub struct SinkRetryReasonError<'a> {
+    pub message: &'static str,
+    pub reason: Cow<'a, str>,
+}
+
+impl InternalEvent for SinkRetryReasonError<'_> {
+    fn emit(self) {
+        error!(
+            message = %self.message,
+            reason = %self.reason,
+            error_type = error_type::REQUEST_FAILED,
+            stage = error_stage::SENDING,
+            rate_limit_secs = 10,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => error_type::REQUEST_FAILED,
+            "stage" => error_stage::SENDING,
+        );
+    }
+}
+
+#[derive(Debug)]
+pub struct SinkRetryError<E> {
+    pub message: &'static str,
+    pub error: E,
+}
+
+impl<E: std::fmt::Display> InternalEvent for SinkRetryError<E> {
+    fn emit(self) {
+        error!(
+            message = %self.message,
+            error = %self.error,
+            error_type = error_type::ENCODER_FAILED,
+            stage = error_stage::PROCESSING,
+            rate_limit_secs = 10,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => error_type::ENCODER_FAILED,
+            "stage" => error_stage::PROCESSING,
+        );
     }
 }

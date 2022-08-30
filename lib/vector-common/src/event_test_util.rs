@@ -5,9 +5,28 @@ thread_local! {
     static EVENTS_RECORDED: RefCell<HashSet<String>> = RefCell::new(HashSet::new());
 }
 
-#[must_use]
-pub fn contains_name(name: &str) -> bool {
-    EVENTS_RECORDED.with(|events| events.borrow().iter().any(|event| event.ends_with(name)))
+/// Ok(()) if true
+///
+/// # Errors
+///
+/// Will return `Err` if `name` is not found in the event record, or is found more than once.
+pub fn contains_name_once(name: &str) -> Result<(), &'static str> {
+    EVENTS_RECORDED.with(|events| {
+        let mut found = false;
+        for event in events.borrow().iter() {
+            if event.ends_with(name) {
+                if found {
+                    return Err("Multiple events");
+                }
+                found = true;
+            }
+        }
+        if found {
+            Ok(())
+        } else {
+            Err("Missing event")
+        }
+    })
 }
 
 pub fn clear_recorded_events() {
