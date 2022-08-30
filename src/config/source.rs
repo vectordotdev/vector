@@ -30,11 +30,11 @@ pub struct SourceOuter {
 }
 
 impl SourceOuter {
-    pub(crate) fn new(source: Sources) -> Self {
+    pub(crate) fn new<I: Into<Sources>>(inner: I) -> Self {
         Self {
             proxy: Default::default(),
             sink_acknowledgements: false,
-            inner: source,
+            inner: inner.into(),
         }
     }
 }

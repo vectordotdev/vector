@@ -34,9 +34,11 @@ impl<T> TransformOuter<T>
 where
     T: Configurable + Serialize,
 {
-    #[cfg(feature = "enterprise")]
-    pub(super) fn new(inputs: Vec<T>, inner: Transforms) -> Self {
-        TransformOuter { inputs, inner }
+    pub(crate) fn new<I: Into<Transforms>>(inputs: Vec<T>, inner: I) -> Self {
+        TransformOuter {
+            inputs,
+            inner: inner.into(),
+        }
     }
 
     pub(super) fn map_inputs<U>(self, f: impl Fn(&T) -> U) -> TransformOuter<U>
