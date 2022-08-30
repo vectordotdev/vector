@@ -12,9 +12,7 @@ use std::{
 use bytes::Bytes;
 use chrono::TimeZone;
 use codecs::{decoding::BoxedFramingError, CharacterDelimitedDecoder};
-use futures::{
-    future, future::BoxFuture, poll, stream::BoxStream, task::Poll, FutureExt, StreamExt,
-};
+use futures::{poll, stream::BoxStream, task::Poll, StreamExt};
 use nix::{
     sys::signal::{kill, Signal},
     unistd::Pid,
@@ -26,7 +24,7 @@ use tokio::{
     fs::{File, OpenOptions},
     io::{self, AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
     process::{Child, Command},
-    sync::{oneshot, Mutex, MutexGuard},
+    sync::{Mutex, MutexGuard},
     time::sleep,
 };
 use tokio_util::codec::FramedRead;
@@ -42,8 +40,7 @@ use crate::{
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, LogEvent, Value},
     internal_events::{
         JournaldCheckpointFileOpenError, JournaldCheckpointSetError, JournaldInvalidRecordError,
-        JournaldNegativeAcknowledgmentError, JournaldReadError, JournaldStartJournalctlError,
-        OldEventsReceived, StreamClosedError,
+        JournaldReadError, JournaldStartJournalctlError, OldEventsReceived, StreamClosedError,
     },
     serde::bool_or_struct,
     shutdown::ShutdownSignal,
@@ -283,7 +280,7 @@ impl JournaldSource {
             })?;
 
         let checkpointer = SharedCheckpointer::new(checkpointer);
-        let (finalizer, shutdown) = Finalizer::new(
+        let finalizer = Finalizer::new(
             self.acknowledgements,
             checkpointer.clone(),
             shutdown.clone(),
@@ -298,7 +295,7 @@ impl JournaldSource {
         mut self,
         checkpointer: SharedCheckpointer,
         finalizer: Finalizer,
-        mut shutdown: BoxFuture<'static, ()>,
+        mut shutdown: ShutdownSignal,
     ) {
         loop {
             if matches!(poll!(&mut shutdown), Poll::Ready(_)) {
@@ -309,7 +306,7 @@ impl JournaldSource {
             let cursor = checkpointer.lock().await.cursor.clone();
             match self.starter.start(cursor.as_deref()) {
                 Ok((stream, running)) => {
-                    if !self.run_stream(stream, &finalizer, &mut shutdown).await {
+                    if !self.run_stream(stream, &finalizer, shutdown.clone()).await {
                         return;
                     }
                     // Explicit drop to ensure it isn't dropped earlier.
@@ -335,7 +332,7 @@ impl JournaldSource {
         &'a mut self,
         mut stream: JournalStream,
         finalizer: &'a Finalizer,
-        shutdown: &'a mut BoxFuture<'static, ()>,
+        mut shutdown: ShutdownSignal,
     ) -> bool {
         let bytes_received = register!(BytesReceived::from(Protocol::from("journald")));
 
@@ -347,7 +344,7 @@ impl JournaldSource {
             // valid and non-filtered event.
             while batch.events.is_empty() {
                 let item = tokio::select! {
-                    _ = &mut *shutdown => return false,
+                    _ = &mut shutdown => return false,
                     item = stream.next() => item,
                 };
                 if !batch.handle_next(item) {
@@ -687,41 +684,23 @@ enum Finalizer {
 }
 
 impl Finalizer {
-    /// Create a new batch finalization handler, which updates the
-    /// stored checkpointer, and a modified shutdown trigger. If
-    /// `acknowledgements` are enabled, the checkpointer is written in
-    /// a background task as acknowledgements are received from sinks,
-    /// and shutdown can be triggered by either the system shutdown or
-    /// a negative acknowledgement.
     fn new(
         acknowledgements: bool,
         checkpointer: SharedCheckpointer,
         shutdown: ShutdownSignal,
-    ) -> (Self, BoxFuture<'static, ()>) {
+    ) -> Self {
         if acknowledgements {
-            let (finalizer, mut ack_stream) = OrderedFinalizer::new(shutdown.clone());
-            let (trigger, tripwire) = oneshot::channel();
+            let (finalizer, mut ack_stream) = OrderedFinalizer::new(shutdown);
             tokio::spawn(async move {
                 while let Some((status, cursor)) = ack_stream.next().await {
                     if status == BatchStatus::Delivered {
                         checkpointer.lock().await.set(cursor).await;
-                    } else {
-                        emit!(JournaldNegativeAcknowledgmentError { cursor: &cursor });
-                        break;
                     }
                 }
-                // We have either received the first negative
-                // acknowledgement, or the `OrderedFinalizer` has
-                // bailed out for some reason. In both cases, we need
-                // to cause the send loop above to stop, and so we do
-                // not need to handle any further status events.
-                // Simply send the trigger and exit this task
-                let _ = trigger.send(());
             });
-            let shutdown = future::select(shutdown, tripwire).map(|_| ()).boxed();
-            (Self::Async(finalizer), shutdown)
+            Self::Async(finalizer)
         } else {
-            (Self::Sync(checkpointer), shutdown.map(|_| ()).boxed())
+            Self::Sync(checkpointer)
         }
     }
 
@@ -789,7 +768,8 @@ impl StatefulCheckpointer {
         })
     }
 
-    async fn set(&mut self, token: String) {
+    async fn set(&mut self, token: impl Into<String>) {
+        let token = token.into();
         if let Err(error) = self.checkpointer.set(&token).await {
             emit!(JournaldCheckpointSetError {
                 error,
@@ -867,7 +847,6 @@ mod checkpointer_tests {
 mod tests {
     use std::{fs, path::Path};
 
-    use pretty_assertions::assert_eq;
     use tempfile::tempdir;
     use tokio::time::{sleep, timeout, Duration, Instant};
 
@@ -1084,25 +1063,7 @@ mod tests {
 
     #[tokio::test]
     async fn handles_acknowledgements() {
-        let (count, checkpoint) = run_acknowledgements(usize::MAX).await;
-
-        assert_eq!(count, 8);
-        assert_eq!(checkpoint.as_deref(), Some("8"));
-    }
-
-    #[tokio::test]
-    async fn handles_negative_acknowledgements() {
-        let (_count, checkpoint) = run_acknowledgements(2).await;
-
-        assert_eq!(checkpoint.as_deref(), Some("2"));
-        // The acknowledgements for the events are delivered after the
-        // events are delivered to the pipeline, so this test would
-        // fail to show that deliveries have stopped.
-        // assert_eq!(count, 2);
-    }
-
-    async fn run_acknowledgements(error_after: usize) -> (usize, Option<String>) {
-        let (tx, mut rx) = SourceSender::new_test_error_after(error_after);
+        let (tx, mut rx) = SourceSender::new_test();
 
         let tempdir = tempdir().unwrap();
         let tempdir = tempdir.path().to_path_buf();
@@ -1120,7 +1081,6 @@ mod tests {
             data_dir: Some(tempdir),
             remap_priority: true,
             acknowledgements: true.into(),
-            batch_size: Some(1),
             ..Default::default()
         };
         let (cx, _shutdown) = SourceContext::new_shutdown(&ComponentKey::from(TEST_COMPONENT), tx);
@@ -1134,13 +1094,16 @@ mod tests {
 
         // Acknowledge all the received events.
         let mut count = 0;
-        while let Poll::Ready(Some(_)) = futures::poll!(rx.next()) {
+        while let Poll::Ready(Some(event)) = futures::poll!(rx.next()) {
+            // The checkpointer shouldn't set the cursor until the end of the batch.
+            assert_eq!(checkpointer.get().await.unwrap(), None);
+            event.metadata().update_status(EventStatus::Delivered);
             count += 1;
         }
+        assert_eq!(count, 8);
 
         tokio::time::sleep(Duration::from_millis(100)).await;
-        let checkpoint = checkpointer.get().await.unwrap();
-        (count, checkpoint)
+        assert_eq!(checkpointer.get().await.unwrap().as_deref(), Some("8"));
     }
 
     #[test]

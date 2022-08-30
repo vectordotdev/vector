@@ -7,7 +7,6 @@ use vector_config::configurable_component;
 use crate::{
     config::{
         log_schema, DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
-        TransformDescription,
     },
     event::{
         metric::{Metric, MetricKind, MetricValue, StatisticKind},
@@ -23,7 +22,7 @@ use crate::{
 };
 
 /// Configuration for the `log_to_metric` transform.
-#[configurable_component(transform)]
+#[configurable_component(transform("log_to_metric"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct LogToMetricConfig {
@@ -180,10 +179,6 @@ pub struct LogToMetric {
     config: LogToMetricConfig,
 }
 
-inventory::submit! {
-    TransformDescription::new::<LogToMetricConfig>("log_to_metric")
-}
-
 impl GenerateConfig for LogToMetricConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
@@ -201,7 +196,6 @@ impl GenerateConfig for LogToMetricConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "log_to_metric")]
 impl TransformConfig for LogToMetricConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(LogToMetric::new(self.clone())))
@@ -217,10 +211,6 @@ impl TransformConfig for LogToMetricConfig {
 
     fn enable_concurrency(&self) -> bool {
         true
-    }
-
-    fn transform_type(&self) -> &'static str {
-        "log_to_metric"
     }
 }
 

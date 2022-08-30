@@ -6,7 +6,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
-async-graphql = { version = "4.0.11", default-features = false, optional = true }
+async-graphql = { version = "4.0.12", default-features = false, optional = true }
 async-trait = { version = "0.1", default-features = false }
 bitmask-enum = { version = "2.0.0", default-features = false }
 bytes = { version = "1.2.1", default-features = false, features = ["serde"] }
@@ -17,7 +17,7 @@ dyn-clone = { version = "1.0.9", default-features = false }
 enrichment = { path = "../enrichment", optional = true }
 enumflags2 = { version = "0.7.5", default-features = false }
 float_eq = { version = "1.0", default-features = false }
-futures = { version = "0.3.23", default-features = false, features = ["std"] }
+futures = { version = "0.3.24", default-features = false, features = ["std"] }
 futures-util = { version = "0.3.21", default-features = false, features = ["std"] }
 headers = { version = "0.3.7", default-features = false }
 http = { version = "0.2.8", default-features = false }

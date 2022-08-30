@@ -3,8 +3,13 @@ use std::{
     fmt,
 };
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+use vector_config::configurable_component;
+
+/// Component identifier.
+#[configurable_component(no_deser, no_ser)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct ComponentKey {
+    /// Component ID.
     id: String,
 }
 

@@ -23,7 +23,7 @@ impl<'a> InternalEvent for TemplateRenderingError<'a> {
                 count = 1,
                 error = %self.error,
                 error_type = error_type::TEMPLATE_FAILED,
-                intentional = "false",
+                intentional = false,
                 reason = %msg,
                 stage = error_stage::PROCESSING,
             );

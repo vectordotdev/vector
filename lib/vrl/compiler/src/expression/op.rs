@@ -82,7 +82,7 @@ impl Op {
 
 impl Expression for Op {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        use ast::Opcode::{Add, And, Div, Eq, Err, Ge, Gt, Le, Lt, Merge, Mul, Ne, Or, Rem, Sub};
+        use ast::Opcode::{Add, And, Div, Eq, Err, Ge, Gt, Le, Lt, Merge, Mul, Ne, Or, Sub};
         use value::Value::{Boolean, Null};
 
         match self.opcode {
@@ -111,7 +111,6 @@ impl Expression for Op {
             Div => lhs.try_div(rhs),
             Add => lhs.try_add(rhs),
             Sub => lhs.try_sub(rhs),
-            Rem => lhs.try_rem(rhs),
             Eq => Ok(lhs.eq_lossy(&rhs).into()),
             Ne => Ok((!lhs.eq_lossy(&rhs)).into()),
             Gt => lhs.try_gt(rhs),
@@ -125,7 +124,7 @@ impl Expression for Op {
     }
 
     fn type_info(&self, state: &TypeState) -> TypeInfo {
-        use ast::Opcode::{Add, And, Div, Eq, Err, Ge, Gt, Le, Lt, Merge, Mul, Ne, Or, Rem, Sub};
+        use ast::Opcode::{Add, And, Div, Eq, Err, Ge, Gt, Le, Lt, Merge, Mul, Ne, Or, Sub};
         use value::Kind as K;
 
         let mut state = state.clone();
@@ -210,21 +209,6 @@ impl Expression for Op {
                         _ => td.fallible(),
                     },
                     _ => td.fallible(),
-                }
-            }
-
-            // ... % ...
-            Rem => {
-                // Division is infallible if the rhs is a literal normal float or integer.
-                match self.rhs.as_value() {
-                    Some(value) if lhs_def.is_float() || lhs_def.is_integer() => match value {
-                        Value::Float(v) if v.is_normal() => TypeDef::float().infallible(),
-                        Value::Float(_) => TypeDef::float().fallible(),
-                        Value::Integer(v) if v != 0 => TypeDef::integer().infallible(),
-                        Value::Integer(_) => TypeDef::integer().fallible(),
-                        _ => TypeDef::float().or_integer().fallible(),
-                    },
-                    _ => TypeDef::float().or_integer().fallible(),
                 }
             }
 
@@ -397,7 +381,7 @@ mod tests {
 
     use ast::{
         Ident,
-        Opcode::{Add, And, Div, Eq, Err, Ge, Gt, Le, Lt, Mul, Ne, Or, Rem, Sub},
+        Opcode::{Add, And, Div, Eq, Err, Ge, Gt, Le, Lt, Mul, Ne, Or, Sub},
     };
     use ordered_float::NotNan;
 
@@ -524,31 +508,6 @@ mod tests {
         add_other {
             expr: |_| op(Add, (), ()),
             want: TypeDef::bytes().or_integer().or_float().fallible(),
-        }
-
-        remainder_integer {
-            expr: |_| op(Rem, 5, 5),
-            want: TypeDef::integer().infallible(),
-        }
-
-        remainder_integer_zero {
-            expr: |_| op(Rem, 5, 0),
-            want: TypeDef::integer().fallible(),
-        }
-
-        remainder_float {
-            expr: |_| op(Rem, 5.0, 5.0),
-            want: TypeDef::float().infallible(),
-        }
-
-        remainder_mixed {
-            expr: |_| op(Rem, 5, 5.0),
-            want: TypeDef::float().infallible(),
-        }
-
-        remainder_other {
-            expr: |_| op(Rem, 5, ()),
-            want: TypeDef::integer().or_float().fallible(),
         }
 
         subtract_integer {

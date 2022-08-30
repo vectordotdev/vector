@@ -3,6 +3,7 @@
 use proc_macro::TokenStream;
 
 mod ast;
+mod attrs;
 mod component_name;
 mod configurable;
 mod configurable_component;
@@ -32,7 +33,8 @@ mod configurable_component;
 /// ## Component-specific modifiers
 ///
 /// Additionally, callers can specify the component type, when being used directly on the top-level configuration object
-/// for a component by specifying the component type (`source`, `transform`, or `sink`) as the sole parameter:
+/// for a component by specifying the component type (`enrichment_table`, `provider`, `sink`,
+/// `source`, or `transform`) and the name of the component:
 ///
 /// ```ignore
 /// use vector_config::configurable_component;
@@ -46,8 +48,10 @@ mod configurable_component;
 /// }
 /// ```
 ///
-/// This adds special metadata to the generated schema for that type indicating that it represents the configuration of
-/// a component of the specified type.
+/// This adds special metadata to the generated schema for that type, which indicates that it
+/// represents the top-level configuration object as a component of the given type. Additionally,
+/// relevant traits and annotations will be added to register the component (using the given name)
+/// within Vector, for the purposes of example configuration generation, and so on.
 ///
 /// ## Opting out of automatic derives
 ///
@@ -90,9 +94,16 @@ pub fn derive_configurable(input: TokenStream) -> TokenStream {
 }
 
 /// Generates an implementation of the `NamedComponent` trait for the given container.
-///
-/// The only valid form of this macro is `#[component_name("something")]`.
-#[proc_macro_attribute]
-pub fn component_name(attrs: TokenStream, item: TokenStream) -> TokenStream {
-    component_name::component_name_impl(attrs, item)
+#[proc_macro_derive(
+    NamedComponent,
+    attributes(
+        enrichment_table_component,
+        provider_component,
+        sink_component,
+        source_component,
+        transform_component
+    )
+)]
+pub fn derive_component_name(input: TokenStream) -> TokenStream {
+    component_name::derive_component_name_impl(input)
 }
