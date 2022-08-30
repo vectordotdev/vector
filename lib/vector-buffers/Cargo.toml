@@ -32,7 +32,7 @@ tracing = { version = "0.1.34", default-features = false, features = ["attribute
 vector-common = { path = "../vector-common", default-features = false, features = ["byte_size_of"] }
 
 [dev-dependencies]
-clap = "3.2.17"
+clap = "3.2.18"
 criterion = { version = "0.3", features = ["html_reports", "async_tokio"] }
 crossbeam-queue = "0.3.6"
 hdrhistogram = "7.5.1"
