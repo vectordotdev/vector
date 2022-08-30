@@ -8,6 +8,7 @@ interpreted as described in [RFC 2119].
 
 - [Introduction](#introduction)
 - [Naming](#naming)
+  - [Namespaces](#namespaces)
   - [Event naming](#event-naming)
   - [Metric naming](#metric-naming)
 - [Emission](#emission)
@@ -25,6 +26,16 @@ This document strives to guide developers towards achieving this.
 
 ## Naming
 
+### Namespaces
+
+Events and metrics are namespaces as one of:
+
+- `Component`
+- `Buffer`
+- `Topology`
+
+Depending on where they are emitted.
+
 ### Event naming
 
 Vector implements an event-driven instrumentation pattern ([RFC 2064]) and
@@ -33,7 +44,7 @@ event names MUST adhere to the following rules:
 - MUST only contain ASCII alphanumeric and lowercase characters
 - MUST be in [camelcase] format
 - MUST follow the `<Namespace><Noun><Verb>[Error]` template
-  - `Namespace` - the internal domain the event belongs to (e.g., `Component`, `Buffer`, `Topology`)
+  - `Namespace` - the [internal domain](#namespaces) the event belongs to
   - `Noun` - the subject of the event (e.g., `Bytes`, `Events`)
   - `Verb` - the past tense verb describing when the event occurred (e.g., `Received`, `Sent`, `Processes`)
   - `[Error]` - if the event is an error it MUST end with `Error`
@@ -45,7 +56,7 @@ Vector broadly follows the [Prometheus metric naming standards]:
 - MUST only contain ASCII alphanumeric, lowercase, and underscore characters
 - MUST be in [snakecase] format
 - MUST follow the `<namespace>_<name>_<unit>_[total]` template
-  - `namespace` - the internal domain that the metric belongs to (e.g., `component`, `buffer`, `topology`)
+  - `namespace` - the [internal domain](#namespaces) the event belongs to
   - `name` - is one or more words that describes the measurement (e.g., `memory_rss`, `requests`)
   - `unit` - MUST be a single [base unit] in plural form, if applicable (e.g., `seconds`, `bytes`)
   - Counters MUST end with `total` (e.g., `disk_written_bytes_total`, `http_requests_total`)
@@ -92,6 +103,8 @@ An `<Name>Error` event MUST be emitted when an error occurs.
     type, they MAY be omitted from being represented explicitly in the
     event fields. However, they MUST still be included in the emitted
     logs and metrics, as specified below, as if they were present.
+  - `stage` - The stage at which the error occurred. This MUST be one of
+    `receiving`, `processing`, or `sending`.
 - Metrics
   - MUST include the defined properties as tags.
   - MUST increment `<namespace>_errors_total` metric.
@@ -116,9 +129,13 @@ This event MUST NOT be emitted before events have been created in Vector. For
 example a source failing to decode incoming data would simply emit the
 `ComponentError` event but would not emit the `ComponentEventsDropped` event.
 
-**You MUST NOT emit this event for retriable operations that can recover and
-prevent data loss. For example, a failed HTTP request that will be retried does
-not result in data loss if the retry succeeds.**
+You MUST NOT emit this event for operations that Vector will retry to prevent data loss. For
+example, a failed HTTP request that will be retried does not result in data loss if the retry
+succeeds.
+
+Note that this event is independent of any clients of Vector that may retry when end-to-end
+acknowledgements are enabled. From Vector's perspective, it has dropped the events and it cannot
+know if the client will retry them.
 
 - Properties
   - `count` - The number of events dropped

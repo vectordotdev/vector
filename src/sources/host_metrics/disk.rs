@@ -1,3 +1,4 @@
+use crate::internal_events::HostMetricsScrapeDetailError;
 use futures::StreamExt;
 use heim::units::information::byte;
 use vector_common::btreemap;
@@ -60,7 +61,10 @@ impl HostMetrics {
                 }
             }
             Err(error) => {
-                error!(message = "Failed to load disk I/O info.", %error, internal_log_rate_secs = 60);
+                emit!(HostMetricsScrapeDetailError {
+                    message: "Failed to load disk I/O info.",
+                    error,
+                });
             }
         }
     }

@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use crate::internal_events::{HostMetricsScrapeDetailError, HostMetricsScrapeError};
 use futures::StreamExt;
 #[cfg(target_os = "linux")]
 use heim::cpu::os::linux::CpuTimeExt;
@@ -40,7 +41,10 @@ impl HostMetrics {
                 }
             }
             Err(error) => {
-                error!(message = "Failed to load CPU times.", %error, internal_log_rate_secs = 60);
+                emit!(HostMetricsScrapeDetailError {
+                    message: "Failed to load CPU times.",
+                    error,
+                });
             }
         }
         // adds the logical cpu count gauge
@@ -53,7 +57,10 @@ impl HostMetrics {
                 },
             ),
             Err(error) => {
-                error!(message = "Failed to load logical CPU count.", %error, internal_log_rate_secs = 60);
+                emit!(HostMetricsScrapeDetailError {
+                    message: "Failed to load logical CPU count.",
+                    error,
+                });
             }
         }
         // adds the physical cpu count gauge
@@ -66,13 +73,15 @@ impl HostMetrics {
                 },
             ),
             Ok(None) => {
-                error!(
-                    message = "Unable to determine physical CPU count.",
-                    internal_log_rate_secs = 60
-                );
+                emit!(HostMetricsScrapeError {
+                    message: "Unable to determine physical CPU count.",
+                });
             }
             Err(error) => {
-                error!(message = "Failed to load physical CPU count.", %error, internal_log_rate_secs = 60);
+                emit!(HostMetricsScrapeDetailError {
+                    message: "Failed to load physical CPU count.",
+                    error,
+                });
             }
         }
     }

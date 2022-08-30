@@ -7,7 +7,7 @@ use vector_core::ByteSizeOf;
 
 use crate::{
     config::{DataType, Output, SourceConfig, SourceContext},
-    internal_events::{EventsReceived, StreamClosedError},
+    internal_events::{EventsReceived, InternalMetricsBytesReceived, StreamClosedError},
     metrics::Controller,
     shutdown::ShutdownSignal,
     SourceSender,
@@ -127,6 +127,8 @@ impl<'a> InternalMetrics<'a> {
             let metrics = self.controller.capture_metrics();
             let count = metrics.len();
             let byte_size = metrics.size_of();
+
+            emit!(InternalMetricsBytesReceived { byte_size });
             emit!(EventsReceived { count, byte_size });
 
             let batch = metrics.into_iter().map(|mut metric| {
@@ -170,7 +172,10 @@ mod tests {
             Event,
         },
         metrics::Controller,
-        test_util, SourceSender,
+        test_util::{
+            self,
+            components::{run_and_assert_source_compliance, SOURCE_TAGS},
+        },
     };
 
     #[test]
@@ -249,23 +254,15 @@ mod tests {
     }
 
     async fn event_from_config(config: InternalMetricsConfig) -> Event {
-        test_util::trace_init();
+        let mut events = run_and_assert_source_compliance(
+            config,
+            time::Duration::from_millis(100),
+            &SOURCE_TAGS,
+        )
+        .await;
 
-        let (sender, mut recv) = SourceSender::new_test();
-
-        tokio::spawn(async move {
-            config
-                .build(SourceContext::new_test(sender, None))
-                .await
-                .unwrap()
-                .await
-                .unwrap()
-        });
-
-        time::timeout(time::Duration::from_millis(100), recv.next())
-            .await
-            .expect("fetch metrics timeout")
-            .expect("failed to get metrics from a stream")
+        assert!(!events.is_empty());
+        events.remove(0)
     }
 
     #[tokio::test]
