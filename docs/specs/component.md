@@ -142,7 +142,7 @@ and filtering bytes from the upstream source and before the creation of a Vector
     - For files, the total number of bytes read from the file excluding the
       delimiter.
   - `protocol` - The protocol used to send the bytes (i.e., `tcp`, `udp`,
-    `unix`, `http`, `https`, `file`, etc.)
+    `unix`, `http`, `https`, `file`, etc.).
   - `http_path` - If relevant, the HTTP path, excluding query strings.
   - `socket` - If relevant, the socket number that bytes were received from.
 - Metrics
