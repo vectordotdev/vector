@@ -171,7 +171,7 @@ sending it, like the `prometheus_exporter` sink, SHOULD NOT publish this metric.
     - For files, the total number of bytes written to the file excluding the
       delimiter.
   - `protocol` - The protocol used to send the bytes (i.e., `tcp`, `udp`,
-    `unix`, `http`, `https`, `file`, etc.)
+    `unix`, `http`, `https`, `file`, etc.).
   - `endpoint` - If relevant, the endpoint that the bytes were sent to. For
     HTTP, this MUST be the host and path only, excluding the query string.
   - `file` - If relevant, the absolute path of the file.
