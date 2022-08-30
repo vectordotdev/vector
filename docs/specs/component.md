@@ -128,6 +128,61 @@ the reception of Vector events from an upstream component.
     defined properties as key-value pairs.
   - MUST NOT be rate limited.
 
+#### ComponentBytesReceived
+
+*Sources* MUST emit a `ComponentBytesReceived` event immediately after receiving, decompressing
+and filtering bytes from the upstream source and before the creation of a Vector event.
+
+- Properties
+  - `byte_size`
+    - For UDP, TCP, and Unix protocols, the total number of bytes received from
+      the socket excluding the delimiter.
+    - For HTTP-based protocols, the total number of bytes in the HTTP body, as
+      represented by the `Content-Length` header.
+    - For files, the total number of bytes read from the file excluding the
+      delimiter.
+  - `protocol` - The protocol used to send the bytes (i.e., `tcp`, `udp`,
+    `unix`, `http`, `https`, `file`, etc.).
+  - `http_path` - If relevant, the HTTP path, excluding query strings.
+  - `socket` - If relevant, the socket number that bytes were received from.
+- Metrics
+  - MUST increment the `component_received_bytes_total` counter by the defined value with
+    the defined properties as metric tags.
+- Logs
+  - MUST log a `Bytes received.` message at the `trace` level with the
+    defined properties as key-value pairs.
+  - MUST NOT be rate limited.
+
+#### ComponentBytesSent
+
+*Sinks* that send events downstream, MUST emit a `ComponentBytesSent` event immediately after
+sending bytes to the downstream target, if the transmission was successful. The reported bytes MUST
+be before compression.
+
+Note that for sinks that simply expose data, but don't delete the data after
+sending it, like the `prometheus_exporter` sink, SHOULD NOT publish this metric.
+
+- Properties
+  - `byte_size`
+    - For UDP, TCP, and Unix protocols, the total number of bytes placed on the
+      socket excluding the delimiter.
+    - For HTTP-based protocols, the total number of bytes in the HTTP body, as
+      represented by the `Content-Length` header.
+    - For files, the total number of bytes written to the file excluding the
+      delimiter.
+  - `protocol` - The protocol used to send the bytes (i.e., `tcp`, `udp`,
+    `unix`, `http`, `https`, `file`, etc.).
+  - `endpoint` - If relevant, the endpoint that the bytes were sent to. For
+    HTTP, this MUST be the host and path only, excluding the query string.
+  - `file` - If relevant, the absolute path of the file.
+- Metrics
+  - MUST increment the `component_sent_bytes_total` counter by the defined value with the
+    defined properties as metric tags.
+- Logs
+  - MUST log a `Bytes sent.` message at the `trace` level with the
+    defined properties as key-value pairs.
+  - MUST NOT be rate limited.
+
 #### ComponentEventsSent
 
 _All components_ MUST emit an `ComponentEventsSent` event that represents the
@@ -173,6 +228,8 @@ event in accordance with the [EventsDropped event] requirements.
 
 #### SinkNetworkBytesSent
 
+(to be implemented)
+
 _Sinks_ MUST emit a `SinkNetworkBytesSent` that represents the egress of
 _raw network bytes_.
 
@@ -198,6 +255,8 @@ _raw network bytes_.
   - MUST NOT be rate limited.
 
 #### SourceNetworkBytesReceived
+
+(to be implemented)
 
 _Sources_ MUST emit a `SourceNetworkBytesReceived` event that represents the
 ingress of _raw network bytes_.
