@@ -562,7 +562,7 @@ pub fn file_source(
                 .await
             {
                 Ok(()) => {
-                    info!("Finished sending.");
+                    debug!("Finished sending.");
                 }
                 Err(error) => {
                     let (count, _) = messages.size_hint();
