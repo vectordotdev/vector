@@ -154,7 +154,7 @@ know if the client will retry them.
   - MUST include the defined properties as key-value pairs.
   - If `intentional` is `true`, MUST log at the `debug` level.
   - If `intentional` is `false`, MUST log at the `error` level.
-  - SHOULD NOT be rate limited.
+  - SHOULD be rate limited to 10 seconds.
 
 [camelcase]: https://en.wikipedia.org/wiki/Camel_case
 [`eventsdropped`]: #EventsDropped
