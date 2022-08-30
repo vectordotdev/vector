@@ -261,6 +261,8 @@ impl ConfigBuilder {
         self.sinks.insert(ComponentKey::from(key.into()), sink);
     }
 
+    // For some feature sets, no transforms are compiled, which leads to no callers using this
+    // method, and in turn, annoying errors about unused variables.
     pub fn add_transform<K: Into<String>, T: Into<Transforms>>(
         &mut self,
         key: K,

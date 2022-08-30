@@ -14,7 +14,6 @@ pub mod dedupe;
 pub mod filter;
 #[cfg(feature = "transforms-geoip")]
 pub mod geoip;
-#[cfg(feature = "transforms-log_to_metric")]
 pub mod log_to_metric;
 #[cfg(feature = "transforms-lua")]
 pub mod lua;
@@ -84,7 +83,6 @@ pub enum Transforms {
     Geoip(#[configurable(derived)] geoip::GeoipConfig),
 
     /// Log to metric.
-    #[cfg(feature = "transforms-log_to_metric")]
     LogToMetric(#[configurable(derived)] log_to_metric::LogToMetricConfig),
 
     /// Lua.
@@ -153,7 +151,6 @@ impl NamedComponent for Transforms {
             Transforms::Filter(config) => config.get_component_name(),
             #[cfg(feature = "transforms-geoip")]
             Transforms::Geoip(config) => config.get_component_name(),
-            #[cfg(feature = "transforms-log_to_metric")]
             Transforms::LogToMetric(config) => config.get_component_name(),
             #[cfg(feature = "transforms-lua")]
             Transforms::Lua(config) => config.get_component_name(),
