@@ -42,8 +42,15 @@ sink_feature_map = {
   'splunk_hec_logs': 'splunk_hec',
 }
 
+# Set of always-compiled components, in terms of their computed feature flag, that should not be
+# emitted as they don't actually have a feature flag... because we always compile them.
+invalid_feature_flags = {
+  'transforms-log_to_metric',
+}
+
 features = get_features(config, 'sources', source_feature_map) \
   .union(get_features(config, 'transforms', transform_feature_map)) \
   .union(get_features(config, 'sinks', sink_feature_map))
+features.difference_update(invalid_feature_flags)
 
 print(','.join(sorted(features)))
