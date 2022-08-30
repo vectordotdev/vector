@@ -155,7 +155,7 @@ and filtering bytes from the upstream source and before the creation of a Vector
 
 #### ComponentBytesSent
 
-*Sinks* that send events down stream, and delete them in Vector, MUST emit
+*Sinks* that send events downstream, and delete them in Vector, MUST emit
 a `ComponentBytesSent` event immediately after sending bytes to the downstream target, if
 the transmission was successful. The reported bytes MUST be before compression.
 
