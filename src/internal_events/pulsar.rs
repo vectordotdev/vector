@@ -36,4 +36,3 @@ impl InternalEvent for PulsarSendingError {
         }
     }
 }
-

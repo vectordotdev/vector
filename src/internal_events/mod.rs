@@ -86,13 +86,13 @@ mod open;
     feature = "transforms-log_to_metric",
 ))]
 mod parser;
-#[cfg(feature = "sinks-pulsar")]
-mod pulsar;
 #[cfg(feature = "sources-postgresql_metrics")]
 mod postgresql_metrics;
 mod process;
 #[cfg(any(feature = "sources-prometheus", feature = "sinks-prometheus"))]
 mod prometheus;
+#[cfg(feature = "sinks-pulsar")]
+mod pulsar;
 #[cfg(any(feature = "sources-redis", feature = "sinks-redis"))]
 mod redis;
 #[cfg(feature = "transforms-reduce")]
@@ -222,12 +222,12 @@ pub(crate) use self::nginx_metrics::*;
     feature = "transforms-log_to_metric",
 ))]
 pub(crate) use self::parser::*;
-#[cfg(feature = "sinks-pulsar")]
-pub(crate) use self::pulsar::*;
 #[cfg(feature = "sources-postgresql_metrics")]
 pub(crate) use self::postgresql_metrics::*;
 #[cfg(any(feature = "sources-prometheus", feature = "sinks-prometheus"))]
 pub(crate) use self::prometheus::*;
+#[cfg(feature = "sinks-pulsar")]
+pub(crate) use self::pulsar::*;
 #[cfg(any(feature = "sources-redis", feature = "sinks-redis"))]
 pub(crate) use self::redis::*;
 #[cfg(feature = "transforms-reduce")]
