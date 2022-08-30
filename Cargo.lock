@@ -797,7 +797,7 @@ dependencies = [
  "md-5",
  "pin-project-lite",
  "sha1",
- "sha2 0.10.2",
+ "sha2 0.10.3",
  "tracing 0.1.34",
 ]
 
@@ -1038,7 +1038,7 @@ dependencies = [
  "serde-xml-rs",
  "serde_derive",
  "serde_json",
- "sha2 0.10.2",
+ "sha2 0.10.3",
  "thiserror",
  "url",
  "uuid 1.1.2",
@@ -4353,7 +4353,7 @@ dependencies = [
  "serde_bytes",
  "serde_with 1.14.0",
  "sha-1 0.10.0",
- "sha2 0.10.2",
+ "sha2 0.10.3",
  "socket2",
  "stringprep",
  "strsim 0.10.0",
@@ -5365,7 +5365,7 @@ dependencies = [
  "md-5",
  "memchr",
  "rand 0.8.5",
- "sha2 0.10.2",
+ "sha2 0.10.3",
  "stringprep",
 ]
 
@@ -6828,9 +6828,9 @@ dependencies = [
 
 [[package]]
 name = "sha2"
-version = "0.10.2"
+version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "55deaec60f81eefe3cce0dc50bda92d6d8e88f2a27df7c5033b42afeb1ed2676"
+checksum = "899bf02746a2c92bf1053d9327dadb252b01af1f81f90cdb902411f518bc7215"
 dependencies = [
  "cfg-if 1.0.0",
  "cpufeatures",
@@ -8498,7 +8498,7 @@ dependencies = [
  "serde_json",
  "serde_with 2.0.0",
  "serde_yaml 0.9.10",
- "sha2 0.10.2",
+ "sha2 0.10.3",
  "smallvec",
  "smpl_jwt",
  "snafu",
@@ -8919,7 +8919,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha-1 0.10.0",
- "sha2 0.10.2",
+ "sha2 0.10.3",
  "sha3",
  "strip-ansi-escapes",
  "syslog_loose",
