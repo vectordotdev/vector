@@ -1,19 +1,19 @@
 use std::collections::HashSet;
 
-use vector_config::configurable_component;
+use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
     config::Input,
     event::{Event, EventArray, EventContainer},
     schema,
-    transform::{
-        InnerTopology, InnerTopologyTransform, SyncTransform, Transform, TransformContext,
-        TransformOutputsBuf,
-    },
+    transform::{SyncTransform, Transform, TransformOutputsBuf},
 };
 
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{ComponentKey, DataType, Output, TransformConfig},
+    config::{
+        ComponentKey, DataType, InnerTopology, InnerTopologyTransform, Output, TransformConfig,
+        TransformContext,
+    },
     transforms::Transforms,
 };
 
@@ -21,10 +21,10 @@ use crate::{
 // constant.
 const INTERIOR_BUFFER_SIZE: usize = 64;
 
-/// A single pipeline.
-#[configurable_component]
+/// Configuration for the `pipeline` transform.
+#[configurable_component(transform("pipeline"))]
 #[derive(Clone, Debug, Default)]
-pub(crate) struct PipelineConfig {
+pub struct PipelineConfig {
     /// The name of the pipeline.
     name: String,
 
@@ -36,6 +36,8 @@ pub(crate) struct PipelineConfig {
     transforms: Vec<Transforms>,
 }
 
+impl_generate_config_from_default!(PipelineConfig);
+
 #[cfg(test)]
 impl PipelineConfig {
     #[allow(dead_code)] // for some small subset of feature flags this code is dead
@@ -45,7 +47,6 @@ impl PipelineConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "pipeline")]
 impl TransformConfig for PipelineConfig {
     async fn build(&self, ctx: &TransformContext) -> crate::Result<Transform> {
         let condition = match &self.filter {
@@ -82,7 +83,7 @@ impl TransformConfig for PipelineConfig {
                 return Err(format!(
                     "pipeline {} has transform of type {} with a named output, unsupported",
                     self.name,
-                    transform.transform_type()
+                    transform.get_component_name()
                 )
                 .into());
             }
@@ -127,15 +128,6 @@ impl TransformConfig for PipelineConfig {
         }
     }
 
-    fn transform_type(&self) -> &'static str {
-        // NOTE It'd be nice to avoid this boilerplate for transforms that are
-        // not meant to be directly user-configurable. In this case, we're
-        // really only implementing TransformConfig because we're ultimately
-        // returning this from an expansion, so it's likely this probably goes
-        // away when expansion goes away.
-        "pipeline"
-    }
-
     fn enable_concurrency(&self) -> bool {
         true
     }
@@ -153,7 +145,7 @@ impl PipelineConfig {
             name.clone(),
             InnerTopologyTransform {
                 inputs: inputs.to_vec(),
-                inner: Box::new(self.clone()),
+                inner: Transforms::Pipeline(self.clone()),
             },
         );
         result

@@ -8637,6 +8637,7 @@ dependencies = [
  "tracing 0.1.34",
  "value",
  "vector-config",
+ "vector-config-macros",
 ]
 
 [[package]]

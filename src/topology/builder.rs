@@ -37,7 +37,7 @@ use super::{
 use crate::{
     config::{
         ComponentKey, DataType, Input, Output, OutputId, ProxyConfig, SinkContext, SourceConfig,
-        SourceContext, TransformContext, TransformOuter,
+        SourceContext, TransformConfig, TransformContext, TransformOuter,
     },
     event::{EventArray, EventContainer},
     internal_events::EventsReceived,
@@ -533,7 +533,7 @@ impl TransformNode {
     ) -> Self {
         Self {
             key,
-            typetag: transform.inner.transform_type(),
+            typetag: transform.inner.get_component_name(),
             inputs: transform.inputs.clone(),
             input_details: transform.inner.input(),
             outputs: transform.inner.outputs(schema_definition),
