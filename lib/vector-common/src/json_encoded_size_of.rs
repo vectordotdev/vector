@@ -1,5 +1,19 @@
 use serde::{ser, Serialize};
 
+pub trait JsonEncodedSizeOf {
+    fn json_encoded_size_of(&self) -> usize;
+}
+
+impl<T> JsonEncodedSizeOf for T
+where
+    T: serde::Serialize,
+{
+    #[inline]
+    fn json_encoded_size_of(&self) -> usize {
+        size_of(self).unwrap()
+    }
+}
+
 #[derive(Debug)]
 pub struct Error;
 
@@ -43,7 +57,6 @@ where
 macro_rules! num {
     ($t:ty) => {
         // NOTE: this is converted into a series of if-statements by the compiler: https://godbolt.org/z/GjhqnzqvM
-        #[inline]
         fn length(n: $t) -> usize {
             let mut power = 10;
             let mut count = 1;
@@ -82,7 +95,6 @@ impl<'a> ser::Serializer for &'a mut Serializer {
     type SerializeStruct = Self;
     type SerializeStructVariant = Self;
 
-    #[inline]
     fn serialize_bool(self, v: bool) -> Result<()> {
         const TRUE_SIZE: usize = 4;
         const FALSE_SIZE: usize = 5;
@@ -91,70 +103,60 @@ impl<'a> ser::Serializer for &'a mut Serializer {
         Ok(())
     }
 
-    #[inline]
     fn serialize_i8(self, v: i8) -> Result<()> {
         num!(i8);
         self.bytes += length(v);
         Ok(())
     }
 
-    #[inline]
     fn serialize_i16(self, v: i16) -> Result<()> {
         num!(i16);
         self.bytes += length(v);
         Ok(())
     }
 
-    #[inline]
     fn serialize_i32(self, v: i32) -> Result<()> {
         num!(i32);
         self.bytes += length(v);
         Ok(())
     }
 
-    #[inline]
     fn serialize_i64(self, v: i64) -> Result<()> {
         num!(i64);
         self.bytes += length(v);
         Ok(())
     }
 
-    #[inline]
     fn serialize_u8(self, v: u8) -> Result<()> {
         num!(u8);
         self.bytes += length(v);
         Ok(())
     }
 
-    #[inline]
     fn serialize_u16(self, v: u16) -> Result<()> {
         num!(u16);
         self.bytes += length(v);
         Ok(())
     }
 
-    #[inline]
     fn serialize_u32(self, v: u32) -> Result<()> {
         num!(u32);
         self.bytes += length(v);
         Ok(())
     }
 
-    #[inline]
     fn serialize_u64(self, v: u64) -> Result<()> {
         num!(u64);
         self.bytes += length(v);
         Ok(())
     }
 
-    #[inline]
     fn serialize_f32(self, v: f32) -> Result<()> {
         fnum!(f32);
         self.bytes += length(v);
         Ok(())
     }
 
-    #[inline]
     fn serialize_f64(self, v: f64) -> Result<()> {
         fnum!(f64);
         self.bytes += length(v);
@@ -168,7 +170,6 @@ impl<'a> ser::Serializer for &'a mut Serializer {
     }
 
     // TODO: handle escaping.
-    #[inline]
     fn serialize_str(self, v: &str) -> Result<()> {
         const QUOTES_SIZE: usize = 2;
 
@@ -176,7 +177,6 @@ impl<'a> ser::Serializer for &'a mut Serializer {
         Ok(())
     }
 
-    #[inline]
     fn serialize_bytes(self, v: &[u8]) -> Result<()> {
         use serde::ser::SerializeSeq;
         let mut seq = self.serialize_seq(Some(v.len()))?;
@@ -230,7 +230,6 @@ impl<'a> ser::Serializer for &'a mut Serializer {
         value.serialize(self)
     }
 
-    #[inline]
     fn serialize_newtype_variant<T>(
         self,
         _name: &'static str,
@@ -251,7 +250,6 @@ impl<'a> ser::Serializer for &'a mut Serializer {
         Ok(())
     }
 
-    #[inline]
     fn serialize_seq(self, _len: Option<usize>) -> Result<Self::SerializeSeq> {
         const BRACKET_SIZE: usize = 1;
 
@@ -274,7 +272,6 @@ impl<'a> ser::Serializer for &'a mut Serializer {
         self.serialize_seq(Some(len))
     }
 
-    #[inline]
     fn serialize_tuple_variant(
         self,
         _name: &'static str,
@@ -292,7 +289,6 @@ impl<'a> ser::Serializer for &'a mut Serializer {
         Ok(self)
     }
 
-    #[inline]
     fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap> {
         const BRACE_SIZE: usize = 1;
 
@@ -306,7 +302,6 @@ impl<'a> ser::Serializer for &'a mut Serializer {
         self.serialize_map(Some(len))
     }
 
-    #[inline]
     fn serialize_struct_variant(
         self,
         _name: &'static str,

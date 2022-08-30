@@ -14,7 +14,7 @@ use std::{
 use crossbeam_utils::atomic::AtomicCell;
 use lookup::{lookup_v2::Path, LookupBuf};
 use serde::{Deserialize, Serialize, Serializer};
-use vector_common::{byte_size_of::JsonEncodedSizeOf, EventDataEq};
+use vector_common::{json_encoded_size_of::JsonEncodedSizeOf, EventDataEq};
 
 use super::{
     finalization::{BatchNotifier, EventFinalizer},

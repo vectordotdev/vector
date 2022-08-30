@@ -1,8 +1,8 @@
 use std::{collections::HashMap, pin::Pin};
 
 use futures::{Stream, StreamExt};
-use vector_common::byte_size_of::JsonEncodedSizeOf;
 use vector_common::internal_event::{emit, EventsSent, DEFAULT_OUTPUT};
+use vector_common::json_encoded_size_of::JsonEncodedSizeOf;
 use vector_common::EventDataEq;
 
 use crate::{
