@@ -1,5 +1,8 @@
-use remote_config::{Client, Config};
+use async_stream::stream;
+use futures::Stream;
+use remote_config::{Client, Config, TargetPath};
 use serde::{Deserialize, Serialize};
+use tokio::time;
 
 use super::{ProviderConfig, Result};
 use crate::{config::enterprise, signal};
@@ -31,26 +34,79 @@ pub fn from_opts(opts: &enterprise::Options) -> Option<Box<dyn ProviderConfig>> 
 #[async_trait::async_trait]
 #[typetag::serde(name = "enterprise")]
 impl ProviderConfig for EnterpriseProvider {
-    async fn build(&mut self, _signal_handler: &mut signal::SignalHandler) -> Result {
+    async fn build(&mut self, signal_handler: &mut signal::SignalHandler) -> Result {
         let mut client = Client::initialize(self.client_config.clone())
             .await
-            .unwrap();
+            .map_err(map_err)?;
 
+        // TODO: use actual Obs Pipelines product when ready
         client.add_product("DEBUG");
-        client.update().await.unwrap();
+        client.update().await.map_err(map_err)?;
 
-        let (config_builder, warnings) = crate::config::load(
-            std::io::Cursor::new(client.target_files.values().next().unwrap()),
-            crate::config::format::Format::Toml,
-        )?;
-
-        for warning in warnings.into_iter() {
-            warn!("{}", warning);
+        let targets = client.targets().map_err(map_err)?;
+        if targets.is_empty() {
+            return Err(vec![String::from("no remote config targets available")]);
         }
-        Ok(config_builder)
+
+        // TODO: decide how to pick a target
+        let path = targets.keys().next().expect("targets is not empty").clone();
+        let version = client.target_version(&path).expect("should have version");
+
+        let builder = load(&mut client, &path).await?;
+
+        signal_handler.add(poll(client, path, version));
+
+        Ok(builder)
     }
 
     fn provider_type(&self) -> &'static str {
         "enterprise"
     }
+}
+
+async fn load(client: &mut Client, path: &TargetPath) -> Result {
+    let (builder, warnings) = crate::config::load(
+        std::io::Cursor::new(client.fetch_target(&path).await.map_err(map_err)?),
+        crate::config::format::Format::Toml,
+    )?;
+    for warning in warnings.into_iter() {
+        warn!("{}", warning);
+    }
+    Ok(builder)
+}
+
+fn poll(
+    mut client: Client,
+    path: TargetPath,
+    mut version: u64,
+) -> impl Stream<Item = signal::SignalTo> {
+    let duration = time::Duration::from_secs(1);
+    let mut interval = time::interval_at(time::Instant::now() + duration, duration);
+
+    stream! {
+        loop {
+            interval.tick().await;
+
+            match client.update().await {
+                Ok(()) => {
+                    let new_version = client.target_version(&path).expect("should have version");
+                    if new_version > version {
+                        info!(message = "new config available", %version);
+                        version = new_version;
+                        match load(&mut client, &path).await {
+                            Ok(builder) => yield signal::SignalTo::ReloadFromConfigBuilder(builder),
+                            Err(errors) => for error in errors {
+                                error!(?error);
+                            }
+                        }
+                    }
+                },
+                Err(error) => error!(%error),
+            }
+        }
+    }
+}
+
+fn map_err(e: remote_config::Error) -> Vec<String> {
+    vec![e.to_string()]
 }

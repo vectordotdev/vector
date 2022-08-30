@@ -6,7 +6,6 @@ edition = "2021"
 publish = false
 
 [dependencies]
-anyhow = "1.0.57"
 indexmap = "1.8.2"
 prost = "0.10.4"
 hyper = { version = "0.14.20", features = ["client", "runtime", "http1", "http2"] }
@@ -14,6 +13,12 @@ hyper-openssl = "0.9.2"
 serde = { version = "1.0.137", features = ["derive"] }
 serde_json = "1.0.81"
 tokio = { version = "1.18.2", features = ["full"] }
+tuf = { git = "https://github.com/lukesteensen/rust-tuf/", branch = "dd-rc" }
+futures = "0.3.21"
+thiserror = "1.0.32"
+openssl = "0.10.41"
+anyhow = "1.0.62"
+rand = "0.8.5"
 
 [build-dependencies]
 prost-build = "0.10.4"
