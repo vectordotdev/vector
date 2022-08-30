@@ -4,7 +4,7 @@ use futures_util::Stream;
 use stream_cancel::Trigger;
 use vector_core::event::EventArray;
 
-use crate::{sources::Sources, SourceSender};
+use crate::{sources::Sources, transforms::Transforms, SourceSender};
 
 use self::{
     sinks::{BasicSinkConfig, ErrorSinkConfig, PanicSinkConfig},
@@ -61,8 +61,8 @@ pub fn tripwire_source() -> (Trigger, Sources) {
     (trigger, Sources::TestTripwire(source))
 }
 
-pub fn basic_transform(suffix: &str, increase: f64) -> BasicTransformConfig {
-    BasicTransformConfig::new(suffix.to_owned(), increase)
+pub fn basic_transform(suffix: &str, increase: f64) -> Transforms {
+    Transforms::TestBasic(BasicTransformConfig::new(suffix.to_owned(), increase))
 }
 
 pub fn basic_sink(channel_size: usize) -> (impl Stream<Item = EventArray>, BasicSinkConfig) {

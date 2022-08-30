@@ -11,7 +11,6 @@ use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to ou
 use serde::{Deserialize, Serialize};
 pub use vector_config::component::{GenerateConfig, SinkDescription, TransformDescription};
 pub use vector_core::config::{AcknowledgementsConfig, DataType, GlobalOptions, Input, Output};
-pub use vector_core::transform::{TransformConfig, TransformContext};
 
 use crate::{conditions, event::Metric, serde::OneOrMany};
 
@@ -48,7 +47,9 @@ pub use loading::{
 };
 pub use sink::{SinkConfig, SinkContext, SinkHealthcheckOptions, SinkOuter};
 pub use source::{SourceConfig, SourceContext, SourceOuter};
-pub use transform::TransformOuter;
+pub use transform::{
+    InnerTopology, InnerTopologyTransform, TransformConfig, TransformContext, TransformOuter,
+};
 pub use unit_test::{build_unit_tests, build_unit_tests_main, UnitTestResult};
 pub use validation::warnings;
 pub use vector_core::config::{log_schema, proxy::ProxyConfig, LogSchema};

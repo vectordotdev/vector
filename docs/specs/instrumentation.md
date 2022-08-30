@@ -103,6 +103,8 @@ An `<Name>Error` event MUST be emitted when an error occurs.
     type, they MAY be omitted from being represented explicitly in the
     event fields. However, they MUST still be included in the emitted
     logs and metrics, as specified below, as if they were present.
+  - `stage` - The stage at which the error occurred. This MUST be one of
+    `receiving`, `processing`, or `sending`.
 - Metrics
   - MUST include the defined properties as tags.
   - MUST increment `<namespace>_errors_total` metric.
@@ -152,7 +154,7 @@ know if the client will retry them.
   - MUST include the defined properties as key-value pairs.
   - If `intentional` is `true`, MUST log at the `debug` level.
   - If `intentional` is `false`, MUST log at the `error` level.
-  - SHOULD NOT be rate limited.
+  - SHOULD be rate limited to 10 seconds.
 
 [camelcase]: https://en.wikipedia.org/wiki/Camel_case
 [`eventsdropped`]: #EventsDropped
