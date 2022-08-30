@@ -55,7 +55,7 @@ components: _amqp: {
 	how_it_works: {
 		lapin: {
 			title: "Lapin"
-			body: """
+			body:  """
 				The `amqp` source and sink uses [`lapin`](\(urls.lapin)) under the hood. This
 				is a reliable pure rust library that facilitates communication with Ampq servers
 				such as RabbitMQ.
