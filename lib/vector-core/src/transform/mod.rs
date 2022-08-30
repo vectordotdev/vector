@@ -1,6 +1,7 @@
 use std::{collections::HashMap, pin::Pin};
 
 use futures::{Stream, StreamExt};
+use vector_common::byte_size_of::JsonEncodedSizeOf;
 use vector_common::internal_event::{emit, EventsSent, DEFAULT_OUTPUT};
 use vector_common::EventDataEq;
 
@@ -258,7 +259,10 @@ impl TransformOutputs {
     pub async fn send(&mut self, buf: &mut TransformOutputsBuf) {
         if let Some(primary) = self.primary_output.as_mut() {
             let count = buf.primary_buffer.as_ref().map_or(0, OutputBuffer::len);
-            let byte_size = buf.primary_buffer.as_ref().map_or(0, ByteSizeOf::size_of);
+            let byte_size = buf
+                .primary_buffer
+                .as_ref()
+                .map_or(0, JsonEncodedSizeOf::json_encoded_size_of);
             buf.primary_buffer
                 .as_mut()
                 .expect("mismatched outputs")
@@ -272,7 +276,7 @@ impl TransformOutputs {
         }
         for (key, buf) in &mut buf.named_buffers {
             let count = buf.len();
-            let byte_size = buf.size_of();
+            let byte_size = buf.json_encoded_size_of();
             buf.send(self.named_outputs.get_mut(key).expect("unknown output"))
                 .await;
             emit(EventsSent {
@@ -488,6 +492,15 @@ impl EventDataEq<Vec<Event>> for OutputBuffer {
         }
 
         self.iter_events().map(Comparator).eq(other.iter())
+    }
+}
+
+impl JsonEncodedSizeOf for OutputBuffer {
+    fn json_encoded_size_of(&self) -> usize {
+        self.0
+            .iter()
+            .map(JsonEncodedSizeOf::json_encoded_size_of)
+            .sum()
     }
 }
 

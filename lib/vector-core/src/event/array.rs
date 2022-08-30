@@ -8,7 +8,10 @@ use futures::{stream, Stream};
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
 use vector_buffers::EventCount;
-use vector_common::finalization::{AddBatchNotifier, BatchNotifier, EventFinalizers, Finalizable};
+use vector_common::{
+    byte_size_of::JsonEncodedSizeOf,
+    finalization::{AddBatchNotifier, BatchNotifier, EventFinalizers, Finalizable},
+};
 
 use super::{
     Event, EventDataEq, EventFinalizer, EventMutRef, EventRef, LogEvent, Metric, TraceEvent,
@@ -226,6 +229,16 @@ impl ByteSizeOf for EventArray {
             Self::Logs(a) => a.allocated_bytes(),
             Self::Metrics(a) => a.allocated_bytes(),
             Self::Traces(a) => a.allocated_bytes(),
+        }
+    }
+}
+
+impl JsonEncodedSizeOf for EventArray {
+    fn json_encoded_size_of(&self) -> usize {
+        match self {
+            Self::Logs(a) => a.json_encoded_size_of(),
+            Self::Metrics(a) => a.json_encoded_size_of(),
+            Self::Traces(a) => a.json_encoded_size_of(),
         }
     }
 }
