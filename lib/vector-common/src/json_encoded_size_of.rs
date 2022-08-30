@@ -23,6 +23,11 @@ pub struct Serializer {
     start_collection: bool,
 }
 
+/// Return the size of `T` as represented by a JSON-encoded string.
+///
+/// # Errors
+///
+/// Returns an error if `T` cannot be serialized.
 pub fn size_of<T>(value: &T) -> Result<usize>
 where
     T: Serialize,
