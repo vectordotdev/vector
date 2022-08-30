@@ -15,7 +15,7 @@ use super::sink::AMQPSink;
 /// Configuration for the `amqp` sink.
 ///
 /// Supports AMQP version 0.9.1
-#[configurable_component(source)]
+#[configurable_component(sink)]
 #[derive(Clone, Debug)]
 pub struct AMQPSinkConfig {
     /// The exchange to publish messages to.

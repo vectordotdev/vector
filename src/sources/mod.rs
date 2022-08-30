@@ -98,6 +98,10 @@ enum BuildError {
 #[derive(Clone, Debug)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Sources {
+    /// AMQP.
+    #[cfg(feature = "sources-amqp")]
+    Amqp(#[configurable(derived)] amqp::AMQPSourceConfig),
+
     /// Apache HTTP Server (HTTPD) Metrics.
     #[cfg(feature = "sources-apache_metrics")]
     ApacheMetrics(#[configurable(derived)] apache_metrics::ApacheMetricsConfig),
@@ -282,6 +286,8 @@ pub enum Sources {
 impl SourceConfig for Sources {
     async fn build(&self, cx: SourceContext) -> crate::Result<self::Source> {
         match self {
+            #[cfg(feature = "sources-amqp")]
+            Self::Amqp(config) => config.build(cx).await,
             #[cfg(feature = "sources-apache_metrics")]
             Self::ApacheMetrics(config) => config.build(cx).await,
             #[cfg(feature = "sources-aws_ecs_metrics")]
@@ -374,6 +380,8 @@ impl SourceConfig for Sources {
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
         match self {
+            #[cfg(feature = "sources-amqp")]
+            Self::Amqp(config) => config.outputs(global_log_namespace),
             #[cfg(feature = "sources-apache_metrics")]
             Self::ApacheMetrics(config) => config.outputs(global_log_namespace),
             #[cfg(feature = "sources-aws_ecs_metrics")]
@@ -466,6 +474,8 @@ impl SourceConfig for Sources {
 
     fn resources(&self) -> Vec<Resource> {
         match self {
+            #[cfg(feature = "sources-amqp")]
+            Self::Amqp(config) => config.resources(),
             #[cfg(feature = "sources-apache_metrics")]
             Self::ApacheMetrics(config) => config.resources(),
             #[cfg(feature = "sources-aws_ecs_metrics")]
@@ -558,6 +568,8 @@ impl SourceConfig for Sources {
 
     fn can_acknowledge(&self) -> bool {
         match self {
+            #[cfg(feature = "sources-amqp")]
+            Self::Amqp(config) => config.can_acknowledge(),
             #[cfg(feature = "sources-apache_metrics")]
             Self::ApacheMetrics(config) => config.can_acknowledge(),
             #[cfg(feature = "sources-aws_ecs_metrics")]
@@ -654,6 +666,8 @@ impl NamedComponent for Sources {
 
     fn get_component_name(&self) -> &'static str {
         match self {
+            #[cfg(feature = "sources-amqp")]
+            Self::Amqp(config) => config.get_component_name(),
             #[cfg(feature = "sources-apache_metrics")]
             Self::ApacheMetrics(config) => config.get_component_name(),
             #[cfg(feature = "sources-aws_ecs_metrics")]

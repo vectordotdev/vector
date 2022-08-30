@@ -1,8 +1,7 @@
 use crate::{
     amqp::AMQPConfig,
     codecs::{Decoder, DecodingConfig},
-    config::SourceContext,
-    config::{log_schema, Output, SourceConfig, SourceDescription},
+    config::{log_schema, Output, SourceConfig, SourceContext},
     event::{BatchNotifier, BatchStatus},
     internal_events::{
         source::{AMQPEventError, AMQPEventReceived},
@@ -39,7 +38,7 @@ enum BuildError {
 }
 
 /// Configuration for the `amqp` source.
-#[configurable_component(source)]
+#[configurable_component(source("amqp"))]
 #[derive(Clone, Debug, Derivative)]
 #[serde(deny_unknown_fields)]
 pub struct AMQPSourceConfig {
@@ -112,10 +111,6 @@ impl Default for AMQPSourceConfig {
     }
 }
 
-inventory::submit! {
-    SourceDescription::new::<AMQPSourceConfig>("amqp")
-}
-
 impl_generate_config_from_default!(AMQPSourceConfig);
 
 impl AMQPSourceConfig {
@@ -125,7 +120,6 @@ impl AMQPSourceConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "amqp")]
 impl SourceConfig for AMQPSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
@@ -142,10 +136,6 @@ impl SourceConfig for AMQPSourceConfig {
             .with_standard_vector_source_metadata();
 
         vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "amqp"
     }
 
     fn can_acknowledge(&self) -> bool {
