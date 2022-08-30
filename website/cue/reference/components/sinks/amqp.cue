@@ -18,9 +18,9 @@ components: sinks: amqp: {
 		healthcheck: enabled: true
 		send: {
 			batch: {
-			       enabled: false
-			       common: false
-			timeout_secs: null
+				enabled:      false
+				common:       false
+				timeout_secs: null
 			}
 			compression: {
 				enabled: true
@@ -55,9 +55,9 @@ components: sinks: amqp: {
 			required:    true
 			warnings: []
 			type: object: {
-			      examples: []
-			      options: {
-				connection_string: components._amqp.configuration.connection_string
+				examples: []
+				options: {
+					connection_string: components._amqp.configuration.connection_string
 				}
 			}
 		}
@@ -71,22 +71,22 @@ components: sinks: amqp: {
 			}
 		}
 		routing_key: {
-			common: false
+			common:      false
 			description: "Template use to generate a routing key which corresponds to a queue binding"
 			required:    false
 			warnings: []
 			type: string: {
 				examples: ["{{ field_a }}-{{ field_b }}"]
-				syntax: "literal"
+				syntax:  "literal"
 				default: null
 			}
 		}
 	}
 
 	input: {
-		logs: true
+		logs:    true
 		metrics: null
-                traces: false
+		traces:  false
 	}
 
 	how_it_works: components._amqp.how_it_works
