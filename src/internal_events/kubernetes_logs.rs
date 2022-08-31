@@ -3,6 +3,7 @@ use vector_core::internal_event::InternalEvent;
 
 use super::prelude::{error_stage, error_type};
 use crate::event::Event;
+use crate::{emit, internal_events::ComponentEventsDropped};
 
 #[derive(Debug)]
 pub struct KubernetesLogsEventsReceived<'a> {
@@ -166,6 +167,7 @@ const KUBERNETES_LIFECYCLE: &str = "kubernetes_lifecycle";
 pub struct KubernetesLifecycleError<E> {
     pub message: &'static str,
     pub error: E,
+    pub count: u64,
 }
 
 impl<E: std::fmt::Display> InternalEvent for KubernetesLifecycleError<E> {
@@ -184,6 +186,10 @@ impl<E: std::fmt::Display> InternalEvent for KubernetesLifecycleError<E> {
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
-        // TODO emit ComponentEventsDropped
+        emit!(ComponentEventsDropped {
+            count: self.count,
+            intentional: false,
+            reason: self.message,
+        });
     }
 }
