@@ -319,7 +319,7 @@ impl Resource {
                     // IP addresses can either be v4 or v6.
                     // Therefore we check if the ip version matches, the port matches and if the protocol (TCP/UDP) matches
                     // when checking for equality.
-                    if address.port() == address0.port() && &protocol0 == protocol && address0.is_ipv4() == address.is_ipv4() {
+                    if address0 == address && &protocol0 == protocol {
                         components.insert(key.clone());
                     }
                 }
