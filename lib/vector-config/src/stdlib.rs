@@ -3,7 +3,7 @@ use std::{
     net::SocketAddr,
     num::{
         NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI8, NonZeroU16, NonZeroU32, NonZeroU64,
-        NonZeroU8,
+        NonZeroU8, NonZeroUsize,
     },
     path::PathBuf,
 };
@@ -113,8 +113,27 @@ macro_rules! impl_configuable_numeric {
 }
 
 impl_configuable_numeric!(
-    u8, u16, u32, u64, usize, i8, i16, i32, i64, isize, f32, f64, NonZeroU8, NonZeroU16,
-    NonZeroU32, NonZeroU64, NonZeroI8, NonZeroI16, NonZeroI32, NonZeroI64
+    u8,
+    u16,
+    u32,
+    u64,
+    usize,
+    i8,
+    i16,
+    i32,
+    i64,
+    isize,
+    f32,
+    f64,
+    NonZeroU8,
+    NonZeroU16,
+    NonZeroU32,
+    NonZeroU64,
+    NonZeroI8,
+    NonZeroI16,
+    NonZeroI32,
+    NonZeroI64,
+    NonZeroUsize
 );
 
 // Arrays and maps.

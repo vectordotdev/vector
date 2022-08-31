@@ -15,7 +15,7 @@ use vector_config::configurable_component;
 
 use crate::{
     codecs::Transformer,
-    config::{log_schema, AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     event::{Event, Value},
     http::HttpClient,
     sinks::{
@@ -34,7 +34,7 @@ fn default_host() -> String {
 }
 
 /// Configuration for the `azure_monitor_logs` sink.
-#[configurable_component]
+#[configurable_component(sink("azure_monitor_logs"))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct AzureMonitorLogsConfig {
@@ -111,10 +111,6 @@ static TIME_GENERATED_FIELD_HEADER: Lazy<HeaderName> =
     Lazy::new(|| HeaderName::from_static("time-generated-field"));
 static CONTENT_TYPE_VALUE: Lazy<HeaderValue> = Lazy::new(|| HeaderValue::from_static(CONTENT_TYPE));
 
-inventory::submit! {
-    SinkDescription::new::<AzureMonitorLogsConfig>("azure_monitor_logs")
-}
-
 impl_generate_config_from_default!(AzureMonitorLogsConfig);
 
 /// Max number of bytes in request body
@@ -131,7 +127,6 @@ const SHARED_KEY: &str = "SharedKey";
 const API_VERSION: &str = "2016-04-01";
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "azure_monitor_logs")]
 impl SinkConfig for AzureMonitorLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let batch_settings = self
@@ -162,10 +157,6 @@ impl SinkConfig for AzureMonitorLogsConfig {
 
     fn input(&self) -> Input {
         Input::log()
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "azure_monitor_logs"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

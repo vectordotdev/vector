@@ -36,7 +36,7 @@ const DEFAULT_FILENAME_TIME_FORMAT: &str = "%s";
 const DEFAULT_FILENAME_APPEND_UUID: bool = true;
 
 /// Configuration for the `aws_s3` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("aws_s3"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct S3SinkConfig {
@@ -144,7 +144,6 @@ impl GenerateConfig for S3SinkConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "aws_s3")]
 impl SinkConfig for S3SinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let service = self.create_service(&cx.proxy).await?;
@@ -155,10 +154,6 @@ impl SinkConfig for S3SinkConfig {
 
     fn input(&self) -> Input {
         Input::new(self.encoding.config().1.input_type() & DataType::Log)
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "aws_s3"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

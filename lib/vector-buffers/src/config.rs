@@ -8,6 +8,7 @@ use serde::{de, ser, Deserialize, Deserializer, Serialize, Serializer};
 use snafu::{ResultExt, Snafu};
 use tracing::Span;
 use vector_common::finalization::Finalizable;
+use vector_config::configurable_component;
 
 use crate::{
     topology::{
@@ -209,29 +210,44 @@ pub const fn memory_buffer_default_max_events() -> NonZeroUsize {
 }
 
 /// A specific type of buffer stage.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize)]
-#[serde(tag = "type")]
-#[serde(rename_all = "snake_case")]
+#[configurable_component(no_deser)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case", tag = "type")]
 pub enum BufferType {
     /// A buffer stage backed by an in-memory channel provided by `tokio`.
     #[serde(rename = "memory")]
     Memory {
+        /// The maximum number of events allowed in the buffer.
         #[serde(default = "memory_buffer_default_max_events")]
         max_events: NonZeroUsize,
+
+        #[configurable(derived)]
         #[serde(default)]
         when_full: WhenFull,
     },
+
     /// A buffer stage backed by an on-disk database, powered by LevelDB.
     #[serde(rename = "disk_v1")]
     DiskV1 {
+        /// The maximum size of the buffer on disk.
+        ///
+        /// Must be at least ~256 megabytes (268435488 bytes).
         max_size: NonZeroU64,
+
+        #[configurable(derived)]
         #[serde(default)]
         when_full: WhenFull,
     },
+
     /// A buffer stage backed by disk.
     #[serde(rename = "disk")]
     DiskV2 {
+        /// The maximum size of the buffer on disk.
+        ///
+        /// Must be at least ~256 megabytes (268435488 bytes).
         max_size: NonZeroU64,
+
+        #[configurable(derived)]
         #[serde(default)]
         when_full: WhenFull,
     },
@@ -280,7 +296,7 @@ impl BufferType {
     }
 }
 
-/// A buffer configuration.
+/// Buffer configuration.
 ///
 /// Buffers are compromised of stages(*) that form a buffer _topology_, with input items being
 /// subject to configurable behavior when each stage reaches configured limits.  Buffers are
@@ -294,12 +310,18 @@ impl BufferType {
 /// functionality to allow chaining buffers together, you'll see "buffer topology" used in internal
 /// documentation to correctly reflect the internal structure.
 ///
-/// TODO: We need to limit chained buffers to only allowing a single copy of each buffer type to be
-/// defined, otherwise, for example, two instances of the same disk buffer type in a single chained
-/// buffer topology would try to both open the same buffer files on disk, which wouldn't work or
-/// would go horribly wrong.
+// TODO: We need to limit chained buffers to only allowing a single copy of each buffer type to be
+// defined, otherwise, for example, two instances of the same disk buffer type in a single chained
+// buffer topology would try to both open the same buffer files on disk, which wouldn't work or
+// would go horribly wrong.
+
+// TODO: We need a custom implementation of `Configurable` here, I think? in order to capture the
+// "deserialize as a single unnested `BufferType`, or as an array of them", but we might also be
+// able to encode that as an untagged enum as well?
+#[configurable_component(no_deser, no_ser)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BufferConfig {
+    /// The stages in the buffer topology.
     pub stages: Vec<BufferType>,
 }
 

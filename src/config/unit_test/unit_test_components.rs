@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use futures_util::{future, stream::BoxStream, FutureExt, StreamExt};
-use serde::{Deserialize, Serialize};
 use tokio::sync::{oneshot, Mutex};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
@@ -77,7 +76,8 @@ pub struct UnitTestSinkResult {
 }
 
 /// Configuration for the `unit_test` sink.
-#[derive(Clone, Default, Derivative, Deserialize, Serialize)]
+#[configurable_component(sink("unit_test"))]
+#[derive(Clone, Default, Derivative)]
 #[derivative(Debug)]
 pub struct UnitTestSinkConfig {
     /// Name of the test that this sink is being used for.
@@ -96,8 +96,9 @@ pub struct UnitTestSinkConfig {
     pub check: UnitTestSinkCheck,
 }
 
+impl_generate_config_from_default!(UnitTestSinkConfig);
+
 #[async_trait::async_trait]
-#[typetag::serde(name = "unit_test")]
 impl SinkConfig for UnitTestSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let tx = self.result_tx.lock().await.take();
@@ -110,10 +111,6 @@ impl SinkConfig for UnitTestSinkConfig {
         let healthcheck = future::ok(()).boxed();
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "unit_test"
     }
 
     fn input(&self) -> Input {

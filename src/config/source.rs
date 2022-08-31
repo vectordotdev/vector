@@ -39,18 +39,46 @@ impl SourceOuter {
     }
 }
 
+/// Generalized interface for describing and building source components.
 #[async_trait]
 #[enum_dispatch]
 pub trait SourceConfig: NamedComponent + core::fmt::Debug + Send + Sync {
+    /// Builds the source with the given context.
+    ///
+    /// If the source is built successfully, `Ok(...)` is returned containing the source.
+    ///
+    /// # Errors
+    ///
+    /// If an error occurs while building the source, an error variant explaining the issue is
+    /// returned.
     async fn build(&self, cx: SourceContext) -> crate::Result<Source>;
 
+    /// Gets the list of outputs exposed by this source.
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output>;
 
-    /// Resources that the source is using.
+    /// Gets the list of resources, if any, used by this source.
+    ///
+    /// Resources represent dependencies -- network ports, file descriptors, and so on -- that
+    /// cannot be shared between components at runtime. This ensures that components can not be
+    /// configured in a way that would deadlock the spawning of a topology, and as well, allows
+    /// Vector to determine the correct order for rebuilding a topology during configuration reload
+    /// when resources must first be reclaimed before being reassigned, and so on.
     fn resources(&self) -> Vec<Resource> {
         Vec::new()
     }
 
+    /// Whether or not this source can acknowledge the events it emits.
+    ///
+    /// Generally, Vector uses acknowledgements to track when an event has finally been processed,
+    /// either successfully or unsuccessfully. While it is used internally in some areas, such as
+    /// within disk buffers for knowing when a message can be deleted from the buffer, it is
+    /// primarily used to signal back to a source that a message has been successfully (durably)
+    /// processed or not.
+    ///
+    /// By exposing whether or not a source supports acknowledgements, we can avoid situations where
+    /// using acknowledgements would only add processing overhead for no benefit to the source, as
+    /// well as emit contextual warnings when end-to-end acknowledgements are enabled, but the
+    /// topology as configured does not actually support the use of end-to-end acknowledgements.
     fn can_acknowledge(&self) -> bool;
 }
 
