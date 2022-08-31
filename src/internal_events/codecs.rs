@@ -1,29 +1,50 @@
+use crate::{emit, internal_events::ComponentEventsDropped};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 use super::prelude::{error_stage, error_type};
 
 #[derive(Debug)]
-pub struct DecoderFramingFailed<'a> {
+pub struct DecoderFramingError<'a> {
     pub error: &'a codecs::decoding::BoxedFramingError,
 }
 
-impl<'a> InternalEvent for DecoderFramingFailed<'a> {
+impl<'a> InternalEvent for DecoderFramingError<'a> {
     fn emit(self) {
-        warn!(message = "Failed framing bytes.", error = %self.error, internal_log_rate_secs = 10);
         counter!("decoder_framing_errors_total", 1);
+        error!(
+            message = "Failed framing bytes.",
+            error = %self.error,
+            error_type = error_type::PARSER_FAILED,
+            stage = error_stage::PROCESSING,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => error_type::PARSER_FAILED,
+            "stage" => error_stage::PROCESSING,
+        );
     }
 }
 
 #[derive(Debug)]
-pub struct DecoderDeserializeFailed<'a> {
+pub struct DecoderDeserializeError<'a> {
     pub error: &'a crate::Error,
 }
 
-impl<'a> InternalEvent for DecoderDeserializeFailed<'a> {
+impl<'a> InternalEvent for DecoderDeserializeError<'a> {
     fn emit(self) {
-        warn!(message = "Failed deserializing frame.", error = %self.error, internal_log_rate_secs = 10);
         counter!("decoder_deserialize_errors_total", 1);
+        error!(
+            message = "Failed deserializing frame.",
+            error = %self.error,
+            error_type = error_type::PARSER_FAILED,
+            stage = error_stage::PROCESSING,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => error_type::PARSER_FAILED,
+            "stage" => error_stage::PROCESSING,
+        );
     }
 }
 
@@ -47,7 +68,15 @@ impl<'a> InternalEvent for EncoderFramingError<'a> {
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::SENDING,
         );
+<<<<<<< HEAD
         // TODO fire component dropped events here
+=======
+        emit!(ComponentEventsDropped {
+            count: 1,
+            intentional: false,
+            reason: "Failed framing bytes.",
+        });
+>>>>>>> master
     }
 }
 
@@ -71,6 +100,7 @@ impl<'a> InternalEvent for EncoderSerializeError<'a> {
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::SENDING,
         );
+<<<<<<< HEAD
         // TODO fire component dropped events here
     }
 }
@@ -95,5 +125,12 @@ impl<E: std::fmt::Display> InternalEvent for EncoderWriteAllError<'_, E> {
             "stage" => error_stage::SENDING,
         );
         // TODO fire component dropped events here
+=======
+        emit!(ComponentEventsDropped {
+            count: 1,
+            intentional: false,
+            reason: "Failed serializing frame.",
+        });
+>>>>>>> master
     }
 }

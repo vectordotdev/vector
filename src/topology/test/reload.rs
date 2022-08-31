@@ -15,17 +15,17 @@ use crate::{
     sinks::prometheus::exporter::PrometheusExporterConfig,
     sources::{
         internal_metrics::InternalMetricsConfig, prometheus::PrometheusRemoteWriteConfig,
-        splunk_hec::SplunkConfig, Sources,
+        splunk_hec::SplunkConfig,
     },
     test_util::{self, mock::basic_sink, next_addr, start_topology, temp_dir, wait_for_tcp},
 };
 
-fn internal_metrics_source() -> Sources {
-    Sources::InternalMetrics(InternalMetricsConfig::default())
+fn internal_metrics_source() -> InternalMetricsConfig {
+    InternalMetricsConfig::default()
 }
 
-fn prom_remote_write_source(addr: SocketAddr) -> Sources {
-    Sources::PrometheusRemoteWrite(PrometheusRemoteWriteConfig::from_address(addr))
+fn prom_remote_write_source(addr: SocketAddr) -> PrometheusRemoteWriteConfig {
+    PrometheusRemoteWriteConfig::from_address(addr)
 }
 
 fn prom_exporter_sink(addr: SocketAddr, flush_period_secs: u64) -> PrometheusExporterConfig {
@@ -36,10 +36,10 @@ fn prom_exporter_sink(addr: SocketAddr, flush_period_secs: u64) -> PrometheusExp
     }
 }
 
-fn splunk_source_config(addr: SocketAddr) -> Sources {
+fn splunk_source_config(addr: SocketAddr) -> SplunkConfig {
     let mut config = SplunkConfig::default();
     config.address = addr;
-    Sources::SplunkHec(config)
+    config
 }
 
 #[tokio::test]

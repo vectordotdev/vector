@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.24.0"
+version = "0.25.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2021"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -200,7 +200,7 @@ smpl_jwt = { version = "0.7.1", default-features = false, optional = true }
 
 # API
 async-graphql = { version = "4.0.12", default-features = false, optional = true, features = ["chrono"] }
-async-graphql-warp = { version = "4.0.11", default-features = false, optional = true }
+async-graphql-warp = { version = "4.0.12", default-features = false, optional = true }
 itertools = { version = "0.10.3", default-features = false, optional = true }
 
 # API client
@@ -213,7 +213,7 @@ tui = { version = "0.19.0", optional = true, default-features = false, features 
 datadog-filter = { path = "lib/datadog/filter" }
 datadog-search-syntax = { path = "lib/datadog/search-syntax" }
 hex = { version = "0.4.3", default-features = false, optional = true }
-sha2 = { version = "0.10.2", default-features = false, optional = true }
+sha2 = { version = "0.10.3", default-features = false, optional = true }
 
 # VRL Lang
 vrl = { path = "lib/vrl/vrl" }
@@ -231,13 +231,14 @@ bytes = { version = "1.2.1", default-features = false, features = ["serde"] }
 bytesize = { version = "1.1.0", default-features = false }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
 cidr-utils = { version = "0.5.7", default-features = false }
-clap = { version = "3.2.18", default-features = false, features = ["derive", "env", "std"] }
+clap = { version = "3.2.19", default-features = false, features = ["derive", "env", "std"] }
 colored = { version = "2.0.0", default-features = false }
 csv = { version = "1.1", default-features = false, optional = true }
 derivative = { version = "2.2.0", default-features = false }
 dirs-next = { version = "2.0.0", default-features = false, optional = true }
 dyn-clone = { version = "1.0.9", default-features = false }
 encoding_rs = { version = "0.8.31", default-features = false, features = ["serde"] }
+enum_dispatch = { version = "0.3.8", default-features = false }
 exitcode = { version = "1.1.2", default-features = false }
 flate2 = { version = "1.0.24", default-features = false, features = ["default"] }
 futures-util = { version = "0.3.21", default-features = false }
@@ -332,7 +333,7 @@ azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git",
 base64 = "0.13.0"
 criterion = { version = "0.3.6", features = ["html_reports", "async_tokio"] }
 libc = "0.2.132"
-pretty_assertions = "1.2.1"
+pretty_assertions = "1.3.0"
 proptest = "1.0"
 quickcheck = "1.0.3"
 reqwest = { version = "0.11", features = ["json"] }
@@ -537,7 +538,6 @@ transforms-logs = [
   "transforms-dedupe",
   "transforms-filter",
   "transforms-geoip",
-  "transforms-log_to_metric",
   "transforms-lua",
   "transforms-metric_to_log",
   "transforms-pipelines",
@@ -550,7 +550,6 @@ transforms-logs = [
 transforms-metrics = [
   "transforms-aggregate",
   "transforms-filter",
-  "transforms-log_to_metric",
   "transforms-lua",
   "transforms-metric_to_log",
   "transforms-pipelines",
@@ -564,7 +563,6 @@ transforms-aws_ec2_metadata = ["dep:arc-swap"]
 transforms-dedupe = ["dep:lru"]
 transforms-filter = []
 transforms-geoip = ["dep:maxminddb"]
-transforms-log_to_metric = []
 transforms-lua = ["dep:mlua", "vector-core/lua"]
 transforms-metric_to_log = []
 transforms-pipelines = ["transforms-filter", "transforms-route"]
@@ -785,11 +783,10 @@ redis-integration-tests = ["sinks-redis", "sources-redis"]
 splunk-integration-tests = ["sinks-splunk_hec"]
 dnstap-integration-tests = ["sources-dnstap"]
 disable-resolv-conf = []
-shutdown-tests = ["api", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-log_to_metric", "transforms-lua", "transforms-remap", "unix"]
+shutdown-tests = ["api", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-lua", "transforms-remap", "unix"]
 cli-tests = ["sinks-blackhole", "sinks-socket", "sources-demo_logs", "sources-file"]
 vector-api-tests = [
   "sources-demo_logs",
-  "transforms-log_to_metric",
   "transforms-remap",
   "sinks-blackhole"
 ]
@@ -799,7 +796,6 @@ vector-unit-test-tests = [
   "transforms-route",
   "transforms-filter",
   "transforms-reduce",
-  "transforms-log_to_metric",
   "sinks-console"
 ]
 enterprise-tests = [

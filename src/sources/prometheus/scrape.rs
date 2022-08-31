@@ -300,7 +300,6 @@ mod test {
     use crate::{
         config,
         sinks::prometheus::exporter::PrometheusExporterConfig,
-        sources::Sources,
         test_util::{
             components::{
                 assert_source_compliance, run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS,
@@ -582,7 +581,7 @@ mod test {
         let mut config = config::Config::builder();
         config.add_source(
             "in",
-            Sources::PrometheusScrape(PrometheusScrapeConfig {
+            PrometheusScrapeConfig {
                 endpoints: vec![format!("http://{}", in_addr)],
                 instance_tag: None,
                 endpoint_tag: None,
@@ -591,7 +590,7 @@ mod test {
                 scrape_interval_secs: 1,
                 tls: None,
                 auth: None,
-            }),
+            },
         );
         config.add_sink(
             "out",
