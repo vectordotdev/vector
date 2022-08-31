@@ -143,7 +143,7 @@ releases: "0.24.0": {
 			type: "fix"
 			scopes: ["reload"]
 			description: """
-				Vector no longer panics when reloading when a config where a component is deleted
+				Vector no longer panics when reloading a config where a component is deleted
 				and then re-added.
 				"""
 			contributors: ["zhongzc"]
