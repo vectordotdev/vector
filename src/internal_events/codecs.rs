@@ -107,11 +107,12 @@ impl<'a> InternalEvent for EncoderSerializeError<'a> {
 }
 
 #[derive(Debug)]
-pub struct EncoderWriteAllError<'a, E> {
+pub struct EncoderWriteError<'a, E> {
     pub error: &'a E,
+    pub count: u64,
 }
 
-impl<E: std::fmt::Display> InternalEvent for EncoderWriteAllError<'_, E> {
+impl<E: std::fmt::Display> InternalEvent for EncoderWriteError<'_, E> {
     fn emit(self) {
         let reason = "Failed writing bytes.";
         error!(
@@ -126,10 +127,12 @@ impl<E: std::fmt::Display> InternalEvent for EncoderWriteAllError<'_, E> {
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::SENDING,
         );
-        emit!(ComponentEventsDropped {
-            count: 1,
-            intentional: false,
-            reason,
-        });
+        if self.count > 0 {
+            emit!(ComponentEventsDropped {
+                count: self.count,
+                intentional: false,
+                reason,
+            });
+        }
     }
 }

@@ -4,7 +4,7 @@ use bytes::BytesMut;
 use codecs::encoding::Framer;
 use tokio_util::codec::Encoder as _;
 
-use crate::{codecs::Transformer, event::Event, internal_events::EncoderWriteAllError};
+use crate::{codecs::Transformer, event::Event, internal_events::EncoderWriteError};
 
 pub trait Encoder<T> {
     /// Encodes the input into the provided writer.
@@ -70,7 +70,10 @@ impl Encoder<Event> for (Transformer, crate::codecs::Encoder<()>) {
 /// instrumentation spec- as this necessitates both an Error and EventsDropped event.
 pub(crate) fn write_all(writer: &mut dyn io::Write, buf: &[u8]) -> io::Result<()> {
     writer.write_all(buf).map_err(|error| {
-        emit!(EncoderWriteAllError { error: &error });
+        emit!(EncoderWriteError {
+            error: &error,
+            count: 1
+        });
         error
     })
 }

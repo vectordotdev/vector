@@ -12,7 +12,10 @@ use tokio::time::{sleep, Sleep};
 use tower::{retry::Policy, timeout::error::Elapsed};
 
 use crate::{
-    internal_events::{SinkRetryError, SinkRetryReasonError},
+    internal_events::{
+        prelude::{error_stage, error_type},
+        SinkRetryReasonError, SinkSendError,
+    },
     Error,
 };
 
@@ -104,10 +107,10 @@ where
             Ok(response) => match self.logic.should_retry_response(response) {
                 RetryAction::Retry(reason) => {
                     if self.remaining_attempts == 0 {
-                        emit!(SinkRetryReasonError {
+                        emit!(SinkSendError {
                             message:
                                 "OK/retry response but retries exhausted; dropping the request.",
-                            reason,
+                            error: reason,
                         });
                         return None;
                     }
@@ -117,9 +120,9 @@ where
                 }
 
                 RetryAction::DontRetry(reason) => {
-                    emit!(SinkRetryReasonError {
+                    emit!(SinkSendError {
                         message: "Not retriable; dropping the request.",
-                        reason,
+                        error: reason,
                     });
                     None
                 }
@@ -128,7 +131,7 @@ where
             },
             Err(error) => {
                 if self.remaining_attempts == 0 {
-                    emit!(SinkRetryError {
+                    emit!(SinkSendError {
                         message: "Retries exhausted; dropping the request.",
                         error,
                     });
@@ -140,7 +143,7 @@ where
                         warn!(message = "Retrying after error.", error = %expected);
                         Some(self.build_retry())
                     } else {
-                        emit!(SinkRetryError {
+                        emit!(SinkSendError {
                             message: "Non-retriable error; dropping the request.",
                             error,
                         });
@@ -150,7 +153,7 @@ where
                     warn!("Request timed out. If this happens often while the events are actually reaching their destination, try decreasing `batch.max_bytes` and/or using `compression` if applicable. Alternatively `request.timeout_secs` can be increased.");
                     Some(self.build_retry())
                 } else {
-                    emit!(SinkRetryError {
+                    emit!(SinkSendError {
                         message: "Unexpected error type; dropping the request.",
                         error,
                     });

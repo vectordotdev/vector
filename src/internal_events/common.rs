@@ -1,4 +1,4 @@
-use std::{borrow::Cow, time::Instant};
+use std::time::Instant;
 
 use crate::emit;
 use metrics::{counter, histogram};
@@ -157,47 +157,24 @@ impl<E: std::fmt::Display> InternalEvent for SinkRequestBuildError<E> {
 }
 
 #[derive(Debug)]
-pub struct SinkRetryReasonError<'a> {
+pub struct SinkSendError<E> {
     pub message: &'static str,
-    pub reason: Cow<'a, str>,
+    pub error: E,
 }
 
-impl InternalEvent for SinkRetryReasonError<'_> {
+impl<E: std::fmt::Display> InternalEvent for SinkSendError<E> {
     fn emit(self) {
         error!(
             message = %self.message,
-            reason = %self.reason,
-            error_type = error_type::REQUEST_FAILED,
+            error = %self.error,
+            error_type = error_type::COMMAND_FAILED,
             stage = error_stage::SENDING,
             rate_limit_secs = 10,
         );
         counter!(
             "component_errors_total", 1,
-            "error_type" => error_type::REQUEST_FAILED,
+            "error_type" => error_type::COMMAND_FAILED,
             "stage" => error_stage::SENDING,
-        );
-    }
-}
-
-#[derive(Debug)]
-pub struct SinkRetryError<E> {
-    pub message: &'static str,
-    pub error: E,
-}
-
-impl<E: std::fmt::Display> InternalEvent for SinkRetryError<E> {
-    fn emit(self) {
-        error!(
-            message = %self.message,
-            error = %self.error,
-            error_type = error_type::ENCODER_FAILED,
-            stage = error_stage::PROCESSING,
-            rate_limit_secs = 10,
-        );
-        counter!(
-            "component_errors_total", 1,
-            "error_type" => error_type::ENCODER_FAILED,
-            "stage" => error_stage::PROCESSING,
         );
     }
 }
