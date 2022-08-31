@@ -30,16 +30,6 @@ fn log(
     Ok(Value::Null)
 }
 
-fn levels() -> Vec<Bytes> {
-    vec![
-        Bytes::from("trace"),
-        Bytes::from("debug"),
-        Bytes::from("info"),
-        Bytes::from("warn"),
-        Bytes::from("error"),
-    ]
-}
-
 #[derive(Clone, Copy, Debug)]
 pub struct Log;
 
@@ -113,46 +103,6 @@ impl Function for Log {
         }
         .as_expr())
     }
-
-    fn compile_argument(
-        &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
-        ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        if name == "level" {
-            let level = match expr {
-                Some(expr) => match expr.as_value() {
-                    Some(value) => levels()
-                        .into_iter()
-                        .find(|level| Some(level) == value.as_bytes())
-                        .ok_or_else(|| vrl::function::Error::InvalidEnumVariant {
-                            keyword: "level",
-                            value,
-                            variants: levels().into_iter().map(Value::from).collect::<Vec<_>>(),
-                        })?,
-                    None => return Ok(None),
-                },
-                None => Bytes::from("info"),
-            };
-
-            let level = LogInfo {
-                level,
-                span: ctx.span(),
-            };
-            Ok(Some(Box::new(level) as Box<dyn std::any::Any + Send + Sync>))
-        } else {
-            Ok(None)
-        }
-    }
-}
-
-#[allow(unused)] // will be used by LLVM runtime
-#[derive(Debug)]
-struct LogInfo {
-    level: Bytes,
-    span: vrl::diagnostic::Span,
 }
 
 #[derive(Debug, Clone)]

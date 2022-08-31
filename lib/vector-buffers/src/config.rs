@@ -389,7 +389,7 @@ mod test {
         let error = serde_yaml::from_str::<BufferConfig>(source).unwrap_err();
         assert_eq!(
             error.to_string(),
-            "unknown field `foo`, expected one of `type`, `max_events`, `max_size`, `when_full` at line 1 column 4"
+            "unknown field `foo`, expected one of `type`, `max_events`, `max_size`, `when_full`"
         );
     }
 
@@ -401,7 +401,7 @@ max_events: 42
         let error = serde_yaml::from_str::<BufferConfig>(source).unwrap_err();
         assert_eq!(
             error.to_string(),
-            "unknown field `max_size`, expected one of `type`, `max_events`, `when_full` at line 1 column 9"
+            "unknown field `max_size`, expected one of `type`, `max_events`, `when_full`"
         );
     }
 

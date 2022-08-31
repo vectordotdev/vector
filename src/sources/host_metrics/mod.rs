@@ -8,14 +8,15 @@ use heim::units::ratio::ratio;
 use heim::units::time::second;
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
+use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    config::{DataType, Output, SourceConfig, SourceContext, SourceDescription},
+    config::{DataType, Output, SourceConfig, SourceContext},
     event::metric::{Metric, MetricKind, MetricTags, MetricValue},
-    internal_events::{BytesReceived, EventsReceived, StreamClosedError},
+    internal_events::{EventsReceived, HostMetricsScrapeDetailError, StreamClosedError},
     shutdown::ShutdownSignal,
     SourceSender,
 };
@@ -71,7 +72,7 @@ pub(self) struct FilterList {
 }
 
 /// Configuration for the `host_metrics` source.
-#[configurable_component(source)]
+#[configurable_component(source("host_metrics"))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
@@ -118,14 +119,9 @@ fn default_namespace() -> Option<String> {
     Some(String::from("host"))
 }
 
-inventory::submit! {
-    SourceDescription::new::<HostMetricsConfig>("host_metrics")
-}
-
 impl_generate_config_from_default!(HostMetricsConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "host_metrics")]
 impl SourceConfig for HostMetricsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         init_roots();
@@ -138,10 +134,6 @@ impl SourceConfig for HostMetricsConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Metric)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "host_metrics"
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -161,19 +153,14 @@ impl HostMetricsConfig {
 
         let generator = HostMetrics::new(self);
 
+        let bytes_received = register!(BytesReceived::from(Protocol::NONE));
+
         while interval.next().await.is_some() {
-            emit!(BytesReceived {
-                byte_size: 0,
-                protocol: "none"
-            });
+            bytes_received.emit(ByteSize(0));
             let metrics = generator.capture_metrics().await;
             let count = metrics.len();
             if let Err(error) = out.send_batch(metrics).await {
-                emit!(StreamClosedError {
-                    count,
-                    error: error.clone()
-                });
-                error!(message = "Error sending host metrics.", %error);
+                emit!(StreamClosedError { count, error });
                 return Err(());
             }
         }
@@ -262,7 +249,10 @@ impl HostMetrics {
                 output.gauge("load15", loadavg.2.get::<ratio>() as f64, BTreeMap::new());
             }
             Err(error) => {
-                error!(message = "Failed to load load average info.", %error, internal_log_rate_secs = 60);
+                emit!(HostMetricsScrapeDetailError {
+                    message: "Failed to load load average info",
+                    error,
+                });
             }
         }
     }
@@ -272,7 +262,10 @@ impl HostMetrics {
         match heim::host::uptime().await {
             Ok(time) => output.gauge("uptime", time.get::<second>() as f64, BTreeMap::default()),
             Err(error) => {
-                error!(message = "Failed to load host uptime info.", %error, internal_log_rate_secs = 60);
+                emit!(HostMetricsScrapeDetailError {
+                    message: "Failed to load host uptime info",
+                    error,
+                });
             }
         }
 
@@ -283,7 +276,10 @@ impl HostMetrics {
                 BTreeMap::default(),
             ),
             Err(error) => {
-                error!(message = "Failed to load host boot time info.", %error, internal_log_rate_secs = 60);
+                emit!(HostMetricsScrapeDetailError {
+                    message: "Failed to load host boot time info",
+                    error,
+                });
             }
         }
     }
@@ -341,7 +337,7 @@ where
     E: std::error::Error,
 {
     result
-        .map_err(|error| error!(message, %error, internal_log_rate_secs = 60))
+        .map_err(|error| emit!(HostMetricsScrapeDetailError { message, error }))
         .ok()
 }
 
@@ -473,7 +469,8 @@ impl From<PatternWrapper> for String {
 
 #[cfg(test)]
 pub(self) mod tests {
-    use std::{collections::HashSet, future::Future};
+    use crate::test_util::components::{run_and_assert_source_compliance, SOURCE_TAGS};
+    use std::{collections::HashSet, future::Future, time::Duration};
 
     use super::*;
 
@@ -751,5 +748,18 @@ pub(self) mod tests {
                 filtered_metrics_with.len() + filtered_metrics_without.len() <= all_metrics.len()
             );
         }
+    }
+
+    #[tokio::test]
+    async fn source_compliance() {
+        let config = HostMetricsConfig {
+            scrape_interval_secs: 1.0,
+            ..Default::default()
+        };
+
+        let events =
+            run_and_assert_source_compliance(config, Duration::from_secs(2), &SOURCE_TAGS).await;
+
+        assert!(!events.is_empty());
     }
 }

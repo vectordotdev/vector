@@ -10,21 +10,22 @@ use snafu::Snafu;
 use std::task::Poll;
 use tokio::time::{self, Duration};
 use tokio_util::codec::FramedRead;
+use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{log_schema, Output, SourceConfig, SourceContext, SourceDescription},
-    internal_events::{BytesReceived, DemoLogsEventProcessed, EventsReceived, StreamClosedError},
+    config::{log_schema, Output, SourceConfig, SourceContext},
+    internal_events::{DemoLogsEventProcessed, EventsReceived, StreamClosedError},
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     SourceSender,
 };
 
 /// Configuration for the `demo_logs` source.
-#[configurable_component(source)]
+#[configurable_component(source("demo_logs"))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(default)]
@@ -185,6 +186,8 @@ async fn demo_logs_source(
 
     let mut interval = maybe_interval.map(|i| time::interval(Duration::from_secs_f64(i)));
 
+    let bytes_received = register!(BytesReceived::from(Protocol::NONE));
+
     for n in 0..count {
         if matches!(futures::poll!(&mut shutdown), Poll::Ready(_)) {
             break;
@@ -193,10 +196,7 @@ async fn demo_logs_source(
         if let Some(interval) = &mut interval {
             interval.tick().await;
         }
-        emit!(BytesReceived {
-            byte_size: 0,
-            protocol: "none",
-        });
+        bytes_received.emit(ByteSize(0));
 
         let line = format.generate_line(n);
 
@@ -246,18 +246,9 @@ async fn demo_logs_source(
     Ok(())
 }
 
-inventory::submit! {
-    SourceDescription::new::<DemoLogsConfig>("demo_logs")
-}
-
-inventory::submit! {
-    SourceDescription::new::<DemoLogsConfig>("generator")
-}
-
 impl_generate_config_from_default!(DemoLogsConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "demo_logs")]
 impl SourceConfig for DemoLogsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
@@ -287,38 +278,6 @@ impl SourceConfig for DemoLogsConfig {
             .with_standard_vector_source_metadata();
 
         vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "demo_logs"
-    }
-
-    fn can_acknowledge(&self) -> bool {
-        false
-    }
-}
-
-/// Configuration for the `generator` source.
-// Add a compatibility alias to avoid breaking existing configs
-//
-// TODO: Is this old enough now that we could actually remove it?
-#[configurable_component(source)]
-#[derive(Clone, Debug)]
-pub struct DemoLogsCompatConfig(#[configurable(transparent)] DemoLogsConfig);
-
-#[async_trait::async_trait]
-#[typetag::serde(name = "generator")]
-impl SourceConfig for DemoLogsCompatConfig {
-    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        self.0.build(cx).await
-    }
-
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
-        self.0.outputs(global_log_namespace)
-    }
-
-    fn source_type(&self) -> &'static str {
-        self.0.source_type()
     }
 
     fn can_acknowledge(&self) -> bool {

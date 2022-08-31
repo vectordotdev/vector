@@ -1,13 +1,16 @@
 use std::fmt;
 
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 pub use vector_core::config::ComponentKey;
 
-// Unlike `ComponentKey`, we never deserialize these directly out of user configs, so it's fine to
-// use the derive. They should really only be triggered by our hacky roundtrip-through-serde clone.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+/// Component output identifier.
+#[configurable_component]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct OutputId {
+    /// The component to which the output belongs.
     pub component: ComponentKey,
+
+    /// The output port name, if not the default.
     pub port: Option<String>,
 }
 

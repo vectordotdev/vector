@@ -11,4 +11,4 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 set -x
 
 cargo install --locked cargo-deny
-cargo deny --all-features check all
+cargo deny --log-level error --all-features check all

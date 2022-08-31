@@ -1,23 +1,11 @@
 use std::time::Instant;
 
+use crate::emit;
 use metrics::{counter, histogram};
 use vector_core::internal_event::InternalEvent;
 pub use vector_core::internal_event::{EventsReceived, OldEventsReceived};
 
 use super::prelude::{error_stage, error_type};
-
-#[derive(Debug)]
-pub struct BytesReceived<'a> {
-    pub byte_size: usize,
-    pub protocol: &'a str,
-}
-
-impl<'a> InternalEvent for BytesReceived<'a> {
-    fn emit(self) {
-        trace!(message = "Bytes received.", byte_size = %self.byte_size, protocol = %self.protocol);
-        counter!("component_received_bytes_total", self.byte_size as u64, "protocol" => self.protocol.to_string());
-    }
-}
 
 #[derive(Debug)]
 pub struct EndpointBytesReceived<'a> {
@@ -80,7 +68,6 @@ impl InternalEvent for StreamClosedError {
             error_code = STREAM_CLOSED,
             error_type = error_type::WRITER_FAILED,
             stage = error_stage::SENDING,
-            count = %self.count,
         );
         counter!(
             "component_errors_total", 1,
@@ -88,12 +75,11 @@ impl InternalEvent for StreamClosedError {
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
         );
-        counter!(
-            "component_discarded_events_total", self.count as u64,
-            "error_code" => STREAM_CLOSED,
-            "error_type" => error_type::WRITER_FAILED,
-            "stage" => error_stage::SENDING,
-        );
+        emit!(ComponentEventsDropped {
+            count: self.count as u64,
+            intentional: false,
+            reason: "Downstream is closed.",
+        });
     }
 }
 
@@ -122,5 +108,27 @@ impl InternalEvent for CollectionCompleted {
         debug!(message = "Collection completed.");
         counter!("collect_completed_total", 1);
         histogram!("collect_duration_seconds", self.end - self.start);
+    }
+}
+
+#[derive(Debug)]
+pub struct ComponentEventsDropped {
+    pub count: u64,
+    pub intentional: bool,
+    pub reason: &'static str,
+}
+
+impl InternalEvent for ComponentEventsDropped {
+    fn emit(self) {
+        error!(
+            message = "Events dropped.",
+            intentional = self.intentional,
+            reason = self.reason,
+        );
+        counter!(
+            "component_discarded_events_total",
+            self.count,
+            "intentional" => if self.intentional { "true" } else { "false" },
+        );
     }
 }

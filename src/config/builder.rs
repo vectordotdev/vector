@@ -6,7 +6,9 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "enterprise")]
 use serde_json::Value;
-use vector_core::{config::GlobalOptions, default_data_dir, transform::TransformConfig};
+use vector_core::{config::GlobalOptions, default_data_dir};
+
+use crate::{sources::Sources, transforms::Transforms};
 
 #[cfg(feature = "api")]
 use super::api;
@@ -14,8 +16,8 @@ use super::api;
 use super::enterprise;
 use super::{
     compiler, provider, schema, ComponentKey, Config, EnrichmentTableConfig, EnrichmentTableOuter,
-    HealthcheckOptions, SecretBackend, SinkConfig, SinkOuter, SourceConfig, SourceOuter,
-    TestDefinition, TransformOuter,
+    HealthcheckOptions, SecretBackend, SinkConfig, SinkOuter, SourceOuter, TestDefinition,
+    TransformOuter,
 };
 
 #[derive(Deserialize, Serialize, Debug, Default)]
@@ -234,7 +236,7 @@ impl ConfigBuilder {
         );
     }
 
-    pub fn add_source<S: SourceConfig + 'static, T: Into<String>>(&mut self, id: T, source: S) {
+    pub fn add_source<T: Into<String>>(&mut self, id: T, source: Sources) {
         self.sources
             .insert(ComponentKey::from(id.into()), SourceOuter::new(source));
     }
@@ -257,20 +259,12 @@ impl ConfigBuilder {
         self.sinks.insert(ComponentKey::from(id.into()), sink);
     }
 
-    pub fn add_transform<T: TransformConfig + 'static, S: Into<String>>(
-        &mut self,
-        id: S,
-        inputs: &[&str],
-        transform: T,
-    ) {
+    pub fn add_transform<S: Into<String>>(&mut self, id: S, inputs: &[&str], inner: Transforms) {
         let inputs = inputs
             .iter()
             .map(|value| value.to_string())
             .collect::<Vec<_>>();
-        let transform = TransformOuter {
-            inner: Box::new(transform),
-            inputs,
-        };
+        let transform = TransformOuter { inner, inputs };
 
         self.transforms
             .insert(ComponentKey::from(id.into()), transform);

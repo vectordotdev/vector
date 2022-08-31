@@ -13,13 +13,14 @@ use std::net::SocketAddr;
 use futures::{future::join, FutureExt, TryFutureExt};
 
 use opentelemetry_proto::proto::collector::logs::v1::logs_service_server::LogsServiceServer;
+use vector_common::internal_event::{BytesReceived, Protocol};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
 use crate::{
     config::{
         AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource, SourceConfig,
-        SourceContext, SourceDescription,
+        SourceContext,
     },
     serde::bool_or_struct,
     sources::{util::grpc::run_grpc_server, Source},
@@ -34,7 +35,7 @@ use self::{
 pub const LOGS: &str = "logs";
 
 /// Configuration for the `opentelemetry` source.
-#[configurable_component(source)]
+#[configurable_component(source("opentelemetry"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct OpentelemetryConfig {
@@ -96,12 +97,7 @@ impl GenerateConfig for OpentelemetryConfig {
     }
 }
 
-inventory::submit! {
-    SourceDescription::new::<OpentelemetryConfig>("opentelemetry")
-}
-
 #[async_trait::async_trait]
-#[typetag::serde(name = "opentelemetry")]
 impl SourceConfig for OpentelemetryConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
@@ -124,7 +120,8 @@ impl SourceConfig for OpentelemetryConfig {
 
         let http_tls_settings = MaybeTlsSettings::from_config(&self.http.tls, true)?;
         let protocol = http_tls_settings.http_protocol_name();
-        let filters = build_warp_filter(acknowledgements, cx.out, protocol);
+        let bytes_received = register!(BytesReceived::from(Protocol::from(protocol)));
+        let filters = build_warp_filter(acknowledgements, cx.out, bytes_received);
         let http_source =
             run_http_server(self.http.address, http_tls_settings, filters, cx.shutdown);
 
@@ -133,10 +130,6 @@ impl SourceConfig for OpentelemetryConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log).with_port(LOGS)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "opentelemetry"
     }
 
     fn resources(&self) -> Vec<Resource> {

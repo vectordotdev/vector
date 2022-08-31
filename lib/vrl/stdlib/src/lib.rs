@@ -40,6 +40,8 @@ mod assert_eq;
 mod boolean;
 #[cfg(feature = "ceil")]
 mod ceil;
+#[cfg(feature = "chunks")]
+mod chunks;
 #[cfg(feature = "compact")]
 mod compact;
 #[cfg(feature = "contains")]
@@ -170,6 +172,8 @@ mod match_datadog_query;
 mod md5;
 #[cfg(feature = "merge")]
 mod merge;
+#[cfg(feature = "mod")]
+mod mod_func;
 #[cfg(feature = "now")]
 mod now;
 #[cfg(feature = "object")]
@@ -319,6 +323,8 @@ pub use assert_eq::AssertEq;
 pub use boolean::Boolean;
 #[cfg(feature = "ceil")]
 pub use ceil::Ceil;
+#[cfg(feature = "chunks")]
+pub use chunks::Chunks;
 #[cfg(feature = "compact")]
 pub use compact::Compact;
 #[cfg(feature = "contains")]
@@ -439,6 +445,8 @@ pub use match_array::MatchArray;
 pub use match_datadog_query::MatchDatadogQuery;
 #[cfg(feature = "merge")]
 pub use merge::Merge;
+#[cfg(feature = "mod")]
+pub use mod_func::Mod;
 #[cfg(feature = "now")]
 pub use now::Now;
 #[cfg(feature = "object")]
@@ -598,6 +606,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Boolean),
         #[cfg(feature = "ceil")]
         Box::new(Ceil),
+        #[cfg(feature = "chunks")]
+        Box::new(Chunks),
         #[cfg(feature = "compact")]
         Box::new(Compact),
         #[cfg(feature = "contains")]
@@ -722,6 +732,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Md5),
         #[cfg(feature = "merge")]
         Box::new(Merge),
+        #[cfg(feature = "mod")]
+        Box::new(Mod),
         #[cfg(feature = "now")]
         Box::new(Now),
         // We are not sure if this is the way we want to expose this functionality yet

@@ -20,6 +20,17 @@ impl InternalEvent for ConnectionOpen {
     }
 }
 
+#[derive(Debug)]
+pub struct EndpointsActive {
+    pub count: usize,
+}
+
+impl InternalEvent for EndpointsActive {
+    fn emit(self) {
+        gauge!("active_endpoints", self.count as f64);
+    }
+}
+
 #[derive(Clone)]
 pub struct OpenGauge {
     gauge: Arc<AtomicUsize>,

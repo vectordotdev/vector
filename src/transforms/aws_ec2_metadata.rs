@@ -14,10 +14,7 @@ use tracing::Instrument;
 use vector_config::configurable_component;
 
 use crate::{
-    config::{
-        DataType, Input, Output, ProxyConfig, TransformConfig, TransformContext,
-        TransformDescription,
-    },
+    config::{DataType, Input, Output, ProxyConfig, TransformConfig, TransformContext},
     event::Event,
     http::HttpClient,
     internal_events::{AwsEc2MetadataRefreshError, AwsEc2MetadataRefreshSuccessful},
@@ -75,7 +72,7 @@ static TOKEN_HEADER: Lazy<Bytes> = Lazy::new(|| Bytes::from("X-aws-ec2-metadata-
 static HOST: Lazy<Uri> = Lazy::new(|| Uri::from_static("http://169.254.169.254"));
 
 /// Configuration for the `aws_ec2_metadata` transform.
-#[configurable_component(transform)]
+#[configurable_component(transform("aws_ec2_metadata"))]
 #[derive(Clone, Debug, Default)]
 pub struct Ec2Metadata {
     /// Overrides the default EC2 metadata endpoint.
@@ -133,14 +130,9 @@ struct Keys {
     role_name_key: MetadataKey,
 }
 
-inventory::submit! {
-    TransformDescription::new::<Ec2Metadata>("aws_ec2_metadata")
-}
-
 impl_generate_config_from_default!(Ec2Metadata);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "aws_ec2_metadata")]
 impl TransformConfig for Ec2Metadata {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         let state = Arc::new(ArcSwap::new(Arc::new(vec![])));
@@ -216,10 +208,6 @@ impl TransformConfig for Ec2Metadata {
 
     fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Metric | DataType::Log)]
-    }
-
-    fn transform_type(&self) -> &'static str {
-        "aws_ec2_metadata"
     }
 }
 

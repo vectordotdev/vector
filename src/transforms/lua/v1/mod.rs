@@ -34,12 +34,6 @@ pub struct LuaConfig {
     search_dirs: Vec<String>,
 }
 
-// Implementation of methods from `TransformConfig`
-// Note that they are implemented as struct methods instead of trait implementation methods
-// because `TransformConfig` trait requires specification of a unique `typetag::serde` name.
-// Specifying some name (for example, "lua_v*") results in this name being listed among
-// possible configuration options for `transforms` section, but such internal name should not
-// be exposed to users.
 impl LuaConfig {
     pub fn build(&self) -> crate::Result<Transform> {
         Lua::new(self.source.clone(), self.search_dirs.clone()).map(Transform::event_task)
@@ -51,10 +45,6 @@ impl LuaConfig {
 
     pub fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
-    }
-
-    pub const fn transform_type(&self) -> &'static str {
-        "lua"
     }
 }
 

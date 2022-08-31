@@ -47,11 +47,10 @@ pub mod error_type {
 #[cfg(any(
     feature = "sinks-azure_blob",
     feature = "sinks-elasticsearch",
-    feature = "sinks-prometheus",
     feature = "sources-apache_metrics",
     feature = "sources-aws_ecs_metrics",
     feature = "sources-aws_kinesis_firehose",
-    feature = "sources-prometheus",
+    feature = "sources-http-scrape",
     feature = "sources-utils-http",
 ))]
 pub(crate) fn http_error_code(code: u16) -> String {
