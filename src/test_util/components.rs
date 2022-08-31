@@ -67,10 +67,6 @@ pub const HTTP_SINK_TAGS: [&str; 2] = ["endpoint", "protocol"];
 /// The standard set of tags for all `AWS`-based sinks.
 pub const AWS_SINK_TAGS: [&str; 2] = ["protocol", "region"];
 
-pub const ALLOW_DOUBLE_EMISSION: bool = true;
-
-pub const DISALLOW_DOUBLE_EMISSION: bool = false;
-
 /// This struct is used to describe a set of component tests.
 pub struct ComponentTests {
     /// The list of event (suffixes) that must be emitted by the component
@@ -147,9 +143,9 @@ pub static COMPONENT_MULTIPLE_OUTPUTS_TESTS: Lazy<ComponentTests> = Lazy::new(||
 impl ComponentTests {
     /// Run the test specification, and assert that all tests passed.
     #[track_caller]
-    pub fn assert_detail(&self, tags: &[&str], allow_double_emission: bool) {
+    pub fn assert(&self, tags: &[&str]) {
         let mut test = ComponentTester::new();
-        test.emitted_all_events(self.events, allow_double_emission);
+        test.emitted_all_events(self.events);
         test.emitted_all_counters(self.tagged_counters, tags);
         test.emitted_all_counters(self.untagged_counters, &[]);
         if !test.errors.is_empty() {
@@ -158,12 +154,6 @@ impl ComponentTests {
                 test.errors.join("\n")
             );
         }
-    }
-
-    /// Run the test specification, and assert that all tests passed.
-    #[track_caller]
-    pub fn assert(&self, tags: &[&str]) {
-        self.assert_detail(tags, ALLOW_DOUBLE_EMISSION);
     }
 }
 
@@ -245,11 +235,10 @@ impl ComponentTester {
         }
     }
 
-    fn emitted_all_events(&mut self, names: &[&str], allow_double_emission: bool) {
+    fn emitted_all_events(&mut self, names: &[&str]) {
         for name in names {
-            if let Err(err_msg) = event_test_util::contains_name(name, allow_double_emission) {
-                self.errors
-                    .push(format!("  - {} event `{}`", err_msg, name));
+            if let Err(err_msg) = event_test_util::contains_name_once(name) {
+                self.errors.push(format!("  - {}", err_msg));
             }
         }
     }
@@ -260,14 +249,13 @@ impl ComponentTester {
 pub async fn assert_source<T>(
     tests: &Lazy<ComponentTests>,
     tags: &[&str],
-    allow_double_emission: bool,
     f: impl Future<Output = T>,
 ) -> T {
     init_test();
 
     let result = f.await;
 
-    tests.assert_detail(tags, allow_double_emission);
+    tests.assert(tags);
 
     result
 }
@@ -275,7 +263,7 @@ pub async fn assert_source<T>(
 /// Convenience wrapper for running source tests.
 #[track_caller]
 pub async fn assert_source_compliance<T>(tags: &[&str], f: impl Future<Output = T>) -> T {
-    assert_source(&SOURCE_TESTS, tags, ALLOW_DOUBLE_EMISSION, f).await
+    assert_source(&SOURCE_TESTS, tags, f).await
 }
 
 /// Runs source tests with timeout and asserts happy path compliance.
@@ -288,16 +276,7 @@ pub async fn run_and_assert_source_compliance<SC>(
 where
     SC: SourceConfig,
 {
-    run_and_assert_source_advanced(
-        source,
-        |_| {},
-        Some(timeout),
-        None,
-        &SOURCE_TESTS,
-        tags,
-        ALLOW_DOUBLE_EMISSION,
-    )
-    .await
+    run_and_assert_source_advanced(source, |_| {}, Some(timeout), None, &SOURCE_TESTS, tags).await
 }
 
 /// Runs source tests with an event count limit and asserts happy path compliance.
@@ -310,16 +289,8 @@ pub async fn run_and_assert_source_compliance_n<SC>(
 where
     SC: SourceConfig,
 {
-    run_and_assert_source_advanced(
-        source,
-        |_| {},
-        None,
-        Some(event_count),
-        &SOURCE_TESTS,
-        tags,
-        ALLOW_DOUBLE_EMISSION,
-    )
-    .await
+    run_and_assert_source_advanced(source, |_| {}, None, Some(event_count), &SOURCE_TESTS, tags)
+        .await
 }
 
 /// Runs source tests with timeout and asserts error path compliance.
@@ -339,7 +310,6 @@ where
         None,
         &COMPONENT_TESTS_ERROR,
         tags,
-        DISALLOW_DOUBLE_EMISSION,
     )
     .await
 }
@@ -355,16 +325,7 @@ pub async fn run_and_assert_source_compliance_advanced<SC>(
 where
     SC: SourceConfig,
 {
-    run_and_assert_source_advanced(
-        source,
-        setup,
-        timeout,
-        event_count,
-        &SOURCE_TESTS,
-        tags,
-        ALLOW_DOUBLE_EMISSION,
-    )
-    .await
+    run_and_assert_source_advanced(source, setup, timeout, event_count, &SOURCE_TESTS, tags).await
 }
 
 #[track_caller]
@@ -375,12 +336,11 @@ pub async fn run_and_assert_source_advanced<SC>(
     event_count: Option<usize>,
     tests: &Lazy<ComponentTests>,
     tags: &[&str],
-    allow_double_emission: bool,
 ) -> Vec<Event>
 where
     SC: SourceConfig,
 {
-    assert_source(tests, tags, allow_double_emission, async move {
+    assert_source(tests, tags, async move {
         // Build the source and set ourselves up to both drive it to completion as well as collect all the events it sends out.
         let (tx, mut rx) = SourceSender::new_test();
         let mut context = SourceContext::new_test(tx, None);
@@ -507,7 +467,7 @@ pub async fn assert_sink_error<T>(tags: &[&str], f: impl Future<Output = T>) -> 
 
     let result = f.await;
 
-    COMPONENT_TESTS_ERROR.assert_detail(tags, DISALLOW_DOUBLE_EMISSION);
+    COMPONENT_TESTS_ERROR.assert(tags);
 
     result
 }

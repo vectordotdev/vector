@@ -1,3 +1,4 @@
+use std::fmt::Write as _;
 use std::{cell::RefCell, collections::HashSet};
 
 thread_local! {
@@ -5,30 +6,30 @@ thread_local! {
     static EVENTS_RECORDED: RefCell<HashSet<String>> = RefCell::new(HashSet::new());
 }
 
-/// Returns Ok(()) if:
-///   - `allow_double_emission` is true and any event contains `name`.
-///   - `allow_double_emission` is false and only one event contains `name`.
+/// Returns Ok(()) if the event name pattern is matched only once.
 ///
 /// # Errors
 ///
-/// Will return `Err` if `name` is not found in the event record, or is found more than once.
-pub fn contains_name(name: &str, allow_double_emission: bool) -> Result<(), &'static str> {
+/// Will return `Err` if `pattern` is not found in the event record, or is found multiple times.
+pub fn contains_name_once(pattern: &str) -> Result<(), String> {
     EVENTS_RECORDED.with(|events| {
-        let mut found = false;
+        let mut n_events = 0;
+        let mut names: String = "".to_string();
         for event in events.borrow().iter() {
-            if event.ends_with(name) {
-                if allow_double_emission {
-                    return Ok(());
-                } else if found {
-                    return Err("Multiple events");
+            if event.ends_with(pattern) {
+                if n_events > 0 {
+                    names.push_str(", ");
                 }
-                found = true;
+                n_events += 1;
+                let _ = write!(names, "`{}`", event);
             }
         }
-        if found {
-            Ok(())
+        if n_events == 0 {
+            Err(format!("Missing event `{}`", pattern))
+        } else if n_events > 1 {
+            Err(format!("Multiple ({}) events: ({})", n_events, names))
         } else {
-            Err("Missing event")
+            Ok(())
         }
     })
 }
