@@ -32,6 +32,8 @@ pub(crate) use config::DatadogLogsConfig;
 
 use crate::config::SinkDescription;
 
+pub(crate) const NAME: &str = "datadog_logs";
+
 inventory::submit! {
-    SinkDescription::new::<DatadogLogsConfig>("datadog_logs")
+    SinkDescription::new::<DatadogLogsConfig>(NAME)
 }

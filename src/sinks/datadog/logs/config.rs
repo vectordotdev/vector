@@ -206,7 +206,7 @@ impl SinkConfig for DatadogLogsConfig {
     }
 
     fn sink_type(&self) -> &'static str {
-        "datadog_logs"
+        super::NAME
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

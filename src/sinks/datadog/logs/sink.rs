@@ -16,7 +16,7 @@ use vector_core::{
     ByteSizeOf,
 };
 
-use super::{config::MAX_PAYLOAD_BYTES, service::LogApiRequest};
+use super::{config::MAX_PAYLOAD_BYTES, service::LogApiRequest, NAME};
 use crate::{
     codecs::{Encoder, Transformer},
     internal_events::SinkRequestBuildError,
@@ -386,10 +386,7 @@ where
                 .filter_map(|request| async move {
                     match request {
                         Err(error) => {
-                            emit!(SinkRequestBuildError {
-                                message: "Failed to build Datadog Logs request.",
-                                error,
-                            });
+                            emit!(SinkRequestBuildError { name: NAME, error });
                             None
                         }
                         Ok(req) => Some(req),
@@ -412,10 +409,7 @@ where
                 .filter_map(|request| async move {
                     match request {
                         Err(error) => {
-                            emit!(SinkRequestBuildError {
-                                message: "Failed to build Datadog Logs request.",
-                                error,
-                            });
+                            emit!(SinkRequestBuildError { name: NAME, error });
                             None
                         }
                         Ok(req) => Some(req),
