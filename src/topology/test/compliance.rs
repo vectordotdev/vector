@@ -13,14 +13,12 @@ use vector_core::{
 use crate::{
     config::{unit_test::UnitTestSourceConfig, ConfigBuilder, SinkConfig, SinkContext},
     sinks::Healthcheck,
-    sources::Sources,
     test_util::{
         components::assert_transform_compliance,
         mock::transforms::{NoopTransformConfig, TransformType},
         start_topology,
     },
     topology::RunningTopology,
-    transforms::Transforms,
 };
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -85,14 +83,14 @@ async fn create_topology(
 
     builder.add_source(
         "in",
-        Sources::UnitTest(UnitTestSourceConfig {
+        UnitTestSourceConfig {
             events: vec![event],
-        }),
+        },
     );
     builder.add_transform(
         "transform",
         &["in"],
-        Transforms::TestNoop(NoopTransformConfig::from(transform_type)),
+        NoopTransformConfig::from(transform_type),
     );
     builder.add_sink(
         "out",

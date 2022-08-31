@@ -25,6 +25,7 @@ use crate::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
     },
     event::{Event, EventFinalizers, EventStatus, Finalizable},
+    internal_events::PulsarSendingError,
     sinks::util::metadata::RequestMetadata,
 };
 
@@ -356,9 +357,12 @@ impl Sink<Event> for PulsarSink {
                         protocol: "tcp",
                     });
                 }
-                Some((Err(error), _, finalizers)) => {
+                Some((Err(error), metadata, finalizers)) => {
                     finalizers.update_status(EventStatus::Errored);
-                    error!(message = "Pulsar sink generated an error.", %error);
+                    emit!(PulsarSendingError {
+                        error: Box::new(error),
+                        count: metadata.event_count(),
+                    });
                     return Poll::Ready(Err(()));
                 }
                 None => break,

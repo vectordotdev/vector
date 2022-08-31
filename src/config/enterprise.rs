@@ -32,9 +32,8 @@ use crate::{
         host_metrics::{Collector, HostMetricsConfig},
         internal_logs::InternalLogsConfig,
         internal_metrics::InternalMetricsConfig,
-        Sources,
     },
-    transforms::{filter::FilterConfig, remap::RemapConfig, Transforms},
+    transforms::{filter::FilterConfig, remap::RemapConfig},
 };
 use vector_config::configurable_component;
 
@@ -434,9 +433,7 @@ fn setup_logs_reporting(
     let internal_logs_id = OutputId::from(ComponentKey::from(INTERNAL_LOGS_KEY));
     let datadog_logs_id = ComponentKey::from(DATADOG_LOGS_KEY);
 
-    let internal_logs = Sources::InternalLogs(InternalLogsConfig {
-        ..Default::default()
-    });
+    let internal_logs = InternalLogsConfig::default();
 
     let custom_logs_tags_vrl = datadog
         .tags
@@ -445,7 +442,7 @@ fn setup_logs_reporting(
 
     let configuration_key = &datadog.configuration_key;
     let vector_version = crate::vector_version();
-    let tag_logs = Transforms::Remap(RemapConfig {
+    let tag_logs = RemapConfig {
         source: Some(format!(
             r#"
             .ddsource = "vector"
@@ -457,7 +454,7 @@ fn setup_logs_reporting(
             custom_logs_tags_vrl,
         )),
         ..Default::default()
-    });
+    };
 
     // Create a Datadog logs sink to consume and emit internal logs.
     let datadog_logs = DatadogLogsConfig {
@@ -505,7 +502,7 @@ fn setup_metrics_reporting(
     // By default, host_metrics generates many metrics and some with high
     // cardinality which can negatively impact customers' costs and downstream
     // systems' performance. To avoid this, we explicitly set `collectors`.
-    let host_metrics = Sources::HostMetrics(HostMetricsConfig {
+    let host_metrics = HostMetricsConfig {
         namespace: Some("vector.host".to_owned()),
         scrape_interval_secs: datadog.reporting_interval_secs,
         collectors: Some(vec![
@@ -517,16 +514,16 @@ fn setup_metrics_reporting(
             Collector::Network,
         ]),
         ..Default::default()
-    });
+    };
 
-    let internal_metrics = Sources::InternalMetrics(InternalMetricsConfig {
+    let internal_metrics = InternalMetricsConfig {
         // While the default namespace for internal metrics is already "vector",
         // setting the namespace here is meant for clarity and resistance
         // against any future or accidental changes.
         namespace: Some("vector".to_owned()),
         scrape_interval_secs: datadog.reporting_interval_secs,
         ..Default::default()
-    });
+    };
 
     let custom_metric_tags_vrl = datadog
         .tags
@@ -535,7 +532,7 @@ fn setup_metrics_reporting(
 
     let configuration_key = &datadog.configuration_key;
     let vector_version = crate::vector_version();
-    let tag_metrics = Transforms::Remap(RemapConfig {
+    let tag_metrics = RemapConfig {
         source: Some(format!(
             r#"
             .tags.configuration_version_hash = "{configuration_version_hash}"
@@ -546,17 +543,17 @@ fn setup_metrics_reporting(
             custom_metric_tags_vrl
         )),
         ..Default::default()
-    });
+    };
 
     // Preserve the `pipelines` namespace for specific metrics
-    let filter_metrics = Transforms::Filter(FilterConfig::from(AnyCondition::String(
+    let filter_metrics = FilterConfig::from(AnyCondition::String(
         r#".name == "component_received_bytes_total""#.to_string(),
-    )));
+    ));
 
-    let pipelines_namespace_metrics = Transforms::Remap(RemapConfig {
+    let pipelines_namespace_metrics = RemapConfig {
         source: Some(r#".namespace = "pipelines""#.to_string()),
         ..Default::default()
-    });
+    };
 
     // Create a Datadog metrics sink to consume and emit internal + host metrics.
     let datadog_metrics = DatadogMetricsConfig {
