@@ -1339,6 +1339,28 @@ mod resource_tests {
     }
 
     #[test]
+    fn different_unspecified_ip_version() {
+        let components = vec![
+            (
+                "sink_0",
+                vec![Resource::tcp(SocketAddr::new(
+                    Ipv4Addr::UNSPECIFIED.into(),
+                    0,
+                ))],
+            ),
+            (
+                "sink_1",
+                vec![Resource::tcp(SocketAddr::new(
+                    Ipv6Addr::UNSPECIFIED.into(),
+                    0,
+                ))],
+            ),
+        ];
+        let conflicting = Resource::conflicts(components);
+        assert_eq!(conflicting, HashMap::new());
+    }
+
+    #[test]
     fn different_protocol() {
         let components = vec![
             (
