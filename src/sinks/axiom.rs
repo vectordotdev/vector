@@ -20,7 +20,7 @@ static CLOUD_URL: &str = "https://cloud.axiom.co";
 /// Configuration for the `axiom` sink.
 #[configurable_component(sink("axiom"))]
 #[derive(Clone, Debug, Default)]
-pub(self) struct AxiomConfig {
+pub struct AxiomConfig {
     /// URI of the Axiom endpoint to send data to.
     ///
     /// Only required if not using Axiom Cloud.

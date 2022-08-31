@@ -161,7 +161,7 @@ pub enum Sinks {
 
     /// Axiom.
     #[cfg(feature = "sinks-axiom")]
-    Axiom(#[configurable(derived)] axiom::AxiomSinkConfig),
+    Axiom(#[configurable(derived)] axiom::AxiomConfig),
 
     /// Azure Blob Storage.
     #[cfg(feature = "sinks-azure_blob")]
