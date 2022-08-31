@@ -1,9 +1,4 @@
-use std::{
-    fmt::Debug,
-    io::{self, Write},
-    num::NonZeroUsize,
-    sync::Arc,
-};
+use std::{fmt::Debug, io, num::NonZeroUsize, sync::Arc};
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -26,8 +21,9 @@ use crate::{
     codecs::{Encoder, Transformer},
     internal_events::SinkRequestBuildError,
     sinks::util::{
-        encoding::Encoder as _, request_builder::EncodeResult, Compression, Compressor,
-        RequestBuilder, SinkBuilderExt,
+        encoding::{write_all, Encoder as _},
+        request_builder::EncodeResult,
+        Compression, Compressor, RequestBuilder, SinkBuilderExt,
     },
 };
 #[derive(Default)]
@@ -247,7 +243,7 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
 
         // Now just compress it like normal.
         let mut compressor = Compressor::from(self.compression);
-        compressor.write_all(&buf)?;
+        write_all(&mut compressor, &buf)?;
         let bytes = compressor.into_inner().freeze();
 
         if self.compression.is_compressed() {
@@ -331,7 +327,7 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for SemanticLogRequestBuilde
 
         // Now just compress it like normal.
         let mut compressor = Compressor::from(self.compression);
-        compressor.write_all(&buf)?;
+        write_all(&mut compressor, &buf)?;
         let bytes = compressor.into_inner().freeze();
 
         if self.compression.is_compressed() {

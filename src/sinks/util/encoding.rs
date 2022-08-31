@@ -68,7 +68,7 @@ impl Encoder<Event> for (Transformer, crate::codecs::Encoder<()>) {
 
 /// Write the buffer to the writer, emitting an internal event which complies with the
 /// instrumentation spec- as this necessitates both an Error and EventsDropped event.
-fn write_all(writer: &mut dyn io::Write, buf: &[u8]) -> io::Result<()> {
+pub(crate) fn write_all(writer: &mut dyn io::Write, buf: &[u8]) -> io::Result<()> {
     writer.write_all(buf).map_err(|error| {
         emit!(EncoderWriteAllError { error: &error });
         error

@@ -5,7 +5,9 @@ thread_local! {
     static EVENTS_RECORDED: RefCell<HashSet<String>> = RefCell::new(HashSet::new());
 }
 
-/// Ok(()) if true
+/// Returns Ok(()) if:
+///   - `allow_double_emission` is true and any event contains `name`.
+///   - `allow_double_emission` is false and only one event contains `name`.
 ///
 /// # Errors
 ///
