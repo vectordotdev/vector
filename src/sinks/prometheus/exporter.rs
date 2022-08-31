@@ -577,7 +577,7 @@ impl StreamSink<Event> for PrometheusExporter {
                 }
                 finalizers.update_status(EventStatus::Delivered);
             } else {
-                emit!(PrometheusNormalizationError { });
+                emit!(PrometheusNormalizationError {});
                 finalizers.update_status(EventStatus::Errored);
             }
         }
