@@ -46,7 +46,5 @@ impl<'a> InternalEvent for TemplateRenderingError<'a> {
             // deprecated
             counter!("events_discarded_total", 1);
         }
-
-        // TODO refactor this with ComponentDroppedEvents
     }
 }

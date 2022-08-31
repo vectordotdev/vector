@@ -55,8 +55,9 @@ pub struct EncoderFramingError<'a> {
 
 impl<'a> InternalEvent for EncoderFramingError<'a> {
     fn emit(self) {
+        let reason = "Failed framing bytes.";
         error!(
-            message = "Failed framing bytes.",
+            message = reason,
             error = %self.error,
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::SENDING,
@@ -68,15 +69,11 @@ impl<'a> InternalEvent for EncoderFramingError<'a> {
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::SENDING,
         );
-<<<<<<< HEAD
-        // TODO fire component dropped events here
-=======
         emit!(ComponentEventsDropped {
             count: 1,
             intentional: false,
-            reason: "Failed framing bytes.",
+            reason,
         });
->>>>>>> master
     }
 }
 
@@ -87,8 +84,9 @@ pub struct EncoderSerializeError<'a> {
 
 impl<'a> InternalEvent for EncoderSerializeError<'a> {
     fn emit(self) {
+        let reason = "Failed serializing frame.";
         error!(
-            message = "Failed serializing frame.",
+            message = reason,
             error = %self.error,
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::SENDING,
@@ -100,8 +98,11 @@ impl<'a> InternalEvent for EncoderSerializeError<'a> {
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::SENDING,
         );
-<<<<<<< HEAD
-        // TODO fire component dropped events here
+        emit!(ComponentEventsDropped {
+            count: 1,
+            intentional: false,
+            reason,
+        });
     }
 }
 
@@ -112,8 +113,9 @@ pub struct EncoderWriteAllError<'a, E> {
 
 impl<E: std::fmt::Display> InternalEvent for EncoderWriteAllError<'_, E> {
     fn emit(self) {
+        let reason = "Failed writing bytes.";
         error!(
-            message = "Failed writing bytes.",
+            message = reason,
             error = %self.error,
             error_type = error_type::IO_FAILED,
             stage = error_stage::SENDING,
@@ -124,13 +126,10 @@ impl<E: std::fmt::Display> InternalEvent for EncoderWriteAllError<'_, E> {
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::SENDING,
         );
-        // TODO fire component dropped events here
-=======
         emit!(ComponentEventsDropped {
             count: 1,
             intentional: false,
-            reason: "Failed serializing frame.",
+            reason,
         });
->>>>>>> master
     }
 }
