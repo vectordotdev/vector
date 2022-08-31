@@ -33,7 +33,7 @@ impl InternalEvent for NatsEventSendError {
         emit!(ComponentEventsDropped {
             count: 1,
             intentional: false,
-            reason: reason,
+            reason,
         });
     }
 }
