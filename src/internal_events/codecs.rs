@@ -1,3 +1,4 @@
+use crate::{emit, internal_events::ComponentEventsDropped};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -54,15 +55,12 @@ pub struct EncoderFramingError<'a> {
 
 impl<'a> InternalEvent for EncoderFramingError<'a> {
     fn emit(self) {
-        warn!(message = "Failed framing bytes.", error = %self.error, internal_log_rate_secs = 10);
         error!(
-            message = "Events dropped.",
-            count = 1,
+            message = "Failed framing bytes.",
             error = %self.error,
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::SENDING,
-            intentional = false,
-            reason = "Failed framing bytes.",
+            internal_log_rate_secs = 10,
         );
         counter!("encoder_framing_errors_total", 1);
         counter!(
@@ -70,12 +68,11 @@ impl<'a> InternalEvent for EncoderFramingError<'a> {
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::SENDING,
         );
-        counter!(
-            "component_discarded_events_total", 1,
-            "error_type" => error_type::ENCODER_FAILED,
-            "stage" => error_stage::SENDING,
-            "intentional" => "false",
-        );
+        emit!(ComponentEventsDropped {
+            count: 1,
+            intentional: false,
+            reason: "Failed framing bytes.",
+        });
     }
 }
 
@@ -86,15 +83,12 @@ pub struct EncoderSerializeError<'a> {
 
 impl<'a> InternalEvent for EncoderSerializeError<'a> {
     fn emit(self) {
-        warn!(message = "Failed serializing frame.", error = %self.error, internal_log_rate_secs = 10);
         error!(
-            message = "Events dropped.",
-            count = 1,
+            message = "Failed serializing frame.",
             error = %self.error,
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::SENDING,
-            intentional = false,
-            reason = "Failed serializing frame.",
+            internal_log_rate_secs = 10,
         );
         counter!("encoder_serialize_errors_total", 1);
         counter!(
@@ -102,11 +96,10 @@ impl<'a> InternalEvent for EncoderSerializeError<'a> {
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::SENDING,
         );
-        counter!(
-            "component_discarded_events_total", 1,
-            "error_type" => error_type::ENCODER_FAILED,
-            "stage" => error_stage::SENDING,
-            "intentional" => "false",
-        );
+        emit!(ComponentEventsDropped {
+            count: 1,
+            intentional: false,
+            reason: "Failed serializing frame.",
+        });
     }
 }
