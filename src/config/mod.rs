@@ -299,7 +299,7 @@ impl Resource {
             for resource in resources {
                 if let Resource::Port(address, protocol) = &resource {
                     if address.ip().is_unspecified() {
-                        unspecified.push((key.clone(), address.port(), *protocol));
+                        unspecified.push((key.clone(), *address, *protocol));
                     }
                 }
 
@@ -313,10 +313,13 @@ impl Resource {
         // Port with unspecified address will bind to all network interfaces
         // so we have to check for all Port resources if they share the same
         // port.
-        for (key, port, protocol0) in unspecified {
+        for (key, address0, protocol0) in unspecified {
             for (resource, components) in resource_map.iter_mut() {
                 if let Resource::Port(address, protocol) = resource {
-                    if address.port() == port && &protocol0 == protocol {
+                    // IP addresses can either be v4 or v6.
+                    // Therefore we check if the ip version matches, the port matches and if the protocol (TCP/UDP) matches
+                    // when checking for equality.
+                    if address.port() == address0.port() && &protocol0 == protocol && address0.is_ipv4() == address.is_ipv4() {
                         components.insert(key.clone());
                     }
                 }
