@@ -361,7 +361,7 @@ impl Sink<Event> for PulsarSink {
                     finalizers.update_status(EventStatus::Errored);
                     emit!(PulsarSendingError {
                         error: Box::new(error),
-                        count: metadata.event_count(),
+                        count: metadata.event_count() as u64,
                     });
                     return Poll::Ready(Err(()));
                 }
