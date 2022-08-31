@@ -225,25 +225,27 @@ impl ConfigBuilder {
         compiler::compile(self)
     }
 
-    pub fn add_enrichment_table<E: EnrichmentTableConfig + 'static, T: Into<String>>(
+    pub fn add_enrichment_table<K: Into<String>, E: EnrichmentTableConfig + 'static>(
         &mut self,
-        name: T,
+        key: K,
         enrichment_table: E,
     ) {
         self.enrichment_tables.insert(
-            ComponentKey::from(name.into()),
+            ComponentKey::from(key.into()),
             EnrichmentTableOuter::new(Box::new(enrichment_table)),
         );
     }
 
-    pub fn add_source<T: Into<String>>(&mut self, id: T, source: Sources) {
-        self.sources
-            .insert(ComponentKey::from(id.into()), SourceOuter::new(source));
+    pub fn add_source<K: Into<String>, S: Into<Sources>>(&mut self, key: K, source: S) {
+        self.sources.insert(
+            ComponentKey::from(key.into()),
+            SourceOuter::new(source.into()),
+        );
     }
 
-    pub fn add_sink<S: SinkConfig + 'static, T: Into<String>>(
+    pub fn add_sink<K: Into<String>, S: SinkConfig + 'static>(
         &mut self,
-        id: T,
+        key: K,
         inputs: &[&str],
         sink: S,
     ) {
@@ -252,22 +254,29 @@ impl ConfigBuilder {
             .map(|value| value.to_string())
             .collect::<Vec<_>>();
         let sink = SinkOuter::new(inputs, Box::new(sink));
-        self.add_sink_outer(id, sink);
+        self.add_sink_outer(key, sink);
     }
 
-    pub fn add_sink_outer(&mut self, id: impl Into<String>, sink: SinkOuter<String>) {
-        self.sinks.insert(ComponentKey::from(id.into()), sink);
+    pub fn add_sink_outer<K: Into<String>>(&mut self, key: K, sink: SinkOuter<String>) {
+        self.sinks.insert(ComponentKey::from(key.into()), sink);
     }
 
-    pub fn add_transform<S: Into<String>>(&mut self, id: S, inputs: &[&str], inner: Transforms) {
+    // For some feature sets, no transforms are compiled, which leads to no callers using this
+    // method, and in turn, annoying errors about unused variables.
+    pub fn add_transform<K: Into<String>, T: Into<Transforms>>(
+        &mut self,
+        key: K,
+        inputs: &[&str],
+        transform: T,
+    ) {
         let inputs = inputs
             .iter()
             .map(|value| value.to_string())
             .collect::<Vec<_>>();
-        let transform = TransformOuter { inner, inputs };
+        let transform = TransformOuter::new(inputs, transform.into());
 
         self.transforms
-            .insert(ComponentKey::from(id.into()), transform);
+            .insert(ComponentKey::from(key.into()), transform);
     }
 
     pub fn set_data_dir(&mut self, path: &Path) {

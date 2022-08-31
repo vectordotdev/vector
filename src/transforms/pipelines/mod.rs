@@ -126,8 +126,6 @@ use crate::{
     transforms::route::{RouteConfig, UNMATCHED_ROUTE},
 };
 
-use super::Transforms;
-
 /// Configuration for the `pipelines` transform.
 #[configurable_component(transform("pipelines"))]
 #[derive(Clone, Debug, Default)]
@@ -243,7 +241,7 @@ impl TransformConfig for PipelinesConfig {
             router_name,
             InnerTopologyTransform {
                 inputs: inputs.to_vec(),
-                inner: Transforms::Route(RouteConfig::new(conditions)),
+                inner: RouteConfig::new(conditions).into(),
             },
         );
         Ok(Some(result))
@@ -299,10 +297,7 @@ mod tests {
     use indexmap::IndexMap;
 
     use super::{GenerateConfig, PipelinesConfig};
-    use crate::{
-        config::{ComponentKey, TransformOuter},
-        transforms::Transforms,
-    };
+    use crate::config::{ComponentKey, TransformOuter};
 
     #[test]
     fn generate_config() {
@@ -324,10 +319,7 @@ mod tests {
     fn expanding() {
         let config = PipelinesConfig::generate_config();
         let config: PipelinesConfig = config.try_into().unwrap();
-        let outer = TransformOuter {
-            inputs: vec!["source".to_string()],
-            inner: Transforms::Pipelines(config),
-        };
+        let outer = TransformOuter::new(vec!["source".to_string()], config);
         let name = ComponentKey::from("foo");
         let mut transforms = IndexMap::new();
         let mut expansions = IndexMap::new();

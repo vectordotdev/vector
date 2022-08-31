@@ -145,7 +145,7 @@ impl PipelineConfig {
             name.clone(),
             InnerTopologyTransform {
                 inputs: inputs.to_vec(),
-                inner: Transforms::Pipeline(self.clone()),
+                inner: self.clone().into(),
             },
         );
         result

@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use async_trait::async_trait;
+use enum_dispatch::enum_dispatch;
 use indexmap::IndexMap;
 use serde::Serialize;
 use vector_config::{configurable_component, Configurable, NamedComponent};
@@ -33,9 +34,11 @@ impl<T> TransformOuter<T>
 where
     T: Configurable + Serialize,
 {
-    #[cfg(feature = "enterprise")]
-    pub(super) fn new(inputs: Vec<T>, inner: Transforms) -> Self {
-        TransformOuter { inputs, inner }
+    pub(crate) fn new<I: Into<Transforms>>(inputs: Vec<T>, inner: I) -> Self {
+        TransformOuter {
+            inputs,
+            inner: inner.into(),
+        }
     }
 
     pub(super) fn map_inputs<U>(self, f: impl Fn(&T) -> U) -> TransformOuter<U>
@@ -166,6 +169,7 @@ impl TransformContext {
 }
 
 #[async_trait]
+#[enum_dispatch]
 pub trait TransformConfig: NamedComponent + core::fmt::Debug + Send + Sync {
     async fn build(&self, globals: &TransformContext) -> crate::Result<Transform>;
 
