@@ -1,4 +1,42 @@
 use serde::{ser, Serialize};
+use value::Value;
+
+pub struct JsonEncodedValue<'a>(pub &'a Value);
+
+impl<'a> Serialize for JsonEncodedValue<'a> {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
+        match &self.0 {
+            // The `Value` type serializes `Value::Bytes` using `serialize_str`, but this requires
+            // an extra allocation.
+            //
+            // Since we never serialize bytes as an array of integers in the JSON representation of
+            // `Value`, we can use `serialize_bytes` instead to count the actual number of bytes in
+            // the byte array, and add two extra bytes for the surrounding quotes. This avoids the
+            // extra allocations, while still allowing `Value` itself to allocate and serialize
+            // `Value::Bytes` to a string.
+            Value::Bytes(b) => serializer.serialize_bytes(b),
+
+            // We approximate the size of a timestamp by using milliseconds precision.
+            //
+            // This can be off, if a different timezone is used (but our `Value` type's serialie
+            // implementation always uses UTC offset), or if the precision is more or less than
+            // milliseconds precision (which can happen, because our `Value` type does automatic
+            // inference of the required amount of precision, from nanoseconds to seconds).
+            //
+            // This is done to avoid having to allocate the timestamp to a string, to calculate the
+            // exact byte size. A future improvement should calculate the required precision, and
+            // addopt the proper timestamp length accordingly.
+            Value::Timestamp(_) => serializer.serialize_str("1970-01-01T00:00:00.000Z"),
+
+            // All other `Value` variants are serialized according to the default serialization
+            // implementation of that type.
+            v => v.serialize(serializer),
+        }
+    }
+}
 
 pub trait JsonEncodedSizeOf {
     fn json_encoded_size_of(&self) -> usize;
