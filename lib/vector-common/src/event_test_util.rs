@@ -10,12 +10,14 @@ thread_local! {
 /// # Errors
 ///
 /// Will return `Err` if `name` is not found in the event record, or is found more than once.
-pub fn contains_name_once(name: &str) -> Result<(), &'static str> {
+pub fn contains_name(name: &str, allow_double_emission: bool) -> Result<(), &'static str> {
     EVENTS_RECORDED.with(|events| {
         let mut found = false;
         for event in events.borrow().iter() {
             if event.ends_with(name) {
-                if found {
+                if allow_double_emission {
+                    return Ok(());
+                } else if found {
                     return Err("Multiple events");
                 }
                 found = true;
