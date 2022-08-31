@@ -238,6 +238,7 @@ derivative = { version = "2.2.0", default-features = false }
 dirs-next = { version = "2.0.0", default-features = false, optional = true }
 dyn-clone = { version = "1.0.9", default-features = false }
 encoding_rs = { version = "0.8.31", default-features = false, features = ["serde"] }
+enum_dispatch = { version = "0.3.8", default-features = false }
 exitcode = { version = "1.1.2", default-features = false }
 flate2 = { version = "1.0.24", default-features = false, features = ["default"] }
 futures-util = { version = "0.3.21", default-features = false }
@@ -537,7 +538,6 @@ transforms-logs = [
   "transforms-dedupe",
   "transforms-filter",
   "transforms-geoip",
-  "transforms-log_to_metric",
   "transforms-lua",
   "transforms-metric_to_log",
   "transforms-pipelines",
@@ -550,7 +550,6 @@ transforms-logs = [
 transforms-metrics = [
   "transforms-aggregate",
   "transforms-filter",
-  "transforms-log_to_metric",
   "transforms-lua",
   "transforms-metric_to_log",
   "transforms-pipelines",
@@ -564,7 +563,6 @@ transforms-aws_ec2_metadata = ["dep:arc-swap"]
 transforms-dedupe = ["dep:lru"]
 transforms-filter = []
 transforms-geoip = ["dep:maxminddb"]
-transforms-log_to_metric = []
 transforms-lua = ["dep:mlua", "vector-core/lua"]
 transforms-metric_to_log = []
 transforms-pipelines = ["transforms-filter", "transforms-route"]
@@ -785,11 +783,10 @@ redis-integration-tests = ["sinks-redis", "sources-redis"]
 splunk-integration-tests = ["sinks-splunk_hec"]
 dnstap-integration-tests = ["sources-dnstap"]
 disable-resolv-conf = []
-shutdown-tests = ["api", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-log_to_metric", "transforms-lua", "transforms-remap", "unix"]
+shutdown-tests = ["api", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-lua", "transforms-remap", "unix"]
 cli-tests = ["sinks-blackhole", "sinks-socket", "sources-demo_logs", "sources-file"]
 vector-api-tests = [
   "sources-demo_logs",
-  "transforms-log_to_metric",
   "transforms-remap",
   "sinks-blackhole"
 ]
@@ -799,7 +796,6 @@ vector-unit-test-tests = [
   "transforms-route",
   "transforms-filter",
   "transforms-reduce",
-  "transforms-log_to_metric",
   "sinks-console"
 ]
 enterprise-tests = [

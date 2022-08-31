@@ -32,7 +32,6 @@ use crate::{
     schema,
     serde::OneOrMany,
     signal,
-    sources::Sources,
     topology::{
         self,
         builder::{self, Pieces},
@@ -239,10 +238,7 @@ impl UnitTestBuildMetadata {
                     .get(&insert_at)
                     .expect("Corresponding source must exist")
                     .as_ref();
-                (
-                    ComponentKey::from(id),
-                    SourceOuter::new(Sources::UnitTest(source_config)),
-                )
+                (ComponentKey::from(id), SourceOuter::new(source_config))
             })
             .collect::<IndexMap<_, _>>())
     }
