@@ -66,7 +66,7 @@ pub fn basic_transform(suffix: &str, increase: f64) -> BasicTransformConfig {
     BasicTransformConfig::new(suffix.to_owned(), increase)
 }
 
-pub fn backpressure_sink(num_to_consume: usize) -> BackpressureSinkConfig {
+pub const fn backpressure_sink(num_to_consume: usize) -> BackpressureSinkConfig {
     BackpressureSinkConfig { num_to_consume }
 }
 

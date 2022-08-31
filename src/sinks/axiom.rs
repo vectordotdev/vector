@@ -140,6 +140,7 @@ mod integration_tests {
     use chrono::{DateTime, Duration, Utc};
     use futures::stream;
     use http::StatusCode;
+    use serde::{Deserialize, Serialize};
     use std::env;
     use tokio::time;
     use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};

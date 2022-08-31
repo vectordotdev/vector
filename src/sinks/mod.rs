@@ -159,6 +159,10 @@ pub enum Sinks {
     #[cfg(feature = "sinks-aws_sqs")]
     AwsSqs(#[configurable(derived)] aws_sqs::SqsSinkConfig),
 
+    /// Axiom.
+    #[cfg(feature = "sinks-axiom")]
+    Axiom(#[configurable(derived)] axiom::AxiomSinkConfig),
+
     /// Azure Blob Storage.
     #[cfg(feature = "sinks-azure_blob")]
     AzureBlob(#[configurable(derived)] azure_blob::AzureBlobSinkConfig),
@@ -370,6 +374,8 @@ impl NamedComponent for Sinks {
             Self::AwsS3(config) => config.get_component_name(),
             #[cfg(feature = "sinks-aws_sqs")]
             Self::AwsSqs(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-axiom")]
+            Self::Axiom(config) => config.get_component_name(),
             #[cfg(feature = "sinks-azure_blob")]
             Self::AzureBlob(config) => config.get_component_name(),
             #[cfg(feature = "sinks-azure_monitor_logs")]
