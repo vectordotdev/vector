@@ -11,13 +11,7 @@ use futures::FutureExt;
 use tokio::time::{sleep, Sleep};
 use tower::{retry::Policy, timeout::error::Elapsed};
 
-use crate::{
-    internal_events::{
-        prelude::{error_stage, error_type},
-        SinkRetryReasonError, SinkSendError,
-    },
-    Error,
-};
+use crate::{internal_events::SinkSendError, Error};
 
 pub enum RetryAction {
     /// Indicate that this request should be retried with a reason
