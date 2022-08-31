@@ -28,12 +28,13 @@ impl InternalEvent for NatsEventSendError {
             "error_code" => io_error_code(&self.error),
             "stage" => error_stage::SENDING,
         );
-        // deprecated
-        counter!("send_errors_total", 1);
         emit!(ComponentEventsDropped {
             count: 1,
             intentional: false,
             reason,
         });
+
+        // deprecated
+        counter!("send_errors_total", 1);
     }
 }
