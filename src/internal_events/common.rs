@@ -112,7 +112,28 @@ impl InternalEvent for CollectionCompleted {
 }
 
 #[derive(Debug)]
-<<<<<<< HEAD
+pub struct ComponentEventsDropped {
+    pub count: u64,
+    pub intentional: bool,
+    pub reason: &'static str,
+}
+
+impl InternalEvent for ComponentEventsDropped {
+    fn emit(self) {
+        error!(
+            message = "Events dropped.",
+            intentional = self.intentional,
+            reason = self.reason,
+        );
+        counter!(
+            "component_discarded_events_total",
+            self.count,
+            "intentional" => if self.intentional { "true" } else { "false" },
+        );
+    }
+}
+
+#[derive(Debug)]
 pub struct SinkRequestBuildError<E> {
     pub message: &'static str,
     pub error: E,
@@ -177,25 +198,6 @@ impl<E: std::fmt::Display> InternalEvent for SinkRetryError<E> {
             "component_errors_total", 1,
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::PROCESSING,
-=======
-pub struct ComponentEventsDropped {
-    pub count: u64,
-    pub intentional: bool,
-    pub reason: &'static str,
-}
-
-impl InternalEvent for ComponentEventsDropped {
-    fn emit(self) {
-        error!(
-            message = "Events dropped.",
-            intentional = self.intentional,
-            reason = self.reason,
-        );
-        counter!(
-            "component_discarded_events_total",
-            self.count,
-            "intentional" => if self.intentional { "true" } else { "false" },
->>>>>>> master
         );
     }
 }
