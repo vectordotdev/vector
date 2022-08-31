@@ -319,7 +319,7 @@ impl Resource {
                     // IP addresses can either be v4 or v6.
                     // Therefore we check if the ip version matches, the port matches and if the protocol (TCP/UDP) matches
                     // when checking for equality.
-                    if address0 == address && &protocol0 == protocol {
+                    if &address0 == address && &protocol0 == protocol {
                         components.insert(key.clone());
                     }
                 }
@@ -1243,7 +1243,7 @@ mod acknowledgements_tests {
 mod resource_tests {
     use std::{
         collections::{HashMap, HashSet},
-        net::{Ipv4Addr, SocketAddr},
+        net::{Ipv4Addr, Ipv6Addr, SocketAddr},
     };
 
     use indoc::indoc;
