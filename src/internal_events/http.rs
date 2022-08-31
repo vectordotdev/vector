@@ -129,3 +129,23 @@ impl<'a> InternalEvent for HttpDecompressError<'a> {
         counter!("parse_errors_total", 1);
     }
 }
+
+pub struct HttpInternalError {
+    pub message: &'static str,
+}
+
+impl InternalEvent for HttpInternalError {
+    fn emit(self) {
+        error!(
+            message = %self.message,
+            error_type = error_type::CONNECTION_FAILED,
+            stage = error_stage::RECEIVING,
+            internal_log_rate_secs = 10
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => error_type::CONNECTION_FAILED,
+            "stage" => error_stage::RECEIVING,
+        );
+    }
+}

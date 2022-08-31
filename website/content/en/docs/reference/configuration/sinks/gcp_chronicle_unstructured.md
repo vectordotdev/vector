@@ -1,7 +1,7 @@
 ---
-title: GCP Chronicle
-description: Store observability events in [Google Chronicle](https://cloud.google.com/chronicle/docs/overview)
-short: GCP Chronicle
+title: GCP Chronicle Unstructured
+description: Store unstructured log events in [Google Chronicle](https://cloud.google.com/chronicle/docs/overview)
+short: GCP Chronicle Unstructured
 kind: sink
 layout: component
 tags: ["gcp", "chronicle", "component", "sink"]

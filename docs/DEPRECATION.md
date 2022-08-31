@@ -41,9 +41,9 @@ When this happens, we will notify by:
   introduced in. This will include instructions on how to transition if applicable.
 - Adding a deprecation note to the [documentation site][configuration] alongside the configuration or feature being
   deprecated.
-- Output a log at the `WARN` level if Vector detects deprecated configuration or features being used on start-up, during
-  `vector validate`, or at runtime, when possible. This log message will lead with the text `DEPRECATED` to make it easy
-  to filter for.
+- When possible, output a log at the `WARN` level if Vector detects deprecated configuration or features being used
+  on start-up, during `vector validate`, or at runtime. This log message will lead with the text `DEPRECATED` to
+  make it easy to filter for.
 
 ### Migration
 

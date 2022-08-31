@@ -21,7 +21,7 @@ use vector_core::config::LogNamespace;
 pub use self::unit_test_components::{
     UnitTestSinkCheck, UnitTestSinkConfig, UnitTestSinkResult, UnitTestSourceConfig,
 };
-use super::{compiler::expand_globs, graph::Graph, OutputId};
+use super::{compiler::expand_globs, graph::Graph, OutputId, TransformConfig};
 use crate::{
     conditions::Condition,
     config::{
