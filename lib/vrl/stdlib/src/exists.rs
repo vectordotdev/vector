@@ -36,7 +36,7 @@ impl Function for Exists {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let query = arguments.required_query("field")?;
 
