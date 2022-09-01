@@ -31,6 +31,12 @@ impl<'a> Serialize for JsonEncodedValue<'a> {
             // addopt the proper timestamp length accordingly.
             Value::Timestamp(_) => serializer.serialize_str("1970-01-01T00:00:00.000Z"),
 
+            // Collection types have their inner `Value`'s wrapped in `JsonEncodedValue`.
+            Value::Object(m) => {
+                serializer.collect_map(m.iter().map(|(k, v)| (k.as_bytes(), Self(v))))
+            }
+            Value::Array(a) => serializer.collect_seq(a.iter().map(|v| Self(v))),
+
             // All other `Value` variants are serialized according to the default serialization
             // implementation of that type.
             v => v.serialize(serializer),
@@ -215,13 +221,12 @@ impl<'a> ser::Serializer for &'a mut Serializer {
         Ok(())
     }
 
+    // Consider `bytes` as being a valid `str`.
     fn serialize_bytes(self, v: &[u8]) -> Result<()> {
-        use serde::ser::SerializeSeq;
-        let mut seq = self.serialize_seq(Some(v.len()))?;
-        for byte in v {
-            seq.serialize_element(byte)?;
-        }
-        seq.end()
+        const QUOTES_SIZE: usize = 2;
+
+        self.bytes += QUOTES_SIZE + v.len();
+        Ok(())
     }
 
     #[inline]
