@@ -27,7 +27,10 @@ pub fn contains_name_once(pattern: &str) -> Result<(), String> {
         if n_events == 0 {
             Err(format!("Missing event `{}`", pattern))
         } else if n_events > 1 {
-            Err(format!("Multiple ({}) events: ({})", n_events, names))
+            Err(format!(
+                "Multiple ({}) events matching `{}`: ({})",
+                n_events, pattern, names
+            ))
         } else {
             Ok(())
         }

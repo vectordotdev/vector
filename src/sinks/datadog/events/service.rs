@@ -40,6 +40,7 @@ impl DriverResponse for DatadogEventsResponse {
     }
 
     fn bytes_sent(&self) -> Option<BytesSent> {
+        // HttpBatchService emits EndpointBytesSend
         None
     }
 }

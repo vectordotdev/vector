@@ -7,18 +7,14 @@ use codecs::{
 };
 use prost::Message;
 use smallvec::{smallvec, SmallVec};
-use vector_common::internal_event::{
-    ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
-};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
-use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::Decoder,
     config::{DataType, GenerateConfig, Output, Resource, SourceContext},
     event::{proto, Event},
-    internal_events::{OldEventsReceived, VectorProtoDecodeError},
+    internal_events::VectorProtoDecodeError,
     sources::{
         util::{SocketListenAddr, TcpNullAcker, TcpSource},
         Source,
@@ -118,9 +114,7 @@ impl VectorConfig {
 }
 
 #[derive(Clone)]
-struct VectorDeserializer {
-    bytes_received: Registered<BytesReceived>,
-}
+struct VectorDeserializer {}
 
 impl Debug for VectorDeserializer {
     fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
@@ -134,14 +128,10 @@ impl decoding::format::Deserializer for VectorDeserializer {
         bytes: Bytes,
         _log_namespace: LogNamespace,
     ) -> crate::Result<SmallVec<[Event; 1]>> {
-        self.bytes_received.emit(ByteSize(bytes.len()));
-
         match proto::EventWrapper::decode(bytes).map(Event::from) {
             Ok(event) => {
-                emit!(OldEventsReceived {
-                    count: 1,
-                    byte_size: event.size_of()
-                });
+                // Not emitting EventsReceveived because SocketEventsReceived is emitted by
+                // TcpSource
                 Ok(smallvec![event])
             }
             Err(error) => {
@@ -162,10 +152,9 @@ impl TcpSource for VectorSource {
     type Acker = TcpNullAcker;
 
     fn decoder(&self) -> Self::Decoder {
-        let bytes_received = register!(BytesReceived::from(Protocol::TCP));
         Decoder::new(
             Framer::LengthDelimited(LengthDelimitedDecoder::new()),
-            Deserializer::Boxed(Box::new(VectorDeserializer { bytes_received })),
+            Deserializer::Boxed(Box::new(VectorDeserializer {})),
         )
     }
 
@@ -217,6 +206,9 @@ mod test {
         crate::test_util::test_generate_config::<VectorConfig>();
     }
 
+    // Note- since this test is round-trip, don't use the `assert_X_` test helpers with it, as it
+    // will trigger multiple internal event emission checks for `EventsSent` since sources and
+    // sinks emit that event.
     async fn stream_test(addr: SocketAddr, source: VectorConfig, sink: SinkConfig) {
         let (tx, rx) = SourceSender::new_test();
 
@@ -255,49 +247,43 @@ mod test {
 
     #[tokio::test]
     async fn it_works_with_vector_sink() {
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
-            let addr = next_addr();
-            stream_test(
-                addr,
-                VectorConfig::from_address(addr.into()),
-                SinkConfig::from_address(format!("localhost:{}", addr.port()), Default::default()),
-            )
-            .await;
-        })
+        let addr = next_addr();
+        stream_test(
+            addr,
+            VectorConfig::from_address(addr.into()),
+            SinkConfig::from_address(format!("localhost:{}", addr.port()), Default::default()),
+        )
         .await;
     }
 
     #[tokio::test]
     async fn it_works_with_vector_sink_tls() {
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
-            let addr = next_addr();
-            stream_test(
-                addr,
-                {
-                    let mut config = VectorConfig::from_address(addr.into());
-                    config.set_tls(Some(TlsSourceConfig {
-                        tls_config: TlsEnableableConfig::test_config(),
-                        client_metadata_key: None,
-                    }));
-                    config
-                },
-                {
-                    let mut config = SinkConfig::from_address(
-                        format!("localhost:{}", addr.port()),
-                        Default::default(),
-                    );
-                    config.set_tls(Some(TlsEnableableConfig {
-                        enabled: Some(true),
-                        options: TlsConfig {
-                            verify_certificate: Some(false),
-                            ..Default::default()
-                        },
-                    }));
-                    config
-                },
-            )
-            .await;
-        })
+        let addr = next_addr();
+        stream_test(
+            addr,
+            {
+                let mut config = VectorConfig::from_address(addr.into());
+                config.set_tls(Some(TlsSourceConfig {
+                    tls_config: TlsEnableableConfig::test_config(),
+                    client_metadata_key: None,
+                }));
+                config
+            },
+            {
+                let mut config = SinkConfig::from_address(
+                    format!("localhost:{}", addr.port()),
+                    Default::default(),
+                );
+                config.set_tls(Some(TlsEnableableConfig {
+                    enabled: Some(true),
+                    options: TlsConfig {
+                        verify_certificate: Some(false),
+                        ..Default::default()
+                    },
+                }));
+                config
+            },
+        )
         .await;
     }
 
@@ -343,7 +329,6 @@ mod test {
     #[tokio::test]
     #[cfg(not(target_os = "windows"))]
     async fn it_processes_stream_of_protobufs() {
-        trace_init();
         let (tx, rx) = SourceSender::new_test();
         let addr = next_addr();
 
@@ -388,5 +373,57 @@ mod test {
 
         let output = collect_ready(rx).await;
         assert_event_data_eq!([Event::from(event)][..], output.as_slice());
+    }
+
+    #[tokio::test]
+    #[cfg(not(target_os = "windows"))]
+    async fn assert_compliance() {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+            let (tx, rx) = SourceSender::new_test();
+            let addr = next_addr();
+
+            let config = VectorConfig::from_address(addr.into());
+
+            let (trigger_shutdown, shutdown, shutdown_down) = ShutdownSignal::new_wired();
+
+            let server = config
+                .build(SourceContext {
+                    key: ComponentKey::from("default"),
+                    globals: GlobalOptions::default(),
+                    shutdown,
+                    out: tx,
+                    proxy: Default::default(),
+                    acknowledgements: false,
+                    schema_definitions: HashMap::default(),
+                    schema: Default::default(),
+                })
+                .await
+                .unwrap();
+            tokio::spawn(server);
+
+            let event = proto::EventWrapper::from(Event::Log(LogEvent::from("short")));
+            let event_len = event.encoded_len();
+            let full_len = event_len + 4;
+
+            let mut out = BytesMut::with_capacity(full_len);
+            event.encode(&mut out).unwrap();
+
+            wait_for_tcp(addr).await;
+
+            let stream = TcpStream::connect(&addr).await.unwrap();
+            let encoder = LengthDelimitedCodec::new();
+            let mut sink = FramedWrite::new(stream, encoder);
+            sink.send(out.into()).await.unwrap();
+
+            let mut stream = sink.into_inner();
+            tokio::time::sleep(Duration::from_secs(2)).await;
+            stream.shutdown().await.unwrap();
+            drop(trigger_shutdown);
+            shutdown_down.await;
+
+            let output = collect_ready(rx).await;
+            assert_event_data_eq!([Event::from(event)][..], output.as_slice());
+        })
+        .await;
     }
 }

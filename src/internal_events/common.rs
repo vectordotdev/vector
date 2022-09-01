@@ -167,13 +167,13 @@ impl<E: std::fmt::Display> InternalEvent for SinkSendError<E> {
         error!(
             message = %self.message,
             error = %self.error,
-            error_type = error_type::COMMAND_FAILED,
+            error_type = error_type::REQUEST_FAILED,
             stage = error_stage::SENDING,
             rate_limit_secs = 10,
         );
         counter!(
             "component_errors_total", 1,
-            "error_type" => error_type::COMMAND_FAILED,
+            "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::SENDING,
         );
     }
