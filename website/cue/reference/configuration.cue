@@ -37,7 +37,7 @@ configuration: {
 			}
 		}
 
-		expire_metrics: {
+		expire_metrics_secs: {
 			common: false
 			description: """
 				If set, Vector will configure the internal metrics system to automatically
