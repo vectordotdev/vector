@@ -191,8 +191,11 @@ impl Client {
 
         let path = path.with_hash_prefix(&expected_hashes[0].1)?;
 
-        // TODO: should targets live in director repo? do they need to live in a repo at all?
-        let mut read = self.config_client.remote_repo().fetch_target(&path).await?;
+        let mut read = self
+            .director_client
+            .remote_repo()
+            .fetch_target(&path)
+            .await?;
         let mut buf = Vec::new();
         read.read_to_end(&mut buf).await?;
 
@@ -280,8 +283,7 @@ impl Client {
     async fn apply(&mut self, response: LatestConfigsResponse) -> Result<()> {
         // Store target files
         for target_file in &response.target_files {
-            // TODO: should targets live in director repo?
-            self.config_client
+            self.director_client
                 .remote_repo_mut()
                 .store_target(
                     &TargetPath::new(&target_file.path)?,
