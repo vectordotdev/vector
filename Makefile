@@ -68,6 +68,7 @@ FORMATTING_END = \033[0m
 # "One weird trick!" https://www.gnu.org/software/make/manual/make.html#Syntax-of-Functions
 EMPTY:=
 SPACE:= ${EMPTY} ${EMPTY}
+COMMA:= ,
 
 help:
 	@printf -- "${FORMATTING_BEGIN_BLUE}                                      __   __  __${FORMATTING_END}\n"
@@ -119,7 +120,7 @@ define ENVIRONMENT_EXEC
 			--env INSIDE_ENVIRONMENT=true \
 			--network host \
 			--mount type=bind,source=${CURRENT_DIR},target=/git/vectordotdev/vector \
-			--mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
+			$(if $(findstring docker,$(CONTAINER_TOOL)),--mount type=bind$(COMMA)source=/var/run/docker.sock$(COMMA)target=/var/run/docker.sock,) \
 			--mount type=volume,source=vector-target,target=/git/vectordotdev/vector/target \
 			--mount type=volume,source=vector-cargo-cache,target=/root/.cargo \
 			--mount type=volume,source=vector-rustup-cache,target=/root/.rustup \
