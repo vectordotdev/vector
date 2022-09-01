@@ -4,7 +4,7 @@ use serde::{de, ser};
 use vector_config::{
     configurable_component,
     schema::{
-        finalize_schema, generate_composite_schema, generate_number_schema, generate_string_schema,
+        generate_composite_schema, generate_number_schema, generate_string_schema,
     },
     schemars::{gen::SchemaGenerator, schema::SchemaObject},
     validation::Validation,
@@ -326,13 +326,11 @@ impl ser::Serialize for CompressionLevel {
 }
 
 impl Configurable for CompressionLevel {
-    fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<Self>) -> SchemaObject {
+    fn generate_schema(_: &mut SchemaGenerator, _: Metadata<Self>) -> SchemaObject {
         let as_number = generate_number_schema::<u32>();
         let as_string = generate_string_schema();
 
-        let mut schema = generate_composite_schema(&[as_number, as_string]);
-        finalize_schema(gen, &mut schema, overrides);
-        schema
+        generate_composite_schema(&[as_number, as_string])
     }
 
     fn description() -> Option<&'static str> {

@@ -822,6 +822,8 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogAzureRequestBuilder {
 // This is implemented manually to satisfy `SinkConfig`, because if we derive it automatically via
 // `#[configurable_component(sink("..."))]`, it would register the sink in a way that allowed it to
 // be used in `vector generate`, etc... and we don't want that.
+//
+// TODO: When the sink is fully supported and we expose it for use/within the docs, remove this.
 impl NamedComponent for DatadogArchivesSinkConfig {
     const NAME: &'static str = "datadog_archives";
 }
