@@ -1,0 +1,5 @@
+# result: {"foo": 1, "bar": 6}
+
+%foo = 1
+%bar = %foo + 5
+%

@@ -9,7 +9,7 @@ pub mod set_secret;
 pub mod set_semantic_meaning;
 
 use ::value::Value;
-use vrl::prelude::expression::Query;
+use lookup::TargetPath;
 use vrl::prelude::*;
 
 pub(crate) fn legacy_keys() -> Vec<Value> {
@@ -23,7 +23,7 @@ pub(crate) fn legacy_keys() -> Vec<Value> {
 #[derive(Clone, Debug)]
 pub enum MetadataKey {
     Legacy(String),
-    Query(Query),
+    Query(TargetPath),
 }
 
 pub const LEGACY_METADATA_KEYS: [&str; 2] = ["datadog_api_key", "splunk_hec_token"];
@@ -44,8 +44,10 @@ fn get_metadata_key(
     arguments: &mut ArgumentList,
 ) -> std::result::Result<MetadataKey, Box<dyn DiagnosticMessage>> {
     if let Ok(Some(query)) = arguments.optional_query("key") {
-        if let vrl::query::Target::External = query.target() {
-            return Ok(MetadataKey::Query(query));
+        if let vrl::query::Target::External(_) = query.target() {
+            // for backwards compatibility reasons, the query is forced to point at metadata
+            let target_path = TargetPath::metadata(query.path().clone());
+            return Ok(MetadataKey::Query(target_path));
         }
     }
 

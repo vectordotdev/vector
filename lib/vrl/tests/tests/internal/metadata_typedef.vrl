@@ -18,12 +18,12 @@
 #   }
 # }
 
-set_metadata_field(., {})
-set_metadata_field(.a, "string")
-set_metadata_field(.b, 5)
-.foo = type_def(get_metadata_field(.))
-remove_metadata_field(.a)
-.foo2 = type_def(get_metadata_field(.))
+% = {}
+%a = "string"
+%b = 5
+.foo = type_def(%)
+del(%a)
+.foo2 = type_def(%)
 .
 
 

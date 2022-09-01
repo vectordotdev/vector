@@ -1,7 +1,7 @@
 pub mod closure;
 
 use diagnostic::{DiagnosticMessage, Label, Note};
-use lookup::LookupBuf;
+use lookup::TargetPath;
 use parser::ast::Ident;
 use std::{
     collections::{BTreeMap, HashMap},
@@ -108,13 +108,8 @@ impl FunctionCompileContext {
     }
 
     #[must_use]
-    pub fn is_read_only_metadata_path(&self, path: &LookupBuf) -> bool {
-        self.config.is_read_only_metadata_path(path)
-    }
-
-    #[must_use]
-    pub fn is_read_only_event_path(&self, path: &LookupBuf) -> bool {
-        self.config.is_read_only_event_path(path)
+    pub fn is_read_only_path(&self, path: &TargetPath) -> bool {
+        self.config.is_read_only_path(path)
     }
 
     /// Consume the `FunctionCompileContext`, returning the (potentially mutated) `AnyMap`.

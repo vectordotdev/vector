@@ -1,41 +1,41 @@
 use ::value::Value;
-use lookup_lib::LookupBuf;
+use lookup_lib::{OwnedPath, TargetPath};
 use vrl::prelude::*;
 
-fn unnest(path: &expression::Query, root_lookup: &LookupBuf, ctx: &mut Context) -> Resolved {
+fn unnest(path: &expression::Query, ctx: &mut Context) -> Resolved {
     let lookup_buf = path.path();
 
     match path.target() {
-        expression::Target::External => {
+        expression::Target::External(prefix) => {
             let root = ctx
                 .target()
-                .target_get(root_lookup)
+                .target_get(&TargetPath::root(*prefix))
                 .expect("must never fail")
                 .expect("always a value");
             unnest_root(root, lookup_buf)
         }
         expression::Target::Internal(v) => {
             let value = ctx.state().variable(v.ident()).unwrap_or(&Value::Null);
-            let root = value.get_by_path(root_lookup).expect("always a value");
+            let root = value.get(&OwnedPath::root()).expect("always a value");
             unnest_root(root, lookup_buf)
         }
         expression::Target::Container(expr) => {
             let value = expr.resolve(ctx)?;
-            let root = value.get_by_path(root_lookup).expect("always a value");
+            let root = value.get(&OwnedPath::root()).expect("always a value");
             unnest_root(root, lookup_buf)
         }
         expression::Target::FunctionCall(expr) => {
             let value = expr.resolve(ctx)?;
-            let root = value.get_by_path(root_lookup).expect("always a value");
+            let root = value.get(&OwnedPath::root()).expect("always a value");
             unnest_root(root, lookup_buf)
         }
     }
 }
 
-fn unnest_root(root: &Value, path: &LookupBuf) -> Resolved {
+fn unnest_root(root: &Value, path: &OwnedPath) -> Resolved {
     let mut trimmed = root.clone();
     let values = trimmed
-        .remove_by_path(path, true)
+        .remove(path, true)
         .ok_or(value::Error::Expected {
             got: Kind::null(),
             expected: Kind::array(Collection::any()),
@@ -46,7 +46,7 @@ fn unnest_root(root: &Value, path: &LookupBuf) -> Resolved {
         .into_iter()
         .map(|value| {
             let mut event = trimmed.clone();
-            event.insert_by_path(path, value);
+            event.insert(path, value);
             event
         })
         .collect::<Vec<_>>();
@@ -102,44 +102,40 @@ impl Function for Unnest {
         mut arguments: ArgumentList,
     ) -> Compiled {
         let path = arguments.required_query("path")?;
-        let root = LookupBuf::root();
-
-        Ok(UnnestFn { path, root }.as_expr())
+        Ok(UnnestFn { path }.as_expr())
     }
 }
 
 #[derive(Debug, Clone)]
 struct UnnestFn {
     path: expression::Query,
-    root: LookupBuf,
 }
 
 impl UnnestFn {
     #[cfg(test)]
     fn new(path: &str) -> Self {
-        use std::str::FromStr;
+        use lookup_lib::{lookup_v2::parse_path, PathPrefix};
 
         Self {
             path: expression::Query::new(
-                expression::Target::External,
-                FromStr::from_str(path).unwrap(),
+                expression::Target::External(PathPrefix::Event),
+                parse_path(path),
             ),
-            root: LookupBuf::root(),
         }
     }
 }
 
 impl FunctionExpression for UnnestFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        unnest(&self.path, &self.root, ctx)
+        unnest(&self.path, ctx)
     }
 
     fn type_def(&self, state: &state::TypeState) -> TypeDef {
         use expression::Target;
 
         match self.path.target() {
-            Target::External => invert_array_at_path(
-                &TypeDef::from(state.external.target_kind().clone()),
+            Target::External(prefix) => invert_array_at_path(
+                &TypeDef::from(state.external.kind(*prefix)),
                 self.path.path(),
             ),
             Target::Internal(v) => invert_array_at_path(&v.type_def(state), self.path.path()),
@@ -160,7 +156,7 @@ impl FunctionExpression for UnnestFn {
 ///    { "a" => { "b" => { "c" => 3 } } },
 ///  ]`
 ///
-pub(crate) fn invert_array_at_path(typedef: &TypeDef, path: &LookupBuf) -> TypeDef {
+pub(crate) fn invert_array_at_path(typedef: &TypeDef, path: &OwnedPath) -> TypeDef {
     let kind = typedef.kind().at_path(path);
 
     let mut array = if let Some(array) = kind.into_array() {
@@ -191,6 +187,7 @@ pub(crate) fn invert_array_at_path(typedef: &TypeDef, path: &LookupBuf) -> TypeD
 
 #[cfg(test)]
 mod tests {
+    use lookup_lib::lookup_v2::parse_path;
     use vector_common::{btreemap, TimeZone};
     use vrl::state::TypeState;
 
@@ -401,7 +398,7 @@ mod tests {
         ];
 
         for case in cases {
-            let path = LookupBuf::from_str(case.path).unwrap();
+            let path = parse_path(case.path);
             let new = invert_array_at_path(&case.old, &path);
             assert_eq!(case.new, new, "{}", path);
         }

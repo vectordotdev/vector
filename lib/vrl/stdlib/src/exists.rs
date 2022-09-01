@@ -52,10 +52,10 @@ pub(crate) struct ExistsFn {
 fn exists(query: &expression::Query, ctx: &mut Context) -> Resolved {
     let path = query.path();
 
-    if query.is_external() {
+    if let Some(target_path) = query.external_path() {
         return Ok(ctx
             .target_mut()
-            .target_get(path)
+            .target_get(&target_path)
             .ok()
             .flatten()
             .is_some()
@@ -64,7 +64,7 @@ fn exists(query: &expression::Query, ctx: &mut Context) -> Resolved {
 
     if let Some(ident) = query.variable_ident() {
         return match ctx.state().variable(ident) {
-            Some(value) => Ok(value.get_by_path(path).is_some().into()),
+            Some(value) => Ok(value.get(path).is_some().into()),
             None => Ok(false.into()),
         };
     }
@@ -72,7 +72,7 @@ fn exists(query: &expression::Query, ctx: &mut Context) -> Resolved {
     if let Some(expr) = query.expression_target() {
         let value = expr.resolve(ctx)?;
 
-        return Ok(value.get_by_path(path).is_some().into());
+        return Ok(value.get(path).is_some().into());
     }
 
     Ok(false.into())

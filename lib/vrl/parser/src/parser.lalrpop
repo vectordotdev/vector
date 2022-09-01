@@ -6,7 +6,8 @@ use diagnostic::span;
 use std::collections::BTreeMap;
 use lalrpop_util::ErrorRecovery;
 use ordered_float::NotNan;
-use lookup::{LookupBuf, SegmentBuf, FieldBuf};
+use lookup::{LookupBuf, SegmentBuf, FieldBuf, PathPrefix, TargetPath, OwnedPath};
+
 
 grammar<'err, 'input>(input: &'input str);
 
@@ -49,8 +50,10 @@ extern {
         "_" => Token::Underscore,
         ":" => Token::Colon,
         "." => Token::Dot,
+        "&" => Token::Ampersand,
         "!" => Token::Bang,
         "->" => Token::Arrow,
+        "%" => Token::Percent,
 
         "+" => Token::Operator("+"),
         "*" => Token::Operator("*"),
@@ -319,18 +322,26 @@ Term: Expr = {
 pub Query: Query = {
     LQuery <Sp<".">> RQuery => {
         let span = <>.span();
-        let target = Node::new(span, QueryTarget::External);
-        let path = Node::new(span, LookupBuf::root());
+        let target = Node::new(span, QueryTarget::External(PathPrefix::Event));
+        let path = Node::new(span, OwnedPath::root());
 
         Query { target, path }
     },
-    LQuery <target: Sp<QueryTarget>> <path: Sp<Path>> RQuery => Query { target, path },
+    LQuery <Sp<"%">> RQuery => {
+        let span = <>.span();
+        let target = Node::new(span, QueryTarget::External(PathPrefix::Metadata));
+        let path = Node::new(span, OwnedPath::root());
+
+        Query { target, path }
+    },
+    LQuery <target: Sp<QueryTarget>> <path: Sp<Path>> RQuery => Query { target, path: path.map(OwnedPath::from) },
 };
 
 #[inline]
 QueryTarget: QueryTarget = {
     Ident => QueryTarget::Internal(<>),
-    "." => QueryTarget::External,
+    "." => QueryTarget::External(PathPrefix::Event),
+    "%" => QueryTarget::External(PathPrefix::Metadata),
     FunctionCall => QueryTarget::FunctionCall(<>),
     Container => QueryTarget::Container(<>),
 };

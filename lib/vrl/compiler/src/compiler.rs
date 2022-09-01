@@ -1,5 +1,5 @@
 use diagnostic::{DiagnosticList, DiagnosticMessage, Severity, Span};
-use lookup::LookupBuf;
+use lookup::{OwnedPath, PathPrefix, TargetPath};
 use parser::ast::{self, Node, QueryTarget};
 
 use crate::state::TypeState;
@@ -31,15 +31,15 @@ pub struct Compiler<'a> {
     diagnostics: Diagnostics,
     fallible: bool,
     abortable: bool,
-    external_queries: Vec<LookupBuf>,
-    external_assignments: Vec<LookupBuf>,
+    external_queries: Vec<TargetPath>,
+    external_assignments: Vec<TargetPath>,
 
     /// A list of variables that are missing, because the rhs expression of the
     /// assignment failed to compile.
     ///
     /// This list allows us to avoid printing "undefined variable" compilation
     /// errors when the reason for it being undefined is another compiler error.
-    skip_missing_query_target: Vec<(QueryTarget, LookupBuf)>,
+    skip_missing_query_target: Vec<(QueryTarget, OwnedPath)>,
 
     /// Track which expression in a chain of expressions is fallible.
     ///
@@ -562,8 +562,12 @@ impl<'a> Compiler<'a> {
         //
         // This data is exposed to the caller of the compiler, to allow any
         // potential external optimizations.
-        if let Target::External = target {
-            self.external_queries.push(path.clone());
+        if let Target::External(prefix) = target {
+            let target_path = TargetPath {
+                prefix,
+                path: path.clone(),
+            };
+            self.external_queries.push(target_path);
         }
 
         Some(Query::new(target, path))
@@ -585,7 +589,7 @@ impl<'a> Compiler<'a> {
         let span = node.span();
 
         let target = match node.into_inner() {
-            External => Target::External,
+            External(prefix) => Target::External(prefix),
             Internal(ident) => {
                 let variable = self.compile_variable(Node::new(span, ident), state)?;
                 Target::Internal(variable)
@@ -622,7 +626,7 @@ impl<'a> Compiler<'a> {
         //
         // See: https://github.com/vectordotdev/vector/issues/12547
         if ident.as_deref() == "get" {
-            self.external_queries.push(LookupBuf::root());
+            self.external_queries.push(TargetPath::event_root());
         }
 
         let arguments = arguments
@@ -749,7 +753,7 @@ impl<'a> Compiler<'a> {
 
         if self
             .skip_missing_query_target
-            .contains(&(QueryTarget::Internal(ident.clone()), LookupBuf::root()))
+            .contains(&(QueryTarget::Internal(ident.clone()), OwnedPath::root()))
         {
             return None;
         }
@@ -827,17 +831,19 @@ impl<'a> Compiler<'a> {
 
     #[cfg(feature = "expr-assignment")]
     fn skip_missing_assignment_target(&mut self, target: ast::AssignmentTarget) {
-        let query = match target {
+        let query = match &target {
             ast::AssignmentTarget::Noop => return,
             ast::AssignmentTarget::Query(ast::Query { target, path }) => {
-                (target.into_inner(), path.into_inner())
+                (target.clone().into_inner(), path.clone().into_inner())
             }
             ast::AssignmentTarget::Internal(ident, path) => (
-                QueryTarget::Internal(ident),
-                path.unwrap_or_else(LookupBuf::root),
+                QueryTarget::Internal(ident.clone()),
+                path.clone().unwrap_or_else(OwnedPath::root),
             ),
             ast::AssignmentTarget::External(path) => {
-                (QueryTarget::External, path.unwrap_or_else(LookupBuf::root))
+                let prefix = path.as_ref().map_or(PathPrefix::Event, |x| x.prefix);
+                let path = path.clone().map_or_else(OwnedPath::root, |x| x.path);
+                (QueryTarget::External(prefix), path)
             }
         };
 

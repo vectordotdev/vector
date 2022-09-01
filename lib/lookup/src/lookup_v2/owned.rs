@@ -1,16 +1,20 @@
 use crate::lookup_v2::{parse_path, BorrowedSegment, Path};
-use std::fmt::Write;
+use std::fmt::{Display, Formatter};
 use vector_config::configurable_component;
 
 /// A lookup path.
 #[configurable_component]
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Hash, PartialOrd, Ord)]
 #[serde(from = "String", into = "String")]
 pub struct OwnedPath {
     pub segments: Vec<OwnedSegment>,
 }
 
 impl OwnedPath {
+    pub fn is_root(&self) -> bool {
+        self.segments.is_empty()
+    }
+
     pub fn root() -> Self {
         vec![].into()
     }
@@ -39,6 +43,50 @@ impl OwnedPath {
         vec![OwnedSegment::field(field)].into()
     }
 
+    /// Create the possible fields that can be followed by this lookup.
+    /// Because of coalesced paths there can be a number of different combinations.
+    /// There is the potential for this function to create a vast number of different
+    /// combinations if there are multiple coalesced segments in a path.
+    ///
+    /// The limit specifies the limit of the path depth we are interested in.
+    /// Metrics is only interested in fields that are up to 3 levels deep (2 levels + 1 to check it
+    /// terminates).
+    ///
+    /// eg, .tags.nork.noog will never be an accepted path so we don't need to spend the time
+    /// collecting it.
+    pub fn to_alternative_components(&self, limit: usize) -> Vec<Vec<&str>> {
+        let mut components = vec![vec![]];
+        for segment in self.segments.iter().take(limit) {
+            match segment {
+                OwnedSegment::Invalid => return vec![],
+                OwnedSegment::Field(field) => {
+                    for component in &mut components {
+                        component.push(field.as_str());
+                    }
+                }
+
+                OwnedSegment::Coalesce(fields) => {
+                    components = components
+                        .iter()
+                        .flat_map(|path| {
+                            fields.iter().map(move |field| {
+                                let mut path = path.clone();
+                                path.push(field.as_str());
+                                path
+                            })
+                        })
+                        .collect();
+                }
+
+                OwnedSegment::Index(_) => {
+                    return Vec::new();
+                }
+            }
+        }
+
+        components
+    }
+
     pub fn push(&mut self, segment: OwnedSegment) {
         self.segments.push(segment);
     }
@@ -50,6 +98,12 @@ impl OwnedPath {
     }
 }
 
+impl Display for OwnedPath {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", String::from(self.clone()))
+    }
+}
+
 impl From<String> for OwnedPath {
     fn from(raw_path: String) -> Self {
         parse_path(raw_path.as_str())
@@ -58,54 +112,46 @@ impl From<String> for OwnedPath {
 
 impl From<OwnedPath> for String {
     fn from(owned: OwnedPath) -> Self {
-        if owned.segments.is_empty() {
-            String::from("<invalid>")
-        } else {
-            let mut coalesce_i = 0;
+        let mut coalesce_i = 0;
 
-            owned
-                .segments
-                .iter()
-                .enumerate()
-                .map(|(i, segment)| match segment {
-                    OwnedSegment::Field(field) => {
-                        serialize_field(field.as_ref(), (i != 0).then(|| "."))
-                    }
-                    OwnedSegment::Index(index) => format!("[{}]", index),
-                    OwnedSegment::Invalid => {
-                        (if i == 0 { "<invalid>" } else { ".<invalid>" }).to_owned()
-                    }
-                    OwnedSegment::Coalesce(fields) => {
-                        let mut output = String::new();
-                        let (last, fields) =
-                            fields.split_last().expect("coalesce must not be empty");
-                        for field in fields {
-                            let field_output = serialize_field(
-                                field.as_ref(),
-                                Some(if coalesce_i == 0 {
-                                    if i == 0 {
-                                        "("
-                                    } else {
-                                        ".("
-                                    }
+        owned
+            .segments
+            .iter()
+            .enumerate()
+            .map(|(i, segment)| match segment {
+                OwnedSegment::Field(field) => {
+                    serialize_field(field.as_ref(), (i != 0).then(|| "."))
+                }
+                OwnedSegment::Index(index) => format!("[{}]", index),
+                OwnedSegment::Invalid => {
+                    (if i == 0 { "<invalid>" } else { ".<invalid>" }).to_owned()
+                }
+                OwnedSegment::Coalesce(fields) => {
+                    let mut output = String::new();
+                    let (last, fields) = fields.split_last().expect("coalesce must not be empty");
+                    for field in fields {
+                        let field_output = serialize_field(
+                            field.as_ref(),
+                            Some(if coalesce_i == 0 {
+                                if i == 0 {
+                                    "("
                                 } else {
-                                    "|"
-                                }),
-                            );
-                            coalesce_i += 1;
-                            output.push_str(&field_output);
-                        }
-                        let _ = write!(
-                            output,
-                            "{})",
-                            serialize_field(last.as_ref(), (coalesce_i != 0).then(|| "|"))
+                                    ".("
+                                }
+                            } else {
+                                "|"
+                            }),
                         );
-                        output
+                        coalesce_i += 1;
+                        output.push_str(&field_output);
                     }
-                })
-                .collect::<Vec<_>>()
-                .join("")
-        }
+                    output += &serialize_field(last.as_ref(), (coalesce_i != 0).then(|| "|"));
+                    output += ")";
+                    output
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("")
     }
 }
 
@@ -144,7 +190,7 @@ impl From<Vec<OwnedSegment>> for OwnedPath {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub enum OwnedSegment {
     Field(String),
     Index(isize),
@@ -172,6 +218,22 @@ impl OwnedSegment {
     }
     pub fn is_invalid(&self) -> bool {
         matches!(self, OwnedSegment::Invalid)
+    }
+
+    pub fn can_start_with(&self, prefix: &OwnedSegment) -> bool {
+        match (self, prefix) {
+            (OwnedSegment::Invalid, _) | (_, OwnedSegment::Invalid) => false,
+            (OwnedSegment::Index(a), OwnedSegment::Index(b)) => a == b,
+            (OwnedSegment::Index(_), _) | (_, OwnedSegment::Index(_)) => false,
+            (OwnedSegment::Field(a), OwnedSegment::Field(b)) => a == b,
+            (OwnedSegment::Field(field), OwnedSegment::Coalesce(fields))
+            | (OwnedSegment::Coalesce(fields), OwnedSegment::Field(field)) => {
+                fields.contains(field)
+            }
+            (OwnedSegment::Coalesce(a), OwnedSegment::Coalesce(b)) => {
+                a.iter().any(|a_field| b.contains(a_field))
+            }
+        }
     }
 }
 
@@ -272,6 +334,7 @@ mod test {
     #[test]
     fn owned_path_serialize() {
         let test_cases = [
+            (".", ""),
             ("", "<invalid>"),
             ("]", "<invalid>"),
             ("]foo", "<invalid>"),
