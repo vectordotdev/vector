@@ -83,7 +83,7 @@ remap: #Remap & {
 			}
 			warnings: [
 				"All attributes are strings and will require manual type coercing.",
-				"Values of duplicate keys are gruped into an array.",
+				"Values of duplicate keys are grouped into an array.",
 			]
 		},
 		{
