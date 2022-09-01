@@ -205,11 +205,14 @@ impl decoding::format::Deserializer for StatsdDeserializer {
         bytes: Bytes,
         _log_namespace: LogNamespace,
     ) -> crate::Result<SmallVec<[Event; 1]>> {
+        // The other modes emit BytesReceived
         if let Some(mode) = self.socket_mode {
-            emit!(SocketBytesReceived {
-                mode,
-                byte_size: bytes.len(),
-            });
+            if mode == SocketMode::Udp {
+                emit!(SocketBytesReceived {
+                    mode,
+                    byte_size: bytes.len(),
+                });
+            }
         }
 
         match std::str::from_utf8(&bytes)
@@ -218,10 +221,15 @@ impl decoding::format::Deserializer for StatsdDeserializer {
         {
             Ok(metric) => {
                 let event = Event::Metric(metric);
-                emit!(EventsReceived {
-                    count: 1,
-                    byte_size: event.size_of(),
-                });
+                if let Some(mode) = self.socket_mode {
+                    // The other modes emit EventsReceived
+                    if mode == SocketMode::Udp {
+                        emit!(EventsReceived {
+                            count: 1,
+                            byte_size: event.size_of(),
+                        });
+                    }
+                }
                 Ok(smallvec![event])
             }
             Err(error) => {
