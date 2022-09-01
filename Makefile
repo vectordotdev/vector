@@ -122,6 +122,7 @@ define ENVIRONMENT_EXEC
 			--mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
 			--mount type=volume,source=vector-target,target=/git/vectordotdev/vector/target \
 			--mount type=volume,source=vector-cargo-cache,target=/root/.cargo \
+			--mount type=volume,source=vector-rustup-cache,target=/root/.rustup \
 			$(ENVIRONMENT_UPSTREAM)
 endef
 
@@ -157,7 +158,7 @@ environment-prepare: ## Prepare the Vector dev shell using $CONTAINER_TOOL.
 
 .PHONY: environment-clean
 environment-clean: ## Clean the Vector dev shell using $CONTAINER_TOOL.
-	@$(CONTAINER_TOOL) volume rm -f vector-target vector-cargo-cache
+	@$(CONTAINER_TOOL) volume rm -f vector-target vector-cargo-cache vector-rustup-cache
 	@$(CONTAINER_TOOL) rmi $(ENVIRONMENT_UPSTREAM) || true
 
 .PHONY: environment-push
