@@ -1,4 +1,7 @@
-use std::{iter::FromIterator, str::FromStr};
+use std::{
+    collections::{btree_map::Entry, BTreeMap},
+    str::FromStr,
+};
 
 use ::value::Value;
 use nom::{
@@ -32,7 +35,27 @@ pub(crate) fn parse_key_value(
         whitespace,
         standalone_key,
     )?;
-    Ok(Value::from_iter(values))
+
+    // Construct Value::Object by grouping values with the same key into an array.
+    // This logic depends on values not being arrays which is true for this parser.
+    let mut map = BTreeMap::new();
+    for (key, value) in values {
+        match map.entry(key) {
+            Entry::Vacant(entry) => {
+                entry.insert(value);
+            }
+            Entry::Occupied(mut entry) => {
+                let existing = entry.get_mut();
+                if let Value::Array(array) = existing {
+                    array.push(value);
+                } else {
+                    let values = vec![std::mem::replace(existing, Value::Null), value];
+                    *existing = Value::Array(values);
+                }
+            }
+        }
+    }
+    Ok(Value::Object(map))
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -96,6 +119,11 @@ impl Function for ParseKeyValue {
                 title: "standalone key",
                 source: r#"parse_key_value!(s'foo=bar foobar', whitespace: "strict")"#,
                 result: Ok(r#"{"foo": "bar", "foobar": true}"#),
+            },
+            Example {
+                title: "duplicate keys",
+                source: r#"parse_key_value!(s'foo=bar foo=nor', whitespace: "strict")"#,
+                result: Ok(r#"{"foo": ["bar", "nor"]}"#),
             },
         ]
     }
@@ -820,6 +848,16 @@ mod test {
             ],
             want: Ok(value!({"To": "tom",
                              "test": "tom test"})),
+            tdef: TypeDef::object(Collection::any()).fallible(),
+        }
+
+        duplicate_keys {
+            args: func_args! [
+                value: r#"Cc: "tom" Cc: "bob""#,
+                key_value_delimiter: ":",
+                field_delimiter: " ",
+            ],
+            want: Ok(value!({"Cc": ["tom", "bob"]})),
             tdef: TypeDef::object(Collection::any()).fallible(),
         }
     ];
