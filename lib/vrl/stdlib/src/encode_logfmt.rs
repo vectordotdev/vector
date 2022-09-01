@@ -30,7 +30,7 @@ impl Function for EncodeLogfmt {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         // The encode_logfmt function is just an alias for `encode_key_value` with the following
         // parameters for the delimiters.

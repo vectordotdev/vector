@@ -99,7 +99,7 @@ impl Function for Unnest {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let path = arguments.required_query("path")?;
         Ok(UnnestFn { path }.as_expr())
