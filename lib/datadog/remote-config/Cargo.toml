@@ -19,6 +19,7 @@ thiserror = "1.0.32"
 openssl = "0.10.41"
 anyhow = "1.0.62"
 rand = "0.8.5"
+base64 = "0.13.0"
 
 [build-dependencies]
 prost-build = "0.10.4"

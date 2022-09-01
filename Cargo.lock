@@ -6007,6 +6007,7 @@ name = "remote-config"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "base64",
  "futures 0.3.21",
  "hyper",
  "hyper-openssl",
@@ -8006,7 +8007,7 @@ checksum = "59547bce71d9c38b83d9c0e92b6066c4253371f15005def0c30d9657f50c7642"
 [[package]]
 name = "tuf"
 version = "0.3.0-beta10"
-source = "git+https://github.com/lukesteensen/rust-tuf/?branch=dd-rc#94ccc7ff72e6f69ce62ac9e9f7a450d9c5619d67"
+source = "git+https://github.com/lukesteensen/rust-tuf/?branch=dd-rc#f941bab771dbd0ae0fb2873bd32bac580a96f581"
 dependencies = [
  "chrono",
  "data-encoding",

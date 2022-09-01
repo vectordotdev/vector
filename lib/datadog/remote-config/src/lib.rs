@@ -268,9 +268,6 @@ impl Client {
 
         request.active_clients.push(self.active_client.clone());
 
-        // TODO: do this properly?
-        // request.backend_client_state = r#"{"file_hashes":[]}"#.into();
-
         let response = self.inner.send_request(request).await?;
 
         self.apply(response).await?;
@@ -395,6 +392,19 @@ impl Client {
         .await?;
 
         self.director_client.update().await?;
+
+        if let Some(state) = self
+            .director_client
+            .database()
+            .trusted_targets()
+            .map(|t| t.additional_fields())
+            .and_then(|t| t.get("custom"))
+            .and_then(|t| t.get("opaque_backend_state"))
+            .and_then(|t| t.as_str())
+            .and_then(|t| base64::decode(t).ok())
+        {
+            self.backend_client_state = state;
+        }
 
         Ok(())
     }
