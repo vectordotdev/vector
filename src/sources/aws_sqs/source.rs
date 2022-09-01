@@ -128,6 +128,8 @@ impl SqsSource {
                         receipts_to_ack.push(receipt_handle);
                     }
                     let timestamp = get_timestamp(&message.attributes);
+                    // Error is logged by `crate::codecs::Decoder`, no further handling
+                    // is needed here.
                     let decoded = util::decode_message(
                         self.decoder.clone(),
                         "aws_sqs",
