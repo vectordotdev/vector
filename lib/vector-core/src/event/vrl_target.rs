@@ -732,8 +732,6 @@ mod test {
 
     #[test]
     fn log_remove() {
-        // use vector_common::btreemap;
-
         let cases = vec![
             (
                 BTreeMap::from([("foo".into(), "bar".into())]),

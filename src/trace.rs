@@ -36,7 +36,7 @@ use crate::event::LogEvent;
 /// This means that callers must subscribe during the configuration phase of their components, and not in the core loop
 /// of the component, as the topology can only report when a component has been spawned, but not necessarily always
 /// when it has started doing, or waiting, for input.
-static BUFFER: OnceCell<Mutex<Option<Vec<LogEvent>>>> = OnceCell::new();
+static BUFFER: Mutex<Option<Vec<LogEvent>>> = Mutex::new(Some(Vec::new()));
 
 /// SHOULD_BUFFER controls whether or not internal log events should be buffered or sent directly to the trace broadcast
 /// channel.
@@ -44,7 +44,8 @@ static SHOULD_BUFFER: AtomicBool = AtomicBool::new(true);
 
 /// SUBSCRIBERS contains a list of callers interested in internal log events who will be notified when early buffering
 /// is disabled, by receiving a copy of all buffered internal log events.
-static SUBSCRIBERS: OnceCell<Mutex<Option<Vec<oneshot::Sender<Vec<LogEvent>>>>>> = OnceCell::new();
+static SUBSCRIBERS: Mutex<Option<Vec<oneshot::Sender<Vec<LogEvent>>>>> =
+    Mutex::new(Some(Vec::new()));
 
 /// SENDER holds the sender/receiver handle that will receive a copy of all the internal log events *after* the topology
 /// has been initialized.
@@ -55,7 +56,6 @@ fn metrics_layer_enabled() -> bool {
 }
 
 pub fn init(color: bool, json: bool, levels: &str) {
-    let _ = BUFFER.set(Mutex::new(Some(Vec::new())));
     let fmt_filter = tracing_subscriber::filter::Targets::from_str(levels).expect(
         "logging filter targets were not formatted correctly or did not specify a valid level",
     );
@@ -112,8 +112,6 @@ pub fn reset_early_buffer() -> Option<Vec<LogEvent>> {
 /// Gets a  mutable reference to the early buffer.
 fn get_early_buffer() -> MutexGuard<'static, Option<Vec<LogEvent>>> {
     BUFFER
-        .get()
-        .expect("Internal logs buffer not initialized")
         .lock()
         .expect("Couldn't acquire lock on internal logs buffer")
 }
@@ -123,7 +121,7 @@ fn get_early_buffer() -> MutexGuard<'static, Option<Vec<LogEvent>>> {
 ///
 /// Checks if [`BUFFER`] is set or if a trace sender exists
 fn should_process_tracing_event() -> bool {
-    BUFFER.get().is_some() || maybe_get_trace_sender().is_some()
+    get_early_buffer().is_some() || maybe_get_trace_sender().is_some()
 }
 
 /// Attempts to buffer an event into the early buffer.
@@ -179,10 +177,7 @@ fn get_trace_receiver() -> broadcast::Receiver<LogEvent> {
 
 /// Gets a mutable reference to the list of waiting subscribers, if it exists.
 fn get_trace_subscriber_list() -> MutexGuard<'static, Option<Vec<oneshot::Sender<Vec<LogEvent>>>>> {
-    SUBSCRIBERS
-        .get_or_init(|| Mutex::new(Some(Vec::new())))
-        .lock()
-        .expect("poisoned locks are dumb")
+    SUBSCRIBERS.lock().expect("poisoned locks are dumb")
 }
 
 /// Attempts to register for early buffered events.

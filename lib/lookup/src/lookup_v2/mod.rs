@@ -121,6 +121,7 @@ impl TargetPath {
     pub fn event_root() -> Self {
         Self::root(PathPrefix::Event)
     }
+
     pub fn metadata_root() -> Self {
         Self::root(PathPrefix::Metadata)
     }

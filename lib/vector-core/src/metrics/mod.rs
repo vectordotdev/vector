@@ -18,12 +18,14 @@ use crate::event::{Metric, MetricKind, MetricValue};
 
 type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Snafu)]
+#[derive(Clone, Copy, Debug, PartialEq, Snafu)]
 pub enum Error {
     #[snafu(display("Recorder already initialized."))]
     AlreadyInitialized,
     #[snafu(display("Metrics system was not initialized."))]
     NotInitialized,
+    #[snafu(display("Timeout value of {} must be positive.", timeout))]
+    TimeoutMustBePositive { timeout: f64 },
 }
 
 static CONTROLLER: OnceCell<Controller> = OnceCell::new();
@@ -130,10 +132,20 @@ impl Controller {
     }
 
     /// Set or clear the expiry time after which idle metrics are dropped from the set of captured
-    /// metrics.
-    pub fn set_expiry(&self, timeout: Option<Duration>) {
+    /// metrics. Invalid timeouts (zero or negative values) are silently remapped to no expiry.
+    ///
+    /// # Errors
+    ///
+    /// The contained timeout value must be positive.
+    pub fn set_expiry(&self, timeout: Option<f64>) -> Result<()> {
+        if let Some(timeout) = timeout {
+            if timeout <= 0.0 {
+                return Err(Error::TimeoutMustBePositive { timeout });
+            }
+        }
         self.recorder
-            .with_registry(|registry| registry.set_expiry(timeout));
+            .with_registry(|registry| registry.set_expiry(timeout.map(Duration::from_secs_f64)));
+        Ok(())
     }
 
     /// Take a snapshot of all gathered metrics and expose them as metric
@@ -234,7 +246,7 @@ mod tests {
 
     use crate::event::MetricKind;
 
-    const IDLE_TIMEOUT: Duration = Duration::from_millis(500);
+    const IDLE_TIMEOUT: f64 = 0.5;
 
     fn init_metrics() -> &'static Controller {
         if let Err(error) = init_test() {
@@ -282,13 +294,13 @@ mod tests {
     #[test]
     fn expires_metrics() {
         let controller = init_metrics();
-        controller.set_expiry(Some(IDLE_TIMEOUT));
+        controller.set_expiry(Some(IDLE_TIMEOUT)).unwrap();
 
         metrics::counter!("test2", 1);
         metrics::counter!("test3", 2);
         assert_eq!(controller.capture_metrics().len(), 4);
 
-        std::thread::sleep(IDLE_TIMEOUT * 2);
+        std::thread::sleep(Duration::from_secs_f64(IDLE_TIMEOUT * 2.0));
         metrics::counter!("test2", 3);
         assert_eq!(controller.capture_metrics().len(), 3);
     }

@@ -147,17 +147,6 @@ impl Expression for DelFn {
         let return_type = self.query.apply_type_info(&mut state);
 
         self.query.delete_type_def(&mut state.external);
-
-        // if self.query.is_external() {
-        //     if let Err(
-        //         value::kind::remove::Error::RootPath
-        //         | value::kind::remove::Error::CoalescedPath
-        //         | value::kind::remove::Error::NegativeIndexPath,
-        //     ) = self.query.delete_type_def(&mut state.external)
-        //     {
-        //
-        //     }
-        // }
         TypeInfo::new(state, return_type)
     }
 }

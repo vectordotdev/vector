@@ -20,7 +20,7 @@ use crate::{
         filter::{self, filter_items},
         relay, sort,
     },
-    config::{ComponentKey, Config},
+    config::{ComponentKey, Config, TransformConfig},
     filter_check,
 };
 use crate::{config::SourceConfig, topology::schema::merged_definition};
@@ -289,7 +289,7 @@ pub fn update_config(config: &Config) {
             component_key.clone(),
             Component::Transform(transform::Transform(transform::Data {
                 component_key: component_key.clone(),
-                component_type: transform.inner.transform_type().to_string(),
+                component_type: transform.inner.get_component_name().to_string(),
                 inputs: transform.inputs.clone(),
                 outputs: transform
                     .inner

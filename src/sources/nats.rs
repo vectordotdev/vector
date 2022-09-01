@@ -4,16 +4,16 @@ use codecs::decoding::{DeserializerConfig, FramingConfig, StreamDecodingError};
 use futures::{pin_mut, stream, Stream, StreamExt};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
+use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
-
 use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{log_schema, GenerateConfig, Output, SourceConfig, SourceContext},
     event::Event,
-    internal_events::{BytesReceived, OldEventsReceived, StreamClosedError},
+    internal_events::{OldEventsReceived, StreamClosedError},
     nats::{from_tls_auth_config, NatsAuthConfig, NatsConfigError},
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
@@ -144,11 +144,9 @@ async fn nats_source(
 ) -> Result<(), ()> {
     let stream = get_subscription_stream(subscription).take_until(shutdown);
     pin_mut!(stream);
+    let bytes_received = register!(BytesReceived::from(Protocol::TCP));
     while let Some(msg) = stream.next().await {
-        emit!(BytesReceived {
-            byte_size: msg.data.len(),
-            protocol: "tcp",
-        });
+        bytes_received.emit(ByteSize(msg.data.len()));
         let mut stream = FramedRead::new(msg.data.as_ref(), decoder.clone());
         while let Some(next) = stream.next().await {
             match next {

@@ -36,7 +36,7 @@ use crate::{
         metric::{Metric, MetricData, MetricKind, MetricSeries, MetricValue},
         Event, EventStatus, Finalizable,
     },
-    internal_events::PrometheusServerRequestComplete,
+    internal_events::{PrometheusNormalizationError, PrometheusServerRequestComplete},
     sinks::{
         util::{
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet},
@@ -575,9 +575,11 @@ impl StreamSink<Event> for PrometheusExporter {
                         metrics.insert(metric_ref, (normalized, MetricMetadata::new(flush_period)));
                     }
                 }
+                finalizers.update_status(EventStatus::Delivered);
+            } else {
+                emit!(PrometheusNormalizationError {});
+                finalizers.update_status(EventStatus::Errored);
             }
-
-            finalizers.update_status(EventStatus::Delivered);
         }
 
         Ok(())

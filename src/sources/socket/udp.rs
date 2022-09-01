@@ -9,6 +9,7 @@ use codecs::{
 use futures::StreamExt;
 use tokio::net::UdpSocket;
 use tokio_util::codec::FramedRead;
+use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
@@ -16,9 +17,7 @@ use crate::{
     codecs::Decoder,
     config::log_schema,
     event::Event,
-    internal_events::{
-        BytesReceived, SocketEventsReceived, SocketMode, SocketReceiveError, StreamClosedError,
-    },
+    internal_events::{SocketEventsReceived, SocketMode, SocketReceiveError, StreamClosedError},
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     sources::Source,
@@ -122,6 +121,8 @@ pub(super) fn udp(
             None => config.max_length,
         };
 
+        let bytes_received = register!(BytesReceived::from(Protocol::UDP));
+
         info!(message = "Listening.", address = %config.address);
 
         // We add 1 to the max_length in order to determine if the received data has been truncated.
@@ -154,7 +155,7 @@ pub(super) fn udp(
                        }
                     };
 
-                    emit!(BytesReceived { byte_size, protocol: "udp" });
+                    bytes_received.emit(ByteSize(byte_size));
 
                     let payload = buf.split_to(byte_size);
                     let truncated = byte_size == max_length + 1;

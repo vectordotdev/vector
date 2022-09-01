@@ -4,7 +4,6 @@ use lookup::{OwnedPath, PathPrefix, TargetPath};
 use parser::ast::{self, Node, QueryTarget};
 
 use crate::function::ArgumentList;
-use crate::parser::Ident;
 use crate::state::TypeState;
 use crate::value::VrlValueConvert;
 use crate::{
@@ -440,7 +439,6 @@ impl<'a> Compiler<'a> {
             Assignment::{Infallible, Single},
             AssignmentOp,
         };
-        use value::Value;
 
         let original_state = state.clone();
 
@@ -747,9 +745,9 @@ impl<'a> Compiler<'a> {
         // expression.
         let function_info = function_call::Builder::new(
             call_span,
-            ident.clone(),
+            ident,
             abort_on_error,
-            arguments.clone(),
+            arguments,
             self.fns,
             &state_before_function,
             state,
@@ -788,7 +786,7 @@ impl<'a> Compiler<'a> {
         });
 
         if let Some((args, function)) = &function_info {
-            self.check_metadata_function_deprecations(&function, args);
+            self.check_metadata_function_deprecations(function, args);
 
             // Update the final state using the function expression to make sure it's accurate.
             *state = function.type_info(&original_state).state;

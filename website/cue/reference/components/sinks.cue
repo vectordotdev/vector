@@ -193,6 +193,9 @@ components: sinks: [Name=string]: {
 											if codec == "json" {
 												json: "JSON encoded event."
 											}
+											if codec == "gelf" {
+												gelf: "[GELF](https://docs.graylog.org/docs/gelf) encoded event."
+											}
 											if codec == "avro" {
 												avro: "Avro encoded event with a given schema."
 											}

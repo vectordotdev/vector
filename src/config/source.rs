@@ -1,15 +1,15 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
+use enum_dispatch::enum_dispatch;
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::{AcknowledgementsConfig, GlobalOptions, LogNamespace, Output};
+use vector_core::{
+    config::{AcknowledgementsConfig, GlobalOptions, LogNamespace, Output},
+    source::Source,
+};
 
 use super::{schema, ComponentKey, ProxyConfig, Resource};
-use crate::{
-    shutdown::ShutdownSignal,
-    sources::{self, Sources},
-    SourceSender,
-};
+use crate::{shutdown::ShutdownSignal, sources::Sources, SourceSender};
 
 /// Fully resolved source component.
 #[configurable_component]
@@ -30,18 +30,19 @@ pub struct SourceOuter {
 }
 
 impl SourceOuter {
-    pub(crate) fn new(source: Sources) -> Self {
+    pub(crate) fn new<I: Into<Sources>>(inner: I) -> Self {
         Self {
             proxy: Default::default(),
             sink_acknowledgements: false,
-            inner: source,
+            inner: inner.into(),
         }
     }
 }
 
 #[async_trait]
+#[enum_dispatch]
 pub trait SourceConfig: NamedComponent + core::fmt::Debug + Send + Sync {
-    async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source>;
+    async fn build(&self, cx: SourceContext) -> crate::Result<Source>;
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output>;
 

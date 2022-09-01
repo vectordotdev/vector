@@ -1,5 +1,6 @@
 use std::io::Error;
 
+use crate::{emit, internal_events::ComponentEventsDropped};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -12,12 +13,14 @@ pub struct NatsEventSendError {
 
 impl InternalEvent for NatsEventSendError {
     fn emit(self) {
+        let reason = "Failed to send message.";
         error!(
-            message = "Failed to send message.",
+            message = reason,
             error = %self.error,
             error_type = error_type::WRITER_FAILED,
             error_code = io_error_code(&self.error),
             stage = error_stage::SENDING,
+            internal_log_rate_secs = 10,
         );
         counter!(
             "component_errors_total", 1,
@@ -25,6 +28,12 @@ impl InternalEvent for NatsEventSendError {
             "error_code" => io_error_code(&self.error),
             "stage" => error_stage::SENDING,
         );
+        emit!(ComponentEventsDropped {
+            count: 1,
+            intentional: false,
+            reason,
+        });
+
         // deprecated
         counter!("send_errors_total", 1);
     }

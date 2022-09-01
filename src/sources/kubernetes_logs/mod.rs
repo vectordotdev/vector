@@ -24,6 +24,7 @@ use kube::{
     },
     Client, Config as ClientConfig,
 };
+use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_common::TimeZone;
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::{transform::TaskTransform, ByteSizeOf};
@@ -35,7 +36,7 @@ use crate::{
     },
     event::{Event, LogEvent},
     internal_events::{
-        BytesReceived, FileSourceInternalEventsEmitter, KubernetesLifecycleError,
+        FileSourceInternalEventsEmitter, KubernetesLifecycleError,
         KubernetesLogsEventAnnotationError, KubernetesLogsEventNamespaceAnnotationError,
         KubernetesLogsEventNodeAnnotationError, KubernetesLogsEventsReceived,
         KubernetesLogsPodInfo, StreamClosedError,
@@ -461,12 +462,10 @@ impl Source {
 
         let checkpoints = checkpointer.view();
         let events = file_source_rx.flat_map(futures::stream::iter);
+        let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
         let events = events.map(move |line| {
             let byte_size = line.text.len();
-            emit!(BytesReceived {
-                byte_size,
-                protocol: "http",
-            });
+            bytes_received.emit(ByteSize(byte_size));
 
             let mut event = create_event(
                 line.text,
