@@ -101,7 +101,7 @@ pub struct ElasticsearchConfig {
     #[configurable(derived)]
     pub auth: Option<ElasticsearchAuth>,
 
-    #[configurable(derived)]
+    /// Custom parameters to add to the query string of each request sent to Elasticsearch.
     pub query: Option<HashMap<String, String>>,
 
     #[configurable(derived)]

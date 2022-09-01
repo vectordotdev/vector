@@ -3,7 +3,7 @@ use vector_config_common::validation::{Format, Validation};
 use crate::{
     schema::generate_string_schema,
     schemars::{gen::SchemaGenerator, schema::SchemaObject},
-    Configurable, Metadata,
+    Configurable, GenerateError, Metadata,
 };
 
 impl Configurable for url::Url {
@@ -20,7 +20,7 @@ impl Configurable for url::Url {
         metadata
     }
 
-    fn generate_schema(_: &mut SchemaGenerator, _: Metadata<Self>) -> SchemaObject {
-        generate_string_schema()
+    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+        Ok(generate_string_schema())
     }
 }

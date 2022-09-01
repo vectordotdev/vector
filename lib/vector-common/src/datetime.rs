@@ -6,7 +6,7 @@ use derivative::Derivative;
 use vector_config::{
     schema::generate_string_schema,
     schemars::{gen::SchemaGenerator, schema::SchemaObject},
-    Configurable, Metadata,
+    Configurable, GenerateError,
 };
 
 #[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
@@ -97,7 +97,7 @@ impl Configurable for TimeZone {
         Some("Strongly-typed list of timezones as defined in the `tz` database.")
     }
 
-    fn generate_schema(_: &mut SchemaGenerator, _: Metadata<Self>) -> SchemaObject {
-        generate_string_schema()
+    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+        Ok(generate_string_schema())
     }
 }

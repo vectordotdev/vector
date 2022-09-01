@@ -4,7 +4,7 @@ use crate::{
     schema::{assert_string_schema_for_map, generate_map_schema},
     schemars::{gen::SchemaGenerator, schema::SchemaObject},
     str::ConfigurableString,
-    Configurable, Metadata,
+    Configurable, GenerateError,
 };
 
 impl<K, V> Configurable for indexmap::IndexMap<K, V>
@@ -18,9 +18,9 @@ where
         true
     }
 
-    fn generate_schema(gen: &mut SchemaGenerator, _: Metadata<Self>) -> SchemaObject {
+    fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
         // Make sure our key type is _truly_ a string schema.
-        assert_string_schema_for_map::<K, Self>(gen);
+        assert_string_schema_for_map::<K, Self>(gen)?;
 
         generate_map_schema::<V>(gen)
     }

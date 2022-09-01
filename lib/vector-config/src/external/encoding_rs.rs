@@ -1,7 +1,7 @@
 use crate::{
     schema::generate_string_schema,
     schemars::{gen::SchemaGenerator, schema::SchemaObject},
-    Configurable, Metadata,
+    Configurable, GenerateError,
 };
 
 impl Configurable for &'static encoding_rs::Encoding {
@@ -19,7 +19,7 @@ impl Configurable for &'static encoding_rs::Encoding {
         )
     }
 
-    fn generate_schema(_: &mut SchemaGenerator, _: Metadata<Self>) -> SchemaObject {
-        generate_string_schema()
+    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+        Ok(generate_string_schema())
     }
 }

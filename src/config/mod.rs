@@ -1381,6 +1381,7 @@ mod resource_tests {
     #[test]
     #[ignore]
     #[allow(clippy::print_stdout)]
+    #[allow(clippy::print_stderr)]
     fn generate_component_config_schema() {
         use crate::config::{SinkOuter, SourceOuter, TransformOuter};
         use indexmap::IndexMap;
@@ -1404,11 +1405,15 @@ mod resource_tests {
             pub sinks: IndexMap<ComponentKey, SinkOuter<String>>,
         }
 
-        let root_schema = generate_root_schema::<ComponentsOnlyConfig>();
-        let json = serde_json::to_string_pretty(&root_schema)
-            .expect("rendering root schema to JSON should not fail");
+        match generate_root_schema::<ComponentsOnlyConfig>() {
+            Ok(schema) => {
+                let json = serde_json::to_string_pretty(&schema)
+                    .expect("rendering root schema to JSON should not fail");
 
-        println!("{}", json);
+                println!("{}", json);
+            }
+            Err(e) => eprintln!("error while generating schema: {:?}", e),
+        }
     }
 }
 

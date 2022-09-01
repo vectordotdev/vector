@@ -515,9 +515,13 @@ pub struct VectorConfig {
 
 #[test]
 fn generate_semi_real_schema() {
-    let root_schema = generate_root_schema::<VectorConfig>();
-    let json = serde_json::to_string_pretty(&root_schema)
-        .expect("rendering root schema to JSON should not fail");
+    match generate_root_schema::<VectorConfig>() {
+        Ok(schema) => {
+            let json = serde_json::to_string_pretty(&schema)
+                .expect("rendering root schema to JSON should not fail");
 
-    println!("{}", json);
+            println!("{}", json);
+        }
+        Err(e) => eprintln!("error while generating schema: {:?}", e),
+    }
 }
