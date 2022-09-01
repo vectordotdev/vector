@@ -119,7 +119,7 @@ fn build_enum_generate_schema_fn(variants: &[Variant<'_>]) -> proc_macro2::Token
             #(#mapped_variants)*
 
             let mut schema = ::vector_config::schema::generate_composite_schema(&subschemas);
-            ::vector_config::schema::finalize_schema(schema_gen, &mut schema, schema_metadata);
+            ::vector_config::schema::apply_metadata(&mut schema, schema_metadata);
 
             schema
         }
@@ -152,7 +152,7 @@ fn generate_struct_field(field: &Field<'_>) -> proc_macro2::TokenStream {
     quote! {
         #field_metadata
         let mut subschema = #spanned_generate_schema;
-        ::vector_config::schema::finalize_schema(schema_gen, &mut subschema, #field_metadata_ref);
+        ::vector_config::schema::apply_metadata(&mut subschema, #field_metadata_ref);
     }
 }
 
@@ -258,7 +258,7 @@ fn build_named_struct_generate_schema_fn(
                 ::vector_config::schema::convert_to_flattened_schema(&mut schema, flattened_subschemas);
             }
 
-            ::vector_config::schema::finalize_schema(schema_gen, &mut schema, metadata);
+            ::vector_config::schema::apply_metadata(&mut schema, metadata);
 
             schema
         }
@@ -280,7 +280,7 @@ fn build_tuple_struct_generate_schema_fn(fields: &[Field<'_>]) -> proc_macro2::T
             #(#mapped_fields)*
 
             let mut schema = ::vector_config::schema::generate_tuple_schema(&subschemas);
-            ::vector_config::schema::finalize_schema(schema_gen, &mut schema, metadata);
+            ::vector_config::schema::apply_metadata(&mut schema, metadata);
 
             schema
         }
@@ -307,7 +307,7 @@ fn build_newtype_struct_generate_schema_fn(fields: &[Field<'_>]) -> proc_macro2:
             let metadata = Self::metadata().merge(overrides);
 
             #field_schema
-            ::vector_config::schema::finalize_schema(schema_gen, &mut subschema, metadata);
+            ::vector_config::schema::apply_metadata(&mut subschema, metadata);
 
             subschema
         }

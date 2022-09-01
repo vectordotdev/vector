@@ -21,6 +21,7 @@ use vector_config::{
 
 /// A templated string.
 #[configurable_component]
+#[configurable(metadata(templateable))]
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 #[serde(try_from = "String", into = "String")]
 pub struct Template {

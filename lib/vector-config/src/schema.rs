@@ -13,49 +13,6 @@ use serde_json::{Map, Value};
 
 use crate::{num::ConfigurableNumber, Configurable, ConfigurableString, CustomAttribute, Metadata};
 
-/// Finalizes the schema.
-///
-/// This ensures all metadata is applied and registers `T` in the generator if possible.
-///
-/// As many configuration types are reused often, such as nearly all sinks allowing configuration of batching
-/// behavior via `BatchConfig`, we utilize JSONSchema's ability to define a named schema and then
-/// reference it via a short identifier whenever we want to apply that schema to a particular field.
-/// This promotes a more concise schema and allows effectively exposing the discrete configuration
-/// types such that they can be surfaced by tools using the schema.
-///
-/// Since we don't utilize the typical flow of generating schemas via `schemars`, we're forced to
-/// manually determine when we should register a schema as a referenceable schema within the schema
-/// generator. As well, we need to handle applying metadata to these schemas such that we preserve
-/// the intended behavior.
-pub fn finalize_schema<T>(
-    gen: &mut SchemaGenerator,
-    schema: &mut SchemaObject,
-    metadata: Metadata<T>,
-) where
-    T: Configurable + Serialize,
-{
-    // If the type that this schema represents is referenceable, check to see if it's been defined
-    // before, and if not, then go ahead and define it.
-    if let Some(ref_name) = T::referenceable_name() {
-        if !gen.definitions().contains_key(ref_name) {
-            // We specifically apply the metadata of `T` itself, and not the `metadata` we've been
-            // given, as we do not want to apply field-level metadata e.g. field-specific default
-            // values. We do, however, apply the given `metadata` to the schema reference itself.
-            apply_metadata(schema, T::metadata());
-            gen.definitions_mut()
-                .insert(ref_name.to_string(), Schema::Object(schema.clone()));
-        }
-
-        // Replace the mutable reference to the original schema with an actual "reference" schema
-        // that points the caller towards the stored definition for the given schema, which is
-        // represented in the JSONSchema output by the usage of `"$ref": "<ref_name>"`.
-        let ref_path = format!("{}{}", gen.settings().definitions_path, ref_name);
-        *schema = SchemaObject::new_ref(ref_path);
-    }
-
-    apply_metadata(schema, metadata);
-}
-
 /// Applies metadata to the given schema.
 ///
 /// Metadata can include semantic information (title, description, etc), validation (min/max, allowable
@@ -190,12 +147,21 @@ where
     schema
 }
 
-pub fn generate_array_schema<T>(gen: &mut SchemaGenerator, metadata: Metadata<T>) -> SchemaObject
+pub fn generate_array_schema<T>(gen: &mut SchemaGenerator) -> SchemaObject
 where
-    T: Configurable,
+    T: Configurable + Serialize,
 {
-    // We generate the schema for `T` itself, and then apply any of `T`'s metadata to the given schema.
-    let element_schema = T::generate_schema(gen, metadata);
+    // We set `T` to be "transparent", which means that during schema finalization, we will relax
+    // the rules we enforce, such as needing a description, knowing that they'll be enforced on the
+    // field that is specifying this array schema, since carrying that description forward to `T`
+    // would not make sense: if it's a schema reference, the definition will have a description, and
+    // otherwise, if it's a primitive like a string... then the field description itself will
+    // already inherently describe it.
+    let mut metadata = Metadata::<T>::default();
+    metadata.set_transparent();
+
+    // Generate the actual schema for the element type `T`.
+    let element_schema = get_or_generate_schema::<T>(gen, metadata);
 
     SchemaObject {
         instance_type: Some(InstanceType::Array.into()),
@@ -207,12 +173,21 @@ where
     }
 }
 
-pub fn generate_set_schema<T>(gen: &mut SchemaGenerator, metadata: Metadata<T>) -> SchemaObject
+pub fn generate_set_schema<T>(gen: &mut SchemaGenerator) -> SchemaObject
 where
-    T: Configurable,
+    T: Configurable + Serialize,
 {
-    // We generate the schema for `T` itself, and then apply any of `T`'s metadata to the given schema.
-    let element_schema = T::generate_schema(gen, metadata);
+    // We set `T` to be "transparent", which means that during schema finalization, we will relax
+    // the rules we enforce, such as needing a description, knowing that they'll be enforced on the
+    // field that is specifying this set schema, since carrying that description forward to `T`
+    // would not make sense: if it's a schema reference, the definition will have a description, and
+    // otherwise, if it's a primitive like a string... then the field description itself will
+    // already inherently describe it.
+    let mut metadata = Metadata::<T>::default();
+    metadata.set_transparent();
+
+    // Generate the actual schema for the element type `T`.
+    let element_schema = get_or_generate_schema::<T>(gen, metadata);
 
     SchemaObject {
         instance_type: Some(InstanceType::Array.into()),
@@ -225,12 +200,21 @@ where
     }
 }
 
-pub fn generate_map_schema<V>(gen: &mut SchemaGenerator, metadata: Metadata<V>) -> SchemaObject
+pub fn generate_map_schema<V>(gen: &mut SchemaGenerator) -> SchemaObject
 where
-    V: Configurable,
+    V: Configurable + Serialize,
 {
-    // We generate the schema for `V` itself, and then apply any of `V`'s metadata to the given schema.
-    let element_schema = V::generate_schema(gen, metadata);
+    // We set `V` to be "transparent", which means that during schema finalization, we will relax
+    // the rules we enforce, such as needing a description, knowing that they'll be enforced on the
+    // field that is specifying this map schema, since carrying that description forward to `V`
+    // would not make sense: if it's a schema reference, the definition will have a description, and
+    // otherwise, if it's a primitive like a string... then the field description itself will
+    // already inherently describe it.
+    let mut metadata = Metadata::<V>::default();
+    metadata.set_transparent();
+
+    // Generate the actual schema for the element type `V`.
+    let element_schema = get_or_generate_schema::<V>(gen, metadata);
 
     SchemaObject {
         instance_type: Some(InstanceType::Object.into()),
@@ -265,10 +249,10 @@ pub fn generate_struct_schema(
 
 pub fn generate_optional_schema<T>(gen: &mut SchemaGenerator, metadata: Metadata<T>) -> SchemaObject
 where
-    T: Configurable,
+    T: Configurable + Serialize,
 {
     // We generate the schema for `T` itself, and then apply any of `T`'s metadata to the given schema.
-    let mut schema = T::generate_schema(gen, metadata);
+    let mut schema = get_or_generate_schema::<T>(gen, metadata);
 
     // We do a little dance here to add an additional instance type of "null" to the schema to
     // signal it can be "X or null", achieving the functional behavior of "this is optional".
@@ -354,16 +338,64 @@ pub fn generate_internal_tagged_variant_schema(tag: String, value: String) -> Sc
 
 pub fn generate_root_schema<T>() -> RootSchema
 where
-    T: Configurable,
+    T: Configurable + Serialize,
 {
     let mut schema_gen = SchemaSettings::draft2019_09().into_generator();
 
-    let schema = T::generate_schema(&mut schema_gen, Metadata::default());
+    let schema = get_or_generate_schema::<T>(&mut schema_gen, T::metadata());
     RootSchema {
         meta_schema: None,
         schema,
         definitions: schema_gen.take_definitions(),
     }
+}
+
+pub fn get_or_generate_schema<T>(gen: &mut SchemaGenerator, overrides: Metadata<T>) -> SchemaObject
+where
+    T: Configurable + Serialize,
+{
+    let mut schema = match T::referenceable_name() {
+        // When `T` has a referencable name, try looking it up in the schema generator's definition
+        // list, and if it exists, create a schema reference to it. Otherwise, generate it and
+        // backfill it in the schema generator.
+        Some(name) => {
+            if !gen.definitions().contains_key(name) {
+                // In order to avoid infinite recursion, we copy the approach that `schemars` takes and
+                // insert a dummy boolean schema before actually generating the real schema, and then
+                // replace it afterwards. If any recursion occurs, a schema reference will be handed
+                // back, which means we don't have to worry about the dummy schema needing to be updated
+                // after the fact.
+                gen.definitions_mut().insert(name.to_string(), Schema::Bool(false));
+               
+                // We generate the schema for `T` with its own default metadata because the override
+                // metadata might only be relevant to the place that `T` is being used.
+                //
+                // For example, if `T` was something for setting the logging level, one component
+                // that allows the logging level to be changed for that component specifically might
+                // want to specify a default value, whereas `T` should not have a default at all..
+                // so if we applied that override metadata, we'd be unwittingly applying a default
+                // for all usages of `T` that didn't override the default themselves.
+                let mut schema = T::generate_schema(gen, T::metadata());
+                apply_metadata(&mut schema, T::metadata());
+        
+                gen.definitions_mut().insert(name.to_string(), Schema::Object(schema));
+            }
+
+            get_schema_ref(gen, name)
+        },
+        // Always generate the schema directly if `T` is not referencable.
+        None => T::generate_schema(gen, T::metadata()),
+    };
+
+    // Apply the override metadata to the resulting schema before handing it back.
+    apply_metadata(&mut schema, overrides);
+
+    schema
+}
+
+fn get_schema_ref<S: AsRef<str>>(gen: &mut SchemaGenerator, name: S) -> SchemaObject {
+    let ref_path = format!("{}{}", gen.settings().definitions_path, name.as_ref());
+    SchemaObject::new_ref(ref_path)
 }
 
 /// Asserts that the key type `K` generates a string-like schema, suitable for use in maps.

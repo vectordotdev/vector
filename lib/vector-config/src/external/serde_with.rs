@@ -1,5 +1,5 @@
 use crate::{
-    schema::{finalize_schema, generate_number_schema},
+    schema::generate_number_schema,
     schemars::{gen::SchemaGenerator, schema::SchemaObject},
     Configurable, Metadata,
 };
@@ -50,12 +50,10 @@ impl Configurable for serde_with::DurationSeconds<u64, serde_with::formats::Stri
         Some("A span of time, in whole seconds.")
     }
 
-    fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<Self>) -> SchemaObject {
+    fn generate_schema(_: &mut SchemaGenerator, _: Metadata<Self>) -> SchemaObject {
         // This boils down to a number schema, but we just need to shuttle around the metadata so
         // that we can call the relevant schema generation function.
-        let mut schema = generate_number_schema::<u64>();
-        finalize_schema(gen, &mut schema, overrides.convert::<u64>());
-        schema
+        generate_number_schema::<u64>()
     }
 }
 
@@ -71,11 +69,9 @@ impl Configurable for serde_with::DurationSeconds<f64, serde_with::formats::Stri
         Some("A span of time, in whole seconds.")
     }
 
-    fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<Self>) -> SchemaObject {
+    fn generate_schema(_: &mut SchemaGenerator, _: Metadata<Self>) -> SchemaObject {
         // This boils down to a number schema, but we just need to shuttle around the metadata so
         // that we can call the relevant schema generation function.
-        let mut schema = generate_number_schema::<f64>();
-        finalize_schema(gen, &mut schema, overrides.convert::<f64>());
-        schema
+        generate_number_schema::<f64>()
     }
 }
