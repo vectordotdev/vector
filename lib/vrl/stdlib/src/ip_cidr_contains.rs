@@ -71,7 +71,7 @@ impl Function for IpCidrContains {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let cidr = arguments.required("cidr");
         let value = arguments.required("value");

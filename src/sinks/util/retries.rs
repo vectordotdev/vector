@@ -227,6 +227,11 @@ impl ExponentialBackoff {
         self.max_delay = Some(duration);
         self
     }
+
+    /// Resents the exponential back-off strategy to its initial state.
+    pub fn reset(&mut self) {
+        self.current = self.base;
+    }
 }
 
 impl Iterator for ExponentialBackoff {

@@ -34,12 +34,12 @@ impl CharacterDelimitedDecoderConfig {
 pub struct CharacterDelimitedDecoderOptions {
     /// The character that delimits byte sequences.
     #[serde(with = "vector_core::serde::ascii_char")]
-    delimiter: u8,
+    pub delimiter: u8,
     /// The maximum length of the byte buffer.
     ///
     /// This length does *not* include the trailing delimiter.
     #[serde(skip_serializing_if = "vector_core::serde::skip_serializing_if_default")]
-    max_length: Option<usize>,
+    pub max_length: Option<usize>,
 }
 
 impl CharacterDelimitedDecoderOptions {
@@ -56,9 +56,9 @@ impl CharacterDelimitedDecoderOptions {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct CharacterDelimitedDecoder {
     /// The delimiter used to separate byte sequences.
-    delimiter: u8,
+    pub delimiter: u8,
     /// The maximum length of the byte buffer.
-    max_length: usize,
+    pub max_length: usize,
 }
 
 impl CharacterDelimitedDecoder {

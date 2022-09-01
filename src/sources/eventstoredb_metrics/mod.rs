@@ -4,17 +4,18 @@ use futures::{FutureExt, StreamExt};
 use http::Uri;
 use hyper::{Body, Request};
 use tokio_stream::wrappers::IntervalStream;
+use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
 use self::types::Stats;
 use crate::{
-    config::{self, Output, SourceConfig, SourceContext, SourceDescription},
+    config::{self, Output, SourceConfig, SourceContext},
     http::HttpClient,
     internal_events::{
-        BytesReceived, EventStoreDbMetricsHttpError, EventStoreDbStatsParsingError,
-        OldEventsReceived, StreamClosedError,
+        EventStoreDbMetricsHttpError, EventStoreDbStatsParsingError, OldEventsReceived,
+        StreamClosedError,
     },
     tls::TlsSettings,
 };
@@ -22,7 +23,7 @@ use crate::{
 pub mod types;
 
 /// Configuration for the `eventstoredb_metrics` source.
-#[configurable_component(source)]
+#[configurable_component(source("eventstoredb_metrics"))]
 #[derive(Clone, Debug, Default)]
 pub struct EventStoreDbConfig {
     /// Endpoints to scrape stats from.
@@ -47,14 +48,9 @@ pub fn default_endpoint() -> String {
     "https://localhost:2113/stats".to_string()
 }
 
-inventory::submit! {
-    SourceDescription::new::<EventStoreDbConfig>("eventstoredb_metrics")
-}
-
 impl_generate_config_from_default!(EventStoreDbConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "eventstoredb_metrics")]
 impl SourceConfig for EventStoreDbConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         eventstoredb(
@@ -67,10 +63,6 @@ impl SourceConfig for EventStoreDbConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(config::DataType::Metric)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "eventstoredb_metrics"
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -89,6 +81,8 @@ fn eventstoredb(
     let tls_settings = TlsSettings::from_options(&None)?;
     let client = HttpClient::new(tls_settings, &cx.proxy)?;
     let url: Uri = endpoint.as_str().parse()?;
+
+    let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
 
     Ok(Box::pin(
         async move {
@@ -116,10 +110,7 @@ fn eventstoredb(
                                 continue;
                             }
                         };
-                        emit!(BytesReceived {
-                            byte_size: bytes.len(),
-                            protocol: "http",
-                        });
+                        bytes_received.emit(ByteSize(bytes.len()));
 
                         match serde_json::from_slice::<Stats>(bytes.as_ref()) {
                             Err(error) => {

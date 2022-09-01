@@ -57,7 +57,7 @@ impl Function for SetSemanticMeaning {
         &self,
         state: &TypeState,
         ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let span = ctx.span();
         let query = arguments.required_query("target")?;

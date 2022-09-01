@@ -16,7 +16,7 @@ use super::util::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
-        SourceConfig, SourceContext, SourceDescription,
+        SourceConfig, SourceContext,
     },
     event::{Event, LogEvent},
     internal_events::{FluentMessageDecodeError, FluentMessageReceived},
@@ -29,7 +29,7 @@ mod message;
 use self::message::{FluentEntry, FluentMessage, FluentRecord, FluentTag, FluentTimestamp};
 
 /// Configuration for the `fluent` source.
-#[configurable_component(source)]
+#[configurable_component(source("fluent"))]
 #[derive(Clone, Debug)]
 pub struct FluentConfig {
     /// The address to listen for connections on.
@@ -54,10 +54,6 @@ pub struct FluentConfig {
     acknowledgements: AcknowledgementsConfig,
 }
 
-inventory::submit! {
-    SourceDescription::new::<FluentConfig>("fluent")
-}
-
 impl GenerateConfig for FluentConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
@@ -73,7 +69,6 @@ impl GenerateConfig for FluentConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "fluent")]
 impl SourceConfig for FluentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let source = FluentSource {};
@@ -99,10 +94,6 @@ impl SourceConfig for FluentConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "fluent"
     }
 
     fn resources(&self) -> Vec<Resource> {

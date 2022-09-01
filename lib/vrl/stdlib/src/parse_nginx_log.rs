@@ -60,7 +60,7 @@ impl Function for ParseNginxLog {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let format = arguments
@@ -95,25 +95,6 @@ impl Function for ParseNginxLog {
                 ),
             },
         ]
-    }
-
-    fn compile_argument(
-        &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        match (name, expr) {
-            ("format", Some(expr)) => {
-                let format = expr
-                    .as_enum("format", variants())?
-                    .try_bytes()
-                    .expect("format not bytes");
-                Ok(Some(Box::new(format) as _))
-            }
-            _ => Ok(None),
-        }
     }
 }
 

@@ -86,7 +86,7 @@ impl Function for Del {
         &self,
         _state: &state::TypeState,
         ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let query = arguments.required_query("target")?;
 
@@ -100,32 +100,6 @@ impl Function for Del {
         }
 
         Ok(Box::new(DelFn { query }))
-    }
-
-    fn compile_argument(
-        &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        match (name, expr) {
-            ("target", Some(expr)) => {
-                let query = match expr {
-                    expression::Expr::Query(query) => query,
-                    _ => {
-                        return Err(Box::new(vrl::function::Error::UnexpectedExpression {
-                            keyword: "field",
-                            expected: "query",
-                            expr: expr.clone(),
-                        }))
-                    }
-                };
-
-                Ok(Some(Box::new(query.clone()) as _))
-            }
-            _ => Ok(None),
-        }
     }
 }
 
@@ -172,18 +146,8 @@ impl Expression for DelFn {
 
         let return_type = self.query.apply_type_info(&mut state);
 
-        if self.query.is_external() {
-            if let Err(
-                value::kind::remove::Error::RootPath
-                | value::kind::remove::Error::CoalescedPath
-                | value::kind::remove::Error::NegativeIndexPath,
-            ) = self.query.delete_type_def(&mut state.external)
-            {
-                // This function is (currently) infallible, so we ignore any errors here.
-                //
-                // see: https://github.com/vectordotdev/vector/issues/11264
-            }
-        }
+        self.query.delete_type_def(&mut state.external);
+
         TypeInfo::new(state, return_type)
     }
 }

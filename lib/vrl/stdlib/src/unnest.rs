@@ -99,36 +99,10 @@ impl Function for Unnest {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let path = arguments.required_query("path")?;
         Ok(UnnestFn { path }.as_expr())
-    }
-
-    fn compile_argument(
-        &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        match (name, expr) {
-            ("path", Some(expr)) => {
-                let query = match expr {
-                    expression::Expr::Query(query) => query,
-                    _ => {
-                        return Err(Box::new(vrl::function::Error::UnexpectedExpression {
-                            keyword: "path",
-                            expected: "query",
-                            expr: expr.clone(),
-                        }))
-                    }
-                };
-
-                Ok(Some(Box::new(query.clone()) as _))
-            }
-            _ => Ok(None),
-        }
     }
 }
 

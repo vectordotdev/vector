@@ -133,6 +133,16 @@ impl<'a> Container<'a> {
                     serde_ast::Data::Enum(variants) => {
                         let variants = variants
                             .iter()
+                            // When an item is marked as being skipped -- `#[serde(skip)]` -- we
+                            // want to filter out variants that are skipped entirely, because
+                            // otherwise they have to meet all the criteria (doc comment, etc)
+                            // despite the fact they won't be part of the configuration schema
+                            // anyways, and we can't filter it out after the below step because all
+                            // we get is the errors until they can be validated completely.
+                            .filter(|variant| {
+                                !variant.attrs.skip_deserializing()
+                                    && !variant.attrs.skip_serializing()
+                            })
                             .map(|variant| {
                                 Variant::from_ast(
                                     variant,

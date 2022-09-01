@@ -368,7 +368,7 @@ components: sinks: aws_s3: components._aws & {
 
 			policies: [
 				{
-					_action: "HeadBucket"
+					_action: "ListBucket"
 					required_for: ["healthcheck"]
 				},
 				{

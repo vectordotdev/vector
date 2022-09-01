@@ -1,5 +1,4 @@
 use crate::lookup_v2::{parse_value_path, BorrowedSegment, ValuePath};
-use std::fmt::Write;
 use std::fmt::{Display, Formatter};
 use vector_config::configurable_component;
 
@@ -114,7 +113,6 @@ impl From<String> for OwnedValuePath {
 impl From<OwnedValuePath> for String {
     fn from(owned: OwnedValuePath) -> Self {
         let mut coalesce_i = 0;
-
         owned
             .segments
             .iter()
@@ -146,11 +144,8 @@ impl From<OwnedValuePath> for String {
                         coalesce_i += 1;
                         output.push_str(&field_output);
                     }
-                    let _ = write!(
-                        output,
-                        "{})",
-                        serialize_field(last.as_ref(), (coalesce_i != 0).then(|| "|"))
-                    );
+                    output += &serialize_field(last.as_ref(), (coalesce_i != 0).then(|| "|"));
+                    output += ")";
                     output
                 }
             })

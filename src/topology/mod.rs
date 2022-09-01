@@ -79,9 +79,13 @@ pub async fn start_validated(
 ) -> Option<(RunningTopology, mpsc::UnboundedReceiver<()>)> {
     let (abort_tx, abort_rx) = mpsc::unbounded_channel();
 
-    crate::metrics::Controller::get()
+    if let Err(error) = crate::metrics::Controller::get()
         .expect("Metrics must be initialized")
-        .set_expiry(config.global.expire_metrics);
+        .set_expiry(config.global.expire_metrics)
+    {
+        error!(message="Invalid metrics expiry.", %error);
+        return None;
+    }
 
     let mut running_topology = RunningTopology::new(config, abort_tx);
 

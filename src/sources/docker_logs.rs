@@ -15,20 +15,22 @@ use futures::{Stream, StreamExt};
 use lookup::lookup_v2::{parse_value_path, OwnedSegment};
 use lookup::PathPrefix;
 use once_cell::sync::Lazy;
-use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tracing_futures::Instrument;
+use vector_common::internal_event::{
+    ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
+};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
 use super::util::MultilineConfig;
 use crate::{
-    config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
+    config::{log_schema, DataType, Output, SourceConfig, SourceContext},
     docker::{docker, DockerTlsConfig},
     event::{self, merge_state::LogEventMergeState, LogEvent, Value},
     internal_events::{
-        BytesReceived, DockerLogsCommunicationError, DockerLogsContainerEventReceived,
+        DockerLogsCommunicationError, DockerLogsContainerEventReceived,
         DockerLogsContainerMetadataFetchError, DockerLogsContainerUnwatch,
         DockerLogsContainerWatch, DockerLogsEventsReceived,
         DockerLogsLoggingDriverUnsupportedError, DockerLogsTimestampParseError, StreamClosedError,
@@ -51,7 +53,7 @@ static STDOUT: Lazy<Bytes> = Lazy::new(|| "stdout".into());
 static CONSOLE: Lazy<Bytes> = Lazy::new(|| "console".into());
 
 /// Configuration for the `docker_logs` source.
-#[configurable_component(source)]
+#[configurable_component(source("docker_logs"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct DockerLogsConfig {
@@ -187,14 +189,9 @@ impl DockerLogsConfig {
     }
 }
 
-inventory::submit! {
-    SourceDescription::new::<DockerLogsConfig>("docker_logs")
-}
-
 impl_generate_config_from_default!(DockerLogsConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "docker_logs")]
 impl SourceConfig for DockerLogsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let source = DockerLogsSource::new(
@@ -228,38 +225,6 @@ impl SourceConfig for DockerLogsConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "docker_logs"
-    }
-
-    fn can_acknowledge(&self) -> bool {
-        false
-    }
-}
-
-// Add a compatibility alias to avoid breaking existing configs
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-struct DockerCompatConfig {
-    #[serde(flatten)]
-    config: DockerLogsConfig,
-}
-
-#[async_trait::async_trait]
-#[typetag::serde(name = "docker")]
-impl SourceConfig for DockerCompatConfig {
-    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        self.config.build(cx).await
-    }
-
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
-        self.config.outputs(global_log_namespace)
-    }
-
-    fn source_type(&self) -> &'static str {
-        "docker"
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -658,6 +623,8 @@ impl EventStreamBuilder {
 
         let core = Arc::clone(&self.core);
 
+        let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
+
         let mut error = None;
         let events_stream = stream
             .map(|value| {
@@ -667,6 +634,7 @@ impl EventStreamBuilder {
                         core.config.partial_event_marker_field.clone(),
                         core.config.auto_partial_merge,
                         &mut partial_event_merge_state,
+                        &bytes_received,
                     )),
                     Err(error) => {
                         // On any error, restart connection
@@ -868,6 +836,7 @@ impl ContainerLogInfo {
         partial_event_marker_field: Option<String>,
         auto_partial_merge: bool,
         partial_event_merge_state: &mut Option<LogEventMergeState>,
+        bytes_received: &Registered<BytesReceived>,
     ) -> Option<LogEvent> {
         let (stream, mut bytes_message) = match log_output {
             LogOutput::StdErr { message } => (STDERR.clone(), message),
@@ -876,10 +845,7 @@ impl ContainerLogInfo {
             LogOutput::StdIn { message: _ } => return None,
         };
 
-        emit!(BytesReceived {
-            byte_size: bytes_message.len(),
-            protocol: "http"
-        });
+        bytes_received.emit(ByteSize(bytes_message.len()));
 
         let message = String::from_utf8_lossy(&bytes_message);
         let mut splitter = message.splitn(2, char::is_whitespace);

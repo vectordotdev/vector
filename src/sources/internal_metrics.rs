@@ -6,15 +6,15 @@ use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    config::{DataType, Output, SourceConfig, SourceContext, SourceDescription},
-    internal_events::{EventsReceived, StreamClosedError},
+    config::{DataType, Output, SourceConfig, SourceContext},
+    internal_events::{EventsReceived, InternalMetricsBytesReceived, StreamClosedError},
     metrics::Controller,
     shutdown::ShutdownSignal,
     SourceSender,
 };
 
 /// Configuration for the `internal_metrics` source.
-#[configurable_component(source)]
+#[configurable_component(source("internal_metrics"))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields, default)]
@@ -60,14 +60,9 @@ pub struct TagsConfig {
     pub pid_key: Option<String>,
 }
 
-inventory::submit! {
-    SourceDescription::new::<InternalMetricsConfig>("internal_metrics")
-}
-
 impl_generate_config_from_default!(InternalMetricsConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "internal_metrics")]
 impl SourceConfig for InternalMetricsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         if self.scrape_interval_secs == 0.0 {
@@ -106,10 +101,6 @@ impl SourceConfig for InternalMetricsConfig {
         vec![Output::default(DataType::Metric)]
     }
 
-    fn source_type(&self) -> &'static str {
-        "internal_metrics"
-    }
-
     fn can_acknowledge(&self) -> bool {
         false
     }
@@ -136,6 +127,8 @@ impl<'a> InternalMetrics<'a> {
             let metrics = self.controller.capture_metrics();
             let count = metrics.len();
             let byte_size = metrics.size_of();
+
+            emit!(InternalMetricsBytesReceived { byte_size });
             emit!(EventsReceived { count, byte_size });
 
             let batch = metrics.into_iter().map(|mut metric| {
@@ -179,7 +172,10 @@ mod tests {
             Event,
         },
         metrics::Controller,
-        test_util, SourceSender,
+        test_util::{
+            self,
+            components::{run_and_assert_source_compliance, SOURCE_TAGS},
+        },
     };
 
     #[test]
@@ -258,23 +254,15 @@ mod tests {
     }
 
     async fn event_from_config(config: InternalMetricsConfig) -> Event {
-        test_util::trace_init();
+        let mut events = run_and_assert_source_compliance(
+            config,
+            time::Duration::from_millis(100),
+            &SOURCE_TAGS,
+        )
+        .await;
 
-        let (sender, mut recv) = SourceSender::new_test();
-
-        tokio::spawn(async move {
-            config
-                .build(SourceContext::new_test(sender, None))
-                .await
-                .unwrap()
-                .await
-                .unwrap()
-        });
-
-        time::timeout(time::Duration::from_millis(100), recv.next())
-            .await
-            .expect("fetch metrics timeout")
-            .expect("failed to get metrics from a stream")
+        assert!(!events.is_empty());
+        events.remove(0)
     }
 
     #[tokio::test]

@@ -42,11 +42,12 @@ configuration: {
 			description: """
 				If set, Vector will configure the internal metrics system to automatically
 				remove all metrics that have not been updated in the given number of seconds.
+				This value must be positive.
 				"""
 			required: false
-			type: uint: {
+			type: float: {
 				default: null
-				examples: [60]
+				examples: [60.0]
 				unit: "seconds"
 			}
 		}
