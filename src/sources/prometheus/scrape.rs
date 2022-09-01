@@ -302,7 +302,7 @@ mod test {
         sinks::prometheus::exporter::PrometheusExporterConfig,
         test_util::{
             components::{run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS},
-            next_addr, start_topology, wait_for_tcp,
+            next_addr, start_topology, trace_init, wait_for_tcp,
         },
         Error,
     };
@@ -533,6 +533,7 @@ mod test {
     // means source and sink will both emit `EventsSent` , triggering multi-emission check.
     #[tokio::test]
     async fn test_prometheus_routing() {
+        trace_init();
         let in_addr = next_addr();
         let out_addr = next_addr();
 
