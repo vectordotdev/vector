@@ -85,7 +85,7 @@ pub async fn start_validated(
     ) {
         (e @ Some(_), None) => {
             warn!(
-                "Global `expire_metrics` setting is deprecated and will be removed in a future version. Use `expire_metrics_secs` instead."
+                "DEPRECATED: `expire_metrics` setting is deprecated and will be removed in a future version. Use `expire_metrics_secs` instead."
             );
             e
         }
