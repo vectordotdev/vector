@@ -249,7 +249,7 @@ impl ArgumentList {
 
     #[cfg(not(feature = "expr-literal"))]
     pub fn optional_literal(
-        &mut self,
+        &self,
         _: &'static str,
     ) -> Result<Option<crate::expression::Noop>, Error> {
         Ok(Some(crate::expression::Noop))
@@ -270,7 +270,7 @@ impl ArgumentList {
 
     #[cfg(feature = "expr-literal")]
     pub fn required_literal(
-        &mut self,
+        &self,
         keyword: &'static str,
     ) -> Result<crate::expression::Literal, Error> {
         Ok(required(self.optional_literal(keyword)?))

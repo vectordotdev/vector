@@ -214,6 +214,7 @@ components: sources: [Name=string]: {
 						can_verify_certificate: features.collect.tls.can_verify_certificate
 						can_verify_hostname:    features.collect.tls.can_verify_hostname
 						enabled_default:        features.collect.tls.enabled_default
+						enabled_by_scheme:      features.collect.tls.enabled_by_scheme
 					}}
 				}
 			}
@@ -263,6 +264,7 @@ components: sources: [Name=string]: {
 					can_verify_certificate:  features.receive.tls.can_verify_certificate
 					can_add_client_metadata: features.receive.tls.can_add_client_metadata
 					enabled_default:         features.receive.tls.enabled_default
+					enabled_by_scheme:       false
 				}}
 			}
 		}
