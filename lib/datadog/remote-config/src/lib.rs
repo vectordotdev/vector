@@ -30,7 +30,7 @@ type TUFClient = tuf::client::Client<
     EphemeralRepository<interchange::Json>,
 >;
 
-// TODO: are these safe to commit/embed?
+// TODO: add for environments other than staging
 const CONFIG_ROOT: &[u8] = include_bytes!("../config_root.json");
 const DIRECTOR_ROOT: &[u8] = include_bytes!("../director_root.json");
 
