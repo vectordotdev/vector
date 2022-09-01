@@ -227,6 +227,7 @@ pub enum BufferType {
     },
 
     /// A buffer stage backed by an on-disk database, powered by LevelDB.
+    #[configurable(deprecated)]
     #[serde(rename = "disk_v1")]
     DiskV1 {
         /// The maximum size of the buffer on disk.

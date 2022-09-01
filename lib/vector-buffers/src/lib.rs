@@ -51,8 +51,8 @@ pub enum WhenFull {
     /// Drops the event instead of waiting for free space in buffer.
     ///
     /// The event will be intentionally dropped. This mode is typically used when performance is the
-    /// highest priority, and it is sustainable to temporarily lose events rather than cause a slow
-    /// down in the acceptance/consumption of events.
+    /// highest priority, and it is preferable to temporarily lose events rather than cause a
+    /// slowdown in the acceptance/consumption of events.
     DropNewest,
 
     /// Overflows to the next stage in the buffer topology.
@@ -63,6 +63,7 @@ pub enum WhenFull {
     /// potentially be able to buffer the event, but it may also block or drop the event.
     ///
     /// This mode can only be used when two or more buffer stages are configured.
+    #[configurable(metadata(hidden))]
     Overflow,
 }
 
