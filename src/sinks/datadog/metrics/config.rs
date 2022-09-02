@@ -1,6 +1,7 @@
 use futures::FutureExt;
-use http::{uri::InvalidUri, Uri};
-use snafu::{ResultExt, Snafu};
+//use http::{uri::InvalidUri, Uri};
+use http::Uri;
+use snafu::ResultExt;
 use tower::ServiceBuilder;
 use vector_config::configurable_component;
 use vector_core::config::proxy::ProxyConfig;
@@ -47,11 +48,11 @@ impl SinkBatchSettings for DatadogMetricsDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 2.0;
 }
 
-#[derive(Debug, Snafu)]
-enum BuildError {
-    #[snafu(display("Invalid host {:?}: {:?}", host, source))]
-    InvalidHost { host: String, source: InvalidUri },
-}
+// #[derive(Debug, Snafu)]
+// enum BuildError {
+//     #[snafu(display("Invalid host {:?}: {:?}", host, source))]
+//     InvalidHost { host: String, source: InvalidUri },
+// }
 
 /// Various metric type-specific API types.
 ///
@@ -155,6 +156,8 @@ impl_generate_config_from_default!(DatadogMetricsConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "datadog_metrics")]
 impl SinkConfig for DatadogMetricsConfig {
+    // TODO should the caller of build catch the Error and emit an internal error event?
+    // or should we do that here..., or lower than here ...
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.build_client(&cx.proxy)?;
         let healthcheck = self.build_healthcheck(client.clone())?;
