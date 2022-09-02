@@ -253,7 +253,7 @@ impl LogNamespace {
                     .value_mut()
                     .insert(path!("vector").concat(metadata_key), value);
             }
-            LogNamespace::Legacy => log.try_insert((PathPrefix::Metadata, legacy_key), value),
+            LogNamespace::Legacy => log.try_insert((PathPrefix::Event, legacy_key), value),
         }
     }
 

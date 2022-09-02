@@ -1279,6 +1279,7 @@ async fn split_outputs() {
 
         {
             let event = log_event.remove(0);
+            println!("Event: {:?}", event);
             let log = event.as_log();
             assert_eq!(log["message"], "baz".into());
             assert_eq!(log["timestamp"], Utc.timestamp(789, 0).into());
