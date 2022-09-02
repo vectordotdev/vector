@@ -633,6 +633,7 @@ impl<'a> Compiler<'a> {
                 }
             }
         }
+
         if func.ident == "set_metadata_field" {
             if let Ok(key) = get_metadata_key(args) {
                 match key {
