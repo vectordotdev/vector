@@ -64,6 +64,10 @@ pub struct Client {
 }
 
 impl Client {
+    /// Initialize a new `Client` from the given configuration.
+    ///
+    /// This will make an initial empty request to the Remote Config service to bootstrap the client
+    /// with some basic metadata, including which products are available.
     pub async fn initialize(config: Config) -> Result<Self> {
         let Config {
             site,
@@ -143,6 +147,7 @@ impl Client {
         Ok(client)
     }
 
+    /// Return a list of products available in the backend, based on the current metadata.
     pub fn available_products(&self) -> Result<Vec<String>> {
         Ok(self
             .config_client
@@ -155,10 +160,13 @@ impl Client {
             .collect())
     }
 
+    /// Add a new product for which we should receive targets on the next call to `update`. The
+    /// valid possibilities can be found via `available_products`.
     pub fn add_product(&mut self, product: impl Into<String>) {
         self.new_products.insert(product.into());
     }
 
+    /// Return the available target paths and their descriptions based on the current metadata.
     pub fn targets(&self) -> Result<&HashMap<TargetPath, TargetDescription>> {
         Ok(self
             .director_client
@@ -168,6 +176,8 @@ impl Client {
             .targets())
     }
 
+    /// Extract the custom version information about a particular target path. This is specific to
+    /// our Remote Config implementation.
     pub fn target_version(&self, path: &TargetPath) -> Result<u64> {
         let desc = self
             .targets()?
@@ -177,6 +187,8 @@ impl Client {
         serde_json::from_value(custom.clone()).map_err(|_| Error::MissingTargetVersion)
     }
 
+    /// Return the value of a particular target file as a `String`, checking both its length and
+    /// hashes against the metadata in the config repo.
     pub async fn fetch_target(&self, path: &TargetPath) -> Result<String> {
         let desc = self
             .targets()?
@@ -220,6 +232,8 @@ impl Client {
         }
     }
 
+    /// Make a request to the Remote Config service to receive any updated metadata and apply it to
+    /// the client's current state.
     pub async fn update(&mut self) -> Result<()> {
         let current_config_snapshot_version = self
             .config_client
@@ -278,7 +292,11 @@ impl Client {
     }
 
     async fn apply(&mut self, response: LatestConfigsResponse) -> Result<()> {
-        // Store target files
+        // At a high level, what we're doing here is populating the "remote" repos with the metadata
+        // that we received from upstream (which does not validate it), and then using the clients'
+        // `update` methods to synchronize that metadata to the "local" repos, during which
+        // validation is performed.
+
         for target_file in &response.target_files {
             self.director_client
                 .remote_repo_mut()
@@ -344,9 +362,6 @@ impl Client {
         )
         .await?;
 
-        self.config_client.update().await?;
-
-        // Populate director metas
         store(
             self.director_client.remote_repo_mut(),
             &MetadataPath::root(),
@@ -391,8 +406,13 @@ impl Client {
         )
         .await?;
 
+        self.config_client.update().await?;
         self.director_client.update().await?;
 
+        // The Remote Config service uses a `custom` field at the top-level of the targets metadata
+        // to store this field which we are supposed to echo back to the server. That `custom` field
+        // is not explicitly part of the TUF spec, which is why we need to pull it out of the
+        // `additional_fields` catch-all here.
         if let Some(state) = self
             .director_client
             .database()
