@@ -1,6 +1,20 @@
 use serde::{ser, Serialize};
 use value::Value;
 
+const NULL_SIZE: usize = 4;
+const TRUE_SIZE: usize = 4;
+const FALSE_SIZE: usize = 5;
+
+const BRACKET_SIZE: usize = 1;
+const BRACES_SIZE: usize = 2;
+const BRACE_SIZE: usize = 1;
+
+const QUOTES_SIZE: usize = 2;
+const COMMA_SIZE: usize = 1;
+const COLON_SIZE: usize = 1;
+
+const EPOCH_RFC3339: &'static str = "1970-01-01T00:00:00.000Z";
+
 pub struct JsonEncodedValue<'a>(pub &'a Value);
 
 impl<'a> Serialize for JsonEncodedValue<'a> {
@@ -29,12 +43,10 @@ impl<'a> Serialize for JsonEncodedValue<'a> {
             // This is done to avoid having to allocate the timestamp to a string, to calculate the
             // exact byte size. A future improvement should calculate the required precision, and
             // addopt the proper timestamp length accordingly.
-            Value::Timestamp(_) => serializer.serialize_str("1970-01-01T00:00:00.000Z"),
+            Value::Timestamp(_) => serializer.serialize_str(EPOCH_RFC3339),
 
             // Collection types have their inner `Value`'s wrapped in `JsonEncodedValue`.
-            Value::Object(m) => {
-                serializer.collect_map(m.iter().map(|(k, v)| (k.as_bytes(), Self(v))))
-            }
+            Value::Object(m) => serializer.collect_map(m.iter().map(|(k, v)| (k, Self(v)))),
             Value::Array(a) => serializer.collect_seq(a.iter().map(|v| Self(v))),
 
             // All other `Value` variants are serialized according to the default serialization
@@ -98,35 +110,6 @@ where
     Ok(serializer.bytes)
 }
 
-macro_rules! num {
-    ($t:ty) => {
-        // NOTE: this is converted into a series of if-statements by the compiler: https://godbolt.org/z/GjhqnzqvM
-        fn length(n: $t) -> usize {
-            let mut power = 10;
-            let mut count = 1;
-            while n >= power {
-                count += 1;
-                if let Some(new_power) = power.checked_mul(10) {
-                    power = new_power;
-                } else {
-                    break;
-                }
-            }
-            count
-        }
-    };
-}
-
-macro_rules! fnum {
-    ($t:ty) => {
-        #[inline]
-        fn length(n: $t) -> usize {
-            let mut buffer = ryu::Buffer::new();
-            buffer.format(n).len()
-        }
-    };
-}
-
 impl<'a> ser::Serializer for &'a mut Serializer {
     type Ok = ();
     type Error = Error;
@@ -140,91 +123,270 @@ impl<'a> ser::Serializer for &'a mut Serializer {
     type SerializeStructVariant = Self;
 
     fn serialize_bool(self, v: bool) -> Result<()> {
-        const TRUE_SIZE: usize = 4;
-        const FALSE_SIZE: usize = 5;
-
         self.bytes += if v { TRUE_SIZE } else { FALSE_SIZE };
         Ok(())
     }
 
     fn serialize_i8(self, v: i8) -> Result<()> {
-        num!(i8);
-        self.bytes += length(v);
+        // -128 ..= 127
+        if v < -99 {
+            self.bytes += 4;
+        } else if v < -9 {
+            self.bytes += 3;
+        } else if v < 0 {
+            self.bytes += 2;
+        } else if v < 10 {
+            self.bytes += 1;
+        } else if v < 100 {
+            self.bytes += 2;
+        } else {
+            self.bytes += 3;
+        }
+
         Ok(())
     }
 
     fn serialize_i16(self, v: i16) -> Result<()> {
-        num!(i16);
-        self.bytes += length(v);
+        // -32_768 ..= 32_767
+        if v < -9_999 {
+            self.bytes += 6;
+        } else if v < -999 {
+            self.bytes += 5;
+        } else if v < -99 {
+            self.bytes += 4;
+        } else if v < -9 {
+            self.bytes += 3;
+        } else if v < 0 {
+            self.bytes += 2;
+        } else if v < 10 {
+            self.bytes += 1;
+        } else if v < 100 {
+            self.bytes += 2;
+        } else if v < 1_000 {
+            self.bytes += 3;
+        } else if v < 10_000 {
+            self.bytes += 4;
+        } else {
+            self.bytes += 5;
+        }
+
         Ok(())
     }
 
     fn serialize_i32(self, v: i32) -> Result<()> {
-        num!(i32);
-        self.bytes += length(v);
+        // -2_147_483_648 ..= 2_147_483_647
+        if v < -999_999_999 {
+            self.bytes += 11;
+        } else if v < -99_999_999 {
+            self.bytes += 10;
+        } else if v < -9_999_999 {
+            self.bytes += 9;
+        } else if v < -999_999 {
+            self.bytes += 8;
+        } else if v < -99_999 {
+            self.bytes += 7;
+        } else if v < -9_999 {
+            self.bytes += 6;
+        } else if v < -999 {
+            self.bytes += 5;
+        } else if v < -99 {
+            self.bytes += 4;
+        } else if v < -9 {
+            self.bytes += 3;
+        } else if v < 0 {
+            self.bytes += 2;
+        } else if v < 10 {
+            self.bytes += 1;
+        } else if v < 100 {
+            self.bytes += 2;
+        } else if v < 1_000 {
+            self.bytes += 3;
+        } else if v < 10_000 {
+            self.bytes += 4;
+        } else if v < 100_000 {
+            self.bytes += 5;
+        } else if v < 1_000_000 {
+            self.bytes += 6;
+        } else if v < 10_000_000 {
+            self.bytes += 7;
+        } else if v < 100_000_000 {
+            self.bytes += 8;
+        } else if v < 1_000_000_000 {
+            self.bytes += 9;
+        } else {
+            self.bytes += 10;
+        }
+
         Ok(())
     }
 
+    #[rustfmt::skip]
     fn serialize_i64(self, v: i64) -> Result<()> {
-        num!(i64);
-        self.bytes += length(v);
+        // -9_223_372_036_854_775_808 ..= 9_223_372_036_854_775_807
+        if v <         -999_999_999_999_999_999 { self.bytes += 20;
+        } else if v <   -99_999_999_999_999_999 { self.bytes += 19;
+        } else if v <    -9_999_999_999_999_999 { self.bytes += 18;
+        } else if v <      -999_999_999_999_999 { self.bytes += 17;
+        } else if v <       -99_999_999_999_999 { self.bytes += 16;
+        } else if v <        -9_999_999_999_999 { self.bytes += 15;
+        } else if v <          -999_999_999_999 { self.bytes += 14;
+        } else if v <           -99_999_999_999 { self.bytes += 13;
+        } else if v <            -9_999_999_999 { self.bytes += 12;
+        } else if v <              -999_999_999 { self.bytes += 11;
+        } else if v <               -99_999_999 { self.bytes += 10;
+        } else if v <                -9_999_999 { self.bytes += 9;
+        } else if v <                  -999_999 { self.bytes += 8;
+        } else if v <                   -99_999 { self.bytes += 7;
+        } else if v <                    -9_999 { self.bytes += 6;
+        } else if v <                      -999 { self.bytes += 5;
+        } else if v <                       -99 { self.bytes += 4;
+        } else if v <                        -9 { self.bytes += 3;
+        } else if v <                         0 { self.bytes += 2;
+        } else if v <                        10 { self.bytes += 1;
+        } else if v <                       100 { self.bytes += 2;
+        } else if v <                     1_000 { self.bytes += 3;
+        } else if v <                    10_000 { self.bytes += 4;
+        } else if v <                   100_000 { self.bytes += 5;
+        } else if v <                 1_000_000 { self.bytes += 6;
+        } else if v <                10_000_000 { self.bytes += 7;
+        } else if v <               100_000_000 { self.bytes += 8;
+        } else if v <             1_000_000_000 { self.bytes += 9;
+        } else if v <            10_000_000_000 { self.bytes += 10;
+        } else if v <           100_000_000_000 { self.bytes += 11;
+        } else if v <         1_000_000_000_000 { self.bytes += 12;
+        } else if v <        10_000_000_000_000 { self.bytes += 13;
+        } else if v <       100_000_000_000_000 { self.bytes += 14;
+        } else if v <     1_000_000_000_000_000 { self.bytes += 15;
+        } else if v <    10_000_000_000_000_000 { self.bytes += 16;
+        } else if v <   100_000_000_000_000_000 { self.bytes += 17;
+        } else if v < 1_000_000_000_000_000_000 { self.bytes += 18;
+        } else                                  { self.bytes += 20; }
+
         Ok(())
     }
 
     fn serialize_u8(self, v: u8) -> Result<()> {
-        num!(u8);
-        self.bytes += length(v);
+        // 0 ..= 255
+        if v < 10 {
+            self.bytes += 1;
+        } else if v < 100 {
+            self.bytes += 2;
+        } else {
+            self.bytes += 3;
+        }
+
         Ok(())
     }
 
     fn serialize_u16(self, v: u16) -> Result<()> {
-        num!(u16);
-        self.bytes += length(v);
+        // 0 ..= 65_535
+        if v < 10 {
+            self.bytes += 1;
+        } else if v < 100 {
+            self.bytes += 2;
+        } else if v < 1000 {
+            self.bytes += 3;
+        } else if v < 10000 {
+            self.bytes += 4;
+        } else {
+            self.bytes += 5;
+        }
+
         Ok(())
     }
 
     fn serialize_u32(self, v: u32) -> Result<()> {
-        num!(u32);
-        self.bytes += length(v);
+        // 0 ..= 4_294_967_295
+        if v < 10 {
+            self.bytes += 1;
+        } else if v < 100 {
+            self.bytes += 2;
+        } else if v < 1_000 {
+            self.bytes += 3;
+        } else if v < 10_000 {
+            self.bytes += 4;
+        } else if v < 100_000 {
+            self.bytes += 5;
+        } else if v < 1_000_000 {
+            self.bytes += 6;
+        } else if v < 10_000_000 {
+            self.bytes += 7;
+        } else if v < 100_000_000 {
+            self.bytes += 8;
+        } else if v < 1_000_000_000 {
+            self.bytes += 9;
+        } else {
+            self.bytes += 10;
+        }
+
         Ok(())
     }
 
+    #[rustfmt::skip]
     fn serialize_u64(self, v: u64) -> Result<()> {
-        num!(u64);
-        self.bytes += length(v);
+        // 0 ..= 18_446_744_073_709_551_615
+        if        v < 10 { self.bytes += 1;
+        } else if v < 100 { self.bytes += 2;
+        } else if v < 1_000 { self.bytes += 3;
+        } else if v < 10_000 { self.bytes += 4;
+        } else if v < 100_000 { self.bytes += 5;
+        } else if v < 1_000_000 { self.bytes += 6;
+        } else if v < 10_000_000 { self.bytes += 7;
+        } else if v < 100_000_000 { self.bytes += 8;
+        } else if v < 1_000_000_000 { self.bytes += 9;
+        } else if v < 10_000_000_000 { self.bytes += 10;
+        } else if v < 100_000_000_000 { self.bytes += 11;
+        } else if v < 1_000_000_000_000 { self.bytes += 12;
+        } else if v < 10_000_000_000_000 { self.bytes += 13;
+        } else if v < 100_000_000_000_000 { self.bytes += 14;
+        } else if v < 1_000_000_000_000_000 { self.bytes += 15;
+        } else if v < 10_000_000_000_000_000 { self.bytes += 16;
+        } else if v < 100_000_000_000_000_000 { self.bytes += 17;
+        } else if v < 1_000_000_000_000_000_000 { self.bytes += 18;
+        } else if v < 10_000_000_000_000_000_000 { self.bytes += 19;
+        } else                                    { self.bytes += 20; }
+
         Ok(())
     }
 
+    /// This method assumes the float isn't NaN or infinite, which holds true for our `Value` type,
+    /// but might not hold true in other cases.
+    ///
+    /// If the float _is_ of one of those types, this method won't panic, but the reported byte size
+    /// won't be accurate.
     fn serialize_f32(self, v: f32) -> Result<()> {
-        fnum!(f32);
-        self.bytes += length(v);
+        let mut buffer = ryu::Buffer::new();
+        self.bytes += buffer.format_finite(v).len();
+
         Ok(())
     }
 
+    /// This method assumes the float isn't NaN or infinite, which holds true for our `Value` type,
+    /// but might not hold true in other cases.
+    ///
+    /// If the float _is_ of one of those types, this method won't panic, but the reported byte size
+    /// won't be accurate.
     fn serialize_f64(self, v: f64) -> Result<()> {
-        fnum!(f64);
-        self.bytes += length(v);
+        let mut buffer = ryu::Buffer::new();
+        self.bytes += buffer.format_finite(v).len();
+
         Ok(())
     }
 
     #[inline]
     fn serialize_char(self, v: char) -> Result<()> {
-        self.bytes += v.len_utf8();
+        self.bytes += QUOTES_SIZE + v.len_utf8();
         Ok(())
     }
 
     // TODO: handle escaping.
     fn serialize_str(self, v: &str) -> Result<()> {
-        const QUOTES_SIZE: usize = 2;
-
         self.bytes += QUOTES_SIZE + v.len();
         Ok(())
     }
 
     // Consider `bytes` as being a valid `str`.
     fn serialize_bytes(self, v: &[u8]) -> Result<()> {
-        const QUOTES_SIZE: usize = 2;
-
         self.bytes += QUOTES_SIZE + v.len();
         Ok(())
     }
@@ -244,8 +406,6 @@ impl<'a> ser::Serializer for &'a mut Serializer {
 
     #[inline]
     fn serialize_unit(self) -> Result<()> {
-        const NULL_SIZE: usize = 4;
-
         self.bytes += NULL_SIZE;
         Ok(())
     }
@@ -283,19 +443,14 @@ impl<'a> ser::Serializer for &'a mut Serializer {
     where
         T: ?Sized + Serialize,
     {
-        const BRACES_SIZE: usize = 2;
-        const COLON_SIZE: usize = 1;
-
         self.bytes += BRACES_SIZE + COLON_SIZE;
-        variant.serialize(&mut *self)?;
-        value.serialize(&mut *self)?;
+        self.serialize_str(variant)?;
+        value.serialize(self)?;
 
         Ok(())
     }
 
     fn serialize_seq(self, _len: Option<usize>) -> Result<Self::SerializeSeq> {
-        const BRACKET_SIZE: usize = 1;
-
         self.start_collection = true;
         self.bytes += BRACKET_SIZE;
         Ok(self)
@@ -322,19 +477,13 @@ impl<'a> ser::Serializer for &'a mut Serializer {
         variant: &'static str,
         _len: usize,
     ) -> Result<Self::SerializeTupleVariant> {
-        const BRACE_SIZE: usize = 1;
-        const COLON_SIZE: usize = 1;
-        const BRACKET_SIZE: usize = 1;
-
         self.bytes += BRACE_SIZE + COLON_SIZE + BRACKET_SIZE;
-        variant.serialize(&mut *self)?;
+        self.serialize_str(variant)?;
         self.start_collection = true;
         Ok(self)
     }
 
     fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap> {
-        const BRACE_SIZE: usize = 1;
-
         self.start_collection = true;
         self.bytes += BRACE_SIZE;
         Ok(self)
@@ -352,12 +501,9 @@ impl<'a> ser::Serializer for &'a mut Serializer {
         variant: &'static str,
         _len: usize,
     ) -> Result<Self::SerializeStructVariant> {
-        const BRACE_SIZE: usize = 1;
-        const COLON_SIZE: usize = 1;
-
         // { "variant": { ...
         self.bytes += BRACE_SIZE + COLON_SIZE + BRACE_SIZE;
-        variant.serialize(&mut *self)?;
+        self.serialize_str(variant)?;
         self.start_collection = true;
         Ok(self)
     }
@@ -372,8 +518,6 @@ impl<'a> ser::SerializeSeq for &'a mut Serializer {
     where
         T: ?Sized + Serialize,
     {
-        const COMMA_SIZE: usize = 1;
-
         if !self.start_collection {
             self.bytes += COMMA_SIZE;
         }
@@ -384,8 +528,6 @@ impl<'a> ser::SerializeSeq for &'a mut Serializer {
 
     #[inline]
     fn end(self) -> Result<()> {
-        const BRACKET_SIZE: usize = 1;
-
         self.bytes += BRACKET_SIZE;
         self.start_collection = false;
         Ok(())
@@ -401,8 +543,6 @@ impl<'a> ser::SerializeTuple for &'a mut Serializer {
     where
         T: ?Sized + Serialize,
     {
-        const COMMA_SIZE: usize = 1;
-
         if !self.start_collection {
             self.bytes += COMMA_SIZE;
         }
@@ -413,8 +553,6 @@ impl<'a> ser::SerializeTuple for &'a mut Serializer {
 
     #[inline]
     fn end(self) -> Result<()> {
-        const BRACKET_SIZE: usize = 1;
-
         self.bytes += BRACKET_SIZE;
         self.start_collection = false;
         Ok(())
@@ -430,8 +568,6 @@ impl<'a> ser::SerializeTupleStruct for &'a mut Serializer {
     where
         T: ?Sized + Serialize,
     {
-        const COMMA_SIZE: usize = 1;
-
         if !self.start_collection {
             self.bytes += COMMA_SIZE;
         }
@@ -442,8 +578,6 @@ impl<'a> ser::SerializeTupleStruct for &'a mut Serializer {
 
     #[inline]
     fn end(self) -> Result<()> {
-        const BRACKET_SIZE: usize = 1;
-
         self.bytes += BRACKET_SIZE;
         self.start_collection = false;
         Ok(())
@@ -459,8 +593,6 @@ impl<'a> ser::SerializeTupleVariant for &'a mut Serializer {
     where
         T: ?Sized + Serialize,
     {
-        const COMMA_SIZE: usize = 1;
-
         if !self.start_collection {
             self.bytes += COMMA_SIZE;
         }
@@ -471,9 +603,6 @@ impl<'a> ser::SerializeTupleVariant for &'a mut Serializer {
 
     #[inline]
     fn end(self) -> Result<()> {
-        const BRACKET_SIZE: usize = 1;
-        const BRACE_SIZE: usize = 1;
-
         self.bytes += BRACKET_SIZE + BRACE_SIZE;
         self.start_collection = false;
         Ok(())
@@ -495,8 +624,6 @@ impl<'a> ser::SerializeMap for &'a mut Serializer {
     where
         T: ?Sized + Serialize,
     {
-        const COMMA_SIZE: usize = 1;
-
         if !self.start_collection {
             self.bytes += COMMA_SIZE;
         }
@@ -510,16 +637,12 @@ impl<'a> ser::SerializeMap for &'a mut Serializer {
     where
         T: ?Sized + Serialize,
     {
-        const COLON_SIZE: usize = 1;
-
         self.bytes += COLON_SIZE;
         value.serialize(&mut **self)
     }
 
     #[inline]
     fn end(self) -> Result<()> {
-        const BRACE_SIZE: usize = 1;
-
         self.start_collection = false;
         self.bytes += BRACE_SIZE;
         Ok(())
@@ -535,9 +658,6 @@ impl<'a> ser::SerializeStruct for &'a mut Serializer {
     where
         T: ?Sized + Serialize,
     {
-        const COMMA_SIZE: usize = 1;
-        const COLON_SIZE: usize = 1;
-
         if !self.start_collection {
             self.bytes += COMMA_SIZE;
         }
@@ -550,8 +670,6 @@ impl<'a> ser::SerializeStruct for &'a mut Serializer {
 
     #[inline]
     fn end(self) -> Result<()> {
-        const BRACE_SIZE: usize = 1;
-
         self.start_collection = false;
         self.bytes += BRACE_SIZE;
         Ok(())
@@ -567,9 +685,6 @@ impl<'a> ser::SerializeStructVariant for &'a mut Serializer {
     where
         T: ?Sized + Serialize,
     {
-        const COMMA_SIZE: usize = 1;
-        const COLON_SIZE: usize = 1;
-
         if !self.start_collection {
             self.bytes += COMMA_SIZE;
         }
@@ -582,8 +697,6 @@ impl<'a> ser::SerializeStructVariant for &'a mut Serializer {
 
     #[inline]
     fn end(self) -> Result<()> {
-        const BRACE_SIZE: usize = 1;
-
         self.start_collection = false;
         self.bytes += BRACE_SIZE + BRACE_SIZE;
         Ok(())

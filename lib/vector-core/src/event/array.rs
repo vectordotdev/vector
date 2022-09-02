@@ -241,8 +241,12 @@ impl JsonEncodedSizeOf for EventArray {
                 .map(|v| JsonEncodedValue(v.value()).json_encoded_size_of())
                 .sum(),
 
+            Self::Traces(a) => a
+                .iter()
+                .map(|v| JsonEncodedValue(v.value()).json_encoded_size_of())
+                .sum(),
+
             Self::Metrics(a) => a.json_encoded_size_of(),
-            Self::Traces(a) => a.json_encoded_size_of(),
         }
     }
 }
