@@ -143,21 +143,21 @@ class Event
     @reports.clear
 
     if @uses == 0
-      @reports.append('Event has no uses.')
+      append('Event has no uses.')
     end
 
     EVENT_CLASSES.each do |suffix, (required_message, counters, additional_tags)|
       if @name.end_with? suffix
         handle.logs.each do |type, message, parameters|
           if type != 'trace'
-            @reports.append('Log type MUST be \"trace!\".')
+            append('Log type MUST be \"trace!\".')
           end
           if message != required_message
-            @reports.append("Log message MUST be \"#{required_message}\" (is \"#{message}\").")
+            append("Log message MUST be \"#{required_message}\" (is \"#{message}\").")
           end
           additional_tags.each do |tag_name|
             unless parameters.include? tag_name
-              @reports.append("Log MUST contain tag \"#{tag_name}\"")
+              append("Log MUST contain tag \"#{tag_name}\"")
             end
           end
         end
@@ -187,13 +187,13 @@ class Event
         if type == 'error'
           ['error_type', 'stage'].each do |parameter|
             unless parameters.include? parameter
-              @reports.append("Error log for Error event MUST include parameter \"#{parameter}\".")
+              append("Error log for Error event MUST include parameter \"#{parameter}\".")
             end
           end
 
           ['error_code', 'error_type', 'stage'].each do |parameter|
             if parameters.include? parameter and !@counters[METRIC_NAME_ERROR].include? parameter
-              @reports.append("Counter \"#{METRIC_NAME_ERROR}\" must include \"#{parameter}\" to match error log.")
+              append("Counter \"#{METRIC_NAME_ERROR}\" must include \"#{parameter}\" to match error log.")
             end
           end
         end
@@ -211,7 +211,7 @@ class Event
       # Instead, verify that component_discarded_events_total is not being over-incremented.
       if @emits_component_events_dropped
         if @counters.include? METRIC_NAME_EVENTS_DROPPED
-          @reports.append("Event emitting ComponentEventsDropped should not also increment counter `#{METRIC_NAME_EVENTS_DROPPED}`")
+          append("Event emitting ComponentEventsDropped should not also increment counter `#{METRIC_NAME_EVENTS_DROPPED}`")
         end
       else
 
@@ -231,13 +231,13 @@ class Event
           if type == 'error'
             ['intentional', 'reason'].each do |parameter|
               unless parameters.include? parameter
-                @reports.append("Error log for EventsDropped event MUST include parameter \"#{parameter}\".")
+                append("Error log for EventsDropped event MUST include parameter \"#{parameter}\".")
               end
             end
 
             ['intentional'].each do |parameter|
               if parameters.include? parameter and !@counters[METRIC_NAME_EVENTS_DROPPED].include? parameter
-                @reports.append("Counter \"#{METRIC_NAME_EVENTS_DROPPED}\" must include \"#{parameter}\" to match error log.")
+                append("Counter \"#{METRIC_NAME_EVENTS_DROPPED}\" must include \"#{parameter}\" to match error log.")
               end
             end
           end
@@ -252,11 +252,11 @@ class Event
         tags.each do |tag, value|
           if tag == 'stage'
             if !value.start_with? 'error_stage::'
-              @reports.append("Counter \"#{name}\" tag \"#{tag}\" value must be an \"error_stage\" constant.")
+              append("Counter \"#{name}\" tag \"#{tag}\" value must be an \"error_stage\" constant.")
             end
           elsif tag == 'error_type'
             if !value.start_with? 'error_type::'
-              @reports.append("Counter \"#{name}\" tag \"#{tag}\" value must be an \"error_type\" constant.")
+              append("Counter \"#{name}\" tag \"#{tag}\" value must be an \"error_type\" constant.")
             end
           end
         end
@@ -268,7 +268,7 @@ class Event
 
   def log_level_one_of(levels)
     if @logs.find_index { |type, message, parameters| levels.include? type }.nil?
-      @reports.append("This event MUST log with one of these levels: #{levels}.")
+      append("This event MUST log with one of these levels: #{levels}.")
     end
   end
 
@@ -284,18 +284,18 @@ class Event
 
     def counters_must_include_exclude_tags(name, required_tags, exclude_tags = [])
       unless @counters.include? name
-        @reports.append("This event MUST increment counter \"#{name}\".")
+        append("This event MUST increment counter \"#{name}\".")
       else
         tags = @counters[name]
         required_tags.each do |tag|
           unless tags.include? tag
-            @reports.append("Counter \"#{name}\" MUST include tag \"#{tag}\".")
+            append("Counter \"#{name}\" MUST include tag \"#{tag}\".")
           end
         end
 
         exclude_tags.each do |tag|
           if tags.include? tag
-            @reports.append("Counter \"#{name}\" MUST NOT include tag \"#{tag}\".")
+            append("Counter \"#{name}\" MUST NOT include tag \"#{tag}\".")
           end
         end
       end
