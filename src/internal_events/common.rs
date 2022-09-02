@@ -120,11 +120,22 @@ pub struct ComponentEventsDropped {
 
 impl InternalEvent for ComponentEventsDropped {
     fn emit(self) {
-        error!(
-            message = "Events dropped.",
-            intentional = self.intentional,
-            reason = self.reason,
-        );
+        let message = "Events dropped";
+        if self.intentional {
+            debug!(
+                message,
+                intentional = self.intentional,
+                reason = self.reason,
+                internal_log_rate_secs = 10,
+            );
+        } else {
+            error!(
+                message,
+                intentional = self.intentional,
+                reason = self.reason,
+                internal_log_rate_secs = 10,
+            );
+        }
         counter!(
             "component_discarded_events_total",
             self.count,
