@@ -176,7 +176,10 @@ mod test {
     use vector_common::assert_event_data_eq;
     #[cfg(not(target_os = "windows"))]
     use {
-        crate::event::proto,
+        crate::{
+            event::proto,
+            test_util::components::{assert_source_compliance, SOCKET_PUSH_SOURCE_TAGS},
+        },
         bytes::BytesMut,
         futures::SinkExt,
         prost::Message,
@@ -192,11 +195,7 @@ mod test {
         },
         shutdown::ShutdownSignal,
         sinks::vector::v1::VectorConfig as SinkConfig,
-        test_util::{
-            collect_ready,
-            components::{assert_source_compliance, SOCKET_PUSH_SOURCE_TAGS},
-            next_addr, trace_init, wait_for_tcp,
-        },
+        test_util::{collect_ready, next_addr, trace_init, wait_for_tcp},
         tls::{TlsConfig, TlsEnableableConfig, TlsSourceConfig},
         SourceSender,
     };

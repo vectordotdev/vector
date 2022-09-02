@@ -189,7 +189,7 @@ impl FrameHandler for DnstapFrameHandler {
      * Takes a data frame from the unix socket and turns it into a Vector Event.
      **/
     fn handle_event(&self, received_from: Option<Bytes>, frame: Bytes) -> Option<Event> {
-        // SocketEventsReceived is emitted  already
+        // SocketEventsReceived is emitted already
 
         self.bytes_received.emit(ByteSize(frame.len()));
 
