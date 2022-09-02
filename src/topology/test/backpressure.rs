@@ -97,12 +97,10 @@ async fn buffer_drop_fan_out() {
         vec!["in".to_string()],
         backpressure_sink(events_to_sink / 2),
     );
-    sink_outer.buffer = BufferConfig {
-        stages: vec![BufferType::Memory {
-            max_events: MEMORY_BUFFER_DEFAULT_MAX_EVENTS,
-            when_full: WhenFull::DropNewest,
-        }],
-    };
+    sink_outer.buffer = BufferConfig::Single(BufferType::Memory {
+        max_events: MEMORY_BUFFER_DEFAULT_MAX_EVENTS,
+        when_full: WhenFull::DropNewest,
+    });
     config.add_sink_outer("out2", sink_outer);
 
     let (_topology, _crash) = start_topology(config.build().unwrap(), false).await;

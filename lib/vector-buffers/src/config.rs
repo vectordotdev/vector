@@ -2,9 +2,10 @@ use std::{
     fmt,
     num::{NonZeroU64, NonZeroUsize},
     path::PathBuf,
+    slice,
 };
 
-use serde::{de, ser, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{de, Deserialize, Deserializer, Serialize};
 use snafu::{ResultExt, Snafu};
 use tracing::Span;
 use vector_common::finalization::Finalizable;
@@ -150,61 +151,6 @@ impl<'de> Deserialize<'de> for BufferType {
     }
 }
 
-struct BufferConfigVisitor;
-
-impl<'de> de::Visitor<'de> for BufferConfigVisitor {
-    type Value = BufferConfig;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("enum BufferType")
-    }
-
-    fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
-    where
-        A: de::MapAccess<'de>,
-    {
-        let stage = BufferTypeVisitor::visit_map_impl(map)?;
-        Ok(BufferConfig {
-            stages: vec![stage],
-        })
-    }
-
-    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-    where
-        A: de::SeqAccess<'de>,
-    {
-        let mut stages = Vec::new();
-        while let Some(stage) = seq.next_element()? {
-            stages.push(stage);
-        }
-        Ok(BufferConfig { stages })
-    }
-}
-
-impl<'de> Deserialize<'de> for BufferConfig {
-    fn deserialize<D>(deserializer: D) -> Result<BufferConfig, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        deserializer.deserialize_any(BufferConfigVisitor)
-    }
-}
-
-impl Serialize for BufferConfig {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        match self.stages.len() {
-            0 => Err(ser::Error::custom(
-                "buffer config cannot be empty when serializing",
-            )),
-            1 => self.stages.first().unwrap().serialize(serializer),
-            _ => self.stages.serialize(serializer),
-        }
-    }
-}
-
 pub const fn memory_buffer_default_max_events() -> NonZeroUsize {
     unsafe { NonZeroUsize::new_unchecked(500) }
 }
@@ -319,28 +265,33 @@ impl BufferType {
 // TODO: We need a custom implementation of `Configurable` here, I think? in order to capture the
 // "deserialize as a single unnested `BufferType`, or as an array of them", but we might also be
 // able to encode that as an untagged enum as well?
-#[configurable_component(no_deser, no_ser)]
+#[configurable_component]
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct BufferConfig {
-    /// The stages in the buffer topology.
-    pub stages: Vec<BufferType>,
+#[serde(untagged)]
+pub enum BufferConfig {
+    /// A single stage buffer topology.
+    Single(#[configurable(transparent)] BufferType),
+
+    /// A chained buffer topology.
+    Chained(#[configurable(transparent)] Vec<BufferType>),
 }
 
 impl Default for BufferConfig {
     fn default() -> Self {
-        Self {
-            stages: vec![BufferType::Memory {
-                max_events: memory_buffer_default_max_events(),
-                when_full: WhenFull::default(),
-            }],
-        }
+        Self::Single(BufferType::Memory {
+            max_events: memory_buffer_default_max_events(),
+            when_full: WhenFull::default(),
+        })
     }
 }
 
 impl BufferConfig {
     /// Gets all of the configured stages for this buffer.
     pub fn stages(&self) -> &[BufferType] {
-        &self.stages
+        match self {
+            Self::Single(stage) => slice::from_ref(stage),
+            Self::Chained(stages) => stages.as_slice(),
+        }
     }
 
     /// Builds the buffer components represented by this configuration.
@@ -367,7 +318,7 @@ impl BufferConfig {
     {
         let mut builder = TopologyBuilder::default();
 
-        for stage in &self.stages {
+        for stage in self.stages() {
             stage.add_to_builder(&mut builder, data_dir.clone(), buffer_id.clone())?;
         }
 
@@ -386,14 +337,14 @@ mod test {
 
     fn check_single_stage(source: &str, expected: BufferType) {
         let config: BufferConfig = serde_yaml::from_str(source).unwrap();
-        assert_eq!(config.stages.len(), 1);
-        let actual = config.stages.first().unwrap();
+        assert_eq!(config.stages().len(), 1);
+        let actual = config.stages().first().unwrap();
         assert_eq!(actual, &expected);
     }
 
     fn check_multiple_stages(source: &str, expected_stages: &[BufferType]) {
         let config: BufferConfig = serde_yaml::from_str(source).unwrap();
-        assert_eq!(config.stages.len(), expected_stages.len());
+        assert_eq!(config.stages().len(), expected_stages.len());
         for (actual, expected) in config.stages().iter().zip(expected_stages) {
             assert_eq!(actual, expected);
         }
@@ -412,7 +363,7 @@ mod test {
         let error = serde_yaml::from_str::<BufferConfig>(source).unwrap_err();
         assert_eq!(
             error.to_string(),
-            "unknown field `foo`, expected one of `type`, `max_events`, `max_size`, `when_full`"
+            "data did not match any variant of untagged enum BufferConfig"
         );
     }
 
@@ -424,7 +375,7 @@ max_events: 42
         let error = serde_yaml::from_str::<BufferConfig>(source).unwrap_err();
         assert_eq!(
             error.to_string(),
-            "unknown field `max_size`, expected one of `type`, `max_events`, `when_full`"
+            "data did not match any variant of untagged enum BufferConfig"
         );
     }
 
