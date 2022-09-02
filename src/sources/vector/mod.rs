@@ -1,30 +1,9 @@
-pub mod v1;
 pub mod v2;
 
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
 use crate::config::{GenerateConfig, Output, Resource, SourceConfig, SourceContext};
-
-/// Marker type for the version one of the configuration for the `vector` source.
-#[configurable_component]
-#[derive(Clone, Debug)]
-enum V1 {
-    /// Marker value for version one.
-    #[serde(rename = "1")]
-    V1,
-}
-
-/// Configuration for version two of the `vector` source.
-#[configurable_component]
-#[derive(Clone, Debug)]
-pub struct VectorConfigV1 {
-    /// Version of the configuration.
-    version: V1,
-
-    #[serde(flatten)]
-    config: v1::VectorConfig,
-}
 
 /// Marker type for the version two of the configuration for the `vector` source.
 #[configurable_component]
@@ -51,9 +30,6 @@ pub struct VectorConfigV2 {
 #[derive(Clone, Debug)]
 #[serde(untagged)]
 pub enum VectorConfig {
-    /// Configuration for version one.
-    V1(#[configurable(derived)] VectorConfigV1),
-
     /// Configuration for version two.
     V2(#[configurable(derived)] VectorConfigV2),
 }
@@ -74,21 +50,18 @@ impl GenerateConfig for VectorConfig {
 impl SourceConfig for VectorConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         match self {
-            VectorConfig::V1(v1) => v1.config.build(cx).await,
             VectorConfig::V2(v2) => v2.config.build(cx).await,
         }
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         match self {
-            VectorConfig::V1(v1) => v1.config.outputs(),
             VectorConfig::V2(v2) => v2.config.outputs(),
         }
     }
 
     fn resources(&self) -> Vec<Resource> {
         match self {
-            VectorConfig::V1(v1) => v1.config.resources(),
             VectorConfig::V2(v2) => v2.config.resources(),
         }
     }
