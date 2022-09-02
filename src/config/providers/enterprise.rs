@@ -20,7 +20,7 @@ pub fn from_opts(opts: &enterprise::Options) -> Option<Box<dyn ProviderConfig>> 
             api_key: opts.api_key.clone().expect("need api key"),
             app_key: opts.application_key.clone(),
             hostname: "foo".into(),
-            agent_version: "bar".into(),
+            agent_version: crate::get_version(),
         };
         Some(Box::new(EnterpriseProvider {
             client_config,
