@@ -229,10 +229,16 @@ impl TaskTransform<Event> for Dedupe {
 mod tests {
     use std::collections::BTreeMap;
 
-    use super::*;
+    use tokio::sync::mpsc;
+    use tokio_stream::wrappers::ReceiverStream;
+
     use crate::{
         event::{Event, LogEvent, Value},
-        transforms::dedupe::{CacheConfig, DedupeConfig, FieldMatchConfig},
+        test_util::components::assert_transform_compliance,
+        transforms::{
+            dedupe::{CacheConfig, DedupeConfig, FieldMatchConfig},
+            test::create_topology,
+        },
     };
 
     #[test]
@@ -240,258 +246,351 @@ mod tests {
         crate::test_util::test_generate_config::<DedupeConfig>();
     }
 
-    fn make_match_transform(num_events: usize, fields: Vec<String>) -> Dedupe {
-        Dedupe::new(DedupeConfig {
+    const fn make_match_transform_config(num_events: usize, fields: Vec<String>) -> DedupeConfig {
+        DedupeConfig {
             cache: CacheConfig { num_events },
             fields: Some(FieldMatchConfig::MatchFields(fields)),
-        })
+        }
     }
 
-    fn make_ignore_transform(num_events: usize, given_fields: Vec<String>) -> Dedupe {
+    fn make_ignore_transform_config(num_events: usize, given_fields: Vec<String>) -> DedupeConfig {
         // "message" and "timestamp" are added automatically to all Events
         let mut fields = vec!["message".into(), "timestamp".into()];
         fields.extend(given_fields);
 
-        Dedupe::new(DedupeConfig {
+        DedupeConfig {
             cache: CacheConfig { num_events },
             fields: Some(FieldMatchConfig::IgnoreFields(fields)),
+        }
+    }
+
+    #[tokio::test]
+    async fn dedupe_match_basic() {
+        let transform_config = make_match_transform_config(5, vec!["matched".into()]);
+        basic(transform_config).await;
+    }
+
+    #[tokio::test]
+    async fn dedupe_ignore_basic() {
+        let transform_config = make_ignore_transform_config(5, vec!["unmatched".into()]);
+        basic(transform_config).await;
+    }
+
+    async fn basic(transform_config: DedupeConfig) {
+        assert_transform_compliance(async {
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) =
+                create_topology(ReceiverStream::new(rx), transform_config).await;
+
+            let mut event1 = Event::Log(LogEvent::from("message"));
+            event1.as_mut_log().insert("matched", "some value");
+            event1.as_mut_log().insert("unmatched", "another value");
+
+            // Test that unmatched field isn't considered
+            let mut event2 = Event::Log(LogEvent::from("message"));
+            event2.as_mut_log().insert("matched", "some value2");
+            event2.as_mut_log().insert("unmatched", "another value");
+
+            // Test that matched field is considered
+            let mut event3 = Event::Log(LogEvent::from("message"));
+            event3.as_mut_log().insert("matched", "some value");
+            event3.as_mut_log().insert("unmatched", "another value2");
+
+            // First event should always be passed through as-is.
+            tx.send(event1.clone()).await.unwrap();
+            let new_event = out.recv().await.unwrap();
+            assert_eq!(new_event, event1);
+
+            // Second event differs in matched field so should be output even though it
+            // has the same value for unmatched field.
+            tx.send(event2.clone()).await.unwrap();
+            let new_event = out.recv().await.unwrap();
+            assert_eq!(new_event, event2);
+
+            // Third event has the same value for "matched" as first event, so it should be dropped.
+            tx.send(event3.clone()).await.unwrap();
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
         })
+        .await;
     }
 
-    #[test]
-    fn dedupe_match_basic() {
-        let transform = make_match_transform(5, vec!["matched".into()]);
-        basic(transform);
+    #[tokio::test]
+    async fn dedupe_match_field_name_matters() {
+        let transform_config =
+            make_match_transform_config(5, vec!["matched1".into(), "matched2".into()]);
+        field_name_matters(transform_config).await;
     }
 
-    #[test]
-    fn dedupe_ignore_basic() {
-        let transform = make_ignore_transform(5, vec!["unmatched".into()]);
-        basic(transform);
+    #[tokio::test]
+    async fn dedupe_ignore_field_name_matters() {
+        let transform_config = make_ignore_transform_config(5, vec![]);
+        field_name_matters(transform_config).await;
     }
 
-    fn basic(mut transform: Dedupe) {
-        let mut event1 = Event::Log(LogEvent::from("message"));
-        event1.as_mut_log().insert("matched", "some value");
-        event1.as_mut_log().insert("unmatched", "another value");
+    async fn field_name_matters(transform_config: DedupeConfig) {
+        assert_transform_compliance(async {
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) =
+                create_topology(ReceiverStream::new(rx), transform_config).await;
 
-        // Test that unmatched field isn't considered
-        let mut event2 = Event::Log(LogEvent::from("message"));
-        event2.as_mut_log().insert("matched", "some value2");
-        event2.as_mut_log().insert("unmatched", "another value");
+            let mut event1 = Event::Log(LogEvent::from("message"));
+            event1.as_mut_log().insert("matched1", "some value");
 
-        // Test that matched field is considered
-        let mut event3 = Event::Log(LogEvent::from("message"));
-        event3.as_mut_log().insert("matched", "some value");
-        event3.as_mut_log().insert("unmatched", "another value2");
+            let mut event2 = Event::Log(LogEvent::from("message"));
+            event2.as_mut_log().insert("matched2", "some value");
 
-        // First event should always be passed through as-is.
-        let new_event = transform.transform_one(event1.clone()).unwrap();
-        assert_eq!(new_event, event1);
+            // First event should always be passed through as-is.
+            tx.send(event1.clone()).await.unwrap();
+            let new_event = out.recv().await.unwrap();
+            assert_eq!(new_event, event1);
 
-        // Second event differs in matched field so should be outputted even though it
-        // has the same value for unmatched field.
-        let new_event = transform.transform_one(event2.clone()).unwrap();
-        assert_eq!(new_event, event2);
+            // Second event has a different matched field name with the same value,
+            // so it should not be considered a dupe
+            tx.send(event2.clone()).await.unwrap();
+            let new_event = out.recv().await.unwrap();
+            assert_eq!(new_event, event2);
 
-        // Third event has the same value for "matched" as first event, so it should be dropped.
-        assert_eq!(None, transform.transform_one(event3));
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await;
     }
 
-    #[test]
-    fn dedupe_match_field_name_matters() {
-        let transform = make_match_transform(5, vec!["matched1".into(), "matched2".into()]);
-        field_name_matters(transform);
+    #[tokio::test]
+    async fn dedupe_match_field_order_irrelevant() {
+        let transform_config =
+            make_match_transform_config(5, vec!["matched1".into(), "matched2".into()]);
+        field_order_irrelevant(transform_config).await;
     }
 
-    #[test]
-    fn dedupe_ignore_field_name_matters() {
-        let transform = make_ignore_transform(5, vec![]);
-        field_name_matters(transform);
-    }
-
-    fn field_name_matters(mut transform: Dedupe) {
-        let mut event1 = Event::Log(LogEvent::from("message"));
-        event1.as_mut_log().insert("matched1", "some value");
-
-        let mut event2 = Event::Log(LogEvent::from("message"));
-        event2.as_mut_log().insert("matched2", "some value");
-
-        // First event should always be passed through as-is.
-        let new_event = transform.transform_one(event1.clone()).unwrap();
-        assert_eq!(new_event, event1);
-
-        // Second event has a different matched field name with the same value,
-        // so it should not be considered a dupe
-        let new_event = transform.transform_one(event2.clone()).unwrap();
-        assert_eq!(new_event, event2);
-    }
-
-    #[test]
-    fn dedupe_match_field_order_irrelevant() {
-        let transform = make_match_transform(5, vec!["matched1".into(), "matched2".into()]);
-        field_order_irrelevant(transform);
-    }
-
-    #[test]
-    fn dedupe_ignore_field_order_irrelevant() {
-        let transform = make_ignore_transform(5, vec!["randomData".into()]);
-        field_order_irrelevant(transform);
+    #[tokio::test]
+    async fn dedupe_ignore_field_order_irrelevant() {
+        let transform_config = make_ignore_transform_config(5, vec!["randomData".into()]);
+        field_order_irrelevant(transform_config).await;
     }
 
     /// Test that two Events that are considered duplicates get handled that
     /// way, even if the order of the matched fields is different between the
     /// two.
-    fn field_order_irrelevant(mut transform: Dedupe) {
-        let mut event1 = Event::Log(LogEvent::from("message"));
-        event1.as_mut_log().insert("matched1", "value1");
-        event1.as_mut_log().insert("matched2", "value2");
+    async fn field_order_irrelevant(transform_config: DedupeConfig) {
+        assert_transform_compliance(async {
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) =
+                create_topology(ReceiverStream::new(rx), transform_config).await;
 
-        // Add fields in opposite order
-        let mut event2 = Event::Log(LogEvent::from("message"));
-        event2.as_mut_log().insert("matched2", "value2");
-        event2.as_mut_log().insert("matched1", "value1");
+            let mut event1 = Event::Log(LogEvent::from("message"));
+            event1.as_mut_log().insert("matched1", "value1");
+            event1.as_mut_log().insert("matched2", "value2");
 
-        // First event should always be passed through as-is.
-        let new_event = transform.transform_one(event1.clone()).unwrap();
-        assert_eq!(new_event, event1);
+            // Add fields in opposite order
+            let mut event2 = Event::Log(LogEvent::from("message"));
+            event2.as_mut_log().insert("matched2", "value2");
+            event2.as_mut_log().insert("matched1", "value1");
 
-        // Second event is the same just with different field order, so it
-        // shouldn't be outputted.
-        assert_eq!(None, transform.transform_one(event2));
+            // First event should always be passed through as-is.
+            tx.send(event1.clone()).await.unwrap();
+            let new_event = out.recv().await.unwrap();
+            assert_eq!(new_event, event1);
+
+            // Second event is the same just with different field order, so it
+            // shouldn't be output.
+            tx.send(event2).await.unwrap();
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await;
     }
 
-    #[test]
-    fn dedupe_match_age_out() {
+    #[tokio::test]
+    async fn dedupe_match_age_out() {
         // Construct transform with a cache size of only 1 entry.
-        let transform = make_match_transform(1, vec!["matched".into()]);
-        age_out(transform);
+        let transform_config = make_match_transform_config(1, vec!["matched".into()]);
+        age_out(transform_config).await;
     }
 
-    #[test]
-    fn dedupe_ignore_age_out() {
+    #[tokio::test]
+    async fn dedupe_ignore_age_out() {
         // Construct transform with a cache size of only 1 entry.
-        let transform = make_ignore_transform(1, vec![]);
-        age_out(transform);
+        let transform_config = make_ignore_transform_config(1, vec![]);
+        age_out(transform_config).await;
     }
 
     /// Test the eviction behavior of the underlying LruCache
-    fn age_out(mut transform: Dedupe) {
-        let mut event1 = Event::Log(LogEvent::from("message"));
-        event1.as_mut_log().insert("matched", "some value");
+    async fn age_out(transform_config: DedupeConfig) {
+        assert_transform_compliance(async {
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) =
+                create_topology(ReceiverStream::new(rx), transform_config).await;
 
-        let mut event2 = Event::Log(LogEvent::from("message"));
-        event2.as_mut_log().insert("matched", "some value2");
+            let mut event1 = Event::Log(LogEvent::from("message"));
+            event1.as_mut_log().insert("matched", "some value");
 
-        // First event should always be passed through as-is.
-        let new_event = transform.transform_one(event1.clone()).unwrap();
-        assert_eq!(new_event, event1);
+            let mut event2 = Event::Log(LogEvent::from("message"));
+            event2.as_mut_log().insert("matched", "some value2");
 
-        // Second event gets outputted because it's not a dupe.  This causes the first
-        // Event to be evicted from the cache.
-        let new_event = transform.transform_one(event2.clone()).unwrap();
-        assert_eq!(new_event, event2);
+            // First event should always be passed through as-is.
+            tx.send(event1.clone()).await.unwrap();
+            let new_event = out.recv().await.unwrap();
+            assert_eq!(new_event, event1);
 
-        // Third event is a dupe but gets outputted anyway because the first
-        // event has aged out of the cache.
-        let new_event = transform.transform_one(event1.clone()).unwrap();
-        assert_eq!(new_event, event1);
+            // Second event gets output because it's not a dupe. This causes the first
+            // Event to be evicted from the cache.
+            tx.send(event2.clone()).await.unwrap();
+            let new_event = out.recv().await.unwrap();
+            assert_eq!(new_event, event2);
+
+            // Third event is a dupe but gets output anyway because the first
+            // event has aged out of the cache.
+            tx.send(event1.clone()).await.unwrap();
+            let new_event = out.recv().await.unwrap();
+            assert_eq!(new_event, event1);
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await;
     }
 
-    #[test]
-    fn dedupe_match_type_matching() {
-        let transform = make_match_transform(5, vec!["matched".into()]);
-        type_matching(transform);
+    #[tokio::test]
+    async fn dedupe_match_type_matching() {
+        let transform_config = make_match_transform_config(5, vec!["matched".into()]);
+        type_matching(transform_config).await;
     }
 
-    #[test]
-    fn dedupe_ignore_type_matching() {
-        let transform = make_ignore_transform(5, vec![]);
-        type_matching(transform);
+    #[tokio::test]
+    async fn dedupe_ignore_type_matching() {
+        let transform_config = make_ignore_transform_config(5, vec![]);
+        type_matching(transform_config).await;
     }
 
     /// Test that two events with values for the matched fields that have
     /// different types but the same string representation aren't considered
     /// duplicates.
-    fn type_matching(mut transform: Dedupe) {
-        let mut event1 = Event::Log(LogEvent::from("message"));
-        event1.as_mut_log().insert("matched", "123");
+    async fn type_matching(transform_config: DedupeConfig) {
+        assert_transform_compliance(async {
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) =
+                create_topology(ReceiverStream::new(rx), transform_config).await;
 
-        let mut event2 = Event::Log(LogEvent::from("message"));
-        event2.as_mut_log().insert("matched", 123);
+            let mut event1 = Event::Log(LogEvent::from("message"));
+            event1.as_mut_log().insert("matched", "123");
 
-        // First event should always be passed through as-is.
-        let new_event = transform.transform_one(event1.clone()).unwrap();
-        assert_eq!(new_event, event1);
+            let mut event2 = Event::Log(LogEvent::from("message"));
+            event2.as_mut_log().insert("matched", 123);
 
-        // Second event should also get passed through even though the string
-        // representations of "matched" are the same.
-        let new_event = transform.transform_one(event2.clone()).unwrap();
-        assert_eq!(new_event, event2);
+            // First event should always be passed through as-is.
+            tx.send(event1.clone()).await.unwrap();
+            let new_event = out.recv().await.unwrap();
+            assert_eq!(new_event, event1);
+
+            // Second event should also get passed through even though the string
+            // representations of "matched" are the same.
+            tx.send(event2.clone()).await.unwrap();
+            let new_event = out.recv().await.unwrap();
+            assert_eq!(new_event, event2);
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await;
     }
 
-    #[test]
-    fn dedupe_match_type_matching_nested_objects() {
-        let transform = make_match_transform(5, vec!["matched".into()]);
-        type_matching_nested_objects(transform);
+    #[tokio::test]
+    async fn dedupe_match_type_matching_nested_objects() {
+        let transform_config = make_match_transform_config(5, vec!["matched".into()]);
+        type_matching_nested_objects(transform_config).await;
     }
 
-    #[test]
-    fn dedupe_ignore_type_matching_nested_objects() {
-        let transform = make_ignore_transform(5, vec![]);
-        type_matching_nested_objects(transform);
+    #[tokio::test]
+    async fn dedupe_ignore_type_matching_nested_objects() {
+        let transform_config = make_ignore_transform_config(5, vec![]);
+        type_matching_nested_objects(transform_config).await;
     }
 
     /// Test that two events where the matched field is a sub object and that
     /// object contains values that have different types but the same string
     /// representation aren't considered duplicates.
-    fn type_matching_nested_objects(mut transform: Dedupe) {
-        let mut map1: BTreeMap<String, Value> = BTreeMap::new();
-        map1.insert("key".into(), "123".into());
-        let mut event1 = Event::Log(LogEvent::from("message"));
-        event1.as_mut_log().insert("matched", map1);
+    async fn type_matching_nested_objects(transform_config: DedupeConfig) {
+        assert_transform_compliance(async {
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) =
+                create_topology(ReceiverStream::new(rx), transform_config).await;
 
-        let mut map2: BTreeMap<String, Value> = BTreeMap::new();
-        map2.insert("key".into(), 123.into());
-        let mut event2 = Event::Log(LogEvent::from("message"));
-        event2.as_mut_log().insert("matched", map2);
+            let mut map1: BTreeMap<String, Value> = BTreeMap::new();
+            map1.insert("key".into(), "123".into());
+            let mut event1 = Event::Log(LogEvent::from("message"));
+            event1.as_mut_log().insert("matched", map1);
 
-        // First event should always be passed through as-is.
-        let new_event = transform.transform_one(event1.clone()).unwrap();
-        assert_eq!(new_event, event1);
+            let mut map2: BTreeMap<String, Value> = BTreeMap::new();
+            map2.insert("key".into(), 123.into());
+            let mut event2 = Event::Log(LogEvent::from("message"));
+            event2.as_mut_log().insert("matched", map2);
 
-        // Second event should also get passed through even though the string
-        // representations of "matched" are the same.
-        let new_event = transform.transform_one(event2.clone()).unwrap();
-        assert_eq!(new_event, event2);
+            // First event should always be passed through as-is.
+            tx.send(event1.clone()).await.unwrap();
+            let new_event = out.recv().await.unwrap();
+            assert_eq!(new_event, event1);
+
+            // Second event should also get passed through even though the string
+            // representations of "matched" are the same.
+            tx.send(event2.clone()).await.unwrap();
+            let new_event = out.recv().await.unwrap();
+            assert_eq!(new_event, event2);
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await;
     }
 
-    #[test]
-    fn dedupe_match_null_vs_missing() {
-        let transform = make_match_transform(5, vec!["matched".into()]);
-        ignore_vs_missing(transform);
+    #[tokio::test]
+    async fn dedupe_match_null_vs_missing() {
+        let transform_config = make_match_transform_config(5, vec!["matched".into()]);
+        ignore_vs_missing(transform_config).await;
     }
 
-    #[test]
-    fn dedupe_ignore_null_vs_missing() {
-        let transform = make_ignore_transform(5, vec![]);
-        ignore_vs_missing(transform);
+    #[tokio::test]
+    async fn dedupe_ignore_null_vs_missing() {
+        let transform_config = make_ignore_transform_config(5, vec![]);
+        ignore_vs_missing(transform_config).await;
     }
 
     /// Test an explicit null vs a field being missing are treated as different.
-    fn ignore_vs_missing(mut transform: Dedupe) {
-        let mut event1 = Event::Log(LogEvent::from("message"));
-        event1.as_mut_log().insert("matched", Value::Null);
+    async fn ignore_vs_missing(transform_config: DedupeConfig) {
+        assert_transform_compliance(async {
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) =
+                create_topology(ReceiverStream::new(rx), transform_config).await;
 
-        let event2 = Event::Log(LogEvent::from("message"));
+            let mut event1 = Event::Log(LogEvent::from("message"));
+            event1.as_mut_log().insert("matched", Value::Null);
 
-        // First event should always be passed through as-is.
-        let new_event = transform.transform_one(event1.clone()).unwrap();
-        assert_eq!(new_event, event1);
+            let event2 = Event::Log(LogEvent::from("message"));
 
-        // Second event should also get passed through as null is different than
-        // missing
-        let new_event = transform.transform_one(event2.clone()).unwrap();
-        assert_eq!(new_event, event2);
+            // First event should always be passed through as-is.
+            tx.send(event1.clone()).await.unwrap();
+            let new_event = out.recv().await.unwrap();
+            assert_eq!(new_event, event1);
+
+            // Second event should also get passed through as null is different than
+            // missing
+            tx.send(event2.clone()).await.unwrap();
+            let new_event = out.recv().await.unwrap();
+            assert_eq!(new_event, event2);
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await;
     }
 }
