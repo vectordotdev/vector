@@ -344,6 +344,7 @@ tower-test = "0.4.0"
 value = { path = "lib/value", features = ["test"] }
 vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
 wiremock = "0.5.14"
+zstd = { version = "0.10.0", default-features = false }
 
 [patch.crates-io]
 # A patch for lib/vector-core/buffers, addresses Issue 7514
