@@ -140,8 +140,6 @@ fn build_struct_generate_schema_fn(
 }
 
 fn generate_struct_field(field: &Field<'_>) -> proc_macro2::TokenStream {
-    //let field_schema_ty = get_field_schema_ty(field);
-
     let field_metadata_ref = Ident::new("field_metadata", Span::call_site());
     let field_metadata = generate_field_metadata(&field_metadata_ref, field);
 
