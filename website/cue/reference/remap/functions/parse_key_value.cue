@@ -123,11 +123,11 @@ remap: functions: parse_key_value: {
 				)
 				"""#
 			return: {
-				at:		"info"
-				method:	"GET"
-				path:	"/index"
-				status:	"200"
-				tags: ["dev","dummy"]
+				at:     "info"
+				method: "GET"
+				path:   "/index"
+				status: "200"
+				tags: ["dev", "dummy"]
 			}
 		},
 	]
