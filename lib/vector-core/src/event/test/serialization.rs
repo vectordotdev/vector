@@ -157,8 +157,8 @@ fn back_and_forth_through_bytes() {
     }
 
     QuickCheck::new()
-        .tests(1_000)
-        .max_tests(10_000)
+        .tests(100)
+        .max_tests(100)
         .quickcheck(inner as fn(EventArray) -> TestResult);
 }
 
