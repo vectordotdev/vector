@@ -35,7 +35,10 @@ where
     healthcheck: SinkHealthcheckOptions,
 
     #[configurable(derived)]
-    #[serde(default, skip_serializing_if = "vector_core::serde::skip_serializing_if_default")]
+    #[serde(
+        default,
+        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
+    )]
     pub buffer: BufferConfig,
 
     #[configurable(derived)]

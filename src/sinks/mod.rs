@@ -318,7 +318,7 @@ pub enum Sinks {
     Statsd(#[configurable(derived)] statsd::StatsdSinkConfig),
 
     /// Test (adaptive concurrency).
-    #[cfg(test)]
+    #[cfg(all(test, feature = "sources-demo_logs"))]
     TestArc(#[configurable(derived)] self::util::adaptive_concurrency::tests::TestConfig),
 
     /// Test (backpressure).
@@ -452,7 +452,7 @@ impl NamedComponent for Sinks {
             Self::SplunkHecMetrics(config) => config.get_component_name(),
             #[cfg(feature = "sinks-statsd")]
             Self::Statsd(config) => config.get_component_name(),
-            #[cfg(test)]
+            #[cfg(all(test, feature = "sources-demo_logs"))]
             Self::TestArc(config) => config.get_component_name(),
             #[cfg(test)]
             Self::TestBackpressure(config) => config.get_component_name(),
