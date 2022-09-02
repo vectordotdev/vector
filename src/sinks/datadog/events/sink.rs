@@ -35,6 +35,7 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {
+                        // TODO emit SinkRequestBuildError
                         error!("Failed to build DatadogEvents request: {:?}.", e);
                         None
                     }

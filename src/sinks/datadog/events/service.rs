@@ -105,7 +105,9 @@ impl Service<DatadogEventsRequest> for DatadogEventsService {
             http_service.ready().await?;
             let event_byte_size = req.metadata.event_byte_size;
             let raw_byte_size = req.body.len();
-            let http_response = http_service.call(req).await?;
+            let http_response = http_service.call(req).await.map_err(|_error| {
+                // TODO emit error
+            })?;
             let event_status = if http_response.is_successful() {
                 EventStatus::Delivered
             } else if http_response.is_transient() {
@@ -113,6 +115,9 @@ impl Service<DatadogEventsRequest> for DatadogEventsService {
             } else {
                 EventStatus::Rejected
             };
+            if !http_response.is_successful {
+                // TODO emit error
+            }
             Ok(DatadogEventsResponse {
                 event_status,
                 http_status: http_response.status(),

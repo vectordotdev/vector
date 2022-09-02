@@ -4,6 +4,7 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 use super::prelude::{error_stage, error_type};
+use crate::{emit, internal_events::ComponentEventsDropped};
 
 fn truncate_string_at(s: &str, maxlen: usize) -> Cow<str> {
     let ellipsis: &str = "[...]";
@@ -51,8 +52,9 @@ pub struct ParserMissingFieldError<'a> {
 
 impl InternalEvent for ParserMissingFieldError<'_> {
     fn emit(self) {
+        let reason = "Field does not exist.";
         error!(
-            message = "Field does not exist.",
+            message = reason,
             field = %self.field,
             error_code = "field_not_found",
             error_type = error_type::CONDITION_FAILED,
@@ -68,6 +70,12 @@ impl InternalEvent for ParserMissingFieldError<'_> {
         );
         // deprecated
         counter!("processing_errors_total", 1, "error_type" => "missing_field");
+
+        emit!(ComponentEventsDropped {
+            count: 1,
+            intentional: false,
+            reason
+        });
     }
 }
 
