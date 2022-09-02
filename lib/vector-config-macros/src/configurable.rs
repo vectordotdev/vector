@@ -319,7 +319,7 @@ fn generate_container_metadata(
     meta_ident: &Ident,
     container: &Container<'_>,
 ) -> proc_macro2::TokenStream {
-    let maybe_title = get_metadata_description(meta_ident, container.title());
+    let maybe_title = get_metadata_title(meta_ident, container.title());
     let maybe_description = get_metadata_description(meta_ident, container.description());
     let maybe_default_value = get_metadata_default_value(meta_ident, container.default_value());
     let maybe_deprecated = get_metadata_deprecated(meta_ident, container.deprecated());
