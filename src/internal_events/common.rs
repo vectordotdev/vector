@@ -75,9 +75,8 @@ impl InternalEvent for StreamClosedError {
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
         );
-        emit!(ComponentEventsDropped {
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
             count: self.count as u64,
-            intentional: false,
             reason: "Downstream is closed.",
         });
     }
@@ -111,27 +110,29 @@ impl InternalEvent for CollectionCompleted {
     }
 }
 
+pub const _INTENTIONAL: bool = true;
+pub const UNINTENTIONAL: bool = false;
+
 #[derive(Debug)]
-pub struct ComponentEventsDropped {
+pub struct ComponentEventsDropped<const INTENTIONAL: bool> {
     pub count: u64,
-    pub intentional: bool,
     pub reason: &'static str,
 }
 
-impl InternalEvent for ComponentEventsDropped {
+impl<const INTENTIONAL: bool> InternalEvent for ComponentEventsDropped<INTENTIONAL> {
     fn emit(self) {
         let message = "Events dropped";
-        if self.intentional {
+        if INTENTIONAL {
             debug!(
                 message,
-                intentional = self.intentional,
+                intentional = INTENTIONAL,
                 reason = self.reason,
                 internal_log_rate_secs = 10,
             );
         } else {
             error!(
                 message,
-                intentional = self.intentional,
+                intentional = INTENTIONAL,
                 reason = self.reason,
                 internal_log_rate_secs = 10,
             );
@@ -139,7 +140,7 @@ impl InternalEvent for ComponentEventsDropped {
         counter!(
             "component_discarded_events_total",
             self.count,
-            "intentional" => if self.intentional { "true" } else { "false" },
+            "intentional" => if INTENTIONAL { "true" } else { "false" },
         );
     }
 }

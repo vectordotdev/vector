@@ -178,7 +178,7 @@ class Event
       # Name check
       append('Error events MUST be named "___Error".') unless @name.end_with? 'Error'
       # Outputs an error log
-      handle.logs_should_have('error')
+      handle.log_level_exactly('error')
       # Metric check
       counters_must_include_exclude_tags(METRIC_NAME_ERROR, ['error_type', 'stage'])
 
@@ -217,8 +217,12 @@ class Event
 
         # Name check
         append('EventsDropped events MUST be named "___EventsDropped".') unless @name.end_with? 'EventsDropped'
-        # Outputs an error log
-        handle.logs_should_have('error')
+
+        # Outputs an error log or debug log. Which level is dependent on the value of the param `intentional`, however
+        # because implementation can involve passing in the value of the `intentional` bool at compile time, we would need to
+        # scan all the source code for places that emit this event to determine that.
+        handle.log_level_one_of(['error', 'debug'])
+
         # Metric check
         counters_must_include_exclude_tags(METRIC_NAME_EVENTS_DROPPED, ['intentional'], ['reason', 'count'])
 
@@ -262,10 +266,14 @@ class Event
     @reports.empty?
   end
 
-  def logs_should_have(level)
-    if @logs.find_index { |type, message, parameters| type == level }.nil?
-      @reports.append("This event MUST log with level #{level}.")
+  def log_level_one_of(levels)
+    if @logs.find_index { |type, message, parameters| levels.include? type }.nil?
+      @reports.append("This event MUST log with one of these levels: #{levels}.")
     end
+  end
+
+  def log_level_exactly(level)
+    log_level_one_of([level])
   end
 
   private
