@@ -6,7 +6,9 @@ use redis::{aio::ConnectionManager, RedisError, RedisResult};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
 use tower::{Service, ServiceBuilder};
-use vector_common::internal_event::BytesSent;
+use vector_common::internal_event::{
+    ByteSize, BytesSent, InternalEventHandle, Protocol, Registered,
+};
 use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
@@ -226,7 +228,11 @@ impl RedisSinkConfig {
 
         let buffer = VecBuffer::new(batch.size);
 
-        let redis = RedisSink { conn, data_type };
+        let redis = RedisSink {
+            conn,
+            data_type,
+            bytes_sent: register!(BytesSent::from(Protocol::TCP)),
+        };
 
         let svc = ServiceBuilder::new()
             .settings(request, RedisRetryLogic)
@@ -337,6 +343,7 @@ impl RetryLogic for RedisRetryLogic {
 pub struct RedisSink {
     conn: ConnectionManager,
     data_type: DataType,
+    bytes_sent: Registered<BytesSent>,
 }
 
 impl Service<Vec<RedisKvEntry>> for RedisSink {
@@ -384,15 +391,13 @@ impl Service<Vec<RedisKvEntry>> for RedisSink {
             }
         }
 
+        let bytes_sent = self.bytes_sent.clone();
         Box::pin(async move {
             let result: RedisPipeResult = pipe.query_async(&mut conn).await;
             match &result {
                 Ok(res) => {
                     if res.is_successful() {
-                        emit!(BytesSent {
-                            byte_size,
-                            protocol: "tcp",
-                        });
+                        bytes_sent.emit(ByteSize(byte_size));
                     } else {
                         warn!("Batch sending was not all successful and will be retried.")
                     }
@@ -485,7 +490,7 @@ mod integration_tests {
 
     use super::*;
     use crate::test_util::{
-        components::{run_and_assert_sink_compliance, SINK_TAGS},
+        components::{assert_sink_compliance, SINK_TAGS},
         random_lines_with_stream, random_string, trace_init,
     };
 
@@ -520,19 +525,22 @@ mod integration_tests {
             acknowledgements: Default::default(),
         };
 
-        // Publish events.
-        let conn = cnf.build_client().await.unwrap();
-
-        let sink = cnf.new(conn).unwrap();
-
         let mut events: Vec<Event> = Vec::new();
         for i in 0..num_events {
             let s: String = i.to_string();
             let e = LogEvent::from(s);
             events.push(e.into());
         }
+        let input = stream::iter(events.clone().into_iter().map(Into::into));
 
-        run_and_assert_sink_compliance(sink, stream::iter(events.clone()), &SINK_TAGS).await;
+        // Publish events.
+        let cnf2 = cnf.clone();
+        assert_sink_compliance(&SINK_TAGS, async move {
+            let conn = cnf2.build_client().await.unwrap();
+            cnf2.new(conn).unwrap().run(input).await
+        })
+        .await
+        .expect("Running sink failed");
 
         let mut conn = cnf.build_client().await.unwrap();
 

@@ -6,7 +6,9 @@ use codecs::JsonSerializerConfig;
 use futures::{stream::BoxStream, FutureExt, StreamExt, TryFutureExt};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
-use vector_common::internal_event::{BytesSent, EventsSent};
+use vector_common::internal_event::{
+    ByteSize, BytesSent, EventsSent, InternalEventHandle, Protocol,
+};
 use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
@@ -172,6 +174,8 @@ impl NatsSink {
 #[async_trait]
 impl StreamSink<Event> for NatsSink {
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
+        let bytes_sent = register!(BytesSent::from(Protocol::TCP));
+
         while let Some(mut event) = input.next().await {
             let finalizers = event.take_finalizers();
 
@@ -213,10 +217,7 @@ impl StreamSink<Event> for NatsSink {
                         count: 1,
                         output: None
                     });
-                    emit!(BytesSent {
-                        byte_size: bytes.len(),
-                        protocol: "tcp"
-                    });
+                    bytes_sent.emit(ByteSize(bytes.len()));
                 }
             }
         }
