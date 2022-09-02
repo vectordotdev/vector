@@ -1,103 +1,25 @@
-use std::{pin::Pin, sync::Mutex};
+use std::sync::Mutex;
 
 use async_trait::async_trait;
-use futures_util::{stream::BoxStream, Stream, StreamExt};
+use futures_util::{stream::BoxStream, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot::{channel, Receiver, Sender};
 use vector_core::{
-    config::{AcknowledgementsConfig, DataType, Input, LogNamespace, Output},
+    config::{AcknowledgementsConfig, Input},
     event::{Event, EventArray, EventContainer, LogEvent},
-    schema::Definition,
     sink::{StreamSink, VectorSink},
-    source::Source,
-    transform::{
-        FunctionTransform, OutputBuffer, TaskTransform, Transform, TransformConfig,
-        TransformContext,
-    },
 };
 
 use crate::{
-    config::{ConfigBuilder, SinkConfig, SinkContext, SourceConfig, SourceContext},
+    config::{unit_test::UnitTestSourceConfig, ConfigBuilder, SinkConfig, SinkContext},
     sinks::Healthcheck,
-    test_util::{components::assert_transform_compliance, start_topology},
+    test_util::{
+        components::assert_transform_compliance,
+        mock::transforms::{NoopTransformConfig, TransformType},
+        start_topology,
+    },
     topology::RunningTopology,
 };
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-enum TransformType {
-    Function,
-    Synchronous,
-    Task,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-struct NoopTransformConfig {
-    transform_type: TransformType,
-}
-
-#[async_trait]
-#[typetag::serde(name = "noop")]
-impl TransformConfig for NoopTransformConfig {
-    fn input(&self) -> Input {
-        Input::all()
-    }
-
-    fn outputs(&self, _: &Definition) -> Vec<Output> {
-        vec![Output::default(DataType::all())]
-    }
-
-    fn transform_type(&self) -> &'static str {
-        "noop"
-    }
-
-    async fn build(&self, _: &TransformContext) -> crate::Result<Transform> {
-        match self.transform_type {
-            TransformType::Function => Ok(Transform::Function(Box::new(NoopTransform))),
-            TransformType::Synchronous => Ok(Transform::Synchronous(Box::new(NoopTransform))),
-            TransformType::Task => Ok(Transform::Task(Box::new(NoopTransform))),
-        }
-    }
-}
-
-impl From<TransformType> for NoopTransformConfig {
-    fn from(transform_type: TransformType) -> Self {
-        Self { transform_type }
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct OneshotSourceConfig {
-    #[serde(skip)]
-    event: Option<Event>,
-}
-
-#[async_trait]
-#[typetag::serde(name = "oneshot")]
-impl SourceConfig for OneshotSourceConfig {
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::all())]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "oneshot"
-    }
-
-    fn can_acknowledge(&self) -> bool {
-        false
-    }
-
-    async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
-        let event = self.event.clone();
-        let mut out = cx.out;
-        let shutdown = cx.shutdown;
-        Ok(Box::pin(async move {
-            let event = event.expect("event must not be none");
-            out.send_event(event).await.unwrap();
-            shutdown.await;
-            Ok(())
-        }))
-    }
-}
 
 #[derive(Debug, Serialize, Deserialize)]
 struct OneshotSinkConfig {
@@ -151,27 +73,6 @@ impl StreamSink<EventArray> for OneshotSink {
     }
 }
 
-#[derive(Clone)]
-struct NoopTransform;
-
-impl FunctionTransform for NoopTransform {
-    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
-        output.push(event);
-    }
-}
-
-impl<T> TaskTransform<T> for NoopTransform
-where
-    T: EventContainer + 'static,
-{
-    fn transform(
-        self: Box<Self>,
-        task: Pin<Box<dyn futures_util::Stream<Item = T> + Send>>,
-    ) -> Pin<Box<dyn Stream<Item = T> + Send>> {
-        Box::pin(task)
-    }
-}
-
 async fn create_topology(
     event: Event,
     transform_type: TransformType,
@@ -180,7 +81,12 @@ async fn create_topology(
 
     let (tx, rx) = channel();
 
-    builder.add_source("in", OneshotSourceConfig { event: Some(event) });
+    builder.add_source(
+        "in",
+        UnitTestSourceConfig {
+            events: vec![event],
+        },
+    );
     builder.add_transform(
         "transform",
         &["in"],

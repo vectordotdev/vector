@@ -1,13 +1,17 @@
 use std::sync::{atomic::AtomicUsize, Arc};
 
 use futures_util::Stream;
+use stream_cancel::Trigger;
 use vector_core::event::EventArray;
 
 use crate::SourceSender;
 
 use self::{
     sinks::{BasicSinkConfig, ErrorSinkConfig, PanicSinkConfig},
-    sources::{BasicSourceConfig, ErrorSourceConfig, PanicSourceConfig},
+    sources::{
+        BackpressureSourceConfig, BasicSourceConfig, ErrorSourceConfig, PanicSourceConfig,
+        TripwireSourceConfig,
+    },
     transforms::BasicTransformConfig,
 };
 
@@ -15,22 +19,30 @@ pub mod sinks;
 pub mod sources;
 pub mod transforms;
 
+pub fn backpressure_source(counter: &Arc<AtomicUsize>) -> BackpressureSourceConfig {
+    BackpressureSourceConfig {
+        counter: Arc::clone(counter),
+    }
+}
+
 pub fn basic_source() -> (SourceSender, BasicSourceConfig) {
     let (tx, rx) = SourceSender::new_with_buffer(1);
-    let source = BasicSourceConfig::new(rx);
-    (tx, source)
+    (tx, BasicSourceConfig::new(rx))
 }
 
 pub fn basic_source_with_data(data: &str) -> (SourceSender, BasicSourceConfig) {
     let (tx, rx) = SourceSender::new_with_buffer(1);
-    let source = BasicSourceConfig::new_with_data(rx, data);
-    (tx, source)
+    (tx, BasicSourceConfig::new_with_data(rx, data))
 }
 
-pub fn basic_source_with_event_counter() -> (SourceSender, BasicSourceConfig, Arc<AtomicUsize>) {
+pub fn basic_source_with_event_counter(
+    force_shutdown: bool,
+) -> (SourceSender, BasicSourceConfig, Arc<AtomicUsize>) {
     let event_counter = Arc::new(AtomicUsize::new(0));
     let (tx, rx) = SourceSender::new_with_buffer(1);
-    let source = BasicSourceConfig::new_with_event_counter(rx, Arc::clone(&event_counter));
+    let mut source = BasicSourceConfig::new_with_event_counter(rx, Arc::clone(&event_counter));
+    source.set_force_shutdown(force_shutdown);
+
     (tx, source, event_counter)
 }
 
@@ -40,6 +52,10 @@ pub fn error_source() -> ErrorSourceConfig {
 
 pub fn panic_source() -> PanicSourceConfig {
     PanicSourceConfig::default()
+}
+
+pub fn tripwire_source() -> (Trigger, TripwireSourceConfig) {
+    TripwireSourceConfig::new()
 }
 
 pub fn basic_transform(suffix: &str, increase: f64) -> BasicTransformConfig {

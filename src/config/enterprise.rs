@@ -433,9 +433,7 @@ fn setup_logs_reporting(
     let internal_logs_id = OutputId::from(ComponentKey::from(INTERNAL_LOGS_KEY));
     let datadog_logs_id = ComponentKey::from(DATADOG_LOGS_KEY);
 
-    let internal_logs = InternalLogsConfig {
-        ..Default::default()
-    };
+    let internal_logs = InternalLogsConfig::default();
 
     let custom_logs_tags_vrl = datadog
         .tags

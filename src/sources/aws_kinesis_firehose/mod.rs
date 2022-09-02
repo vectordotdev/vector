@@ -11,7 +11,6 @@ use crate::{
     codecs::DecodingConfig,
     config::{
         AcknowledgementsConfig, GenerateConfig, Output, Resource, SourceConfig, SourceContext,
-        SourceDescription,
     },
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
@@ -23,7 +22,7 @@ mod handlers;
 mod models;
 
 /// Configuration for the `aws_kinesis_firehose` source.
-#[configurable_component(source)]
+#[configurable_component(source("aws_kinesis_firehose"))]
 #[derive(Clone, Debug)]
 pub struct AwsKinesisFirehoseConfig {
     /// The address to listen for connections on.
@@ -95,7 +94,6 @@ impl fmt::Display for Compression {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "aws_kinesis_firehose")]
 impl SourceConfig for AwsKinesisFirehoseConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let decoder = DecodingConfig::new(
@@ -134,10 +132,6 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
         vec![Output::default(self.decoding.output_type())]
     }
 
-    fn source_type(&self) -> &'static str {
-        "aws_kinesis_firehose"
-    }
-
     fn resources(&self) -> Vec<Resource> {
         vec![Resource::tcp(self.address)]
     }
@@ -145,10 +139,6 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
     fn can_acknowledge(&self) -> bool {
         true
     }
-}
-
-inventory::submit! {
-    SourceDescription::new::<AwsKinesisFirehoseConfig>("aws_kinesis_firehose")
 }
 
 impl GenerateConfig for AwsKinesisFirehoseConfig {

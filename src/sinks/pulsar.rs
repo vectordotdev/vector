@@ -27,6 +27,7 @@ use crate::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
     },
     event::{Event, EventFinalizers, EventStatus, Finalizable},
+    internal_events::PulsarSendingError,
     sinks::util::metadata::RequestMetadata,
 };
 
@@ -358,9 +359,12 @@ impl Sink<Event> for PulsarSink {
                     this.bytes_sent
                         .emit(ByteSize(metadata.request_encoded_size()));
                 }
-                Some((Err(error), _, finalizers)) => {
+                Some((Err(error), metadata, finalizers)) => {
                     finalizers.update_status(EventStatus::Errored);
-                    error!(message = "Pulsar sink generated an error.", %error);
+                    emit!(PulsarSendingError {
+                        error: Box::new(error),
+                        count: metadata.event_count() as u64,
+                    });
                     return Poll::Ready(Err(()));
                 }
                 None => break,

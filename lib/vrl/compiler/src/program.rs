@@ -1,4 +1,4 @@
-use lookup::LookupBuf;
+use lookup::TargetPath;
 
 use crate::state::TypeState;
 use crate::{
@@ -59,9 +59,9 @@ pub struct ProgramInfo {
     pub abortable: bool,
 
     /// A list of possible queries made to the external [`Target`] at runtime.
-    pub target_queries: Vec<LookupBuf>,
+    pub target_queries: Vec<TargetPath>,
 
     /// A list of possible assignments made to the external [`Target`] at
     /// runtime.
-    pub target_assignments: Vec<LookupBuf>,
+    pub target_assignments: Vec<TargetPath>,
 }

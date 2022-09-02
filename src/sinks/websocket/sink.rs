@@ -374,7 +374,7 @@ const fn is_closed(error: &WsError) -> bool {
     )
 }
 
-#[cfg(all(test, feature = "sources-utils-tls"))]
+#[cfg(test)]
 mod tests {
     use std::net::SocketAddr;
 

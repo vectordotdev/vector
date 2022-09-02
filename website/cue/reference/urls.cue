@@ -242,6 +242,7 @@ urls: {
 	http:                                       "https://www.w3.org/Protocols/"
 	http_client:                                "\(wikipedia)/wiki/Hypertext_Transfer_Protocol#Client_request"
 	http_server:                                "\(wikipedia)/wiki/Web_server"
+	http_scrape:                                "https://www.rfc-editor.org/rfc/rfc9110.html"
 	humio:                                      "https://humio.com"
 	humio_hec:                                  "https://docs.humio.com/integrations/data-shippers/hec/"
 	humio_hec_format_of_data:                   "https://docs.humio.com/integrations/data-shippers/hec/#format-of-data"

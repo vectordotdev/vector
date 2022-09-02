@@ -272,7 +272,7 @@ impl DatadogTracesEncoder {
                 .and_then(|v| v.as_boolean())
                 .unwrap_or(false),
             spans,
-            tags,
+            tags: tags.clone(),
         };
 
         dd_proto::TracerPayload {
@@ -297,6 +297,15 @@ impl DatadogTracesEncoder {
                 .map(|v| v.to_string_lossy())
                 .unwrap_or_default(),
             chunks: vec![chunk],
+            tags,
+            env: trace
+                .get("env")
+                .map(|v| v.to_string_lossy())
+                .unwrap_or_default(),
+            hostname: trace
+                .get("hostname")
+                .map(|v| v.to_string_lossy())
+                .unwrap_or_default(),
             app_version: trace
                 .get("app_version")
                 .map(|v| v.to_string_lossy())

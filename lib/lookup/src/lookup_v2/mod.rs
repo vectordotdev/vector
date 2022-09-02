@@ -5,6 +5,7 @@ mod jit;
 mod owned;
 
 use self::jit::{JitLookup, JitPath};
+use std::fmt::{Debug, Display, Formatter};
 
 pub use borrowed::BorrowedSegment;
 pub use concat::PathConcat;
@@ -58,6 +59,21 @@ pub trait Path<'a>: Clone {
         self.segment_iter().eq(other.segment_iter())
     }
 
+    fn can_start_with(&self, prefix: impl Path<'a>) -> bool {
+        let mut self_segments = self.to_owned_path().segments.into_iter();
+        for prefix_segment in prefix.to_owned_path().segments.iter() {
+            match self_segments.next() {
+                None => return false,
+                Some(self_segment) => {
+                    if !self_segment.can_start_with(prefix_segment) {
+                        return false;
+                    }
+                }
+            }
+        }
+        true
+    }
+
     fn to_owned_path(&self) -> OwnedPath {
         let mut owned_path = OwnedPath::root();
         let mut coalesce = vec![];
@@ -86,5 +102,70 @@ impl<'a> Path<'a> for &'a str {
 
     fn segment_iter(&self) -> Self::Iter {
         JitPath::new(self).segment_iter()
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum PathPrefix {
+    Event,
+    Metadata,
+}
+
+#[derive(Hash, Eq, PartialEq, Clone, PartialOrd, Ord)]
+pub struct TargetPath {
+    pub prefix: PathPrefix,
+    pub path: OwnedPath,
+}
+
+impl TargetPath {
+    pub fn event_root() -> Self {
+        Self::root(PathPrefix::Event)
+    }
+
+    pub fn metadata_root() -> Self {
+        Self::root(PathPrefix::Metadata)
+    }
+
+    pub fn root(prefix: PathPrefix) -> Self {
+        Self {
+            prefix,
+            path: OwnedPath::root(),
+        }
+    }
+
+    pub fn event(path: OwnedPath) -> Self {
+        Self {
+            prefix: PathPrefix::Event,
+            path,
+        }
+    }
+
+    pub fn metadata(path: OwnedPath) -> Self {
+        Self {
+            prefix: PathPrefix::Metadata,
+            path,
+        }
+    }
+
+    pub fn can_start_with(&self, prefix: &Self) -> bool {
+        if self.prefix != prefix.prefix {
+            return false;
+        }
+        (&self.path).can_start_with(&prefix.path)
+    }
+}
+
+impl Display for TargetPath {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self.prefix {
+            PathPrefix::Event => write!(f, ".{}", self.path),
+            PathPrefix::Metadata => write!(f, "%{}", self.path),
+        }
+    }
+}
+
+impl Debug for TargetPath {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(self, f)
     }
 }

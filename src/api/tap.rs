@@ -415,7 +415,6 @@ async fn tap_handler(
     test,
     feature = "sinks-blackhole",
     feature = "sources-demo_logs",
-    feature = "transforms-log_to_metric",
     feature = "transforms-remap",
 ))]
 mod tests {

@@ -193,6 +193,9 @@ components: sinks: [Name=string]: {
 											if codec == "json" {
 												json: "JSON encoded event."
 											}
+											if codec == "gelf" {
+												gelf: "[GELF](https://docs.graylog.org/docs/gelf) encoded event."
+											}
 											if codec == "avro" {
 												avro: "Avro encoded event with a given schema."
 											}
@@ -515,6 +518,7 @@ components: sinks: [Name=string]: {
 					can_verify_certificate: features.send.tls.can_verify_certificate
 					can_verify_hostname:    features.send.tls.can_verify_hostname
 					enabled_default:        features.send.tls.enabled_default
+					enabled_by_scheme:      features.send.tls.enabled_by_scheme
 				}}
 			}
 		}

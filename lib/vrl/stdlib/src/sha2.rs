@@ -69,7 +69,7 @@ impl Function for Sha2 {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let variant = arguments
@@ -79,27 +79,6 @@ impl Function for Sha2 {
             .expect("variant not bytes");
 
         Ok(Sha2Fn { value, variant }.as_expr())
-    }
-
-    fn compile_argument(
-        &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        match (name, expr) {
-            ("variant", Some(expr)) => {
-                let variant = expr
-                    .as_enum("variant", variants())?
-                    .try_bytes()
-                    .expect("variant not bytes");
-
-                Ok(Some(Box::new(variant) as _))
-            }
-            ("variant", None) => Ok(Some(Box::new(Bytes::from("SHA-512/256")) as _)),
-            _ => Ok(None),
-        }
     }
 }
 

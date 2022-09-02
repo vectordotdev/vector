@@ -1,12 +1,11 @@
 use std::path::Path;
 
-use codecs::{encoding::FramingConfig, TextSerializerConfig};
-
 use crate::{
     config::Config,
-    sinks::console::{ConsoleSinkConfig, Target},
-    sources::socket::SocketConfig,
-    test_util::{next_addr, start_topology, trace_init},
+    test_util::{
+        mock::{basic_sink, basic_source},
+        start_topology, trace_init,
+    },
 };
 
 #[tokio::test]
@@ -14,16 +13,8 @@ async fn topology_doesnt_reload_new_data_dir() {
     trace_init();
 
     let mut old_config = Config::builder();
-    old_config.add_source("in", SocketConfig::make_basic_tcp_config(next_addr()));
-    old_config.add_sink(
-        "out",
-        &["in"],
-        ConsoleSinkConfig {
-            target: Target::Stdout,
-            encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
-            acknowledgements: Default::default(),
-        },
-    );
+    old_config.add_source("in", basic_source().1);
+    old_config.add_sink("out", &["in"], basic_sink(1).1);
     old_config.global.data_dir = Some(Path::new("/asdf").to_path_buf());
     let mut new_config = old_config.clone();
 

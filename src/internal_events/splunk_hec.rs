@@ -1,3 +1,5 @@
+// ## skip check-dropped-events ##
+
 #[cfg(feature = "sinks-splunk_hec")]
 pub use self::sink::*;
 #[cfg(feature = "sources-splunk_hec")]
