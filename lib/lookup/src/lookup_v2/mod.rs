@@ -226,7 +226,7 @@ impl Display for OwnedTargetPath {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self.prefix {
             PathPrefix::Event => write!(f, ".{}", self.path),
-            PathPrefix::Metadata => write!(f, "@{}", self.path),
+            PathPrefix::Metadata => write!(f, "%{}", self.path),
         }
     }
 }
