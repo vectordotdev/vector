@@ -22,7 +22,7 @@ use crate::{
 };
 
 /// Configuration for the `datadog_events` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("datadog_events"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogEventsConfig {
@@ -116,7 +116,6 @@ impl DatadogEventsConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "datadog_events")]
 impl SinkConfig for DatadogEventsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.build_client(cx.proxy())?;
@@ -128,10 +127,6 @@ impl SinkConfig for DatadogEventsConfig {
 
     fn input(&self) -> Input {
         Input::log()
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "datadog_events"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

@@ -9,8 +9,8 @@ use vector_core::{sink::StreamSink, transform::Transform};
 use super::{host_key, logs::HumioLogsConfig};
 use crate::{
     config::{
-        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
-        TransformConfig, TransformContext,
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, TransformConfig,
+        TransformContext,
     },
     event::{Event, EventArray, EventContainer},
     sinks::{
@@ -31,7 +31,7 @@ use crate::{
 // `humio_logs` config here.
 //
 // [1]: https://github.com/serde-rs/serde/issues/1504
-#[configurable_component(sink)]
+#[configurable_component(sink("humio_metrics"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct HumioMetricsConfig {
@@ -112,10 +112,6 @@ pub struct HumioMetricsConfig {
     acknowledgements: AcknowledgementsConfig,
 }
 
-inventory::submit! {
-    SinkDescription::new::<HumioMetricsConfig>("humio_metrics")
-}
-
 impl GenerateConfig for HumioMetricsConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(indoc! {r#"
@@ -127,7 +123,6 @@ impl GenerateConfig for HumioMetricsConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "humio_metrics")]
 impl SinkConfig for HumioMetricsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let transform = self
@@ -167,10 +162,6 @@ impl SinkConfig for HumioMetricsConfig {
 
     fn input(&self) -> Input {
         Input::metric()
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "humio_metrics"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

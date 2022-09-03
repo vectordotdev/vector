@@ -23,9 +23,7 @@ use vector_core::config::log_schema;
 
 use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
-    config::{
-        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
-    },
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::{Event, EventFinalizers, EventStatus, Finalizable},
     internal_events::PulsarSendingError,
     sinks::util::metadata::RequestMetadata,
@@ -38,7 +36,7 @@ enum BuildError {
 }
 
 /// Configuration for the `pulsar` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("pulsar"))]
 #[derive(Clone, Debug)]
 pub struct PulsarSinkConfig {
     /// The endpoint to which the Pulsar client should connect to.
@@ -138,10 +136,6 @@ struct PulsarSink {
     bytes_sent: Registered<BytesSent>,
 }
 
-inventory::submit! {
-    SinkDescription::new::<PulsarSinkConfig>("pulsar")
-}
-
 impl GenerateConfig for PulsarSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
@@ -156,7 +150,6 @@ impl GenerateConfig for PulsarSinkConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "pulsar")]
 impl SinkConfig for PulsarSinkConfig {
     async fn build(
         &self,
@@ -184,10 +177,6 @@ impl SinkConfig for PulsarSinkConfig {
 
     fn input(&self) -> Input {
         Input::log()
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "pulsar"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

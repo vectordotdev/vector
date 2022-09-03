@@ -14,10 +14,7 @@ use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
-    config::{
-        self, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
-        SinkDescription,
-    },
+    config::{self, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::Event,
     internal_events::{RedisSendEventError, TemplateRenderingError},
     sinks::util::{
@@ -29,10 +26,6 @@ use crate::{
     },
     template::{Template, TemplateParseError},
 };
-
-inventory::submit! {
-    SinkDescription::new::<RedisSinkConfig>("redis")
-}
 
 #[derive(Debug, Snafu)]
 enum RedisSinkError {
@@ -116,7 +109,7 @@ impl SinkBatchSettings for RedisDefaultBatchSettings {
 }
 
 /// Configuration for the `redis` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("redis"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct RedisSinkConfig {
@@ -176,7 +169,6 @@ impl GenerateConfig for RedisSinkConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "redis")]
 impl SinkConfig for RedisSinkConfig {
     async fn build(
         &self,
@@ -193,10 +185,6 @@ impl SinkConfig for RedisSinkConfig {
 
     fn input(&self) -> Input {
         Input::new(self.encoding.config().input_type() & config::DataType::Log)
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "redis"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

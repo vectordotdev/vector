@@ -15,7 +15,7 @@ use vector_core::{
 };
 
 use crate::{
-    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     event::{
         metric::{Metric, MetricValue, Sample, StatisticKind},
         Event,
@@ -55,7 +55,7 @@ impl SinkBatchSettings for InfluxDbDefaultBatchSettings {
 }
 
 /// Configuration for the `influxdb_metrics` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("influxdb_metrics"))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct InfluxDbConfig {
@@ -112,14 +112,9 @@ struct InfluxDbRequest {
     series: Vec<String>,
 }
 
-inventory::submit! {
-    SinkDescription::new::<InfluxDbConfig>("influxdb_metrics")
-}
-
 impl_generate_config_from_default!(InfluxDbConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "influxdb_metrics")]
 impl SinkConfig for InfluxDbConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let tls_settings = TlsSettings::from_options(&self.tls)?;
@@ -137,10 +132,6 @@ impl SinkConfig for InfluxDbConfig {
 
     fn input(&self) -> Input {
         Input::metric()
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "influxdb_metrics"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

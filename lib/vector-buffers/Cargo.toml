@@ -17,7 +17,7 @@ crossbeam-utils = { version = "0.8.11", default-features = false }
 db-key = { version = "0.0.5", default-features = false }
 fslock = { version = "0.2.1", default-features = false, features = ["std"] }
 futures = { version = "0.3.24", default-features = false, features = ["std"] }
-leveldb = { version = "0.8.6", default-features = false  }
+leveldb = { version = "0.8.6", default-features = false }
 memmap2 = { version = "0.5.7", default-features = false }
 metrics = "0.20.1"
 num-traits = { version = "0.2.15", default-features = false }
@@ -29,7 +29,10 @@ snafu = { version = "0.7.1", default-features = false, features = ["std"] }
 tokio-util = { version = "0.7.0", default-features = false }
 tokio = { version = "1.20.1", default-features = false, features = ["rt", "macros", "rt-multi-thread", "sync", "fs", "io-util", "time"] }
 tracing = { version = "0.1.34", default-features = false, features = ["attributes"] }
-vector-common = { path = "../vector-common", default-features = false, features = ["byte_size_of"] }
+vector-config = { path = "../vector-config", default-features = false }
+vector-config-common = { path = "../vector-config-common", default-features = false }
+vector-config-macros = { path = "../vector-config-macros", default-features = false }
+vector-common = { path = "../vector-common", default-features = false, features = ["byte_size_of", "serde"] }
 
 [dev-dependencies]
 clap = "3.2.19"

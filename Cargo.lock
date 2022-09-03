@@ -8626,6 +8626,9 @@ dependencies = [
  "tracing-fluent-assertions",
  "tracing-subscriber 0.3.15",
  "vector-common",
+ "vector-config",
+ "vector-config-common",
+ "vector-config-macros",
 ]
 
 [[package]]

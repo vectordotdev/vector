@@ -17,7 +17,7 @@ use crate::{
 };
 
 /// Configuration for the `papertrail` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("papertrail"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct PapertrailConfig {
@@ -64,7 +64,6 @@ impl GenerateConfig for PapertrailConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "papertrail")]
 impl SinkConfig for PapertrailConfig {
     async fn build(
         &self,
@@ -111,10 +110,6 @@ impl SinkConfig for PapertrailConfig {
 
     fn input(&self) -> Input {
         Input::new(self.encoding.config().input_type() & DataType::Log)
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "papertrail"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

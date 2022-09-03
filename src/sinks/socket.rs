@@ -8,15 +8,12 @@ use vector_config::configurable_component;
 use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
     codecs::{Encoder, EncodingConfig, EncodingConfigWithFraming, SinkType},
-    config::{
-        AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
-        SinkDescription,
-    },
+    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     sinks::util::{tcp::TcpSinkConfig, udp::UdpSinkConfig},
 };
 
 /// Configuration for the `socket` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("socket"))]
 #[derive(Clone, Debug)]
 pub struct SocketSinkConfig {
     #[serde(flatten)]
@@ -81,10 +78,6 @@ pub struct UnixMode {
     encoding: EncodingConfigWithFraming,
 }
 
-inventory::submit! {
-    SinkDescription::new::<SocketSinkConfig>("socket")
-}
-
 impl GenerateConfig for SocketSinkConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(
@@ -119,7 +112,6 @@ impl SocketSinkConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "socket")]
 impl SinkConfig for SocketSinkConfig {
     async fn build(
         &self,
@@ -156,10 +148,6 @@ impl SinkConfig for SocketSinkConfig {
             Mode::Unix(UnixMode { encoding, .. }) => encoding.config().1.input_type(),
         };
         Input::new(encoder_input_type & DataType::Log)
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "socket"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

@@ -8,10 +8,7 @@ use vector_config::configurable_component;
 
 use crate::{
     codecs::Transformer,
-    config::{
-        log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
-        SinkDescription,
-    },
+    config::{log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::{Event, Value},
     http::HttpClient,
     sinks::{
@@ -38,7 +35,7 @@ impl SinkBatchSettings for InfluxDbLogsDefaultBatchSettings {
 }
 
 /// Configuration for the `influxdb_logs` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("influxdb_logs"))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct InfluxDbLogsConfig {
@@ -103,10 +100,6 @@ struct InfluxDbLogsSink {
     transformer: Transformer,
 }
 
-inventory::submit! {
-    SinkDescription::new::<InfluxDbLogsConfig>("influxdb_logs")
-}
-
 impl GenerateConfig for InfluxDbLogsConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(indoc! {r#"
@@ -122,7 +115,6 @@ impl GenerateConfig for InfluxDbLogsConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "influxdb_logs")]
 impl SinkConfig for InfluxDbLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let measurement = self.get_measurement()?;
@@ -176,10 +168,6 @@ impl SinkConfig for InfluxDbLogsConfig {
 
     fn input(&self) -> Input {
         Input::log()
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "influxdb_logs"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
