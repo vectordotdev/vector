@@ -63,14 +63,17 @@ components: sources: internal_metrics: {
 				examples: []
 				options: {
 					host_key: {
-						category: "Context"
-						common:   false
+						category:    "Context"
+						common:      false
 						description: """
-							If set, will add a tag using the provided key name with a value of the current the current host.
+							The key name added to each event representing the current host. This can also be globally set via the
+							[global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key).
+
+							Set to "" to suppress this key.
 							"""
-						required: false
+						required:    false
 						type: string: {
-							default: null
+							default: "host"
 						}
 					}
 					pid_key: {

@@ -1,10 +1,11 @@
 use std::convert::AsRef;
 
-use lookup::LookupBuf;
+use lookup::lookup_v2::TargetPath;
+use lookup::PathPrefix;
 use value::{Secrets, Value};
 
 /// Any target object you want to remap using VRL has to implement this trait.
-pub trait Target: std::fmt::Debug + MetadataTarget + SecretTarget {
+pub trait Target: std::fmt::Debug + SecretTarget {
     /// Insert a given [`Value`] in the provided [`Target`].
     ///
     /// The `path` parameter determines _where_ in the given target the value
@@ -39,18 +40,18 @@ pub trait Target: std::fmt::Debug + MetadataTarget + SecretTarget {
     /// When inserting into a coalesced path, the implementor is encouraged to
     /// insert into the right-most segment if none exists, but can return an
     /// error if needed.
-    fn target_insert(&mut self, path: &LookupBuf, value: Value) -> Result<(), String>;
+    fn target_insert(&mut self, path: &TargetPath, value: Value) -> Result<(), String>;
 
     /// Get a value for a given path, or `None` if no value is found.
     ///
     /// See [`Target::insert`] for more details.
-    fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String>;
+    fn target_get(&self, path: &TargetPath) -> Result<Option<&Value>, String>;
 
     /// Get a mutable reference to the value for a given path, or `None` if no
     /// value is found.
     ///
     /// See [`Target::insert`] for more details.
-    fn target_get_mut(&mut self, path: &LookupBuf) -> Result<Option<&mut Value>, String>;
+    fn target_get_mut(&mut self, path: &TargetPath) -> Result<Option<&mut Value>, String>;
 
     /// Remove the given path from the object.
     ///
@@ -58,15 +59,7 @@ pub trait Target: std::fmt::Debug + MetadataTarget + SecretTarget {
     ///
     /// If `compact` is true, after deletion, if an empty object or array is
     /// left behind, it should be removed as well, cascading up to the root.
-    fn target_remove(&mut self, path: &LookupBuf, compact: bool) -> Result<Option<Value>, String>;
-}
-
-pub trait MetadataTarget {
-    fn get_metadata(&self, _path: &LookupBuf) -> Result<Option<Value>, String>;
-
-    fn set_metadata(&mut self, _path: &LookupBuf, _value: Value) -> Result<(), String>;
-
-    fn remove_metadata(&mut self, _path: &LookupBuf) -> Result<(), String>;
+    fn target_remove(&mut self, path: &TargetPath, compact: bool) -> Result<Option<Value>, String>;
 }
 
 pub trait SecretTarget {
@@ -85,37 +78,40 @@ pub struct TargetValueRef<'a> {
 }
 
 impl Target for TargetValueRef<'_> {
-    fn target_insert(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
-        self.value.insert_by_path(path, value);
+    fn target_insert(&mut self, target_path: &TargetPath, value: Value) -> Result<(), String> {
+        match target_path.prefix {
+            PathPrefix::Event => self.value.insert(&target_path.path, value),
+            PathPrefix::Metadata => self.metadata.insert(&target_path.path, value),
+        };
         Ok(())
     }
 
-    fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String> {
-        Ok(self.value.get_by_path(path))
+    fn target_get(&self, target_path: &TargetPath) -> Result<Option<&Value>, String> {
+        let value = match target_path.prefix {
+            PathPrefix::Event => self.value.get(&target_path.path),
+            PathPrefix::Metadata => self.metadata.get(&target_path.path),
+        };
+        Ok(value)
     }
 
-    fn target_get_mut(&mut self, path: &LookupBuf) -> Result<Option<&mut Value>, String> {
-        Ok(self.value.get_by_path_mut(path))
+    fn target_get_mut(&mut self, target_path: &TargetPath) -> Result<Option<&mut Value>, String> {
+        let value = match target_path.prefix {
+            PathPrefix::Event => self.value.get_mut(&target_path.path),
+            PathPrefix::Metadata => self.metadata.get_mut(&target_path.path),
+        };
+        Ok(value)
     }
 
-    fn target_remove(&mut self, path: &LookupBuf, compact: bool) -> Result<Option<Value>, String> {
-        Ok(self.value.remove_by_path(path, compact))
-    }
-}
-
-impl MetadataTarget for TargetValueRef<'_> {
-    fn get_metadata(&self, path: &LookupBuf) -> Result<Option<Value>, String> {
-        Ok(self.metadata.get_by_path(path).cloned())
-    }
-
-    fn set_metadata(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
-        self.metadata.insert_by_path(path, value);
-        Ok(())
-    }
-
-    fn remove_metadata(&mut self, path: &LookupBuf) -> Result<(), String> {
-        self.metadata.remove_by_path(path, false);
-        Ok(())
+    fn target_remove(
+        &mut self,
+        target_path: &TargetPath,
+        compact: bool,
+    ) -> Result<Option<Value>, String> {
+        let prev_value = match target_path.prefix {
+            PathPrefix::Event => self.value.remove(&target_path.path, compact),
+            PathPrefix::Metadata => self.metadata.remove(&target_path.path, compact),
+        };
+        Ok(prev_value)
     }
 }
 
@@ -141,37 +137,40 @@ pub struct TargetValue {
 }
 
 impl Target for TargetValue {
-    fn target_insert(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
-        self.value.insert_by_path(path, value);
+    fn target_insert(&mut self, target_path: &TargetPath, value: Value) -> Result<(), String> {
+        match target_path.prefix {
+            PathPrefix::Event => self.value.insert(&target_path.path, value),
+            PathPrefix::Metadata => self.metadata.insert(&target_path.path, value),
+        };
         Ok(())
     }
 
-    fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String> {
-        Ok(self.value.get_by_path(path))
+    fn target_get(&self, target_path: &TargetPath) -> Result<Option<&Value>, String> {
+        let value = match target_path.prefix {
+            PathPrefix::Event => self.value.get(&target_path.path),
+            PathPrefix::Metadata => self.metadata.get(&target_path.path),
+        };
+        Ok(value)
     }
 
-    fn target_get_mut(&mut self, path: &LookupBuf) -> Result<Option<&mut Value>, String> {
-        Ok(self.value.get_by_path_mut(path))
+    fn target_get_mut(&mut self, target_path: &TargetPath) -> Result<Option<&mut Value>, String> {
+        let value = match target_path.prefix {
+            PathPrefix::Event => self.value.get_mut(&target_path.path),
+            PathPrefix::Metadata => self.metadata.get_mut(&target_path.path),
+        };
+        Ok(value)
     }
 
-    fn target_remove(&mut self, path: &LookupBuf, compact: bool) -> Result<Option<Value>, String> {
-        Ok(self.value.remove_by_path(path, compact))
-    }
-}
-
-impl MetadataTarget for TargetValue {
-    fn get_metadata(&self, path: &LookupBuf) -> Result<Option<Value>, String> {
-        Ok(self.metadata.get_by_path(path).cloned())
-    }
-
-    fn set_metadata(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
-        self.metadata.insert_by_path(path, value);
-        Ok(())
-    }
-
-    fn remove_metadata(&mut self, path: &LookupBuf) -> Result<(), String> {
-        self.metadata.remove_by_path(path, false);
-        Ok(())
+    fn target_remove(
+        &mut self,
+        target_path: &TargetPath,
+        compact: bool,
+    ) -> Result<Option<Value>, String> {
+        let prev_value = match target_path.prefix {
+            PathPrefix::Event => self.value.remove(&target_path.path, compact),
+            PathPrefix::Metadata => self.metadata.remove(&target_path.path, compact),
+        };
+        Ok(prev_value)
     }
 }
 
@@ -205,42 +204,44 @@ impl SecretTarget for Secrets {
 
 #[cfg(any(test, feature = "test"))]
 mod value_target_impl {
-    use super::{LookupBuf, MetadataTarget, SecretTarget, Target, Value};
+    use super::{SecretTarget, Target, Value};
+    use lookup::{PathPrefix, TargetPath};
 
     impl Target for Value {
-        fn target_insert(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
-            self.insert_by_path(path, value);
+        fn target_insert(&mut self, target_path: &TargetPath, value: Value) -> Result<(), String> {
+            match target_path.prefix {
+                PathPrefix::Event => self.insert(&target_path.path, value),
+                PathPrefix::Metadata => panic!("Value has no metadata. Use `TargetValue` instead."),
+            };
             Ok(())
         }
 
-        fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String> {
-            Ok(self.get_by_path(path))
+        fn target_get(&self, target_path: &TargetPath) -> Result<Option<&Value>, String> {
+            match target_path.prefix {
+                PathPrefix::Event => Ok(self.get(&target_path.path)),
+                PathPrefix::Metadata => panic!("Value has no metadata. Use `TargetValue` instead."),
+            }
         }
 
-        fn target_get_mut(&mut self, path: &LookupBuf) -> Result<Option<&mut Value>, String> {
-            Ok(self.get_by_path_mut(path))
+        fn target_get_mut(
+            &mut self,
+            target_path: &TargetPath,
+        ) -> Result<Option<&mut Value>, String> {
+            match target_path.prefix {
+                PathPrefix::Event => Ok(self.get_mut(&target_path.path)),
+                PathPrefix::Metadata => panic!("Value has no metadata. Use `TargetValue` instead."),
+            }
         }
 
         fn target_remove(
             &mut self,
-            path: &LookupBuf,
+            target_path: &TargetPath,
             compact: bool,
         ) -> Result<Option<Value>, String> {
-            Ok(self.remove_by_path(path, compact))
-        }
-    }
-
-    impl MetadataTarget for Value {
-        fn get_metadata(&self, _path: &LookupBuf) -> Result<Option<Value>, String> {
-            panic!("Value has no metadata. Use `TargetValue` instead.")
-        }
-
-        fn set_metadata(&mut self, _path: &LookupBuf, _value: Value) -> Result<(), String> {
-            panic!("Value has no metadata. Use `TargetValue` instead.")
-        }
-
-        fn remove_metadata(&mut self, _path: &LookupBuf) -> Result<(), String> {
-            panic!("Value has no metadata. Use `TargetValue` instead.")
+            match target_path.prefix {
+                PathPrefix::Event => Ok(self.remove(&target_path.path, compact)),
+                PathPrefix::Metadata => panic!("Value has no metadata. Use `TargetValue` instead."),
+            }
         }
     }
 
@@ -263,7 +264,7 @@ mod value_target_impl {
 mod tests {
     #![allow(clippy::print_stdout)] // tests
 
-    use lookup::{FieldBuf, SegmentBuf};
+    use lookup::owned_path;
 
     use super::*;
     use crate::value;
@@ -271,53 +272,41 @@ mod tests {
     #[test]
     fn target_get() {
         let cases = vec![
-            (value!(true), vec![], Ok(Some(value!(true)))),
-            (value!(true), vec![SegmentBuf::from("foo")], Ok(None)),
-            (value!({}), vec![], Ok(Some(value!({})))),
-            (value!({foo: "bar"}), vec![], Ok(Some(value!({foo: "bar"})))),
+            (value!(true), owned_path!(), Ok(Some(value!(true)))),
+            (value!(true), owned_path!("foo"), Ok(None)),
+            (value!({}), owned_path!(), Ok(Some(value!({})))),
             (
                 value!({foo: "bar"}),
-                vec![SegmentBuf::from("foo")],
+                owned_path!(),
+                Ok(Some(value!({foo: "bar"}))),
+            ),
+            (
+                value!({foo: "bar"}),
+                owned_path!("foo"),
                 Ok(Some(value!("bar"))),
             ),
-            (
-                value!({foo: "bar"}),
-                vec![SegmentBuf::from("bar")],
-                Ok(None),
-            ),
-            (
-                value!([1, 2, 3, 4, 5]),
-                vec![SegmentBuf::from(1)],
-                Ok(Some(value!(2))),
-            ),
+            (value!({foo: "bar"}), owned_path!("bar"), Ok(None)),
+            (value!([1, 2, 3, 4, 5]), owned_path!(1), Ok(Some(value!(2)))),
             (
                 value!({foo: [{bar: true}]}),
-                vec![
-                    SegmentBuf::from("foo"),
-                    SegmentBuf::from(0),
-                    SegmentBuf::from("bar"),
-                ],
+                owned_path!("foo", 0, "bar"),
                 Ok(Some(value!(true))),
             ),
             (
                 value!({foo: {"bar baz": {baz: 2}}}),
-                vec![
-                    SegmentBuf::from("foo"),
-                    SegmentBuf::from(vec![FieldBuf::from("qux"), FieldBuf::from(r#""bar baz""#)]),
-                    SegmentBuf::from("baz"),
-                ],
+                owned_path!("foo", vec!["qux", r#"bar baz"#], "baz"),
                 Ok(Some(value!(2))),
             ),
         ];
 
-        for (value, segments, expect) in cases {
+        for (value, path, expect) in cases {
             let value: Value = value;
             let target = TargetValue {
                 value,
                 metadata: value!({}),
                 secrets: Secrets::new(),
             };
-            let path = LookupBuf::from_segments(segments);
+            let path = TargetPath::event(path);
 
             assert_eq!(
                 target.target_get(&path).map(Option::<&Value>::cloned),
@@ -327,114 +316,102 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn target_insert() {
         let cases = vec![
             (
                 value!({foo: "bar"}),
-                vec![],
+                owned_path!(),
                 value!({baz: "qux"}),
                 value!({baz: "qux"}),
                 Ok(()),
             ),
             (
                 value!({foo: "bar"}),
-                vec![SegmentBuf::from("baz")],
+                owned_path!("baz"),
                 true.into(),
                 value!({foo: "bar", baz: true}),
                 Ok(()),
             ),
             (
                 value!({foo: [{bar: "baz"}]}),
-                vec![
-                    SegmentBuf::from("foo"),
-                    SegmentBuf::from(0),
-                    SegmentBuf::from("baz"),
-                ],
+                owned_path!("foo", 0, "baz"),
                 true.into(),
                 value!({foo: [{bar: "baz", baz: true}]}),
                 Ok(()),
             ),
             (
                 value!({foo: {bar: "baz"}}),
-                vec![SegmentBuf::from("bar"), SegmentBuf::from("baz")],
+                owned_path!("bar", "baz"),
                 true.into(),
                 value!({foo: {bar: "baz"}, bar: {baz: true}}),
                 Ok(()),
             ),
             (
                 value!({foo: "bar"}),
-                vec![SegmentBuf::from("foo")],
+                owned_path!("foo"),
                 "baz".into(),
                 value!({foo: "baz"}),
                 Ok(()),
             ),
             (
                 value!({foo: "bar"}),
-                vec![
-                    SegmentBuf::from("foo"),
-                    SegmentBuf::from(2),
-                    SegmentBuf::from(r#""bar baz""#),
-                    SegmentBuf::from("a"),
-                    SegmentBuf::from("b"),
-                ],
+                owned_path!("foo", 2, r#"bar baz"#, "a", "b"),
                 true.into(),
                 value!({foo: [null, null, {"bar baz": {"a": {"b": true}}}]}),
                 Ok(()),
             ),
-            /*
             (
                 value!({foo: [0, 1, 2]}),
-                vec![SegmentBuf::from("foo"), SegmentBuf::from(5)],
+                owned_path!("foo", 5),
                 "baz".into(),
                 value!({foo: [0, 1, 2, null, null, "baz"]}),
                 Ok(()),
             ),
             (
                 value!({foo: "bar"}),
-                vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
+                owned_path!("foo", 0),
                 "baz".into(),
                 value!({foo: ["baz"]}),
                 Ok(()),
             ),
             (
                 value!({foo: []}),
-                vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
+                owned_path!("foo", 0),
                 "baz".into(),
                 value!({foo: ["baz"]}),
                 Ok(()),
             ),
             (
                 value!({foo: [0]}),
-                vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
+                owned_path!("foo", 0),
                 "baz".into(),
                 value!({foo: ["baz"]}),
                 Ok(()),
             ),
             (
                 value!({foo: [0, 1]}),
-                vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
+                owned_path!("foo", 0),
                 "baz".into(),
                 value!({foo: ["baz", 1]}),
                 Ok(()),
             ),
             (
                 value!({foo: [0, 1]}),
-                vec![SegmentBuf::from("foo"), SegmentBuf::from(1)],
+                owned_path!("foo", 1),
                 "baz".into(),
                 value!({foo: [0, "baz"]}),
                 Ok(()),
             ),
-            */
         ];
 
-        for (target, segments, value, expect, result) in cases {
+        for (target, path, value, expect, result) in cases {
             let mut target = TargetValue {
                 value: target,
                 metadata: value!({}),
                 secrets: Secrets::new(),
             };
-            println!("Inserting at {:?}", segments);
-            let path = LookupBuf::from_segments(segments);
+            let path = TargetPath::event(path);
 
             assert_eq!(
                 Target::target_insert(&mut target, &path, value.clone()),
@@ -453,82 +430,71 @@ mod tests {
         let cases = vec![
             (
                 value!({foo: "bar"}),
-                vec![SegmentBuf::from("baz")],
+                owned_path!("baz"),
                 false,
                 None,
                 Some(value!({foo: "bar"})),
             ),
             (
                 value!({foo: "bar"}),
-                vec![SegmentBuf::from("foo")],
+                owned_path!("foo"),
                 false,
                 Some(value!("bar")),
                 Some(value!({})),
             ),
             (
                 value!({foo: "bar"}),
-                vec![SegmentBuf::coalesce(vec![
-                    FieldBuf::from(r#""foo bar""#),
-                    FieldBuf::from("foo"),
-                ])],
+                owned_path!(vec![r#"foo bar"#, "foo"]),
                 false,
                 Some(value!("bar")),
                 Some(value!({})),
             ),
             (
                 value!({foo: "bar", baz: "qux"}),
-                vec![],
+                owned_path!(),
                 false,
                 Some(value!({foo: "bar", baz: "qux"})),
                 Some(value!({})),
             ),
             (
                 value!({foo: "bar", baz: "qux"}),
-                vec![],
+                owned_path!(),
                 true,
                 Some(value!({foo: "bar", baz: "qux"})),
                 Some(value!({})),
             ),
             (
                 value!({foo: [0]}),
-                vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
+                owned_path!("foo", 0),
                 false,
                 Some(value!(0)),
                 Some(value!({foo: []})),
             ),
             (
                 value!({foo: [0]}),
-                vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
+                owned_path!("foo", 0),
                 true,
                 Some(value!(0)),
                 Some(value!({})),
             ),
             (
                 value!({foo: {"bar baz": [0]}, bar: "baz"}),
-                vec![
-                    SegmentBuf::from("foo"),
-                    SegmentBuf::from(r#""bar baz""#),
-                    SegmentBuf::from(0),
-                ],
+                owned_path!("foo", r#"bar baz"#, 0),
                 false,
                 Some(value!(0)),
                 Some(value!({foo: {"bar baz": []}, bar: "baz"})),
             ),
             (
                 value!({foo: {"bar baz": [0]}, bar: "baz"}),
-                vec![
-                    SegmentBuf::from("foo"),
-                    SegmentBuf::from(r#""bar baz""#),
-                    SegmentBuf::from(0),
-                ],
+                owned_path!("foo", r#"bar baz"#, 0),
                 true,
                 Some(value!(0)),
                 Some(value!({bar: "baz"})),
             ),
         ];
 
-        for (target, segments, compact, value, expect) in cases {
-            let path = LookupBuf::from_segments(segments);
+        for (target, path, compact, value, expect) in cases {
+            let path = TargetPath::event(path);
 
             let mut target = TargetValue {
                 value: target,
@@ -540,7 +506,8 @@ mod tests {
                 Ok(value)
             );
             assert_eq!(
-                Target::target_get(&target, &LookupBuf::root()).map(Option::<&Value>::cloned),
+                Target::target_get(&target, &TargetPath::event_root())
+                    .map(Option::<&Value>::cloned),
                 Ok(expect)
             );
         }

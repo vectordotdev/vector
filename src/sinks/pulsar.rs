@@ -15,7 +15,9 @@ use pulsar::{
 };
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
-use vector_common::internal_event::{BytesSent, EventsSent};
+use vector_common::internal_event::{
+    ByteSize, BytesSent, EventsSent, InternalEventHandle as _, Protocol, Registered,
+};
 use vector_config::configurable_component;
 use vector_core::config::log_schema;
 
@@ -131,6 +133,7 @@ struct PulsarSink {
             ),
         >,
     >,
+    bytes_sent: Registered<BytesSent>,
 }
 
 impl GenerateConfig for PulsarSinkConfig {
@@ -245,6 +248,7 @@ impl PulsarSink {
             encoder,
             state: PulsarSinkState::Ready(Box::new(producer)),
             in_flight: FuturesUnordered::new(),
+            bytes_sent: register!(BytesSent::from(Protocol::TCP)),
         })
     }
 
@@ -341,16 +345,14 @@ impl Sink<Event> for PulsarSink {
                         output: None,
                     });
 
-                    emit!(BytesSent {
-                        byte_size: metadata.request_encoded_size(),
-                        protocol: "tcp",
-                    });
+                    this.bytes_sent
+                        .emit(ByteSize(metadata.request_encoded_size()));
                 }
                 Some((Err(error), metadata, finalizers)) => {
                     finalizers.update_status(EventStatus::Errored);
                     emit!(PulsarSendingError {
                         error: Box::new(error),
-                        count: metadata.event_count(),
+                        count: metadata.event_count() as u64,
                     });
                     return Poll::Ready(Err(()));
                 }
@@ -385,7 +387,7 @@ mod integration_tests {
     use super::*;
     use crate::sinks::VectorSink;
     use crate::test_util::{
-        components::{run_and_assert_sink_compliance, SINK_TAGS},
+        components::{assert_sink_compliance, SINK_TAGS},
         random_lines_with_stream, random_string, trace_init,
     };
 
@@ -431,9 +433,13 @@ mod integration_tests {
         let transformer = cnf.encoding.transformer();
         let serializer = cnf.encoding.build().unwrap();
         let encoder = Encoder::<()>::new(serializer);
-        let sink = PulsarSink::new(producer, transformer, encoder).unwrap();
-        let sink = VectorSink::from_event_sink(sink);
-        run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
+
+        assert_sink_compliance(&SINK_TAGS, async move {
+            let sink = PulsarSink::new(producer, transformer, encoder).unwrap();
+            VectorSink::from_event_sink(sink).run(events).await
+        })
+        .await
+        .expect("Running sink failed");
 
         for line in input {
             let msg = match consumer.next().await.unwrap() {

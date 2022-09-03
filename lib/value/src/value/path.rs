@@ -1,6 +1,4 @@
-use std::collections::BTreeMap;
-
-use lookup::{FieldBuf, LookupBuf, SegmentBuf};
+use lookup::lookup_v2::Path;
 
 use crate::Value;
 
@@ -10,39 +8,15 @@ impl Value {
     /// For example, given the path `.foo.bar` and value `true`, the return
     /// value would be an object representing `{ "foo": { "bar": true } }`.
     #[must_use]
-    pub fn at_path(mut self, path: &LookupBuf) -> Self {
-        for segment in path.as_segments().iter().rev() {
-            match segment {
-                SegmentBuf::Field(FieldBuf { name, .. }) => {
-                    let mut map = BTreeMap::default();
-                    map.insert(name.as_str().to_owned(), self);
-                    self = Self::Object(map);
-                }
-                SegmentBuf::Coalesce(fields) => {
-                    let field = fields.last().expect("fields should not be empty");
-                    let mut map = BTreeMap::default();
-                    map.insert(field.as_str().to_owned(), self);
-                    self = Self::Object(map);
-                }
-                SegmentBuf::Index(index) => {
-                    let mut array = vec![];
-
-                    if *index > 0 {
-                        array.resize(*index as usize, Self::Null);
-                    }
-
-                    array.push(self);
-                    self = Self::Array(array);
-                }
-            }
-        }
-
-        self
+    pub fn at_path<'a>(self, path: impl Path<'a>) -> Self {
+        let mut result = Self::Null;
+        result.insert(path, self);
+        result
     }
 }
 
 #[cfg(test)]
-mod tests {
+mod at_path_tests {
     use std::collections::BTreeMap;
 
     use lookup::{parser, LookupBuf};

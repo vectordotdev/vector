@@ -700,14 +700,12 @@ components: {
 				description: "Configures the TLS options for outgoing connections."
 				required:    false
 				type: object: options: {
-					if Args.enabled_by_scheme != _|_ {
-						if !Args.enabled_by_scheme {
-							enabled: {
-								common:      true
-								description: "Enable TLS during connections to the remote."
-								required:    false
-								type: bool: default: Args.enabled_default
-							}
+					if !Args.enabled_by_scheme {
+						enabled: {
+							common:      true
+							description: "Enable TLS during connections to the remote."
+							required:    false
+							type: bool: default: Args.enabled_default
 						}
 					}
 

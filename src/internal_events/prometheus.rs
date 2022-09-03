@@ -8,6 +8,7 @@ use prometheus_parser::ParserError;
 use vector_core::internal_event::InternalEvent;
 
 use super::prelude::{error_stage, error_type};
+use crate::{emit, internal_events::ComponentEventsDropped};
 
 #[cfg(feature = "sources-prometheus")]
 #[derive(Debug)]
@@ -82,5 +83,29 @@ impl InternalEvent for PrometheusServerRequestComplete {
             warn!(message, status_code = %self.status_code);
         }
         counter!("requests_received_total", 1);
+    }
+}
+
+#[derive(Debug)]
+pub struct PrometheusNormalizationError;
+
+impl InternalEvent for PrometheusNormalizationError {
+    fn emit(self) {
+        let reason = "Prometheuse metric normalization failed.";
+        error!(
+            message = reason,
+            error_type = error_type::CONVERSION_FAILED,
+            stage = error_stage::PROCESSING,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => error_type::CONVERSION_FAILED,
+            "stage" => error_stage::PROCESSING,
+        );
+        emit!(ComponentEventsDropped {
+            count: 1,
+            intentional: false,
+            reason,
+        });
     }
 }
