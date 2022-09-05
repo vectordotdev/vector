@@ -15,7 +15,7 @@ use super::sink::AMQPSink;
 /// Configuration for the `amqp` sink.
 ///
 /// Supports AMQP version 0.9.1
-#[configurable_component(sink)]
+#[configurable_component(sink("amqp"))]
 #[derive(Clone, Debug)]
 pub struct AMQPSinkConfig {
     /// The exchange to publish messages to.
@@ -66,7 +66,6 @@ impl GenerateConfig for AMQPSinkConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "amqp")]
 impl SinkConfig for AMQPSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink = AMQPSink::new(self.clone()).await?;
@@ -76,10 +75,6 @@ impl SinkConfig for AMQPSinkConfig {
 
     fn input(&self) -> Input {
         Input::new(DataType::Log)
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "amqp"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

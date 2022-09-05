@@ -10,7 +10,7 @@ use std::{
 use tower::Service;
 use vector_common::{
     finalization::{EventFinalizers, EventStatus, Finalizable},
-    internal_event::{BytesSent, EventsSent},
+    internal_event::EventsSent,
 };
 use vector_core::stream::DriverResponse;
 
@@ -63,11 +63,8 @@ impl DriverResponse for AMQPResponse {
         }
     }
 
-    fn bytes_sent(&self) -> Option<BytesSent> {
-        Some(BytesSent {
-            byte_size: self.byte_size,
-            protocol: "amqp 0.9.1",
-        })
+    fn bytes_sent(&self) -> Option<(usize, &str)> {
+        Some((self.byte_size, "amqp 0.9.1"))
     }
 }
 
