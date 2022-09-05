@@ -7,7 +7,7 @@ mod sink;
 #[cfg(test)]
 mod tests;
 
-use config::AMQPSinkConfig;
+pub use config::AMQPSinkConfig;
 use snafu::Snafu;
 
 use crate::{config::SinkDescription, template::TemplateParseError};
