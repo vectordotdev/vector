@@ -19,7 +19,7 @@ pub mod datadog_agent;
 pub mod demo_logs;
 #[cfg(all(unix, feature = "sources-dnstap"))]
 pub mod dnstap;
-#[cfg(feature = "sources-docker_logs")]
+#[cfg(any(feature = "sources-docker_logs", feature = "sources-docker_stats"))]
 pub mod docker;
 #[cfg(feature = "sources-eventstoredb_metrics")]
 pub mod eventstoredb_metrics;
@@ -145,6 +145,10 @@ pub enum Sources {
     /// Docker Logs.
     #[cfg(feature = "sources-docker_logs")]
     DockerLogs(#[configurable(derived)] docker::logs::DockerLogsConfig),
+
+    /// Docker Stats.
+    #[cfg(feature = "sources-docker_stats")]
+    DockerStats(#[configurable(derived)] docker::stats::DockerStatsConfig),
 
     /// EventStoreDB Metrics.
     #[cfg(feature = "sources-eventstoredb_metrics")]
@@ -327,6 +331,8 @@ impl NamedComponent for Sources {
             Self::Dnstap(config) => config.get_component_name(),
             #[cfg(feature = "sources-docker_logs")]
             Self::DockerLogs(config) => config.get_component_name(),
+            #[cfg(feature = "sources-docker_stats")]
+            Self::DockerStats(config) => config.get_component_name(),
             #[cfg(feature = "sources-eventstoredb_metrics")]
             Self::EventstoredbMetrics(config) => config.get_component_name(),
             #[cfg(feature = "sources-exec")]
