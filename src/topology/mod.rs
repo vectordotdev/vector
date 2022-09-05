@@ -98,7 +98,7 @@ pub async fn start_validated(
 }
 
 pub async fn build_or_log_errors(
-    config: &Config,
+    config: &mut Config,
     diff: &ConfigDiff,
     buffers: HashMap<ComponentKey, BuiltBuffer>,
 ) -> Option<Pieces> {

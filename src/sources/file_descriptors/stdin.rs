@@ -2,7 +2,10 @@ use std::io;
 
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::LogNamespace;
+use vector_core::{
+    config::LogNamespace,
+    event::{Event, LogEvent},
+};
 
 use crate::{
     config::{Output, Resource, SourceConfig, SourceContext},
@@ -86,6 +89,12 @@ impl SourceConfig for StdinConfig {
 
     fn can_acknowledge(&self) -> bool {
         false
+    }
+
+    fn generate_demo_data(&self) -> Event {
+        let mut event = LogEvent::default();
+        event.insert("message", "zork floog");
+        Event::Log(event)
     }
 }
 

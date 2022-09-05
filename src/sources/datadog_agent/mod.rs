@@ -32,7 +32,7 @@ use tracing::Span;
 use value::Kind;
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::LogNamespace;
-use vector_core::event::{BatchNotifier, BatchStatus};
+use vector_core::event::{BatchNotifier, BatchStatus, LogEvent};
 use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Reply};
 
 use crate::{
@@ -263,6 +263,12 @@ impl SourceConfig for DatadogAgentConfig {
 
     fn can_acknowledge(&self) -> bool {
         true
+    }
+
+    fn generate_demo_data(&self) -> Event {
+        let mut event = LogEvent::default();
+        event.insert("message", "event");
+        Event::Log(event)
     }
 }
 

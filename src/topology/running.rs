@@ -205,7 +205,7 @@ impl RunningTopology {
     ///
     /// If all changes from the new configuration cannot be made, and the current configuration
     /// cannot be fully restored, then `Err(())` is returned.
-    pub async fn reload_config_and_respawn(&mut self, new_config: Config) -> Result<bool, ()> {
+    pub async fn reload_config_and_respawn(&mut self, mut new_config: Config) -> Result<bool, ()> {
         info!("Reloading running topology with new configuration.");
 
         if self.config.global != new_config.global {
@@ -235,7 +235,7 @@ impl RunningTopology {
         // Try to build all of the new components coming from the new configuration.  If we can
         // successfully build them, we'll attempt to connect them up to the topology and spawn their
         // respective component tasks.
-        if let Some(mut new_pieces) = build_or_log_errors(&new_config, &diff, buffers.clone()).await
+        if let Some(mut new_pieces) = build_or_log_errors(&mut new_config, &diff, buffers.clone()).await
         {
             // If healthchecks are configured for any of the changing/new components, try running
             // them before moving forward with connecting and spawning.  In some cases, healthchecks
@@ -260,7 +260,7 @@ impl RunningTopology {
         warn!("Failed to completely load new configuration. Restoring old configuration.");
 
         let diff = diff.flip();
-        if let Some(mut new_pieces) = build_or_log_errors(&self.config, &diff, buffers).await {
+        if let Some(mut new_pieces) = build_or_log_errors(&mut self.config, &diff, buffers).await {
             if self
                 .run_healthchecks(&diff, &mut new_pieces, self.config.healthchecks)
                 .await

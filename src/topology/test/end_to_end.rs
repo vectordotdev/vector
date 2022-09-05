@@ -80,7 +80,7 @@ async fn http_to_http(status: StatusCode, response: StatusCode) {
 
     let address1 = test_util::next_addr();
     let address2 = test_util::next_addr();
-    let config = config::load_from_str(
+    let mut config = config::load_from_str(
         &format!(
             r#"
 [sources.in]
@@ -101,7 +101,7 @@ uri = "http://{address2}/"
     )
     .unwrap();
     let diff = ConfigDiff::initial(&config);
-    let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
+    let pieces = topology::build_or_log_errors(&mut config, &diff, HashMap::new())
         .await
         .unwrap();
     let (_topology, _shutdown) = topology::start_validated(config, diff, pieces)

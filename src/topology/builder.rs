@@ -46,7 +46,7 @@ use crate::{
     spawn_named,
     transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
     utilization::wrap,
-    SourceSender,
+    SourceSender, sources::demo_mode::DemoMode,
 };
 
 static ENRICHMENT_TABLES: Lazy<enrichment::TableRegistry> =
@@ -133,7 +133,7 @@ pub struct Pieces {
 
 /// Builds only the new pieces, and doesn't check their topology.
 pub async fn build_pieces(
-    config: &super::Config,
+    config: &mut super::Config,
     diff: &ConfigDiff,
     mut buffers: HashMap<ComponentKey, BuiltBuffer>,
 ) -> Result<Pieces, Vec<String>> {
@@ -237,12 +237,18 @@ pub async fn build_pieces(
             schema_definitions,
             schema: config.schema,
         };
-        let server = match source.inner.build(context).await {
-            Err(error) => {
-                errors.push(format!("Source \"{}\": {}", key, error));
-                continue;
+        let server = if source.demo_mode {
+            let demo_mode = DemoMode::new(source.inner.clone());
+            let server = demo_mode.build(context);
+            server
+        } else {
+            match source.inner.build(context).await {
+                Err(error) => {
+                    errors.push(format!("Source \"{}\": {}", key, error));
+                    continue;
+                }
+                Ok(server) => server,
             }
-            Ok(server) => server,
         };
 
         // The force_shutdown_tripwire is a Future that when it resolves means that this source

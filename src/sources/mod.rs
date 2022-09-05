@@ -78,10 +78,11 @@ pub mod syslog;
 #[cfg(feature = "sources-vector")]
 pub mod vector;
 
+pub(crate) mod demo_mode;
 pub(crate) mod util;
 
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::{LogNamespace, Output};
+use vector_core::{config::{LogNamespace, Output}, event::Event};
 pub use vector_core::source::Source;
 
 use crate::config::{unit_test::UnitTestSourceConfig, Resource, SourceConfig, SourceContext};
@@ -658,6 +659,100 @@ impl SourceConfig for Sources {
             Self::UnitTest(config) => config.can_acknowledge(),
             #[cfg(feature = "sources-vector")]
             Self::Vector(config) => config.can_acknowledge(),
+        }
+    }
+
+    fn generate_demo_data(&self) -> Event {
+        match self {
+            #[cfg(feature = "sources-apache_metrics")]
+            Self::ApacheMetrics(config) => config.generate_demo_data(),
+            #[cfg(feature = "sources-aws_ecs_metrics")]
+            Self::AwsEcsMetrics(config) => config.generate_demo_data(),
+            #[cfg(feature = "sources-aws_kinesis_firehose")]
+            Self::AwsKinesisFirehose(config) => config.generate_demo_data(),
+            #[cfg(feature = "sources-aws_s3")]
+            Self::AwsS3(config) => config.generate_demo_data(),
+            #[cfg(feature = "sources-aws_sqs")]
+            Self::AwsSqs(config) => config.generate_demo_data(),
+            #[cfg(feature = "sources-datadog_agent")]
+            Self::DatadogAgent(config) => config.generate_demo_data(),
+            #[cfg(feature = "sources-demo_logs")]
+            Self::DemoLogs(config) => config.generate_demo_data(),
+            #[cfg(all(unix, feature = "sources-dnstap"))]
+            Self::Dnstap(config) => config.generate_demo_data(),
+            #[cfg(feature = "sources-docker_logs")]
+            Self::DockerLogs(config) => config.generate_demo_data(),
+            #[cfg(feature = "sources-eventstoredb_metrics")]
+            Self::EventstoredbMetrics(config) => config.generate_demo_data(),
+            #[cfg(feature = "sources-exec")]
+            Self::Exec(config) => config.generate_demo_data(),
+            #[cfg(feature = "sources-file")]
+            Self::File(config) => config.generate_demo_data(),
+            #[cfg(all(unix, feature = "sources-file-descriptor"))]
+            Self::FileDescriptor(config) => config.generate_demo_data(),
+            #[cfg(feature = "sources-fluent")]
+            Self::Fluent(config) => config.generate_demo_data(),
+            #[cfg(feature = "sources-gcp_pubsub")]
+            Self::GcpPubsub(config) => config.generate_demo_data(),
+            #[cfg(feature = "sources-heroku_logs")]
+            Self::HerokuLogs(config) => config.generate_demo_data(),
+            #[cfg(feature = "sources-host_metrics")]
+            Self::HostMetrics(config) => config.generate_demo_data(),
+            #[cfg(feature = "sources-http")]
+            Self::Http(config) => config.generate_demo_data(),
+            #[cfg(feature = "sources-http_scrape")]
+            Self::HttpScrape(config) => config.generate_demo_data(),
+            #[cfg(feature = "sources-internal_logs")]
+            Self::InternalLogs(config) => config.generate_demo_data(),
+            #[cfg(feature = "sources-internal_metrics")]
+            Self::InternalMetrics(config) => config.generate_demo_data(),
+            #[cfg(all(unix, feature = "sources-journald"))]
+            Self::Journald(config) => config.generate_demo_data(),
+            #[cfg(feature = "sources-kafka")]
+            Self::Kafka(config) => config.generate_demo_data(),
+            #[cfg(feature = "sources-kubernetes_logs")]
+            Self::KubernetesLogs(config) => config.generate_demo_data(),
+            #[cfg(all(feature = "sources-logstash"))]
+            Self::Logstash(config) => config.generate_demo_data(),
+            #[cfg(feature = "sources-mongodb_metrics")]
+            Self::MongodbMetrics(config) => config.generate_demo_data(),
+            #[cfg(all(feature = "sources-nats"))]
+            Self::Nats(config) => config.generate_demo_data(),
+            #[cfg(feature = "sources-nginx_metrics")]
+            Self::NginxMetrics(config) => config.generate_demo_data(),
+            #[cfg(feature = "sources-opentelemetry")]
+            Self::Opentelemetry(config) => config.generate_demo_data(),
+            #[cfg(feature = "sources-postgresql_metrics")]
+            Self::PostgresqlMetrics(config) => config.generate_demo_data(),
+            #[cfg(feature = "sources-prometheus")]
+            Self::PrometheusScrape(config) => config.generate_demo_data(),
+            #[cfg(feature = "sources-prometheus")]
+            Self::PrometheusRemoteWrite(config) => config.generate_demo_data(),
+            #[cfg(feature = "sources-redis")]
+            Self::Redis(config) => config.generate_demo_data(),
+            #[cfg(test)]
+            Self::TestBackpressure(config) => config.generate_demo_data(),
+            #[cfg(test)]
+            Self::TestBasic(config) => config.generate_demo_data(),
+            #[cfg(test)]
+            Self::TestError(config) => config.generate_demo_data(),
+            #[cfg(test)]
+            Self::TestPanic(config) => config.generate_demo_data(),
+            #[cfg(test)]
+            Self::TestTripwire(config) => config.generate_demo_data(),
+            #[cfg(feature = "sources-socket")]
+            Self::Socket(config) => config.generate_demo_data(),
+            #[cfg(feature = "sources-splunk_hec")]
+            Self::SplunkHec(config) => config.generate_demo_data(),
+            #[cfg(feature = "sources-statsd")]
+            Self::Statsd(config) => config.generate_demo_data(),
+            #[cfg(feature = "sources-stdin")]
+            Self::Stdin(config) => config.generate_demo_data(),
+            #[cfg(feature = "sources-syslog")]
+            Self::Syslog(config) => config.generate_demo_data(),
+            Self::UnitTest(config) => config.generate_demo_data(),
+            #[cfg(feature = "sources-vector")]
+            Self::Vector(config) => config.generate_demo_data(),
         }
     }
 }

@@ -2,7 +2,10 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 use vector_config::{configurable_component, NamedComponent};
-use vector_core::config::{AcknowledgementsConfig, GlobalOptions, LogNamespace, Output};
+use vector_core::{
+    config::{AcknowledgementsConfig, GlobalOptions, LogNamespace, Output},
+    event::Event,
+};
 
 use super::{schema, ComponentKey, ProxyConfig, Resource};
 use crate::{
@@ -25,6 +28,10 @@ pub struct SourceOuter {
     #[serde(default, skip)]
     pub sink_acknowledgements: bool,
 
+    /// Determines if the component should run in demo mode.
+    #[serde(default)]
+    pub demo_mode: bool,
+
     #[serde(flatten)]
     pub(crate) inner: Sources,
 }
@@ -35,6 +42,7 @@ impl SourceOuter {
             proxy: Default::default(),
             sink_acknowledgements: false,
             inner: source,
+            demo_mode: false,
         }
     }
 }
@@ -51,6 +59,10 @@ pub trait SourceConfig: NamedComponent + core::fmt::Debug + Send + Sync {
     }
 
     fn can_acknowledge(&self) -> bool;
+
+    fn generate_demo_data(&self) -> Event {
+        unimplemented!()
+    }
 }
 
 pub struct SourceContext {
