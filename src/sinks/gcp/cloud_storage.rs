@@ -14,10 +14,7 @@ use vector_core::event::{EventFinalizers, Finalizable};
 
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
-    config::{
-        AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
-        SinkDescription,
-    },
+    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     event::Event,
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
     http::HttpClient,
@@ -51,10 +48,8 @@ pub enum GcsHealthcheckError {
     KeyPrefixTemplate { source: TemplateParseError },
 }
 
-const NAME: &str = "gcp_cloud_storage";
-
 /// Configuration for the `gcp_cloud_storage` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("gcp_cloud_storage"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct GcsSinkConfig {
@@ -172,10 +167,6 @@ fn default_config(encoding: EncodingConfigWithFraming) -> GcsSinkConfig {
     }
 }
 
-inventory::submit! {
-    SinkDescription::new::<GcsSinkConfig>(NAME)
-}
-
 impl GenerateConfig for GcsSinkConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(indoc! {r#"
@@ -189,7 +180,6 @@ impl GenerateConfig for GcsSinkConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "gcp_cloud_storage")]
 impl SinkConfig for GcsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let auth = self.auth.build(Scope::DevStorageReadWrite).await?;
@@ -209,10 +199,6 @@ impl SinkConfig for GcsSinkConfig {
 
     fn input(&self) -> Input {
         Input::new(self.encoding.config().1.input_type() & DataType::Log)
-    }
-
-    fn sink_type(&self) -> &'static str {
-        NAME
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

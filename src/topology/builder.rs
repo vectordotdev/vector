@@ -14,6 +14,7 @@ use tokio::{
     time::{timeout, Duration},
 };
 use tracing::Instrument;
+use vector_config::NamedComponent;
 use vector_core::{
     buffers::{
         topology::{
@@ -35,8 +36,8 @@ use super::{
 };
 use crate::{
     config::{
-        ComponentKey, DataType, Input, Output, OutputId, ProxyConfig, SinkContext, SourceContext,
-        TransformContext, TransformOuter,
+        ComponentKey, DataType, Input, Output, OutputId, ProxyConfig, SinkConfig, SinkContext,
+        SourceConfig, SourceContext, TransformConfig, TransformContext, TransformOuter,
     },
     event::{EventArray, EventContainer},
     internal_events::EventsReceived,
@@ -156,18 +157,22 @@ pub async fn build_pieces(
     {
         debug!(component = %key, "Building new source.");
 
-        let typetag = source.inner.source_type();
+        let typetag = source.inner.get_component_name();
         let source_outputs = source.inner.outputs(config.schema.log_namespace());
 
         let span = error_span!(
             "source",
             component_kind = "source",
             component_id = %key.id(),
-            component_type = %source.inner.source_type(),
+            component_type = %source.inner.get_component_name(),
             // maintained for compatibility
             component_name = %key.id(),
         );
-        let task_name = format!(">> {} ({}, pump) >>", source.inner.source_type(), key.id());
+        let task_name = format!(
+            ">> {} ({}, pump) >>",
+            source.inner.get_component_name(),
+            key.id()
+        );
 
         let mut builder = {
             let _span = span.enter();
@@ -332,7 +337,7 @@ pub async fn build_pieces(
         let healthcheck = sink.healthcheck();
         let enable_healthcheck = healthcheck.enabled && config.healthchecks.enabled;
 
-        let typetag = sink.inner.sink_type();
+        let typetag = sink.inner.get_component_name();
         let input_type = sink.inner.input().data_type();
 
         if config.schema.validation {
@@ -528,7 +533,7 @@ impl TransformNode {
     ) -> Self {
         Self {
             key,
-            typetag: transform.inner.transform_type(),
+            typetag: transform.inner.get_component_name(),
             inputs: transform.inputs.clone(),
             input_details: transform.inner.input(),
             outputs: transform.inner.outputs(schema_definition),

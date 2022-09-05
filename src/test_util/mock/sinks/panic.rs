@@ -5,7 +5,7 @@ use std::{
 
 use async_trait::async_trait;
 use futures_util::{future::ok, FutureExt, Sink};
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 use vector_core::{
     config::{AcknowledgementsConfig, Input},
     event::Event,
@@ -13,24 +13,21 @@ use vector_core::{
 };
 
 use crate::{
-    config::{SinkConfig, SinkContext, SinkDescription},
+    config::{SinkConfig, SinkContext},
     sinks::Healthcheck,
 };
 
-/// A test sink that immediately panics.
-#[derive(Debug, Default, Deserialize, Serialize)]
+/// Configuration for the `test_panic` sink.
+#[configurable_component(sink("test_panic"))]
+#[derive(Clone, Debug, Default)]
 pub struct PanicSinkConfig {
+    /// Dummy field used for generating unique configurations to trigger reloads.
     dummy: Option<String>,
 }
 
 impl_generate_config_from_default!(PanicSinkConfig);
 
-inventory::submit! {
-    SinkDescription::new::<PanicSinkConfig>("panic_sink")
-}
-
 #[async_trait]
-#[typetag::serde(name = "panic_sink")]
 impl SinkConfig for PanicSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         Ok((VectorSink::from_event_sink(PanicSink), ok(()).boxed()))
@@ -38,10 +35,6 @@ impl SinkConfig for PanicSinkConfig {
 
     fn input(&self) -> Input {
         Input::log()
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "panic_sink"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

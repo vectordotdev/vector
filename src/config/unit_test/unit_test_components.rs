@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use futures_util::{future, stream::BoxStream, FutureExt, StreamExt};
-use serde::{Deserialize, Serialize};
 use tokio::sync::{oneshot, Mutex};
+use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 use vector_core::{
     config::{DataType, Input, Output},
@@ -13,26 +13,29 @@ use vector_core::{
 use crate::{
     conditions::Condition,
     config::{AcknowledgementsConfig, SinkConfig, SinkContext, SourceConfig, SourceContext},
+    impl_generate_config_from_default,
     sinks::Healthcheck,
     sources,
 };
 
-#[derive(Debug, Serialize, Deserialize, Default, Clone)]
+/// Configuration for the `unit_test` source.
+#[configurable_component(source("unit_test"))]
+#[derive(Clone, Debug, Default)]
 pub struct UnitTestSourceConfig {
+    /// List of events sent from this source as part of the test.
     #[serde(skip)]
     pub events: Vec<Event>,
 }
 
+impl_generate_config_from_default!(UnitTestSourceConfig);
+
 #[async_trait::async_trait]
-#[typetag::serde(name = "unit_test")]
 impl SourceConfig for UnitTestSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let events = self.events.clone().into_iter();
 
         Ok(Box::pin(async move {
             let mut out = cx.out;
-            // To appropriately shut down the topology after the source is done
-            // sending events, we need to hold on to this shutdown trigger.
             let _shutdown = cx.shutdown;
             out.send_batch(events).await.map_err(|_| ())?;
             Ok(())
@@ -43,10 +46,6 @@ impl SourceConfig for UnitTestSourceConfig {
         vec![Output::default(DataType::all())]
     }
 
-    fn source_type(&self) -> &'static str {
-        "unit_test"
-    }
-
     fn can_acknowledge(&self) -> bool {
         false
     }
@@ -54,11 +53,13 @@ impl SourceConfig for UnitTestSourceConfig {
 
 #[derive(Clone)]
 pub enum UnitTestSinkCheck {
-    // Check sets of conditions against received events
+    /// Check all events that are received against the list of conditions.
     Checks(Vec<Vec<Condition>>),
-    // Check that no events were received
+
+    /// Check that no events were received.
     NoOutputs,
-    // Do nothing
+
+    /// Do nothing.
     NoOp,
 }
 
@@ -74,24 +75,30 @@ pub struct UnitTestSinkResult {
     pub test_errors: Vec<String>,
 }
 
-#[derive(Serialize, Deserialize, Default, Derivative)]
+/// Configuration for the `unit_test` sink.
+#[configurable_component(sink("unit_test"))]
+#[derive(Clone, Default, Derivative)]
 #[derivative(Debug)]
 pub struct UnitTestSinkConfig {
-    // Name of the test this sink is part of
+    /// Name of the test that this sink is being used for.
     pub test_name: String,
-    // Name of the transform/branch associated with this sink
+
+    /// List of names of the transform/branch associated with this sink.
     pub transform_ids: Vec<String>,
+
+    /// Sender side of the test result channel.
     #[serde(skip)]
-    // Sender used to transmit the test result
     pub result_tx: Arc<Mutex<Option<oneshot::Sender<UnitTestSinkResult>>>>,
+
+    /// Predicate applied to each event that reaches the sink.
     #[serde(skip)]
     #[derivative(Debug = "ignore")]
-    // Check applied to incoming events
     pub check: UnitTestSinkCheck,
 }
 
+impl_generate_config_from_default!(UnitTestSinkConfig);
+
 #[async_trait::async_trait]
-#[typetag::serde(name = "unit_test")]
 impl SinkConfig for UnitTestSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let tx = self.result_tx.lock().await.take();
@@ -104,10 +111,6 @@ impl SinkConfig for UnitTestSinkConfig {
         let healthcheck = future::ok(()).boxed();
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "unit_test"
     }
 
     fn input(&self) -> Input {

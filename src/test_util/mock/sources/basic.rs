@@ -4,8 +4,8 @@ use std::sync::{
 };
 
 use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
 use vector_buffers::topology::channel::{limited, LimitedReceiver};
+use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 use vector_core::{
     config::{DataType, Output},
@@ -13,21 +13,26 @@ use vector_core::{
     source::Source,
 };
 
-use crate::config::{SourceConfig, SourceContext, SourceDescription};
+use crate::config::{SourceConfig, SourceContext};
 
-/// A test source.
-#[derive(Debug, Deserialize, Serialize)]
+/// Configuration for the `test_basic` source.
+#[configurable_component(source("test_basic"))]
+#[derive(Clone, Debug)]
 #[serde(default)]
 pub struct BasicSourceConfig {
     #[serde(skip)]
     receiver: Arc<Mutex<Option<LimitedReceiver<EventArray>>>>,
+
     #[serde(skip)]
     event_counter: Option<Arc<AtomicUsize>>,
+
     #[serde(skip)]
     data_type: Option<DataType>,
+
     #[serde(skip)]
     force_shutdown: bool,
-    // something for serde to use, so we can trigger rebuilds
+
+    /// Meaningless field that only exists for triggering config diffs during topology reloading.
     data: Option<String>,
 }
 
@@ -45,10 +50,6 @@ impl Default for BasicSourceConfig {
 }
 
 impl_generate_config_from_default!(BasicSourceConfig);
-
-inventory::submit! {
-    SourceDescription::new::<BasicSourceConfig>("basic_source")
-}
 
 impl BasicSourceConfig {
     pub fn new(receiver: LimitedReceiver<EventArray>) -> Self {
@@ -90,7 +91,6 @@ impl BasicSourceConfig {
 }
 
 #[async_trait]
-#[typetag::serde(name = "basic_source")]
 impl SourceConfig for BasicSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let wrapped = Arc::clone(&self.receiver);
@@ -133,10 +133,6 @@ impl SourceConfig for BasicSourceConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(self.data_type.unwrap())]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "basic_source"
     }
 
     fn can_acknowledge(&self) -> bool {

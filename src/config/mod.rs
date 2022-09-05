@@ -7,11 +7,10 @@ use std::{
 };
 
 use async_trait::async_trait;
-use component::ComponentDescription;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
 use serde::{Deserialize, Serialize};
+pub use vector_config::component::{GenerateConfig, SinkDescription, TransformDescription};
 pub use vector_core::config::{AcknowledgementsConfig, DataType, GlobalOptions, Input, Output};
-pub use vector_core::transform::{TransformConfig, TransformContext};
 
 use crate::{conditions, event::Metric, serde::OneOrMany};
 
@@ -19,7 +18,6 @@ pub mod api;
 mod builder;
 mod cmd;
 mod compiler;
-pub mod component;
 mod diff;
 #[cfg(feature = "enterprise")]
 pub mod enterprise;
@@ -32,7 +30,7 @@ mod schema;
 mod sink;
 mod source;
 mod transform;
-mod unit_test;
+pub mod unit_test;
 mod validation;
 mod vars;
 pub mod watcher;
@@ -47,9 +45,11 @@ pub use loading::{
     load_from_str, load_source_from_paths, merge_path_lists, process_paths, SecretBackend,
     CONFIG_PATHS,
 };
-pub use sink::{SinkConfig, SinkContext, SinkDescription, SinkHealthcheckOptions, SinkOuter};
-pub use source::{SourceConfig, SourceContext, SourceDescription, SourceOuter};
-pub use transform::{TransformDescription, TransformOuter};
+pub use sink::{SinkConfig, SinkContext, SinkHealthcheckOptions, SinkOuter};
+pub use source::{SourceConfig, SourceContext, SourceOuter};
+pub use transform::{
+    InnerTopology, InnerTopologyTransform, TransformConfig, TransformContext, TransformOuter,
+};
 pub use unit_test::{build_unit_tests, build_unit_tests_main, UnitTestResult};
 pub use validation::warnings;
 pub use vector_core::config::{log_schema, proxy::ProxyConfig, LogSchema};
@@ -231,10 +231,6 @@ impl Default for HealthcheckOptions {
     }
 }
 
-pub trait GenerateConfig {
-    fn generate_config() -> toml::Value;
-}
-
 #[macro_export]
 macro_rules! impl_generate_config_from_default {
     ($type:ty) => {
@@ -266,10 +262,6 @@ pub trait EnrichmentTableConfig: core::fmt::Debug + Send + Sync + dyn_clone::Dyn
         globals: &GlobalOptions,
     ) -> crate::Result<Box<dyn enrichment::Table + Send + Sync>>;
 }
-
-pub type EnrichmentTableDescription = ComponentDescription<Box<dyn EnrichmentTableConfig>>;
-
-inventory::collect!(EnrichmentTableDescription);
 
 /// Unique thing, like port, of which only one owner can be.
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
@@ -560,22 +552,22 @@ mod tests {
         let err = load(
             r#"
             [sources.in]
-            type = "basic_source"
+            type = "test_basic"
 
             [transforms.sample]
-            type = "basic_transform"
+            type = "test_basic"
             inputs = []
             suffix = "foo"
             increase = 1.25
 
             [transforms.sample2]
-            type = "basic_transform"
+            type = "test_basic"
             inputs = ["qwerty"]
             suffix = "foo"
             increase = 1.25
 
             [sinks.out]
-            type = "basic_sink"
+            type = "test_basic"
             inputs = ["asdf", "in", "in"]
             "#,
             Format::Toml,
@@ -599,19 +591,19 @@ mod tests {
         let err = load(
             r#"
             [sources.foo]
-            type = "basic_source"
+            type = "test_basic"
 
             [sources.bar]
-            type = "basic_source"
+            type = "test_basic"
 
             [transforms.foo]
-            type = "basic_transform"
+            type = "test_basic"
             inputs = ["bar"]
             suffix = "foo"
             increase = 1.25
 
             [sinks.out]
-            type = "basic_sink"
+            type = "test_basic"
             inputs = ["foo"]
             "#,
             Format::Toml,
@@ -638,7 +630,7 @@ mod tests {
             fd = 0
 
             [sinks.out]
-            type = "basic_sink"
+            type = "test_basic"
             inputs = ["stdin", "file_descriptor"]
             "#,
             Format::Toml,
@@ -659,13 +651,11 @@ mod tests {
             [sources.file_descriptor1]
             type = "file_descriptor"
             fd = 10
-
             [sources.file_descriptor2]
             type = "file_descriptor"
             fd = 10
-
             [sinks.out]
-            type = "basic_sink"
+            type = "test_basic"
             inputs = ["file_descriptor1", "file_descriptor2"]
             "#,
             Format::Toml,
@@ -692,7 +682,7 @@ mod tests {
             fd = 20
 
             [sinks.out]
-            type = "basic_sink"
+            type = "test_basic"
             inputs = ["file_descriptor1", "file_descriptor2"]
             "#,
             Format::Toml,
@@ -708,25 +698,25 @@ mod tests {
         let warnings = load(
             r#"
             [sources.in1]
-            type = "basic_source"
+            type = "test_basic"
 
             [sources.in2]
-            type = "basic_source"
+            type = "test_basic"
 
             [transforms.sample1]
-            type = "basic_transform"
+            type = "test_basic"
             inputs = ["in1"]
             suffix = "foo"
             increase = 1.25
 
             [transforms.sample2]
-            type = "basic_transform"
+            type = "test_basic"
             inputs = ["in1"]
             suffix = "foo"
             increase = 1.25
 
             [sinks.out]
-            type = "basic_sink"
+            type = "test_basic"
             inputs = ["sample1"]
             "#,
             Format::Toml,
@@ -748,34 +738,34 @@ mod tests {
         let errors = load(
             r#"
             [sources.in]
-            type = "basic_source"
+            type = "test_basic"
 
             [transforms.one]
-            type = "basic_transform"
+            type = "test_basic"
             inputs = ["in"]
             suffix = "foo"
             increase = 1.25
 
             [transforms.two]
-            type = "basic_transform"
+            type = "test_basic"
             inputs = ["one", "four"]
             suffix = "foo"
             increase = 1.25
 
             [transforms.three]
-            type = "basic_transform"
+            type = "test_basic"
             inputs = ["two"]
             suffix = "foo"
             increase = 1.25
 
             [transforms.four]
-            type = "basic_transform"
+            type = "test_basic"
             inputs = ["three"]
             suffix = "foo"
             increase = 1.25
 
             [sinks.out]
-            type = "basic_sink"
+            type = "test_basic"
             inputs = ["four"]
             "#,
             Format::Toml,
@@ -794,10 +784,10 @@ mod tests {
         let config = load_from_str(
             indoc! {r#"
                 [sources.in]
-                type = "basic_source"
+                type = "test_basic"
 
                 [sinks.out]
-                type = "basic_sink"
+                type = "test_basic"
                 inputs = ["in"]
             "#},
             Format::Toml,
@@ -815,10 +805,10 @@ mod tests {
         let config = load_from_str(
             indoc! {r#"
             [sources.in]
-            type = "basic_source"
+            type = "test_basic"
 
             [sinks.out]
-            type = "basic_sink"
+            type = "test_basic"
             inputs = ["in"]
             "#},
             Format::Toml,
@@ -846,10 +836,10 @@ mod tests {
                   timestamp_key = "then"
 
                 [sources.in]
-                  type = "basic_source"
+                  type = "test_basic"
 
                 [sinks.out]
-                  type = "basic_sink"
+                  type = "test_basic"
                   inputs = ["in"]
             "#},
             Format::Toml,
@@ -866,10 +856,10 @@ mod tests {
         let mut config: ConfigBuilder = format::deserialize(
             indoc! {r#"
                 [sources.in]
-                  type = "basic_source"
+                  type = "test_basic"
 
                 [sinks.out]
-                  type = "basic_sink"
+                  type = "test_basic"
                   inputs = ["in"]
             "#},
             Format::Toml,
@@ -886,7 +876,7 @@ mod tests {
                           http = "http://proxy.inc:3128"
 
                         [transforms.foo]
-                          type = "basic_transform"
+                          type = "test_basic"
                           inputs = [ "in" ]
                           suffix = "foo"
                           increase = 1.25
@@ -924,10 +914,10 @@ mod tests {
         let mut config: ConfigBuilder = format::deserialize(
             indoc! {r#"
                 [sources.in]
-                  type = "basic_source"
+                  type = "test_basic"
 
                 [sinks.out]
-                  type = "basic_sink"
+                  type = "test_basic"
                   inputs = ["in"]
             "#},
             Format::Toml,
@@ -939,16 +929,16 @@ mod tests {
                 format::deserialize(
                     indoc! {r#"
                         [sources.in]
-                          type = "basic_source"
+                          type = "test_basic"
 
                         [transforms.foo]
-                          type = "basic_transform"
+                          type = "test_basic"
                           inputs = [ "in" ]
                           suffix = "foo"
                           increase = 1.25
 
                         [sinks.out]
-                          type = "basic_sink"
+                          type = "test_basic"
                           inputs = ["in"]
                     "#},
                     Format::Toml,
@@ -1204,7 +1194,7 @@ mod acknowledgements_tests {
                 [sources.in3]
                     type = "file"
                 [transforms.parse3]
-                    type = "basic_transform"
+                    type = "test_basic"
                     inputs = ["in3"]
                     increase = 0.0
                     suffix = ""
@@ -1254,6 +1244,7 @@ mod resource_tests {
     };
 
     use indoc::indoc;
+    use vector_config::schema::generate_root_schema;
 
     use super::{load_from_str, Format, Resource};
 
@@ -1385,6 +1376,44 @@ mod resource_tests {
             Format::Toml,
         )
         .is_err());
+    }
+
+    #[test]
+    #[ignore]
+    #[allow(clippy::print_stdout)]
+    #[allow(clippy::print_stderr)]
+    fn generate_component_config_schema() {
+        use crate::config::{SinkOuter, SourceOuter, TransformOuter};
+        use indexmap::IndexMap;
+        use vector_common::config::ComponentKey;
+        use vector_config::configurable_component;
+
+        /// Top-level Vector configuration.
+        #[configurable_component]
+        #[derive(Clone)]
+        struct ComponentsOnlyConfig {
+            /// Configured sources.
+            #[serde(default)]
+            pub sources: IndexMap<ComponentKey, SourceOuter>,
+
+            /// Configured transforms.
+            #[serde(default)]
+            pub transforms: IndexMap<ComponentKey, TransformOuter<String>>,
+
+            /// Configured sinks.
+            #[serde(default)]
+            pub sinks: IndexMap<ComponentKey, SinkOuter<String>>,
+        }
+
+        match generate_root_schema::<ComponentsOnlyConfig>() {
+            Ok(schema) => {
+                let json = serde_json::to_string_pretty(&schema)
+                    .expect("rendering root schema to JSON should not fail");
+
+                println!("{}", json);
+            }
+            Err(e) => eprintln!("error while generating schema: {:?}", e),
+        }
     }
 }
 

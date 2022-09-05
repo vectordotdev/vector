@@ -262,4 +262,4 @@ As a user experience design committee member, you are responsible for:
 - Reviewing and approving user-facing changes in pull requests.
 - Updating and evolving guides to reflect new Vector changes.
 
-[Hicks Law]: https://en.wikipedia.org/wiki/Hick%27s_law
+[hicks law]: https://en.wikipedia.org/wiki/Hick%27s_law

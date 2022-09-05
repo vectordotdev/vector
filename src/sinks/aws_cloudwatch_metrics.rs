@@ -18,9 +18,7 @@ use crate::aws::RegionOrEndpoint;
 use crate::aws::{create_client, is_retriable_error, ClientBuilder};
 use crate::{
     aws::auth::AwsAuthentication,
-    config::{
-        AcknowledgementsConfig, Input, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
-    },
+    config::{AcknowledgementsConfig, Input, ProxyConfig, SinkConfig, SinkContext},
     event::{
         metric::{Metric, MetricValue},
         Event,
@@ -49,7 +47,7 @@ impl SinkBatchSettings for CloudWatchMetricsDefaultBatchSettings {
 }
 
 /// Configuration for the `aws_cloudwatch_metrics` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("aws_cloudwatch_metrics"))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct CloudWatchMetricsSinkConfig {
@@ -100,10 +98,6 @@ pub struct CloudWatchMetricsSinkConfig {
     acknowledgements: AcknowledgementsConfig,
 }
 
-inventory::submit! {
-    SinkDescription::new::<CloudWatchMetricsSinkConfig>("aws_cloudwatch_metrics")
-}
-
 impl_generate_config_from_default!(CloudWatchMetricsSinkConfig);
 
 struct CloudwatchMetricsClientBuilder;
@@ -123,7 +117,6 @@ impl ClientBuilder for CloudwatchMetricsClientBuilder {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "aws_cloudwatch_metrics")]
 impl SinkConfig for CloudWatchMetricsSinkConfig {
     async fn build(
         &self,
@@ -137,10 +130,6 @@ impl SinkConfig for CloudWatchMetricsSinkConfig {
 
     fn input(&self) -> Input {
         Input::metric()
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "aws_cloudwatch_metrics"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

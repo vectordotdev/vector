@@ -38,7 +38,7 @@ impl Function for ToRegex {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         warn!("`to_regex` is an expensive function that could impact throughput.");
         let value = arguments.required("value");

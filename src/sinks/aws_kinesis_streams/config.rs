@@ -69,7 +69,7 @@ impl SinkBatchSettings for KinesisDefaultBatchSettings {
 }
 
 /// Configuration for the `aws_kinesis_streams` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("aws_kinesis_streams"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct KinesisSinkConfig {
@@ -159,7 +159,6 @@ impl KinesisSinkConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "aws_kinesis_streams")]
 impl SinkConfig for KinesisSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.create_client(&cx.proxy).await?;
@@ -199,10 +198,6 @@ impl SinkConfig for KinesisSinkConfig {
 
     fn input(&self) -> Input {
         Input::new(self.encoding.config().input_type() & DataType::Log)
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "aws_kinesis_streams"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

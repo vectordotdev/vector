@@ -436,9 +436,7 @@ fn setup_logs_reporting(
     let internal_logs_id = OutputId::from(ComponentKey::from(INTERNAL_LOGS_KEY));
     let datadog_logs_id = ComponentKey::from(DATADOG_LOGS_KEY);
 
-    let internal_logs = InternalLogsConfig {
-        ..Default::default()
-    };
+    let internal_logs = InternalLogsConfig::default();
 
     let custom_logs_tags_vrl = datadog
         .tags
@@ -483,7 +481,7 @@ fn setup_logs_reporting(
 
     config.sinks.insert(
         datadog_logs_id,
-        SinkOuter::new(vec![tag_logs_id], Box::new(datadog_logs)),
+        SinkOuter::new(vec![tag_logs_id], datadog_logs),
     );
 }
 
@@ -597,7 +595,7 @@ fn setup_metrics_reporting(
         datadog_metrics_id,
         SinkOuter::new(
             vec![tag_metrics_id, pipelines_namespace_metrics_id],
-            Box::new(datadog_metrics),
+            datadog_metrics,
         ),
     );
 }

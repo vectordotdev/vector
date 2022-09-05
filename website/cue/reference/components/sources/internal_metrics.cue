@@ -63,14 +63,17 @@ components: sources: internal_metrics: {
 				examples: []
 				options: {
 					host_key: {
-						category: "Context"
-						common:   false
+						category:    "Context"
+						common:      false
 						description: """
-							If set, will add a tag using the provided key name with a value of the current the current host.
+							The key name added to each event representing the current host. This can also be globally set via the
+							[global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key).
+
+							Set to "" to suppress this key.
 							"""
-						required: false
+						required:    false
 						type: string: {
-							default: null
+							default: "host"
 						}
 					}
 					pid_key: {
@@ -563,7 +566,8 @@ components: sources: internal_metrics: {
 		}
 		component_received_events_count: {
 			description: """
-				A histogram of Vector the number of events passed in each internal batch in Vector's internal topology.
+				A histogram of the number of events passed in each internal batch in Vector's internal topology.
+
 				Note that this is separate than sink-level batching. It is mostly useful for low level debugging
 				performance issues in Vector due to small internal batches.
 				"""

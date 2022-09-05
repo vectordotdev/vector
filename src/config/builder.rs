@@ -6,7 +6,9 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "enterprise")]
 use serde_json::Value;
-use vector_core::{config::GlobalOptions, default_data_dir, transform::TransformConfig};
+use vector_core::{config::GlobalOptions, default_data_dir};
+
+use crate::{sinks::Sinks, sources::Sources, transforms::Transforms};
 
 #[cfg(feature = "api")]
 use super::api;
@@ -14,8 +16,7 @@ use super::api;
 use super::enterprise;
 use super::{
     compiler, provider, schema, ComponentKey, Config, EnrichmentTableConfig, EnrichmentTableOuter,
-    HealthcheckOptions, SecretBackend, SinkConfig, SinkOuter, SourceConfig, SourceOuter,
-    TestDefinition, TransformOuter,
+    HealthcheckOptions, SecretBackend, SinkOuter, SourceOuter, TestDefinition, TransformOuter,
 };
 
 #[derive(Deserialize, Serialize, Debug, Default)]
@@ -223,43 +224,40 @@ impl ConfigBuilder {
         compiler::compile(self)
     }
 
-    pub fn add_enrichment_table<E: EnrichmentTableConfig + 'static, T: Into<String>>(
+    pub fn add_enrichment_table<K: Into<String>, E: EnrichmentTableConfig + 'static>(
         &mut self,
-        name: T,
+        key: K,
         enrichment_table: E,
     ) {
         self.enrichment_tables.insert(
-            ComponentKey::from(name.into()),
+            ComponentKey::from(key.into()),
             EnrichmentTableOuter::new(Box::new(enrichment_table)),
         );
     }
 
-    pub fn add_source<S: SourceConfig + 'static, T: Into<String>>(&mut self, id: T, source: S) {
+    pub fn add_source<K: Into<String>, S: Into<Sources>>(&mut self, key: K, source: S) {
         self.sources
-            .insert(ComponentKey::from(id.into()), SourceOuter::new(source));
+            .insert(ComponentKey::from(key.into()), SourceOuter::new(source));
     }
 
-    pub fn add_sink<S: SinkConfig + 'static, T: Into<String>>(
-        &mut self,
-        id: T,
-        inputs: &[&str],
-        sink: S,
-    ) {
+    pub fn add_sink<K: Into<String>, S: Into<Sinks>>(&mut self, key: K, inputs: &[&str], sink: S) {
         let inputs = inputs
             .iter()
             .map(|value| value.to_string())
             .collect::<Vec<_>>();
-        let sink = SinkOuter::new(inputs, Box::new(sink));
-        self.add_sink_outer(id, sink);
+        let sink = SinkOuter::new(inputs, sink);
+        self.add_sink_outer(key, sink);
     }
 
-    pub fn add_sink_outer(&mut self, id: impl Into<String>, sink: SinkOuter<String>) {
-        self.sinks.insert(ComponentKey::from(id.into()), sink);
+    pub fn add_sink_outer<K: Into<String>>(&mut self, key: K, sink: SinkOuter<String>) {
+        self.sinks.insert(ComponentKey::from(key.into()), sink);
     }
 
-    pub fn add_transform<T: TransformConfig + 'static, S: Into<String>>(
+    // For some feature sets, no transforms are compiled, which leads to no callers using this
+    // method, and in turn, annoying errors about unused variables.
+    pub fn add_transform<K: Into<String>, T: Into<Transforms>>(
         &mut self,
-        id: S,
+        key: K,
         inputs: &[&str],
         transform: T,
     ) {
@@ -267,13 +265,10 @@ impl ConfigBuilder {
             .iter()
             .map(|value| value.to_string())
             .collect::<Vec<_>>();
-        let transform = TransformOuter {
-            inner: Box::new(transform),
-            inputs,
-        };
+        let transform = TransformOuter::new(inputs, transform);
 
         self.transforms
-            .insert(ComponentKey::from(id.into()), transform);
+            .insert(ComponentKey::from(key.into()), transform);
     }
 
     pub fn set_data_dir(&mut self, path: &Path) {

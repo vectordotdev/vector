@@ -19,6 +19,7 @@ mod errors;
 pub use errors::{ClosedError, StreamSendError};
 
 pub(crate) const CHUNK_SIZE: usize = 1000;
+
 #[cfg(test)]
 const TEST_BUFFER_SIZE: usize = 100;
 
@@ -126,14 +127,16 @@ impl SourceSender {
     }
 
     #[cfg(test)]
-    pub fn new_test_error_after(n: usize) -> (Self, impl Stream<Item = Event> + Unpin) {
+    pub fn new_test_errors(
+        error_at: impl Fn(usize) -> bool,
+    ) -> (Self, impl Stream<Item = Event> + Unpin) {
         let (pipe, recv) = Self::new_with_buffer(TEST_BUFFER_SIZE);
         // In a source test pipeline, there is no sink to acknowledge
         // events, so we have to add a map to the receiver to handle the
         // finalization.
         let mut count: usize = 0;
         let recv = recv.into_stream().flat_map(move |mut events| {
-            let status = if count == n {
+            let status = if error_at(count) {
                 EventStatus::Errored
             } else {
                 EventStatus::Delivered

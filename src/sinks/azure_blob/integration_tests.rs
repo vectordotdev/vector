@@ -24,7 +24,7 @@ use crate::{
         VectorSink,
     },
     test_util::{
-        components::{run_and_assert_sink_compliance, SINK_TAGS},
+        components::{assert_sink_compliance, SINK_TAGS},
         random_events_with_stream, random_lines, random_lines_with_stream, random_string,
     },
 };
@@ -76,10 +76,9 @@ async fn azure_blob_insert_lines_into_blob() {
         blob_prefix: Some(blob_prefix.clone()),
         ..config
     };
-    let sink = config.to_sink();
     let (lines, input) = random_lines_with_stream(100, 10, None);
 
-    run_and_assert_sink_compliance(sink, input, &SINK_TAGS).await;
+    config.run_assert(input).await;
 
     let blobs = config.list_blobs(blob_prefix.as_str()).await;
     assert_eq!(blobs.len(), 1);
@@ -102,10 +101,9 @@ async fn azure_blob_insert_json_into_blob() {
             .into(),
         ..config
     };
-    let sink = config.to_sink();
     let (events, input) = random_events_with_stream(100, 10, None);
 
-    run_and_assert_sink_compliance(sink, input, &SINK_TAGS).await;
+    config.run_assert(input).await;
 
     let blobs = config.list_blobs(blob_prefix.as_str()).await;
     assert_eq!(blobs.len(), 1);
@@ -130,10 +128,9 @@ async fn azure_blob_insert_lines_into_blob_gzip() {
         compression: Compression::gzip_default(),
         ..config
     };
-    let sink = config.to_sink();
     let (lines, events) = random_lines_with_stream(100, 10, None);
 
-    run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
+    config.run_assert(events).await;
 
     let blobs = config.list_blobs(blob_prefix.as_str()).await;
     assert_eq!(blobs.len(), 1);
@@ -163,10 +160,9 @@ async fn azure_blob_insert_json_into_blob_gzip() {
         compression: Compression::gzip_default(),
         ..config
     };
-    let sink = config.to_sink();
     let (events, input) = random_events_with_stream(100, 10, None);
 
-    run_and_assert_sink_compliance(sink, input, &SINK_TAGS).await;
+    config.run_assert(input).await;
 
     let blobs = config.list_blobs(blob_prefix.as_str()).await;
     assert_eq!(blobs.len(), 1);
@@ -200,8 +196,7 @@ async fn azure_blob_rotate_files_after_the_buffer_size_is_reached() {
         ..config
     };
 
-    let sink = config.to_sink();
-    run_and_assert_sink_compliance(sink, input, &SINK_TAGS).await;
+    config.run_assert(input).await;
 
     let blobs = config.list_blobs(blob_prefix.as_str()).await;
     assert_eq!(blobs.len(), 3);
@@ -240,7 +235,7 @@ impl AzureBlobSinkConfig {
         config
     }
 
-    pub fn to_sink(&self) -> VectorSink {
+    fn to_sink(&self) -> VectorSink {
         let client = azure_common::config::build_client(
             self.connection_string.clone(),
             self.storage_account.clone(),
@@ -249,6 +244,13 @@ impl AzureBlobSinkConfig {
         .expect("Failed to create client");
 
         self.build_processor(client).expect("Failed to create sink")
+    }
+
+    async fn run_assert(&self, input: impl Stream<Item = EventArray> + Send) {
+        // `to_sink` needs to be inside the assertion check
+        assert_sink_compliance(&SINK_TAGS, async move { self.to_sink().run(input).await })
+            .await
+            .expect("Running sink failed");
     }
 
     pub async fn list_blobs(&self, prefix: &str) -> Vec<String> {

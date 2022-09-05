@@ -42,8 +42,8 @@ pub struct TagCardinalityValueLimitReached<'a> {
 impl<'a> InternalEvent for TagCardinalityValueLimitReached<'a> {
     fn emit(self) {
         debug!(
-            "Value_limit reached for key {}. New values for this key will be rejected.",
-            key = self.key,
+            message = "Value_limit reached for key. New values for this key will be rejected.",
+            key = %self.key,
         );
         counter!("value_limit_reached_total", 1);
     }

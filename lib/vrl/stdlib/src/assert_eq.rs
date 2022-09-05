@@ -74,7 +74,7 @@ impl Function for AssertEq {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let left = arguments.required("left");
         let right = arguments.required("right");
