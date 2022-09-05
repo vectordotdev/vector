@@ -12,7 +12,7 @@ use vector_config::configurable_component;
 
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, Input, Output, TransformConfig, TransformContext},
     event::{discriminant::Discriminant, Event, EventMetadata, LogEvent},
     internal_events::ReduceStaleEventFlushed,
     schema,
@@ -25,11 +25,12 @@ use crate::event::Value;
 pub use merge_strategy::*;
 
 /// Configuration for the `reduce` transform.
-#[configurable_component(transform)]
+#[configurable_component(transform("reduce"))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields, default)]
 pub struct ReduceConfig {
-    /// The maximum period of time to wait after the last event is received, in milliseconds, before a combined event should be considered complete.
+    /// The maximum period of time to wait after the last event is received, in milliseconds, before
+    /// a combined event should be considered complete.
     pub expire_after_ms: Option<u64>,
 
     /// The interval to check for and flush any expired events, in milliseconds.
@@ -37,45 +38,45 @@ pub struct ReduceConfig {
 
     /// An ordered list of fields by which to group events.
     ///
-    /// Each group with matching values for the specified keys is reduced independently, allowing you to keep
-    /// independent event streams separate. When no fields are specified, all events will be combined in a single group.
+    /// Each group with matching values for the specified keys is reduced independently, allowing
+    /// you to keep independent event streams separate. When no fields are specified, all events
+    /// will be combined in a single group.
     ///
-    /// For example, if `group_by = ["host", "region"]`, then all incoming events that have the same host and region
-    /// will be grouped together before being reduced.
+    /// For example, if `group_by = ["host", "region"]`, then all incoming events that have the same
+    /// host and region will be grouped together before being reduced.
     #[serde(default)]
     pub group_by: Vec<String>,
 
     /// A map of field names to custom merge strategies.
     ///
-    /// For each field specified, the given strategy will be used for combining events rather than the default behavior.
+    /// For each field specified, the given strategy will be used for combining events rather than
+    /// the default behavior.
     ///
     /// The default behavior is as follows:
     ///
     /// - The first value of a string field is kept, subsequent values are discarded.
-    /// - For timestamp fields the first is kept and a new field `[field-name]_end` is added with the last received timestamp value.
+    /// - For timestamp fields the first is kept and a new field `[field-name]_end` is added with
+    ///   the last received timestamp value.
     /// - Numeric values are summed.
     #[serde(default)]
     pub merge_strategies: IndexMap<String, MergeStrategy>,
 
     /// A condition used to distinguish the final event of a transaction.
     ///
-    /// If this condition resolves to `true` for an event, the current transaction is immediately flushed with this event.
+    /// If this condition resolves to `true` for an event, the current transaction is immediately
+    /// flushed with this event.
     pub ends_when: Option<AnyCondition>,
 
     /// A condition used to distinguish the first event of a transaction.
     ///
-    /// If this condition resolves to `true` for an event, the previous transaction is flushed (without this event) and a new transaction is started.
+    /// If this condition resolves to `true` for an event, the previous transaction is flushed
+    /// (without this event) and a new transaction is started.
     pub starts_when: Option<AnyCondition>,
-}
-
-inventory::submit! {
-    TransformDescription::new::<ReduceConfig>("reduce")
 }
 
 impl_generate_config_from_default!(ReduceConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "reduce")]
 impl TransformConfig for ReduceConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         Reduce::new(self, &context.enrichment_tables).map(Transform::event_task)
@@ -87,10 +88,6 @@ impl TransformConfig for ReduceConfig {
 
     fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
-    }
-
-    fn transform_type(&self) -> &'static str {
-        "reduce"
     }
 }
 

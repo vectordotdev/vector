@@ -33,7 +33,7 @@ mod integration_test {
             VectorSink,
         },
         test_util::{
-            components::{run_and_assert_sink_compliance, SINK_TAGS},
+            components::{assert_sink_compliance, SINK_TAGS},
             random_lines_with_stream, random_string, wait_for,
         },
         tls::{TlsConfig, TlsEnableableConfig, TEST_PEM_INTERMEDIATE_CA_PATH},
@@ -255,8 +255,6 @@ mod integration_test {
         };
         let topic = format!("{}-{}", topic, chrono::Utc::now().format("%Y%m%d"));
         println!("Topic name generated in test: {:?}", topic);
-        let sink = KafkaSink::new(config).unwrap();
-        let sink = VectorSink::from_event_streamsink(sink);
 
         let num_events = 1000;
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
@@ -276,7 +274,13 @@ mod integration_test {
             });
             events
         });
-        run_and_assert_sink_compliance(sink, input_events, &SINK_TAGS).await;
+        assert_sink_compliance(&SINK_TAGS, async move {
+            let sink = KafkaSink::new(config).unwrap();
+            let sink = VectorSink::from_event_streamsink(sink);
+            sink.run(input_events).await
+        })
+        .await
+        .expect("Running sink failed");
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         // read back everything from the beginning

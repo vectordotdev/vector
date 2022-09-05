@@ -1,7 +1,7 @@
 use crate::{
-    schema::{finalize_schema, generate_number_schema},
+    schema::generate_number_schema,
     schemars::{gen::SchemaGenerator, schema::SchemaObject},
-    Configurable, Metadata,
+    Configurable, GenerateError, Metadata,
 };
 
 // Blanket implementation of `Configurable` for any `serde_with` helper that is also `Configurable`.
@@ -28,13 +28,13 @@ where
         T::metadata().convert::<Self>()
     }
 
-    fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<Self>) -> SchemaObject {
+    fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
         // Forward to the underlying `T`.
         //
         // We have to convert from `Metadata<Self>` to `Metadata<T>` which erases the default value,
         // notably, but `serde_with` helpers should never actually have default values, so this is
         // essentially a no-op.
-        T::generate_schema(gen, overrides.convert::<T>())
+        T::generate_schema(gen)
     }
 }
 
@@ -50,12 +50,10 @@ impl Configurable for serde_with::DurationSeconds<u64, serde_with::formats::Stri
         Some("A span of time, in whole seconds.")
     }
 
-    fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<Self>) -> SchemaObject {
+    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
         // This boils down to a number schema, but we just need to shuttle around the metadata so
         // that we can call the relevant schema generation function.
-        let mut schema = generate_number_schema::<u64>();
-        finalize_schema(gen, &mut schema, overrides.convert::<u64>());
-        schema
+        Ok(generate_number_schema::<u64>())
     }
 }
 
@@ -71,11 +69,9 @@ impl Configurable for serde_with::DurationSeconds<f64, serde_with::formats::Stri
         Some("A span of time, in whole seconds.")
     }
 
-    fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<Self>) -> SchemaObject {
+    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
         // This boils down to a number schema, but we just need to shuttle around the metadata so
         // that we can call the relevant schema generation function.
-        let mut schema = generate_number_schema::<f64>();
-        finalize_schema(gen, &mut schema, overrides.convert::<f64>());
-        schema
+        Ok(generate_number_schema::<f64>())
     }
 }

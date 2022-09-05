@@ -95,7 +95,7 @@ requirements, the following requirements define support for this architecture:
 - Architecture
   - MUST deploy as a service with reserved/dedicated resources.
   - SHOULD deploy with a persistent disk that is available between deployments by default,
-     MUST be overridable by the user if they do not want a persistent disk.
+    MUST be overridable by the user if they do not want a persistent disk.
   - MUST deploy with Vector's [default aggregator configuration][default_aggregator_configuration].
   - Configured Vector ports, including non-default user configured ports,
     SHOULD be automatically accessible within the Cluster or VPC.
@@ -104,14 +104,14 @@ requirements, the following requirements define support for this architecture:
     mechanisms.
 - Sizing
   - MUST have dedicated/reserved resources that cannot be stolen by other services, preventing
-     the "noisy neighbor" problem to the degree possible.
+    the "noisy neighbor" problem to the degree possible.
   - The Vector service SHOULD NOT be artificially limited with resource
     limiters such as cgroups.
   - SHOULD require 8 vCPUs by default, MUST be overridable by the user.
   - SHOULD require 2 GiB of memory per vCPU (16 GiB in this case) by default,
-     MUST be overridable by the user.
+    MUST be overridable by the user.
   - SHOULD request 36 GiB of disk space per vCPU by default (288 GiB in this case),
-     MUST be overridable by the user.
+    MUST be overridable by the user.
 
 The following are additional requirements for Orchestration Platform installation
 targets:
@@ -121,11 +121,11 @@ targets:
   - SHOULD deploy across multiple availability zones by default, MUST be overridable by the user.
 - Scaling
   - SHOULD provide facilities for provisioning a load balancer to enable horizontal scaling
-     out of the box. MUST be overridable by the user.
+    out of the box. MUST be overridable by the user.
     - Cloud-managed load balancers (i.e., AWS NLB) SHOULD be supported in addition to
-        self-managed load balancers (i.e., HAProxy).
+      self-managed load balancers (i.e., HAProxy).
     - Cloud-managed load balancers SHOULD be prioritized by default over self-managed
-        load balancers.
+      load balancers.
     - Network load balancers (layer-4) SHOULD be prioritized over HTTP load balancers (layer-7)
   - Autoscaling SHOULD be enabled by default, driven by an average of 85%
     CPU utilization and a stabilization period of 5 minutes.
@@ -178,6 +178,6 @@ targets as there is little added benefit.
 [high_availability]: https://vector.dev/docs/setup/going-to-prod/high-availability/
 [reduce_decisions]: https://github.com/vectordotdev/vector/blob/master/docs/USER_EXPERIENCE_DESIGN.md#be-opinionated--reduce-decisions
 [reference_architectures]: https://vector.dev/docs/setup/going-to-prod/arch/
-[RFC 2119]: https://datatracker.ietf.org/doc/html/rfc2119
+[rfc 2119]: https://datatracker.ietf.org/doc/html/rfc2119
 [terminology_document]: https://vector.dev/docs/reference/glossary/
 [unified_architecture]: https://vector.dev/docs/setup/going-to-prod/arch/unified/

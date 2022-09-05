@@ -5,6 +5,8 @@ use heim::units::ratio::ratio;
 use vector_common::btreemap;
 use vector_config::configurable_component;
 
+use crate::internal_events::{HostMetricsScrapeDetailError, HostMetricsScrapeFilesystemError};
+
 use super::{filter_result, FilterList, HostMetrics};
 
 /// Options for the “filesystem” metrics collector.
@@ -65,12 +67,15 @@ impl HostMetrics {
                         heim::disk::usage(partition.mount_point())
                             .await
                             .map_err(|error| {
-                                error!(
-                                    message = "Failed to load partition usage data.",
-                                    mount_point = ?partition.mount_point(),
-                                    %error,
-                                    internal_log_rate_secs = 60,
-                                )
+                                emit!(HostMetricsScrapeFilesystemError {
+                                    message: "Failed to load partitions info.",
+                                    mount_point: partition
+                                        .mount_point()
+                                        .to_str()
+                                        .unwrap_or("unknown")
+                                        .to_string(),
+                                    error,
+                                })
                             })
                             .map(|usage| (partition, usage))
                             .ok()
@@ -110,7 +115,10 @@ impl HostMetrics {
                 }
             }
             Err(error) => {
-                error!(message = "Failed to load partitions info.", %error, internal_log_rate_secs = 60);
+                emit!(HostMetricsScrapeDetailError {
+                    message: "Failed to load partitions info.",
+                    error,
+                });
             }
         }
     }

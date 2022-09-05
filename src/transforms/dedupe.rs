@@ -8,7 +8,6 @@ use vector_config::configurable_component;
 use crate::{
     config::{
         log_schema, DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
-        TransformDescription,
     },
     event::{Event, Value},
     internal_events::DedupeEventDiscarded,
@@ -18,9 +17,11 @@ use crate::{
 
 /// Configuration for controlling what fields to match against.
 ///
-/// When no field matching configuration is specified, events are matched using the `timestamp`, `host`, and `message`
-/// fields from an event. The specific field names used will be those set in the global [`log
-/// schema`](https://vector.dev/docs/reference/configuration/global-options/#log_schema) configuration.
+/// When no field matching configuration is specified, events are matched using the `timestamp`,
+/// `host`, and `message` fields from an event. The specific field names used will be those set in
+/// the global [`log schema`][global_log_schema] configuration.
+///
+/// [global_log_schema]: https://vector.dev/docs/reference/configuration/global-options/#log_schema
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
@@ -44,7 +45,7 @@ pub struct CacheConfig {
 }
 
 /// Configuration for the `dedupe` transform.
-#[configurable_component(transform)]
+#[configurable_component(transform("dedupe"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct DedupeConfig {
@@ -83,10 +84,6 @@ pub struct Dedupe {
     cache: LruCache<CacheEntry, bool>,
 }
 
-inventory::submit! {
-    TransformDescription::new::<DedupeConfig>("dedupe")
-}
-
 impl GenerateConfig for DedupeConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
@@ -98,7 +95,6 @@ impl GenerateConfig for DedupeConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "dedupe")]
 impl TransformConfig for DedupeConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::event_task(Dedupe::new(self.clone())))
@@ -110,10 +106,6 @@ impl TransformConfig for DedupeConfig {
 
     fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
-    }
-
-    fn transform_type(&self) -> &'static str {
-        "dedupe"
     }
 }
 

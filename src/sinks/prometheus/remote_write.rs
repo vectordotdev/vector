@@ -10,7 +10,7 @@ use vector_core::ByteSizeOf;
 
 use super::collector::{self, MetricCollector as _};
 use crate::{
-    config::{self, AcknowledgementsConfig, Input, SinkConfig, SinkDescription},
+    config::{self, AcknowledgementsConfig, Input, SinkConfig},
     event::{Event, Metric},
     http::{Auth, HttpClient},
     internal_events::TemplateRenderingError,
@@ -44,7 +44,7 @@ enum Errors {
 }
 
 /// Configuration for the `prometheus_remote_write` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("prometheus_remote_write"))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct RemoteWriteConfig {
@@ -105,14 +105,9 @@ pub struct RemoteWriteConfig {
     pub acknowledgements: AcknowledgementsConfig,
 }
 
-inventory::submit! {
-    SinkDescription::new::<RemoteWriteConfig>("prometheus_remote_write")
-}
-
 impl_generate_config_from_default!(RemoteWriteConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "prometheus_remote_write")]
 impl SinkConfig for RemoteWriteConfig {
     async fn build(
         &self,
@@ -177,10 +172,6 @@ impl SinkConfig for RemoteWriteConfig {
 
     fn input(&self) -> Input {
         Input::metric()
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "prometheus_remote_write"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

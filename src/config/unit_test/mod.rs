@@ -21,7 +21,7 @@ use vector_core::config::LogNamespace;
 pub use self::unit_test_components::{
     UnitTestSinkCheck, UnitTestSinkConfig, UnitTestSinkResult, UnitTestSourceConfig,
 };
-use super::{compiler::expand_globs, graph::Graph, OutputId};
+use super::{compiler::expand_globs, graph::Graph, OutputId, TransformConfig};
 use crate::{
     conditions::Condition,
     config::{
@@ -32,7 +32,6 @@ use crate::{
     schema,
     serde::OneOrMany,
     signal,
-    sources::Sources,
     topology::{
         self,
         builder::{self, Pieces},
@@ -239,10 +238,7 @@ impl UnitTestBuildMetadata {
                     .get(&insert_at)
                     .expect("Corresponding source must exist")
                     .as_ref();
-                (
-                    ComponentKey::from(id),
-                    SourceOuter::new(Sources::UnitTest(source_config)),
-                )
+                (ComponentKey::from(id), SourceOuter::new(source_config))
             })
             .collect::<IndexMap<_, _>>())
     }
@@ -316,7 +312,7 @@ impl UnitTestBuildMetadata {
                 let sink_id = sink_ids.join(",");
                 (
                     ComponentKey::from(sink_id),
-                    SinkOuter::new(transform_ids_str, Box::new(sink_config)),
+                    SinkOuter::new(transform_ids_str, sink_config),
                 )
             })
             .collect::<IndexMap<_, _>>();
@@ -505,7 +501,7 @@ fn get_loose_end_outputs_sink(config: &ConfigBuilder) -> Option<SinkOuter<String
             result_tx: Arc::new(Mutex::new(None)),
             check: UnitTestSinkCheck::NoOp,
         };
-        Some(SinkOuter::new(loose_end_outputs, Box::new(noop_sink)))
+        Some(SinkOuter::new(loose_end_outputs, noop_sink))
     }
 }
 

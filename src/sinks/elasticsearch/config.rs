@@ -39,7 +39,7 @@ use lookup::path;
 pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
 
 /// Configuration for the `elasticsearch` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("elasticsearch"))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ElasticsearchConfig {
@@ -101,7 +101,7 @@ pub struct ElasticsearchConfig {
     #[configurable(derived)]
     pub auth: Option<ElasticsearchAuth>,
 
-    #[configurable(derived)]
+    /// Custom parameters to add to the query string of each request sent to Elasticsearch.
     pub query: Option<HashMap<String, String>>,
 
     #[configurable(derived)]
@@ -366,7 +366,6 @@ impl DataStreamConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "elasticsearch")]
 impl SinkConfig for ElasticsearchConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let common = ElasticsearchCommon::parse_config(self).await?;
@@ -412,10 +411,6 @@ impl SinkConfig for ElasticsearchConfig {
 
     fn input(&self) -> Input {
         Input::new(DataType::Metric | DataType::Log)
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "elasticsearch"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

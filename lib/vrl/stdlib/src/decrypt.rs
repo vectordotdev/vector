@@ -129,7 +129,7 @@ impl Function for Decrypt {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let ciphertext = arguments.required("ciphertext");
         let algorithm = arguments.required("algorithm");
