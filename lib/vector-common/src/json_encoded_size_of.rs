@@ -19,6 +19,39 @@ const EPOCH_RFC3339_3: &str = "1970-01-01T00:00:00.000Z";
 const EPOCH_RFC3339_6: &str = "1970-01-01T00:00:00.000000Z";
 const EPOCH_RFC3339_9: &str = "1970-01-01T00:00:00.000000000Z";
 
+// Taken from `serde_json`.
+const BB: u8 = b'b'; // \x08
+const TT: u8 = b't'; // \x09
+const NN: u8 = b'n'; // \x0A
+const FF: u8 = b'f'; // \x0C
+const RR: u8 = b'r'; // \x0D
+const QU: u8 = b'"'; // \x22
+const BS: u8 = b'\\'; // \x5C
+const UU: u8 = b'u'; // \x00...\x1F except the ones above
+const __: u8 = 0;
+
+// Lookup table of escape sequences. A value of b'x' at index i means that byte
+// i is escaped as "\x" in JSON. A value of 0 means that byte i is not escaped.
+static ESCAPE: [u8; 256] = [
+    //   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F
+    UU, UU, UU, UU, UU, UU, UU, UU, BB, TT, NN, UU, FF, RR, UU, UU, // 0
+    UU, UU, UU, UU, UU, UU, UU, UU, UU, UU, UU, UU, UU, UU, UU, UU, // 1
+    __, __, QU, __, __, __, __, __, __, __, __, __, __, __, __, __, // 2
+    __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 3
+    __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 4
+    __, __, __, __, __, __, __, __, __, __, __, __, BS, __, __, __, // 5
+    __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 6
+    __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 7
+    __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 8
+    __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 9
+    __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // A
+    __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // B
+    __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // C
+    __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // D
+    __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // E
+    __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // F
+];
+
 /// A wrapper type around the default `Value` type, to implement the `Serialize` trait in an
 /// efficient way to count the JSON encoded bytes of a `Value`.
 ///
@@ -58,12 +91,20 @@ impl<'a> Serialize for JsonEncodedByteCountingValue<'a> {
             Value::Object(m) => serializer.collect_map(m.iter().map(|(k, v)| (k, Self(v)))),
             Value::Array(a) => serializer.collect_seq(a.iter().map(Self)),
 
-            // While we use the default `Serializer` implementation for `Value` in this case, we
-            // could in the future optimize this to avoid allocations for invalid UTF-8 encoded
-            // bytes by manually iterating the bytes and counting the valid bytes, plus changing the
-            // byte count to account for the replacement of invalid sequences with `U+FFFD
-            // REPLACEMENT CHARACTER`.
-            v @ Value::Bytes(_) => v.serialize(serializer),
+            // The `Value` type serializes `Value::Bytes` using `serialize_str`, but this has two
+            // downsides:
+            //
+            // 1. For invalid UTF-8 encoded bytes, it will replace them with `U+FFFD REPLACEMENT,
+            //    requiring allocations before counting the bytes.
+            //
+            // 2. Even for valid UTF-8 encoded bytes, it will have to validate all individual bytes,
+            //    which our soaks have shown to cause a significant drop in throughput.
+            //
+            // Because of this, we take the assumption that all bytes passed through this serializer
+            // are valid UTF-8 encoded bytes, and thus can be counted as-is. If this is not the
+            // case, the final byte size will be off slightly, or significantly, depending on how
+            // much of the bytes are invalid.
+            Value::Bytes(b) => serializer.serialize_bytes(b),
 
             // All other `Value` variants are serialized according to the default serialization
             // implementation of that type.
@@ -341,46 +382,15 @@ impl<'a> ser::Serializer for &'a mut Serializer {
         Ok(())
     }
 
-    // TODO: handle escaping.
     fn serialize_str(self, v: &str) -> Result<()> {
-        // Taken from `serde_json`.
-        const BB: u8 = b'b'; // \x08
-        const TT: u8 = b't'; // \x09
-        const NN: u8 = b'n'; // \x0A
-        const FF: u8 = b'f'; // \x0C
-        const RR: u8 = b'r'; // \x0D
-        const QU: u8 = b'"'; // \x22
-        const BS: u8 = b'\\'; // \x5C
-        const UU: u8 = b'u'; // \x00...\x1F except the ones above
-        const __: u8 = 0;
+        self.serialize_bytes(v.as_bytes())
+    }
 
-        // Lookup table of escape sequences. A value of b'x' at index i means that byte
-        // i is escaped as "\x" in JSON. A value of 0 means that byte i is not escaped.
-        static ESCAPE: [u8; 256] = [
-            //   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F
-            UU, UU, UU, UU, UU, UU, UU, UU, BB, TT, NN, UU, FF, RR, UU, UU, // 0
-            UU, UU, UU, UU, UU, UU, UU, UU, UU, UU, UU, UU, UU, UU, UU, UU, // 1
-            __, __, QU, __, __, __, __, __, __, __, __, __, __, __, __, __, // 2
-            __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 3
-            __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 4
-            __, __, __, __, __, __, __, __, __, __, __, __, BS, __, __, __, // 5
-            __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 6
-            __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 7
-            __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 8
-            __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 9
-            __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // A
-            __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // B
-            __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // C
-            __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // D
-            __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // E
-            __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // F
-        ];
-
-        let bytes = v.as_bytes();
-
+    // Consider `bytes` as being a valid `str`.
+    fn serialize_bytes(self, v: &[u8]) -> Result<()> {
         let mut start = 0;
 
-        for (i, &byte) in bytes.iter().enumerate() {
+        for (i, &byte) in v.iter().enumerate() {
             let escape = ESCAPE[byte as usize];
             if escape == 0 {
                 continue;
@@ -401,19 +411,13 @@ impl<'a> ser::Serializer for &'a mut Serializer {
             start = i + 1;
         }
 
-        if start != bytes.len() {
+        if start != v.len() {
             self.bytes += v[start..].len();
         }
 
         self.bytes += QUOTES_SIZE;
 
-        // self.bytes += QUOTES_SIZE + v.len();
         Ok(())
-    }
-
-    // Consider `bytes` as being a valid `str`.
-    fn serialize_bytes(self, _: &[u8]) -> Result<()> {
-        unreachable!("value type considers bytes as `str`")
     }
 
     #[inline]
