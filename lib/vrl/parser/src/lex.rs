@@ -993,7 +993,6 @@ impl<'input> Lexer<'input> {
                         };
                     }
                 }
-
                 '.' | '%' if last_char.is_none() => valid = true,
                 '.' if last_char == Some(')') => valid = true,
                 '.' if last_char == Some('}') => valid = true,
