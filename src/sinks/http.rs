@@ -655,6 +655,8 @@ mod tests {
 
     #[tokio::test]
     async fn fails_on_permanent_error() {
+        // TODO use assert_sink_error test helper
+
         let num_lines = 1000;
 
         let (in_addr, sink) = build_sink("").await;
