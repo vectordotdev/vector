@@ -1,4 +1,7 @@
-use crate::{emit, internal_events::ComponentEventsDropped};
+use crate::{
+    emit,
+    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
+};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -27,9 +30,8 @@ impl InternalEvent for RemapMappingError {
             "stage" => error_stage::PROCESSING,
         );
         if self.event_dropped {
-            emit!(ComponentEventsDropped {
+            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
                 count: 1,
-                intentional: false,
                 reason: "Mapping failed with event.",
             });
         }
@@ -53,9 +55,8 @@ impl InternalEvent for RemapMappingAbort {
         );
 
         if self.event_dropped {
-            emit!(ComponentEventsDropped {
+            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
                 count: 1,
-                intentional: false,
                 reason: "Event mapping aborted.",
             });
         }

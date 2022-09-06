@@ -79,11 +79,28 @@ pub async fn start_validated(
 ) -> Option<(RunningTopology, mpsc::UnboundedReceiver<()>)> {
     let (abort_tx, abort_rx) = mpsc::unbounded_channel();
 
+    let expire_metrics = match (
+        config.global.expire_metrics,
+        config.global.expire_metrics_secs,
+    ) {
+        (e @ Some(_), None) => {
+            warn!(
+                "DEPRECATED: `expire_metrics` setting is deprecated and will be removed in a future version. Use `expire_metrics_secs` instead."
+            );
+            e
+        }
+        (Some(_), Some(_)) => {
+            error!("Cannot set both `expire_metrics` and `expire_metrics_secs`.");
+            return None;
+        }
+        (None, e) => e,
+    };
+
     if let Err(error) = crate::metrics::Controller::get()
         .expect("Metrics must be initialized")
-        .set_expiry(config.global.expire_metrics)
+        .set_expiry(expire_metrics)
     {
-        error!(message="Invalid metrics expiry.", %error);
+        error!(message = "Invalid metrics expiry.", %error);
         return None;
     }
 

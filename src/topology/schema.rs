@@ -4,7 +4,10 @@ use value::Kind;
 pub(super) use crate::schema::Definition;
 
 use crate::{
-    config::{ComponentKey, Config, Output, OutputId, SinkOuter, SourceConfig, TransformConfig},
+    config::{
+        ComponentKey, Config, Output, OutputId, SinkConfig, SinkOuter, SourceConfig,
+        TransformConfig,
+    },
     topology,
 };
 

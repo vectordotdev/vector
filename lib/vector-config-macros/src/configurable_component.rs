@@ -30,32 +30,20 @@ impl ComponentType {
     /// down to the derive for `NamedComponent`. This allows it to emit error messages that _look_
     /// like they're coming from `configurable_component`, even though they're coming from the
     /// derive for `NamedComponent`.
-    ///
-    /// However, not all typed components require a name (yet) which is why this function will
-    /// optionally return an ident.
-    fn get_named_component_helper_ident(&self) -> Option<Ident> {
-        match self {
-            ComponentType::EnrichmentTable => {
-                Some(attrs::ENRICHMENT_TABLE_COMPONENT.as_ident(Span::call_site()))
-            }
-            ComponentType::Provider => Some(attrs::PROVIDER_COMPONENT.as_ident(Span::call_site())),
-            ComponentType::Sink => None,
-            ComponentType::Source => Some(attrs::SOURCE_COMPONENT.as_ident(Span::call_site())),
-            ComponentType::Transform => {
-                Some(attrs::TRANSFORM_COMPONENT.as_ident(Span::call_site()))
-            }
-        }
+    fn get_named_component_helper_ident(&self) -> Ident {
+        let attr = match self {
+            ComponentType::EnrichmentTable => attrs::ENRICHMENT_TABLE_COMPONENT,
+            ComponentType::Provider => attrs::PROVIDER_COMPONENT,
+            ComponentType::Sink => attrs::SINK_COMPONENT,
+            ComponentType::Source => attrs::SOURCE_COMPONENT,
+            ComponentType::Transform => attrs::TRANSFORM_COMPONENT,
+        };
+
+        attr.as_ident(Span::call_site())
     }
 
     fn is_valid_type(path: &Path) -> bool {
         ComponentType::try_from(path).is_ok()
-    }
-
-    fn is_valid_named_type(path: &Path) -> bool {
-        ComponentType::try_from(path)
-            .ok()
-            .and_then(|ct| ct.get_named_component_helper_ident())
-            .is_some()
     }
 
     /// Gets the type of this component as a string.
@@ -167,21 +155,18 @@ impl TypedComponent {
     }
 
     /// Creates the component name registration code.
-    ///
-    /// If this component type does not require a name, `None` is returned.
-    fn get_component_name_registration(&self) -> Option<proc_macro2::TokenStream> {
-        self.component_type
-            .get_named_component_helper_ident()
-            .map(|helper_attr| match self.component_name.as_ref() {
-                None => quote_spanned! {self.span=>
-                    #[derive(::vector_config_macros::NamedComponent)]
-                    #[#helper_attr]
-                },
-                Some(component_name) => quote_spanned! {self.span=>
-                    #[derive(::vector_config_macros::NamedComponent)]
-                    #[#helper_attr(#component_name)]
-                },
-            })
+    fn get_component_name_registration(&self) -> proc_macro2::TokenStream {
+        let helper_attr = self.component_type.get_named_component_helper_ident();
+        match self.component_name.as_ref() {
+            None => quote_spanned! {self.span=>
+                #[derive(::vector_config_macros::NamedComponent)]
+                #[#helper_attr]
+            },
+            Some(component_name) => quote_spanned! {self.span=>
+                #[derive(::vector_config_macros::NamedComponent)]
+                #[#helper_attr(#component_name)]
+            },
+        }
     }
 }
 
@@ -190,8 +175,9 @@ struct Options {
     /// Component type details, if specified.
     ///
     /// While the macro `#[configurable_component]` sort of belies an implication that any item
-    /// being annotated is a component, we only consider sources, transforms, and sinks a true
-    /// "component", in the context of a component in a Vector topology.
+    /// being annotated is a component, we make a distinction here in terms of what can be a
+    /// component in a Vector topology, versus simply what is allowed as a configurable "component"
+    /// within a Vector configuration.
     typed_component: Option<TypedComponent>,
 
     /// Whether to disable the automatic derive for `serde::Serialize`.
@@ -230,9 +216,7 @@ impl FromMeta for Options {
                 }
 
                 // Marked as a typed component that requires a name.
-                NestedMeta::Meta(Meta::List(ml))
-                    if ComponentType::is_valid_named_type(&ml.path) =>
-                {
+                NestedMeta::Meta(Meta::List(ml)) if ComponentType::is_valid_type(&ml.path) => {
                     if typed_component.is_some() {
                         errors.push(
                             Error::custom("already marked as a typed component").with_span(ml),
@@ -247,13 +231,11 @@ impl FromMeta for Options {
                     }
                 }
 
-                // Marked as a typed component that either doesn't require a name, or potentially as
-                // one that does require a name, but it was not specified.
+                // Marked as a typed component that requires a name, but it was not specified.
                 //
-                // If the given component type does not require a name, everything is fine. If it
-                // does, but it was forgotten, we still want to generate our normal derive output,
-                // as we let the `NamedComponent` derive handle emitting errors for component types
-                // that are required to have a name, but did not specify one.
+                // When marked as a typed component, but no name is specified, we still want to
+                // generate our normal derive output, as we let the `NamedComponent` derive handle
+                // emitting an error to tell the user that the component type requires a name,
                 //
                 // We don't emit those errors here because errors in attribute macros will cause a
                 // cascading set of errors that are too noisy.
@@ -273,7 +255,7 @@ impl FromMeta for Options {
                 }
 
                 NestedMeta::Meta(m) => {
-                    let error = "expected one of: `enrichment_table(\"...\")`, `provider(\"...\")`, `source(\"...\")`, `transform(\"...\")`, `sink`, `no_ser`, or `no_deser`";
+                    let error = "expected one of: `enrichment_table(\"...\")`, `provider(\"...\")`, `source(\"...\")`, `transform(\"...\")`, `sink(\"...\")`, `no_ser`, or `no_deser`";
                     errors.push(Error::custom(error).with_span(m));
                 }
 

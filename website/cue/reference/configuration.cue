@@ -44,6 +44,22 @@ configuration: {
 				remove all metrics that have not been updated in the given number of seconds.
 				This value must be positive.
 				"""
+			warnings: ["Deprecated, please use `expire_metrics_secs` instead."]
+			required: false
+			type: float: {
+				default: null
+				examples: [60.0]
+				unit: "seconds"
+			}
+		}
+
+		expire_metrics_secs: {
+			common: false
+			description: """
+				If set, Vector will configure the internal metrics system to automatically
+				remove all metrics that have not been updated in the given number of seconds.
+				This value must be positive.
+				"""
 			required: false
 			type: float: {
 				default: null

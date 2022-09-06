@@ -307,7 +307,7 @@ pub fn update_config(config: &Config) {
             component_key.clone(),
             Component::Sink(sink::Sink(sink::Data {
                 component_key: component_key.clone(),
-                component_type: sink.inner.sink_type().to_string(),
+                component_type: sink.inner.get_component_name().to_string(),
                 inputs: sink.inputs.clone(),
             })),
         );

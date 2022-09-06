@@ -5,9 +5,9 @@ use tokio::time::Duration;
 use vector_buffers::{BufferConfig, BufferType, WhenFull};
 use vector_core::config::MEMORY_BUFFER_DEFAULT_MAX_EVENTS;
 
-use crate::topology::builder::SOURCE_SENDER_BUFFER_SIZE;
 use crate::{config::Config, test_util, test_util::start_topology};
 use crate::{config::SinkOuter, test_util::mock::backpressure_source};
+use crate::{test_util::mock::backpressure_sink, topology::builder::SOURCE_SENDER_BUFFER_SIZE};
 
 // Based on how we pump events from `SourceSender` into `Fanout`, there's always one extra event we
 // may pull out of `SourceSender` but can't yet send into `Fanout`, so we account for that here.
@@ -30,13 +30,7 @@ async fn serial_backpressure() {
 
     let source_counter = Arc::new(AtomicUsize::new(0));
     config.add_source("in", backpressure_source(&source_counter));
-    config.add_sink(
-        "out",
-        &["in"],
-        test_sink::TestBackpressureSinkConfig {
-            num_to_consume: events_to_sink,
-        },
-    );
+    config.add_sink("out", &["in"], backpressure_sink(events_to_sink));
 
     let (_topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
@@ -65,21 +59,9 @@ async fn default_fan_out() {
 
     let source_counter = Arc::new(AtomicUsize::new(0));
     config.add_source("in", backpressure_source(&source_counter));
-    config.add_sink(
-        "out1",
-        &["in"],
-        test_sink::TestBackpressureSinkConfig {
-            num_to_consume: events_to_sink * 2,
-        },
-    );
+    config.add_sink("out1", &["in"], backpressure_sink(events_to_sink * 2));
 
-    config.add_sink(
-        "out2",
-        &["in"],
-        test_sink::TestBackpressureSinkConfig {
-            num_to_consume: events_to_sink,
-        },
-    );
+    config.add_sink("out2", &["in"], backpressure_sink(events_to_sink));
 
     let (_topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
@@ -109,26 +91,16 @@ async fn buffer_drop_fan_out() {
 
     let source_counter = Arc::new(AtomicUsize::new(0));
     config.add_source("in", backpressure_source(&source_counter));
-    config.add_sink(
-        "out1",
-        &["in"],
-        test_sink::TestBackpressureSinkConfig {
-            num_to_consume: events_to_sink,
-        },
-    );
+    config.add_sink("out1", &["in"], backpressure_sink(events_to_sink));
 
     let mut sink_outer = SinkOuter::new(
         vec!["in".to_string()],
-        Box::new(test_sink::TestBackpressureSinkConfig {
-            num_to_consume: events_to_sink / 2,
-        }),
+        backpressure_sink(events_to_sink / 2),
     );
-    sink_outer.buffer = BufferConfig {
-        stages: vec![BufferType::Memory {
-            max_events: MEMORY_BUFFER_DEFAULT_MAX_EVENTS,
-            when_full: WhenFull::DropNewest,
-        }],
-    };
+    sink_outer.buffer = BufferConfig::Single(BufferType::Memory {
+        max_events: MEMORY_BUFFER_DEFAULT_MAX_EVENTS,
+        when_full: WhenFull::DropNewest,
+    });
     config.add_sink_outer("out2", sink_outer);
 
     let (_topology, _crash) = start_topology(config.build().unwrap(), false).await;
@@ -173,13 +145,7 @@ async fn multiple_inputs_backpressure() {
     let source_counter = Arc::new(AtomicUsize::new(0));
     config.add_source("in1", backpressure_source(&source_counter));
     config.add_source("in2", backpressure_source(&source_counter));
-    config.add_sink(
-        "out",
-        &["in1", "in2"],
-        test_sink::TestBackpressureSinkConfig {
-            num_to_consume: events_to_sink,
-        },
-    );
+    config.add_sink("out", &["in1", "in2"], backpressure_sink(events_to_sink));
 
     let (_topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
@@ -196,60 +162,4 @@ async fn multiple_inputs_backpressure() {
 async fn wait_until_expected(source_counter: impl AsRef<AtomicUsize>, expected: usize) {
     crate::test_util::wait_for_atomic_usize(source_counter, |count| count >= expected).await;
     tokio::time::sleep(Duration::from_millis(100)).await;
-}
-
-mod test_sink {
-    use async_trait::async_trait;
-    use futures::stream::BoxStream;
-    use futures::{FutureExt, StreamExt};
-    use serde::{Deserialize, Serialize};
-
-    use crate::config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext};
-    use crate::event::Event;
-    use crate::sinks::util::StreamSink;
-    use crate::sinks::{Healthcheck, VectorSink};
-
-    #[derive(Debug)]
-    struct TestBackpressureSink {
-        // It consumes this many then stops.
-        num_to_consume: usize,
-    }
-
-    #[async_trait]
-    impl StreamSink<Event> for TestBackpressureSink {
-        async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-            let _num_taken = input.take(self.num_to_consume).count().await;
-            futures::future::pending::<()>().await;
-            Ok(())
-        }
-    }
-
-    #[derive(Debug, Serialize, Deserialize)]
-    pub(super) struct TestBackpressureSinkConfig {
-        pub num_to_consume: usize,
-    }
-
-    #[async_trait]
-    #[typetag::serde(name = "test-backpressure-sink")]
-    impl SinkConfig for TestBackpressureSinkConfig {
-        async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-            let sink = TestBackpressureSink {
-                num_to_consume: self.num_to_consume,
-            };
-            let healthcheck = futures::future::ok(()).boxed();
-            Ok((VectorSink::from_event_streamsink(sink), healthcheck))
-        }
-
-        fn input(&self) -> Input {
-            Input::all()
-        }
-
-        fn sink_type(&self) -> &'static str {
-            "test-backpressure-sink"
-        }
-
-        fn acknowledgements(&self) -> &AcknowledgementsConfig {
-            &AcknowledgementsConfig::DEFAULT
-        }
-    }
 }

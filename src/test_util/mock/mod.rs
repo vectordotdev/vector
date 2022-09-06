@@ -2,12 +2,16 @@ use std::sync::{atomic::AtomicUsize, Arc};
 
 use futures_util::Stream;
 use stream_cancel::Trigger;
+use tokio::sync::oneshot::Sender;
 use vector_core::event::EventArray;
 
 use crate::SourceSender;
 
 use self::{
-    sinks::{BasicSinkConfig, ErrorSinkConfig, PanicSinkConfig},
+    sinks::{
+        BackpressureSinkConfig, BasicSinkConfig, ErrorSinkConfig, OneshotSinkConfig,
+        PanicSinkConfig,
+    },
     sources::{
         BackpressureSourceConfig, BasicSourceConfig, ErrorSourceConfig, PanicSourceConfig,
         TripwireSourceConfig,
@@ -62,6 +66,10 @@ pub fn basic_transform(suffix: &str, increase: f64) -> BasicTransformConfig {
     BasicTransformConfig::new(suffix.to_owned(), increase)
 }
 
+pub const fn backpressure_sink(num_to_consume: usize) -> BackpressureSinkConfig {
+    BackpressureSinkConfig { num_to_consume }
+}
+
 pub fn basic_sink(channel_size: usize) -> (impl Stream<Item = EventArray>, BasicSinkConfig) {
     let (tx, rx) = SourceSender::new_with_buffer(channel_size);
     let sink = BasicSinkConfig::new(tx, true);
@@ -87,6 +95,10 @@ pub fn basic_sink_failing_healthcheck(
 
 pub fn error_sink() -> ErrorSinkConfig {
     ErrorSinkConfig::default()
+}
+
+pub fn oneshot_sink(tx: Sender<EventArray>) -> OneshotSinkConfig {
+    OneshotSinkConfig::new(tx)
 }
 
 pub fn panic_sink() -> PanicSinkConfig {

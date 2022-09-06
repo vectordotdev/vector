@@ -17,7 +17,7 @@ use crate::{
 };
 
 /// Configuration for the `loki` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("loki"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct LokiConfig {
@@ -149,7 +149,6 @@ impl LokiConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "loki")]
 impl SinkConfig for LokiConfig {
     async fn build(
         &self,
@@ -181,10 +180,6 @@ impl SinkConfig for LokiConfig {
 
     fn input(&self) -> Input {
         Input::new(self.encoding.config().input_type() & DataType::Log)
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "loki"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
