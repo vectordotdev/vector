@@ -14,10 +14,10 @@ const QUOTES_SIZE: usize = 2;
 const COMMA_SIZE: usize = 1;
 const COLON_SIZE: usize = 1;
 
-const EPOCH_RFC3339_0: &'static str = "1970-01-01T00:00:00Z";
-const EPOCH_RFC3339_3: &'static str = "1970-01-01T00:00:00.000Z";
-const EPOCH_RFC3339_6: &'static str = "1970-01-01T00:00:00.000000Z";
-const EPOCH_RFC3339_9: &'static str = "1970-01-01T00:00:00.000000000Z";
+const EPOCH_RFC3339_0: &str = "1970-01-01T00:00:00Z";
+const EPOCH_RFC3339_3: &str = "1970-01-01T00:00:00.000Z";
+const EPOCH_RFC3339_6: &str = "1970-01-01T00:00:00.000000Z";
+const EPOCH_RFC3339_9: &str = "1970-01-01T00:00:00.000000000Z";
 
 /// A wrapper type around the default `Value` type, to implement the `Serialize` trait in an
 /// efficient way to count the JSON encoded bytes of a `Value`.
