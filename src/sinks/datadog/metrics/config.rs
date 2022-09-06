@@ -155,8 +155,6 @@ impl_generate_config_from_default!(DatadogMetricsConfig);
 
 #[async_trait::async_trait]
 impl SinkConfig for DatadogMetricsConfig {
-    // TODO should the caller of build catch the Error and emit an internal error event?
-    // or should we do that here..., or lower than here ...
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.build_client(&cx.proxy)?;
         let healthcheck = self.build_healthcheck(client.clone())?;
