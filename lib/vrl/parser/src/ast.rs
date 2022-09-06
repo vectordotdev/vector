@@ -10,7 +10,7 @@ use std::{
 #[cfg(feature = "fuzz")]
 use arbitrary::Arbitrary;
 use diagnostic::Span;
-use lookup::lookup_v2::{OwnedPath, PathPrefix, TargetPath};
+use lookup::lookup_v2::{OwnedTargetPath, OwnedValuePath, PathPrefix};
 use ordered_float::NotNan;
 
 use crate::{template_string::TemplateString, Error};
@@ -851,8 +851,8 @@ impl fmt::Debug for Assignment {
 pub enum AssignmentTarget {
     Noop,
     Query(Query),
-    Internal(Ident, Option<OwnedPath>),
-    External(Option<TargetPath>),
+    Internal(Ident, Option<OwnedValuePath>),
+    External(Option<OwnedTargetPath>),
 }
 
 impl AssignmentTarget {
@@ -878,7 +878,10 @@ impl AssignmentTarget {
                         let prefix = path.as_ref().map_or(PathPrefix::Event, |x| x.prefix);
                         Node::new(span, QueryTarget::External(prefix))
                     },
-                    path: Node::new(span, path.clone().map_or(OwnedPath::root(), |x| x.path)),
+                    path: Node::new(
+                        span,
+                        path.clone().map_or(OwnedValuePath::root(), |x| x.path),
+                    ),
                 },
             )),
         }
@@ -922,7 +925,7 @@ impl fmt::Debug for AssignmentTarget {
 #[derive(Clone, PartialEq)]
 pub struct Query {
     pub target: Node<QueryTarget>,
-    pub path: Node<OwnedPath>,
+    pub path: Node<OwnedValuePath>,
 }
 
 impl fmt::Display for Query {

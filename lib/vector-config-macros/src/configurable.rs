@@ -92,14 +92,14 @@ fn build_metadata_fn(container: &Container<'_>) -> proc_macro2::TokenStream {
 
 fn build_virtual_newtype_schema_fn(virtual_ty: Type) -> proc_macro2::TokenStream {
     quote! {
-        fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator, overrides: ::vector_config::Metadata<Self>) -> ::vector_config::schemars::schema::SchemaObject {
+        fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator) -> std::result::Result<::vector_config::schemars::schema::SchemaObject, ::vector_config::GenerateError> {
             // Virtual newtypes always shuttle their schema's metadata/overridden metadata when generating the schema
             // for the wrapped type, otherwise we wouldn't be able to effectively document them. This does mean we end
             // up dropping any default value for _this_ schema's metadata, including overridden metadata, so the wrapped
             // type must have a default value for itself if having a default value is required.
-            let overrides = Self::metadata().merge(overrides).convert();
+            let metadata = Self::metadata().convert();
 
-            <#virtual_ty as ::vector_config::Configurable>::generate_schema(schema_gen, overrides)
+            ::vector_config::schema::get_or_generate_schema::<#virtual_ty>(schema_gen, metadata)
         }
     }
 }
@@ -112,16 +112,16 @@ fn build_enum_generate_schema_fn(variants: &[Variant<'_>]) -> proc_macro2::Token
         .map(generate_enum_variant_schema);
 
     quote! {
-        fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator, overrides: ::vector_config::Metadata<Self>) -> ::vector_config::schemars::schema::SchemaObject {
+        fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator) -> std::result::Result<::vector_config::schemars::schema::SchemaObject, ::vector_config::GenerateError> {
             let mut subschemas = ::std::vec::Vec::new();
 
-            let schema_metadata = Self::metadata().merge(overrides);
+            let schema_metadata = Self::metadata();
             #(#mapped_variants)*
 
             let mut schema = ::vector_config::schema::generate_composite_schema(&subschemas);
-            ::vector_config::schema::finalize_schema(schema_gen, &mut schema, schema_metadata);
+            ::vector_config::schema::apply_metadata(&mut schema, schema_metadata);
 
-            schema
+            Ok(schema)
         }
     }
 }
@@ -140,19 +140,18 @@ fn build_struct_generate_schema_fn(
 }
 
 fn generate_struct_field(field: &Field<'_>) -> proc_macro2::TokenStream {
-    let field_schema_ty = get_field_schema_ty(field);
-
     let field_metadata_ref = Ident::new("field_metadata", Span::call_site());
     let field_metadata = generate_field_metadata(&field_metadata_ref, field);
 
     let spanned_generate_schema = quote_spanned! {field.span()=>
-        <#field_schema_ty as ::vector_config::Configurable>::generate_schema(schema_gen, #field_metadata_ref.as_subschema())
+        ::vector_config::schema::get_or_generate_schema(schema_gen, #field_metadata_ref.as_subschema())?
     };
 
     quote! {
         #field_metadata
+
         let mut subschema = #spanned_generate_schema;
-        ::vector_config::schema::finalize_schema(schema_gen, &mut subschema, #field_metadata_ref);
+        ::vector_config::schema::apply_metadata(&mut subschema, #field_metadata_ref);
     }
 }
 
@@ -238,12 +237,12 @@ fn build_named_struct_generate_schema_fn(
         .map(|field| generate_named_struct_field(container, field));
 
     quote! {
-        fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator, overrides: ::vector_config::Metadata<Self>) -> ::vector_config::schemars::schema::SchemaObject {
+        fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator) -> std::result::Result<::vector_config::schemars::schema::SchemaObject, ::vector_config::GenerateError> {
             let mut properties = ::vector_config::indexmap::IndexMap::new();
             let mut required = ::std::collections::BTreeSet::new();
             let mut flattened_subschemas = ::std::vec::Vec::new();
 
-            let metadata = Self::metadata().merge(overrides);
+            let metadata = Self::metadata();
             #(#mapped_fields)*
 
             let additional_properties = None;
@@ -258,9 +257,9 @@ fn build_named_struct_generate_schema_fn(
                 ::vector_config::schema::convert_to_flattened_schema(&mut schema, flattened_subschemas);
             }
 
-            ::vector_config::schema::finalize_schema(schema_gen, &mut schema, metadata);
+            ::vector_config::schema::apply_metadata(&mut schema, metadata);
 
-            schema
+            Ok(schema)
         }
     }
 }
@@ -273,16 +272,16 @@ fn build_tuple_struct_generate_schema_fn(fields: &[Field<'_>]) -> proc_macro2::T
         .map(generate_tuple_struct_field);
 
     quote! {
-        fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator, overrides: ::vector_config::Metadata<Self>) -> ::vector_config::schemars::schema::SchemaObject {
+        fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator) -> std::result::Result<::vector_config::schemars::schema::SchemaObject, ::vector_config::GenerateError> {
             let mut subschemas = ::std::collections::Vec::new();
 
-            let metadata = Self::metadata().merge(overrides);
+            let metadata = Self::metadata();
             #(#mapped_fields)*
 
             let mut schema = ::vector_config::schema::generate_tuple_schema(&subschemas);
-            ::vector_config::schema::finalize_schema(schema_gen, &mut schema, metadata);
+            ::vector_config::schema::apply_metadata(&mut schema, metadata);
 
-            schema
+            Ok(schema)
         }
     }
 }
@@ -303,13 +302,13 @@ fn build_newtype_struct_generate_schema_fn(fields: &[Field<'_>]) -> proc_macro2:
     let field_schema = mapped_fields.remove(0);
 
     quote! {
-        fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator, overrides: ::vector_config::Metadata<Self>) -> ::vector_config::schemars::schema::SchemaObject {
-            let metadata = Self::metadata().merge(overrides);
+        fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator) -> std::result::Result<::vector_config::schemars::schema::SchemaObject, ::vector_config::GenerateError> {
+            let metadata = Self::metadata();
 
             #field_schema
-            ::vector_config::schema::finalize_schema(schema_gen, &mut subschema, metadata);
+            ::vector_config::schema::apply_metadata(&mut subschema, metadata);
 
-            subschema
+            Ok(subschema)
         }
     }
 }
@@ -318,7 +317,7 @@ fn generate_container_metadata(
     meta_ident: &Ident,
     container: &Container<'_>,
 ) -> proc_macro2::TokenStream {
-    let maybe_title = get_metadata_description(meta_ident, container.title());
+    let maybe_title = get_metadata_title(meta_ident, container.title());
     let maybe_description = get_metadata_description(meta_ident, container.description());
     let maybe_default_value = get_metadata_default_value(meta_ident, container.default_value());
     let maybe_deprecated = get_metadata_deprecated(meta_ident, container.deprecated());

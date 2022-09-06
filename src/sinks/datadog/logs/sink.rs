@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use codecs::{encoding::Framer, CharacterDelimitedEncoder, JsonSerializer};
 use futures::{stream::BoxStream, StreamExt};
-use lookup::path;
+use lookup::event_path;
 use snafu::Snafu;
 use tower::Service;
 use vector_core::{
@@ -136,10 +136,13 @@ impl crate::sinks::util::encoding::Encoder<Vec<Event>> for JsonEncoding {
     fn encode_input(&self, mut input: Vec<Event>, writer: &mut dyn io::Write) -> io::Result<usize> {
         for event in input.iter_mut() {
             let log = event.as_mut_log();
-            log.rename_key(self.log_schema.message_key(), path!("message"));
-            log.rename_key(self.log_schema.host_key(), path!("host"));
+            log.rename_key(self.log_schema.message_key(), event_path!("message"));
+            log.rename_key(self.log_schema.host_key(), event_path!("host"));
             if let Some(Value::Timestamp(ts)) = log.remove(self.log_schema.timestamp_key()) {
-                log.insert(path!("timestamp"), Value::Integer(ts.timestamp_millis()));
+                log.insert(
+                    event_path!("timestamp"),
+                    Value::Integer(ts.timestamp_millis()),
+                );
             }
         }
 
@@ -156,13 +159,13 @@ impl crate::sinks::util::encoding::Encoder<Vec<Event>> for SemanticJsonEncoding 
             let message_key = log
                 .find_key_by_meaning("message")
                 .expect("enforced by schema");
-            log.rename_key(message_key.as_str(), path!("message"));
+            log.rename_key(message_key.as_str(), event_path!("message"));
 
             // host
             let host_key = log
                 .find_key_by_meaning("host")
                 .unwrap_or_else(|| self.log_schema.host_key().into());
-            log.rename_key(host_key.as_str(), path!("host"));
+            log.rename_key(host_key.as_str(), event_path!("host"));
 
             // timestamp
             let ts = log
@@ -170,7 +173,7 @@ impl crate::sinks::util::encoding::Encoder<Vec<Event>> for SemanticJsonEncoding 
                 .expect("enforced by schema")
                 .as_timestamp_unwrap();
             let ms = ts.timestamp_millis();
-            log.insert(path!("timestamp"), Value::Integer(ms));
+            log.insert(event_path!("timestamp"), Value::Integer(ms));
         }
 
         self.encoder.encode_input(input, writer)

@@ -1,4 +1,7 @@
-use crate::{emit, internal_events::ComponentEventsDropped};
+use crate::{
+    emit,
+    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
+};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -30,9 +33,8 @@ impl InternalEvent for DatadogMetricsEncodingError {
         );
 
         if self.dropped_events > 0 {
-            emit!(ComponentEventsDropped {
+            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
                 count: self.dropped_events,
-                intentional: false,
                 reason,
             });
         }

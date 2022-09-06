@@ -30,7 +30,8 @@ use dnstap_proto::{
     message::Type as DnstapMessageType, Dnstap, Message as DnstapMessage, SocketFamily,
     SocketProtocol,
 };
-use lookup::lookup_v2::OwnedPath;
+use lookup::lookup_v2::OwnedValuePath;
+use lookup::PathPrefix;
 
 use super::{
     dns_message::{
@@ -78,7 +79,7 @@ static DNSTAP_MESSAGE_RESPONSE_TYPE_IDS: Lazy<HashSet<i32>> = Lazy::new(|| {
 
 pub struct DnstapParser<'a> {
     event_schema: &'a DnstapEventSchema,
-    parent_key_path: OwnedPath,
+    parent_key_path: OwnedValuePath,
     log_event: &'a mut LogEvent,
 }
 
@@ -105,7 +106,8 @@ impl<'a> DnstapParser<'a> {
     {
         let mut node_path = self.parent_key_path.clone();
         node_path.push_field(key);
-        self.log_event.insert(&node_path, value)
+        self.log_event
+            .insert((PathPrefix::Event, &node_path), value)
     }
 
     pub fn parse_dnstap_data(&mut self, frame: Bytes) -> Result<()> {

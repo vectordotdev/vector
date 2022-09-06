@@ -143,7 +143,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use lookup::lookup_v2::parse_path;
+    use lookup::lookup_v2::parse_value_path;
 
     use super::*;
     use crate::codecs::encoding::TimestampFormat;
@@ -166,7 +166,10 @@ mod test {
 
         let transformer = encoding.transformer();
 
-        assert_eq!(transformer.only_fields(), &Some(vec![parse_path("a.b[0]")]));
+        assert_eq!(
+            transformer.only_fields(),
+            &Some(vec![parse_value_path("a.b[0]")])
+        );
         assert_eq!(
             transformer.except_fields(),
             &Some(vec!["ignore_me".to_owned()])
@@ -198,7 +201,10 @@ mod test {
 
         let transformer = encoding.transformer();
 
-        assert_eq!(transformer.only_fields(), &Some(vec![parse_path("a.b[0]")]));
+        assert_eq!(
+            transformer.only_fields(),
+            &Some(vec![parse_value_path("a.b[0]")])
+        );
         assert_eq!(
             transformer.except_fields(),
             &Some(vec!["ignore_me".to_owned()])
@@ -227,7 +233,10 @@ mod test {
 
         let transformer = encoding.transformer();
 
-        assert_eq!(transformer.only_fields(), &Some(vec![parse_path("a.b[0]")]));
+        assert_eq!(
+            transformer.only_fields(),
+            &Some(vec![parse_value_path("a.b[0]")])
+        );
         assert_eq!(
             transformer.except_fields(),
             &Some(vec!["ignore_me".to_owned()])
