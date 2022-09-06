@@ -36,8 +36,8 @@ use super::{
 };
 use crate::{
     config::{
-        ComponentKey, DataType, Input, Output, OutputId, ProxyConfig, SinkContext, SourceConfig,
-        SourceContext, TransformConfig, TransformContext, TransformOuter,
+        ComponentKey, DataType, Input, Output, OutputId, ProxyConfig, SinkConfig, SinkContext,
+        SourceConfig, SourceContext, TransformConfig, TransformContext, TransformOuter,
     },
     event::{EventArray, EventContainer},
     internal_events::EventsReceived,
@@ -337,7 +337,7 @@ pub async fn build_pieces(
         let healthcheck = sink.healthcheck();
         let enable_healthcheck = healthcheck.enabled && config.healthchecks.enabled;
 
-        let typetag = sink.inner.sink_type();
+        let typetag = sink.inner.get_component_name();
         let input_type = sink.inner.input().data_type();
 
         if config.schema.validation {

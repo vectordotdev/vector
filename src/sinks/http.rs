@@ -16,10 +16,7 @@ use vector_config::configurable_component;
 
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
-    config::{
-        AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
-        SinkDescription,
-    },
+    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     event::Event,
     http::{Auth, HttpClient, MaybeAuth},
     sinks::util::{
@@ -46,7 +43,7 @@ enum BuildError {
 }
 
 /// Configuration for the `http` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("http"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct HttpSinkConfig {
@@ -130,10 +127,6 @@ pub enum HttpMethod {
     Patch,
 }
 
-inventory::submit! {
-    SinkDescription::new::<HttpSinkConfig>("http")
-}
-
 impl GenerateConfig for HttpSinkConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(
@@ -180,7 +173,6 @@ fn default_sink(encoding: EncodingConfigWithFraming) -> HttpSink {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "http")]
 impl SinkConfig for HttpSinkConfig {
     async fn build(
         &self,
@@ -235,10 +227,6 @@ impl SinkConfig for HttpSinkConfig {
 
     fn input(&self) -> Input {
         Input::new(self.encoding.config().1.input_type() & DataType::Log)
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "http"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

@@ -41,7 +41,7 @@ regex = { version = "1.6.0", default-features = false, features = ["std", "perf"
 serde = { version = "1.0.144", default-features = false, features = ["derive", "rc"] }
 serde_json = { version = "1.0.85", default-features = false }
 snafu = { version = "0.7.1", default-features = false }
-socket2 = { version = "0.4.6", default-features = false }
+socket2 = { version = "0.4.7", default-features = false }
 tokio = { version = "1.20.1", default-features = false, features = ["net"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1", default-features = false, features = ["time"], optional = true }

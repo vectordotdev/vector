@@ -312,7 +312,7 @@ impl UnitTestBuildMetadata {
                 let sink_id = sink_ids.join(",");
                 (
                     ComponentKey::from(sink_id),
-                    SinkOuter::new(transform_ids_str, Box::new(sink_config)),
+                    SinkOuter::new(transform_ids_str, sink_config),
                 )
             })
             .collect::<IndexMap<_, _>>();
@@ -501,7 +501,7 @@ fn get_loose_end_outputs_sink(config: &ConfigBuilder) -> Option<SinkOuter<String
             result_tx: Arc::new(Mutex::new(None)),
             check: UnitTestSinkCheck::NoOp,
         };
-        Some(SinkOuter::new(loose_end_outputs, Box::new(noop_sink)))
+        Some(SinkOuter::new(loose_end_outputs, noop_sink))
     }
 }
 

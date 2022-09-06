@@ -147,7 +147,6 @@ impl Expression for DelFn {
         let return_type = self.query.apply_type_info(&mut state);
 
         self.query.delete_type_def(&mut state.external);
-
         TypeInfo::new(state, return_type)
     }
 }

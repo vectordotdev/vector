@@ -56,12 +56,14 @@ pub struct ProxyConfig {
     /// Proxy endpoint to use when proxying HTTP traffic.
     ///
     /// Must be a valid URI string.
+    #[configurable(validation(format = "uri"))]
     #[serde(default)]
     pub http: Option<String>,
 
     /// Proxy endpoint to use when proxying HTTPS traffic.
     ///
     /// Must be a valid URI string.
+    #[configurable(validation(format = "uri"))]
     #[serde(default)]
     pub https: Option<String>,
 

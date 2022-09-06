@@ -383,29 +383,3 @@ impl NamedComponent for Sources {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use vector_config::{configurable_component, schema::generate_root_schema};
-
-    use crate::sources::Sources;
-
-    /// Top-level Vector configuration. (mock)
-    #[configurable_component]
-    #[derive(Clone)]
-    struct MockRootConfig {
-        /// All configured sources.
-        sources: Vec<Sources>,
-    }
-
-    #[test]
-    #[ignore]
-    #[allow(clippy::print_stdout)]
-    fn vector_config() {
-        let root_schema = generate_root_schema::<MockRootConfig>();
-        let json = serde_json::to_string_pretty(&root_schema)
-            .expect("rendering root schema to JSON should not fail");
-
-        println!("{}", json);
-    }
-}

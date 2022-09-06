@@ -3,9 +3,7 @@ pub mod v2;
 
 use vector_config::configurable_component;
 
-use crate::config::{
-    AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
-};
+use crate::config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext};
 
 /// Marker type for the version one of the configuration for the `vector` sink.
 #[configurable_component]
@@ -50,7 +48,7 @@ pub struct VectorConfigV2 {
 }
 
 /// Configurable for the `vector` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("vector"))]
 #[derive(Clone, Debug)]
 #[serde(untagged)]
 pub enum VectorConfig {
@@ -59,10 +57,6 @@ pub enum VectorConfig {
 
     /// Configuration for version two.
     V2(#[configurable(derived)] VectorConfigV2),
-}
-
-inventory::submit! {
-    SinkDescription::new::<VectorConfig>("vector")
 }
 
 impl GenerateConfig for VectorConfig {
@@ -77,7 +71,6 @@ impl GenerateConfig for VectorConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "vector")]
 impl SinkConfig for VectorConfig {
     async fn build(
         &self,
@@ -91,10 +84,6 @@ impl SinkConfig for VectorConfig {
 
     fn input(&self) -> Input {
         Input::all()
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "vector"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
