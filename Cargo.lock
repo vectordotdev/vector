@@ -4121,9 +4121,9 @@ dependencies = [
 
 [[package]]
 name = "md-5"
-version = "0.10.2"
+version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "274fd6bd98a3c75c9515d9393b063099f60f9b47f09ee20a34fd76287fd017f4"
+checksum = "66b48670c893079d3c2ed79114e3644b7004df1c361a4e0ad52e2e6940d07c3d"
 dependencies = [
  "digest 0.10.3",
 ]
@@ -6190,9 +6190,9 @@ dependencies = [
 
 [[package]]
 name = "roaring"
-version = "0.9.0"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd539cab4e32019956fe7e0cf160bb6d4802f4be2b52c4253d76d3bb0f85a5f7"
+checksum = "48de5b5febb28599c6d9d34817d8ee8c74417af507b90dde0d481b28ca55ed6f"
 dependencies = [
  "bytemuck",
  "byteorder",
