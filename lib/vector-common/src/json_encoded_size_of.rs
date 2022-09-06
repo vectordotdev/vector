@@ -103,7 +103,7 @@ impl<'a> Serialize for JsonEncodedByteCountingValue<'a> {
             // Because of this, we take the assumption that all bytes passed through this serializer
             // are valid UTF-8 encoded bytes, and thus can be counted as-is. If this is not the
             // case, the final byte size will be off slightly, or significantly, depending on how
-            // much of the bytes are invalid.
+            // many of the bytes need to be escaped, or replaced.
             Value::Bytes(b) => serializer.serialize_bytes(b),
 
             // All other `Value` variants are serialized according to the default serialization
@@ -388,35 +388,7 @@ impl<'a> ser::Serializer for &'a mut Serializer {
 
     // Consider `bytes` as being a valid `str`.
     fn serialize_bytes(self, v: &[u8]) -> Result<()> {
-        let mut start = 0;
-
-        for (i, &byte) in v.iter().enumerate() {
-            let escape = ESCAPE[byte as usize];
-            if escape == 0 {
-                continue;
-            }
-
-            if start < i {
-                self.bytes += v[start..i].len();
-            }
-
-            match escape {
-                // `\u00bb`
-                UU => self.bytes += 6,
-
-                // All other escapes add 2 bytes (one for the byte itself, and one for `\`).
-                _ => self.bytes += 2,
-            }
-
-            start = i + 1;
-        }
-
-        if start != v.len() {
-            self.bytes += v[start..].len();
-        }
-
-        self.bytes += QUOTES_SIZE;
-
+        self.bytes += v.len() + QUOTES_SIZE;
         Ok(())
     }
 
