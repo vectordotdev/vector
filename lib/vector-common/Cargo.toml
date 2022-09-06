@@ -11,7 +11,8 @@ default = [
   "btreemap",
   "conversion",
   "tokenize",
-  "encoding"
+  "encoding",
+  "sensitive_string"
 ]
 
 aws_cloudwatch_logs_subscription = [
@@ -35,6 +36,8 @@ encoding = [
   "dep:snafu",
   "btreemap"
 ]
+
+sensitive_string = []
 
 test = []
 
