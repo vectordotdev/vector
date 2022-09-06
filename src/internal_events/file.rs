@@ -6,7 +6,7 @@ use vector_core::internal_event::InternalEvent;
 
 #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
 pub use self::source::*;
-use super::prelude::{error_stage, error_type};
+use vector_common::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct FileOpen {
@@ -77,7 +77,7 @@ mod source {
 
     use super::{FileOpen, InternalEvent};
     use crate::emit;
-    use crate::internal_events::prelude::{error_stage, error_type};
+    use vector_common::internal_event::{error_stage, error_type};
 
     #[derive(Debug)]
     pub struct FileBytesReceived<'a> {
