@@ -31,21 +31,6 @@ impl<'a> Serialize for JsonEncodedByteCountingValue<'a> {
         S: ser::Serializer,
     {
         match &self.0 {
-            // The default `Value` `Serializer` implementation always allocates to a string, whereas
-            // we can use a reference to the existing bytes to count the size of the final string,
-            // as long as those bytes are valid UTF-8.
-            //
-            // If the bytes are invalid UTF-8, we still have to allocate, to get the final exact
-            // size, as the invalid sequences are replaced with the `U+FFFD REPLACEMENT CHARACTER`.
-            //
-            // If performance is an issue, we can change this to manually iterate the byte sequences
-            // and add/subtract byte counts as we encounter valid/invalid UTF-8 sequences.
-            Value::Bytes(b) => {
-                let s = String::from_utf8_lossy(b);
-
-                serializer.serialize_str(s.as_ref())
-            }
-
             // The timestamp is converted to a static epoch timestamp, to avoid any unnecessary
             // allocations.
             //
@@ -72,6 +57,13 @@ impl<'a> Serialize for JsonEncodedByteCountingValue<'a> {
             // Collection types have their inner `Value`'s wrapped in `JsonEncodedValue`.
             Value::Object(m) => serializer.collect_map(m.iter().map(|(k, v)| (k, Self(v)))),
             Value::Array(a) => serializer.collect_seq(a.iter().map(Self)),
+
+            // While we use the default `Serializer` implementation for `Value` in this case, we
+            // could in the future optimize this to avoid allocations for invalid UTF-8 encoded
+            // bytes by manually iterating the bytes and counting the valid bytes, plus changing the
+            // byte count to account for the replacement of invalid sequences with `U+FFFD
+            // REPLACEMENT CHARACTER`.
+            v @ Value::Bytes(_) => v.serialize(serializer),
 
             // All other `Value` variants are serialized according to the default serialization
             // implementation of that type.
