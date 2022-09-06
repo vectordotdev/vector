@@ -97,7 +97,7 @@ async fn handle_batch_status(receiver: Option<BatchStatusReceiver>) -> Result<()
     }
 }
 
-/// Configurable for the `vector` source.
+/// Configuration for the `vector` source.
 #[configurable_component(source("vector"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]

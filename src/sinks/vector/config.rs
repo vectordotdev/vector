@@ -27,7 +27,7 @@ use crate::{
     tls::{tls_connector_builder, MaybeTlsSettings, TlsEnableableConfig},
 };
 
-/// Configurable for the `vector` sink.
+/// Configuration for the `vector` sink.
 #[configurable_component(sink("vector"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
