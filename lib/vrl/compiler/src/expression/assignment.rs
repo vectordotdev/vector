@@ -1,7 +1,8 @@
 use std::{convert::TryFrom, fmt};
 
 use diagnostic::{DiagnosticMessage, Label, Note};
-use lookup::{LookupBuf, SegmentBuf};
+use lookup::lookup_v2::TargetPath;
+use lookup::{LookupBuf, OwnedPath, PathPrefix, SegmentBuf};
 use value::{Kind, Value};
 
 use crate::{
@@ -178,8 +179,8 @@ fn verify_mutable(
     assignment_span: Span,
 ) -> Result<(), Error> {
     match target {
-        Target::External(lookup_buf) => {
-            if config.is_read_only_event_path(lookup_buf) {
+        Target::External(target_path) => {
+            if config.is_read_only_path(target_path) {
                 Err(Error {
                     variant: ErrorVariant::ReadOnly,
                     expr_span,
@@ -205,7 +206,7 @@ fn verify_overwriteable(
     assignment_span: Span,
     rhs_expr: Expr,
 ) -> Result<(), Error> {
-    let mut path = target.lookup_buf();
+    let mut path = LookupBuf::from(target.path());
 
     let root_kind = match target {
         Target::Noop => Kind::any(),
@@ -320,8 +321,8 @@ impl fmt::Debug for Assignment {
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub(crate) enum Target {
     Noop,
-    Internal(Ident, LookupBuf),
-    External(LookupBuf),
+    Internal(Ident, OwnedPath),
+    External(TargetPath),
 }
 
 impl Target {
@@ -330,26 +331,35 @@ impl Target {
             Self::Noop => {}
             Self::Internal(ident, path) => {
                 let type_def = match state.local.variable(ident) {
-                    None => TypeDef::null().with_type_inserted(path, new_type_def),
-                    Some(&Details { ref type_def, .. }) => {
-                        type_def.clone().with_type_inserted(path, new_type_def)
-                    }
+                    None => TypeDef::null().with_type_inserted(&path.clone().into(), new_type_def),
+                    Some(&Details { ref type_def, .. }) => type_def
+                        .clone()
+                        .with_type_inserted(&path.clone().into(), new_type_def),
                 };
 
                 let details = Details { type_def, value };
                 state.local.insert_variable(ident.clone(), details);
             }
 
-            Self::External(path) => {
-                state.external.update_target(Details {
-                    type_def: state
-                        .external
-                        .target()
-                        .type_def
-                        .clone()
-                        .with_type_inserted(path, new_type_def),
-                    value,
-                });
+            Self::External(target_path) => {
+                match target_path.prefix {
+                    PathPrefix::Event => {
+                        state.external.update_target(Details {
+                            type_def: state
+                                .external
+                                .target()
+                                .type_def
+                                .clone()
+                                .with_type_inserted(&target_path.path.clone().into(), new_type_def),
+                            value,
+                        });
+                    }
+                    PathPrefix::Metadata => {
+                        let mut kind = state.external.metadata_kind().clone();
+                        kind.insert(&target_path.path, new_type_def.kind().clone());
+                        state.external.update_metadata(kind);
+                    }
+                };
             }
         }
     }
@@ -370,7 +380,9 @@ impl Target {
                 // Update existing variable using the provided path, or create a
                 // new value in the store.
                 match ctx.state_mut().variable_mut(ident) {
-                    Some(stored) => stored.insert_by_path(path, value),
+                    Some(stored) => {
+                        stored.insert(path, value);
+                    }
                     None => ctx
                         .state_mut()
                         .insert_variable(ident.clone(), value.at_path(path)),
@@ -383,11 +395,11 @@ impl Target {
         }
     }
 
-    fn lookup_buf(&self) -> LookupBuf {
+    fn path(&self) -> OwnedPath {
         match self {
-            Self::Noop => LookupBuf::root(),
+            Self::Noop => OwnedPath::root(),
             Self::Internal(_, path) => path.clone(),
-            Self::External(path) => path.clone(),
+            Self::External(target_path) => target_path.path.clone(),
         }
     }
 }
@@ -400,8 +412,7 @@ impl fmt::Display for Target {
             Noop => f.write_str("_"),
             Internal(ident, path) if path.is_root() => ident.fmt(f),
             Internal(ident, path) => write!(f, "{}{}", ident, path),
-            External(path) if path.is_root() => f.write_str("."),
-            External(path) => write!(f, ".{}", path),
+            External(path) => write!(f, "{}", path),
         }
     }
 }
@@ -412,9 +423,13 @@ impl fmt::Debug for Target {
 
         match self {
             Noop => f.write_str("Noop"),
-            Internal(ident, path) if path.is_root() => write!(f, "Internal({})", ident),
-            Internal(ident, path) => write!(f, "Internal({}{})", ident, path),
-            External(path) if path.is_root() => f.write_str("External(.)"),
+            Internal(ident, path) => {
+                if path.is_root() {
+                    write!(f, "Internal({})", ident)
+                } else {
+                    write!(f, "Internal({}{})", ident, path)
+                }
+            }
             External(path) => write!(f, "External({})", path),
         }
     }
@@ -438,7 +453,7 @@ impl TryFrom<ast::AssignmentTarget> for Target {
 
                 match target {
                     ast::QueryTarget::Internal(ident) => Internal(ident, path),
-                    ast::QueryTarget::External => External(path),
+                    ast::QueryTarget::External(prefix) => External(TargetPath { prefix, path }),
                     _ => {
                         return Err(Error {
                             variant: ErrorVariant::InvalidTarget(span),
@@ -449,9 +464,11 @@ impl TryFrom<ast::AssignmentTarget> for Target {
                 }
             }
             ast::AssignmentTarget::Internal(ident, path) => {
-                Internal(ident, path.unwrap_or_else(LookupBuf::root))
+                Internal(ident, path.unwrap_or_else(OwnedPath::root))
             }
-            ast::AssignmentTarget::External(path) => External(path.unwrap_or_else(LookupBuf::root)),
+            ast::AssignmentTarget::External(path) => {
+                External(path.unwrap_or_else(TargetPath::event_root))
+            }
         };
 
         Ok(target)

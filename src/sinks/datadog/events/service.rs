@@ -8,7 +8,6 @@ use futures::{
 use http::Request;
 use hyper::Body;
 use tower::{Service, ServiceExt};
-use vector_common::internal_event::BytesSent;
 use vector_core::{internal_event::EventsSent, stream::DriverResponse};
 
 use crate::{
@@ -39,7 +38,7 @@ impl DriverResponse for DatadogEventsResponse {
         }
     }
 
-    fn bytes_sent(&self) -> Option<BytesSent> {
+    fn bytes_sent(&self) -> Option<(usize, &str)> {
         // HttpBatchService emits EndpointBytesSend
         None
     }

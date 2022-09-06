@@ -4,10 +4,7 @@ use vector_config::configurable_component;
 use super::host_key;
 use crate::{
     codecs::EncodingConfig,
-    config::{
-        AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
-        SinkDescription,
-    },
+    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     sinks::{
         splunk_hec::{
             common::{
@@ -26,7 +23,7 @@ use crate::{
 const HOST: &str = "https://cloud.humio.com";
 
 /// Configuration for the `humio_logs` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("humio_logs"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct HumioLogsConfig {
@@ -121,10 +118,6 @@ pub struct HumioLogsConfig {
     pub(super) timestamp_key: String,
 }
 
-inventory::submit! {
-    SinkDescription::new::<HumioLogsConfig>("humio_logs")
-}
-
 pub fn timestamp_nanos_key() -> Option<String> {
     Some("@timestamp.nanos".to_string())
 }
@@ -153,7 +146,6 @@ impl GenerateConfig for HumioLogsConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "humio_logs")]
 impl SinkConfig for HumioLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         self.build_hec_config().build(cx).await
@@ -161,10 +153,6 @@ impl SinkConfig for HumioLogsConfig {
 
     fn input(&self) -> Input {
         Input::new(self.encoding.config().input_type() & DataType::Log)
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "humio_logs"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

@@ -168,39 +168,79 @@ impl TransformContext {
     }
 }
 
+/// Generalized interface for describing and building transform components.
 #[async_trait]
 #[enum_dispatch]
 pub trait TransformConfig: NamedComponent + core::fmt::Debug + Send + Sync {
+    /// Builds the transform with the given context.
+    ///
+    /// If the transform is built successfully, `Ok(...)` is returned containing the transform.
+    ///
+    /// # Errors
+    ///
+    /// If an error occurs while building the transform, an error variant explaining the issue is
+    /// returned.
     async fn build(&self, globals: &TransformContext) -> crate::Result<Transform>;
 
+    /// Gets the input configuration for this transform.
     fn input(&self) -> Input;
 
-    /// Returns a list of outputs to which this transform can deliver events.
+    /// Gets the list of outputs exposed by this transform.
     ///
     /// The provided `merged_definition` can be used by transforms to understand the expected shape
     /// of events flowing through the transform.
     fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output>;
 
-    /// Verifies that the provided outputs and the inner plumbing of the transform are valid.
+    /// Validates that the configuration of the transform is valid.
+    ///
+    /// This would generally be where logical conditions were checked, such as ensuring a transform
+    /// isn't using a named output that matches a reserved output name, and so on.
+    ///
+    /// # Errors
+    ///
+    /// If validation does not succeed, an error variant containing a list of all validation errors
+    /// is returned.
     fn validate(&self, _merged_definition: &schema::Definition) -> Result<(), Vec<String>> {
         Ok(())
     }
 
-    /// Return true if the transform is able to be run across multiple tasks simultaneously with no
-    /// concerns around statefulness, ordering, etc.
+    /// Whether or not concurrency should be enabled for this transform.
+    ///
+    /// When enabled, this transform may be run in parallel in order to attempt to maximize
+    /// throughput for this node in the topology. Transforms should generally not run concurrently
+    /// unless they are compute-heavy, as there is a cost/overhead associated with fanning out
+    /// events to the parallel transform tasks.
     fn enable_concurrency(&self) -> bool {
         false
     }
 
-    /// Allows to detect if a transform can be embedded in another transform.
-    /// It's used by the pipelines transform for now.
+    /// Whether or not this transform can be nested, given the types of transforms it would be
+    /// nested within.
+    ///
+    /// For some transforms, they can expand themselves into a subtopology of nested transforms.
+    /// However, in order to prevent an infinite recursion of nested transforms, we may want to only
+    /// allow one layer of "expansion". Additionally, there may be known issues with a transform
+    /// that is nested under another specific transform interacting poorly, or incorrectly.
+    ///
+    /// This method allows a transform to report if it can or cannot function correctly if it is
+    /// nested under transforms of a specific type, or if such nesting is fundamentally disallowed.
     fn nestable(&self, _parents: &HashSet<&'static str>) -> bool {
         true
     }
 
-    /// Allows a transform configuration to expand itself into multiple "child"
-    /// transformations to replace it. This allows a transform to act as a macro
-    /// for various patterns.
+    /// Attempts to expand the transform into a subtopology of transforms.
+    ///
+    /// This mechanism allows a transform to act like a macro pattern, where only one transform is
+    /// configured from the user's perspective, but multiple transforms can be created, and
+    /// connected, and returned back to the topology in a seamless way.
+    ///
+    /// If the transform supports expansion, `Ok(Some(...))` is returned containing the inner
+    /// topology that represents an organized subtopology consisting of the set of expanded
+    /// transforms. Otherwise, if expansion is not supported for this transform, `Ok(None)` is returned.
+    ///
+    /// # Errors
+    ///
+    /// If there is an error during expansion, an error variant explaining the issue is returned.
     fn expand(
         &mut self,
         _name: &ComponentKey,

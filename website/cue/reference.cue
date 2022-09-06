@@ -55,7 +55,7 @@ _values: {
 // * `removed` - The component has been removed.
 #DevelopmentStatus: "beta" | "stable" | "deprecated" | "removed"
 
-#EncodingCodec: "json" | "logfmt" | "text" | "native" | "native_json" | "avro"
+#EncodingCodec: "json" | "logfmt" | "text" | "native" | "native_json" | "avro" | "gelf"
 
 #Endpoint: {
 	description: string

@@ -49,11 +49,12 @@ impl<'a> InternalEvent for AwsEcsMetricsParseError<'a> {
             error = ?self.error,
             stage = error_stage::PROCESSING,
             error_type = error_type::PARSER_FAILED,
+            internal_log_rate_secs = 10,
         );
         debug!(
             message = %format!("Failed to parse response:\\n\\n{}\\n\\n", self.body.escape_debug()),
             endpoint = %self.endpoint,
-            internal_log_rate_secs = 10
+            internal_log_rate_secs = 10,
         );
         counter!("parse_errors_total", 1);
         counter!(
@@ -79,6 +80,7 @@ impl InternalEvent for AwsEcsMetricsResponseError<'_> {
             error_code = %http_error_code(self.code.as_u16()),
             error_type = "http_error",
             endpoint = %self.endpoint,
+            internal_log_rate_secs = 10,
         );
         counter!("http_error_response_total", 1);
         counter!(
@@ -106,6 +108,7 @@ impl InternalEvent for AwsEcsMetricsHttpError<'_> {
             error_type = error_type::REQUEST_FAILED,
             error_code = %hyper_error_code(&self.error),
             endpoint = %self.endpoint,
+            internal_log_rate_secs = 10,
         );
         counter!("http_request_errors_total", 1);
         counter!(

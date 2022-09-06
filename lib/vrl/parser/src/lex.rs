@@ -194,6 +194,12 @@ impl DiagnosticMessage for Error {
     }
 }
 
+#[derive(Debug)]
+enum CoalesceState {
+    Dot,
+    Coalesce,
+}
+
 // -----------------------------------------------------------------------------
 // lexer
 // -----------------------------------------------------------------------------
@@ -207,6 +213,10 @@ pub(crate) struct Lexer<'input> {
     open_brackets: usize,
     open_braces: usize,
     open_parens: usize,
+    query_start: Option<usize>,
+
+    // used to track if the lexer is inside a coalesce (to differentiate a '@' path prefix from a coalesce field starting with '@')
+    coalesce_state: Option<CoalesceState>,
 
     /// Keep track of when the lexer is supposed to emit an `RQuery` token.
     ///
@@ -224,6 +234,114 @@ pub(crate) struct Lexer<'input> {
     ///   ~~~~~~~~~~  0..10
     ///    ~~~~       1..5
     rquery_indices: Vec<usize>,
+}
+
+impl<'input> Lexer<'input> {
+    fn next_token(&mut self) -> Option<SpannedResult<'input, usize>> {
+        use Token::{
+            Ampersand, Arrow, Bang, Colon, Comma, Dot, Escape, InvalidToken, LBrace, LBracket,
+            LParen, LQuery, Newline, Percent, RBrace, RBracket, RParen, RQuery, SemiColon,
+            Underscore,
+        };
+
+        loop {
+            let start = self.next_index();
+
+            // Check if we need to emit a `LQuery` token.
+            //
+            // We don't advance the internal iterator, because this token does not
+            // represent a physical character, instead it is a boundary marker.
+            let query_start_result = self.query_start(start);
+            match query_start_result {
+                Err(err) => return Some(Err(err)),
+                Ok(true) => {
+                    self.query_start = Some(start);
+                    // dbg!("LQuery"); // NOTE: uncomment this for debugging
+                    return Some(Ok((start, LQuery, start + 1)));
+                }
+                Ok(false) => {}
+            };
+
+            // Check if we need to emit a `RQuery` token.
+            //
+            // We don't advance the internal iterator, because this token does not
+            // represent a physical character, instead it is a boundary marker.
+            if let Some(pos) = self.query_end(start) {
+                // dbg!("RQuery"); // NOTE: uncomment this for debugging
+                return Some(Ok((pos, RQuery, pos + 1)));
+            }
+
+            // Advance the internal iterator and emit the next token, or loop
+            // again if we encounter a token we want to ignore (e.g. whitespace).
+            if let Some((start, ch)) = self.bump() {
+                let result = match ch {
+                    '"' => Some(self.string_literal(start)),
+
+                    ';' => Some(Ok(self.token(start, SemiColon))),
+                    '\n' => Some(Ok(self.token(start, Newline))),
+                    '\\' => Some(Ok(self.token(start, Escape))),
+
+                    '(' => Some(Ok(self.open(start, LParen))),
+                    '[' => Some(Ok(self.open(start, LBracket))),
+                    '{' => Some(Ok(self.open(start, LBrace))),
+                    '}' => Some(Ok(self.close(start, RBrace))),
+                    ']' => Some(Ok(self.close(start, RBracket))),
+                    ')' => Some(Ok(self.close(start, RParen))),
+                    '.' => Some(Ok(self.token(start, Dot))),
+                    '%' => Some(Ok(self.token(start, Percent))),
+                    '&' if !matches!(self.peek(), Some((_, '&'))) => {
+                        Some(Ok(self.token(start, Ampersand)))
+                    }
+                    ':' => Some(Ok(self.token(start, Colon))),
+                    ',' => Some(Ok(self.token(start, Comma))),
+
+                    '_' if !self.test_peek(is_ident_continue) => {
+                        Some(Ok(self.token(start, Underscore)))
+                    }
+
+                    '!' if self.test_peek(|ch| ch == '!' || !is_operator(ch)) => {
+                        Some(Ok(self.token(start, Bang)))
+                    }
+
+                    '-' if self.test_peek(|ch| ch == '>') => {
+                        let _ = self.bump();
+                        Some(Ok(self.token(start, Arrow)))
+                    }
+
+                    '#' => {
+                        self.take_until(start, |ch| ch == '\n');
+                        continue;
+                    }
+
+                    'r' if self.test_peek(|ch| ch == '\'') => Some(self.regex_literal(start)),
+                    's' if self.test_peek(|ch| ch == '\'') => Some(self.raw_string_literal(start)),
+                    't' if self.test_peek(|ch| ch == '\'') => Some(self.timestamp_literal(start)),
+
+                    ch if is_ident_start(ch) => Some(Ok(self.identifier_or_function_call(start))),
+                    ch if is_digit(ch) || (ch == '-' && self.test_peek(is_digit)) => {
+                        Some(self.numeric_literal_or_identifier(start))
+                    }
+                    ch if is_operator(ch) => Some(Ok(self.operator(start))),
+                    ch if ch.is_whitespace() => continue,
+
+                    ch => Some(Ok(self.token(start, InvalidToken(ch)))),
+                };
+
+                // dbg!(&result); // NOTE: uncomment this for debugging
+
+                return result;
+
+                // If we've parsed the final character, and there are still open
+                // queries, we need to keep the iterator going and close those
+                // queries.
+            } else if let Some(end) = self.rquery_indices.pop() {
+                // dbg!("RQuery"); // NOTE: uncomment this for debugging
+                return Some(Ok((end, RQuery, end + 1)));
+            }
+
+            return None;
+        }
+    }
 }
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
@@ -269,6 +387,8 @@ pub enum Token<S> {
     Underscore,
     Escape,
     Arrow,
+    Ampersand,
+    Percent,
 
     Equals,
     MergeEquals,
@@ -312,11 +432,11 @@ pub enum Token<S> {
 impl<S> Token<S> {
     pub(crate) fn map<R>(self, f: impl Fn(S) -> R) -> Token<R> {
         use self::Token::{
-            Abort, Arrow, Bang, Colon, Comma, Dot, Else, Equals, Escape, False, FloatLiteral,
-            FunctionCall, Identifier, If, IntegerLiteral, InvalidToken, LBrace, LBracket, LParen,
-            LQuery, MergeEquals, Newline, Null, Operator, PathField, Question, RBrace, RBracket,
-            RParen, RQuery, RawStringLiteral, RegexLiteral, ReservedIdentifier, SemiColon,
-            StringLiteral, TimestampLiteral, True, Underscore,
+            Abort, Ampersand, Arrow, Bang, Colon, Comma, Dot, Else, Equals, Escape, False,
+            FloatLiteral, FunctionCall, Identifier, If, IntegerLiteral, InvalidToken, LBrace,
+            LBracket, LParen, LQuery, MergeEquals, Newline, Null, Operator, PathField, Percent,
+            Question, RBrace, RBracket, RParen, RQuery, RawStringLiteral, RegexLiteral,
+            ReservedIdentifier, SemiColon, StringLiteral, TimestampLiteral, True, Underscore,
         };
 
         match self {
@@ -361,6 +481,8 @@ impl<S> Token<S> {
             Underscore => Underscore,
             Escape => Escape,
             Arrow => Arrow,
+            Ampersand => Ampersand,
+            Percent => Percent,
 
             Equals => Equals,
             MergeEquals => MergeEquals,
@@ -379,11 +501,11 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use self::Token::{
-            Abort, Arrow, Bang, Colon, Comma, Dot, Else, Equals, Escape, False, FloatLiteral,
-            FunctionCall, Identifier, If, IntegerLiteral, InvalidToken, LBrace, LBracket, LParen,
-            LQuery, MergeEquals, Newline, Null, Operator, PathField, Question, RBrace, RBracket,
-            RParen, RQuery, RawStringLiteral, RegexLiteral, ReservedIdentifier, SemiColon,
-            StringLiteral, TimestampLiteral, True, Underscore,
+            Abort, Ampersand, Arrow, Bang, Colon, Comma, Dot, Else, Equals, Escape, False,
+            FloatLiteral, FunctionCall, Identifier, If, IntegerLiteral, InvalidToken, LBrace,
+            LBracket, LParen, LQuery, MergeEquals, Newline, Null, Operator, PathField, Percent,
+            Question, RBrace, RBracket, RParen, RQuery, RawStringLiteral, RegexLiteral,
+            ReservedIdentifier, SemiColon, StringLiteral, TimestampLiteral, True, Underscore,
         };
 
         let s = match *self {
@@ -422,6 +544,8 @@ where
             Underscore => "Underscore",
             Escape => "Escape",
             Arrow => "Arrow",
+            Ampersand => "Ampersand",
+            Percent => "Percent",
 
             Equals => "Equals",
             MergeEquals => "MergeEquals",
@@ -562,103 +686,18 @@ impl<'input> Iterator for Lexer<'input> {
     type Item = SpannedResult<'input, usize>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        use Token::{
-            Arrow, Bang, Colon, Comma, Dot, Escape, InvalidToken, LBrace, LBracket, LParen, LQuery,
-            Newline, RBrace, RBracket, RParen, RQuery, SemiColon, Underscore,
-        };
-
-        loop {
-            let start = self.next_index();
-
-            // Check if we need to emit a `LQuery` token.
-            //
-            // We don't advance the internal iterator, because this token does not
-            // represent a physical character, instead it is a boundary marker.
-            match self.query_start(start) {
-                Err(err) => return Some(Err(err)),
-                Ok(true) => {
-                    // dbg!("LQuery"); // NOTE: uncomment this for debugging
-                    return Some(Ok((start, LQuery, start + 1)));
+        let result = self.next_token();
+        if let Some(Ok((_, token, _))) = &result {
+            self.coalesce_state = match (&self.coalesce_state, token) {
+                (None, Token::Dot) => Some(CoalesceState::Dot),
+                (Some(CoalesceState::Coalesce), Token::RParen) => None,
+                (Some(CoalesceState::Coalesce), _) | (Some(CoalesceState::Dot), Token::LParen) => {
+                    Some(CoalesceState::Coalesce)
                 }
-                Ok(false) => (),
-            }
-
-            // Check if we need to emit a `RQuery` token.
-            //
-            // We don't advance the internal iterator, because this token does not
-            // represent a physical character, instead it is a boundary marker.
-            if let Some(pos) = self.query_end(start) {
-                // dbg!("RQuery"); // NOTE: uncomment this for debugging
-                return Some(Ok((pos, RQuery, pos + 1)));
-            }
-
-            // Advance the internal iterator and emit the next token, or loop
-            // again if we encounter a token we want to ignore (e.g. whitespace).
-            if let Some((start, ch)) = self.bump() {
-                let result = match ch {
-                    '"' => Some(self.string_literal(start)),
-
-                    ';' => Some(Ok(self.token(start, SemiColon))),
-                    '\n' => Some(Ok(self.token(start, Newline))),
-                    '\\' => Some(Ok(self.token(start, Escape))),
-
-                    '(' => Some(Ok(self.open(start, LParen))),
-                    '[' => Some(Ok(self.open(start, LBracket))),
-                    '{' => Some(Ok(self.open(start, LBrace))),
-                    '}' => Some(Ok(self.close(start, RBrace))),
-                    ']' => Some(Ok(self.close(start, RBracket))),
-                    ')' => Some(Ok(self.close(start, RParen))),
-
-                    '.' => Some(Ok(self.token(start, Dot))),
-                    ':' => Some(Ok(self.token(start, Colon))),
-                    ',' => Some(Ok(self.token(start, Comma))),
-
-                    '_' if !self.test_peek(is_ident_continue) => {
-                        Some(Ok(self.token(start, Underscore)))
-                    }
-
-                    '!' if self.test_peek(|ch| ch == '!' || !is_operator(ch)) => {
-                        Some(Ok(self.token(start, Bang)))
-                    }
-
-                    '-' if self.test_peek(|ch| ch == '>') => {
-                        let _ = self.bump();
-                        Some(Ok(self.token(start, Arrow)))
-                    }
-
-                    '#' => {
-                        self.take_until(start, |ch| ch == '\n');
-                        continue;
-                    }
-
-                    'r' if self.test_peek(|ch| ch == '\'') => Some(self.regex_literal(start)),
-                    's' if self.test_peek(|ch| ch == '\'') => Some(self.raw_string_literal(start)),
-                    't' if self.test_peek(|ch| ch == '\'') => Some(self.timestamp_literal(start)),
-
-                    ch if is_ident_start(ch) => Some(Ok(self.identifier_or_function_call(start))),
-                    ch if is_digit(ch) || (ch == '-' && self.test_peek(is_digit)) => {
-                        Some(self.numeric_literal_or_identifier(start))
-                    }
-                    ch if is_operator(ch) => Some(Ok(self.operator(start))),
-                    ch if ch.is_whitespace() => continue,
-
-                    ch => Some(Ok(self.token(start, InvalidToken(ch)))),
-                };
-
-                // dbg!(&result); // NOTE: uncomment this for debugging
-
-                return result;
-
-            // If we've parsed the final character, and there are still open
-            // queries, we need to keep the iterator going and close those
-            // queries.
-            } else if let Some(end) = self.rquery_indices.pop() {
-                // dbg!("RQuery"); // NOTE: uncomment this for debugging
-                return Some(Ok((end, RQuery, end + 1)));
-            }
-
-            return None;
+                _ => None,
+            };
         }
+        result
     }
 }
 
@@ -712,6 +751,11 @@ impl<'input> Lexer<'input> {
             return Ok(false);
         }
 
+        // If we are in the middle of a coalesce query, this can't be the start of another query
+        if matches!(self.coalesce_state, Some(CoalesceState::Coalesce)) {
+            return Ok(false);
+        }
+
         // Take a clone of the existing chars iterator, to allow us to look
         // ahead without advancing the lexer's iterator. This is cheap, since
         // the original iterator only holds references.
@@ -721,7 +765,9 @@ impl<'input> Lexer<'input> {
         // Only continue if the current character is a valid query start
         // character. We know there's at least one more char, given the above
         // assertion.
-        if !is_query_start(chars.peek().unwrap().1) {
+
+        let query_start_char = chars.peek().unwrap().1;
+        if !is_query_start(query_start_char) {
             return Ok(false);
         }
 
@@ -948,7 +994,7 @@ impl<'input> Lexer<'input> {
                     }
                 }
 
-                '.' if last_char.is_none() => valid = true,
+                '.' | '%' if last_char.is_none() => valid = true,
                 '.' if last_char == Some(')') => valid = true,
                 '.' if last_char == Some('}') => valid = true,
                 '.' if last_char == Some(']') => valid = true,
@@ -976,7 +1022,6 @@ impl<'input> Lexer<'input> {
                         if ch == '\n' {
                             break;
                         }
-
                         end = pos;
                     }
                     continue;
@@ -1144,6 +1189,8 @@ impl<'input> Lexer<'input> {
             open_brackets: 0,
             open_parens: 0,
             rquery_indices: vec![],
+            query_start: None,
+            coalesce_state: None,
         }
     }
 
@@ -1224,7 +1271,7 @@ fn is_ident_continue(ch: char) -> bool {
 
 fn is_query_start(ch: char) -> bool {
     match ch {
-        '.' | '{' | '[' => true,
+        '%' | '.' | '{' | '[' => true,
         ch => is_ident_start(ch),
     }
 }
@@ -1283,9 +1330,9 @@ mod test {
     use super::*;
     use crate::lex::Token::{
         Arrow, Bang, Colon, Comma, Dot, Else, Equals, FloatLiteral, FunctionCall, Identifier, If,
-        IntegerLiteral, LBrace, LBracket, LParen, LQuery, Newline, Operator, PathField, RBrace,
-        RBracket, RParen, RQuery, RawStringLiteral, RegexLiteral, StringLiteral, TimestampLiteral,
-        True,
+        IntegerLiteral, LBrace, LBracket, LParen, LQuery, Newline, Operator, PathField, Percent,
+        RBrace, RBracket, RParen, RQuery, RawStringLiteral, RegexLiteral, StringLiteral,
+        TimestampLiteral, True,
     };
 
     fn lexer(input: &str) -> impl Iterator<Item = SpannedResult<'_, usize>> + '_ {
@@ -1315,6 +1362,100 @@ mod test {
         assert_eq!(count, length);
         assert!(count > 0);
         assert!(lexer.next().is_none());
+    }
+
+    #[test]
+    fn test_1() {
+        test(
+            data(r#"%foo"#),
+            vec![
+                (r#"~   "#, LQuery),
+                (r#"~   "#, Percent),
+                (r#" ~~~"#, Identifier("foo")),
+                (r#"   ~"#, RQuery),
+            ],
+        );
+    }
+
+    #[test]
+    fn test_2() {
+        test(
+            data(r#"%@foo"#),
+            vec![
+                (r#"~    "#, LQuery),
+                (r#"~    "#, Percent),
+                (r#" ~~~~"#, PathField("@foo")),
+                (r#"    ~"#, RQuery),
+            ],
+        );
+    }
+
+    #[test]
+    fn test_3() {
+        test(
+            data(r#"%foo[%bar]"#),
+            vec![
+                (r#"~    "#, LQuery),
+                (r#"~    "#, Percent),
+                (r#" ~~~ "#, Identifier("foo")),
+                (r#"    ~ "#, LBracket),
+                (r#"     ~ "#, LQuery),
+                (r#"     ~ "#, Percent),
+                (r#"      ~~~ "#, Identifier("bar")),
+                (r#"        ~"#, RQuery),
+                (r#"         ~ "#, RBracket),
+                (r#"         ~"#, RQuery),
+            ],
+        );
+    }
+
+    #[test]
+    fn test_4() {
+        test(
+            data(r#"%foo.@bar"#),
+            vec![
+                (r#"~    "#, LQuery),
+                (r#"~    "#, Percent),
+                (r#" ~~~ "#, Identifier("foo")),
+                (r#"    ~ "#, Dot),
+                (r#"     ~~~~ "#, PathField("@bar")),
+                (r#"        ~"#, RQuery),
+            ],
+        );
+    }
+
+    #[test]
+    fn test_5() {
+        test(
+            data(r#".(a|b)"#),
+            vec![
+                (r#"~    "#, LQuery),
+                (r#"~    "#, Dot),
+                (r#" ~ "#, LParen),
+                (r#"  ~ "#, Identifier("a")),
+                (r#"   ~ "#, Operator("|")),
+                (r#"    ~ "#, Identifier("b")),
+                (r#"     ~ "#, RParen),
+                (r#"     ~ "#, RQuery),
+            ],
+        );
+    }
+
+    #[test]
+    fn test_6() {
+        test(
+            data(r#".(@a|b)"#),
+            vec![
+                (r#"~    "#, LQuery),
+                (r#"~    "#, Dot),
+                (r#" ~ "#, LParen),
+                (r#"  ~~ "#, PathField("@a")),
+                (r#"    ~ "#, Operator("|")),
+                (r#"     ~ "#, Identifier("b")),
+                (r#"      ~ "#, RParen),
+                (r#"      ~ "#, RQuery),
+            ],
+        );
     }
 
     #[test]

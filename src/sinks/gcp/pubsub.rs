@@ -10,10 +10,7 @@ use vector_config::configurable_component;
 
 use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
-    config::{
-        AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
-        SinkDescription,
-    },
+    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     event::Event,
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope, PUBSUB_URL},
     http::HttpClient,
@@ -47,7 +44,7 @@ impl SinkBatchSettings for PubsubDefaultBatchSettings {
 }
 
 /// Configuration for the `gcp_pubsub` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("gcp_pubsub"))]
 #[derive(Clone, Debug)]
 pub struct PubsubConfig {
     /// The project name to which to publish events.
@@ -87,10 +84,6 @@ pub struct PubsubConfig {
     acknowledgements: AcknowledgementsConfig,
 }
 
-inventory::submit! {
-    SinkDescription::new::<PubsubConfig>("gcp_pubsub")
-}
-
 impl GenerateConfig for PubsubConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(indoc! {r#"
@@ -103,7 +96,6 @@ impl GenerateConfig for PubsubConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "gcp_pubsub")]
 impl SinkConfig for PubsubConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink = PubsubSink::from_config(self).await?;
@@ -132,10 +124,6 @@ impl SinkConfig for PubsubConfig {
 
     fn input(&self) -> Input {
         Input::new(self.encoding.config().input_type() & DataType::Log)
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "gcp_pubsub"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

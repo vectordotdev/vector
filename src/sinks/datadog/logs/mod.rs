@@ -30,10 +30,4 @@ mod sink;
 
 pub(crate) use config::DatadogLogsConfig;
 
-use crate::config::SinkDescription;
-
 pub(crate) const NAME: &str = "datadog_logs";
-
-inventory::submit! {
-    SinkDescription::new::<DatadogLogsConfig>(NAME)
-}

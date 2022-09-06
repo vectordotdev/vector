@@ -22,7 +22,7 @@ components: sinks: socket: {
 				codec: {
 					enabled: true
 					framing: true
-					enum: ["json", "text"]
+					enum: ["json", "text", "gelf"]
 				}
 			}
 			send_buffer_bytes: {

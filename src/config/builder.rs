@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use vector_core::{config::GlobalOptions, default_data_dir};
 
-use crate::{sources::Sources, transforms::Transforms};
+use crate::{sinks::Sinks, sources::Sources, transforms::Transforms};
 
 #[cfg(feature = "api")]
 use super::api;
@@ -16,8 +16,7 @@ use super::api;
 use super::enterprise;
 use super::{
     compiler, provider, schema, ComponentKey, Config, EnrichmentTableConfig, EnrichmentTableOuter,
-    HealthcheckOptions, SecretBackend, SinkConfig, SinkOuter, SourceOuter, TestDefinition,
-    TransformOuter,
+    HealthcheckOptions, SecretBackend, SinkOuter, SourceOuter, TestDefinition, TransformOuter,
 };
 
 #[derive(Deserialize, Serialize, Debug, Default)]
@@ -237,23 +236,16 @@ impl ConfigBuilder {
     }
 
     pub fn add_source<K: Into<String>, S: Into<Sources>>(&mut self, key: K, source: S) {
-        self.sources.insert(
-            ComponentKey::from(key.into()),
-            SourceOuter::new(source.into()),
-        );
+        self.sources
+            .insert(ComponentKey::from(key.into()), SourceOuter::new(source));
     }
 
-    pub fn add_sink<K: Into<String>, S: SinkConfig + 'static>(
-        &mut self,
-        key: K,
-        inputs: &[&str],
-        sink: S,
-    ) {
+    pub fn add_sink<K: Into<String>, S: Into<Sinks>>(&mut self, key: K, inputs: &[&str], sink: S) {
         let inputs = inputs
             .iter()
             .map(|value| value.to_string())
             .collect::<Vec<_>>();
-        let sink = SinkOuter::new(inputs, Box::new(sink));
+        let sink = SinkOuter::new(inputs, sink);
         self.add_sink_outer(key, sink);
     }
 
@@ -273,7 +265,7 @@ impl ConfigBuilder {
             .iter()
             .map(|value| value.to_string())
             .collect::<Vec<_>>();
-        let transform = TransformOuter::new(inputs, transform.into());
+        let transform = TransformOuter::new(inputs, transform);
 
         self.transforms
             .insert(ComponentKey::from(key.into()), transform);

@@ -45,7 +45,7 @@ impl Function for Ipv6ToIpV4 {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         Ok(Ipv6ToIpV4Fn { value }.as_expr())

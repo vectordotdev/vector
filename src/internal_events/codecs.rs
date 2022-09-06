@@ -1,4 +1,7 @@
-use crate::{emit, internal_events::ComponentEventsDropped};
+use crate::{
+    emit,
+    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
+};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -69,11 +72,7 @@ impl<'a> InternalEvent for EncoderFramingError<'a> {
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::SENDING,
         );
-        emit!(ComponentEventsDropped {
-            count: 1,
-            intentional: false,
-            reason,
-        });
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }
 
@@ -98,11 +97,7 @@ impl<'a> InternalEvent for EncoderSerializeError<'a> {
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::SENDING,
         );
-        emit!(ComponentEventsDropped {
-            count: 1,
-            intentional: false,
-            reason,
-        });
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }
 
@@ -128,9 +123,8 @@ impl<E: std::fmt::Display> InternalEvent for EncoderWriteError<'_, E> {
             "stage" => error_stage::SENDING,
         );
         if self.count > 0 {
-            emit!(ComponentEventsDropped {
+            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
                 count: self.count,
-                intentional: false,
                 reason,
             });
         }
