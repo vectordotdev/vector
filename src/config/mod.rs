@@ -10,6 +10,7 @@ use async_trait::async_trait;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
 use serde::{Deserialize, Serialize};
 pub use vector_config::component::{GenerateConfig, SinkDescription, TransformDescription};
+use vector_config::{configurable_component, Configurable};
 pub use vector_core::config::{AcknowledgementsConfig, DataType, GlobalOptions, Input, Output};
 
 use crate::{conditions, event::Metric, serde::OneOrMany};
@@ -202,10 +203,21 @@ impl Config {
     }
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+/// Healthcheck options.
+#[configurable_component]
+#[derive(Clone, Copy, Debug)]
 #[serde(default)]
 pub struct HealthcheckOptions {
+    /// Whether or not healthchecks are enabled for all sinks.
+    ///
+    /// Can be overridden on a per-sink basis.
     pub enabled: bool,
+
+    /// Whether or not to require a sink to report as being healthy during startup.
+    ///
+    /// When enabled and a sink reports not being healthy, Vector will exit during start-up.
+    ///
+    /// Can be alternatively set, and overridden by, the `--require-healthy` command-line flag.
     pub require_healthy: bool,
 }
 
@@ -349,15 +361,29 @@ impl Display for Resource {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+/// A unit test definition.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct TestDefinition<T = OutputId> {
+pub struct TestDefinition<T = OutputId>
+where
+    T: Configurable + Serialize,
+{
+    /// The name of the unit test.
     pub name: String,
+
+    /// An input event to test against.
     pub input: Option<TestInput>,
+
+    /// A set of input events to test against.
     #[serde(default)]
     pub inputs: Vec<TestInput>,
+
+    /// A set of expected output events after the test has run.
     #[serde(default)]
     pub outputs: Vec<TestOutput<T>>,
+
+    /// A set of component outputs that should not have emitted any events.
     #[serde(default)]
     pub no_outputs_from: Vec<T>,
 }
@@ -490,23 +516,55 @@ impl TestDefinition<OutputId> {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+/// Value for a log field.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(untagged)]
 pub enum TestInputValue {
-    String(String),
-    Integer(i64),
-    Float(f64),
-    Boolean(bool),
+    /// A string.
+    String(#[configurable(transparent)] String),
+
+    /// An integer.
+    Integer(#[configurable(transparent)] i64),
+
+    /// A floating-point number.
+    Float(#[configurable(transparent)] f64),
+
+    /// A boolean.
+    Boolean(#[configurable(transparent)] bool),
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+/// A unit test input.
+///
+/// An input describes not only the type of event to insert, but also which transform within the
+/// configuration to insert it to.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct TestInput {
+    /// The name of the transform to insert the input event to.
     pub insert_at: ComponentKey,
+
+    /// The type of the input event.
+    ///
+    /// Can be either `raw`, `log`, or `metric.
     #[serde(default = "default_test_input_type", rename = "type")]
     pub type_str: String,
+
+    /// The raw string value to use as the input event.
+    ///
+    /// Use this only when the input event should be a raw event (i.e. unprocessed/undecoded log
+    /// event) and when the input type is set to `raw`.
     pub value: Option<String>,
+
+    /// The set of log fields to use when creating a log input event.
+    ///
+    /// Only relevant when `type` is `log`.
     pub log_fields: Option<IndexMap<String, TestInputValue>>,
+
+    /// The metric to use as an input event.
+    ///
+    /// Only relevant when `type` is `metric`.
     pub metric: Option<Metric>,
 }
 

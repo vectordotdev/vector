@@ -1,16 +1,21 @@
 use std::net::{Ipv4Addr, SocketAddr};
 
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Copy, Clone)]
+/// API options.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[serde(default, deny_unknown_fields)]
 pub struct Options {
+    /// Whether or not the API endpoint is available.
     #[serde(default = "default_enabled")]
     pub enabled: bool,
 
+    /// The address to listen on for the API endpoint.
     #[serde(default = "default_address")]
     pub address: Option<SocketAddr>,
 
+    /// Whether or not to expose the GraphQL playground on the API endpoint.
     #[serde(default = "default_playground")]
     pub playground: bool,
 }

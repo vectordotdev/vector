@@ -3,9 +3,10 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 #[cfg(feature = "enterprise")]
 use serde_json::Value;
+use vector_config::configurable_component;
 use vector_core::{config::GlobalOptions, default_data_dir};
 
 use crate::{sinks::Sinks, sources::Sources, transforms::Transforms};
@@ -19,32 +20,59 @@ use super::{
     HealthcheckOptions, SecretBackend, SinkOuter, SourceOuter, TestDefinition, TransformOuter,
 };
 
-#[derive(Deserialize, Serialize, Debug, Default)]
+/// A complete Vector configuration.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ConfigBuilder {
     #[serde(flatten)]
     pub global: GlobalOptions,
+
     #[cfg(feature = "api")]
+    #[configurable(derived)]
     #[serde(default)]
     pub api: api::Options,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub schema: schema::Options,
+
     #[cfg(feature = "enterprise")]
+    #[configurable(derived)]
     #[serde(default)]
     pub enterprise: Option<enterprise::Options>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub healthchecks: HealthcheckOptions,
+
+    /// All configured enrichment tables.
     #[serde(default)]
     pub enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter>,
+
+    /// All configured sources.
     #[serde(default)]
     pub sources: IndexMap<ComponentKey, SourceOuter>,
+
+    /// All configured sinks.
     #[serde(default)]
     pub sinks: IndexMap<ComponentKey, SinkOuter<String>>,
+
+    /// All configured transforms.
     #[serde(default)]
     pub transforms: IndexMap<ComponentKey, TransformOuter<String>>,
+
+    /// All configured unit tests.
     #[serde(default)]
     pub tests: Vec<TestDefinition<String>>,
+
+    /// Optional configuration provider to use.
+    ///
+    /// Configuration providers allow sourcing configuration information from a source other than
+    /// the typical configuration files that must be passed to Vector.
     pub provider: Option<Box<dyn provider::ProviderConfig>>,
+
+    /// All configured secrets backends.
     #[serde(default)]
     pub secret: IndexMap<ComponentKey, Box<dyn SecretBackend>>,
 }
@@ -143,18 +171,6 @@ impl<'a> From<&'a ConfigBuilder> for ConfigBuilderHash<'a> {
             provider: &value.provider,
             secret: value.secret.iter().map(|(k, v)| (k, v.as_ref())).collect(),
         }
-    }
-}
-
-impl Clone for ConfigBuilder {
-    fn clone(&self) -> Self {
-        // This is a hack around the issue of cloning
-        // trait objects. So instead to clone the config
-        // we first serialize it into JSON, then back from
-        // JSON. Originally we used TOML here but TOML does not
-        // support serializing `None`.
-        let json = serde_json::to_value(self).unwrap();
-        serde_json::from_value(json).unwrap()
     }
 }
 
