@@ -7,31 +7,22 @@ use crate::config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, S
 /// Marker type for the version two of the configuration for the `vector` sink.
 #[configurable_component]
 #[derive(Clone, Debug)]
-enum V2 {
+enum VectorConfigVersion {
     /// Marker value for version two.
     #[serde(rename = "2")]
     V2,
 }
 
-/// Configuration for version two of the `vector` sink.
-#[configurable_component]
-#[derive(Clone, Debug)]
-#[serde(deny_unknown_fields)]
-pub struct VectorConfigV2 {
-    /// Version of the configuration.
-    version: Option<V2>,
-
-    #[serde(flatten)]
-    config: v2::VectorConfig,
-}
-
 /// Configurable for the `vector` sink.
 #[configurable_component(sink("vector"))]
 #[derive(Clone, Debug)]
-#[serde(untagged)]
-pub enum VectorConfig {
-    /// Configuration for version two.
-    V2(#[configurable(derived)] VectorConfigV2),
+#[serde(deny_unknown_fields)]
+pub struct VectorConfig {
+    /// Version of the configuration.
+    version: Option<VectorConfigVersion>,
+
+    #[serde(flatten)]
+    config: v2::VectorConfig,
 }
 
 impl GenerateConfig for VectorConfig {
@@ -51,9 +42,7 @@ impl SinkConfig for VectorConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        match self {
-            VectorConfig::V2(v2) => v2.config.build(cx).await,
-        }
+        self.config.build(cx).await
     }
 
     fn input(&self) -> Input {
@@ -61,9 +50,7 @@ impl SinkConfig for VectorConfig {
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        match self {
-            Self::V2(v2) => &v2.config.acknowledgements,
-        }
+        &self.config.acknowledgements
     }
 }
 
