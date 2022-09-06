@@ -24,6 +24,7 @@ impl InternalEvent for DatadogMetricsEncodingError {
             error_type = error_type::ENCODER_FAILED,
             intentional = "false",
             stage = error_stage::PROCESSING,
+            internal_log_rate_secs = 10,
         );
         counter!(
             "component_errors_total", 1,
