@@ -1244,6 +1244,7 @@ mod resource_tests {
     };
 
     use indoc::indoc;
+    use vector_config::schema::generate_root_schema;
 
     use super::{load_from_str, Format, Resource};
 
@@ -1375,6 +1376,44 @@ mod resource_tests {
             Format::Toml,
         )
         .is_err());
+    }
+
+    #[test]
+    #[ignore]
+    #[allow(clippy::print_stdout)]
+    #[allow(clippy::print_stderr)]
+    fn generate_component_config_schema() {
+        use crate::config::{SinkOuter, SourceOuter, TransformOuter};
+        use indexmap::IndexMap;
+        use vector_common::config::ComponentKey;
+        use vector_config::configurable_component;
+
+        /// Top-level Vector configuration.
+        #[configurable_component]
+        #[derive(Clone)]
+        struct ComponentsOnlyConfig {
+            /// Configured sources.
+            #[serde(default)]
+            pub sources: IndexMap<ComponentKey, SourceOuter>,
+
+            /// Configured transforms.
+            #[serde(default)]
+            pub transforms: IndexMap<ComponentKey, TransformOuter<String>>,
+
+            /// Configured sinks.
+            #[serde(default)]
+            pub sinks: IndexMap<ComponentKey, SinkOuter<String>>,
+        }
+
+        match generate_root_schema::<ComponentsOnlyConfig>() {
+            Ok(schema) => {
+                let json = serde_json::to_string_pretty(&schema)
+                    .expect("rendering root schema to JSON should not fail");
+
+                println!("{}", json);
+            }
+            Err(e) => eprintln!("error while generating schema: {:?}", e),
+        }
     }
 }
 

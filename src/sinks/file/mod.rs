@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use async_compression::tokio::write::GzipEncoder;
+use async_compression::tokio::write::{GzipEncoder, ZstdEncoder};
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use codecs::{
@@ -22,10 +22,7 @@ use vector_core::{internal_event::EventsSent, ByteSizeOf};
 
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
-    config::{
-        AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
-        SinkDescription,
-    },
+    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     event::{Event, EventStatus, Finalizable},
     expiring_hash_map::ExpiringHashMap,
     internal_events::{FileBytesSent, FileIoError, FileOpen, TemplateRenderingError},
@@ -38,7 +35,7 @@ use std::convert::TryFrom;
 use bytes_path::BytesPath;
 
 /// Configuration for the `file` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("file"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct FileSinkConfig {
@@ -70,10 +67,6 @@ pub struct FileSinkConfig {
     pub acknowledgements: AcknowledgementsConfig,
 }
 
-inventory::submit! {
-    SinkDescription::new::<FileSinkConfig>("file")
-}
-
 impl GenerateConfig for FileSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
@@ -96,6 +89,9 @@ pub enum Compression {
     /// Gzip compression.
     Gzip,
 
+    /// Zstandard compression.
+    Zstd,
+
     /// No compression.
     None,
 }
@@ -109,6 +105,7 @@ impl Default for Compression {
 enum OutFile {
     Regular(File),
     Gzip(GzipEncoder<File>),
+    Zstd(ZstdEncoder<File>),
 }
 
 impl OutFile {
@@ -116,6 +113,7 @@ impl OutFile {
         match compression {
             Compression::None => OutFile::Regular(file),
             Compression::Gzip => OutFile::Gzip(GzipEncoder::new(file)),
+            Compression::Zstd => OutFile::Zstd(ZstdEncoder::new(file)),
         }
     }
 
@@ -123,6 +121,7 @@ impl OutFile {
         match self {
             OutFile::Regular(file) => file.sync_all().await,
             OutFile::Gzip(gzip) => gzip.get_mut().sync_all().await,
+            OutFile::Zstd(zstd) => zstd.get_mut().sync_all().await,
         }
     }
 
@@ -130,6 +129,7 @@ impl OutFile {
         match self {
             OutFile::Regular(file) => file.shutdown().await,
             OutFile::Gzip(gzip) => gzip.shutdown().await,
+            OutFile::Zstd(zstd) => zstd.shutdown().await,
         }
     }
 
@@ -137,6 +137,7 @@ impl OutFile {
         match self {
             OutFile::Regular(file) => file.write_all(src).await,
             OutFile::Gzip(gzip) => gzip.write_all(src).await,
+            OutFile::Zstd(zstd) => zstd.write_all(src).await,
         }
     }
 
@@ -149,7 +150,6 @@ impl OutFile {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "file")]
 impl SinkConfig for FileSinkConfig {
     async fn build(
         &self,
@@ -164,10 +164,6 @@ impl SinkConfig for FileSinkConfig {
 
     fn input(&self) -> Input {
         Input::new(self.encoding.config().1.input_type() & DataType::Log)
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "file"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -411,7 +407,7 @@ mod tests {
         config::log_schema,
         test_util::{
             components::{run_and_assert_sink_compliance, FILE_SINK_TAGS},
-            lines_from_file, lines_from_gzip_file, random_events_with_stream,
+            lines_from_file, lines_from_gzip_file, lines_from_zstd_file, random_events_with_stream,
             random_lines_with_stream, temp_dir, temp_file, trace_init,
         },
     };
@@ -488,6 +484,42 @@ mod tests {
         .await;
 
         let output = lines_from_gzip_file(template);
+        for (input, output) in input.into_iter().zip(output) {
+            assert_eq!(input, output);
+        }
+    }
+
+    #[tokio::test]
+    async fn single_partition_zstd() {
+        trace_init();
+
+        let template = temp_file();
+
+        let config = FileSinkConfig {
+            path: template.clone().try_into().unwrap(),
+            idle_timeout_secs: None,
+            encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
+            compression: Compression::Zstd,
+            acknowledgements: Default::default(),
+        };
+
+        let sink = FileSink::new(&config).unwrap();
+        let (input, _) = random_lines_with_stream(100, 64, None);
+
+        let events = Box::pin(stream::iter(
+            input
+                .clone()
+                .into_iter()
+                .map(|e| Event::Log(LogEvent::from(e))),
+        ));
+        run_and_assert_sink_compliance(
+            VectorSink::from_event_streamsink(sink),
+            events,
+            &FILE_SINK_TAGS,
+        )
+        .await;
+
+        let output = lines_from_zstd_file(template);
         for (input, output) in input.into_iter().zip(output) {
             assert_eq!(input, output);
         }

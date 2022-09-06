@@ -14,7 +14,7 @@ use snafu::Snafu;
 
 pub use self::ddsketch::{AgentDDSketch, BinMap, Config};
 use self::{label_filter::VectorLabelFilter, recorder::Registry, recorder::VectorRecorder};
-use crate::event::{Metric, MetricKind, MetricValue};
+use crate::event::{Metric, MetricValue};
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -181,13 +181,11 @@ impl Controller {
         let value = (metrics.len() + 2) as f64;
         metrics.push(Metric::from_metric_kv(
             &CARDINALITY_KEY,
-            MetricKind::Absolute,
             MetricValue::Gauge { value },
             timestamp,
         ));
         metrics.push(Metric::from_metric_kv(
             &CARDINALITY_COUNTER_KEY,
-            MetricKind::Absolute,
             MetricValue::Counter { value },
             timestamp,
         ));

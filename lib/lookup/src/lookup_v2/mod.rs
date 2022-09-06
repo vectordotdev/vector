@@ -44,7 +44,7 @@ macro_rules! metadata_path {
 /// This allocates and will be slower than using `path!`. Prefer that when possible.
 /// The return value must be borrowed to get a value that implements `Path`.
 ///
-/// Example: `owned_path!("foo", 4, "bar")` is the pre-parsed path of `foo[4].bar`
+/// Example: `owned_value_path!("foo", 4, "bar")` is the pre-parsed path of `foo[4].bar`
 #[macro_export]
 macro_rules! owned_value_path {
     ($($segment:expr),*) => {{

@@ -48,6 +48,8 @@ pub struct GlobalOptions {
     pub acknowledgements: AcknowledgementsConfig,
     #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
     pub expire_metrics: Option<f64>,
+    #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
+    pub expire_metrics_secs: Option<f64>,
 }
 
 impl GlobalOptions {

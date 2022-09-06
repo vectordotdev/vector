@@ -21,6 +21,7 @@ use vector_config::{
 
 /// A templated string.
 #[configurable_component]
+#[configurable(metadata(templateable))]
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 #[serde(try_from = "String", into = "String")]
 pub struct Template {
@@ -204,7 +205,7 @@ fn default_simple_source_listen_addr() -> SocketListenAddr {
 
 /// A sink for sending events to the `simple` service.
 #[derive(Clone)]
-#[configurable_component(sink)]
+#[configurable_component(sink("simple"))]
 #[configurable(metadata(status = "beta"))]
 pub struct SimpleSinkConfig {
     /// The endpoint to send events to.
@@ -263,7 +264,7 @@ fn default_simple_sink_endpoint() -> String {
 
 /// A sink for sending events to the `advanced` service.
 #[derive(Clone)]
-#[configurable_component(sink)]
+#[configurable_component(sink("advanced"))]
 #[configurable(metadata(status = "stable"))]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AdvancedSinkConfig {
@@ -514,9 +515,13 @@ pub struct VectorConfig {
 
 #[test]
 fn generate_semi_real_schema() {
-    let root_schema = generate_root_schema::<VectorConfig>();
-    let json = serde_json::to_string_pretty(&root_schema)
-        .expect("rendering root schema to JSON should not fail");
+    match generate_root_schema::<VectorConfig>() {
+        Ok(schema) => {
+            let json = serde_json::to_string_pretty(&schema)
+                .expect("rendering root schema to JSON should not fail");
 
-    println!("{}", json);
+            println!("{}", json);
+        }
+        Err(e) => eprintln!("error while generating schema: {:?}", e),
+    }
 }

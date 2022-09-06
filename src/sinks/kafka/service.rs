@@ -10,7 +10,9 @@ use rdkafka::{
 };
 use tower::Service;
 use vector_core::{
-    internal_event::{BytesSent, EventsSent},
+    internal_event::{
+        ByteSize, BytesSent, EventsSent, InternalEventHandle as _, Protocol, Registered,
+    },
     stream::DriverResponse,
 };
 
@@ -57,15 +59,18 @@ impl Finalizable for KafkaRequest {
     }
 }
 
+#[derive(Clone)]
 pub struct KafkaService {
     kafka_producer: FutureProducer<KafkaStatisticsContext>,
+    bytes_sent: Registered<BytesSent>,
 }
 
 impl KafkaService {
-    pub(crate) const fn new(
-        kafka_producer: FutureProducer<KafkaStatisticsContext>,
-    ) -> KafkaService {
-        KafkaService { kafka_producer }
+    pub(crate) fn new(kafka_producer: FutureProducer<KafkaStatisticsContext>) -> KafkaService {
+        KafkaService {
+            kafka_producer,
+            bytes_sent: register!(BytesSent::from(Protocol("kafka".into()))),
+        }
     }
 }
 
@@ -79,7 +84,7 @@ impl Service<KafkaRequest> for KafkaService {
     }
 
     fn call(&mut self, request: KafkaRequest) -> Self::Future {
-        let kafka_producer = self.kafka_producer.clone();
+        let this = self.clone();
 
         Box::pin(async move {
             let mut record =
@@ -95,14 +100,11 @@ impl Service<KafkaRequest> for KafkaService {
             }
 
             //rdkafka will internally retry forever if the queue is full
-
-            match kafka_producer.send(record, Timeout::Never).await {
+            match this.kafka_producer.send(record, Timeout::Never).await {
                 Ok((_partition, _offset)) => {
-                    emit!(BytesSent {
-                        byte_size: request.body.len()
-                            + request.metadata.key.map(|x| x.len()).unwrap_or(0),
-                        protocol: "kafka"
-                    });
+                    this.bytes_sent.emit(ByteSize(
+                        request.body.len() + request.metadata.key.map(|x| x.len()).unwrap_or(0),
+                    ));
                     Ok(KafkaResponse {
                         event_byte_size: request.event_byte_size,
                     })
