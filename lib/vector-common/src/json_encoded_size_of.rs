@@ -1,3 +1,4 @@
+use chrono::Timelike;
 use serde::{ser, Serialize};
 use value::Value;
 
@@ -13,41 +14,64 @@ const QUOTES_SIZE: usize = 2;
 const COMMA_SIZE: usize = 1;
 const COLON_SIZE: usize = 1;
 
-const EPOCH_RFC3339: &'static str = "1970-01-01T00:00:00.000Z";
+const EPOCH_RFC3339_0: &'static str = "1970-01-01T00:00:00Z";
+const EPOCH_RFC3339_3: &'static str = "1970-01-01T00:00:00.000Z";
+const EPOCH_RFC3339_6: &'static str = "1970-01-01T00:00:00.000000Z";
+const EPOCH_RFC3339_9: &'static str = "1970-01-01T00:00:00.000000000Z";
 
-pub struct JsonEncodedValue<'a>(pub &'a Value);
+/// A wrapper type around the default `Value` type, to implement the `Serialize` trait in an
+/// efficient way to count the JSON encoded bytes of a `Value`.
+///
+/// See the comments in the `Serializer` implementation for more details.
+pub struct JsonEncodedByteCountingValue<'a>(pub &'a Value);
 
-impl<'a> Serialize for JsonEncodedValue<'a> {
+impl<'a> Serialize for JsonEncodedByteCountingValue<'a> {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: ser::Serializer,
     {
         match &self.0 {
-            // The `Value` type serializes `Value::Bytes` using `serialize_str`, but this requires
-            // an extra allocation.
+            // The default `Value` `Serializer` implementation always allocates to a string, whereas
+            // we can use a reference to the existing bytes to count the size of the final string,
+            // as long as those bytes are valid UTF-8.
             //
-            // Since we never serialize bytes as an array of integers in the JSON representation of
-            // `Value`, we can use `serialize_bytes` instead to count the actual number of bytes in
-            // the byte array, and add two extra bytes for the surrounding quotes. This avoids the
-            // extra allocations, while still allowing `Value` itself to allocate and serialize
-            // `Value::Bytes` to a string.
-            Value::Bytes(b) => serializer.serialize_bytes(b),
+            // If the bytes are invalid UTF-8, we still have to allocate, to get the final exact
+            // size, as the invalid sequences are replaced with the `U+FFFD REPLACEMENT CHARACTER`.
+            //
+            // If performance is an issue, we can change this to manually iterate the byte sequences
+            // and add/subtract byte counts as we encounter valid/invalid UTF-8 sequences.
+            Value::Bytes(b) => {
+                let s = String::from_utf8_lossy(b);
 
-            // We approximate the size of a timestamp by using milliseconds precision.
+                serializer.serialize_str(s.as_ref())
+            }
+
+            // The timestamp is converted to a static epoch timestamp, to avoid any unnecessary
+            // allocations.
             //
-            // This can be off, if a different timezone is used (but our `Value` type's serialie
-            // implementation always uses UTC offset), or if the precision is more or less than
-            // milliseconds precision (which can happen, because our `Value` type does automatic
-            // inference of the required amount of precision, from nanoseconds to seconds).
+            // The following invariants must hold for the size of timestamps to remain correct:
             //
-            // This is done to avoid having to allocate the timestamp to a string, to calculate the
-            // exact byte size. A future improvement should calculate the required precision, and
-            // addopt the proper timestamp length accordingly.
-            Value::Timestamp(_) => serializer.serialize_str(EPOCH_RFC3339),
+            // - `chrono::SecondsFormat::AutoSi` is used to calculate nanoseconds precision.
+            // - `chrono::offset::Utc` is used as the timezone.
+            // - `use_z` is `true` for the `chrono::DateTime#to_rfc3339_opts` function call.
+            Value::Timestamp(ts) => {
+                let ns = ts.nanosecond() % 1_000_000_000;
+                let epoch = if ns == 0 {
+                    EPOCH_RFC3339_0
+                } else if ns % 1_000_000 == 0 {
+                    EPOCH_RFC3339_3
+                } else if ns % 1_000 == 0 {
+                    EPOCH_RFC3339_6
+                } else {
+                    EPOCH_RFC3339_9
+                };
+
+                serializer.serialize_str(epoch)
+            }
 
             // Collection types have their inner `Value`'s wrapped in `JsonEncodedValue`.
             Value::Object(m) => serializer.collect_map(m.iter().map(|(k, v)| (k, Self(v)))),
-            Value::Array(a) => serializer.collect_seq(a.iter().map(|v| Self(v))),
+            Value::Array(a) => serializer.collect_seq(a.iter().map(Self)),
 
             // All other `Value` variants are serialized according to the default serialization
             // implementation of that type.
@@ -127,95 +151,59 @@ impl<'a> ser::Serializer for &'a mut Serializer {
         Ok(())
     }
 
+    #[rustfmt::skip]
     fn serialize_i8(self, v: i8) -> Result<()> {
         // -128 ..= 127
-        if v < -99 {
-            self.bytes += 4;
-        } else if v < -9 {
-            self.bytes += 3;
-        } else if v < 0 {
-            self.bytes += 2;
-        } else if v < 10 {
-            self.bytes += 1;
-        } else if v < 100 {
-            self.bytes += 2;
-        } else {
-            self.bytes += 3;
-        }
+        if        v < -99 { self.bytes += 4;
+        } else if v <  -9 { self.bytes += 3;
+        } else if v <   0 { self.bytes += 2;
+        } else if v <  10 { self.bytes += 1;
+        } else if v < 100 { self.bytes += 2;
+        } else            { self.bytes += 3; }
 
         Ok(())
     }
 
+    #[rustfmt::skip]
     fn serialize_i16(self, v: i16) -> Result<()> {
         // -32_768 ..= 32_767
-        if v < -9_999 {
-            self.bytes += 6;
-        } else if v < -999 {
-            self.bytes += 5;
-        } else if v < -99 {
-            self.bytes += 4;
-        } else if v < -9 {
-            self.bytes += 3;
-        } else if v < 0 {
-            self.bytes += 2;
-        } else if v < 10 {
-            self.bytes += 1;
-        } else if v < 100 {
-            self.bytes += 2;
-        } else if v < 1_000 {
-            self.bytes += 3;
-        } else if v < 10_000 {
-            self.bytes += 4;
-        } else {
-            self.bytes += 5;
-        }
+        if        v < -9_999 { self.bytes += 6;
+        } else if v <   -999 { self.bytes += 5;
+        } else if v <    -99 { self.bytes += 4;
+        } else if v <     -9 { self.bytes += 3;
+        } else if v <      0 { self.bytes += 2;
+        } else if v <     10 { self.bytes += 1;
+        } else if v <    100 { self.bytes += 2;
+        } else if v <  1_000 { self.bytes += 3;
+        } else if v < 10_000 { self.bytes += 4;
+        } else               { self.bytes += 5; }
 
         Ok(())
     }
 
+    #[rustfmt::skip]
     fn serialize_i32(self, v: i32) -> Result<()> {
         // -2_147_483_648 ..= 2_147_483_647
-        if v < -999_999_999 {
-            self.bytes += 11;
-        } else if v < -99_999_999 {
-            self.bytes += 10;
-        } else if v < -9_999_999 {
-            self.bytes += 9;
-        } else if v < -999_999 {
-            self.bytes += 8;
-        } else if v < -99_999 {
-            self.bytes += 7;
-        } else if v < -9_999 {
-            self.bytes += 6;
-        } else if v < -999 {
-            self.bytes += 5;
-        } else if v < -99 {
-            self.bytes += 4;
-        } else if v < -9 {
-            self.bytes += 3;
-        } else if v < 0 {
-            self.bytes += 2;
-        } else if v < 10 {
-            self.bytes += 1;
-        } else if v < 100 {
-            self.bytes += 2;
-        } else if v < 1_000 {
-            self.bytes += 3;
-        } else if v < 10_000 {
-            self.bytes += 4;
-        } else if v < 100_000 {
-            self.bytes += 5;
-        } else if v < 1_000_000 {
-            self.bytes += 6;
-        } else if v < 10_000_000 {
-            self.bytes += 7;
-        } else if v < 100_000_000 {
-            self.bytes += 8;
-        } else if v < 1_000_000_000 {
-            self.bytes += 9;
-        } else {
-            self.bytes += 10;
-        }
+        if        v <  -999_999_999 { self.bytes += 11;
+        } else if v <   -99_999_999 { self.bytes += 10;
+        } else if v <    -9_999_999 { self.bytes +=  9;
+        } else if v <      -999_999 { self.bytes +=  8;
+        } else if v <       -99_999 { self.bytes +=  7;
+        } else if v <        -9_999 { self.bytes +=  6;
+        } else if v <          -999 { self.bytes +=  5;
+        } else if v <           -99 { self.bytes +=  4;
+        } else if v <            -9 { self.bytes +=  3;
+        } else if v <             0 { self.bytes +=  2;
+        } else if v <            10 { self.bytes +=  1;
+        } else if v <           100 { self.bytes +=  2;
+        } else if v <         1_000 { self.bytes +=  3;
+        } else if v <        10_000 { self.bytes +=  4;
+        } else if v <       100_000 { self.bytes +=  5;
+        } else if v <     1_000_000 { self.bytes +=  6;
+        } else if v <    10_000_000 { self.bytes +=  7;
+        } else if v <   100_000_000 { self.bytes +=  8;
+        } else if v < 1_000_000_000 { self.bytes +=  9;
+        } else                      { self.bytes += 10; }
 
         Ok(())
     }
@@ -223,7 +211,7 @@ impl<'a> ser::Serializer for &'a mut Serializer {
     #[rustfmt::skip]
     fn serialize_i64(self, v: i64) -> Result<()> {
         // -9_223_372_036_854_775_808 ..= 9_223_372_036_854_775_807
-        if v <         -999_999_999_999_999_999 { self.bytes += 20;
+        if        v <  -999_999_999_999_999_999 { self.bytes += 20;
         } else if v <   -99_999_999_999_999_999 { self.bytes += 19;
         } else if v <    -9_999_999_999_999_999 { self.bytes += 18;
         } else if v <      -999_999_999_999_999 { self.bytes += 17;
@@ -234,23 +222,23 @@ impl<'a> ser::Serializer for &'a mut Serializer {
         } else if v <            -9_999_999_999 { self.bytes += 12;
         } else if v <              -999_999_999 { self.bytes += 11;
         } else if v <               -99_999_999 { self.bytes += 10;
-        } else if v <                -9_999_999 { self.bytes += 9;
-        } else if v <                  -999_999 { self.bytes += 8;
-        } else if v <                   -99_999 { self.bytes += 7;
-        } else if v <                    -9_999 { self.bytes += 6;
-        } else if v <                      -999 { self.bytes += 5;
-        } else if v <                       -99 { self.bytes += 4;
-        } else if v <                        -9 { self.bytes += 3;
-        } else if v <                         0 { self.bytes += 2;
-        } else if v <                        10 { self.bytes += 1;
-        } else if v <                       100 { self.bytes += 2;
-        } else if v <                     1_000 { self.bytes += 3;
-        } else if v <                    10_000 { self.bytes += 4;
-        } else if v <                   100_000 { self.bytes += 5;
-        } else if v <                 1_000_000 { self.bytes += 6;
-        } else if v <                10_000_000 { self.bytes += 7;
-        } else if v <               100_000_000 { self.bytes += 8;
-        } else if v <             1_000_000_000 { self.bytes += 9;
+        } else if v <                -9_999_999 { self.bytes +=  9;
+        } else if v <                  -999_999 { self.bytes +=  8;
+        } else if v <                   -99_999 { self.bytes +=  7;
+        } else if v <                    -9_999 { self.bytes +=  6;
+        } else if v <                      -999 { self.bytes +=  5;
+        } else if v <                       -99 { self.bytes +=  4;
+        } else if v <                        -9 { self.bytes +=  3;
+        } else if v <                         0 { self.bytes +=  2;
+        } else if v <                        10 { self.bytes +=  1;
+        } else if v <                       100 { self.bytes +=  2;
+        } else if v <                     1_000 { self.bytes +=  3;
+        } else if v <                    10_000 { self.bytes +=  4;
+        } else if v <                   100_000 { self.bytes +=  5;
+        } else if v <                 1_000_000 { self.bytes +=  6;
+        } else if v <                10_000_000 { self.bytes +=  7;
+        } else if v <               100_000_000 { self.bytes +=  8;
+        } else if v <             1_000_000_000 { self.bytes +=  9;
         } else if v <            10_000_000_000 { self.bytes += 10;
         } else if v <           100_000_000_000 { self.bytes += 11;
         } else if v <         1_000_000_000_000 { self.bytes += 12;
@@ -260,64 +248,46 @@ impl<'a> ser::Serializer for &'a mut Serializer {
         } else if v <    10_000_000_000_000_000 { self.bytes += 16;
         } else if v <   100_000_000_000_000_000 { self.bytes += 17;
         } else if v < 1_000_000_000_000_000_000 { self.bytes += 18;
-        } else                                  { self.bytes += 20; }
+        } else                                  { self.bytes += 19; }
 
         Ok(())
     }
 
+    #[rustfmt::skip]
     fn serialize_u8(self, v: u8) -> Result<()> {
         // 0 ..= 255
-        if v < 10 {
-            self.bytes += 1;
-        } else if v < 100 {
-            self.bytes += 2;
-        } else {
-            self.bytes += 3;
-        }
+        if        v <  10 { self.bytes += 1;
+        } else if v < 100 { self.bytes += 2;
+        } else            { self.bytes += 3; }
 
         Ok(())
     }
 
+    #[rustfmt::skip]
     fn serialize_u16(self, v: u16) -> Result<()> {
         // 0 ..= 65_535
-        if v < 10 {
-            self.bytes += 1;
-        } else if v < 100 {
-            self.bytes += 2;
-        } else if v < 1000 {
-            self.bytes += 3;
-        } else if v < 10000 {
-            self.bytes += 4;
-        } else {
-            self.bytes += 5;
-        }
+        if        v <     10 { self.bytes += 1;
+        } else if v <    100 { self.bytes += 2;
+        } else if v <  1_000 { self.bytes += 3;
+        } else if v < 10_000 { self.bytes += 4;
+        } else               { self.bytes += 5; }
 
         Ok(())
     }
 
+    #[rustfmt::skip]
     fn serialize_u32(self, v: u32) -> Result<()> {
         // 0 ..= 4_294_967_295
-        if v < 10 {
-            self.bytes += 1;
-        } else if v < 100 {
-            self.bytes += 2;
-        } else if v < 1_000 {
-            self.bytes += 3;
-        } else if v < 10_000 {
-            self.bytes += 4;
-        } else if v < 100_000 {
-            self.bytes += 5;
-        } else if v < 1_000_000 {
-            self.bytes += 6;
-        } else if v < 10_000_000 {
-            self.bytes += 7;
-        } else if v < 100_000_000 {
-            self.bytes += 8;
-        } else if v < 1_000_000_000 {
-            self.bytes += 9;
-        } else {
-            self.bytes += 10;
-        }
+        if        v <            10 { self.bytes += 1;
+        } else if v <           100 { self.bytes += 2;
+        } else if v <         1_000 { self.bytes += 3;
+        } else if v <        10_000 { self.bytes += 4;
+        } else if v <       100_000 { self.bytes += 5;
+        } else if v <     1_000_000 { self.bytes += 6;
+        } else if v <    10_000_000 { self.bytes += 7;
+        } else if v <   100_000_000 { self.bytes += 8;
+        } else if v < 1_000_000_000 { self.bytes += 9;
+        } else                      { self.bytes += 10; }
 
         Ok(())
     }
@@ -325,26 +295,26 @@ impl<'a> ser::Serializer for &'a mut Serializer {
     #[rustfmt::skip]
     fn serialize_u64(self, v: u64) -> Result<()> {
         // 0 ..= 18_446_744_073_709_551_615
-        if        v < 10 { self.bytes += 1;
-        } else if v < 100 { self.bytes += 2;
-        } else if v < 1_000 { self.bytes += 3;
-        } else if v < 10_000 { self.bytes += 4;
-        } else if v < 100_000 { self.bytes += 5;
-        } else if v < 1_000_000 { self.bytes += 6;
-        } else if v < 10_000_000 { self.bytes += 7;
-        } else if v < 100_000_000 { self.bytes += 8;
-        } else if v < 1_000_000_000 { self.bytes += 9;
-        } else if v < 10_000_000_000 { self.bytes += 10;
-        } else if v < 100_000_000_000 { self.bytes += 11;
-        } else if v < 1_000_000_000_000 { self.bytes += 12;
-        } else if v < 10_000_000_000_000 { self.bytes += 13;
-        } else if v < 100_000_000_000_000 { self.bytes += 14;
-        } else if v < 1_000_000_000_000_000 { self.bytes += 15;
-        } else if v < 10_000_000_000_000_000 { self.bytes += 16;
-        } else if v < 100_000_000_000_000_000 { self.bytes += 17;
-        } else if v < 1_000_000_000_000_000_000 { self.bytes += 18;
+        if        v <                         10 { self.bytes +=  1;
+        } else if v <                        100 { self.bytes +=  2;
+        } else if v <                      1_000 { self.bytes +=  3;
+        } else if v <                     10_000 { self.bytes +=  4;
+        } else if v <                    100_000 { self.bytes +=  5;
+        } else if v <                  1_000_000 { self.bytes +=  6;
+        } else if v <                 10_000_000 { self.bytes +=  7;
+        } else if v <                100_000_000 { self.bytes +=  8;
+        } else if v <              1_000_000_000 { self.bytes +=  9;
+        } else if v <             10_000_000_000 { self.bytes += 10;
+        } else if v <            100_000_000_000 { self.bytes += 11;
+        } else if v <          1_000_000_000_000 { self.bytes += 12;
+        } else if v <         10_000_000_000_000 { self.bytes += 13;
+        } else if v <        100_000_000_000_000 { self.bytes += 14;
+        } else if v <      1_000_000_000_000_000 { self.bytes += 15;
+        } else if v <     10_000_000_000_000_000 { self.bytes += 16;
+        } else if v <    100_000_000_000_000_000 { self.bytes += 17;
+        } else if v <  1_000_000_000_000_000_000 { self.bytes += 18;
         } else if v < 10_000_000_000_000_000_000 { self.bytes += 19;
-        } else                                    { self.bytes += 20; }
+        } else                                   { self.bytes += 20; }
 
         Ok(())
     }
@@ -381,14 +351,77 @@ impl<'a> ser::Serializer for &'a mut Serializer {
 
     // TODO: handle escaping.
     fn serialize_str(self, v: &str) -> Result<()> {
-        self.bytes += QUOTES_SIZE + v.len();
+        // Taken from `serde_json`.
+        const BB: u8 = b'b'; // \x08
+        const TT: u8 = b't'; // \x09
+        const NN: u8 = b'n'; // \x0A
+        const FF: u8 = b'f'; // \x0C
+        const RR: u8 = b'r'; // \x0D
+        const QU: u8 = b'"'; // \x22
+        const BS: u8 = b'\\'; // \x5C
+        const UU: u8 = b'u'; // \x00...\x1F except the ones above
+        const __: u8 = 0;
+
+        // Lookup table of escape sequences. A value of b'x' at index i means that byte
+        // i is escaped as "\x" in JSON. A value of 0 means that byte i is not escaped.
+        static ESCAPE: [u8; 256] = [
+            //   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F
+            UU, UU, UU, UU, UU, UU, UU, UU, BB, TT, NN, UU, FF, RR, UU, UU, // 0
+            UU, UU, UU, UU, UU, UU, UU, UU, UU, UU, UU, UU, UU, UU, UU, UU, // 1
+            __, __, QU, __, __, __, __, __, __, __, __, __, __, __, __, __, // 2
+            __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 3
+            __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 4
+            __, __, __, __, __, __, __, __, __, __, __, __, BS, __, __, __, // 5
+            __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 6
+            __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 7
+            __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 8
+            __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 9
+            __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // A
+            __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // B
+            __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // C
+            __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // D
+            __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // E
+            __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // F
+        ];
+
+        let bytes = v.as_bytes();
+
+        let mut start = 0;
+
+        for (i, &byte) in bytes.iter().enumerate() {
+            let escape = ESCAPE[byte as usize];
+            if escape == 0 {
+                continue;
+            }
+
+            if start < i {
+                self.bytes += v[start..i].len();
+            }
+
+            match escape {
+                // `\u00bb`
+                UU => self.bytes += 6,
+
+                // All other escapes add 2 bytes (one for the byte itself, and one for `\`).
+                _ => self.bytes += 2,
+            }
+
+            start = i + 1;
+        }
+
+        if start != bytes.len() {
+            self.bytes += v[start..].len();
+        }
+
+        self.bytes += QUOTES_SIZE;
+
+        // self.bytes += QUOTES_SIZE + v.len();
         Ok(())
     }
 
     // Consider `bytes` as being a valid `str`.
-    fn serialize_bytes(self, v: &[u8]) -> Result<()> {
-        self.bytes += QUOTES_SIZE + v.len();
-        Ok(())
+    fn serialize_bytes(self, _: &[u8]) -> Result<()> {
+        unreachable!("value type considers bytes as `str`")
     }
 
     #[inline]
