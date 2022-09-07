@@ -114,7 +114,7 @@ pub mod sink {
         emit,
         internal_events::{
             prelude::{error_stage, error_type},
-            ComponentEventsDropped,
+            ComponentEventsDropped, UNINTENTIONAL,
         },
     };
     use metrics::counter;
@@ -140,11 +140,7 @@ pub mod sink {
                 "error_type" => error_type::REQUEST_FAILED,
                 "stage" => error_stage::SENDING,
             );
-            emit!(ComponentEventsDropped {
-                count: 1,
-                intentional: false,
-                reason,
-            });
+            emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
         }
     }
 
@@ -168,11 +164,7 @@ pub mod sink {
                 "error_type" => error_type::REQUEST_FAILED,
                 "stage" => error_stage::SENDING,
             );
-            emit!(ComponentEventsDropped {
-                count: 1,
-                intentional: false,
-                reason,
-            });
+            emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
         }
     }
 }
