@@ -9,15 +9,18 @@ use serde_json::Value;
 use vector_config::configurable_component;
 use vector_core::{config::GlobalOptions, default_data_dir};
 
-use crate::{sinks::Sinks, sources::Sources, transforms::Transforms};
+use crate::{
+    enrichment_tables::EnrichmentTables, providers::Providers, secrets::SecretBackends,
+    sinks::Sinks, sources::Sources, transforms::Transforms,
+};
 
 #[cfg(feature = "api")]
 use super::api;
 #[cfg(feature = "enterprise")]
 use super::enterprise;
 use super::{
-    compiler, provider, schema, ComponentKey, Config, EnrichmentTableConfig, EnrichmentTableOuter,
-    HealthcheckOptions, SecretBackend, SinkOuter, SourceOuter, TestDefinition, TransformOuter,
+    compiler, schema, ComponentKey, Config, EnrichmentTableOuter, HealthcheckOptions, SinkOuter,
+    SourceOuter, TestDefinition, TransformOuter,
 };
 
 /// A complete Vector configuration.
@@ -70,11 +73,11 @@ pub struct ConfigBuilder {
     ///
     /// Configuration providers allow sourcing configuration information from a source other than
     /// the typical configuration files that must be passed to Vector.
-    pub provider: Option<Box<dyn provider::ProviderConfig>>,
+    pub provider: Option<Providers>,
 
     /// All configured secrets backends.
     #[serde(default)]
-    pub secret: IndexMap<ComponentKey, Box<dyn SecretBackend>>,
+    pub secret: IndexMap<ComponentKey, SecretBackends>,
 }
 
 #[cfg(feature = "enterprise")]
@@ -90,8 +93,8 @@ struct ConfigBuilderHash<'a> {
     sinks: BTreeMap<&'a ComponentKey, &'a SinkOuter<String>>,
     transforms: BTreeMap<&'a ComponentKey, &'a TransformOuter<String>>,
     tests: &'a Vec<TestDefinition<String>>,
-    provider: &'a Option<Box<dyn provider::ProviderConfig>>,
-    secret: BTreeMap<&'a ComponentKey, &'a dyn SecretBackend>,
+    provider: &'a Option<Providers>,
+    secret: BTreeMap<&'a ComponentKey, &'a SecretBackends>,
 }
 
 #[cfg(feature = "enterprise")]
@@ -169,7 +172,7 @@ impl<'a> From<&'a ConfigBuilder> for ConfigBuilderHash<'a> {
             transforms: value.transforms.iter().collect(),
             tests: &value.tests,
             provider: &value.provider,
-            secret: value.secret.iter().map(|(k, v)| (k, v.as_ref())).collect(),
+            secret: value.secret.iter().collect(),
         }
     }
 }
@@ -240,14 +243,14 @@ impl ConfigBuilder {
         compiler::compile(self)
     }
 
-    pub fn add_enrichment_table<K: Into<String>, E: EnrichmentTableConfig + 'static>(
+    pub fn add_enrichment_table<K: Into<String>, E: Into<EnrichmentTables>>(
         &mut self,
         key: K,
         enrichment_table: E,
     ) {
         self.enrichment_tables.insert(
             ComponentKey::from(key.into()),
-            EnrichmentTableOuter::new(Box::new(enrichment_table)),
+            EnrichmentTableOuter::new(enrichment_table),
         );
     }
 

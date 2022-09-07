@@ -68,6 +68,7 @@ pub(crate) mod nats;
 #[allow(unreachable_pub)]
 pub(crate) mod proto;
 pub mod providers;
+pub mod secrets;
 pub mod serde;
 #[cfg(windows)]
 pub mod service;
