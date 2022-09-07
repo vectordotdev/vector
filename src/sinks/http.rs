@@ -16,7 +16,7 @@ use vector_config::configurable_component;
 
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
-    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::Event,
     http::{Auth, HttpClient, MaybeAuth},
     sinks::util::{
