@@ -19,7 +19,7 @@ remap: functions: del: {
 			name:        "compact"
 			description: "If compact is true, after deletion, if an empty object or array is left behind, it should be removed as well, cascading up to the root."
 			required:    false
-			default: false,
+			default:     false
 			type: ["boolean"]
 		},
 	]
