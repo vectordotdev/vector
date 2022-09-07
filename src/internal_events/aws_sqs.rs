@@ -1,5 +1,5 @@
 use metrics::counter;
-#[cfg(any(feature = "sources-aws_s3"))]
+#[cfg(feature = "sources-aws_s3")]
 pub use s3::*;
 use vector_core::internal_event::InternalEvent;
 
