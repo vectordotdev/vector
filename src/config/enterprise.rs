@@ -557,7 +557,7 @@ fn setup_metrics_reporting(
 
     // Create a Datadog metrics sink to consume and emit internal + host metrics.
     let datadog_metrics = DatadogMetricsConfig {
-        default_api_key: api_key,
+        default_api_key: api_key.into(),
         endpoint: datadog.endpoint.clone(),
         site: datadog.site.clone(),
         region: datadog.region,
