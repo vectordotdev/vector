@@ -19,7 +19,7 @@ enumflags2 = { version = "0.7.5", default-features = false }
 float_eq = { version = "1.0", default-features = false }
 futures = { version = "0.3.24", default-features = false, features = ["std"] }
 futures-util = { version = "0.3.21", default-features = false, features = ["std"] }
-headers = { version = "0.3.7", default-features = false }
+headers = { version = "0.3.8", default-features = false }
 http = { version = "0.2.8", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
 indexmap = { version = "~1.9.1", default-features = false, features = ["serde"] }
@@ -29,7 +29,7 @@ metrics-tracing-context = { version = "0.12.0", default-features = false }
 metrics-util = { version = "0.14.0", default-features = false, features = ["registry"] }
 mlua = { version = "0.8.3", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 no-proxy = { version  = "0.3.2", default-features = false, features = ["serialize"] }
-once_cell = { version = "1.13", default-features = false }
+once_cell = { version = "1.14", default-features = false }
 openssl = { version = "0.10.41", default-features = false, features = ["vendored"] }
 ordered-float = { version = "3.0.0", default-features = false }
 pin-project = { version = "1.0.12", default-features = false }

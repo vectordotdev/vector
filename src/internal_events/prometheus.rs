@@ -8,7 +8,10 @@ use prometheus_parser::ParserError;
 use vector_core::internal_event::InternalEvent;
 
 use super::prelude::{error_stage, error_type};
-use crate::{emit, internal_events::ComponentEventsDropped};
+use crate::{
+    emit,
+    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
+};
 
 #[cfg(feature = "sources-prometheus")]
 #[derive(Debug)]
@@ -102,10 +105,6 @@ impl InternalEvent for PrometheusNormalizationError {
             "error_type" => error_type::CONVERSION_FAILED,
             "stage" => error_stage::PROCESSING,
         );
-        emit!(ComponentEventsDropped {
-            count: 1,
-            intentional: false,
-            reason,
-        });
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }

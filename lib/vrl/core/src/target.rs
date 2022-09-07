@@ -1,6 +1,6 @@
 use std::convert::AsRef;
 
-use lookup::lookup_v2::TargetPath;
+use lookup::lookup_v2::OwnedTargetPath;
 use lookup::PathPrefix;
 use value::{Secrets, Value};
 
@@ -40,18 +40,18 @@ pub trait Target: std::fmt::Debug + SecretTarget {
     /// When inserting into a coalesced path, the implementor is encouraged to
     /// insert into the right-most segment if none exists, but can return an
     /// error if needed.
-    fn target_insert(&mut self, path: &TargetPath, value: Value) -> Result<(), String>;
+    fn target_insert(&mut self, path: &OwnedTargetPath, value: Value) -> Result<(), String>;
 
     /// Get a value for a given path, or `None` if no value is found.
     ///
     /// See [`Target::insert`] for more details.
-    fn target_get(&self, path: &TargetPath) -> Result<Option<&Value>, String>;
+    fn target_get(&self, path: &OwnedTargetPath) -> Result<Option<&Value>, String>;
 
     /// Get a mutable reference to the value for a given path, or `None` if no
     /// value is found.
     ///
     /// See [`Target::insert`] for more details.
-    fn target_get_mut(&mut self, path: &TargetPath) -> Result<Option<&mut Value>, String>;
+    fn target_get_mut(&mut self, path: &OwnedTargetPath) -> Result<Option<&mut Value>, String>;
 
     /// Remove the given path from the object.
     ///
@@ -59,7 +59,11 @@ pub trait Target: std::fmt::Debug + SecretTarget {
     ///
     /// If `compact` is true, after deletion, if an empty object or array is
     /// left behind, it should be removed as well, cascading up to the root.
-    fn target_remove(&mut self, path: &TargetPath, compact: bool) -> Result<Option<Value>, String>;
+    fn target_remove(
+        &mut self,
+        path: &OwnedTargetPath,
+        compact: bool,
+    ) -> Result<Option<Value>, String>;
 }
 
 pub trait SecretTarget {
@@ -78,7 +82,7 @@ pub struct TargetValueRef<'a> {
 }
 
 impl Target for TargetValueRef<'_> {
-    fn target_insert(&mut self, target_path: &TargetPath, value: Value) -> Result<(), String> {
+    fn target_insert(&mut self, target_path: &OwnedTargetPath, value: Value) -> Result<(), String> {
         match target_path.prefix {
             PathPrefix::Event => self.value.insert(&target_path.path, value),
             PathPrefix::Metadata => self.metadata.insert(&target_path.path, value),
@@ -86,7 +90,7 @@ impl Target for TargetValueRef<'_> {
         Ok(())
     }
 
-    fn target_get(&self, target_path: &TargetPath) -> Result<Option<&Value>, String> {
+    fn target_get(&self, target_path: &OwnedTargetPath) -> Result<Option<&Value>, String> {
         let value = match target_path.prefix {
             PathPrefix::Event => self.value.get(&target_path.path),
             PathPrefix::Metadata => self.metadata.get(&target_path.path),
@@ -94,7 +98,10 @@ impl Target for TargetValueRef<'_> {
         Ok(value)
     }
 
-    fn target_get_mut(&mut self, target_path: &TargetPath) -> Result<Option<&mut Value>, String> {
+    fn target_get_mut(
+        &mut self,
+        target_path: &OwnedTargetPath,
+    ) -> Result<Option<&mut Value>, String> {
         let value = match target_path.prefix {
             PathPrefix::Event => self.value.get_mut(&target_path.path),
             PathPrefix::Metadata => self.metadata.get_mut(&target_path.path),
@@ -104,7 +111,7 @@ impl Target for TargetValueRef<'_> {
 
     fn target_remove(
         &mut self,
-        target_path: &TargetPath,
+        target_path: &OwnedTargetPath,
         compact: bool,
     ) -> Result<Option<Value>, String> {
         let prev_value = match target_path.prefix {
@@ -137,7 +144,7 @@ pub struct TargetValue {
 }
 
 impl Target for TargetValue {
-    fn target_insert(&mut self, target_path: &TargetPath, value: Value) -> Result<(), String> {
+    fn target_insert(&mut self, target_path: &OwnedTargetPath, value: Value) -> Result<(), String> {
         match target_path.prefix {
             PathPrefix::Event => self.value.insert(&target_path.path, value),
             PathPrefix::Metadata => self.metadata.insert(&target_path.path, value),
@@ -145,7 +152,7 @@ impl Target for TargetValue {
         Ok(())
     }
 
-    fn target_get(&self, target_path: &TargetPath) -> Result<Option<&Value>, String> {
+    fn target_get(&self, target_path: &OwnedTargetPath) -> Result<Option<&Value>, String> {
         let value = match target_path.prefix {
             PathPrefix::Event => self.value.get(&target_path.path),
             PathPrefix::Metadata => self.metadata.get(&target_path.path),
@@ -153,7 +160,10 @@ impl Target for TargetValue {
         Ok(value)
     }
 
-    fn target_get_mut(&mut self, target_path: &TargetPath) -> Result<Option<&mut Value>, String> {
+    fn target_get_mut(
+        &mut self,
+        target_path: &OwnedTargetPath,
+    ) -> Result<Option<&mut Value>, String> {
         let value = match target_path.prefix {
             PathPrefix::Event => self.value.get_mut(&target_path.path),
             PathPrefix::Metadata => self.metadata.get_mut(&target_path.path),
@@ -163,7 +173,7 @@ impl Target for TargetValue {
 
     fn target_remove(
         &mut self,
-        target_path: &TargetPath,
+        target_path: &OwnedTargetPath,
         compact: bool,
     ) -> Result<Option<Value>, String> {
         let prev_value = match target_path.prefix {
@@ -205,10 +215,14 @@ impl SecretTarget for Secrets {
 #[cfg(any(test, feature = "test"))]
 mod value_target_impl {
     use super::{SecretTarget, Target, Value};
-    use lookup::{PathPrefix, TargetPath};
+    use lookup::{OwnedTargetPath, PathPrefix};
 
     impl Target for Value {
-        fn target_insert(&mut self, target_path: &TargetPath, value: Value) -> Result<(), String> {
+        fn target_insert(
+            &mut self,
+            target_path: &OwnedTargetPath,
+            value: Value,
+        ) -> Result<(), String> {
             match target_path.prefix {
                 PathPrefix::Event => self.insert(&target_path.path, value),
                 PathPrefix::Metadata => panic!("Value has no metadata. Use `TargetValue` instead."),
@@ -216,7 +230,7 @@ mod value_target_impl {
             Ok(())
         }
 
-        fn target_get(&self, target_path: &TargetPath) -> Result<Option<&Value>, String> {
+        fn target_get(&self, target_path: &OwnedTargetPath) -> Result<Option<&Value>, String> {
             match target_path.prefix {
                 PathPrefix::Event => Ok(self.get(&target_path.path)),
                 PathPrefix::Metadata => panic!("Value has no metadata. Use `TargetValue` instead."),
@@ -225,7 +239,7 @@ mod value_target_impl {
 
         fn target_get_mut(
             &mut self,
-            target_path: &TargetPath,
+            target_path: &OwnedTargetPath,
         ) -> Result<Option<&mut Value>, String> {
             match target_path.prefix {
                 PathPrefix::Event => Ok(self.get_mut(&target_path.path)),
@@ -235,7 +249,7 @@ mod value_target_impl {
 
         fn target_remove(
             &mut self,
-            target_path: &TargetPath,
+            target_path: &OwnedTargetPath,
             compact: bool,
         ) -> Result<Option<Value>, String> {
             match target_path.prefix {
@@ -264,7 +278,7 @@ mod value_target_impl {
 mod tests {
     #![allow(clippy::print_stdout)] // tests
 
-    use lookup::owned_path;
+    use lookup::owned_value_path;
 
     use super::*;
     use crate::value;
@@ -272,29 +286,33 @@ mod tests {
     #[test]
     fn target_get() {
         let cases = vec![
-            (value!(true), owned_path!(), Ok(Some(value!(true)))),
-            (value!(true), owned_path!("foo"), Ok(None)),
-            (value!({}), owned_path!(), Ok(Some(value!({})))),
+            (value!(true), owned_value_path!(), Ok(Some(value!(true)))),
+            (value!(true), owned_value_path!("foo"), Ok(None)),
+            (value!({}), owned_value_path!(), Ok(Some(value!({})))),
             (
                 value!({foo: "bar"}),
-                owned_path!(),
+                owned_value_path!(),
                 Ok(Some(value!({foo: "bar"}))),
             ),
             (
                 value!({foo: "bar"}),
-                owned_path!("foo"),
+                owned_value_path!("foo"),
                 Ok(Some(value!("bar"))),
             ),
-            (value!({foo: "bar"}), owned_path!("bar"), Ok(None)),
-            (value!([1, 2, 3, 4, 5]), owned_path!(1), Ok(Some(value!(2)))),
+            (value!({foo: "bar"}), owned_value_path!("bar"), Ok(None)),
+            (
+                value!([1, 2, 3, 4, 5]),
+                owned_value_path!(1),
+                Ok(Some(value!(2))),
+            ),
             (
                 value!({foo: [{bar: true}]}),
-                owned_path!("foo", 0, "bar"),
+                owned_value_path!("foo", 0, "bar"),
                 Ok(Some(value!(true))),
             ),
             (
                 value!({foo: {"bar baz": {baz: 2}}}),
-                owned_path!("foo", vec!["qux", r#"bar baz"#], "baz"),
+                owned_value_path!("foo", vec!["qux", r#"bar baz"#], "baz"),
                 Ok(Some(value!(2))),
             ),
         ];
@@ -306,7 +324,7 @@ mod tests {
                 metadata: value!({}),
                 secrets: Secrets::new(),
             };
-            let path = TargetPath::event(path);
+            let path = OwnedTargetPath::event(path);
 
             assert_eq!(
                 target.target_get(&path).map(Option::<&Value>::cloned),
@@ -321,84 +339,84 @@ mod tests {
         let cases = vec![
             (
                 value!({foo: "bar"}),
-                owned_path!(),
+                owned_value_path!(),
                 value!({baz: "qux"}),
                 value!({baz: "qux"}),
                 Ok(()),
             ),
             (
                 value!({foo: "bar"}),
-                owned_path!("baz"),
+                owned_value_path!("baz"),
                 true.into(),
                 value!({foo: "bar", baz: true}),
                 Ok(()),
             ),
             (
                 value!({foo: [{bar: "baz"}]}),
-                owned_path!("foo", 0, "baz"),
+                owned_value_path!("foo", 0, "baz"),
                 true.into(),
                 value!({foo: [{bar: "baz", baz: true}]}),
                 Ok(()),
             ),
             (
                 value!({foo: {bar: "baz"}}),
-                owned_path!("bar", "baz"),
+                owned_value_path!("bar", "baz"),
                 true.into(),
                 value!({foo: {bar: "baz"}, bar: {baz: true}}),
                 Ok(()),
             ),
             (
                 value!({foo: "bar"}),
-                owned_path!("foo"),
+                owned_value_path!("foo"),
                 "baz".into(),
                 value!({foo: "baz"}),
                 Ok(()),
             ),
             (
                 value!({foo: "bar"}),
-                owned_path!("foo", 2, r#"bar baz"#, "a", "b"),
+                owned_value_path!("foo", 2, r#"bar baz"#, "a", "b"),
                 true.into(),
                 value!({foo: [null, null, {"bar baz": {"a": {"b": true}}}]}),
                 Ok(()),
             ),
             (
                 value!({foo: [0, 1, 2]}),
-                owned_path!("foo", 5),
+                owned_value_path!("foo", 5),
                 "baz".into(),
                 value!({foo: [0, 1, 2, null, null, "baz"]}),
                 Ok(()),
             ),
             (
                 value!({foo: "bar"}),
-                owned_path!("foo", 0),
+                owned_value_path!("foo", 0),
                 "baz".into(),
                 value!({foo: ["baz"]}),
                 Ok(()),
             ),
             (
                 value!({foo: []}),
-                owned_path!("foo", 0),
+                owned_value_path!("foo", 0),
                 "baz".into(),
                 value!({foo: ["baz"]}),
                 Ok(()),
             ),
             (
                 value!({foo: [0]}),
-                owned_path!("foo", 0),
+                owned_value_path!("foo", 0),
                 "baz".into(),
                 value!({foo: ["baz"]}),
                 Ok(()),
             ),
             (
                 value!({foo: [0, 1]}),
-                owned_path!("foo", 0),
+                owned_value_path!("foo", 0),
                 "baz".into(),
                 value!({foo: ["baz", 1]}),
                 Ok(()),
             ),
             (
                 value!({foo: [0, 1]}),
-                owned_path!("foo", 1),
+                owned_value_path!("foo", 1),
                 "baz".into(),
                 value!({foo: [0, "baz"]}),
                 Ok(()),
@@ -411,7 +429,7 @@ mod tests {
                 metadata: value!({}),
                 secrets: Secrets::new(),
             };
-            let path = TargetPath::event(path);
+            let path = OwnedTargetPath::event(path);
 
             assert_eq!(
                 Target::target_insert(&mut target, &path, value.clone()),
@@ -430,63 +448,63 @@ mod tests {
         let cases = vec![
             (
                 value!({foo: "bar"}),
-                owned_path!("baz"),
+                owned_value_path!("baz"),
                 false,
                 None,
                 Some(value!({foo: "bar"})),
             ),
             (
                 value!({foo: "bar"}),
-                owned_path!("foo"),
+                owned_value_path!("foo"),
                 false,
                 Some(value!("bar")),
                 Some(value!({})),
             ),
             (
                 value!({foo: "bar"}),
-                owned_path!(vec![r#"foo bar"#, "foo"]),
+                owned_value_path!(vec![r#"foo bar"#, "foo"]),
                 false,
                 Some(value!("bar")),
                 Some(value!({})),
             ),
             (
                 value!({foo: "bar", baz: "qux"}),
-                owned_path!(),
+                owned_value_path!(),
                 false,
                 Some(value!({foo: "bar", baz: "qux"})),
                 Some(value!({})),
             ),
             (
                 value!({foo: "bar", baz: "qux"}),
-                owned_path!(),
+                owned_value_path!(),
                 true,
                 Some(value!({foo: "bar", baz: "qux"})),
                 Some(value!({})),
             ),
             (
                 value!({foo: [0]}),
-                owned_path!("foo", 0),
+                owned_value_path!("foo", 0),
                 false,
                 Some(value!(0)),
                 Some(value!({foo: []})),
             ),
             (
                 value!({foo: [0]}),
-                owned_path!("foo", 0),
+                owned_value_path!("foo", 0),
                 true,
                 Some(value!(0)),
                 Some(value!({})),
             ),
             (
                 value!({foo: {"bar baz": [0]}, bar: "baz"}),
-                owned_path!("foo", r#"bar baz"#, 0),
+                owned_value_path!("foo", r#"bar baz"#, 0),
                 false,
                 Some(value!(0)),
                 Some(value!({foo: {"bar baz": []}, bar: "baz"})),
             ),
             (
                 value!({foo: {"bar baz": [0]}, bar: "baz"}),
-                owned_path!("foo", r#"bar baz"#, 0),
+                owned_value_path!("foo", r#"bar baz"#, 0),
                 true,
                 Some(value!(0)),
                 Some(value!({bar: "baz"})),
@@ -494,7 +512,7 @@ mod tests {
         ];
 
         for (target, path, compact, value, expect) in cases {
-            let path = TargetPath::event(path);
+            let path = OwnedTargetPath::event(path);
 
             let mut target = TargetValue {
                 value: target,
@@ -506,7 +524,7 @@ mod tests {
                 Ok(value)
             );
             assert_eq!(
-                Target::target_get(&target, &TargetPath::event_root())
+                Target::target_get(&target, &OwnedTargetPath::event_root())
                     .map(Option::<&Value>::cloned),
                 Ok(expect)
             );

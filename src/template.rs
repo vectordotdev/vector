@@ -245,6 +245,7 @@ mod tests {
 
     use super::*;
     use crate::event::{Event, LogEvent, MetricKind, MetricValue};
+    use lookup::metadata_path;
 
     #[test]
     fn get_fields() {
@@ -292,6 +293,17 @@ mod tests {
         let template = Template::try_from("{{log_stream}}").unwrap();
 
         assert_eq!(Ok(Bytes::from("stream")), template.render(&event))
+    }
+
+    #[test]
+    fn render_log_metadata() {
+        let mut event = Event::Log(LogEvent::from("hello world"));
+        event
+            .as_mut_log()
+            .insert(metadata_path!("metadata_key"), "metadata_value");
+        let template = Template::try_from("{{%metadata_key}}").unwrap();
+
+        assert_eq!(Ok(Bytes::from("metadata_value")), template.render(&event))
     }
 
     #[test]

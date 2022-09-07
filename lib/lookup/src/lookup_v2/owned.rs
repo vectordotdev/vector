@@ -1,4 +1,4 @@
-use crate::lookup_v2::{parse_path, BorrowedSegment, Path};
+use crate::lookup_v2::{parse_value_path, BorrowedSegment, ValuePath};
 use std::fmt::{Display, Formatter};
 use vector_config::configurable_component;
 
@@ -6,11 +6,11 @@ use vector_config::configurable_component;
 #[configurable_component]
 #[derive(Debug, Clone, PartialEq, Eq, Default, Hash, PartialOrd, Ord)]
 #[serde(from = "String", into = "String")]
-pub struct OwnedPath {
+pub struct OwnedValuePath {
     pub segments: Vec<OwnedSegment>,
 }
 
-impl OwnedPath {
+impl OwnedValuePath {
     pub fn is_root(&self) -> bool {
         self.segments.is_empty()
     }
@@ -98,22 +98,21 @@ impl OwnedPath {
     }
 }
 
-impl Display for OwnedPath {
+impl Display for OwnedValuePath {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", String::from(self.clone()))
     }
 }
 
-impl From<String> for OwnedPath {
+impl From<String> for OwnedValuePath {
     fn from(raw_path: String) -> Self {
-        parse_path(raw_path.as_str())
+        parse_value_path(raw_path.as_str())
     }
 }
 
-impl From<OwnedPath> for String {
-    fn from(owned: OwnedPath) -> Self {
+impl From<OwnedValuePath> for String {
+    fn from(owned: OwnedValuePath) -> Self {
         let mut coalesce_i = 0;
-
         owned
             .segments
             .iter()
@@ -184,7 +183,7 @@ fn serialize_field(field: &str, separator: Option<&str>) -> String {
     }
 }
 
-impl From<Vec<OwnedSegment>> for OwnedPath {
+impl From<Vec<OwnedSegment>> for OwnedValuePath {
     fn from(segments: Vec<OwnedSegment>) -> Self {
         Self { segments }
     }
@@ -271,7 +270,7 @@ impl From<isize> for OwnedSegment {
     }
 }
 
-impl<'a> Path<'a> for &'a Vec<OwnedSegment> {
+impl<'a> ValuePath<'a> for &'a Vec<OwnedSegment> {
     type Iter = OwnedSegmentSliceIter<'a>;
 
     fn segment_iter(&self) -> Self::Iter {
@@ -283,7 +282,7 @@ impl<'a> Path<'a> for &'a Vec<OwnedSegment> {
     }
 }
 
-impl<'a> Path<'a> for &'a OwnedPath {
+impl<'a> ValuePath<'a> for &'a OwnedValuePath {
     type Iter = OwnedSegmentSliceIter<'a>;
 
     fn segment_iter(&self) -> Self::Iter {
@@ -329,7 +328,7 @@ impl<'a> Iterator for OwnedSegmentSliceIter<'a> {
 
 #[cfg(test)]
 mod test {
-    use crate::lookup_v2::parse_path;
+    use crate::lookup_v2::parse_value_path;
 
     #[test]
     fn owned_path_serialize() {
@@ -374,7 +373,7 @@ mod test {
         ];
 
         for (path, expected) in test_cases {
-            let path = parse_path(path);
+            let path = parse_value_path(path);
             let path = serde_json::to_string(&path).unwrap();
             let path = serde_json::from_str::<serde_json::Value>(&path).unwrap();
             assert_eq!(path, expected);

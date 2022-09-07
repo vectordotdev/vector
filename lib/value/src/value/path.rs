@@ -1,4 +1,4 @@
-use lookup::lookup_v2::Path;
+use lookup::lookup_v2::ValuePath;
 
 use crate::Value;
 
@@ -8,7 +8,7 @@ impl Value {
     /// For example, given the path `.foo.bar` and value `true`, the return
     /// value would be an object representing `{ "foo": { "bar": true } }`.
     #[must_use]
-    pub fn at_path<'a>(self, path: impl Path<'a>) -> Self {
+    pub fn at_path<'a>(self, path: impl ValuePath<'a>) -> Self {
         let mut result = Self::Null;
         result.insert(path, self);
         result

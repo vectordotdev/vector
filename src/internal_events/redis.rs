@@ -27,7 +27,7 @@ impl<'a> InternalEvent for RedisSendEventError<'a> {
             error_code = %self.error_code,
             error_type = error_type::WRITER_FAILED,
             stage = error_stage::SENDING,
-            rate_limit_secs = 10,
+            internal_log_rate_secs = 10,
         );
         counter!(
             "component_errors_total", 1,
@@ -61,7 +61,7 @@ impl InternalEvent for RedisReceiveEventError {
             error_code = %self.error_code,
             error_type = error_type::READER_FAILED,
             stage = error_stage::SENDING,
-            rate_limit_secs = 10,
+            internal_log_rate_secs = 10,
         );
         counter!(
             "component_errors_total", 1,

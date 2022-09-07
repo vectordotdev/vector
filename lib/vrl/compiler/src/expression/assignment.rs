@@ -1,8 +1,8 @@
 use std::{convert::TryFrom, fmt};
 
 use diagnostic::{DiagnosticMessage, Label, Note};
-use lookup::lookup_v2::TargetPath;
-use lookup::{LookupBuf, OwnedPath, PathPrefix, SegmentBuf};
+use lookup::lookup_v2::OwnedTargetPath;
+use lookup::{LookupBuf, OwnedValuePath, PathPrefix, SegmentBuf};
 use value::{Kind, Value};
 
 use crate::{
@@ -321,8 +321,8 @@ impl fmt::Debug for Assignment {
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub(crate) enum Target {
     Noop,
-    Internal(Ident, OwnedPath),
-    External(TargetPath),
+    Internal(Ident, OwnedValuePath),
+    External(OwnedTargetPath),
 }
 
 impl Target {
@@ -395,9 +395,9 @@ impl Target {
         }
     }
 
-    fn path(&self) -> OwnedPath {
+    fn path(&self) -> OwnedValuePath {
         match self {
-            Self::Noop => OwnedPath::root(),
+            Self::Noop => OwnedValuePath::root(),
             Self::Internal(_, path) => path.clone(),
             Self::External(target_path) => target_path.path.clone(),
         }
@@ -453,7 +453,9 @@ impl TryFrom<ast::AssignmentTarget> for Target {
 
                 match target {
                     ast::QueryTarget::Internal(ident) => Internal(ident, path),
-                    ast::QueryTarget::External(prefix) => External(TargetPath { prefix, path }),
+                    ast::QueryTarget::External(prefix) => {
+                        External(OwnedTargetPath { prefix, path })
+                    }
                     _ => {
                         return Err(Error {
                             variant: ErrorVariant::InvalidTarget(span),
@@ -464,10 +466,10 @@ impl TryFrom<ast::AssignmentTarget> for Target {
                 }
             }
             ast::AssignmentTarget::Internal(ident, path) => {
-                Internal(ident, path.unwrap_or_else(OwnedPath::root))
+                Internal(ident, path.unwrap_or_else(OwnedValuePath::root))
             }
             ast::AssignmentTarget::External(path) => {
-                External(path.unwrap_or_else(TargetPath::event_root))
+                External(path.unwrap_or_else(OwnedTargetPath::event_root))
             }
         };
 

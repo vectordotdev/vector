@@ -1,4 +1,7 @@
-use crate::{emit, internal_events::ComponentEventsDropped};
+use crate::{
+    emit,
+    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
+};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -68,9 +71,8 @@ impl<'a> InternalEvent for EncoderFramingError<'a> {
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::SENDING,
         );
-        emit!(ComponentEventsDropped {
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
             count: 1,
-            intentional: false,
             reason: "Failed framing bytes.",
         });
     }
@@ -96,9 +98,8 @@ impl<'a> InternalEvent for EncoderSerializeError<'a> {
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::SENDING,
         );
-        emit!(ComponentEventsDropped {
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
             count: 1,
-            intentional: false,
             reason: "Failed serializing frame.",
         });
     }
