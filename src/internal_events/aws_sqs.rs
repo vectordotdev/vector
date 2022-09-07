@@ -1,12 +1,12 @@
 use metrics::counter;
-#[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs"))]
+#[cfg(any(feature = "sources-aws_s3"))]
 pub use s3::*;
 use vector_core::internal_event::InternalEvent;
 
 #[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs"))]
 use crate::internal_events::prelude::{error_stage, error_type};
 
-#[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs"))]
+#[cfg(feature = "sources-aws_s3")]
 mod s3 {
     use aws_sdk_sqs::model::{
         BatchResultErrorEntry, DeleteMessageBatchRequestEntry, DeleteMessageBatchResultEntry,
@@ -15,31 +15,6 @@ mod s3 {
     use super::*;
     use crate::sources::aws_s3::sqs::ProcessingError;
 
-    #[derive(Debug)]
-    pub struct SqsMessageReceiveError<'a, E> {
-        pub error: &'a E,
-    }
-
-    impl<'a, E: std::fmt::Display> InternalEvent for SqsMessageReceiveError<'a, E> {
-        fn emit(self) {
-            error!(
-                message = "Failed to fetch SQS events.",
-                error = %self.error,
-                error_code = "failed_fetching_sqs_events",
-                error_type = error_type::REQUEST_FAILED,
-                stage = error_stage::RECEIVING,
-                internal_log_rate_secs = 10,
-            );
-            counter!(
-                "component_errors_total", 1,
-                "error_code" => "failed_fetching_sqs_events",
-                "error_type" => error_type::REQUEST_FAILED,
-                "stage" => error_stage::RECEIVING,
-            );
-            // deprecated
-            counter!("sqs_message_receive_failed_total", 1);
-        }
-    }
     #[derive(Debug)]
     pub struct SqsMessageProcessingError<'a> {
         pub message_id: &'a str,
@@ -146,6 +121,32 @@ mod s3 {
             counter!("sqs_message_delete_failed_total", self.entries.len() as u64);
             counter!("sqs_message_delete_batch_failed_total", 1);
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct SqsMessageReceiveError<'a, E> {
+    pub error: &'a E,
+}
+
+impl<'a, E: std::fmt::Display> InternalEvent for SqsMessageReceiveError<'a, E> {
+    fn emit(self) {
+        error!(
+            message = "Failed to fetch SQS events.",
+            error = %self.error,
+            error_code = "failed_fetching_sqs_events",
+            error_type = error_type::REQUEST_FAILED,
+            stage = error_stage::RECEIVING,
+            internal_log_rate_secs = 10,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "failed_fetching_sqs_events",
+            "error_type" => error_type::REQUEST_FAILED,
+            "stage" => error_stage::RECEIVING,
+        );
+        // deprecated
+        counter!("sqs_message_receive_failed_total", 1);
     }
 }
 
