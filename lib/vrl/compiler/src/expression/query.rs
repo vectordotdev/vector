@@ -6,25 +6,25 @@ use crate::{
     type_def::Details,
     Context, Expression,
 };
-use lookup::{LookupBuf, OwnedPath, PathPrefix, TargetPath};
+use lookup::{LookupBuf, OwnedTargetPath, OwnedValuePath, PathPrefix};
 use std::fmt;
 use value::{kind::remove, Value};
 
 #[derive(Clone, PartialEq)]
 pub struct Query {
     target: Target,
-    path: OwnedPath,
+    path: OwnedValuePath,
 }
 
 impl Query {
     // TODO:
     // - error when trying to index into object
     // - error when trying to path into array
-    pub fn new(target: Target, path: OwnedPath) -> Self {
+    pub fn new(target: Target, path: OwnedValuePath) -> Self {
         Query { target, path }
     }
 
-    pub fn path(&self) -> &OwnedPath {
+    pub fn path(&self) -> &OwnedValuePath {
         &self.path
     }
 
@@ -36,9 +36,9 @@ impl Query {
         matches!(self.target, Target::External(_))
     }
 
-    pub fn external_path(&self) -> Option<TargetPath> {
+    pub fn external_path(&self) -> Option<OwnedTargetPath> {
         match self.target {
-            Target::External(prefix) => Some(TargetPath {
+            Target::External(prefix) => Some(OwnedTargetPath {
                 prefix,
                 path: self.path.clone(),
             }),
@@ -103,7 +103,7 @@ impl Expression for Query {
 
         let value = match &self.target {
             External(prefix) => {
-                let path = TargetPath {
+                let path = OwnedTargetPath {
                     prefix: *prefix,
                     path: self.path.clone(),
                 };
@@ -221,7 +221,7 @@ mod tests {
     fn test_type_def() {
         let query = Query {
             target: Target::External(PathPrefix::Event),
-            path: OwnedPath::root(),
+            path: OwnedValuePath::root(),
         };
 
         let state = TypeState::default();

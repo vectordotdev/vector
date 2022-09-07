@@ -38,7 +38,7 @@ use crate::{
     shutdown::ShutdownSignal,
     SourceSender,
 };
-use lookup::path;
+use lookup::event_path;
 
 static SUPPORTED_S3S_EVENT_VERSION: Lazy<semver::VersionReq> =
     Lazy::new(|| semver::VersionReq::parse("~2").unwrap());
@@ -504,9 +504,9 @@ impl IngestorProcess {
         let mut stream = lines.filter_map(move |line| {
             let mut log = LogEvent::from_bytes_legacy(&line).with_batch_notifier_option(&batch);
 
-            log.insert(path!("bucket"), bucket_name.clone());
-            log.insert(path!("object"), object_key.clone());
-            log.insert(path!("region"), aws_region.clone());
+            log.insert(event_path!("bucket"), bucket_name.clone());
+            log.insert(event_path!("object"), object_key.clone());
+            log.insert(event_path!("region"), aws_region.clone());
             log.insert(log_schema().source_type_key(), Bytes::from("aws_s3"));
             log.insert(log_schema().timestamp_key(), timestamp);
 

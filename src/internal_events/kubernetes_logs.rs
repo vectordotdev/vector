@@ -85,7 +85,7 @@ impl InternalEvent for KubernetesLogsEventNamespaceAnnotationError<'_> {
             error_code = ANNOTATION_FAILED,
             error_type = error_type::READER_FAILED,
             stage = error_stage::PROCESSING,
-            rate_limit_secs = 10,
+            internal_log_rate_secs = 10,
         );
         counter!(
             "component_errors_total", 1,
@@ -110,7 +110,7 @@ impl InternalEvent for KubernetesLogsEventNodeAnnotationError<'_> {
             error_code = ANNOTATION_FAILED,
             error_type = error_type::READER_FAILED,
             stage = error_stage::PROCESSING,
-            rate_limit_secs = 10,
+            internal_log_rate_secs = 10,
         );
         counter!(
             "component_errors_total", 1,
@@ -149,7 +149,7 @@ impl InternalEvent for KubernetesLogsDockerFormatParseError<'_> {
             error = %self.error,
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
-            rate_limit_secs = 10,
+            internal_log_rate_secs = 10,
         );
         counter!(
             "component_errors_total", 1,
@@ -176,7 +176,7 @@ impl<E: std::fmt::Display> InternalEvent for KubernetesLifecycleError<E> {
             error_code = KUBERNETES_LIFECYCLE,
             error_type = error_type::READER_FAILED,
             stage = error_stage::PROCESSING,
-            rate_limit_secs = 10,
+            internal_log_rate_secs = 10,
         );
         counter!(
             "component_errors_total", 1,

@@ -45,6 +45,7 @@ class Event
   def initialize(name)
     @path = nil
     @skip_dropped_events = false
+    @emits_component_events_dropped = false
     @name = name
     @reports = []
     @members = {}
@@ -107,6 +108,13 @@ class Event
     end
   end
 
+  # Scan for the emission of ComponentEventsDropped.
+  def scan_component_dropped_events(block)
+    if block.match(/emit!\(\s*ComponentEventsDropped\s*\{/)
+      @emits_component_events_dropped = true
+    end
+  end
+
   # The event signature is used to check for duplicates and is
   # composed from the member names and their types, the metric types,
   # names, and their tags, and the log messages and parameters. If no
@@ -135,21 +143,21 @@ class Event
     @reports.clear
 
     if @uses == 0
-      @reports.append('Event has no uses.')
+      append('Event has no uses.')
     end
 
     EVENT_CLASSES.each do |suffix, (required_message, counters, additional_tags)|
       if @name.end_with? suffix
         handle.logs.each do |type, message, parameters|
           if type != 'trace'
-            @reports.append('Log type MUST be \"trace!\".')
+            append('Log type MUST be \"trace!\".')
           end
           if message != required_message
-            @reports.append("Log message MUST be \"#{required_message}\" (is \"#{message}\").")
+            append("Log message MUST be \"#{required_message}\" (is \"#{message}\").")
           end
           additional_tags.each do |tag_name|
             unless parameters.include? tag_name
-              @reports.append("Log MUST contain tag \"#{tag_name}\"")
+              append("Log MUST contain tag \"#{tag_name}\"")
             end
           end
         end
@@ -170,7 +178,7 @@ class Event
       # Name check
       append('Error events MUST be named "___Error".') unless @name.end_with? 'Error'
       # Outputs an error log
-      handle.logs_should_have('error')
+      handle.log_level_exactly('error')
       # Metric check
       counters_must_include_exclude_tags(METRIC_NAME_ERROR, ['error_type', 'stage'])
 
@@ -179,13 +187,13 @@ class Event
         if type == 'error'
           ['error_type', 'stage'].each do |parameter|
             unless parameters.include? parameter
-              @reports.append("Error log for Error event MUST include parameter \"#{parameter}\".")
+              append("Error log for Error event MUST include parameter \"#{parameter}\".")
             end
           end
 
           ['error_code', 'error_type', 'stage'].each do |parameter|
             if parameters.include? parameter and !@counters[METRIC_NAME_ERROR].include? parameter
-              @reports.append("Counter \"#{METRIC_NAME_ERROR}\" must include \"#{parameter}\" to match error log.")
+              append("Counter \"#{METRIC_NAME_ERROR}\" must include \"#{parameter}\" to match error log.")
             end
           end
         end
@@ -198,25 +206,39 @@ class Event
     # Validate <Namespace>EventsDropped events
     if is_events_dropped_event && !@skip_dropped_events
 
-      # Name check
-      append('EventsDropped events MUST be named "___EventsDropped".') unless @name.end_with? 'EventsDropped'
-      # Outputs an error log
-      handle.logs_should_have('error')
-      # Metric check
-      counters_must_include_exclude_tags(METRIC_NAME_EVENTS_DROPPED, ['intentional'], ['reason', 'count'])
+      # Don't run the checks on event structs which themselves emit ComponentEventsDropped,
+      # as the ComponentEventsDropped event is already checked.
+      # Instead, verify that component_discarded_events_total is not being over-incremented.
+      if @emits_component_events_dropped
+        if @counters.include? METRIC_NAME_EVENTS_DROPPED
+          append("Event emitting ComponentEventsDropped should not also increment counter `#{METRIC_NAME_EVENTS_DROPPED}`")
+        end
+      else
 
-      # Make sure EventsDropped events contain the required parameters
-      handle.logs.each do |type, message, parameters|
-        if type == 'error'
-          ['intentional', 'reason'].each do |parameter|
-            unless parameters.include? parameter
-              @reports.append("Error log for EventsDropped event MUST include parameter \"#{parameter}\".")
+        # Name check
+        append('EventsDropped events MUST be named "___EventsDropped".') unless @name.end_with? 'EventsDropped'
+
+        # Outputs an error log or debug log. Which level is dependent on the value of the param `intentional`, however
+        # because implementation can involve passing in the value of the `intentional` bool at compile time, we would need to
+        # scan all the source code for places that emit this event to determine that.
+        handle.log_level_one_of(['error', 'debug'])
+
+        # Metric check
+        counters_must_include_exclude_tags(METRIC_NAME_EVENTS_DROPPED, ['intentional'], ['reason', 'count'])
+
+        # Make sure EventsDropped events contain the required parameters
+        handle.logs.each do |type, message, parameters|
+          if type == 'error'
+            ['intentional', 'reason'].each do |parameter|
+              unless parameters.include? parameter
+                append("Error log for EventsDropped event MUST include parameter \"#{parameter}\".")
+              end
             end
-          end
 
-          ['intentional'].each do |parameter|
-            if parameters.include? parameter and !@counters[METRIC_NAME_EVENTS_DROPPED].include? parameter
-              @reports.append("Counter \"#{METRIC_NAME_EVENTS_DROPPED}\" must include \"#{parameter}\" to match error log.")
+            ['intentional'].each do |parameter|
+              if parameters.include? parameter and !@counters[METRIC_NAME_EVENTS_DROPPED].include? parameter
+                append("Counter \"#{METRIC_NAME_EVENTS_DROPPED}\" must include \"#{parameter}\" to match error log.")
+              end
             end
           end
         end
@@ -230,11 +252,11 @@ class Event
         tags.each do |tag, value|
           if tag == 'stage'
             if !value.start_with? 'error_stage::'
-              @reports.append("Counter \"#{name}\" tag \"#{tag}\" value must be an \"error_stage\" constant.")
+              append("Counter \"#{name}\" tag \"#{tag}\" value must be an \"error_stage\" constant.")
             end
           elsif tag == 'error_type'
             if !value.start_with? 'error_type::'
-              @reports.append("Counter \"#{name}\" tag \"#{tag}\" value must be an \"error_type\" constant.")
+              append("Counter \"#{name}\" tag \"#{tag}\" value must be an \"error_type\" constant.")
             end
           end
         end
@@ -244,10 +266,14 @@ class Event
     @reports.empty?
   end
 
-  def logs_should_have(level)
-    if @logs.find_index { |type, message, parameters| type == level }.nil?
-      @reports.append("This event MUST log with level #{level}.")
+  def log_level_one_of(levels)
+    if @logs.find_index { |type, message, parameters| levels.include? type }.nil?
+      append("This event MUST log with one of these levels: #{levels}.")
     end
+  end
+
+  def log_level_exactly(level)
+    log_level_one_of([level])
   end
 
   private
@@ -258,18 +284,18 @@ class Event
 
     def counters_must_include_exclude_tags(name, required_tags, exclude_tags = [])
       unless @counters.include? name
-        @reports.append("This event MUST increment counter \"#{name}\".")
+        append("This event MUST increment counter \"#{name}\".")
       else
         tags = @counters[name]
         required_tags.each do |tag|
           unless tags.include? tag
-            @reports.append("Counter \"#{name}\" MUST include tag \"#{tag}\".")
+            append("Counter \"#{name}\" MUST include tag \"#{tag}\".")
           end
         end
 
         exclude_tags.each do |tag|
           if tags.include? tag
-            @reports.append("Counter \"#{name}\" MUST NOT include tag \"#{tag}\".")
+            append("Counter \"#{name}\" MUST NOT include tag \"#{tag}\".")
           end
         end
       end
@@ -337,6 +363,7 @@ Find.find('.') do |path|
             event.impl_internal_event = true
             event.scan_metrics(block)
             event.scan_logs(block)
+            event.scan_component_dropped_events(block)
           end
         elsif trait == 'RegisterInternalEvent'
           # Extract the handle type name to join them together

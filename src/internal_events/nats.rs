@@ -1,6 +1,9 @@
 use std::io::Error;
 
-use crate::{emit, internal_events::ComponentEventsDropped};
+use crate::{
+    emit,
+    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
+};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -28,11 +31,7 @@ impl InternalEvent for NatsEventSendError {
             "error_code" => io_error_code(&self.error),
             "stage" => error_stage::SENDING,
         );
-        emit!(ComponentEventsDropped {
-            count: 1,
-            intentional: false,
-            reason,
-        });
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
 
         // deprecated
         counter!("send_errors_total", 1);

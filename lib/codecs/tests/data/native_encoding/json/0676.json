@@ -1,1 +1,1 @@
-{"log":{}}
+{"metric":{"name":"i","tags":{"i":"r"},"interval_ms":3333133629,"kind":"absolute","counter":{"value":494272.0}}}

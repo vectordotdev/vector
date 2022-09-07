@@ -8,7 +8,7 @@ use codecs::{
     NewlineDelimitedDecoderConfig,
 };
 use http::StatusCode;
-use lookup::path;
+use lookup::event_path;
 use tokio_util::codec::Decoder as _;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
@@ -287,7 +287,7 @@ fn add_headers(events: &mut [Event], headers_config: &[String], headers: HeaderM
 
         for event in events.iter_mut() {
             event.as_mut_log().try_insert(
-                path!(header_name),
+                event_path!(header_name),
                 Value::from(value.map(Bytes::copy_from_slice)),
             );
         }
@@ -296,7 +296,7 @@ fn add_headers(events: &mut [Event], headers_config: &[String], headers: HeaderM
 
 #[cfg(test)]
 mod tests {
-    use lookup::path;
+    use lookup::event_path;
     use std::str::FromStr;
     use std::{collections::BTreeMap, io::Write, net::SocketAddr};
 
@@ -698,7 +698,10 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log.get(path!("dotted.key")).unwrap(), &Value::from("value"));
+            assert_eq!(
+                log.get(event_path!("dotted.key")).unwrap(),
+                &Value::from("value")
+            );
         }
         {
             let event = events.remove(0);

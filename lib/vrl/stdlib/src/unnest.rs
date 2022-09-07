@@ -1,5 +1,5 @@
 use ::value::Value;
-use lookup_lib::{OwnedPath, TargetPath};
+use lookup_lib::{OwnedTargetPath, OwnedValuePath};
 use vrl::prelude::*;
 
 fn unnest(path: &expression::Query, ctx: &mut Context) -> Resolved {
@@ -9,30 +9,30 @@ fn unnest(path: &expression::Query, ctx: &mut Context) -> Resolved {
         expression::Target::External(prefix) => {
             let root = ctx
                 .target()
-                .target_get(&TargetPath::root(*prefix))
+                .target_get(&OwnedTargetPath::root(*prefix))
                 .expect("must never fail")
                 .expect("always a value");
             unnest_root(root, lookup_buf)
         }
         expression::Target::Internal(v) => {
             let value = ctx.state().variable(v.ident()).unwrap_or(&Value::Null);
-            let root = value.get(&OwnedPath::root()).expect("always a value");
+            let root = value.get(&OwnedValuePath::root()).expect("always a value");
             unnest_root(root, lookup_buf)
         }
         expression::Target::Container(expr) => {
             let value = expr.resolve(ctx)?;
-            let root = value.get(&OwnedPath::root()).expect("always a value");
+            let root = value.get(&OwnedValuePath::root()).expect("always a value");
             unnest_root(root, lookup_buf)
         }
         expression::Target::FunctionCall(expr) => {
             let value = expr.resolve(ctx)?;
-            let root = value.get(&OwnedPath::root()).expect("always a value");
+            let root = value.get(&OwnedValuePath::root()).expect("always a value");
             unnest_root(root, lookup_buf)
         }
     }
 }
 
-fn unnest_root(root: &Value, path: &OwnedPath) -> Resolved {
+fn unnest_root(root: &Value, path: &OwnedValuePath) -> Resolved {
     let mut trimmed = root.clone();
     let values = trimmed
         .remove(path, true)
@@ -114,12 +114,12 @@ struct UnnestFn {
 impl UnnestFn {
     #[cfg(test)]
     fn new(path: &str) -> Self {
-        use lookup_lib::{lookup_v2::parse_path, PathPrefix};
+        use lookup_lib::{lookup_v2::parse_value_path, PathPrefix};
 
         Self {
             path: expression::Query::new(
                 expression::Target::External(PathPrefix::Event),
-                parse_path(path),
+                parse_value_path(path),
             ),
         }
     }
@@ -156,7 +156,7 @@ impl FunctionExpression for UnnestFn {
 ///    { "a" => { "b" => { "c" => 3 } } },
 ///  ]`
 ///
-pub(crate) fn invert_array_at_path(typedef: &TypeDef, path: &OwnedPath) -> TypeDef {
+pub(crate) fn invert_array_at_path(typedef: &TypeDef, path: &OwnedValuePath) -> TypeDef {
     let kind = typedef.kind().at_path(path);
 
     let mut array = if let Some(array) = kind.into_array() {
@@ -187,7 +187,7 @@ pub(crate) fn invert_array_at_path(typedef: &TypeDef, path: &OwnedPath) -> TypeD
 
 #[cfg(test)]
 mod tests {
-    use lookup_lib::lookup_v2::parse_path;
+    use lookup_lib::lookup_v2::parse_value_path;
     use vector_common::{btreemap, TimeZone};
     use vrl::state::TypeState;
 
@@ -398,7 +398,7 @@ mod tests {
         ];
 
         for case in cases {
-            let path = parse_path(case.path);
+            let path = parse_value_path(case.path);
             let new = invert_array_at_path(&case.old, &path);
             assert_eq!(case.new, new, "{}", path);
         }

@@ -10,22 +10,21 @@
 use std::borrow::Cow;
 use std::str::CharIndices;
 
-use crate::lookup_v2::{BorrowedSegment, Path};
+use crate::lookup_v2::{BorrowedSegment, ValuePath};
 
 #[derive(Clone)]
-pub struct JitPath<'a> {
+pub struct JitValuePath<'a> {
     path: &'a str,
 }
 
-impl JitPath<'_> {
-    pub fn new(path: &str) -> JitPath {
-        JitPath { path }
+impl JitValuePath<'_> {
+    pub fn new(path: &str) -> JitValuePath {
+        JitValuePath { path }
     }
 }
 
-/// This is essentially an iterator over a `JitPath`.
 #[derive(Clone)]
-pub struct JitLookup<'a> {
+pub struct JitValuePathIter<'a> {
     path: &'a str,
     chars: CharIndices<'a>,
     state: JitState,
@@ -34,7 +33,7 @@ pub struct JitLookup<'a> {
     coalesce_count: u32,
 }
 
-impl<'a> JitLookup<'a> {
+impl<'a> JitValuePathIter<'a> {
     pub fn new(path: &'a str) -> Self {
         Self {
             chars: path.char_indices(),
@@ -46,11 +45,11 @@ impl<'a> JitLookup<'a> {
     }
 }
 
-impl<'a> Path<'a> for JitPath<'a> {
-    type Iter = JitLookup<'a>;
+impl<'a> ValuePath<'a> for JitValuePath<'a> {
+    type Iter = JitValuePathIter<'a>;
 
     fn segment_iter(&self) -> Self::Iter {
-        JitLookup::new(self.path)
+        JitValuePathIter::new(self.path)
     }
 }
 
@@ -75,7 +74,7 @@ enum JitState {
     End,
 }
 
-impl<'a> Iterator for JitLookup<'a> {
+impl<'a> Iterator for JitValuePathIter<'a> {
     type Item = BorrowedSegment<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -376,72 +375,78 @@ impl<'a> Iterator for JitLookup<'a> {
 
 #[cfg(test)]
 mod test {
-    use crate::lookup_v2::{OwnedPath, OwnedSegment, Path};
-    use crate::owned_path;
+    use crate::lookup_v2::{OwnedSegment, OwnedValuePath, ValuePath};
+    use crate::owned_value_path;
 
     #[test]
     fn parsing() {
-        let test_cases: Vec<(_, OwnedPath)> = vec![
-            ("", owned_path!(OwnedSegment::Invalid)),
-            (".", owned_path!()),
-            ("]", owned_path!(OwnedSegment::Invalid)),
-            ("]foo", owned_path!(OwnedSegment::Invalid)),
-            ("..", owned_path!(OwnedSegment::Invalid)),
-            ("...", owned_path!(OwnedSegment::Invalid)),
-            ("f", owned_path!("f")),
-            (".f", owned_path!("f")),
-            (".[", owned_path!(OwnedSegment::Invalid)),
-            ("f.", owned_path!("f", OwnedSegment::Invalid)),
-            ("foo", owned_path!("foo")),
+        let test_cases: Vec<(_, OwnedValuePath)> = vec![
+            ("", owned_value_path!(OwnedSegment::Invalid)),
+            (".", owned_value_path!()),
+            ("]", owned_value_path!(OwnedSegment::Invalid)),
+            ("]foo", owned_value_path!(OwnedSegment::Invalid)),
+            ("..", owned_value_path!(OwnedSegment::Invalid)),
+            ("...", owned_value_path!(OwnedSegment::Invalid)),
+            ("f", owned_value_path!("f")),
+            (".f", owned_value_path!("f")),
+            (".[", owned_value_path!(OwnedSegment::Invalid)),
+            ("f.", owned_value_path!("f", OwnedSegment::Invalid)),
+            ("foo", owned_value_path!("foo")),
             (
                 "ec2.metadata.\"availability-zone\"",
-                owned_path!("ec2", "metadata", "availability-zone"),
+                owned_value_path!("ec2", "metadata", "availability-zone"),
             ),
-            (".foo", owned_path!("foo")),
-            (".@timestamp", owned_path!("@timestamp")),
-            ("foo[", owned_path!("foo", OwnedSegment::Invalid)),
-            ("foo$", owned_path!(OwnedSegment::Invalid)),
-            ("\"$peci@l chars\"", owned_path!("$peci@l chars")),
-            (".foo.foo bar", owned_path!("foo", OwnedSegment::Invalid)),
-            (".foo.\"foo bar\".bar", owned_path!("foo", "foo bar", "bar")),
-            ("[1]", owned_path!(1)),
-            ("[42]", owned_path!(42)),
-            (".[42]", owned_path!(42)),
-            ("[42].foo", owned_path!(42, "foo")),
-            ("foo.[42]", owned_path!("foo", OwnedSegment::Invalid)),
-            ("foo..bar", owned_path!("foo", OwnedSegment::Invalid)),
-            ("[42]foo", owned_path!(42, "foo")),
-            ("[-1]", owned_path!(-1)),
-            ("[-42]", owned_path!(-42)),
-            (".[-42]", owned_path!(-42)),
-            ("[-42].foo", owned_path!(-42, "foo")),
-            ("[-42]foo", owned_path!(-42, "foo")),
-            (".\"[42]. {}-_\"", owned_path!("[42]. {}-_")),
-            ("\"a\\\"a\"", owned_path!("a\"a")),
-            (".\"a\\\"a\"", owned_path!("a\"a")),
+            (".foo", owned_value_path!("foo")),
+            (".@timestamp", owned_value_path!("@timestamp")),
+            ("foo[", owned_value_path!("foo", OwnedSegment::Invalid)),
+            ("foo$", owned_value_path!(OwnedSegment::Invalid)),
+            ("\"$peci@l chars\"", owned_value_path!("$peci@l chars")),
+            (
+                ".foo.foo bar",
+                owned_value_path!("foo", OwnedSegment::Invalid),
+            ),
+            (
+                ".foo.\"foo bar\".bar",
+                owned_value_path!("foo", "foo bar", "bar"),
+            ),
+            ("[1]", owned_value_path!(1)),
+            ("[42]", owned_value_path!(42)),
+            (".[42]", owned_value_path!(42)),
+            ("[42].foo", owned_value_path!(42, "foo")),
+            ("foo.[42]", owned_value_path!("foo", OwnedSegment::Invalid)),
+            ("foo..bar", owned_value_path!("foo", OwnedSegment::Invalid)),
+            ("[42]foo", owned_value_path!(42, "foo")),
+            ("[-1]", owned_value_path!(-1)),
+            ("[-42]", owned_value_path!(-42)),
+            (".[-42]", owned_value_path!(-42)),
+            ("[-42].foo", owned_value_path!(-42, "foo")),
+            ("[-42]foo", owned_value_path!(-42, "foo")),
+            (".\"[42]. {}-_\"", owned_value_path!("[42]. {}-_")),
+            ("\"a\\\"a\"", owned_value_path!("a\"a")),
+            (".\"a\\\"a\"", owned_value_path!("a\"a")),
             (
                 ".foo.\"a\\\"a\".\"b\\\\b\".bar",
-                owned_path!("foo", "a\"a", "b\\b", "bar"),
+                owned_value_path!("foo", "a\"a", "b\\b", "bar"),
             ),
-            (r#"."🤖""#, owned_path!("🤖")),
-            (".(a|b)", owned_path!(vec!["a", "b"])),
-            ("(a|b)", owned_path!(vec!["a", "b"])),
-            ("( a | b )", owned_path!(vec!["a", "b"])),
-            (".(a|b)[1]", owned_path!(vec!["a", "b"], 1)),
-            (".(a|b).foo", owned_path!(vec!["a", "b"], "foo")),
-            (".(a|b|c)", owned_path!(vec!["a", "b", "c"])),
-            ("[1](a|b)", owned_path!(1, vec!["a", "b"])),
-            ("[1].(a|b)", owned_path!(1, vec!["a", "b"])),
-            ("foo.(a|b)", owned_path!("foo", vec!["a", "b"])),
-            ("(\"a\"|b)", owned_path!(vec!["a", "b"])),
-            ("(a|\"b.c\")", owned_path!(vec!["a", "b.c"])),
-            ("(a|\"b\\\"c\")", owned_path!(vec!["a", "b\"c"])),
-            ("(\"b\\\"c\"|a)", owned_path!(vec!["b\"c", "a"])),
-            ("(a)", owned_path!(OwnedSegment::Invalid)),
+            (r#"."🤖""#, owned_value_path!("🤖")),
+            (".(a|b)", owned_value_path!(vec!["a", "b"])),
+            ("(a|b)", owned_value_path!(vec!["a", "b"])),
+            ("( a | b )", owned_value_path!(vec!["a", "b"])),
+            (".(a|b)[1]", owned_value_path!(vec!["a", "b"], 1)),
+            (".(a|b).foo", owned_value_path!(vec!["a", "b"], "foo")),
+            (".(a|b|c)", owned_value_path!(vec!["a", "b", "c"])),
+            ("[1](a|b)", owned_value_path!(1, vec!["a", "b"])),
+            ("[1].(a|b)", owned_value_path!(1, vec!["a", "b"])),
+            ("foo.(a|b)", owned_value_path!("foo", vec!["a", "b"])),
+            ("(\"a\"|b)", owned_value_path!(vec!["a", "b"])),
+            ("(a|\"b.c\")", owned_value_path!(vec!["a", "b.c"])),
+            ("(a|\"b\\\"c\")", owned_value_path!(vec!["a", "b\"c"])),
+            ("(\"b\\\"c\"|a)", owned_value_path!(vec!["b\"c", "a"])),
+            ("(a)", owned_value_path!(OwnedSegment::Invalid)),
         ];
 
         for (path, expected) in test_cases {
-            if !Path::eq(&path, &expected) {
+            if !ValuePath::eq(&path, &expected) {
                 panic!(
                     "Not equal. Input={:?}\nExpected: {:?}\nActual: {:?}",
                     path,

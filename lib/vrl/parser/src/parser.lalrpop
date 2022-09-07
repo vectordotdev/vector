@@ -6,7 +6,7 @@ use diagnostic::span;
 use std::collections::BTreeMap;
 use lalrpop_util::ErrorRecovery;
 use ordered_float::NotNan;
-use lookup::{LookupBuf, SegmentBuf, FieldBuf, PathPrefix, TargetPath, OwnedPath};
+use lookup::{LookupBuf, SegmentBuf, FieldBuf, PathPrefix, OwnedTargetPath, OwnedValuePath};
 
 
 grammar<'err, 'input>(input: &'input str);
@@ -323,18 +323,18 @@ pub Query: Query = {
     LQuery <Sp<".">> RQuery => {
         let span = <>.span();
         let target = Node::new(span, QueryTarget::External(PathPrefix::Event));
-        let path = Node::new(span, OwnedPath::root());
+        let path = Node::new(span, OwnedValuePath::root());
 
         Query { target, path }
     },
     LQuery <Sp<"%">> RQuery => {
         let span = <>.span();
         let target = Node::new(span, QueryTarget::External(PathPrefix::Metadata));
-        let path = Node::new(span, OwnedPath::root());
+        let path = Node::new(span, OwnedValuePath::root());
 
         Query { target, path }
     },
-    LQuery <target: Sp<QueryTarget>> <path: Sp<Path>> RQuery => Query { target, path: path.map(OwnedPath::from) },
+    LQuery <target: Sp<QueryTarget>> <path: Sp<Path>> RQuery => Query { target, path: path.map(OwnedValuePath::from) },
 };
 
 #[inline]

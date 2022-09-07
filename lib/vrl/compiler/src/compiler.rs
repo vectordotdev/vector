@@ -1,6 +1,6 @@
 use core::Value;
 use diagnostic::{DiagnosticList, DiagnosticMessage, Note, Severity, Span};
-use lookup::{OwnedPath, PathPrefix, TargetPath};
+use lookup::{OwnedTargetPath, OwnedValuePath, PathPrefix};
 use parser::ast::{self, Node, QueryTarget};
 
 use crate::function::ArgumentList;
@@ -34,15 +34,15 @@ pub struct Compiler<'a> {
     diagnostics: Diagnostics,
     fallible: bool,
     abortable: bool,
-    external_queries: Vec<TargetPath>,
-    external_assignments: Vec<TargetPath>,
+    external_queries: Vec<OwnedTargetPath>,
+    external_assignments: Vec<OwnedTargetPath>,
 
     /// A list of variables that are missing, because the rhs expression of the
     /// assignment failed to compile.
     ///
     /// This list allows us to avoid printing "undefined variable" compilation
     /// errors when the reason for it being undefined is another compiler error.
-    skip_missing_query_target: Vec<(QueryTarget, OwnedPath)>,
+    skip_missing_query_target: Vec<(QueryTarget, OwnedValuePath)>,
 
     /// Track which expression in a chain of expressions is fallible.
     ///
@@ -565,7 +565,7 @@ impl<'a> Compiler<'a> {
         // This data is exposed to the caller of the compiler, to allow any
         // potential external optimizations.
         if let Target::External(prefix) = target {
-            let target_path = TargetPath {
+            let target_path = OwnedTargetPath {
                 prefix,
                 path: path.clone(),
             };
@@ -704,7 +704,7 @@ impl<'a> Compiler<'a> {
         //
         // See: https://github.com/vectordotdev/vector/issues/12547
         if ident.as_deref() == "get" {
-            self.external_queries.push(TargetPath::event_root());
+            self.external_queries.push(OwnedTargetPath::event_root());
         }
 
         let arguments: Vec<_> = arguments
@@ -836,7 +836,7 @@ impl<'a> Compiler<'a> {
 
         if self
             .skip_missing_query_target
-            .contains(&(QueryTarget::Internal(ident.clone()), OwnedPath::root()))
+            .contains(&(QueryTarget::Internal(ident.clone()), OwnedValuePath::root()))
         {
             return None;
         }
@@ -921,11 +921,11 @@ impl<'a> Compiler<'a> {
             }
             ast::AssignmentTarget::Internal(ident, path) => (
                 QueryTarget::Internal(ident.clone()),
-                path.clone().unwrap_or_else(OwnedPath::root),
+                path.clone().unwrap_or_else(OwnedValuePath::root),
             ),
             ast::AssignmentTarget::External(path) => {
                 let prefix = path.as_ref().map_or(PathPrefix::Event, |x| x.prefix);
-                let path = path.clone().map_or_else(OwnedPath::root, |x| x.path);
+                let path = path.clone().map_or_else(OwnedValuePath::root, |x| x.path);
                 (QueryTarget::External(prefix), path)
             }
         };
@@ -949,7 +949,7 @@ pub(crate) fn legacy_keys() -> Vec<Value> {
 #[derive(Clone, Debug)]
 enum MetadataKey {
     Legacy(String),
-    Query(TargetPath),
+    Query(OwnedTargetPath),
 }
 
 fn get_metadata_key(
@@ -958,7 +958,7 @@ fn get_metadata_key(
     if let Ok(Some(query)) = arguments.optional_query("key") {
         if let Target::External(_) = query.target() {
             // for backwards compatibility reasons, the query is forced to point at metadata
-            let target_path = TargetPath::metadata(query.path().clone());
+            let target_path = OwnedTargetPath::metadata(query.path().clone());
             return Ok(MetadataKey::Query(target_path));
         }
     }
