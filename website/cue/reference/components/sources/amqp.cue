@@ -1,7 +1,7 @@
 package metadata
 
 components: sources: amqp: {
-	title: "Amqp"
+	title: "AMQP"
 
 	features: {
 		acknowledgements: false
@@ -12,7 +12,7 @@ components: sources: amqp: {
 				interface: {
 					socket: {
 						api: {
-							title: "Amqp protocol"
+							title: "AMQP protocol"
 							url:   urls.amqp_protocol
 						}
 						direction: "incoming"
@@ -43,7 +43,7 @@ components: sources: amqp: {
 
 	configuration: {
 		connection: {
-			description: "Connection options for Amqp source"
+			description: "Connection options for the AMQP source."
 			required:    true
 			warnings: []
 			type: object: {
@@ -54,7 +54,7 @@ components: sources: amqp: {
 			}
 		}
 		group_id: {
-			description: "The consumer group name to be used to consume events from Amqp."
+			description: "The consumer group name to be used to consume events from AMQP."
 			required:    true
 			warnings: []
 			type: string: {
@@ -64,7 +64,7 @@ components: sources: amqp: {
 		}
 		routing_key: {
 			common:      true
-			description: "The log field name to use for the Amqp routing key."
+			description: "The log field name to use for the AMQP routing key."
 			required:    false
 			warnings: []
 			type: string: {
@@ -75,7 +75,7 @@ components: sources: amqp: {
 		}
 		exchange_key: {
 			common:      true
-			description: "The log field name to use for the Amqp exchange key."
+			description: "The log field name to use for the AMQP exchange key."
 			required:    false
 			warnings: []
 			type: string: {
@@ -86,7 +86,7 @@ components: sources: amqp: {
 		}
 		offset_key: {
 			common:      true
-			description: "The log field name to use for the Amqp offset key."
+			description: "The log field name to use for the AMQP offset key."
 			required:    false
 			warnings: []
 			type: string: {
@@ -98,10 +98,10 @@ components: sources: amqp: {
 	}
 
 	output: logs: record: {
-		description: "An individual Amqp record"
+		description: "An individual AMQP record."
 		fields: {
 			message: {
-				description: "The raw line from the Amqp record."
+				description: "The raw line from the AMQP record."
 				required:    true
 				type: string: {
 					examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
@@ -109,7 +109,7 @@ components: sources: amqp: {
 				}
 			}
 			offset: {
-				description: "The Amqp offset at the time the record was retrieved."
+				description: "The AMQP offset at the time the record was retrieved."
 				required:    true
 				type: uint: {
 					examples: [100]
@@ -117,10 +117,10 @@ components: sources: amqp: {
 				}
 			}
 			timestamp: fields._current_timestamp & {
-				description: "The timestamp encoded in the Amqp message or the current time if it cannot be fetched."
+				description: "The timestamp encoded in the AMQP message or the current time if it cannot be fetched."
 			}
 			exchange: {
-				description: "The Amqp exchange that the record came from."
+				description: "The AMQP exchange that the record came from."
 				required:    true
 				type: string: {
 					examples: ["topic"]

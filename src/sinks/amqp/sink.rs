@@ -1,3 +1,5 @@
+//! The sink for the AMQP sink that wires together the main stream that takes the
+//! event and sends it to AMQP.
 use crate::{
     codecs::Transformer, event::Event, internal_events::TemplateRenderingError,
     sinks::util::builder::SinkBuilderExt, template::Template,

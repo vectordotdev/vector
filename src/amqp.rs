@@ -1,22 +1,12 @@
 use lapin::tcp::{OwnedIdentity, OwnedTLSConfig};
-use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 use vector_config::configurable_component;
-
-/// Client certificate for rabbit authentication
-#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
-#[serde(rename_all = "snake_case")]
-pub(crate) enum ClientCertDer {
-    /// Certificate embedded in config file as base64 string
-    Embedded(String),
-    /// Certificate on file system
-    Path(PathBuf),
-}
 
 /// Connection options for AMQP.
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub(crate) struct AMQPConfig {
+    /// URI for the AMQP server.
+    ///
     /// Format: amqp://user:password@host:port/vhost?timeout=seconds
     pub(crate) connection_string: String,
 

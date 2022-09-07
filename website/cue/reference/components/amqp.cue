@@ -7,7 +7,7 @@ components: _amqp: {
 			interface: {
 				socket: {
 					api: {
-						title: "Amqp protocol"
+						title: "AMQP protocol"
 						url:   urls.amqp_protocol
 					}
 					direction: "outgoing"
@@ -42,7 +42,10 @@ components: _amqp: {
 
 	configuration: {
 		connection_string: {
-			description: "Connection string to use when connecting to an amqp server in the format of amqp://user:password@host:port/vhost?timeout=seconds"
+			description: """
+				Connection string to use when connecting to an AMQP server in the format of amqp://user:password@host:port/vhost?timeout=seconds.
+				The default vhost can be represented as %2f.
+				"""
 			required:    true
 			warnings: []
 			type: string: {
@@ -57,7 +60,7 @@ components: _amqp: {
 			title: "Lapin"
 			body:  """
 				The `amqp` source and sink uses [`lapin`](\(urls.lapin)) under the hood. This
-				is a reliable pure rust library that facilitates communication with Ampq servers
+				is a reliable pure rust library that facilitates communication with AMPQ servers
 				such as RabbitMQ.
 				"""
 		}

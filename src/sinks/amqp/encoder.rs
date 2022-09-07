@@ -1,3 +1,4 @@
+//! Encoding for the AMQP sink.
 use crate::{event::Event, sinks::util::encoding::Encoder};
 use bytes::BytesMut;
 use std::io;

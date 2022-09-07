@@ -5,15 +5,42 @@ pub mod source {
     use vector_core::internal_event::InternalEvent;
 
     #[derive(Debug)]
-    pub struct AMQPEventReceived {
+    pub struct AMQPBytesReceived {
+        pub byte_size: usize,
+        pub protocol: &'static str,
+    }
+
+    impl InternalEvent for AMQPBytesReceived {
+        fn emit(self) {
+            trace!(
+                message = "Bytes received.",
+                byte_size = %self.byte_size,
+                protocol = %self.protocol,
+            );
+            counter!(
+                "component_received_bytes_total",
+                self.byte_size as u64,
+                "protocol" => self.protocol,
+            );
+        }
+    }
+
+    #[derive(Debug)]
+    pub struct AMQPEventsReceived {
         pub byte_size: usize,
     }
 
-    impl InternalEvent for AMQPEventReceived {
+    impl InternalEvent for AMQPEventsReceived {
         fn emit(self) {
-            trace!(message = "Received one event.", internal_log_rate_secs = 10);
-            counter!("processed_events_total", 1);
-            counter!("processed_bytes_total", self.byte_size as u64);
+            trace!(message = "Events received.", internal_log_rate_secs = 10);
+            counter!("component_received_events_total", 1);
+            counter!(
+                "component_received_event_bytes_total",
+                self.byte_size as u64
+            );
+
+            // deprecated
+            counter!("events_in_total", 1);
         }
     }
 
@@ -37,11 +64,59 @@ pub mod source {
             );
         }
     }
+
+    #[derive(Debug)]
+    pub struct AMQPAckError {
+        pub error: lapin::Error,
+    }
+
+    impl InternalEvent for AMQPAckError {
+        fn emit(self) {
+            error!(message = "Unable to ack.",
+                   error = ?self.error,
+                   error_type = error_type::ACKNOWLEDGMENT_FAILED,
+                   stage = error_stage::RECEIVING,
+                   internal_log_rate_secs = 10
+            );
+            counter!(
+                "component_errors_total", 1,
+                "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
+                "stage" => error_stage::RECEIVING,
+            );
+        }
+    }
+
+    #[derive(Debug)]
+    pub struct AMQPRejectError {
+        pub error: lapin::Error,
+    }
+
+    impl InternalEvent for AMQPRejectError {
+        fn emit(self) {
+            error!(message = "Unable to reject.",
+                   error = ?self.error,
+                   error_type = error_type::COMMAND_FAILED,
+                   stage = error_stage::RECEIVING,
+                   internal_log_rate_secs = 10
+            );
+            counter!(
+                "component_errors_total", 1,
+                "error_type" => error_type::COMMAND_FAILED,
+                "stage" => error_stage::RECEIVING,
+            );
+        }
+    }
 }
 
 #[cfg(feature = "sinks-amqp")]
 pub mod sink {
-    use crate::internal_events::prelude::{error_stage, error_type};
+    use crate::{
+        emit,
+        internal_events::{
+            prelude::{error_stage, error_type},
+            ComponentEventsDropped,
+        },
+    };
     use metrics::counter;
     use vector_core::internal_event::InternalEvent;
 
@@ -52,7 +127,9 @@ pub mod sink {
 
     impl InternalEvent for AMQPDeliveryError<'_> {
         fn emit(self) {
-            error!(message = "Unable to deliver.",
+            let reason = "Unable to deliver.";
+
+            error!(message = reason,
                    error = ?self.error,
                    error_type = error_type::REQUEST_FAILED,
                    stage = error_stage::SENDING,
@@ -63,12 +140,11 @@ pub mod sink {
                 "error_type" => error_type::REQUEST_FAILED,
                 "stage" => error_stage::SENDING,
             );
-            counter!(
-                "component_discarded_events_total", 1,
-                "error_type" => error_type::REQUEST_FAILED,
-                "stage" => error_stage::SENDING,
-                "intentional" => "false",
-            );
+            emit!(ComponentEventsDropped {
+                count: 1,
+                intentional: false,
+                reason,
+            });
         }
     }
 
@@ -79,7 +155,9 @@ pub mod sink {
 
     impl InternalEvent for AMQPAcknowledgementError<'_> {
         fn emit(self) {
-            error!(message = "Acknowledgement failed.",
+            let reason = "Acknowledgement failed.";
+
+            error!(message = reason,
                    error = ?self.error,
                    error_type = error_type::REQUEST_FAILED,
                    stage = error_stage::SENDING,
@@ -90,16 +168,11 @@ pub mod sink {
                 "error_type" => error_type::REQUEST_FAILED,
                 "stage" => error_stage::SENDING,
             );
-            counter!(
-                "component_discarded_events_total", 1,
-                "error_type" => error_type::REQUEST_FAILED,
-                "stage" => error_stage::SENDING,
-                "intentional" => "false",
-            );
-        }
-
-        fn name(&self) -> Option<&'static str> {
-            None
+            emit!(ComponentEventsDropped {
+                count: 1,
+                intentional: false,
+                reason,
+            });
         }
     }
 }

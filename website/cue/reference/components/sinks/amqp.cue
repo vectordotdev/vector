@@ -1,14 +1,14 @@
 package metadata
 
 components: sinks: amqp: {
-	title: "Amqp"
+	title: "AMQP"
 
 	classes: {
 		commonly_used: true
 		delivery:      "at_least_once"
 		development:   "beta"
 		egress_method: "dynamic"
-		service_providers: ["Amqp"]
+		service_providers: ["AMQP"]
 		stateful: false
 	}
 
@@ -51,7 +51,7 @@ components: sinks: amqp: {
 
 	configuration: {
 		connection: {
-			description: "Connection options for Amqp sink"
+			description: "Connection options for the AMQP sink."
 			required:    true
 			warnings: []
 			type: object: {
@@ -62,7 +62,7 @@ components: sinks: amqp: {
 			}
 		}
 		exchange: {
-			description: "The exchange to publish messages to"
+			description: "The exchange to publish messages to."
 			required:    true
 			warnings: []
 			type: string: {
@@ -72,7 +72,7 @@ components: sinks: amqp: {
 		}
 		routing_key: {
 			common:      false
-			description: "Template use to generate a routing key which corresponds to a queue binding"
+			description: "Template use to generate a routing key which corresponds to a queue binding."
 			required:    false
 			warnings: []
 			type: string: {

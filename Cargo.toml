@@ -198,7 +198,7 @@ prost-types = { version = "0.10.1", default-features = false, optional = true }
 goauth = { version = "0.13.1", optional = true }
 smpl_jwt = { version = "0.7.1", default-features = false, optional = true }
 
-# Amqp
+# AMQP
 lapin = { version = "2.1.1", default-features = false, optional = true }
 
 # API
@@ -888,4 +888,3 @@ name = "codecs"
 path = "benches/codecs/main.rs"
 harness = false
 required-features = ["codecs-benches"]
-

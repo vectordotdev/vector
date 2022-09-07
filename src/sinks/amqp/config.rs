@@ -1,3 +1,4 @@
+//! Configuration functionality for the AMQP sink.
 use crate::{
     amqp::AMQPConfig,
     codecs::EncodingConfig,
@@ -21,12 +22,12 @@ pub struct AMQPSinkConfig {
     /// The exchange to publish messages to.
     pub(crate) exchange: String,
 
-    /// Template use to generate a routing key which corresponds to a queue binding.
+    /// Template used to generate a routing key which corresponds to a queue binding.
     // TODO: We will eventually be able to add metadata on a per-field basis, such that we can add metadata for marking
     // this field as being capable of using Vector's templating syntax.
     pub(crate) routing_key: Option<String>,
 
-    /// Connection options for AMQP sink
+    /// Connection options for the `amqp` sink.
     pub(crate) connection: AMQPConfig,
 
     #[configurable(derived)]

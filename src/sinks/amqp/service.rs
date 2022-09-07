@@ -1,3 +1,5 @@
+//! The main tower service that takes the request created by the request builder\
+//! and sends it to AMQP.
 use crate::internal_events::sink::{AMQPAcknowledgementError, AMQPDeliveryError};
 use bytes::Bytes;
 use futures::future::BoxFuture;
@@ -64,7 +66,7 @@ impl DriverResponse for AMQPResponse {
     }
 
     fn bytes_sent(&self) -> Option<(usize, &str)> {
-        Some((self.byte_size, "amqp 0.9.1"))
+        Some((self.byte_size, "amqp_0_9_1"))
     }
 }
 
@@ -103,7 +105,7 @@ impl Service<AMQPRequest> for AMQPService {
                 .unwrap();
 
             let byte_size = req.body.len();
-            let f = channel
+            let fut = channel
                 .basic_publish(
                     &req.exchange,
                     &req.routing_key,
@@ -113,7 +115,7 @@ impl Service<AMQPRequest> for AMQPService {
                 )
                 .await;
 
-            match f {
+            match fut {
                 Ok(result) => match result.await {
                     Ok(lapin::publisher_confirm::Confirmation::Nack(_)) => {
                         warn!("Received Negative Acknowledgement from AMQP server.");
