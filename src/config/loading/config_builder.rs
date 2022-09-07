@@ -3,7 +3,7 @@ use std::{collections::HashMap, io::Read};
 use indexmap::IndexMap;
 use toml::value::Table;
 
-use super::{deserialize_table, loader, prepare_input, secrets};
+use super::{deserialize_table, loader, prepare_input, secret};
 use super::{ComponentHint, Process};
 use crate::config::{
     ComponentKey, ConfigBuilder, EnrichmentTableOuter, SinkOuter, SourceOuter, TestDefinition,
@@ -38,7 +38,7 @@ impl Process for ConfigBuilderLoader {
         let prepared_input = self
             .secrets
             .as_ref()
-            .map(|s| secrets::interpolate(&prepared_input, s))
+            .map(|s| secret::interpolate(&prepared_input, s))
             .unwrap_or(Ok(prepared_input))?;
         Ok((prepared_input, warnings))
     }
