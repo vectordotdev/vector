@@ -36,6 +36,7 @@ pub mod dns;
 pub mod docker;
 pub mod expiring_hash_map;
 pub mod generate;
+pub mod generate_schema;
 #[macro_use]
 #[allow(unreachable_pub)]
 pub mod internal_events;

@@ -101,8 +101,8 @@ impl<V: 'static> Fields<V> {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[serde(untagged)]
 pub enum OneOrMany<T> {
-    One(#[configurable(derived)] T),
-    Many(#[configurable(derived)] Vec<T>),
+    One(#[configurable(transparent)] T),
+    Many(#[configurable(transparent)] Vec<T>),
 }
 
 impl<T> OneOrMany<T> {
