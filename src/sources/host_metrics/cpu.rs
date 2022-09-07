@@ -119,7 +119,7 @@ mod tests {
                 n_logical_cpus += 1;
             } else {
                 // catch any bogey
-                assert!(false, "unrecognized metric name");
+                panic!("unrecognized metric name");
             }
         }
 
