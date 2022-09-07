@@ -40,7 +40,7 @@ message Log {
 
 message Trace {
   map<string, Value> fields = 1;
-  Value metadata = 3;
+  Value metadata = 2;
 }
 
 message ValueMap {
