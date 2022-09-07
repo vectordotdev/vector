@@ -1,7 +1,7 @@
 pub mod closure;
 
 use diagnostic::{DiagnosticMessage, Label, Note};
-use lookup::TargetPath;
+use lookup::OwnedTargetPath;
 use parser::ast::Ident;
 use std::{
     collections::{BTreeMap, HashMap},
@@ -108,7 +108,7 @@ impl FunctionCompileContext {
     }
 
     #[must_use]
-    pub fn is_read_only_path(&self, path: &TargetPath) -> bool {
+    pub fn is_read_only_path(&self, path: &OwnedTargetPath) -> bool {
         self.config.is_read_only_path(path)
     }
 

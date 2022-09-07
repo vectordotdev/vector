@@ -6,8 +6,8 @@ use std::{
     path::PathBuf,
 };
 
-use lookup::lookup_v2::Path;
-use lookup::path;
+use lookup::lookup_v2::ValuePath;
+use lookup::{metadata_path, path, PathPrefix};
 use snafu::{ResultExt, Snafu};
 use value::Kind;
 use vector_common::TimeZone;
@@ -425,14 +425,18 @@ where
             Event::Log(ref mut log) => match log.namespace() {
                 LogNamespace::Legacy => {
                     log.insert(
-                        log_schema().metadata_key().concat(path!("dropped")),
+                        (
+                            PathPrefix::Event,
+                            log_schema().metadata_key().concat(path!("dropped")),
+                        ),
                         self.dropped_data(reason, error),
                     );
                 }
                 LogNamespace::Vector => {
-                    log.metadata_mut()
-                        .value_mut()
-                        .insert(path!("vector", "dropped"), self.dropped_data(reason, error));
+                    log.insert(
+                        metadata_path!("vector", "dropped"),
+                        self.dropped_data(reason, error),
+                    );
                 }
             },
             Event::Metric(ref mut metric) => {
