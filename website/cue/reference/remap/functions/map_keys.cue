@@ -82,6 +82,6 @@ remap: functions: map_keys: {
 					"app_kubernetes_io/name": "mysql"
 				}
 			}
-		}
+		},
 	]
 }
