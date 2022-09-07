@@ -48,6 +48,7 @@ impl<'a> InternalEvent for MongoDbMetricsRequestError<'a> {
             error = ?self.error,
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::RECEIVING,
+            internal_log_rate_secs = 10,
         );
         counter!(
             "component_errors_total", 1,
@@ -72,6 +73,7 @@ impl<'a> InternalEvent for MongoDbMetricsBsonParseError<'a> {
             error = ?self.error,
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::RECEIVING,
+            internal_log_rate_secs = 10,
         );
         counter!(
             "component_errors_total", 1,
