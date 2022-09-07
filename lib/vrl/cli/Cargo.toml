@@ -14,7 +14,7 @@ path = "src/main.rs"
 clap = { version = "3.2.20", features = ["derive"] }
 exitcode = "1"
 indoc = "1.0.7"
-once_cell = { version = "1.13", optional = true }
+once_cell = { version = "1.14", optional = true }
 prettytable-rs = { version = "0.9", default-features = false, optional = true }
 regex = { version = "1", default-features = false, optional = true, features = ["perf"] }
 rustyline = { version = "10", default-features = false, optional = true }
