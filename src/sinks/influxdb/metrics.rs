@@ -183,6 +183,9 @@ impl InfluxDbSvc {
                         .map(|metric| Ok(EncodedEvent::new(metric, byte_size)))
                 })
             })
+
+            // TODO emit an Error event below, and see if we get a double emission when
+            // implementing an error path test that uses the test helper
             .sink_map_err(|error| error!(message = "Fatal influxdb sink error.", %error));
 
         Ok(VectorSink::from_event_sink(sink))
