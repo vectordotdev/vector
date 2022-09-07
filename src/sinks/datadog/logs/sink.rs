@@ -239,6 +239,7 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
         // sink to incremental encoding and simply put up with suboptimal batch sizes if we need to end up splitting due
         // to (un)compressed size limitations.
         let mut buf = Vec::new();
+        let n_events = events.len();
         let uncompressed_size = self.encoder().encode_input(events, &mut buf)?;
         if uncompressed_size > MAX_PAYLOAD_BYTES {
             return Err(RequestBuildError::PayloadTooBig);
@@ -246,7 +247,7 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
 
         // Now just compress it like normal.
         let mut compressor = Compressor::from(self.compression);
-        write_all(&mut compressor, &buf)?;
+        write_all(&mut compressor, n_events, &buf)?;
         let bytes = compressor.into_inner().freeze();
 
         if self.compression.is_compressed() {
@@ -323,6 +324,7 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for SemanticLogRequestBuilde
         // sink to incremental encoding and simply put up with suboptimal batch sizes if we need to end up splitting due
         // to (un)compressed size limitations.
         let mut buf = Vec::new();
+        let n_events = events.len();
         let uncompressed_size = self.encoder().encode_input(events, &mut buf)?;
         if uncompressed_size > MAX_PAYLOAD_BYTES {
             return Err(RequestBuildError::PayloadTooBig);
@@ -330,7 +332,7 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for SemanticLogRequestBuilde
 
         // Now just compress it like normal.
         let mut compressor = Compressor::from(self.compression);
-        write_all(&mut compressor, &buf)?;
+        write_all(&mut compressor, n_events, &buf)?;
         let bytes = compressor.into_inner().freeze();
 
         if self.compression.is_compressed() {
