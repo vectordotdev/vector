@@ -8,7 +8,7 @@ pub(crate) use crate::schema::Definition;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[serde(default, deny_unknown_fields)]
 pub struct Options {
-    /// Whether or not schema validation is enabled.
+    /// Whether or not schema is enabled.
     #[serde(default = "default_enabled")]
     pub enabled: bool,
 

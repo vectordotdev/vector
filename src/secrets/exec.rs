@@ -26,12 +26,11 @@ pub struct ExecBackend {
 
 impl GenerateConfig for ExecBackend {
     fn generate_config() -> toml::Value {
-        let backend = ExecBackend {
+        toml::Value::try_from(ExecBackend {
             command: vec![String::from("/path/to/script")],
-            timeout: 3,
-        };
-
-        toml::Value::try_from(&backend).expect("should not fail to serialize")
+            timeout: 5,
+        })
+        .unwrap()
     }
 }
 

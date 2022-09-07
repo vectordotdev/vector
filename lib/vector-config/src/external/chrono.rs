@@ -9,7 +9,7 @@ where
     TZ: chrono::TimeZone,
 {
     fn description() -> Option<&'static str> {
-        Some("ISO 8601 combined date and time with time zone.")
+        Some("ISO 8601 combined date and time with timezone.")
     }
 
     fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {

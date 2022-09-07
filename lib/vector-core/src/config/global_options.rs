@@ -36,12 +36,12 @@ pub(crate) enum DataDirError {
 #[derive(Clone, Debug, Default, PartialEq)]
 #[serde(default)]
 pub struct GlobalOptions {
-    /// The directory used for persisting Vector state.
+    /// The directory used for persisting Vector state data.
     ///
-    /// This is the directory where Vector, and configured components, will store their their state,
-    /// such as disk buffers, file checkpoints, and more.
+    /// This is the directory where Vector will store any state data, such as disk buffers, file
+    /// checkpoints, and more.
     ///
-    /// Vector must have wirte permissions to this directory.
+    /// Vector must have write permissions to this directory.
     #[serde(default = "crate::default_data_dir")]
     pub data_dir: Option<PathBuf>,
 

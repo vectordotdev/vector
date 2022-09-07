@@ -14,13 +14,13 @@ use crate::metrics::AgentDDSketch;
 #[serde(rename_all = "snake_case")]
 /// Container for the actual value of a metric.
 pub enum MetricValue {
-    /// A simple value that can not decrease except to reset it to zero.
+    /// A cumulative numerical value that can only increase or be reset to zero.
     Counter {
         /// The value of the counter.
         value: f64,
     },
 
-    /// A sampled numerical value.
+    /// A single numerical value that can arbitrarily go up and down.
     Gauge {
         /// The value of the gauge.
         value: f64,
@@ -32,9 +32,9 @@ pub enum MetricValue {
         values: BTreeSet<String>,
     },
 
-    /// A set of sampled values.
+    /// A set of observations without any aggregation or sampling.
     Distribution {
-        /// The samples within this distribution.
+        /// The observed values within this distribution.
         samples: Vec<Sample>,
 
         /// The type of statistics to derive for this distribution.

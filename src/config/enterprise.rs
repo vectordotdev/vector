@@ -55,7 +55,9 @@ static DATADOG_REPORTING_PATH_STUB: &str = "/api/unstable/observability_pipeline
 pub static DATADOG_API_KEY_ENV_VAR_SHORT: &str = "DD_API_KEY";
 pub static DATADOG_API_KEY_ENV_VAR_FULL: &str = "DATADOG_API_KEY";
 
-/// Enterprise options for using Datadog's Observability Pipelines.
+/// Enterprise options for using Datadog's [Observability Pipelines][datadog_op].
+///
+/// [datadog_op]: https://www.datadoghq.com/product/observability-pipelines/
 #[configurable_component]
 #[derive(Clone, Debug, PartialEq)]
 #[serde(deny_unknown_fields)]

@@ -3,7 +3,6 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use indexmap::IndexMap;
-use serde::Serialize;
 #[cfg(feature = "enterprise")]
 use serde_json::Value;
 use vector_config::configurable_component;
@@ -81,7 +80,7 @@ pub struct ConfigBuilder {
 }
 
 #[cfg(feature = "enterprise")]
-#[derive(Serialize)]
+#[derive(::serde::Serialize)]
 struct ConfigBuilderHash<'a> {
     #[cfg(feature = "api")]
     api: &'a api::Options,
@@ -127,7 +126,7 @@ impl ConfigBuilderHash<'_> {
 #[cfg(feature = "enterprise")]
 fn to_sorted_json_string<T>(value: T) -> String
 where
-    T: Serialize,
+    T: ::serde::Serialize,
 {
     let mut value = serde_json::to_value(value).expect("Should serialize to JSON. Please report.");
     sort_json_value(&mut value);

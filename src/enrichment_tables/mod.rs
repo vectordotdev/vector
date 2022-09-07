@@ -4,7 +4,6 @@ use vector_config::{configurable_component, NamedComponent};
 
 use crate::config::{EnrichmentTableConfig, GlobalOptions};
 
-#[cfg(feature = "enrichment-tables-file")]
 pub mod file;
 
 #[cfg(feature = "enrichment-tables-geoip")]
@@ -17,7 +16,6 @@ pub mod geoip;
 #[enum_dispatch(EnrichmentTableConfig)]
 pub enum EnrichmentTables {
     /// File.
-    #[cfg(feature = "enrichment-tables-file")]
     File(#[configurable(derived)] file::FileConfig),
 
     /// GeoIP.
@@ -31,7 +29,6 @@ impl NamedComponent for EnrichmentTables {
 
     fn get_component_name(&self) -> &'static str {
         match self {
-            #[cfg(feature = "enrichment-tables-file")]
             Self::File(config) => config.get_component_name(),
             #[cfg(feature = "enrichment-tables-geoip")]
             Self::Geoip(config) => config.get_component_name(),

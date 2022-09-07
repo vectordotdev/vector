@@ -179,7 +179,7 @@ pub enum SubCommand {
     /// Generate a Vector configuration containing a list of components.
     Generate(generate::Opts),
 
-    /// Generate the configuration schema for this version of Vector.
+    /// Generate the configuration schema for this version of Vector. (experimental)
     ///
     /// A JSON Schema document will be written to stdout that represents the valid schema for a
     /// Vector configuration. This schema is based on the "full" configuration, such that for usages

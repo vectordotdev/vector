@@ -62,7 +62,7 @@ pub struct LogSchema {
 
     /// The name of the event field to set the source identifier in.
     ///
-    /// Generally, this field will be set by Vector itself in certain sources.
+    /// This field will be set by the Vector source that the event was created in.
     #[serde(default = "LogSchema::default_source_type_key")]
     source_type_key: String,
 

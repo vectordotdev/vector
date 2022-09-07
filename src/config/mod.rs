@@ -6,7 +6,7 @@ use std::{
     path::PathBuf,
 };
 
-use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
+use indexmap::IndexMap;
 pub use vector_config::component::{GenerateConfig, SinkDescription, TransformDescription};
 use vector_config::configurable_component;
 pub use vector_core::config::{AcknowledgementsConfig, DataType, GlobalOptions, Input, Output};

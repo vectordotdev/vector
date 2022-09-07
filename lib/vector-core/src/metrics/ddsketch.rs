@@ -184,7 +184,7 @@ impl Bin {
     }
 }
 
-/// An implementation of [`DDSketch`][ddsketch] that mirrors the implementation from the [Datadog Agent][ddagent].
+/// [DDSketch][ddsketch] implementation based on the [Datadog Agent][ddagent].
 ///
 /// This implementation is subtly different from the open-source implementations of `DDSketch`, as
 /// Datadog made some slight tweaks to configuration values and in-memory layout to optimize it for
