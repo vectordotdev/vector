@@ -5,7 +5,8 @@ use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use http::{uri::PathAndQuery, Request, StatusCode, Uri};
 use hyper::{body::to_bytes as body_to_bytes, Body};
-use lookup::lookup_v2::{parse_path, OwnedPath};
+use lookup::lookup_v2::{parse_value_path, OwnedValuePath};
+use lookup::PathPrefix;
 use once_cell::sync::Lazy;
 use serde::Deserialize;
 use snafu::ResultExt as _;
@@ -109,7 +110,7 @@ pub struct Ec2MetadataTransform {
 
 #[derive(Debug, Clone)]
 struct MetadataKey {
-    log_path: OwnedPath,
+    log_path: OwnedValuePath,
     metric_tag: String,
 }
 
@@ -230,7 +231,7 @@ impl Ec2MetadataTransform {
         match event {
             Event::Log(ref mut log) => {
                 state.iter().for_each(|(k, v)| {
-                    log.insert(&k.log_path, v.clone());
+                    log.insert((PathPrefix::Event, &k.log_path), v.clone());
                 });
             }
             Event::Metric(ref mut metric) => {
@@ -519,12 +520,12 @@ impl MetadataClient {
 fn create_key(namespace: &Option<String>, key: &str) -> MetadataKey {
     if let Some(namespace) = namespace {
         MetadataKey {
-            log_path: parse_path(namespace).with_field_appended(key),
+            log_path: parse_value_path(namespace).with_field_appended(key),
             metric_tag: format!("{}.{}", namespace, key),
         }
     } else {
         MetadataKey {
-            log_path: OwnedPath::single_field(key),
+            log_path: OwnedValuePath::single_field(key),
             metric_tag: key.to_owned(),
         }
     }
@@ -580,7 +581,8 @@ enum Ec2MetadataError {
 #[cfg(test)]
 mod integration_tests {
     use futures::{SinkExt, StreamExt};
-    use lookup::lookup_v2::{parse_path, BorrowedSegment, OwnedPath, OwnedSegment};
+    use lookup::event_path;
+    use lookup::lookup_v2::{parse_value_path, OwnedSegment, OwnedValuePath};
 
     use super::*;
     use crate::{
@@ -593,7 +595,7 @@ mod integration_tests {
         std::env::var("EC2_METADATA_ADDRESS").unwrap_or_else(|_| "http://localhost:8111".into())
     }
 
-    fn expected_log_fields() -> Vec<(OwnedPath, &'static str)> {
+    fn expected_log_fields() -> Vec<(OwnedValuePath, &'static str)> {
         vec![
             (
                 vec![OwnedSegment::field(AVAILABILITY_ZONE_KEY)].into(),
@@ -637,7 +639,7 @@ mod integration_tests {
                 vec![OwnedSegment::field(SUBNET_ID_KEY)].into(),
                 "mock-subnet-id",
             ),
-            (parse_path("\"role-name\"[0]"), "mock-user"),
+            (parse_value_path("\"role-name\"[0]"), "mock-user"),
         ]
     }
 
@@ -703,7 +705,7 @@ mod integration_tests {
         let log = LogEvent::default();
         let mut expected_log = log.clone();
         for (k, v) in expected_log_fields().iter().cloned() {
-            expected_log.insert(&k, v);
+            expected_log.insert((PathPrefix::Event, &k), v);
         }
 
         tx.send(log.into()).await.unwrap();
@@ -906,9 +908,7 @@ mod integration_tests {
 
             let event = stream.next().await.unwrap();
             assert_eq!(
-                event
-                    .as_log()
-                    .get(&[BorrowedSegment::field(AVAILABILITY_ZONE_KEY)]),
+                event.as_log().get(event_path!(AVAILABILITY_ZONE_KEY)),
                 Some(&"ww-region-1a".into())
             );
         }

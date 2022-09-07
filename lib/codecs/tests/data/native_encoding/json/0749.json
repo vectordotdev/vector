@@ -1,1 +1,1 @@
-{"log":{"￿":9223372036854775807}}
+{"metric":{"name":"g","namespace":"_","tags":{"v":"r"},"timestamp":"1969-12-31T16:10:51.000029605Z","kind":"absolute","counter":{"value":799232.0}}}

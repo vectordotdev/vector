@@ -4,7 +4,7 @@
 #![allow(clippy::print_stdout)] // test framework
 use diagnostic::Span;
 use lookup::lookup_v2::OwnedSegment;
-use lookup::{FieldBuf, LookupBuf, OwnedPath, SegmentBuf};
+use lookup::{FieldBuf, LookupBuf, OwnedValuePath, SegmentBuf};
 use ordered_float::NotNan;
 use parser::ast::{
     Assignment, AssignmentOp, AssignmentTarget, Block, Container, Expr, FunctionArgument,
@@ -73,7 +73,7 @@ prop_compose! {
 }
 
 prop_compose! {
-    fn variable()(ident in ident(), lookup in path()) -> (Ident, OwnedPath) {
+    fn variable()(ident in ident(), lookup in path()) -> (Ident, OwnedValuePath) {
         (ident, lookup)
     }
 }
@@ -116,8 +116,8 @@ prop_compose! {
 }
 
 prop_compose! {
-    fn path() (path in prop::collection::vec(ident(), 1..2)) -> OwnedPath {
-        OwnedPath {
+    fn path() (path in prop::collection::vec(ident(), 1..2)) -> OwnedValuePath {
+        OwnedValuePath {
             segments:
             path.into_iter()
                 .map(|field| OwnedSegment::Field(field.as_ref().to_owned()))
