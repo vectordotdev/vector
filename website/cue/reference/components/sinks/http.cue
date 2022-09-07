@@ -70,7 +70,7 @@ components: sinks: http: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
+		notices: ["Input type support can depend on configured `encoding.codec`"]
 	}
 
 	configuration: {
@@ -103,9 +103,16 @@ components: sinks: http: {
 	}
 
 	input: {
-		logs:    true
-		metrics: null
-		traces:  false
+		logs: true
+		metrics: {
+			counter:      true
+			distribution: true
+			gauge:        true
+			histogram:    true
+			summary:      true
+			set:          true
+		}
+		traces: true
 	}
 
 	telemetry: metrics: {

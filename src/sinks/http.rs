@@ -226,7 +226,7 @@ impl SinkConfig for HttpSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::new(self.encoding.config().1.input_type() & DataType::Log)
+        Input::new(self.encoding.config().1.input_type())
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
