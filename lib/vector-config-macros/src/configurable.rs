@@ -65,7 +65,30 @@ pub fn derive_configurable_impl(input: TokenStream) -> TokenStream {
             #[allow(unused_qualifications)]
             impl #impl_generics ::vector_config::Configurable for #name #ty_generics #where_clause {
                 fn referenceable_name() -> Option<&'static str> {
-                    Some(std::concat!(std::module_path!(), "::", #ref_name))
+                    // If the type name we get back from `std::any::type_name` doesn't start with
+                    // the module path, use a concatentated version.
+                    //
+                    // We do this because `std::any::type_name` states it may or may not return a
+                    // fully-qualified type path, as that behavior is not stabilized, so we want to
+                    // avoid using non-fully-qualified paths since we might encounter collisions
+                    // with schema reference names otherwise.
+                    //
+                    // The reason we don't _only_ use the manually-concatentated version is because
+                    // it's a little difficult to get it to emit a clean name, as we can't emit
+                    // pretty-printed tokens directly -- i.e. just emit the tokens that represent
+                    // `MyStructName<T, U, ...>` -- and would need to format the string to do so,
+                    // which would mean we wouldn't be able to return `&'static str`.
+                    //
+                    // We'll likely relax that in the future, given the inconsequential nature of
+                    // allocations during configuration schema generation... but this works well for
+                    // now and at least will be consistent within the same Rust version.
+
+                    let self_type_name = ::std::any::type_name::<Self>();
+                    if !self_type_name.starts_with(std::module_path!()) {
+                        Some(std::concat!(std::module_path!(), "::", #ref_name))
+                    } else {
+                        Some(self_type_name)
+                    }
                 }
 
                 #metadata_fn

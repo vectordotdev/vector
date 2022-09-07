@@ -1,7 +1,5 @@
-use serde::Serialize;
-
 use crate::{
-    schema::{generate_array_schema, generate_composite_schema, generate_number_schema},
+    schema::generate_number_schema,
     schemars::{gen::SchemaGenerator, schema::SchemaObject},
     Configurable, GenerateError, Metadata,
 };
@@ -50,12 +48,6 @@ where
     }
 }
 
-impl Configurable for serde_with::Same {
-    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
-        Ok(SchemaObject::new_ref("".to_string()))
-    }
-}
-
 impl Configurable for serde_with::DurationSeconds<u64, serde_with::formats::Strict> {
     fn referenceable_name() -> Option<&'static str> {
         // We're masking the type parameters here because we only deal with whole seconds via this
@@ -91,48 +83,5 @@ impl Configurable for serde_with::DurationSeconds<f64, serde_with::formats::Stri
         // This boils down to a number schema, but we just need to shuttle around the metadata so
         // that we can call the relevant schema generation function.
         Ok(generate_number_schema::<f64>())
-    }
-}
-
-impl<T> Configurable for serde_with::OneOrMany<T>
-where
-    T: Configurable + Serialize,
-{
-    fn referenceable_name() -> Option<&'static str> {
-        // Forward to the underlying `T`.
-        T::referenceable_name()
-    }
-
-    fn description() -> Option<&'static str> {
-        // Forward to the underlying `T`.
-        T::description()
-    }
-
-    fn metadata() -> Metadata<Self> {
-        // Forward to the underlying `T`.
-        //
-        // We have to convert from `Metadata<T>` to `Metadata<Self>` which erases the default value,
-        // notably, but `serde_with` helpers should never actually have default values, so this is
-        // essentially a no-op.
-        T::metadata().convert::<Self>()
-    }
-
-    fn validate_metadata(metadata: &Metadata<Self>) -> Result<(), GenerateError> {
-        // Forward to the underlying `T`.
-        //
-        // We have to convert from `Metadata<Self>` to `Metadata<T>` which erases the default value,
-        // notably, but `serde_with` helpers should never actually have default values, so this is
-        // essentially a no-op.
-        let converted = metadata.convert::<T>();
-        T::validate_metadata(&converted)
-    }
-
-    fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
-        // The "one or many" helper essentially represents a composite schema of either accepting
-        // just the `T` directly, or a `Vec<T>`.
-        let single = T::generate_schema(gen)?;
-        let multiple = generate_array_schema::<T>(gen)?;
-
-        Ok(generate_composite_schema(&[single, multiple]))
     }
 }
