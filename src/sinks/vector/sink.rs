@@ -9,12 +9,10 @@ use vector_core::{
     ByteSizeOf,
 };
 
+use super::service::VectorRequest;
 use crate::{
     event::{proto::EventWrapper, Event, EventFinalizers, Finalizable},
-    sinks::{
-        util::{SinkBuilderExt, StreamSink},
-        vector::v2::service::VectorRequest,
-    },
+    sinks::util::{SinkBuilderExt, StreamSink},
 };
 
 struct EventData {

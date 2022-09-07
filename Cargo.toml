@@ -530,7 +530,7 @@ sources-utils-http-query = []
 sources-utils-http-scrape = ["sources-utils-http", "sources-http"]
 sources-utils-udp = []
 sources-utils-unix = []
-sources-vector = ["listenfd", "dep:tonic", "protobuf-build"]
+sources-vector = ["dep:tonic", "protobuf-build"]
 
 # Transforms
 transforms = ["transforms-logs", "transforms-metrics"]
