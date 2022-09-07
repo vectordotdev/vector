@@ -8,7 +8,7 @@ use vector_common::internal_event::{
     ByteSize, BytesReceived, EventsReceived, InternalEventHandle as _, Protocol,
 };
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_core::{config::LogNamespace, ByteSizeOf};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
@@ -151,9 +151,12 @@ async fn nats_source(
         let mut stream = FramedRead::new(msg.data.as_ref(), decoder.clone());
         while let Some(next) = stream.next().await {
             match next {
-                Ok((events, byte_size)) => {
+                Ok((events, _byte_size)) => {
                     let count = events.len();
-                    emit!(EventsReceived { count, byte_size });
+                    emit!(EventsReceived {
+                        count,
+                        byte_size: events.size_of()
+                    });
 
                     let now = Utc::now();
 
