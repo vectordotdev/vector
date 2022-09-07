@@ -15,6 +15,13 @@ remap: functions: del: {
 			required:    true
 			type: ["path"]
 		},
+		{
+			name:        "compact"
+			description: "If compact is true, after deletion, if an empty object or array is left behind, it should be removed as well, cascading up to the root."
+			required:    false
+			default: false,
+			type: ["boolean"]
+		},
 	]
 	internal_failure_reasons: []
 	notices: [
