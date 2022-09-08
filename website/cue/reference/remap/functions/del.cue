@@ -16,10 +16,14 @@ remap: functions: del: {
 			type: ["path"]
 		},
 		{
-			name:        "compact"
-			description: "If compact is true, after deletion, if an empty object or array is left behind, it should be removed as well, cascading up to the root. This only applies to the path being deleted, and any parent paths."
-			required:    false
-			default:     false
+			name: "compact"
+			description: """
+				If compact is true, after deletion, if an empty object or array is left
+				behind, it should be removed as well, cascading up to the root. This only
+				applies to the path being deleted, and any parent paths.
+				"""
+			required: false
+			default:  false
 			type: ["boolean"]
 		},
 	]
