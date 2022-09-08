@@ -33,6 +33,7 @@ releases: "0.24.0": {
 		- A new `opentelemetry` source to receive input from OpenTelemetry collectors and SDKs. Only
 		  logs are supported in this release, but support for metrics and traces are in-flight.
 		  An `opentelemetry` sink will follow.
+		- Support for expiring high cardinality internal metrics through `expire_metrics`.
 
 		Note that this release has a backwards incompatible data model change that users of the
 		`vector` sink and disk buffers should be aware of while upgrading. See the [note in the
