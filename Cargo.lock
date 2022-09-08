@@ -6191,9 +6191,9 @@ dependencies = [
 
 [[package]]
 name = "roaring"
-version = "0.10.0"
+version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "48de5b5febb28599c6d9d34817d8ee8c74417af507b90dde0d481b28ca55ed6f"
+checksum = "ef0fb5e826a8bde011ecae6a8539dd333884335c57ff0f003fbe27c25bbe8f71"
 dependencies = [
  "bytemuck",
  "byteorder",

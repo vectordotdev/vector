@@ -284,7 +284,7 @@ rand_distr = { version = "0.4.3", default-features = false }
 rdkafka = { version = "0.28.0", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
 redis = { version = "0.21.6", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
 regex = { version = "1.6.0", default-features = false, features = ["std", "perf"] }
-roaring = { version = "0.10.0", default-features = false, optional = true }
+roaring = { version = "0.10.1", default-features = false, optional = true }
 seahash = { version = "4.1.0", default-features = false }
 semver = { version = "1.0.13", default-features = false, features = ["serde", "std"], optional = true }
 smallvec = { version = "1", default-features = false, features = ["union"] }
