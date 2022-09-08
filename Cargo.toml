@@ -275,7 +275,7 @@ openssl = { version = "0.10.41", default-features = false, features = ["vendored
 openssl-probe = { version = "0.1.5", default-features = false }
 openssl-src = { version = "111", default-features = false }
 ordered-float = { version = "3.0.0", default-features = false }
-percent-encoding = { version = "2.1.0", default-features = false }
+percent-encoding = { version = "2.2.0", default-features = false }
 pin-project = { version = "1.0.12", default-features = false }
 postgres-openssl = { version = "0.5.0", default-features = false, features = ["runtime"], optional = true }
 pulsar = { version = "4.1.2", default-features = false, features = ["tokio-runtime", "auth-oauth2"], optional = true }
