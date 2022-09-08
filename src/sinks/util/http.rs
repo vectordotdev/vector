@@ -21,12 +21,13 @@ use vector_core::ByteSizeOf;
 
 use super::{
     retries::{RetryAction, RetryLogic},
-    sink, Batch, EncodedEvent, Partition, TowerBatchedSink, TowerPartitionSink, TowerRequestConfig,
-    TowerRequestSettings,
+    sink, uri, Batch, EncodedEvent, Partition, TowerBatchedSink, TowerPartitionSink,
+    TowerRequestConfig, TowerRequestSettings,
 };
 use crate::{
     event::Event,
     http::{HttpClient, HttpError},
+    internal_events::EndpointBytesSent,
 };
 
 pub trait HttpEventEncoder<Output> {
@@ -381,8 +382,19 @@ where
 
         Box::pin(async move {
             let request = request_builder(body).await?;
+            let byte_size = request.body().len();
             let request = request.map(Body::from);
+            let (protocol, endpoint) = uri::protocol_endpoint(request.uri().clone());
+
             let response = http_client.call(request).await?;
+
+            if response.status().is_success() {
+                emit!(EndpointBytesSent {
+                    byte_size,
+                    protocol: &protocol,
+                    endpoint: &endpoint
+                });
+            }
 
             let (parts, body) = response.into_parts();
             let mut body = body::aggregate(body).await?;
