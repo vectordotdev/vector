@@ -1444,6 +1444,7 @@ dependencies = [
  "chrono",
  "chrono-tz-build",
  "phf",
+ "serde",
 ]
 
 [[package]]
@@ -8661,6 +8662,8 @@ dependencies = [
 name = "vector-config"
 version = "0.1.0"
 dependencies = [
+ "chrono",
+ "chrono-tz",
  "encoding_rs",
  "indexmap",
  "inventory",
@@ -8753,6 +8756,7 @@ dependencies = [
  "security-framework",
  "serde",
  "serde_json",
+ "serde_with 2.0.0",
  "snafu",
  "socket2",
  "tokio",

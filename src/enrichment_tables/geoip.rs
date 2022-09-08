@@ -82,7 +82,6 @@ impl GenerateConfig for GeoipConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "geoip")]
 impl EnrichmentTableConfig for GeoipConfig {
     async fn build(
         &self,
