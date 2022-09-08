@@ -17,11 +17,12 @@ impl InternalEvent for EventsReceived {
         let fcount = self.count as f64;
         histogram!("component_received_events_count", fcount);
         counter!("component_received_events_total", self.count as u64);
-        counter!("events_in_total", self.count as u64);
         counter!(
             "component_received_event_bytes_total",
             self.byte_size as u64
         );
+        // deprecated
+        counter!("events_in_total", self.count as u64);
     }
 }
 
