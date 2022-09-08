@@ -62,8 +62,8 @@ pub struct AmqpSourceConfig {
     pub(crate) connection: AmqpConfig,
 
     /// The `AMQP` routing key.
-    #[serde(default = "default_routing_key")]
-    pub(crate) routing_key: String,
+    #[serde(default = "default_routing_key_field")]
+    pub(crate) routing_key_field: String,
 
     /// The `AMQP` exchange key.
     #[serde(default = "default_exchange_key")]
@@ -100,7 +100,7 @@ fn default_consumer() -> String {
     "vector".into()
 }
 
-fn default_routing_key() -> String {
+fn default_routing_key_field() -> String {
     "routing".into()
 }
 
@@ -182,7 +182,7 @@ pub(crate) async fn amqp_source(
 }
 
 struct Keys<'a> {
-    routing_key: &'a str,
+    routing_key_field: &'a str,
     routing: &'a str,
     exchange_key: &'a str,
     exchange: &'a str,
@@ -216,7 +216,7 @@ fn populate_event(
     log_namespace.insert_source_metadata(
         "amqp",
         log,
-        keys.routing_key,
+        keys.routing_key_field,
         "routing",
         keys.routing.to_string(),
     );
@@ -253,7 +253,7 @@ async fn receive_event(
     let routing = msg.routing_key.to_string();
     let exchange = msg.exchange.to_string();
     let keys = Keys {
-        routing_key: config.routing_key.as_str(),
+        routing_key_field: config.routing_key_field.as_str(),
         exchange_key: config.exchange_key.as_str(),
         offset_key: config.offset_key.as_str(),
         routing: &routing,
