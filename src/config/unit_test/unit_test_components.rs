@@ -2,8 +2,9 @@ use std::sync::Arc;
 
 use futures::{stream, Sink, Stream};
 use futures_util::{future, stream::BoxStream, FutureExt, StreamExt};
+use serde::{Deserialize, Serialize};
 use tokio::sync::{oneshot, Mutex};
-use vector_config::configurable_component;
+use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
     config::{DataType, Input, LogNamespace, Output},
     event::Event,
@@ -278,6 +279,10 @@ impl UnitTestStreamSinkConfig {
             sink: Arc::new(Mutex::new(Some(Box::new(sink)))),
         }
     }
+}
+
+impl NamedComponent for UnitTestStreamSinkConfig {
+    const NAME: &'static str = "UnitTestStream";
 }
 
 impl std::fmt::Debug for UnitTestStreamSinkConfig {

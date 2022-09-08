@@ -343,6 +343,7 @@ mod test {
 
     use super::*;
     use crate::test_util::components::assert_transform_compliance;
+    use crate::transforms::test::create_topology;
     use crate::{
         config::TransformConfig,
         event::{LogEvent, Value},
