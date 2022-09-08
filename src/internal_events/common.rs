@@ -2,8 +2,8 @@ use std::time::Instant;
 
 use crate::emit;
 use metrics::{counter, histogram};
+pub use vector_core::internal_event::EventsReceived;
 use vector_core::internal_event::InternalEvent;
-pub use vector_core::internal_event::{EventsReceived, OldEventsReceived};
 
 use super::prelude::{error_stage, error_type};
 
