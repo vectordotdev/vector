@@ -130,6 +130,29 @@ impl<'a> InternalEvent for HttpDecompressError<'a> {
     }
 }
 
+pub struct HttpRequestError<'a> {
+    pub status_code: http::StatusCode,
+    pub endpoint: &'a str,
+}
+
+impl<'a> InternalEvent for HttpRequestError<'a> {
+    fn emit(self) {
+        error!(
+            message = "HTTP call failed.",
+            endpoint = %self.endpoint,
+            status_code = %self.status_code,
+            error_type = error_type::REQUEST_FAILED,
+            stage = error_stage::SENDING,
+            internal_log_rate_secs = 10
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => error_type::REQUEST_FAILED,
+            "stage" => error_stage::SENDING,
+        );
+    }
+}
+
 pub struct HttpInternalError {
     pub message: &'static str,
 }

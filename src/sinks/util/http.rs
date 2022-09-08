@@ -27,7 +27,7 @@ use super::{
 use crate::{
     event::Event,
     http::{HttpClient, HttpError},
-    internal_events::EndpointBytesSent,
+    internal_events::{EndpointBytesSent, HttpRequestError},
 };
 
 pub trait HttpEventEncoder<Output> {
@@ -392,6 +392,11 @@ where
                 emit!(EndpointBytesSent {
                     byte_size,
                     protocol: &protocol,
+                    endpoint: &endpoint
+                });
+            } else {
+                emit!(HttpRequestError {
+                    status_code: response.status(),
                     endpoint: &endpoint
                 });
             }
