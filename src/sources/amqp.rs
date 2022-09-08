@@ -240,10 +240,6 @@ async fn receive_event(
     finalizer: Option<&UnorderedFinalizer<FinalizerEntry>>,
     msg: Delivery,
 ) -> Result<(), ()> {
-    emit!(AmqpEventsReceived {
-        byte_size: msg.data.len()
-    });
-
     let payload = Cursor::new(Bytes::copy_from_slice(&msg.data));
     let mut stream = FramedRead::new(payload, config.decoder(log_namespace));
 
@@ -272,6 +268,11 @@ async fn receive_event(
                     emit!(AmqpBytesReceived {
                         byte_size,
                         protocol: "amqp_0_9_1",
+                    });
+
+                    emit!(AmqpEventsReceived {
+                        byte_size: byte_size,
+                        count: events.len(),
                     });
 
                     for mut event in events {

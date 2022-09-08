@@ -28,11 +28,16 @@ pub mod source {
     #[derive(Debug)]
     pub struct AmqpEventsReceived {
         pub byte_size: usize,
+        pub count: usize,
     }
 
     impl InternalEvent for AmqpEventsReceived {
         fn emit(self) {
-            trace!(message = "Events received.");
+            trace!(
+                message = "Events received.",
+                count = self.count,
+                byte_size = self.byte_size
+            );
             counter!("component_received_events_total", 1);
             counter!(
                 "component_received_event_bytes_total",
