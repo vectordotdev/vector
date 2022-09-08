@@ -33,7 +33,7 @@ releases: "0.24.0": {
 		- A new `opentelemetry` source to receive input from OpenTelemetry collectors and SDKs. Only
 		  logs are supported in this release, but support for metrics and traces are in-flight.
 		  An `opentelemetry` sink will follow.
-		- Support for expiring high cardinality internal metrics through `expire_metrics`.
+		- Support for expiring high cardinality internal metrics through `expire_metrics_secs`.
 
 		Note that this release has a backwards incompatible data model change that users of the
 		`vector` sink and disk buffers should be aware of while upgrading. See the [note in the
@@ -395,9 +395,9 @@ releases: "0.24.0": {
 			type: "enhancement"
 			scopes: ["observability"]
 			description: """
-				Vector's internal metrics store, which is exposed via the `internal_metrics`
+				Vector's internal metrics store, which is exposed via the `internal_metrics_secs`
 				source, now allows for expiration of metrics via a new configurable global
-				`expire_metrics` configuration option. When set, the store will drop metrics that
+				`expire_metrics_secs` configuration option. When set, the store will drop metrics that
 				haven't been seen in the configured duration. This can be used to expire metrics
 				from the `kubernetes_logs` source, and others, which tag their internal metrics with
 				high cardinality, but ephemeral, tags like `file`.
