@@ -26,30 +26,6 @@ pub mod source {
     }
 
     #[derive(Debug)]
-    pub struct AmqpEventsReceived {
-        pub byte_size: usize,
-        pub count: usize,
-    }
-
-    impl InternalEvent for AmqpEventsReceived {
-        fn emit(self) {
-            trace!(
-                message = "Events received.",
-                count = self.count,
-                byte_size = self.byte_size
-            );
-            counter!("component_received_events_total", 1);
-            counter!(
-                "component_received_event_bytes_total",
-                self.byte_size as u64
-            );
-
-            // deprecated
-            counter!("events_in_total", 1);
-        }
-    }
-
-    #[derive(Debug)]
     pub struct AmqpEventError {
         pub error: lapin::Error,
     }
@@ -132,9 +108,9 @@ pub mod sink {
 
     impl InternalEvent for AmqpDeliveryError<'_> {
         fn emit(self) {
-            let reason = "Unable to deliver.";
+            let deliver_reason = "Unable to deliver.";
 
-            error!(message = reason,
+            error!(message = deliver_reason,
                    error = ?self.error,
                    error_type = error_type::REQUEST_FAILED,
                    stage = error_stage::SENDING,
@@ -145,7 +121,10 @@ pub mod sink {
                 "error_type" => error_type::REQUEST_FAILED,
                 "stage" => error_stage::SENDING,
             );
-            emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
+            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                count: 1,
+                reason: deliver_reason
+            });
         }
     }
 
@@ -156,9 +135,9 @@ pub mod sink {
 
     impl InternalEvent for AmqpAcknowledgementError<'_> {
         fn emit(self) {
-            let reason = "Acknowledgement failed.";
+            let ack_reason = "Acknowledgement failed.";
 
-            error!(message = reason,
+            error!(message = ack_reason,
                    error = ?self.error,
                    error_type = error_type::REQUEST_FAILED,
                    stage = error_stage::SENDING,
@@ -169,7 +148,10 @@ pub mod sink {
                 "error_type" => error_type::REQUEST_FAILED,
                 "stage" => error_stage::SENDING,
             );
-            emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
+            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                count: 1,
+                reason: ack_reason
+            });
         }
     }
 }

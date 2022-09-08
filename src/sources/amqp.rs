@@ -7,7 +7,7 @@ use crate::{
     event::{BatchNotifier, BatchStatus},
     internal_events::{
         source::{
-            AmqpAckError, AmqpBytesReceived, AmqpEventError, AmqpEventsReceived, AmqpRejectError,
+            AmqpAckError, AmqpBytesReceived, AmqpEventError, AmqpRejectError,
         },
         StreamClosedError,
     },
@@ -25,7 +25,7 @@ use lapin::{acker::Acker, message::Delivery, Channel};
 use snafu::Snafu;
 use std::{io::Cursor, pin::Pin};
 use tokio_util::codec::FramedRead;
-use vector_common::finalizer::UnorderedFinalizer;
+use vector_common::{finalizer::UnorderedFinalizer, internal_event::EventsReceived};
 use vector_config::configurable_component;
 use vector_core::{
     config::{AcknowledgementsConfig, LogNamespace},
@@ -270,7 +270,7 @@ async fn receive_event(
                         protocol: "amqp_0_9_1",
                     });
 
-                    emit!(AmqpEventsReceived {
+                    emit!(EventsReceived {
                         byte_size: byte_size,
                         count: events.len(),
                     });
