@@ -163,7 +163,7 @@ pub async fn create_client<T: ClientBuilder>(
     Ok(T::build(client, &config))
 }
 
-pub async fn sign_aws_request(
+pub async fn sign_request(
     service_name: &str,
     request: &mut http::Request<Bytes>,
     credentials_provider: &SharedCredentialsProvider,

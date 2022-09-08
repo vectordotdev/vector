@@ -13,7 +13,7 @@ use vector_core::ByteSizeOf;
 
 use super::collector::{self, MetricCollector as _};
 use crate::{
-    aws::{sign_aws_request, RegionOrEndpoint},
+    aws::RegionOrEndpoint,
     config::{self, AcknowledgementsConfig, Input, SinkConfig},
     event::{Event, Metric},
     http::{Auth, HttpClient},
@@ -360,7 +360,7 @@ async fn sign_request(
     credentials_provider: &SharedCredentialsProvider,
     region: &Option<Region>,
 ) -> crate::Result<()> {
-    sign_aws_request("aps", request, credentials_provider, region).await
+    crate::aws::sign_request("aps", request, credentials_provider, region).await
 }
 
 #[cfg(test)]

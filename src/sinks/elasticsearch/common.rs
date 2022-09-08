@@ -10,7 +10,6 @@ use super::{
     request_builder::ElasticsearchRequestBuilder, ElasticsearchEncoder, InvalidHostSnafu, Request,
 };
 use crate::{
-    aws::sign_aws_request,
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         elasticsearch::{
@@ -168,5 +167,5 @@ pub async fn sign_request(
     credentials_provider: &SharedCredentialsProvider,
     region: &Option<Region>,
 ) -> crate::Result<()> {
-    sign_aws_request("es", request, credentials_provider, region).await
+    crate::aws::sign_request("es", request, credentials_provider, region).await
 }
