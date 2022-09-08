@@ -83,6 +83,10 @@ impl KafkaSink {
             encoder: self.encoder,
             log_schema: log_schema(),
         };
+
+        // TODO I believe this is not catching errors and should be.
+        // build_request() can fail.
+        // Supports the theory from the influxdb sink PR.
         let sink = input
             .filter_map(|event| future::ready(request_builder.build_request(event)))
             .into_driver(service);
