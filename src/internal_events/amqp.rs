@@ -5,12 +5,12 @@ pub mod source {
     use vector_core::internal_event::InternalEvent;
 
     #[derive(Debug)]
-    pub struct AMQPBytesReceived {
+    pub struct AmqpBytesReceived {
         pub byte_size: usize,
         pub protocol: &'static str,
     }
 
-    impl InternalEvent for AMQPBytesReceived {
+    impl InternalEvent for AmqpBytesReceived {
         fn emit(self) {
             trace!(
                 message = "Bytes received.",
@@ -26,13 +26,13 @@ pub mod source {
     }
 
     #[derive(Debug)]
-    pub struct AMQPEventsReceived {
+    pub struct AmqpEventsReceived {
         pub byte_size: usize,
     }
 
-    impl InternalEvent for AMQPEventsReceived {
+    impl InternalEvent for AmqpEventsReceived {
         fn emit(self) {
-            trace!(message = "Events received.", internal_log_rate_secs = 10);
+            trace!(message = "Events received.");
             counter!("component_received_events_total", 1);
             counter!(
                 "component_received_event_bytes_total",
@@ -45,11 +45,11 @@ pub mod source {
     }
 
     #[derive(Debug)]
-    pub struct AMQPEventError {
+    pub struct AmqpEventError {
         pub error: lapin::Error,
     }
 
-    impl InternalEvent for AMQPEventError {
+    impl InternalEvent for AmqpEventError {
         fn emit(self) {
             error!(message = "Failed to read message.",
                    error = ?self.error,
@@ -66,11 +66,11 @@ pub mod source {
     }
 
     #[derive(Debug)]
-    pub struct AMQPAckError {
+    pub struct AmqpAckError {
         pub error: lapin::Error,
     }
 
-    impl InternalEvent for AMQPAckError {
+    impl InternalEvent for AmqpAckError {
         fn emit(self) {
             error!(message = "Unable to ack.",
                    error = ?self.error,
@@ -87,11 +87,11 @@ pub mod source {
     }
 
     #[derive(Debug)]
-    pub struct AMQPRejectError {
+    pub struct AmqpRejectError {
         pub error: lapin::Error,
     }
 
-    impl InternalEvent for AMQPRejectError {
+    impl InternalEvent for AmqpRejectError {
         fn emit(self) {
             error!(message = "Unable to reject.",
                    error = ?self.error,
@@ -121,11 +121,11 @@ pub mod sink {
     use vector_core::internal_event::InternalEvent;
 
     #[derive(Debug)]
-    pub struct AMQPDeliveryError<'a> {
+    pub struct AmqpDeliveryError<'a> {
         pub error: &'a lapin::Error,
     }
 
-    impl InternalEvent for AMQPDeliveryError<'_> {
+    impl InternalEvent for AmqpDeliveryError<'_> {
         fn emit(self) {
             let reason = "Unable to deliver.";
 
@@ -145,11 +145,11 @@ pub mod sink {
     }
 
     #[derive(Debug)]
-    pub struct AMQPAcknowledgementError<'a> {
+    pub struct AmqpAcknowledgementError<'a> {
         pub error: &'a lapin::Error,
     }
 
-    impl InternalEvent for AMQPAcknowledgementError<'_> {
+    impl InternalEvent for AmqpAcknowledgementError<'_> {
         fn emit(self) {
             let reason = "Acknowledgement failed.";
 

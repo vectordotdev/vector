@@ -133,7 +133,7 @@ pub enum HealthcheckError {
 pub enum Sinks {
     /// AMQP.
     #[cfg(feature = "sinks-amqp")]
-    Amqp(#[configurable(derived)] amqp::AMQPSinkConfig),
+    Amqp(#[configurable(derived)] amqp::AmqpSinkConfig),
 
     /// Apex Logs.
     #[cfg(feature = "sinks-apex")]

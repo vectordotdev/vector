@@ -1,4 +1,4 @@
-//! AMQP sink.
+//! `AMQP` sink.
 //! Handles version AMQP 0.9.1 which is used by RabbitMQ.
 mod config;
 mod encoder;
@@ -9,23 +9,19 @@ mod sink;
 #[cfg(test)]
 mod tests;
 
-pub use config::AMQPSinkConfig;
+pub use config::AmqpSinkConfig;
 use snafu::Snafu;
 
-use crate::{config::SinkDescription, template::TemplateParseError};
+use crate::config::SinkDescription;
 
 inventory::submit! {
-    SinkDescription::new::<AMQPSinkConfig>("amqp")
+    SinkDescription::new::<AmqpSinkConfig>("amqp")
 }
 
 #[derive(Debug, Snafu)]
 enum BuildError {
     #[snafu(display("creating amqp producer failed: {}", source))]
-    AMQPCreateFailed {
+    AmqpCreateFailed {
         source: Box<dyn std::error::Error + Send + Sync>,
     },
-    #[snafu(display("invalid exchange template: {}", source))]
-    ExchangeTemplate { source: TemplateParseError },
-    #[snafu(display("invalid routing key template: {}", source))]
-    RoutingKeyTemplate { source: TemplateParseError },
 }

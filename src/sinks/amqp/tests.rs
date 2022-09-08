@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 pub fn generate_config() {
-    crate::test_util::test_generate_config::<AMQPSinkConfig>();
+    crate::test_util::test_generate_config::<AmqpSinkConfig>();
 }
 
 #[cfg(feature = "amqp-integration-tests")]
@@ -22,8 +22,8 @@ mod integration_tests {
     use std::{sync::Arc, time::Duration};
     use vector_core::config::LogNamespace;
 
-    pub fn make_config() -> AMQPSinkConfig {
-        let mut config = AMQPSinkConfig {
+    pub fn make_config() -> AmqpSinkConfig {
+        let mut config = AmqpSinkConfig {
             exchange: "it".to_string(),
             ..Default::default()
         };
@@ -164,7 +164,7 @@ mod integration_tests {
         let (amqp_sink, healthcheck) = config.build(cx).await.unwrap();
         healthcheck.await.expect("Health check failed");
 
-        let source_cfg = crate::sources::amqp::AMQPSourceConfig {
+        let source_cfg = crate::sources::amqp::AmqpSourceConfig {
             connection: config.connection.clone(),
             queue: queue.clone(),
             consumer: format!("test-{}-amqp-source", random_string(10)),

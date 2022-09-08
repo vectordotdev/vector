@@ -105,7 +105,7 @@ enum BuildError {
 pub enum Sources {
     /// AMQP.
     #[cfg(feature = "sources-amqp")]
-    Amqp(#[configurable(derived)] amqp::AMQPSourceConfig),
+    Amqp(#[configurable(derived)] amqp::AmqpSourceConfig),
 
     /// Apache HTTP Server (HTTPD) Metrics.
     #[cfg(feature = "sources-apache_metrics")]

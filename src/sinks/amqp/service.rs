@@ -1,6 +1,6 @@
-//! The main tower service that takes the request created by the request builder\
-//! and sends it to AMQP.
-use crate::internal_events::sink::{AMQPAcknowledgementError, AMQPDeliveryError};
+//! The main tower service that takes the request created by the request builder
+//! and sends it to `AMQP`.
+use crate::internal_events::sink::{AmqpAcknowledgementError, AmqpDeliveryError};
 use bytes::Bytes;
 use futures::future::BoxFuture;
 use lapin::{options::BasicPublishOptions, BasicProperties};
@@ -18,14 +18,14 @@ use vector_core::stream::DriverResponse;
 
 /// The request contains the data to send to `AMQP` together
 /// with the information need to route the message.
-pub(super) struct AMQPRequest {
+pub(super) struct AmqpRequest {
     body: Bytes,
     exchange: String,
     routing_key: String,
     finalizers: EventFinalizers,
 }
 
-impl AMQPRequest {
+impl AmqpRequest {
     pub(super) fn new(
         body: Bytes,
         exchange: String,
@@ -41,18 +41,18 @@ impl AMQPRequest {
     }
 }
 
-impl Finalizable for AMQPRequest {
+impl Finalizable for AmqpRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
         std::mem::take(&mut self.finalizers)
     }
 }
 
 /// A successful response from `AMQP`.
-pub(super) struct AMQPResponse {
+pub(super) struct AmqpResponse {
     byte_size: usize,
 }
 
-impl DriverResponse for AMQPResponse {
+impl DriverResponse for AmqpResponse {
     fn event_status(&self) -> EventStatus {
         EventStatus::Delivered
     }
@@ -71,23 +71,23 @@ impl DriverResponse for AMQPResponse {
 }
 
 /// The tower service that handles the actual sending of data to `AMQP`.
-pub(super) struct AMQPService {
+pub(super) struct AmqpService {
     pub(super) channel: Arc<lapin::Channel>,
 }
 
 #[derive(Debug, Snafu)]
-pub(super) enum AMQPError {
+pub(super) enum AmqpError {
     #[snafu(display("Failed retrieving Acknowledgement: {}", error))]
-    AMQPAcknowledgementFailed { error: lapin::Error },
+    AmqpAcknowledgementFailed { error: lapin::Error },
 
     #[snafu(display("Failed AMQP request: {}", error))]
-    AMQPDeliveryFailed { error: lapin::Error },
+    AmqpDeliveryFailed { error: lapin::Error },
 }
 
-impl Service<AMQPRequest> for AMQPService {
-    type Response = AMQPResponse;
+impl Service<AmqpRequest> for AmqpService {
+    type Response = AmqpResponse;
 
-    type Error = AMQPError;
+    type Error = AmqpError;
 
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
@@ -95,7 +95,7 @@ impl Service<AMQPRequest> for AMQPService {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, req: AMQPRequest) -> Self::Future {
+    fn call(&mut self, req: AmqpRequest) -> Self::Future {
         let channel = Arc::clone(&self.channel);
 
         Box::pin(async move {
@@ -119,19 +119,19 @@ impl Service<AMQPRequest> for AMQPService {
                 Ok(result) => match result.await {
                     Ok(lapin::publisher_confirm::Confirmation::Nack(_)) => {
                         warn!("Received Negative Acknowledgement from AMQP server.");
-                        Ok(AMQPResponse { byte_size })
+                        Ok(AmqpResponse { byte_size })
                     }
                     Err(error) => {
                         // TODO: In due course the caller could emit these on error.
-                        emit!(AMQPAcknowledgementError { error: &error });
-                        Err(AMQPError::AMQPAcknowledgementFailed { error })
+                        emit!(AmqpAcknowledgementError { error: &error });
+                        Err(AmqpError::AmqpAcknowledgementFailed { error })
                     }
-                    Ok(_) => Ok(AMQPResponse { byte_size }),
+                    Ok(_) => Ok(AmqpResponse { byte_size }),
                 },
                 Err(error) => {
                     // TODO: In due course the caller could emit these on error.
-                    emit!(AMQPDeliveryError { error: &error });
-                    Err(AMQPError::AMQPDeliveryFailed { error })
+                    emit!(AmqpDeliveryError { error: &error });
+                    Err(AmqpError::AmqpDeliveryFailed { error })
                 }
             }
         })

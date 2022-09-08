@@ -1,9 +1,10 @@
-//! Configuration functionality for the AMQP sink.
+//! Configuration functionality for the `AMQP` sink.
 use crate::{
-    amqp::AMQPConfig,
+    amqp::AmqpConfig,
     codecs::EncodingConfig,
     config::{DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     sinks::{Healthcheck, VectorSink},
+    template::Template,
 };
 use codecs::TextSerializerConfig;
 use futures::FutureExt;
@@ -11,24 +12,24 @@ use std::sync::Arc;
 use vector_config::configurable_component;
 use vector_core::config::AcknowledgementsConfig;
 
-use super::sink::AMQPSink;
+use super::sink::AmqpSink;
 
 /// Configuration for the `amqp` sink.
 ///
 /// Supports AMQP version 0.9.1
 #[configurable_component(sink("amqp"))]
 #[derive(Clone, Debug)]
-pub struct AMQPSinkConfig {
+pub struct AmqpSinkConfig {
     /// The exchange to publish messages to.
-    pub(crate) exchange: String,
+    #[configurable(metadata(templateable))]
+    pub(crate) exchange: Template,
 
     /// Template used to generate a routing key which corresponds to a queue binding.
-    // TODO: We will eventually be able to add metadata on a per-field basis, such that we can add metadata for marking
-    // this field as being capable of using Vector's templating syntax.
-    pub(crate) routing_key: Option<String>,
+    #[configurable(metadata(templateable))]
+    pub(crate) routing_key: Option<Template>,
 
     /// Connection options for the `amqp` sink.
-    pub(crate) connection: AMQPConfig,
+    pub(crate) connection: AmqpConfig,
 
     #[configurable(derived)]
     pub(crate) encoding: EncodingConfig,
@@ -42,19 +43,19 @@ pub struct AMQPSinkConfig {
     pub(crate) acknowledgements: AcknowledgementsConfig,
 }
 
-impl Default for AMQPSinkConfig {
+impl Default for AmqpSinkConfig {
     fn default() -> Self {
         Self {
-            exchange: "vector".to_string(),
+            exchange: Template::try_from("vector").unwrap(),
             routing_key: None,
             encoding: TextSerializerConfig::new().into(),
-            connection: AMQPConfig::default(),
+            connection: AmqpConfig::default(),
             acknowledgements: AcknowledgementsConfig::default(),
         }
     }
 }
 
-impl GenerateConfig for AMQPSinkConfig {
+impl GenerateConfig for AmqpSinkConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(
             r#"connection.connection_string = "amqp://localhost:5672/%2f"
@@ -67,9 +68,9 @@ impl GenerateConfig for AMQPSinkConfig {
 }
 
 #[async_trait::async_trait]
-impl SinkConfig for AMQPSinkConfig {
+impl SinkConfig for AmqpSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let sink = AMQPSink::new(self.clone()).await?;
+        let sink = AmqpSink::new(self.clone()).await?;
         let hc = healthcheck(Arc::clone(&sink.channel)).boxed();
         Ok((VectorSink::from_event_streamsink(sink), hc))
     }

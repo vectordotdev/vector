@@ -1,20 +1,20 @@
 use lapin::tcp::{OwnedIdentity, OwnedTLSConfig};
 use vector_config::configurable_component;
 
-/// Connection options for AMQP.
+/// Connection options for `AMQP`.
 #[configurable_component]
 #[derive(Clone, Debug)]
-pub(crate) struct AMQPConfig {
-    /// URI for the AMQP server.
+pub(crate) struct AmqpConfig {
+    /// URI for the `AMQP` server.
     ///
-    /// Format: amqp://user:password@host:port/vhost?timeout=seconds
+    /// Format: amqp://<user>:<password>@<host>:<port>/<vhost>?timeout=<seconds>
     pub(crate) connection_string: String,
 
     #[configurable(derived)]
     pub(crate) tls: Option<crate::tls::TlsConfig>,
 }
 
-impl Default for AMQPConfig {
+impl Default for AmqpConfig {
     fn default() -> Self {
         Self {
             connection_string: "amqp://127.0.0.1/%2f".to_string(),
@@ -23,7 +23,7 @@ impl Default for AMQPConfig {
     }
 }
 
-impl AMQPConfig {
+impl AmqpConfig {
     pub(crate) async fn connect(
         &self,
     ) -> Result<(lapin::Connection, lapin::Channel), Box<dyn std::error::Error + Send + Sync>> {

@@ -1,5 +1,5 @@
-//! The sink for the AMQP sink that wires together the main stream that takes the
-//! event and sends it to AMQP.
+//! The sink for the `AMQP` sink that wires together the main stream that takes the
+//! event and sends it to `AMQP`.
 use crate::{
     codecs::Transformer, event::Event, internal_events::TemplateRenderingError,
     sinks::util::builder::SinkBuilderExt, template::Template,
@@ -8,14 +8,13 @@ use async_trait::async_trait;
 use futures::StreamExt;
 use futures_util::stream::BoxStream;
 use lapin::options::ConfirmSelectOptions;
-use snafu::ResultExt;
-use std::{convert::TryFrom, sync::Arc};
+use std::sync::Arc;
 use tower::ServiceBuilder;
 use vector_core::sink::StreamSink;
 
 use super::{
-    config::AMQPSinkConfig, encoder::AMQPEncoder, request_builder::AMQPRequestBuilder,
-    service::AMQPService, BuildError, ExchangeTemplateSnafu, RoutingKeyTemplateSnafu,
+    config::AmqpSinkConfig, encoder::AmqpEncoder, request_builder::AmqpRequestBuilder,
+    service::AmqpService, BuildError,
 };
 
 /// Stores the event together with the rendered exchange and routing_key values.
@@ -23,13 +22,13 @@ use super::{
 /// and metadata containing the exchange and routing_key.
 /// This event needs to be created prior to building the request so we can filter out
 /// any events that error whilst redndering the templates.
-pub(super) struct AMQPEvent {
+pub(super) struct AmqpEvent {
     pub(super) event: Event,
     pub(super) exchange: String,
     pub(super) routing_key: String,
 }
 
-pub(super) struct AMQPSink {
+pub(super) struct AmqpSink {
     pub(super) channel: Arc<lapin::Channel>,
     exchange: Template,
     routing_key: Option<Template>,
@@ -37,18 +36,18 @@ pub(super) struct AMQPSink {
     encoder: crate::codecs::Encoder<()>,
 }
 
-impl AMQPSink {
-    pub(super) async fn new(config: AMQPSinkConfig) -> crate::Result<Self> {
+impl AmqpSink {
+    pub(super) async fn new(config: AmqpSinkConfig) -> crate::Result<Self> {
         let (_, channel) = config
             .connection
             .connect()
             .await
-            .map_err(|e| BuildError::AMQPCreateFailed { source: e })?;
+            .map_err(|e| BuildError::AmqpCreateFailed { source: e })?;
 
         channel
             .confirm_select(ConfirmSelectOptions::default())
             .await
-            .map_err(|e| BuildError::AMQPCreateFailed {
+            .map_err(|e| BuildError::AmqpCreateFailed {
                 source: Box::new(e),
             })?;
 
@@ -56,21 +55,18 @@ impl AMQPSink {
         let serializer = config.encoding.build()?;
         let encoder = crate::codecs::Encoder::<()>::new(serializer);
 
-        Ok(AMQPSink {
+        Ok(AmqpSink {
             channel: Arc::new(channel),
-            exchange: Template::try_from(config.exchange).context(ExchangeTemplateSnafu)?,
-            routing_key: config
-                .routing_key
-                .map(|k| Template::try_from(k).context(RoutingKeyTemplateSnafu))
-                .transpose()?,
+            exchange: config.exchange,
+            routing_key: config.routing_key,
             transformer,
             encoder,
         })
     }
 
-    /// Transforms an event into an AMQP event by rendering the required template fields.
+    /// Transforms an event into an `AMQP` event by rendering the required template fields.
     /// Returns None if there is an error whilst rendering.
-    fn make_amqp_event(&self, event: Event) -> Option<AMQPEvent> {
+    fn make_amqp_event(&self, event: Event) -> Option<AmqpEvent> {
         let exchange = self
             .exchange
             .render_string(&event)
@@ -97,7 +93,7 @@ impl AMQPSink {
                 .ok()?,
         };
 
-        Some(AMQPEvent {
+        Some(AmqpEvent {
             event,
             exchange,
             routing_key,
@@ -105,13 +101,13 @@ impl AMQPSink {
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let request_builder = AMQPRequestBuilder {
-            encoder: AMQPEncoder {
+        let request_builder = AmqpRequestBuilder {
+            encoder: AmqpEncoder {
                 encoder: self.encoder.clone(),
                 transformer: self.transformer.clone(),
             },
         };
-        let service = ServiceBuilder::new().service(AMQPService {
+        let service = ServiceBuilder::new().service(AmqpService {
             channel: Arc::clone(&self.channel),
         });
 
@@ -134,7 +130,7 @@ impl AMQPSink {
 }
 
 #[async_trait]
-impl StreamSink<Event> for AMQPSink {
+impl StreamSink<Event> for AmqpSink {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
     }
