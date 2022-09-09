@@ -12,6 +12,7 @@ mod integration_tests {
         config::{SinkConfig, SinkContext},
         serde::{default_decoding, default_framing_message_based},
         shutdown::ShutdownSignal,
+        template::Template,
         test_util::{
             components::{run_and_assert_sink_compliance, SINK_TAGS},
             random_lines_with_stream, random_string,
@@ -24,7 +25,7 @@ mod integration_tests {
 
     pub fn make_config() -> AmqpSinkConfig {
         let mut config = AmqpSinkConfig {
-            exchange: "it".to_string(),
+            exchange: Template::try_from("it").unwrap(),
             ..Default::default()
         };
         let user = std::env::var("AMQP_USER").unwrap_or_else(|_| "guest".to_string());
@@ -41,7 +42,7 @@ mod integration_tests {
         let exchange = format!("test-{}-exchange", random_string(10));
 
         let mut config = make_config();
-        config.exchange = exchange;
+        config.exchange = Template::try_from(exchange.as_str()).unwrap();
         let (_conn, channel) = config.connection.connect().await.unwrap();
         super::config::healthcheck(Arc::new(channel)).await.unwrap();
     }
@@ -62,7 +63,8 @@ mod integration_tests {
 
     async fn amqp_happy_path() {
         let mut config = make_config();
-        config.exchange = format!("test-{}-exchange", random_string(10));
+        let exchange = format!("test-{}-exchange", random_string(10));
+        config.exchange = Template::try_from(exchange.as_str()).unwrap();
         let queue = format!("test-{}-queue", random_string(10));
 
         let (_conn, channel) = config.connection.connect().await.unwrap();
@@ -72,7 +74,7 @@ mod integration_tests {
         };
         channel
             .exchange_declare(
-                &config.exchange,
+                &exchange,
                 lapin::ExchangeKind::Fanout,
                 exchange_opts,
                 lapin::types::FieldTable::default(),
@@ -97,7 +99,7 @@ mod integration_tests {
         channel
             .queue_bind(
                 &queue,
-                &config.exchange,
+                &exchange,
                 "",
                 lapin::options::QueueBindOptions::default(),
                 lapin::types::FieldTable::default(),
@@ -142,7 +144,8 @@ mod integration_tests {
 
     async fn amqp_round_trip() {
         let mut config = make_config();
-        config.exchange = format!("test-{}-exchange", random_string(10));
+        let exchange = format!("test-{}-exchange", random_string(10));
+        config.exchange = Template::try_from(exchange.as_str()).unwrap();
         let queue = format!("test-{}-queue", random_string(10));
 
         let (_conn, channel) = config.connection.connect().await.unwrap();
@@ -152,7 +155,7 @@ mod integration_tests {
         };
         channel
             .exchange_declare(
-                &config.exchange,
+                &exchange,
                 lapin::ExchangeKind::Fanout,
                 exchange_opts,
                 lapin::types::FieldTable::default(),
@@ -168,7 +171,7 @@ mod integration_tests {
             connection: config.connection.clone(),
             queue: queue.clone(),
             consumer: format!("test-{}-amqp-source", random_string(10)),
-            routing_key: "routing".to_string(),
+            routing_key_field: "routing".to_string(),
             exchange_key: "exchange".to_string(),
             offset_key: "offset".to_string(),
             framing: default_framing_message_based(),
@@ -200,7 +203,7 @@ mod integration_tests {
         channel
             .queue_bind(
                 &queue,
-                &config.exchange,
+                &exchange,
                 "",
                 lapin::options::QueueBindOptions::default(),
                 lapin::types::FieldTable::default(),

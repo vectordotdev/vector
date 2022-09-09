@@ -506,7 +506,7 @@ mod integration_test {
         let mut config = make_config();
         config.consumer = consumer;
         config.queue = queue;
-        config.routing_key = "message_key".to_string();
+        config.routing_key_field = "message_key".to_string();
         config.exchange_key = "exchange".to_string();
         let (_conn, channel) = config.connection.connect().await.unwrap();
         let exchange_opts = lapin::options::ExchangeDeclareOptions {
