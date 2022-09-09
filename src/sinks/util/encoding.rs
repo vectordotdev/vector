@@ -70,13 +70,23 @@ impl Encoder<Event> for (Transformer, crate::codecs::Encoder<()>) {
     }
 }
 
-/// Write the buffer to the writer, emitting an internal event which complies with the
+/// Write the buffer to the writer. If the operation fails, emit an internal event which complies with the
 /// instrumentation spec- as this necessitates both an Error and EventsDropped event.
-pub(crate) fn write_all(writer: &mut dyn io::Write, n_events: usize, buf: &[u8]) -> io::Result<()> {
+///
+/// # Arguments
+///
+/// * `writer`           - The object implementing io::Write to write data to.
+/// * `n_events_pending` - The number of events that are dropped if this write fails.
+/// * `buf`              - The buffer to write.
+pub(crate) fn write_all(
+    writer: &mut dyn io::Write,
+    n_events_pending: usize,
+    buf: &[u8],
+) -> io::Result<()> {
     writer.write_all(buf).map_err(|error| {
         emit!(EncoderWriteError {
             error: &error,
-            count: n_events as u64,
+            count: n_events_pending as u64,
         });
         error
     })

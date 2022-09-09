@@ -205,7 +205,7 @@ impl decoding::format::Deserializer for StatsdDeserializer {
         bytes: Bytes,
         _log_namespace: LogNamespace,
     ) -> crate::Result<SmallVec<[Event; 1]>> {
-        // The other modes emit BytesReceived
+        // The other modes already emit BytesReceived
         if let Some(mode) = self.socket_mode {
             if mode == SocketMode::Udp {
                 emit!(SocketBytesReceived {
@@ -221,14 +221,12 @@ impl decoding::format::Deserializer for StatsdDeserializer {
         {
             Ok(metric) => {
                 let event = Event::Metric(metric);
-                if let Some(mode) = self.socket_mode {
-                    // The other modes emit EventsReceived
-                    if mode == SocketMode::Udp {
-                        emit!(EventsReceived {
-                            count: 1,
-                            byte_size: event.size_of(),
-                        });
-                    }
+                // The other modes already emit EventsReceived
+                if matches!(self.socket_mode, Some(SocketMode::Udp)) {
+                    emit!(EventsReceived {
+                        count: 1,
+                        byte_size: event.size_of(),
+                    });
                 }
                 Ok(smallvec![event])
             }
