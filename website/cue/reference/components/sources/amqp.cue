@@ -62,7 +62,7 @@ components: sources: amqp: {
 				syntax: "literal"
 			}
 		}
-		routing_key: {
+		routing_key_field: {
 			common:      true
 			description: "The log field name to use for the AMQP routing key."
 			required:    false
