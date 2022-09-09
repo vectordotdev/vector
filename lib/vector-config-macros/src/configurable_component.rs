@@ -13,6 +13,7 @@ use crate::attrs;
 enum ComponentType {
     EnrichmentTable,
     Provider,
+    Secrets,
     Sink,
     Source,
     Transform,
@@ -34,6 +35,7 @@ impl ComponentType {
         let attr = match self {
             ComponentType::EnrichmentTable => attrs::ENRICHMENT_TABLE_COMPONENT,
             ComponentType::Provider => attrs::PROVIDER_COMPONENT,
+            ComponentType::Secrets => attrs::SECRETS_COMPONENT,
             ComponentType::Sink => attrs::SINK_COMPONENT,
             ComponentType::Source => attrs::SOURCE_COMPONENT,
             ComponentType::Transform => attrs::TRANSFORM_COMPONENT,
@@ -51,6 +53,7 @@ impl ComponentType {
         match self {
             ComponentType::EnrichmentTable => "enrichment_table",
             ComponentType::Provider => "provider",
+            ComponentType::Secrets => "secrets",
             ComponentType::Sink => "sink",
             ComponentType::Source => "source",
             ComponentType::Transform => "transform",
@@ -66,6 +69,8 @@ impl<'a> TryFrom<&'a Path> for ComponentType {
             Ok(Self::EnrichmentTable)
         } else if path == attrs::PROVIDER {
             Ok(Self::Provider)
+        } else if path == attrs::SECRETS {
+            Ok(Self::Secrets)
         } else if path == attrs::SINK {
             Ok(Self::Sink)
         } else if path == attrs::SOURCE {
@@ -136,6 +141,9 @@ impl TypedComponent {
                 }
                 ComponentType::Provider => {
                     parse_quote! { ::vector_config::component::ProviderDescription }
+                }
+                ComponentType::Secrets => {
+                    parse_quote! { ::vector_config::component::SecretsDescription }
                 }
                 ComponentType::Sink => parse_quote! { ::vector_config::component::SinkDescription },
                 ComponentType::Source => {
@@ -255,7 +263,7 @@ impl FromMeta for Options {
                 }
 
                 NestedMeta::Meta(m) => {
-                    let error = "expected one of: `enrichment_table(\"...\")`, `provider(\"...\")`, `source(\"...\")`, `transform(\"...\")`, `sink(\"...\")`, `no_ser`, or `no_deser`";
+                    let error = "expected one of: `enrichment_table(\"...\")`, `provider(\"...\")`, `source(\"...\")`, `transform(\"...\")`, `secrets(\"...\")`, `sink(\"...\")`, `no_ser`, or `no_deser`";
                     errors.push(Error::custom(error).with_span(m));
                 }
 

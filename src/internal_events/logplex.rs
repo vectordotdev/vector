@@ -1,7 +1,8 @@
 use metrics::counter;
+use vector_common::internal_event::{error_stage, error_type};
 use vector_core::internal_event::InternalEvent;
 
-use super::prelude::{error_stage, error_type, io_error_code};
+use super::prelude::io_error_code;
 
 #[derive(Debug)]
 pub struct HerokuLogplexRequestReceived<'a> {

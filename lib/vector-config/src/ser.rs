@@ -90,6 +90,16 @@ where
         H::metadata().convert::<Self>()
     }
 
+    fn validate_metadata(metadata: &Metadata<Self>) -> Result<(), GenerateError> {
+        // Forward to the underlying `H`.
+        //
+        // We have to convert from `Metadata<Self>` to `Metadata<H>` which erases the default value,
+        // notably, but `serde_with` helpers should never actually have default values, so this is
+        // essentially a no-op.
+        let converted = metadata.convert::<H>();
+        H::validate_metadata(&converted)
+    }
+
     fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
         // Forward to the underlying `H`.
         H::generate_schema(gen)

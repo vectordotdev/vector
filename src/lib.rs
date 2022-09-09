@@ -36,6 +36,7 @@ pub mod dns;
 pub mod docker;
 pub mod expiring_hash_map;
 pub mod generate;
+pub mod generate_schema;
 #[macro_use]
 #[allow(unreachable_pub)]
 pub mod internal_events;
@@ -68,6 +69,7 @@ pub(crate) mod nats;
 #[allow(unreachable_pub)]
 pub(crate) mod proto;
 pub mod providers;
+pub mod secrets;
 pub mod serde;
 #[cfg(windows)]
 pub mod service;

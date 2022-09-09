@@ -55,53 +55,73 @@ static DATADOG_REPORTING_PATH_STUB: &str = "/api/unstable/observability_pipeline
 pub static DATADOG_API_KEY_ENV_VAR_SHORT: &str = "DD_API_KEY";
 pub static DATADOG_API_KEY_ENV_VAR_FULL: &str = "DATADOG_API_KEY";
 
-#[derive(Debug, PartialEq, Clone)]
+/// Enterprise options for using Datadog's [Observability Pipelines][datadog_op].
+///
+/// [datadog_op]: https://www.datadoghq.com/product/observability-pipelines/
 #[configurable_component]
+#[derive(Clone, Debug, PartialEq)]
 #[serde(deny_unknown_fields)]
-/// Observability Pipelines config options.
 pub struct Options {
+    /// Whether or not Observability Pipelines support is enabled.
     #[serde(default = "default_enabled")]
-    /// Enables Observability Pipelines.
     pub enabled: bool,
 
+    /// Whether or not to report internal component logs to Observability Pipelines.
     #[serde(default = "default_enable_logs_reporting")]
-    /// Enables reporting of internal component logs to Datadog.
     pub enable_logs_reporting: bool,
 
+    /// The Datadog [site][dd_site] to send data to.
+    ///
+    /// [dd_site]: https://docs.datadoghq.com/getting_started/site
     #[serde(default)]
-    /// Datadog site (e.g. datadoghq.eu).
     site: Option<String>,
-    /// Datadog region, used to derive a default site for a given region.
+
+    /// The Datadog region to send data to.
+    ///
+    /// This option is deprecated, and the `site` field should be used instead.
+    #[configurable(deprecated)]
     region: Option<Region>,
+
+    /// The Datadog endpoint to send data to.
+    ///
+    /// This is an advanced setting that is generally meant only for testing, and overrides both
+    /// `site` and `region`.
+    ///
+    /// You should prefer to set `site`.
     #[configurable(derived)]
-    /// Datadog endpoint, takes precedence over the region and the site. Used mainly for dev environments.
     endpoint: Option<String>,
 
+    /// The Datadog [API key][api_key] to send data with.
+    ///
+    /// [api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
     #[serde(default)]
-    /// Datadog API key.
     pub api_key: Option<String>,
+
+    /// The Datadog application key.
+    ///
+    /// This is deprecated.
     #[configurable(deprecated)]
-    /// Datadog application key (deprecated).
     pub application_key: Option<String>,
-    /// Observability Pipeline's configuration key.
+
+    /// The configuration key for Observability Pipelines.
     pub configuration_key: String,
 
+    /// The amount of time, in seconds, between reporting host metrics to Observability Pipelines.
     #[serde(default = "default_reporting_interval_secs")]
-    /// A time interval to scrap and report host metrics.
     pub reporting_interval_secs: f64,
 
+    /// The maximum number of retries to report Vector's configuration to Observability Pipelines at startup.
     #[serde(default = "default_max_retries")]
-    /// The maximum number of retries to report a Vector configuration at startup.
     pub max_retries: u32,
 
+    #[configurable(derived)]
     #[serde(
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    #[configurable(derived)]
     proxy: ProxyConfig,
 
-    /// Additional tags, added to generated Datadog metrics.
+    /// A map of additional tags for metrics sent to Observability Pipelines.
     tags: Option<IndexMap<String, String>>,
 }
 

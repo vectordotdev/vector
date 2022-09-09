@@ -1,6 +1,6 @@
 use futures::FutureExt;
-use http::{uri::InvalidUri, Uri};
-use snafu::{ResultExt, Snafu};
+use http::Uri;
+use snafu::ResultExt;
 use tower::ServiceBuilder;
 use vector_config::configurable_component;
 use vector_core::config::proxy::ProxyConfig;
@@ -45,12 +45,6 @@ impl SinkBatchSettings for DatadogMetricsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(100_000);
     const MAX_BYTES: Option<usize> = None;
     const TIMEOUT_SECS: f64 = 2.0;
-}
-
-#[derive(Debug, Snafu)]
-enum BuildError {
-    #[snafu(display("Invalid host {:?}: {:?}", host, source))]
-    InvalidHost { host: String, source: InvalidUri },
 }
 
 /// Various metric type-specific API types.
