@@ -1065,7 +1065,7 @@ mod tests {
         compression: Compression,
     ) -> (VectorSink, Healthcheck) {
         HecLogsSinkConfig {
-            default_token: TOKEN.to_owned(),
+            default_token: TOKEN.to_owned().into(),
             endpoint: format!("http://{}", address),
             host_key: "host".to_owned(),
             indexed_fields: vec![],
