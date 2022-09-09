@@ -45,7 +45,7 @@ components: sinks: file: {
 	configuration: {
 		idle_timeout_secs: {
 			common:      false
-			description: "The amount of time a file can be idle  and stay open. After not receiving any events for this timeout, the file will be flushed and closed.\n"
+			description: "The amount of time a file can be idle and stay open. After not receiving any events for this timeout, the file will be flushed and closed.\n"
 			required:    false
 			type: uint: {
 				default: 30
