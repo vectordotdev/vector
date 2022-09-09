@@ -15,8 +15,11 @@ use pulsar::{
 };
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
-use vector_common::internal_event::{
-    ByteSize, BytesSent, EventsSent, InternalEventHandle as _, Protocol, Registered,
+use vector_common::{
+    internal_event::{
+        ByteSize, BytesSent, EventsSent, InternalEventHandle as _, Protocol, Registered,
+    },
+    sensitive_string::SensitiveString,
 };
 use vector_config::configurable_component;
 use vector_core::config::log_schema;
@@ -69,13 +72,13 @@ struct AuthConfig {
     ///
     /// This can be used either for basic authentication (username/password) or JWT authentication.
     /// When used for JWT, the value should be `token`.
-    name: Option<String>,
+    name: Option<SensitiveString>,
 
     /// Basic authentication password/token.
     ///
     /// This can be used either for basic authentication (username/password) or JWT authentication.
     /// When used for JWT, the value should be the signed JWT, in the compact representation.
-    token: Option<String>,
+    token: Option<SensitiveString>,
 
     #[configurable(derived)]
     oauth2: Option<OAuth2Config>,
@@ -194,8 +197,8 @@ impl PulsarSinkConfig {
                 auth.oauth2.as_ref(),
             ) {
                 (Some(name), Some(token), None) => builder.with_auth(Authentication {
-                    name: name.clone(),
-                    data: token.as_bytes().to_vec(),
+                    name: name.inner().to_owned(),
+                    data: token.inner().as_bytes().to_vec(),
                 }),
                 (None, None, Some(oauth2)) => builder.with_auth_provider(
                     OAuth2Authentication::client_credentials(OAuth2Params {
