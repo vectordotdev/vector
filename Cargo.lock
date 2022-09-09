@@ -164,7 +164,7 @@ version = "2.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "93ae1ddd39efd67689deb1979d80bad3bf7f2b09c6e6117c8d1f2443b5e2f83e"
 dependencies = [
- "bstr",
+ "bstr 0.2.17",
  "doc-comment",
  "predicates",
  "predicates-core",
@@ -1278,6 +1278,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "bstr"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "11aee792a41973cf54c837d6f344e35a03076328831b01ef30a14d965d47bfbc"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1898,7 +1907,7 @@ version = "1.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "22813a6dc45b335f9bade10bf7271dc477e81113e89eb251a0bc2a8a81c536e1"
 dependencies = [
- "bstr",
+ "bstr 0.2.17",
  "csv-core",
  "itoa 0.4.8",
  "ryu",
@@ -2562,7 +2571,7 @@ checksum = "534be3985e262585e2a8bb8322969e2115f0eff293b5bf522bef397fff54c9bc"
 name = "file-source"
 version = "0.1.0"
 dependencies = [
- "bstr",
+ "bstr 1.0.0",
  "bytes 1.2.1",
  "chrono",
  "crc",
@@ -4321,7 +4330,7 @@ version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "10277581090f5cb7ecf814bc611152ce4db6dc8deffcaa08e24ed4c5197d9186"
 dependencies = [
- "bstr",
+ "bstr 0.2.17",
  "cc",
  "lua-src",
  "luajit-src",
