@@ -147,7 +147,7 @@ impl SinkConfig for InfluxDbLogsConfig {
 
         let sink = InfluxDbLogsSink {
             uri,
-            token,
+            token: token.inner().to_owned(),
             protocol_version,
             measurement,
             tags,

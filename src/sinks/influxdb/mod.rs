@@ -9,6 +9,7 @@ use futures::FutureExt;
 use http::{StatusCode, Uri};
 use snafu::{ResultExt, Snafu};
 use tower::Service;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
 use crate::http::HttpClient;
@@ -71,12 +72,12 @@ pub struct InfluxDb1Settings {
     /// The username to authenticate with.
     ///
     /// Only relevant when using InfluxDB v0.x/v1.x.
-    username: Option<String>,
+    username: Option<SensitiveString>,
 
     /// The password to authenticate with.
     ///
     /// Only relevant when using InfluxDB v0.x/v1.x.
-    password: Option<String>,
+    password: Option<SensitiveString>,
 }
 
 /// Configuration settings for InfluxDB v2.x.
@@ -98,13 +99,13 @@ pub struct InfluxDb2Settings {
     /// Only relevant when using InfluxDB v2.x and above.
     ///
     /// [token_docs]: https://v2.docs.influxdata.com/v2.0/security/tokens/
-    token: String,
+    token: SensitiveString,
 }
 
 trait InfluxDbSettings: std::fmt::Debug {
     fn write_uri(&self, endpoint: String) -> crate::Result<Uri>;
     fn healthcheck_uri(&self, endpoint: String) -> crate::Result<Uri>;
-    fn token(&self) -> String;
+    fn token(&self) -> SensitiveString;
     fn protocol_version(&self) -> ProtocolVersion;
 }
 
@@ -117,8 +118,8 @@ impl InfluxDbSettings for InfluxDb1Settings {
                 ("consistency", self.consistency.clone()),
                 ("db", Some(self.database.clone())),
                 ("rp", self.retention_policy_name.clone()),
-                ("p", self.password.clone()),
-                ("u", self.username.clone()),
+                ("p", self.password.as_ref().map(|v| v.inner().to_owned())),
+                ("u", self.username.as_ref().map(|v| v.inner().to_owned())),
                 ("precision", Some("ns".to_owned())),
             ],
         )
@@ -128,8 +129,8 @@ impl InfluxDbSettings for InfluxDb1Settings {
         encode_uri(&endpoint, "ping", &[])
     }
 
-    fn token(&self) -> String {
-        "".to_string()
+    fn token(&self) -> SensitiveString {
+        SensitiveString::default()
     }
 
     fn protocol_version(&self) -> ProtocolVersion {
@@ -154,7 +155,7 @@ impl InfluxDbSettings for InfluxDb2Settings {
         encode_uri(&endpoint, "ping", &[])
     }
 
-    fn token(&self) -> String {
+    fn token(&self) -> SensitiveString {
         self.token.clone()
     }
 
@@ -609,8 +610,8 @@ mod tests {
             consistency: Some("quorum".to_owned()),
             database: "vector_db".to_owned(),
             retention_policy_name: Some("autogen".to_owned()),
-            username: Some("writer".to_owned()),
-            password: Some("secret".to_owned()),
+            username: Some("writer".to_owned().into()),
+            password: Some("secret".to_owned().into()),
         };
 
         let uri = settings
@@ -624,7 +625,7 @@ mod tests {
         let settings = InfluxDb2Settings {
             org: "my-org".to_owned(),
             bucket: "my-bucket".to_owned(),
-            token: "my-token".to_owned(),
+            token: "my-token".to_owned().into(),
         };
 
         let uri = settings
@@ -642,8 +643,8 @@ mod tests {
             consistency: Some("quorum".to_owned()),
             database: "vector_db".to_owned(),
             retention_policy_name: Some("autogen".to_owned()),
-            username: Some("writer".to_owned()),
-            password: Some("secret".to_owned()),
+            username: Some("writer".to_owned().into()),
+            password: Some("secret".to_owned().into()),
         };
 
         let uri = settings
@@ -657,7 +658,7 @@ mod tests {
         let settings = InfluxDb2Settings {
             org: "my-org".to_owned(),
             bucket: "my-bucket".to_owned(),
-            token: "my-token".to_owned(),
+            token: "my-token".to_owned().into(),
         };
 
         let uri = settings
