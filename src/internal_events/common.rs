@@ -5,7 +5,7 @@ use metrics::{counter, histogram};
 pub use vector_core::internal_event::EventsReceived;
 use vector_core::internal_event::InternalEvent;
 
-use super::prelude::{error_stage, error_type};
+use vector_common::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct EndpointBytesReceived<'a> {
@@ -141,6 +141,52 @@ impl<const INTENTIONAL: bool> InternalEvent for ComponentEventsDropped<INTENTION
             "component_discarded_events_total",
             self.count,
             "intentional" => if INTENTIONAL { "true" } else { "false" },
+        );
+    }
+}
+
+#[derive(Debug)]
+pub struct SinkRequestBuildError<E> {
+    pub name: &'static str,
+    pub error: E,
+}
+
+impl<E: std::fmt::Display> InternalEvent for SinkRequestBuildError<E> {
+    fn emit(self) {
+        error!(
+            message = format!("Failed to build request for {}", self.name),
+            error = %self.error,
+            error_type = error_type::ENCODER_FAILED,
+            stage = error_stage::PROCESSING,
+            internal_log_rate_secs = 10,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => error_type::ENCODER_FAILED,
+            "stage" => error_stage::PROCESSING,
+        );
+    }
+}
+
+#[derive(Debug)]
+pub struct SinkSendError<E> {
+    pub message: &'static str,
+    pub error: E,
+}
+
+impl<E: std::fmt::Display> InternalEvent for SinkSendError<E> {
+    fn emit(self) {
+        error!(
+            message = %self.message,
+            error = %self.error,
+            error_type = error_type::REQUEST_FAILED,
+            stage = error_stage::SENDING,
+            internal_log_rate_secs = 10,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => error_type::REQUEST_FAILED,
+            "stage" => error_stage::SENDING,
         );
     }
 }

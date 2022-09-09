@@ -29,6 +29,7 @@ RUN ./scripts/environment/prepare.sh && ./scripts/environment/setup-helm.sh
 VOLUME /vector
 VOLUME /vector/target
 VOLUME /root/.cargo
+VOLUME /root/.rustup
 
 # Prepare for use
 COPY ./scripts/environment/entrypoint.sh /

@@ -199,7 +199,7 @@ goauth = { version = "0.13.1", optional = true }
 smpl_jwt = { version = "0.7.1", default-features = false, optional = true }
 
 # API
-async-graphql = { version = "4.0.12", default-features = false, optional = true, features = ["chrono"] }
+async-graphql = { version = "4.0.13", default-features = false, optional = true, features = ["chrono"] }
 async-graphql-warp = { version = "4.0.12", default-features = false, optional = true }
 itertools = { version = "0.10.3", default-features = false, optional = true }
 
@@ -275,7 +275,7 @@ openssl = { version = "0.10.41", default-features = false, features = ["vendored
 openssl-probe = { version = "0.1.5", default-features = false }
 openssl-src = { version = "111", default-features = false }
 ordered-float = { version = "3.0.0", default-features = false }
-percent-encoding = { version = "2.1.0", default-features = false }
+percent-encoding = { version = "2.2.0", default-features = false }
 pin-project = { version = "1.0.12", default-features = false }
 postgres-openssl = { version = "0.5.0", default-features = false, features = ["runtime"], optional = true }
 pulsar = { version = "4.1.2", default-features = false, features = ["tokio-runtime", "auth-oauth2"], optional = true }
@@ -284,7 +284,7 @@ rand_distr = { version = "0.4.3", default-features = false }
 rdkafka = { version = "0.28.0", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
 redis = { version = "0.21.6", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
 regex = { version = "1.6.0", default-features = false, features = ["std", "perf"] }
-roaring = { version = "0.10.0", default-features = false, optional = true }
+roaring = { version = "0.10.1", default-features = false, optional = true }
 seahash = { version = "4.1.0", default-features = false }
 semver = { version = "1.0.13", default-features = false, features = ["serde", "std"], optional = true }
 smallvec = { version = "1", default-features = false, features = ["union"] }

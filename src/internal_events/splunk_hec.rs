@@ -11,11 +11,11 @@ mod sink {
     use serde_json::Error;
     use vector_core::internal_event::InternalEvent;
 
-    use crate::internal_events::prelude::{error_stage, error_type};
     use crate::{
         event::metric::{MetricKind, MetricValue},
         sinks::splunk_hec::common::acknowledgements::HecAckApiError,
     };
+    use vector_common::internal_event::{error_stage, error_type};
 
     #[derive(Debug)]
     pub struct SplunkEventEncodeError {
@@ -195,8 +195,8 @@ mod source {
     use metrics::counter;
     use vector_core::internal_event::InternalEvent;
 
-    use crate::internal_events::prelude::{error_stage, error_type};
     use crate::sources::splunk_hec::ApiError;
+    use vector_common::internal_event::{error_stage, error_type};
 
     #[derive(Debug)]
     pub struct SplunkHecRequestReceived<'a> {
