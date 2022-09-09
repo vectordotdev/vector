@@ -313,8 +313,8 @@ mod tests {
         },
         test_util::{
             components::{
-                run_and_assert_sink_compliance, run_and_assert_sink_error, HTTP_SINK_TAGS,
-                SOURCE_ERROR_TAGS,
+                run_and_assert_sink_compliance, run_and_assert_sink_error, COMPONENT_ERROR_TAGS,
+                HTTP_SINK_TAGS,
             },
             next_addr,
         },
@@ -694,7 +694,7 @@ mod tests {
         if batch_status == BatchStatus::Delivered {
             run_and_assert_sink_compliance(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
         } else {
-            run_and_assert_sink_error(sink, stream::iter(events), &SOURCE_ERROR_TAGS).await;
+            run_and_assert_sink_error(sink, stream::iter(events), &COMPONENT_ERROR_TAGS).await;
         }
 
         assert_eq!(receiver.try_recv(), Ok(batch_status));
