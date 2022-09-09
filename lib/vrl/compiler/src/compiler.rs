@@ -1,8 +1,11 @@
-use diagnostic::{DiagnosticList, DiagnosticMessage, Severity, Span};
-use lookup::{OwnedPath, PathPrefix, TargetPath};
+use core::Value;
+use diagnostic::{DiagnosticList, DiagnosticMessage, Note, Severity, Span};
+use lookup::{OwnedTargetPath, OwnedValuePath, PathPrefix};
 use parser::ast::{self, Node, QueryTarget};
 
+use crate::function::ArgumentList;
 use crate::state::TypeState;
+use crate::value::VrlValueConvert;
 use crate::{
     expression::{
         assignment, function_call, literal, predicate, query, Abort, Array, Assignment, Block,
@@ -11,7 +14,7 @@ use crate::{
     },
     parser::ast::RootExpr,
     program::ProgramInfo,
-    CompileConfig, Function, Program, TypeDef,
+    CompileConfig, DeprecationWarning, Function, Program, TypeDef,
 };
 
 pub(crate) type Diagnostics = Vec<Box<dyn DiagnosticMessage>>;
@@ -31,15 +34,15 @@ pub struct Compiler<'a> {
     diagnostics: Diagnostics,
     fallible: bool,
     abortable: bool,
-    external_queries: Vec<TargetPath>,
-    external_assignments: Vec<TargetPath>,
+    external_queries: Vec<OwnedTargetPath>,
+    external_assignments: Vec<OwnedTargetPath>,
 
     /// A list of variables that are missing, because the rhs expression of the
     /// assignment failed to compile.
     ///
     /// This list allows us to avoid printing "undefined variable" compilation
     /// errors when the reason for it being undefined is another compiler error.
-    skip_missing_query_target: Vec<(QueryTarget, OwnedPath)>,
+    skip_missing_query_target: Vec<(QueryTarget, OwnedValuePath)>,
 
     /// Track which expression in a chain of expressions is fallible.
     ///
@@ -436,7 +439,6 @@ impl<'a> Compiler<'a> {
             Assignment::{Infallible, Single},
             AssignmentOp,
         };
-        use value::Value;
 
         let original_state = state.clone();
 
@@ -563,7 +565,7 @@ impl<'a> Compiler<'a> {
         // This data is exposed to the caller of the compiler, to allow any
         // potential external optimizations.
         if let Target::External(prefix) = target {
-            let target_path = TargetPath {
+            let target_path = OwnedTargetPath {
                 prefix,
                 path: path.clone(),
             };
@@ -608,6 +610,82 @@ impl<'a> Compiler<'a> {
     }
 
     #[cfg(feature = "expr-function_call")]
+    fn check_metadata_function_deprecations(&mut self, func: &FunctionCall, args: &ArgumentList) {
+        if func.ident == "get_metadata_field" {
+            if let Ok(key) = get_metadata_key(args) {
+                match key {
+                    MetadataKey::Query(target_path) => self.diagnostics.push(Box::new(
+                        DeprecationWarning::new("the \"get_metadata_field\" function")
+                            .with_span(func.span)
+                            .with_notes(Note::solution(
+                                "using the metadata path syntax instead",
+                                vec![format!("{}", target_path)],
+                            )),
+                    )),
+                    MetadataKey::Legacy(secret_key) => self.diagnostics.push(Box::new(
+                        DeprecationWarning::new("the \"get_metadata_field\" function")
+                            .with_span(func.span)
+                            .with_notes(Note::solution(
+                                "using the \"get_secret\" function instead",
+                                vec![format!("get_secret(\"{}\")", secret_key)],
+                            )),
+                    )),
+                }
+            }
+        }
+
+        if func.ident == "set_metadata_field" {
+            if let Ok(key) = get_metadata_key(args) {
+                match key {
+                    MetadataKey::Query(target_path) => self.diagnostics.push(Box::new(
+                        DeprecationWarning::new("the \"set_metadata_field\" function")
+                            .with_span(func.span)
+                            .with_notes(Note::solution(
+                                "using the metadata path syntax instead",
+                                vec![format!("{} = {}", target_path, args.required_expr("value"))],
+                            )),
+                    )),
+                    MetadataKey::Legacy(secret_key) => self.diagnostics.push(Box::new(
+                        DeprecationWarning::new("the \"set_metadata_field\" function")
+                            .with_span(func.span)
+                            .with_notes(Note::solution(
+                                "using the \"set_secret\" function instead",
+                                vec![format!(
+                                    "set_secret(\"{}\", {})",
+                                    secret_key,
+                                    args.required_expr("value")
+                                )],
+                            )),
+                    )),
+                }
+            }
+        }
+
+        if func.ident == "remove_metadata_field" {
+            if let Ok(key) = get_metadata_key(args) {
+                match key {
+                    MetadataKey::Query(target_path) => self.diagnostics.push(Box::new(
+                        DeprecationWarning::new("the \"remove_metadata_field\" function")
+                            .with_span(func.span)
+                            .with_notes(Note::solution(
+                                "using the metadata path syntax instead",
+                                vec![format!("del({})", target_path)],
+                            )),
+                    )),
+                    MetadataKey::Legacy(secret_key) => self.diagnostics.push(Box::new(
+                        DeprecationWarning::new("the \"remove_metadata_field\" function")
+                            .with_span(func.span)
+                            .with_notes(Note::solution(
+                                "using the \"remove_secret\" function instead",
+                                vec![format!("remove_secret(\"{}\")", secret_key)],
+                            )),
+                    )),
+                }
+            }
+        }
+    }
+
+    #[cfg(feature = "expr-function_call")]
     fn compile_function_call(
         &mut self,
         node: Node<ast::FunctionCall>,
@@ -626,10 +704,10 @@ impl<'a> Compiler<'a> {
         //
         // See: https://github.com/vectordotdev/vector/issues/12547
         if ident.as_deref() == "get" {
-            self.external_queries.push(TargetPath::event_root());
+            self.external_queries.push(OwnedTargetPath::event_root());
         }
 
-        let arguments = arguments
+        let arguments: Vec<_> = arguments
             .into_iter()
             .map(|node| {
                 Some(Node::new(
@@ -666,7 +744,7 @@ impl<'a> Compiler<'a> {
 
         // First, we create a new function-call builder to validate the
         // expression.
-        let function = function_call::Builder::new(
+        let function_info = function_call::Builder::new(
             call_span,
             ident,
             abort_on_error,
@@ -692,6 +770,8 @@ impl<'a> Compiler<'a> {
                 }
             };
 
+            let arg_list = builder.get_arg_list().clone();
+
             builder
                 .compile(
                     &state_before_function,
@@ -703,14 +783,17 @@ impl<'a> Compiler<'a> {
                 )
                 .map_err(|err| self.diagnostics.push(Box::new(err)))
                 .ok()
+                .map(|func| (arg_list, func))
         });
 
-        if let Some(function) = &function {
+        if let Some((args, function)) = &function_info {
+            self.check_metadata_function_deprecations(function, args);
+
             // Update the final state using the function expression to make sure it's accurate.
             *state = function.type_info(&original_state).state;
         }
 
-        function
+        function_info.map(|info| info.1)
     }
 
     #[cfg(feature = "expr-function_call")]
@@ -753,7 +836,7 @@ impl<'a> Compiler<'a> {
 
         if self
             .skip_missing_query_target
-            .contains(&(QueryTarget::Internal(ident.clone()), OwnedPath::root()))
+            .contains(&(QueryTarget::Internal(ident.clone()), OwnedValuePath::root()))
         {
             return None;
         }
@@ -838,15 +921,52 @@ impl<'a> Compiler<'a> {
             }
             ast::AssignmentTarget::Internal(ident, path) => (
                 QueryTarget::Internal(ident.clone()),
-                path.clone().unwrap_or_else(OwnedPath::root),
+                path.clone().unwrap_or_else(OwnedValuePath::root),
             ),
             ast::AssignmentTarget::External(path) => {
                 let prefix = path.as_ref().map_or(PathPrefix::Event, |x| x.prefix);
-                let path = path.clone().map_or_else(OwnedPath::root, |x| x.path);
+                let path = path.clone().map_or_else(OwnedValuePath::root, |x| x.path);
                 (QueryTarget::External(prefix), path)
             }
         };
 
         self.skip_missing_query_target.push(query);
     }
+}
+
+// Everything below is temporarily needed for deprecation warnings for the metadata functions
+
+const LEGACY_METADATA_KEYS: [&str; 2] = ["datadog_api_key", "splunk_hec_token"];
+
+pub(crate) fn legacy_keys() -> Vec<Value> {
+    LEGACY_METADATA_KEYS
+        .iter()
+        .map(|key| (*key).into())
+        .collect()
+}
+
+#[allow(clippy::large_enum_variant)]
+#[derive(Clone, Debug)]
+enum MetadataKey {
+    Legacy(String),
+    Query(OwnedTargetPath),
+}
+
+fn get_metadata_key(
+    arguments: &ArgumentList,
+) -> std::result::Result<MetadataKey, Box<dyn DiagnosticMessage>> {
+    if let Ok(Some(query)) = arguments.optional_query("key") {
+        if let Target::External(_) = query.target() {
+            // for backwards compatibility reasons, the query is forced to point at metadata
+            let target_path = OwnedTargetPath::metadata(query.path().clone());
+            return Ok(MetadataKey::Query(target_path));
+        }
+    }
+
+    let key = arguments.required_enum("key", &legacy_keys())?;
+    Ok(MetadataKey::Legacy(
+        key.try_bytes_utf8_lossy()
+            .expect("key not bytes")
+            .to_string(),
+    ))
 }

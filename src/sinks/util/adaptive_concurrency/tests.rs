@@ -21,16 +21,17 @@ use futures::{
 };
 use rand::{thread_rng, Rng};
 use rand_distr::Exp1;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use snafu::Snafu;
 use tokio::time::{self, sleep, Duration, Instant};
 use tower::Service;
+use vector_config::configurable_component;
 
 use super::controller::ControllerStatistics;
 use crate::{
     config::{self, AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     event::{metric::MetricValue, Event},
-    metrics::{self},
+    metrics,
     sinks::{
         util::{
             retries::RetryLogic, BatchSettings, Concurrency, EncodedEvent, EncodedLength,
@@ -45,36 +46,38 @@ use crate::{
     },
 };
 
-#[derive(Copy, Clone, Debug, Derivative, Deserialize, Serialize)]
+/// Request handling action when the request limit has been exceeded.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(rename_all = "lowercase")]
 enum Action {
     #[derivative(Default)]
-    // Above the given limit, additional requests will return with an
-    // error.
+    /// Additional requests will return with an error.
     Defer,
-    // Above the given limit, additional requests will be silently
-    // dropped.
+
+    /// Additional requests will be silently dropped.
     Drop,
 }
 
-#[derive(Copy, Clone, Debug, Default, Deserialize, Serialize)]
+/// Limit parameters for sink's ARC behavior.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default)]
 struct LimitParams {
-    // The scale is the amount a request's delay increases at higher
-    // levels of the variable.
+    /// The amount a request's delay increases at higher levels of the variable.
     #[serde(default)]
     scale: f64,
 
-    // The knee is the point above which a request's delay increases at
-    // an exponential scale rather than a linear scale.
+    /// The point above which a request's delay increases at an exponential scale rather than a linear scale.
     knee_start: Option<usize>,
 
+    /// The exponent value when the request's delay increase is in the exponential region.
     knee_exp: Option<f64>,
 
-    // The limit is the level above which more requests will be denied.
+    /// The level above which more requests will be denied.
     limit: Option<usize>,
 
-    // The action specifies how over-limit requests will be denied.
+    #[configurable(derived)]
     #[serde(default)]
     action: Action,
 }
@@ -100,31 +103,36 @@ impl LimitParams {
     }
 }
 
-#[derive(Copy, Clone, Debug, Default, Deserialize, Serialize)]
+/// Test parameters for the sink's ARC behavior.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default)]
 struct TestParams {
-    // The number of requests to issue.
+    /// The number of requests to issue.
     requests: usize,
 
-    // The time interval between requests.
+    /// The time interval between requests.
     #[serde(default = "default_interval")]
     interval: f64,
 
-    // The delay is the base time every request takes return.
+    /// The minimum duration that a request takes to return.
     delay: f64,
 
-    // The jitter is the amount of per-request response time randomness,
-    // as a fraction of `delay`. The average response time will be
-    // `delay * (1 + jitter)` and will have an exponential distribution
-    // with λ=1.
+    /// The amount of per-request response time randomness, as a fraction of `delay`.
+    ///
+    /// The average response time will be `delay * (1 + jitter)` and will have an exponential
+    /// distribution with λ=1.
     #[serde(default)]
     jitter: f64,
 
+    #[configurable(derived)]
     #[serde(default)]
     concurrency_limit_params: LimitParams,
 
+    #[configurable(derived)]
     #[serde(default)]
     rate: LimitParams,
 
+    #[configurable(derived)]
     #[serde(default = "default_concurrency")]
     concurrency: Concurrency,
 }
@@ -137,9 +145,14 @@ const fn default_concurrency() -> Concurrency {
     Concurrency::Adaptive
 }
 
-#[derive(Debug, Serialize)]
-struct TestConfig {
+/// Configuration for the `test_arc` sink.
+#[configurable_component(sink("test_arc"))]
+#[derive(Clone, Debug, Default)]
+pub struct TestConfig {
+    #[configurable(derived)]
     request: TowerRequestConfig,
+
+    #[configurable(derived)]
     params: TestParams,
 
     // The statistics collected by running a test must be local to that
@@ -147,13 +160,15 @@ struct TestConfig {
     // are created by `Default` and may be cloned to retain a handle.
     #[serde(skip)]
     control: Arc<Mutex<TestController>>,
+
     // Oh, the horror!
     #[serde(skip)]
     controller_stats: Arc<Mutex<Arc<Mutex<ControllerStatistics>>>>,
 }
 
+impl_generate_config_from_default!(TestConfig);
+
 #[async_trait::async_trait]
-#[typetag::serialize(name = "test")]
 impl SinkConfig for TestConfig {
     async fn build(&self, _cx: SinkContext) -> Result<(VectorSink, Healthcheck), crate::Error> {
         let mut batch_settings = BatchSettings::default();
@@ -187,14 +202,6 @@ impl SinkConfig for TestConfig {
 
     fn input(&self) -> Input {
         Input::all()
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "test"
-    }
-
-    fn typetag_deserialize(&self) {
-        unimplemented!("not intended for use in real configs")
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -311,7 +318,7 @@ impl RetryLogic for TestRetryLogic {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct TestController {
     todo: usize,
     send_done: Option<oneshot::Sender<()>>,

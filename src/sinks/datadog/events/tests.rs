@@ -2,8 +2,7 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 use futures::{
-    //channel::mpsc::{Receiver, TryRecvError},
-    channel::mpsc::Receiver,
+    channel::mpsc::{Receiver, TryRecvError},
     stream::Stream,
     StreamExt,
 };
@@ -18,7 +17,7 @@ use crate::{
     event::EventArray,
     sinks::util::test::{build_test_server_status, load_sink},
     test_util::{
-        components::{self, HTTP_SINK_TAGS},
+        components::{self, COMPONENT_ERROR_TAGS, HTTP_SINK_TAGS},
         next_addr, random_lines_with_stream,
     },
 };
@@ -64,13 +63,11 @@ async fn start_test(
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
     let (expected, events) = random_events_with_stream(100, 10, Some(batch));
 
-    components::run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
-
-    //components::init_test();
-    //sink.run(events).await.unwrap();
-    //if batch_status == BatchStatus::Delivered {
-    //    components::SINK_TESTS.assert(&HTTP_SINK_TAGS);
-    //}
+    if batch_status == BatchStatus::Delivered {
+        components::run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
+    } else {
+        components::run_and_assert_sink_error(sink, events, &COMPONENT_ERROR_TAGS).await;
+    }
 
     assert_eq!(receiver.try_recv(), Ok(batch_status));
 
@@ -103,15 +100,12 @@ async fn smoke() {
     }
 }
 
-// TODO use error test helper...
+#[tokio::test]
+async fn handles_failure() {
+    let (_expected, mut rx) = start_test(StatusCode::FORBIDDEN, BatchStatus::Rejected).await;
 
-// #[tokio::test]
-// async fn handles_failure() {
-//
-//     let (_expected, mut rx) = start_test(StatusCode::FORBIDDEN, BatchStatus::Rejected).await;
-//
-//     assert!(matches!(rx.try_next(), Err(TryRecvError { .. })));
-// }
+    assert!(matches!(rx.try_next(), Err(TryRecvError { .. })));
+}
 
 #[tokio::test]
 async fn api_key_in_metadata() {

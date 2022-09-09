@@ -3,8 +3,11 @@ use std::borrow::Cow;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
-use super::prelude::{error_stage, error_type};
-use crate::{emit, internal_events::ComponentEventsDropped};
+use crate::{
+    emit,
+    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
+};
+use vector_common::internal_event::{error_stage, error_type};
 
 fn truncate_string_at(s: &str, maxlen: usize) -> Cow<str> {
     let ellipsis: &str = "[...]";
@@ -71,11 +74,7 @@ impl InternalEvent for ParserMissingFieldError<'_> {
         // deprecated
         counter!("processing_errors_total", 1, "error_type" => "missing_field");
 
-        emit!(ComponentEventsDropped {
-            count: 1,
-            intentional: false,
-            reason
-        });
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }
 

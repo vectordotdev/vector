@@ -8,7 +8,6 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
 use vector_common::EventDataEq;
 use vector_config::configurable_component;
 #[cfg(feature = "vrl")]
@@ -33,7 +32,9 @@ pub use self::value::*;
 
 pub type MetricTags = BTreeMap<String, String>;
 
-#[derive(Clone, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
+/// A metric.
+#[configurable_component]
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct Metric {
     #[serde(flatten)]
     pub(super) series: MetricSeries,
@@ -41,7 +42,8 @@ pub struct Metric {
     #[serde(flatten)]
     pub(super) data: MetricData,
 
-    #[serde(skip_serializing, default = "EventMetadata::default")]
+    /// Internal event metadata.
+    #[serde(skip, default = "EventMetadata::default")]
     metadata: EventMetadata,
 }
 

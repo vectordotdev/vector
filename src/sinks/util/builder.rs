@@ -121,7 +121,7 @@ pub trait SinkBuilderExt: Stream {
     ///
     /// As an example, the normal `request_builder` doesn't allow for a batch of input events to be
     /// split up: all events must be split at the beginning, encoded separately (and all together),
-    /// and the nreassembled into the request.  If the encoding of these events caused a payload to
+    /// and then reassembled into the request.  If the encoding of these events caused a payload to
     /// be generated that was, say, too large, you would have to back out the operation entirely by
     /// failing the batch.
     ///

@@ -1,12 +1,15 @@
-use std::borrow::Cow;
-
-use bytes::Bytes;
 use metrics::{counter, gauge};
+use std::borrow::Cow;
 use vector_core::internal_event::InternalEvent;
+
+use crate::{
+    emit,
+    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
+};
 
 #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
 pub use self::source::*;
-use super::prelude::{error_stage, error_type};
+use vector_common::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct FileOpen {
@@ -42,17 +45,19 @@ impl InternalEvent for FileBytesSent<'_> {
 }
 
 #[derive(Debug)]
-pub struct FileIoError<'a> {
+pub struct FileIoError<'a, P> {
     pub error: std::io::Error,
     pub code: &'static str,
     pub message: &'static str,
-    pub path: Option<&'a Bytes>,
+    pub path: &'a P,
+    pub dropped_events: u64,
 }
 
-impl<'a> InternalEvent for FileIoError<'a> {
+impl<'a, P: std::fmt::Debug> InternalEvent for FileIoError<'a, P> {
     fn emit(self) {
         error!(
             message = %self.message,
+            path = ?self.path,
             error = %self.error,
             error_code = %self.code,
             error_type = error_type::IO_FAILED,
@@ -65,6 +70,13 @@ impl<'a> InternalEvent for FileIoError<'a> {
             "error_type" => error_type::IO_FAILED,
             "stage" => error_stage::SENDING,
         );
+
+        if self.dropped_events > 0 {
+            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                count: self.dropped_events,
+                reason: self.message,
+            });
+        }
     }
 }
 
@@ -77,7 +89,7 @@ mod source {
 
     use super::{FileOpen, InternalEvent};
     use crate::emit;
-    use crate::internal_events::prelude::{error_stage, error_type};
+    use vector_common::internal_event::{error_stage, error_type};
 
     #[derive(Debug)]
     pub struct FileBytesReceived<'a> {

@@ -1,6 +1,6 @@
 //! All types related to inserting one [`Kind`] into another.
 
-use lookup::lookup_v2::{BorrowedSegment, Path};
+use lookup::lookup_v2::{BorrowedSegment, ValuePath};
 
 use crate::kind::Collection;
 use crate::Kind;
@@ -10,7 +10,7 @@ impl Kind {
     /// Insert the `Kind` at the given `path` within `self`.
     /// This has the same behavior as `Value::insert`.
     #[allow(clippy::needless_pass_by_value)] // only reference types implement Path
-    pub fn insert<'a>(&'a mut self, path: impl Path<'a>, kind: Self) {
+    pub fn insert<'a>(&'a mut self, path: impl ValuePath<'a>, kind: Self) {
         self.insert_recursive(path.segment_iter(), kind.upgrade_undefined());
     }
 
@@ -18,7 +18,7 @@ impl Kind {
     /// There is a subtle difference
     /// between this and `Kind::insert` where this function does _not_ convert undefined to null.
     #[allow(clippy::needless_pass_by_value)] // only reference types implement Path
-    pub fn set_at_path<'a>(&'a mut self, path: impl Path<'a>, kind: Self) {
+    pub fn set_at_path<'a>(&'a mut self, path: impl ValuePath<'a>, kind: Self) {
         self.insert_recursive(path.segment_iter(), kind);
     }
 
@@ -230,8 +230,8 @@ impl Kind {
 
 #[cfg(test)]
 mod tests {
-    use lookup::lookup_v2::{parse_path, OwnedPath};
-    use lookup::owned_path;
+    use lookup::lookup_v2::{parse_value_path, OwnedValuePath};
+    use lookup::owned_value_path;
     use std::collections::BTreeMap;
 
     use super::*;
@@ -242,7 +242,7 @@ mod tests {
     fn test_insert() {
         struct TestCase {
             this: Kind,
-            path: OwnedPath,
+            path: OwnedValuePath,
             kind: Kind,
             expected: Kind,
         }
@@ -260,7 +260,7 @@ mod tests {
                 "root insert",
                 TestCase {
                     this: Kind::bytes(),
-                    path: owned_path!(),
+                    path: owned_value_path!(),
                     kind: Kind::integer(),
                     expected: Kind::integer(),
                 },
@@ -269,7 +269,7 @@ mod tests {
                 "root insert object",
                 TestCase {
                     this: Kind::bytes(),
-                    path: owned_path!(),
+                    path: owned_value_path!(),
                     kind: Kind::object(BTreeMap::from([("a".into(), Kind::integer())])),
                     expected: Kind::object(BTreeMap::from([("a".into(), Kind::integer())])),
                 },
@@ -278,7 +278,7 @@ mod tests {
                 "empty object insert field",
                 TestCase {
                     this: Kind::object(Collection::empty()),
-                    path: owned_path!("a"),
+                    path: owned_value_path!("a"),
                     kind: Kind::integer(),
                     expected: Kind::object(BTreeMap::from([("a".into(), Kind::integer())])),
                 },
@@ -287,7 +287,7 @@ mod tests {
                 "non-empty object insert field",
                 TestCase {
                     this: Kind::object(BTreeMap::from([("b".into(), Kind::bytes())])),
-                    path: owned_path!("a"),
+                    path: owned_value_path!("a"),
                     kind: Kind::integer(),
                     expected: Kind::object(BTreeMap::from([
                         ("a".into(), Kind::integer()),
@@ -299,7 +299,7 @@ mod tests {
                 "object overwrite field",
                 TestCase {
                     this: Kind::object(BTreeMap::from([("a".into(), Kind::bytes())])),
-                    path: owned_path!("a"),
+                    path: owned_value_path!("a"),
                     kind: Kind::integer(),
                     expected: Kind::object(BTreeMap::from([("a".into(), Kind::integer())])),
                 },
@@ -308,7 +308,7 @@ mod tests {
                 "set array index on empty array",
                 TestCase {
                     this: Kind::array(Collection::empty()),
-                    path: owned_path!(0),
+                    path: owned_value_path!(0),
                     kind: Kind::integer(),
                     expected: Kind::array(BTreeMap::from([(0.into(), Kind::integer())])),
                 },
@@ -317,7 +317,7 @@ mod tests {
                 "set array index past the end without unknown",
                 TestCase {
                     this: Kind::array(Collection::empty()),
-                    path: owned_path!(1),
+                    path: owned_value_path!(1),
                     kind: Kind::integer(),
                     expected: Kind::array(BTreeMap::from([
                         (0.into(), Kind::null()),
@@ -329,7 +329,7 @@ mod tests {
                 "set array index past the end with unknown",
                 TestCase {
                     this: Kind::array(Collection::empty().with_unknown(Kind::integer())),
-                    path: owned_path!(1),
+                    path: owned_value_path!(1),
                     kind: Kind::bytes(),
                     expected: Kind::array(
                         Collection::from(BTreeMap::from([
@@ -344,7 +344,7 @@ mod tests {
                 "set array index past the end with unknown, nested",
                 TestCase {
                     this: Kind::array(Collection::empty().with_unknown(Kind::integer())),
-                    path: owned_path!(1, "foo"),
+                    path: owned_value_path!(1, "foo"),
                     kind: Kind::bytes(),
                     expected: Kind::array(
                         Collection::from(BTreeMap::from([
@@ -362,7 +362,7 @@ mod tests {
                 "set array index past the end with null unknown",
                 TestCase {
                     this: Kind::array(Collection::empty().with_unknown(Kind::null())),
-                    path: owned_path!(1),
+                    path: owned_value_path!(1),
                     kind: Kind::integer(),
                     expected: Kind::array(
                         Collection::from(BTreeMap::from([
@@ -377,7 +377,7 @@ mod tests {
                 "set field on non-object",
                 TestCase {
                     this: Kind::integer(),
-                    path: owned_path!("a"),
+                    path: owned_value_path!("a"),
                     kind: Kind::integer(),
                     expected: Kind::object(BTreeMap::from([("a".into(), Kind::integer())])),
                 },
@@ -386,7 +386,7 @@ mod tests {
                 "set array index on non-array",
                 TestCase {
                     this: Kind::integer(),
-                    path: owned_path!(0),
+                    path: owned_value_path!(0),
                     kind: Kind::integer(),
                     expected: Kind::array(BTreeMap::from([(0.into(), Kind::integer())])),
                 },
@@ -398,7 +398,7 @@ mod tests {
                         (0.into(), Kind::integer()),
                         (1.into(), Kind::integer()),
                     ])),
-                    path: owned_path!(-1),
+                    path: owned_value_path!(-1),
                     kind: Kind::bytes(),
                     expected: Kind::array(BTreeMap::from([
                         (0.into(), Kind::integer()),
@@ -410,7 +410,7 @@ mod tests {
                 "set negative array index past the end (no unknown)",
                 TestCase {
                     this: Kind::array(BTreeMap::from([(0.into(), Kind::integer())])),
-                    path: owned_path!(-2),
+                    path: owned_value_path!(-2),
                     kind: Kind::bytes(),
                     expected: Kind::array(BTreeMap::from([
                         (0.into(), Kind::bytes()),
@@ -425,7 +425,7 @@ mod tests {
                         Collection::from(BTreeMap::from([(0.into(), Kind::integer())]))
                             .with_unknown(Kind::integer()),
                     ),
-                    path: owned_path!(-1),
+                    path: owned_value_path!(-1),
                     kind: Kind::bytes(),
                     expected: Kind::array(
                         Collection::from(BTreeMap::from([(0.into(), Kind::bytes().or_integer())]))
@@ -437,7 +437,7 @@ mod tests {
                 "set negative array index empty unknown array",
                 TestCase {
                     this: Kind::array(Collection::empty().with_unknown(Kind::integer())),
-                    path: owned_path!(-1),
+                    path: owned_value_path!(-1),
                     kind: Kind::bytes(),
                     expected: Kind::array(
                         Collection::from(BTreeMap::from([
@@ -452,7 +452,7 @@ mod tests {
                 "set negative array index empty unknown array (2)",
                 TestCase {
                     this: Kind::array(Collection::empty().with_unknown(Kind::integer())),
-                    path: owned_path!(-2),
+                    path: owned_value_path!(-2),
                     kind: Kind::bytes(),
                     expected: Kind::array(
                         Collection::from(BTreeMap::from([
@@ -477,7 +477,7 @@ mod tests {
                         ]))
                         .with_unknown(Kind::integer()),
                     ),
-                    path: owned_path!(-3),
+                    path: owned_value_path!(-3),
                     kind: Kind::bytes(),
                     expected: Kind::array(
                         Collection::from(BTreeMap::from([
@@ -503,7 +503,7 @@ mod tests {
                         ]))
                         .with_unknown(Kind::integer()),
                     ),
-                    path: owned_path!(-3),
+                    path: owned_value_path!(-3),
                     kind: Kind::bytes(),
                     expected: Kind::array(
                         Collection::from(BTreeMap::from([
@@ -519,7 +519,7 @@ mod tests {
                 "set negative array index on non-array",
                 TestCase {
                     this: Kind::integer(),
-                    path: owned_path!(-3),
+                    path: owned_value_path!(-3),
                     kind: Kind::bytes(),
                     expected: Kind::array(Collection::from(BTreeMap::from([
                         (0.into(), Kind::bytes()),
@@ -532,7 +532,7 @@ mod tests {
                 "set nested negative array index on unknown array",
                 TestCase {
                     this: Kind::array(Collection::empty().with_unknown(Kind::integer())),
-                    path: owned_path!(-3, "foo"),
+                    path: owned_value_path!(-3, "foo"),
                     kind: Kind::bytes(),
                     expected: Kind::array(
                         Collection::from(BTreeMap::from([
@@ -569,7 +569,7 @@ mod tests {
                         Collection::from(BTreeMap::from([(0.into(), Kind::integer())]))
                             .with_unknown(Kind::integer()),
                     ),
-                    path: owned_path!(-1, "foo"),
+                    path: owned_value_path!(-1, "foo"),
                     kind: Kind::bytes(),
                     expected: Kind::array(
                         Collection::from(BTreeMap::from([(
@@ -589,7 +589,7 @@ mod tests {
                 "coalesce empty object",
                 TestCase {
                     this: Kind::object(Collection::empty()),
-                    path: parse_path(".(a|b)"),
+                    path: parse_value_path(".(a|b)"),
                     kind: Kind::bytes(),
                     expected: Kind::object(Collection::from(BTreeMap::from([(
                         "b".into(),
@@ -604,7 +604,7 @@ mod tests {
                         "a".into(),
                         Kind::integer(),
                     )]))),
-                    path: parse_path(".(a|b)"),
+                    path: parse_value_path(".(a|b)"),
                     kind: Kind::bytes(),
                     expected: Kind::object(Collection::from(BTreeMap::from([(
                         "a".into(),
@@ -619,7 +619,7 @@ mod tests {
                         "b".into(),
                         Kind::integer(),
                     )]))),
-                    path: parse_path(".(a|b)"),
+                    path: parse_value_path(".(a|b)"),
                     kind: Kind::bytes(),
                     expected: Kind::object(Collection::from(BTreeMap::from([(
                         "b".into(),
@@ -634,7 +634,7 @@ mod tests {
                         ("a".into(), Kind::integer()),
                         ("b".into(), Kind::integer()),
                     ]))),
-                    path: parse_path(".(a|b)"),
+                    path: parse_value_path(".(a|b)"),
                     kind: Kind::bytes(),
                     expected: Kind::object(Collection::from(BTreeMap::from([
                         ("a".into(), Kind::bytes()),
@@ -646,7 +646,7 @@ mod tests {
                 "coalesce nested",
                 TestCase {
                     this: Kind::object(Collection::from(BTreeMap::from([]))),
-                    path: parse_path(".(a|b).x"),
+                    path: parse_value_path(".(a|b).x"),
                     kind: Kind::bytes(),
                     expected: Kind::object(Collection::from(BTreeMap::from([(
                         "b".into(),
@@ -658,7 +658,7 @@ mod tests {
                 "insert into never",
                 TestCase {
                     this: Kind::never(),
-                    path: parse_path(".x"),
+                    path: parse_value_path(".x"),
                     kind: Kind::bytes(),
                     expected: Kind::never(),
                 },
@@ -667,7 +667,7 @@ mod tests {
                 "insert never",
                 TestCase {
                     this: Kind::object(Collection::empty()),
-                    path: parse_path(".x"),
+                    path: parse_value_path(".x"),
                     kind: Kind::never(),
                     expected: Kind::never(),
                 },
@@ -676,7 +676,7 @@ mod tests {
                 "insert undefined",
                 TestCase {
                     this: Kind::object(Collection::empty()),
-                    path: parse_path(".x"),
+                    path: parse_value_path(".x"),
                     kind: Kind::undefined(),
                     expected: Kind::object(BTreeMap::from([("x".into(), Kind::null())])),
                 },
@@ -685,7 +685,7 @@ mod tests {
                 "array insert into any",
                 TestCase {
                     this: Kind::any(),
-                    path: owned_path!(2),
+                    path: owned_value_path!(2),
                     kind: Kind::bytes(),
                     expected: Kind::array(
                         Collection::from(BTreeMap::from([
@@ -701,7 +701,7 @@ mod tests {
                 "object insert into any",
                 TestCase {
                     this: Kind::any(),
-                    path: owned_path!("b"),
+                    path: owned_value_path!("b"),
                     kind: Kind::bytes(),
                     expected: Kind::object(
                         Collection::from(BTreeMap::from([("b".into(), Kind::bytes())]))
@@ -713,7 +713,7 @@ mod tests {
                 "nested object/array insert into any",
                 TestCase {
                     this: Kind::any(),
-                    path: owned_path!("x", 2),
+                    path: owned_value_path!("x", 2),
                     kind: Kind::bytes(),
                     expected: Kind::object(
                         Collection::from(BTreeMap::from([(
@@ -735,7 +735,7 @@ mod tests {
                 "nested array/array insert into any",
                 TestCase {
                     this: Kind::any(),
-                    path: owned_path!(0, 0),
+                    path: owned_value_path!(0, 0),
                     kind: Kind::bytes(),
                     expected: Kind::array(
                         Collection::from(BTreeMap::from([(

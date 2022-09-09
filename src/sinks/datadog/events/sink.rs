@@ -8,7 +8,7 @@ use vector_core::stream::DriverResponse;
 use crate::{
     config::log_schema,
     event::Event,
-    internal_events::ParserMissingFieldError,
+    internal_events::{ParserMissingFieldError, SinkRequestBuildError},
     sinks::{
         datadog::events::request_builder::{DatadogEventsRequest, DatadogEventsRequestBuilder},
         util::{SinkBuilderExt, StreamSink},
@@ -34,9 +34,11 @@ where
             .request_builder(concurrency_limit, DatadogEventsRequestBuilder::new())
             .filter_map(|request| async move {
                 match request {
-                    Err(e) => {
-                        // TODO emit SinkRequestBuildError
-                        error!("Failed to build DatadogEvents request: {:?}.", e);
+                    Err(error) => {
+                        emit!(SinkRequestBuildError {
+                            name: super::NAME,
+                            error
+                        });
                         None
                     }
                     Ok(req) => Some(req),

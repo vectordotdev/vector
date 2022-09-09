@@ -111,12 +111,12 @@ pub(crate) struct DelFn {
 impl DelFn {
     #[cfg(test)]
     fn new(path: &str) -> Self {
-        use lookup_lib::{lookup_v2::parse_path, PathPrefix};
+        use lookup_lib::{lookup_v2::parse_value_path, PathPrefix};
 
         Self {
             query: expression::Query::new(
                 expression::Target::External(PathPrefix::Event),
-                parse_path(path),
+                parse_value_path(path),
             ),
         }
     }
@@ -147,7 +147,6 @@ impl Expression for DelFn {
         let return_type = self.query.apply_type_info(&mut state);
 
         self.query.delete_type_def(&mut state.external);
-
         TypeInfo::new(state, return_type)
     }
 }

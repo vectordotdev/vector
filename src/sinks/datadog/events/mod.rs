@@ -8,8 +8,4 @@ mod tests;
 
 pub use self::config::DatadogEventsConfig;
 
-use crate::config::SinkDescription;
-
-inventory::submit! {
-    SinkDescription::new::<DatadogEventsConfig>("datadog_events")
-}
+const NAME: &str = "datadog_events";
