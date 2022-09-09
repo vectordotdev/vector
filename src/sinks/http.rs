@@ -320,7 +320,6 @@ impl util::http::HttpSink for HttpSink {
 
                 let buffer = BytesMut::new();
                 let mut w = GzEncoder::new(buffer.writer(), level.as_flate2());
-                // TODO replace with write_all from dd logs PR
                 w.write_all(&body).expect("Writing to Vec can't fail");
                 body = w.finish().expect("Writing to Vec can't fail").into_inner();
             }
@@ -329,7 +328,6 @@ impl util::http::HttpSink for HttpSink {
 
                 let buffer = BytesMut::new();
                 let mut w = ZlibEncoder::new(buffer.writer(), level.as_flate2());
-                // TODO replace with write_all from dd logs PR
                 w.write_all(&body).expect("Writing to Vec can't fail");
                 body = w.finish().expect("Writing to Vec can't fail").into_inner();
             }
@@ -410,7 +408,11 @@ mod tests {
             http::HttpSink,
             test::{build_test_server, build_test_server_generic, build_test_server_status},
         },
-        test_util::{components, components::HTTP_SINK_TAGS, next_addr, random_lines_with_stream},
+        test_util::{
+            components,
+            components::{COMPONENT_ERROR_TAGS, HTTP_SINK_TAGS},
+            next_addr, random_lines_with_stream,
+        },
     };
 
     #[test]
@@ -657,27 +659,28 @@ mod tests {
 
     #[tokio::test]
     async fn fails_on_permanent_error() {
-        // TODO use assert_sink_error test helper
+        components::assert_sink_error(&COMPONENT_ERROR_TAGS, async {
+            let num_lines = 1000;
 
-        let num_lines = 1000;
+            let (in_addr, sink) = build_sink("").await;
 
-        let (in_addr, sink) = build_sink("").await;
+            let (rx, trigger, server) = build_test_server_status(in_addr, StatusCode::FORBIDDEN);
 
-        let (rx, trigger, server) = build_test_server_status(in_addr, StatusCode::FORBIDDEN);
+            let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+            let (_input_lines, events) = random_lines_with_stream(100, num_lines, Some(batch));
+            let pump = sink.run(events);
 
-        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-        let (_input_lines, events) = random_lines_with_stream(100, num_lines, Some(batch));
-        let pump = sink.run(events);
+            tokio::spawn(server);
 
-        tokio::spawn(server);
+            pump.await.unwrap();
+            drop(trigger);
 
-        pump.await.unwrap();
-        drop(trigger);
+            assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
 
-        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
-
-        let output_lines = get_received(rx, |_| unreachable!("There should be no lines")).await;
-        assert!(output_lines.is_empty());
+            let output_lines = get_received(rx, |_| unreachable!("There should be no lines")).await;
+            assert!(output_lines.is_empty());
+        })
+        .await;
     }
 
     #[tokio::test]
