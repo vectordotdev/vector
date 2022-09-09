@@ -380,8 +380,9 @@ mod integration_tests {
         line_agg,
         sources::util::MultilineConfig,
         test_util::{
-            collect_n, components::assert_source_compliance, lines_from_gzip_file, random_lines,
-            trace_init,
+            collect_n,
+            components::{assert_source_compliance, SOURCE_TAGS},
+            lines_from_gzip_file, random_lines, trace_init,
         },
         SourceSender,
     };
@@ -597,7 +598,7 @@ mod integration_tests {
         expected_lines: Vec<String>,
         status: EventStatus,
     ) {
-        assert_source_compliance(&["protocol"], async move {
+        assert_source_compliance(&SOURCE_TAGS, async move {
             let key = key.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
 
             let s3 = s3_client().await;
