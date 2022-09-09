@@ -40,7 +40,7 @@ use crate::{
 };
 use lookup::event_path;
 
-static SUPPORTED_S3S_EVENT_VERSION: Lazy<semver::VersionReq> =
+static SUPPORTED_S3_EVENT_VERSION: Lazy<semver::VersionReq> =
     Lazy::new(|| semver::VersionReq::parse("~2").unwrap());
 
 /// SQS configuration options.
@@ -399,7 +399,7 @@ impl IngestorProcess {
         s3_event: S3EventRecord,
     ) -> Result<(), ProcessingError> {
         let event_version: semver::Version = s3_event.event_version.clone().into();
-        if !SUPPORTED_S3S_EVENT_VERSION.matches(&event_version) {
+        if !SUPPORTED_S3_EVENT_VERSION.matches(&event_version) {
             return Err(ProcessingError::UnsupportedS3EventVersion {
                 version: event_version.clone(),
             });
