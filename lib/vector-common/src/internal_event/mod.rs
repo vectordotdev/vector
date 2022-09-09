@@ -2,6 +2,8 @@ mod bytes_received;
 mod bytes_sent;
 mod events_received;
 mod events_sent;
+mod prelude;
+pub mod service;
 
 pub use metrics::SharedString;
 
@@ -9,6 +11,7 @@ pub use bytes_received::BytesReceived;
 pub use bytes_sent::BytesSent;
 pub use events_received::EventsReceived;
 pub use events_sent::{EventsSent, DEFAULT_OUTPUT};
+pub use prelude::{error_stage, error_type};
 
 pub trait InternalEvent: Sized {
     fn emit(self);

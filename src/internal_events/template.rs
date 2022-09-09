@@ -5,7 +5,7 @@ use crate::{
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
-use super::prelude::{error_stage, error_type};
+use vector_common::internal_event::{error_stage, error_type};
 
 pub struct TemplateRenderingError<'a> {
     pub field: Option<&'a str>,

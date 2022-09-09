@@ -1,8 +1,8 @@
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
-use super::prelude::{error_stage, error_type};
 use crate::sources::fluent::DecodeError;
+use vector_common::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct FluentMessageReceived {
