@@ -3,7 +3,7 @@ use vector_core::internal_event::InternalEvent;
 
 use vector_common::internal_event::{error_stage, error_type};
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 #[allow(dead_code)] // some features only use some variants
 pub enum SocketMode {
     Tcp,
