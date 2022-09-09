@@ -6,9 +6,7 @@ use crate::{
     config::{log_schema, Output, SourceConfig, SourceContext},
     event::{BatchNotifier, BatchStatus},
     internal_events::{
-        source::{
-            AmqpAckError, AmqpBytesReceived, AmqpEventError, AmqpRejectError,
-        },
+        source::{AmqpAckError, AmqpBytesReceived, AmqpEventError, AmqpRejectError},
         StreamClosedError,
     },
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
