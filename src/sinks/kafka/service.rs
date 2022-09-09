@@ -98,7 +98,7 @@ impl Service<KafkaRequest> for KafkaService {
                 record = record.headers(headers);
             }
 
-            //rdkafka will internally retry forever if the queue is full
+            // rdkafka will internally retry forever if the queue is full
             match this.kafka_producer.send(record, Timeout::Never).await {
                 Ok((_partition, _offset)) => Ok(KafkaResponse {
                     event_byte_size: request.event_byte_size,
