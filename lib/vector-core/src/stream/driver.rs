@@ -168,7 +168,8 @@ where
     ) {
         match result {
             Err(error) => {
-                emit(service::CallError { error, request_id });
+                // `Error` and `EventsDropped` internal events are emitted in the sink retry logic.
+                error!(message = "Service call failed.", ?error, request_id);
                 finalizers.update_status(EventStatus::Rejected);
             }
             Ok(response) => {
