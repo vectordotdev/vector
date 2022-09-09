@@ -15,7 +15,10 @@ use crate::{
     config::SinkConfig,
     event::{TraceEvent, Value},
     sinks::util::test::{build_test_server_status, load_sink},
-    test_util::{map_event_batch_stream, next_addr},
+    test_util::{
+        components::{assert_sink_compliance, SINK_TAGS},
+        map_event_batch_stream, next_addr,
+    },
 };
 
 /// Submit traces to a dummy http server
@@ -24,28 +27,31 @@ async fn start_test(
     http_status_code: StatusCode,
     events: Vec<Event>,
 ) -> Receiver<(http::request::Parts, Bytes)> {
-    let addr = next_addr();
-    let config = format!(
-        indoc! {r#"
+    assert_sink_compliance(&SINK_TAGS, async {
+        let addr = next_addr();
+        let config = format!(
+            indoc! {r#"
             default_api_key = "atoken"
             compression = "none"
             endpoint = "http://{}"
         "#},
-        addr
-    );
-    let (config, cx) = load_sink::<DatadogTracesConfig>(&config).unwrap();
-    let (sink, _) = config.build(cx).await.unwrap();
+            addr
+        );
+        let (config, cx) = load_sink::<DatadogTracesConfig>(&config).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
-    let (rx, _trigger, server) = build_test_server_status(addr, http_status_code);
-    tokio::spawn(server);
+        let (rx, _trigger, server) = build_test_server_status(addr, http_status_code);
+        tokio::spawn(server);
 
-    let (batch, receiver) = BatchNotifier::new_with_receiver();
-    let stream = map_event_batch_stream(stream::iter(events), Some(batch));
+        let (batch, receiver) = BatchNotifier::new_with_receiver();
+        let stream = map_event_batch_stream(stream::iter(events), Some(batch));
 
-    sink.run(stream).await.unwrap();
-    assert_eq!(receiver.await, batch_status);
+        sink.run(stream).await.unwrap();
+        assert_eq!(receiver.await, batch_status);
 
-    rx
+        rx
+    })
+    .await
 }
 
 fn simple_span(resource: String) -> BTreeMap<String, Value> {

@@ -30,6 +30,6 @@ tokio-tungstenite = { version = "0.17.2", default-features = false, features = [
 
 # External libs
 chrono = { version = "0.4.6", default-features = false, features = ["serde"] }
-url = { version = "2.2.2", default-features = false }
+url = { version = "2.3.0", default-features = false }
 uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
 indoc = { version = "1.0.7", default-features = false }

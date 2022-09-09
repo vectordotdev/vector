@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     net::SocketAddr,
     num::{
         NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI8, NonZeroU16, NonZeroU32, NonZeroU64,
@@ -156,6 +156,15 @@ where
         assert_string_schema_for_map::<K, Self>(gen)?;
 
         generate_map_schema::<V>(gen)
+    }
+}
+
+impl<V> Configurable for BTreeSet<V>
+where
+    V: Configurable + Serialize + Eq + std::hash::Hash,
+{
+    fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+        generate_set_schema::<V>(gen)
     }
 }
 

@@ -1,1 +1,1 @@
-{"metric":{"name":"x","tags":{"l":"v"},"timestamp":"1969-12-31T18:17:47.000013040Z","kind":"incremental","gauge":{"value":-73024.0}}}
+{"metric":{"name":"b","timestamp":"1969-12-31T18:27:28.000030995Z","interval_ms":56754363,"kind":"absolute","aggregated_summary":{"quantiles":[{"quantile":-108480.0,"value":114048.0},{"quantile":358592.0,"value":-333056.0},{"quantile":-151232.0,"value":-971008.0},{"quantile":729609.6093,"value":557504.0}],"count":14440719739974664862,"sum":162944.0}}}

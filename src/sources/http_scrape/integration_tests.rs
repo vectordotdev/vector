@@ -23,7 +23,7 @@ use super::{
     HttpScrapeConfig,
 };
 
-use crate::test_util::components::{run_and_assert_source_error, SOURCE_ERROR_TAGS};
+use crate::test_util::components::{run_and_assert_source_error, COMPONENT_ERROR_TAGS};
 
 fn dufs_address() -> String {
     std::env::var("DUFS_ADDRESS").unwrap_or_else(|_| "http://localhost:5000".into())
@@ -42,7 +42,7 @@ fn dufs_https_address() -> String {
 /// internal event metric is fired that no events would be outputed by the source.
 pub(crate) async fn run_error(config: HttpScrapeConfig) {
     let events =
-        run_and_assert_source_error(config, Duration::from_secs(3), &SOURCE_ERROR_TAGS).await;
+        run_and_assert_source_error(config, Duration::from_secs(3), &COMPONENT_ERROR_TAGS).await;
 
     assert!(events.is_empty());
 }

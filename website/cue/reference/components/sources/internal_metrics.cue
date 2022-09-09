@@ -217,25 +217,25 @@ components: sources: internal_metrics: {
 			description:       "The average round-trip time (RTT) for the current window."
 			type:              "histogram"
 			default_namespace: "vector"
-			tags:              _internal_metrics_tags
+			tags:              _component_tags
 		}
 		adaptive_concurrency_in_flight: {
 			description:       "The number of outbound requests currently awaiting a response."
 			type:              "histogram"
 			default_namespace: "vector"
-			tags:              _internal_metrics_tags
+			tags:              _component_tags
 		}
 		adaptive_concurrency_limit: {
 			description:       "The concurrency limit that the adaptive concurrency feature has decided on for this current window."
 			type:              "histogram"
 			default_namespace: "vector"
-			tags:              _internal_metrics_tags
+			tags:              _component_tags
 		}
 		adaptive_concurrency_observed_rtt: {
 			description:       "The observed round-trip time (RTT) for requests."
 			type:              "histogram"
 			default_namespace: "vector"
-			tags:              _internal_metrics_tags
+			tags:              _component_tags
 		}
 		checkpoint_write_errors_total: {
 			description:       "The total number of errors writing checkpoints. This metric is deprecated in favor of `component_errors_total`."
