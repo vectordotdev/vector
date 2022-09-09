@@ -52,6 +52,15 @@ components: sinks: file: {
 				unit:    null
 			}
 		}
+		compression_level: {
+			common:      false
+			description: "Precise quality based on the underlying compression algorithms’ qualities. The interpretation of this depends on the algorithm chosen and the specific implementation backing it. Qualities are implicitly clamped to the algorithm’s maximum.\n"
+			required:    false
+			type: uint: {
+				default: null
+				unit:    null
+			}
+		}
 		path: {
 			description: "File name to write events to. Compression format extension must be explicit."
 			required:    true

@@ -58,6 +58,11 @@ pub struct FileSinkConfig {
     )]
     pub compression: Compression,
 
+    /// Precise quality based on the underlying compression algorithms’ qualities.
+    /// The interpretation of this depends on the algorithm chosen and the specific implementation
+    /// backing it. Qualities are implicitly clamped to the algorithm’s maximum.
+    pub compression_level: Option<u32>,
+
     #[configurable(derived)]
     #[serde(
         default,
@@ -74,6 +79,7 @@ impl GenerateConfig for FileSinkConfig {
             idle_timeout_secs: None,
             encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
             compression: Default::default(),
+            compression_level: None,
             acknowledgements: Default::default(),
         })
         .unwrap()
@@ -109,11 +115,24 @@ enum OutFile {
 }
 
 impl OutFile {
-    fn new(file: File, compression: Compression) -> Self {
-        match compression {
-            Compression::None => OutFile::Regular(file),
-            Compression::Gzip => OutFile::Gzip(GzipEncoder::new(file)),
-            Compression::Zstd => OutFile::Zstd(ZstdEncoder::new(file)),
+    fn new(file: File, compression: Compression, compression_level: Option<u32>) -> Self {
+        if let Some(compression_level) = compression_level {
+            let compression_level = async_compression::Level::Precise(compression_level);
+            match compression {
+                Compression::None => OutFile::Regular(file),
+                Compression::Gzip => {
+                    OutFile::Gzip(GzipEncoder::with_quality(file, compression_level))
+                }
+                Compression::Zstd => {
+                    OutFile::Zstd(ZstdEncoder::with_quality(file, compression_level))
+                }
+            }
+        } else {
+            match compression {
+                Compression::None => OutFile::Regular(file),
+                Compression::Gzip => OutFile::Gzip(GzipEncoder::new(file)),
+                Compression::Zstd => OutFile::Zstd(ZstdEncoder::new(file)),
+            }
         }
     }
 
@@ -179,6 +198,7 @@ pub struct FileSink {
     idle_timeout: Duration,
     files: ExpiringHashMap<Bytes, OutFile>,
     compression: Compression,
+    compression_level: Option<u32>,
 }
 
 impl FileSink {
@@ -194,6 +214,7 @@ impl FileSink {
             idle_timeout: Duration::from_secs(config.idle_timeout_secs.unwrap_or(30)),
             files: ExpiringHashMap::default(),
             compression: config.compression,
+            compression_level: config.compression_level,
         })
     }
 
@@ -324,7 +345,7 @@ impl FileSink {
                 }
             };
 
-            let outfile = OutFile::new(file, self.compression);
+            let outfile = OutFile::new(file, self.compression, self.compression_level);
 
             self.files.insert_at(path.clone(), outfile, next_deadline);
             emit!(FileOpen {
@@ -437,6 +458,7 @@ mod tests {
             idle_timeout_secs: None,
             encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
             compression: Compression::None,
+            compression_level: None,
             acknowledgements: Default::default(),
         };
 
@@ -473,6 +495,7 @@ mod tests {
             idle_timeout_secs: None,
             encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
             compression: Compression::Gzip,
+            compression_level: None,
             acknowledgements: Default::default(),
         };
 
@@ -509,6 +532,7 @@ mod tests {
             idle_timeout_secs: None,
             encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
             compression: Compression::Zstd,
+            compression_level: None,
             acknowledgements: Default::default(),
         };
 
@@ -550,6 +574,7 @@ mod tests {
             idle_timeout_secs: None,
             encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
             compression: Compression::None,
+            compression_level: None,
             acknowledgements: Default::default(),
         };
 
@@ -635,6 +660,7 @@ mod tests {
             idle_timeout_secs: Some(1),
             encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
             compression: Compression::None,
+            compression_level: None,
             acknowledgements: Default::default(),
         };
 

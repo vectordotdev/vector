@@ -136,7 +136,7 @@ components: sinks: [Name=string]: {
 					description: """
 						The compression strategy used to compress the encoded event data before transmission.
 
-						The default compression level of the chosen algorithm is used.
+						The default compression level of the chosen algorithm is used unless otherwise specified.
 						Some cloud storage API clients and browsers will handle decompression transparently,
 						so files may not always appear to be compressed depending how they are accessed.
 						"""
