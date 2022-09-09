@@ -287,8 +287,8 @@ impl HttpSink for LogdnaConfig {
             .unwrap();
 
         let auth = Auth::Basic {
-            user: self.api_key.clone(),
-            password: "".to_string(),
+            user: self.api_key.clone().into(),
+            password: "".to_string().into(),
         };
 
         auth.apply(&mut request);

@@ -422,7 +422,7 @@ mod tests {
         trace_init();
 
         let auth = Some(Auth::Bearer {
-            token: "OiJIUzI1NiIsInR5cCI6IkpXVCJ".to_string(),
+            token: "OiJIUzI1NiIsInR5cCI6IkpXVCJ".to_string().into(),
         });
         let auth_clone = auth.clone();
         let addr = next_addr();
