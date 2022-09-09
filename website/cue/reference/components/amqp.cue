@@ -46,7 +46,7 @@ components: _amqp: {
 				Connection string to use when connecting to an AMQP server in the format of amqp://user:password@host:port/vhost?timeout=seconds.
 				The default vhost can be represented as %2f.
 				"""
-			required:    true
+			required: true
 			warnings: []
 			type: string: {
 				examples: ["amqp://user:password@127.0.0.1:5672/%2f?timeout=10"]
