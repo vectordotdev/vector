@@ -7,5 +7,3 @@ pub mod sink;
 mod tests;
 
 pub use self::config::DatadogEventsConfig;
-
-const NAME: &str = "datadog_events";
