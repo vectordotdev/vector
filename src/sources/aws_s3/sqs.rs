@@ -527,10 +527,7 @@ impl IngestorProcess {
         let send_error = match self.out.send_event_stream(&mut stream).await {
             Ok(_) => None,
             Err(error) => {
-                // count is set to 0 to have no discarded events considering
-                // the events are not yet acknowledged and will be retried in
-                // case of error
-                emit!(StreamClosedError { error, count: 0 });
+                emit!(StreamClosedError { error, count: 1 });
                 Some(crate::source_sender::ClosedError)
             }
         };
@@ -558,9 +555,10 @@ impl IngestorProcess {
                     BatchStatus::Delivered => Ok(()),
                     BatchStatus::Errored => Err(ProcessingError::ErrorAcknowledgement),
                     BatchStatus::Rejected => {
+                        // We should emit `component_discarded_events_total` here, but is count always 1?
                         error!(
                             message = "Sink reported events were rejected.",
-                            internal_log_rate_secs = 5,
+                            internal_log_rate_secs = 10,
                         );
                         // Failed events cannot be retried, so continue to delete the SQS source message.
                         Ok(())
