@@ -19,7 +19,7 @@ serde_json = { version = "1.0.85", default-features = false }
 serde_with = { version = "2.0.0", default-features = false, features = ["std"] }
 snafu = { version = "0.7.1", default-features = false }
 toml = { version = "0.5.9", default-features = false }
-url = { version = "2.3.0", default-features = false, features = ["serde"] }
+url = { version = "2.3.1", default-features = false, features = ["serde"] }
 vector-config-common = { path = "../vector-config-common" }
 vector-config-macros = { path = "../vector-config-macros" }
 
