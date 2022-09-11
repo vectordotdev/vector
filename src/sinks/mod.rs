@@ -267,6 +267,10 @@ pub enum Sinks {
     #[cfg(feature = "sinks-loki")]
     Loki(#[configurable(derived)] loki::LokiConfig),
 
+    /// MQTT.
+    #[cfg(feature = "sinks-mqtt")]
+    Mqtt(#[configurable(derived)] self::mqtt::MqttSinkConfig),
+
     /// NATS.
     #[cfg(feature = "sinks-nats")]
     Nats(#[configurable(derived)] self::nats::NatsSinkConfig),
@@ -428,6 +432,8 @@ impl NamedComponent for Sinks {
             Self::Logdna(config) => config.get_component_name(),
             #[cfg(feature = "sinks-loki")]
             Self::Loki(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-mqtt")]
+            Self::Mqtt(config) => config.get_component_name(),
             #[cfg(feature = "sinks-nats")]
             Self::Nats(config) => config.get_component_name(),
             #[cfg(feature = "sinks-new_relic")]

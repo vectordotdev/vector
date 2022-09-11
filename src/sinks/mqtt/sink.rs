@@ -159,7 +159,7 @@ impl MqttSink {
                                 });
                                 emit!(BytesSent {
                                     byte_size: message_len,
-                                    protocol: "mqtt"
+                                    protocol: "mqtt".into(),
                                 });
                             })
                         },

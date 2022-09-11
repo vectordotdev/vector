@@ -2626,6 +2626,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b59b6469c35ab601d6487d28879bccfbe8c896c33a3fe699c4d29817e552cc58"
 
 [[package]]
+name = "flume"
+version = "0.10.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1657b4441c3403d9f7b3409e47575237dac27b1b5726df654a6ecbf92f0f7577"
+dependencies = [
+ "futures-core",
+ "futures-sink",
+ "nanorand",
+ "pin-project",
+ "spin 0.9.3",
+]
+
+[[package]]
 name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4424,6 +4437,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e5ce46fe64a9d73be07dcbe690a38ce1b293be448fd8ce1e6c1b8062c9f72c6a"
 
 [[package]]
+name = "nanorand"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a51313c5820b0b02bd422f4b44776fbf47961755c74ce64afc73bfad10226c3"
+dependencies = [
+ "getrandom 0.2.6",
+]
+
+[[package]]
 name = "native-tls"
 version = "0.2.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5356,6 +5378,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "pollster"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5da3b0203fd7ee5720aa0b5e790b591aa5d3f41c3ed2c34a3a393382198af2f7"
+
+[[package]]
 name = "portable-atomic"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6226,6 +6254,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "rumqttc"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "59d0bc9f169b15197e527c6784e7e7687683f503bfd0040d180422c9b2551eb8"
+dependencies = [
+ "bytes 1.2.1",
+ "flume",
+ "http",
+ "log",
+ "pollster",
+ "rustls-pemfile 0.3.0",
+ "thiserror",
+ "tokio",
+ "tokio-rustls 0.23.3",
+]
+
+[[package]]
 name = "rust-argon2"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7059,6 +7104,9 @@ name = "spin"
 version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c530c2b0d0bf8b69304b39fe2001993e267461948b890cd037d8ad4293fa1a0d"
+dependencies = [
+ "lock_api",
+]
 
 [[package]]
 name = "spki"
@@ -8520,6 +8568,7 @@ dependencies = [
  "rmp-serde",
  "rmpv",
  "roaring",
+ "rumqttc",
  "seahash",
  "semver 1.0.13",
  "serde",

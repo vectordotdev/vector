@@ -1,7 +1,9 @@
+use std::time::Duration;
+
 use codecs::JsonSerializerConfig;
-use rumqttc::{MqttOptions, Transport};
-use serde::{Deserialize, Serialize};
+use rumqttc::{MqttOptions, Transport, TlsConfiguration};
 use snafu::ResultExt;
+use vector_config::configurable_component;
 
 use crate::{
     codecs::EncodingConfig,
@@ -13,22 +15,48 @@ use crate::{
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+/// Configuration for the `mqtt` sink
+#[configurable_component(sink("mqtt"))]
+#[derive(Clone, Debug)]
 pub struct MqttSinkConfig {
+    /// MQTT server address
     pub host: String,
+
+    /// TCP port
     #[serde(default = "default_port")]
     pub port: u16,
+
+    /// MQTT username
     pub user: String,
+
+    /// MQTT password
     pub password: String,
+
+    /// MQTT client ID
     #[serde(default = "default_client_id")]
     pub client_id: String,
+
+    /// Connection keep-alive interval
     #[serde(default = "default_keep_alive")]
     pub keep_alive: u16,
+
+    /// Clean MQTT session on login?
     #[serde(default = "default_clean_session")]
     pub clean_session: bool,
+
+    /// TLS configuration
+    #[configurable(derived)]
     pub tls: Option<TlsEnableableConfig>,
+
+    /// MQTT publish topic (templates allowed)
     pub topic: String,
+
+    /// Encoding configuration
+    #[configurable(derived)]
     pub encoding: EncodingConfig,
+
+    #[configurable(derived)]
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 const fn default_port() -> u16 {
@@ -60,13 +88,13 @@ impl GenerateConfig for MqttSinkConfig {
             tls: None,
             topic: "vector".into(),
             encoding: JsonSerializerConfig::new().into(),
+            acknowledgements: AcknowledgementsConfig::default(),
         })
         .unwrap()
     }
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "mqtt")]
 impl SinkConfig for MqttSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let connector = self.build_connector()?;
@@ -82,12 +110,8 @@ impl SinkConfig for MqttSinkConfig {
         Input::log()
     }
 
-    fn sink_type(&self) -> &'static str {
-        "mqtt"
-    }
-
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        None
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
@@ -96,14 +120,16 @@ impl MqttSinkConfig {
         let tls = MaybeTlsSettings::from_config(&self.tls, false)
             .context(TlsSnafu)?;
         let mut options = MqttOptions::new(&self.client_id, &self.host, self.port);
-        options.set_keep_alive(self.keep_alive);
+        options.set_keep_alive(Duration::from_secs(self.keep_alive.into()));
         options.set_clean_session(self.clean_session);
         options.set_credentials(&self.user, &self.password);
         if let Some(tls) = tls.tls() {
             let ca = tls.authorities_pem().flatten().collect();
             let client_auth = None;
             let alpn = Some(vec!["mqtt".into()]);
-            options.set_transport(Transport::tls(ca, client_auth, alpn));
+            options.set_transport(Transport::Tls(TlsConfiguration::Simple {
+                ca, client_auth, alpn
+            }));
         }
         MqttConnector::new(options, self.topic.clone())
     }
