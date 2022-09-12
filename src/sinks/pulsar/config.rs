@@ -48,8 +48,6 @@ pub struct PulsarSinkConfig {
     #[serde(default)]
     pub batch_size: Option<u32>,
 
-    /// Enables compression for messages. No compression by default.
-    /// Valid values are
     #[configurable(derived)]
     #[serde(default)]
     pub compression: Option<PulsarCompression>,
