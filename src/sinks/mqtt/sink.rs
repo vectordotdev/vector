@@ -147,35 +147,37 @@ impl MqttSink {
                     let mut bytes = BytesMut::new();
                     let res = match self.encoder.encode(event, &mut bytes) {
                         Ok(()) => {
-                            finalizers.update_status(EventStatus::Delivered);
-
                             let message = bytes.to_vec();
                             let message_len = message.len();
 
                             let qos = QoS::ExactlyOnce;
                             let retain = false;
-                            client.publish(&topic, qos, retain, message).await.map(|_| {
-                                emit!(EventsSent {
-                                    count: 1,
-                                    byte_size: event_byte_size,
-                                    output: None
-                                });
-                                emit!(BytesSent {
-                                    byte_size: message_len,
-                                    protocol: "mqtt".into(),
-                                });
-                            })
+                            client.publish(&topic, qos, retain, message).await
+                                .map(|_| {
+                                    emit!(EventsSent {
+                                        count: 1,
+                                        byte_size: event_byte_size,
+                                        output: None
+                                    });
+                                    emit!(BytesSent {
+                                        byte_size: message_len,
+                                        protocol: "mqtt".into(),
+                                    });
+                                }).map_err(|error| {
+                                    emit!(MqttClientError { error });
+                                })
                         },
                         Err(_) => {
-                            // Error is handled by `Encoder`.
-                            finalizers.update_status(EventStatus::Errored);
-                            Ok(())
+                            Err(())
                         }
                     };
 
-                    if let Err(error) = res {
-                        emit!(MqttClientError { error });
+                    // encoding error
+                    if let Err(()) = res {
+                        finalizers.update_status(EventStatus::Errored);
                         return Err(());
+                    } else {
+                        finalizers.update_status(EventStatus::Delivered);
                     }
                 },
 
