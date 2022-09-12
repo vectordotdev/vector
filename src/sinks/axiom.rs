@@ -336,7 +336,7 @@ mod integration_tests {
 
         let config = AxiomConfig {
             url: Some(url.clone()),
-            token: token.clone(),
+            token: token.clone().into(),
             dataset: dataset.clone(),
             ..Default::default()
         };

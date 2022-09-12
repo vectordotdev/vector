@@ -900,7 +900,7 @@ mod integration_tests {
         let influxdb2_settings = Some(InfluxDb2Settings {
             org: ORG.to_string(),
             bucket: BUCKET.to_string(),
-            token: TOKEN.to_string(),
+            token: TOKEN.to_string().into(),
         });
         let proxy = ProxyConfig::default();
         let client = HttpClient::new(None, &proxy).unwrap();
@@ -921,7 +921,7 @@ mod integration_tests {
         let influxdb2_settings = Some(InfluxDb2Settings {
             org: ORG.to_string(),
             bucket: BUCKET.to_string(),
-            token: TOKEN.to_string(),
+            token: TOKEN.to_string().into(),
         });
         let proxy = ProxyConfig::default();
         let client = HttpClient::new(None, &proxy).unwrap();

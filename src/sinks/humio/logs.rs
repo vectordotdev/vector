@@ -355,7 +355,7 @@ mod integration_tests {
         batch.max_events = Some(1);
 
         HumioLogsConfig {
-            token: token.to_string(),
+            token: token.to_string().into(),
             endpoint: Some(humio_address()),
             source: None,
             encoding: JsonSerializerConfig::new().into(),

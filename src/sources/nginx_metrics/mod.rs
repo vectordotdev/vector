@@ -320,8 +320,8 @@ mod integration_tests {
         test_nginx(
             url,
             Some(Auth::Basic {
-                user: "vector".to_owned(),
-                password: "vector".to_owned(),
+                user: "vector".to_owned().into(),
+                password: "vector".to_owned().into(),
             }),
             ProxyConfig::default(),
         )

@@ -177,8 +177,8 @@ async fn unauthorized_wrong_auth() {
         headers: HashMap::new(),
         tls: None,
         auth: Some(Auth::Basic {
-            user: "white_rabbit".to_string(),
-            password: "morpheus".to_string(),
+            user: "white_rabbit".to_string().into(),
+            password: "morpheus".to_string().into(),
         }),
         log_namespace: None,
     })
@@ -197,8 +197,8 @@ async fn authorized() {
         headers: HashMap::new(),
         tls: None,
         auth: Some(Auth::Basic {
-            user: "user".to_string(),
-            password: "pass".to_string(),
+            user: "user".to_string().into(),
+            password: "pass".to_string().into(),
         }),
         log_namespace: None,
     })
