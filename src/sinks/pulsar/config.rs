@@ -166,6 +166,7 @@ impl PulsarSinkConfig {
 
         builder.build().await
     }
+    
     pub(crate) fn build_producer_options(&self) -> ProducerOptions {
         let mut opts = ProducerOptions {
             encrypted: None,
