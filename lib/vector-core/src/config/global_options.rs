@@ -1,4 +1,4 @@
-use std::{fs::DirBuilder, path::PathBuf};
+use std::{fs::DirBuilder, path::PathBuf, time::Duration};
 
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -47,7 +47,16 @@ pub struct GlobalOptions {
     )]
     pub acknowledgements: AcknowledgementsConfig,
     #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
-    pub expire_metrics: Option<f64>,
+    pub expire_metrics: Option<Duration>,
+
+    /// The amount of time, in seconds, that internal metrics will persist after having not been
+    /// updated before they expire and are removed.
+    ///
+    /// Not set by default, which allows all internal metrics to grow unbounded over time. If you
+    /// have a configuration that emits many high-cardinality metrics, you may want to consider
+    /// setting this to a value that ensures that metrics live long enough to be emitted and
+    /// captured, but not so long that they continue to build up indefinitely, as this will consume
+    /// a small amount of memory for each metric.
     #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
     pub expire_metrics_secs: Option<f64>,
 }

@@ -83,7 +83,7 @@ pub async fn start_validated(
         config.global.expire_metrics,
         config.global.expire_metrics_secs,
     ) {
-        (e @ Some(_), None) => e,
+        (Some(e), None) => Some(e.as_secs_f64()),
         (Some(_), Some(_)) => {
             error!("Cannot set both `expire_metrics` and `expire_metrics_secs`.");
             return None;
