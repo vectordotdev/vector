@@ -110,7 +110,7 @@ impl InternalEvent for CollectionCompleted {
     }
 }
 
-pub const _INTENTIONAL: bool = true;
+pub const INTENTIONAL: bool = true;
 pub const UNINTENTIONAL: bool = false;
 
 #[derive(Debug)]
