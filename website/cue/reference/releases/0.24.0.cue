@@ -398,9 +398,9 @@ releases: "0.24.0": {
 			type: "enhancement"
 			scopes: ["observability"]
 			description: """
-				Vector's internal metrics store, which is exposed via the `internal_metrics_secs`
+				Vector's internal metrics store, which is exposed via the `internal_metrics`
 				source, now allows for expiration of metrics via a new configurable global
-				`expire_metrics_secs` configuration option. When set, the store will drop metrics that
+				`expire_metrics` configuration option. When set, the store will drop metrics that
 				haven't been seen in the configured duration. This can be used to expire metrics
 				from the `kubernetes_logs` source, and others, which tag their internal metrics with
 				high cardinality, but ephemeral, tags like `file`.
