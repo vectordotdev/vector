@@ -27,10 +27,10 @@ pub struct MqttSinkConfig {
     pub port: u16,
 
     /// MQTT username
-    pub user: String,
+    pub user: Option<String>,
 
     /// MQTT password
-    pub password: String,
+    pub password: Option<String>,
 
     /// MQTT client ID
     #[serde(default = "default_client_id")]
@@ -80,8 +80,8 @@ impl GenerateConfig for MqttSinkConfig {
         toml::Value::try_from(Self {
             host: "localhost".into(),
             port: default_port(),
-            user: "admin".into(),
-            password: "secret".into(),
+            user: None,
+            password: None,
             client_id: default_client_id(),
             keep_alive: default_keep_alive(),
             clean_session: default_clean_session(),
@@ -122,7 +122,9 @@ impl MqttSinkConfig {
         let mut options = MqttOptions::new(&self.client_id, &self.host, self.port);
         options.set_keep_alive(Duration::from_secs(self.keep_alive.into()));
         options.set_clean_session(self.clean_session);
-        options.set_credentials(&self.user, &self.password);
+        if let (Some(user), Some(password)) = (&self.user, &self.password) {
+            options.set_credentials(user, password);
+        }
         if let Some(tls) = tls.tls() {
             let ca = tls.authorities_pem().flatten().collect();
             let client_auth = None;
