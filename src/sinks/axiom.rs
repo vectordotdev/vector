@@ -94,7 +94,7 @@ impl SinkConfig for AxiomConfig {
             endpoint: self.build_endpoint(),
             compression: self.compression,
             auth: Some(ElasticsearchAuth::Basic {
-                user: "axiom".to_string().into(),
+                user: "axiom".to_string(),
                 password: self.token.clone(),
             }),
             query: Some(query),
