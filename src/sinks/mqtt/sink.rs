@@ -145,39 +145,37 @@ impl MqttSink {
                     let event_byte_size = event.size_of();
 
                     let mut bytes = BytesMut::new();
-                    let res = match self.encoder.encode(event, &mut bytes) {
+                    let message = match self.encoder.encode(event, &mut bytes) {
                         Ok(()) => {
-                            let message = bytes.to_vec();
-                            let message_len = message.len();
-
-                            let qos = QoS::ExactlyOnce;
-                            let retain = false;
-                            client.publish(&topic, qos, retain, message).await
-                                .map(|_| {
-                                    emit!(EventsSent {
-                                        count: 1,
-                                        byte_size: event_byte_size,
-                                        output: None
-                                    });
-                                    emit!(BytesSent {
-                                        byte_size: message_len,
-                                        protocol: "mqtt".into(),
-                                    });
-                                }).map_err(|error| {
-                                    emit!(MqttClientError { error });
-                                })
-                        },
+                            bytes.to_vec()
+                        }
                         Err(_) => {
-                            Err(())
+                            finalizers.update_status(EventStatus::Errored);
+                            continue;
                         }
                     };
+                    let message_len = message.len();
 
-                    // encoding error
-                    if let Err(()) = res {
-                        finalizers.update_status(EventStatus::Errored);
-                        return Err(());
-                    } else {
-                        finalizers.update_status(EventStatus::Delivered);
+                    let qos = QoS::ExactlyOnce;
+                    let retain = false;
+                    match client.publish(&topic, qos, retain, message).await {
+                        Ok(()) => {
+                            emit!(EventsSent {
+                                count: 1,
+                                byte_size: event_byte_size,
+                                output: None
+                            });
+                            emit!(BytesSent {
+                                byte_size: message_len,
+                                protocol: "mqtt".into(),
+                            });
+                            finalizers.update_status(EventStatus::Delivered);
+                        }
+                        Err(error) => {
+                            emit!(MqttClientError { error });
+                            finalizers.update_status(EventStatus::Errored);
+                            return Err(());
+                        }
                     }
                 },
 
