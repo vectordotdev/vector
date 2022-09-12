@@ -9,7 +9,12 @@ use rdkafka::{
     util::Timeout,
 };
 use tower::Service;
-use vector_core::{internal_event::EventsSent, stream::DriverResponse};
+use vector_core::{
+    internal_event::{
+        ByteSize, BytesSent, EventsSent, InternalEventHandle as _, Protocol, Registered,
+    },
+    stream::DriverResponse,
+};
 
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
@@ -32,7 +37,6 @@ pub struct KafkaRequestMetadata {
 
 pub struct KafkaResponse {
     event_byte_size: usize,
-    bytes_sent: usize,
 }
 
 impl DriverResponse for KafkaResponse {
@@ -47,10 +51,6 @@ impl DriverResponse for KafkaResponse {
             output: None,
         }
     }
-
-    fn bytes_sent(&self) -> Option<(usize, &str)> {
-        Some((self.bytes_sent, "tcp"))
-    }
 }
 
 impl Finalizable for KafkaRequest {
@@ -62,13 +62,15 @@ impl Finalizable for KafkaRequest {
 #[derive(Clone)]
 pub struct KafkaService {
     kafka_producer: FutureProducer<KafkaStatisticsContext>,
+    bytes_sent: Registered<BytesSent>,
 }
 
 impl KafkaService {
-    pub(crate) const fn new(
-        kafka_producer: FutureProducer<KafkaStatisticsContext>,
-    ) -> KafkaService {
-        KafkaService { kafka_producer }
+    pub(crate) fn new(kafka_producer: FutureProducer<KafkaStatisticsContext>) -> KafkaService {
+        KafkaService {
+            kafka_producer,
+            bytes_sent: register!(BytesSent::from(Protocol("kafka".into()))),
+        }
     }
 }
 
@@ -81,7 +83,6 @@ impl Service<KafkaRequest> for KafkaService {
         Poll::Ready(Ok(()))
     }
 
-    // Emission of internal events is handled upstream by the caller
     fn call(&mut self, request: KafkaRequest) -> Self::Future {
         let this = self.clone();
 
@@ -98,13 +99,16 @@ impl Service<KafkaRequest> for KafkaService {
                 record = record.headers(headers);
             }
 
-            // rdkafka will internally retry forever if the queue is full
+            //rdkafka will internally retry forever if the queue is full
             match this.kafka_producer.send(record, Timeout::Never).await {
-                Ok((_partition, _offset)) => Ok(KafkaResponse {
-                    event_byte_size: request.event_byte_size,
-                    bytes_sent: request.body.len()
-                        + request.metadata.key.map(|x| x.len()).unwrap_or(0),
-                }),
+                Ok((_partition, _offset)) => {
+                    this.bytes_sent.emit(ByteSize(
+                        request.body.len() + request.metadata.key.map(|x| x.len()).unwrap_or(0),
+                    ));
+                    Ok(KafkaResponse {
+                        event_byte_size: request.event_byte_size,
+                    })
+                }
                 Err((kafka_err, _original_record)) => Err(kafka_err),
             }
         })
