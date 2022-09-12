@@ -10,7 +10,7 @@ use quickcheck::{Arbitrary, Gen};
 use vector_buffers::EventCount;
 use vector_common::{
     finalization::{AddBatchNotifier, BatchNotifier, EventFinalizers, Finalizable},
-    json_encoded_size_of::{JsonEncodedByteCountingValue, JsonEncodedSizeOf},
+    json_encoded_size_of::{EstimatedJsonEncodedSizeOf, JsonEncodedByteCountingValue},
 };
 
 use super::{
@@ -233,20 +233,20 @@ impl ByteSizeOf for EventArray {
     }
 }
 
-impl JsonEncodedSizeOf for EventArray {
-    fn json_encoded_size_of(&self) -> usize {
+impl EstimatedJsonEncodedSizeOf for EventArray {
+    fn estimated_json_encoded_size_of(&self) -> usize {
         match self {
             Self::Logs(a) => a
                 .iter()
-                .map(|v| JsonEncodedByteCountingValue(v.value()).json_encoded_size_of())
+                .map(|v| JsonEncodedByteCountingValue(v.value()).estimated_json_encoded_size_of())
                 .sum(),
 
             Self::Traces(a) => a
                 .iter()
-                .map(|v| JsonEncodedByteCountingValue(v.value()).json_encoded_size_of())
+                .map(|v| JsonEncodedByteCountingValue(v.value()).estimated_json_encoded_size_of())
                 .sum(),
 
-            Self::Metrics(a) => a.json_encoded_size_of(),
+            Self::Metrics(a) => a.estimated_json_encoded_size_of(),
         }
     }
 }

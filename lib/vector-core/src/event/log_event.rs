@@ -15,7 +15,7 @@ use crossbeam_utils::atomic::AtomicCell;
 use lookup::{lookup_v2::Path, LookupBuf};
 use serde::{Deserialize, Serialize, Serializer};
 use vector_common::{
-    json_encoded_size_of::{JsonEncodedByteCountingValue, JsonEncodedSizeOf},
+    json_encoded_size_of::{EstimatedJsonEncodedSizeOf, JsonEncodedByteCountingValue},
     EventDataEq,
 };
 
@@ -74,14 +74,14 @@ impl ByteSizeOf for Inner {
     }
 }
 
-impl JsonEncodedSizeOf for Inner {
-    fn json_encoded_size_of(&self) -> usize {
+impl EstimatedJsonEncodedSizeOf for Inner {
+    fn estimated_json_encoded_size_of(&self) -> usize {
         self.json_encoded_size_cache
             .load()
             .unwrap_or_else(|| {
                 let value = JsonEncodedByteCountingValue(&self.fields);
 
-                let size = value.json_encoded_size_of();
+                let size = value.estimated_json_encoded_size_of();
                 let size = NonZeroUsize::new(size).expect("Size cannot be zero");
 
                 self.json_encoded_size_cache.store(Some(size));

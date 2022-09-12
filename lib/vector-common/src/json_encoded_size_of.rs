@@ -80,17 +80,21 @@ impl<'a> Serialize for JsonEncodedByteCountingValue<'a> {
     }
 }
 
-pub trait JsonEncodedSizeOf {
-    fn json_encoded_size_of(&self) -> usize;
+/// A helper trait that is implemented for any `T` that implements `serde::Serialize`, to get the
+/// estimated JSON encoded size of that type.
+pub trait EstimatedJsonEncodedSizeOf {
+    fn estimated_json_encoded_size_of(&self) -> usize;
 }
 
-impl<T> JsonEncodedSizeOf for T
+impl<T> EstimatedJsonEncodedSizeOf for T
 where
     T: serde::Serialize,
 {
+    /// Returns the estimated JSON encoded size of `self`, or `0` if the size cannot be calculated
+    /// because `T` errors during serialization.
     #[inline]
-    fn json_encoded_size_of(&self) -> usize {
-        size_of(self).unwrap()
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        estimated_size_of(self).unwrap_or_default()
     }
 }
 
@@ -112,17 +116,30 @@ impl ser::Error for Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// A serializer that counts the number of JSON-encoded bytes in a serializable type.
+///
+/// See [`estimated_size_of`] for an easy-to-use wrapper function around this serializer.
+///
+/// This serializer is **optimized for performance**. This means that it is allowed to *approximate*
+/// the size of a type, if doing an exact calculation is too expensive.
+///
+/// Specifically
+///
+/// Additionally, the serializer assumes the type is serialized to a JSON-encoded string using the
+/// `serde_json` crate, which internally uses the `ryu` crate to encode floating point types.
 pub struct Serializer {
     bytes: usize,
     start_collection: bool,
 }
 
-/// Return the size of `T` as represented by a JSON-encoded string.
+/// Return the estimated size of `T` as represented by a JSON-encoded string.
+///
+/// See [`Serializer`] for more details.`
 ///
 /// # Errors
 ///
 /// Returns an error if `T` cannot be serialized.
-pub fn size_of<T>(value: &T) -> Result<usize>
+pub fn estimated_size_of<T>(value: &T) -> Result<usize>
 where
     T: Serialize,
 {
@@ -319,23 +336,18 @@ impl<'a> ser::Serializer for &'a mut Serializer {
         Ok(())
     }
 
-    /// This method assumes the float isn't NaN or infinite, which holds true for our `Value` type,
-    /// but might not hold true in other cases.
-    ///
-    /// If the float _is_ of one of those types, this method won't panic, but the reported byte size
-    /// won't be accurate.
+    /// This method delegates to `serialize_f64`, as that is what `serde_json` does as well. Not
+    /// doing so would result in a small difference in the reported byte size of the serialized
+    /// value.
     fn serialize_f32(self, v: f32) -> Result<()> {
-        let mut buffer = ryu::Buffer::new();
-        self.bytes += buffer.format_finite(v).len();
-
-        Ok(())
+        self.serialize_f64(v as f64)
     }
 
-    /// This method assumes the float isn't NaN or infinite, which holds true for our `Value` type,
-    /// but might not hold true in other cases.
+    /// This method assumes the float is finite (not NaN or infinite), which holds true for our
+    /// `Value` type, but might not hold true in other cases.
     ///
-    /// If the float _is_ of one of those types, this method won't panic, but the reported byte size
-    /// won't be accurate.
+    /// If the float _is_ of one of those classifications, this method won't panic, but the reported
+    /// byte size won't be accurate.
     fn serialize_f64(self, v: f64) -> Result<()> {
         let mut buffer = ryu::Buffer::new();
         self.bytes += buffer.format_finite(v).len();
@@ -353,7 +365,16 @@ impl<'a> ser::Serializer for &'a mut Serializer {
         self.serialize_bytes(v.as_bytes())
     }
 
-    // Consider `bytes` as being a valid `str`.
+    /// Consider `bytes` as being a valid `str`.
+    ///
+    /// This is a special-case that allows a fast path of counting a string as a slice of bytes,
+    /// without having to check for invalid UTF-8 characters, or characters that need to be escaped.
+    ///
+    /// This means that any of those cases are ignored, and thus the final byte count **WILL**
+    /// differ from the JSON serialized form of the type.
+    ///
+    /// This is known, and accepted, as the overhead of checking for valid UTF-8 + escaped character
+    /// sequences is too expensive for our use-case of this serializer.
     fn serialize_bytes(self, v: &[u8]) -> Result<()> {
         self.bytes += v.len() + QUOTES_SIZE;
         Ok(())
@@ -673,45 +694,343 @@ impl<'a> ser::SerializeStructVariant for &'a mut Serializer {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-#[test]
-fn test_struct() {
-    #[derive(Serialize)]
-    struct Test {
-        int: u32,
-        seq: Vec<&'static str>,
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use super::*;
+    use quickcheck::{Arbitrary, Gen, TestResult};
+    use quickcheck_macros::quickcheck;
+    use serde_json::json;
+
+    #[derive(Serialize, Clone, Debug)]
+    struct MyEvent {
+        field_one: bool,
+        field_two: u32,
     }
 
-    let test = Test {
-        int: 1,
-        seq: vec!["a", "b"],
-    };
-    let expected = r#"{"int":1,"seq":["a","b"]}"#;
-    assert_eq!(size_of(&test).unwrap(), expected.len());
-}
-
-#[test]
-fn test_enum() {
-    #[derive(Serialize)]
-    enum E {
-        Unit,
-        Newtype(u32),
-        Tuple(u32, u32),
-        Struct { a: u32 },
+    impl Arbitrary for MyEvent {
+        fn arbitrary(g: &mut Gen) -> Self {
+            Self {
+                field_one: bool::arbitrary(g),
+                field_two: u32::arbitrary(g),
+            }
+        }
     }
 
-    let u = E::Unit;
-    let expected = r#""Unit""#;
-    assert_eq!(size_of(&u).unwrap(), expected.len());
+    #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize)]
+    struct ValidString(String);
 
-    let n = E::Newtype(1);
-    let expected = r#"{"Newtype":1}"#;
-    assert_eq!(size_of(&n).unwrap(), expected.len());
+    impl Arbitrary for ValidString {
+        fn arbitrary(g: &mut Gen) -> Self {
+            loop {
+                let s = String::arbitrary(g);
+                if !is_inaccurately_counted_bytes(s.as_bytes()) {
+                    return Self(s);
+                }
+            }
+        }
+    }
 
-    let t = E::Tuple(1, 2);
-    let expected = r#"{"Tuple":[1,2]}"#;
-    assert_eq!(size_of(&t).unwrap(), expected.len());
+    impl std::ops::Deref for ValidString {
+        type Target = String;
 
-    let s = E::Struct { a: 1 };
-    let expected = r#"{"Struct":{"a":1}}"#;
-    assert_eq!(size_of(&s).unwrap(), expected.len());
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+
+    #[test]
+    fn test_struct() {
+        #[derive(Serialize)]
+        struct Test {
+            int: u32,
+            seq: Vec<&'static str>,
+        }
+
+        let test = Test {
+            int: 1,
+            seq: vec!["a", "b"],
+        };
+        let expected = r#"{"int":1,"seq":["a","b"]}"#;
+        assert_eq!(estimated_size_of(&test).unwrap(), expected.len());
+    }
+
+    #[test]
+    fn test_enum() {
+        #[derive(Serialize)]
+        enum E {
+            Unit,
+            Newtype(u32),
+            Tuple(u32, u32),
+            Struct { a: u32 },
+        }
+
+        let u = E::Unit;
+        let expected = r#""Unit""#;
+        assert_eq!(estimated_size_of(&u).unwrap(), expected.len());
+
+        let n = E::Newtype(1);
+        let expected = r#"{"Newtype":1}"#;
+        assert_eq!(estimated_size_of(&n).unwrap(), expected.len());
+
+        let t = E::Tuple(1, 2);
+        let expected = r#"{"Tuple":[1,2]}"#;
+        assert_eq!(estimated_size_of(&t).unwrap(), expected.len());
+
+        let s = E::Struct { a: 1 };
+        let expected = r#"{"Struct":{"a":1}}"#;
+        assert_eq!(estimated_size_of(&s).unwrap(), expected.len());
+    }
+
+    #[quickcheck]
+    fn serialize_i8(v: i8) -> bool {
+        let got = estimated_size_of(&v).unwrap();
+        let want = serde_json::to_string(&v).unwrap();
+
+        got == want.len()
+    }
+
+    #[quickcheck]
+    fn serialize_i16(v: i16) -> bool {
+        let got = estimated_size_of(&v).unwrap();
+        let want = serde_json::to_string(&v).unwrap();
+
+        got == want.len()
+    }
+
+    #[quickcheck]
+    fn serialize_i32(v: i32) -> bool {
+        let got = estimated_size_of(&v).unwrap();
+        let want = serde_json::to_string(&v).unwrap();
+
+        got == want.len()
+    }
+
+    #[quickcheck]
+    fn serialize_i64(v: i64) -> bool {
+        let got = estimated_size_of(&v).unwrap();
+        let want = serde_json::to_string(&v).unwrap();
+
+        got == want.len()
+    }
+
+    #[quickcheck]
+    fn serialize_isize(v: isize) -> bool {
+        let got = estimated_size_of(&v).unwrap();
+        let want = serde_json::to_string(&v).unwrap();
+
+        got == want.len()
+    }
+
+    #[quickcheck]
+    fn serialize_u8(v: u8) -> bool {
+        let got = estimated_size_of(&v).unwrap();
+        let want = serde_json::to_string(&v).unwrap();
+
+        got == want.len()
+    }
+
+    #[quickcheck]
+    fn serialize_u16(v: u16) -> bool {
+        let got = estimated_size_of(&v).unwrap();
+        let want = serde_json::to_string(&v).unwrap();
+
+        got == want.len()
+    }
+
+    #[quickcheck]
+    fn serialize_u32(v: u32) -> bool {
+        let got = estimated_size_of(&v).unwrap();
+        let want = serde_json::to_string(&v).unwrap();
+
+        got == want.len()
+    }
+
+    #[quickcheck]
+    fn serialize_u64(v: u64) -> bool {
+        let got = estimated_size_of(&v).unwrap();
+        let want = serde_json::to_string(&v).unwrap();
+
+        got == want.len()
+    }
+
+    #[quickcheck]
+    fn serialize_usize(v: usize) -> bool {
+        let got = estimated_size_of(&v).unwrap();
+        let want = serde_json::to_string(&v).unwrap();
+
+        got == want.len()
+    }
+
+    #[quickcheck]
+    fn serialize_f32(v: f32) -> bool {
+        // floats are expected to be finite.
+        if !v.is_finite() {
+            return true;
+        }
+
+        // We need to convert the float to `serde_json::Value`, as both implementations use `ryu` to
+        // quickly convert floating point numbers to decimal strings, which differs in the final
+        // output compared to the default `Display` implementation of `f32`/`f64`.
+        let v = json!(v);
+
+        let got = estimated_size_of(&v).unwrap();
+        let want = serde_json::to_string(&v).unwrap();
+
+        got == want.len()
+    }
+
+    #[quickcheck]
+    fn serialize_f64(v: f64) -> bool {
+        // floats are expected to be finite.
+        if !v.is_finite() {
+            return true;
+        }
+
+        // We need to convert the float to `serde_json::Value`, as both implementations use `ryu` to
+        // quickly convert floating point numbers to decimal strings, which differs in the final
+        // output compared to the default `Display` implementation of `f32`/`f64`.
+        let v = json!(v);
+
+        let got = estimated_size_of(&v).unwrap();
+        let want = serde_json::to_string(&v).unwrap();
+
+        got == want.len()
+    }
+
+    #[quickcheck]
+    fn serialize_char(v: char) -> TestResult {
+        if is_inaccurately_counted_bytes(&[v as u8]) {
+            return TestResult::discard();
+        }
+
+        let got = estimated_size_of(&v).unwrap();
+        let want = serde_json::to_string(&v).unwrap();
+
+        TestResult::from_bool(got == want.len())
+    }
+
+    #[quickcheck]
+    fn serialize_str(v: String) -> TestResult {
+        if is_inaccurately_counted_bytes(v.as_bytes()) {
+            return TestResult::discard();
+        }
+
+        let got = estimated_size_of(&v).unwrap();
+        let want = serde_json::to_string(&v).unwrap();
+
+        TestResult::from_bool(got == want.len())
+    }
+
+    #[quickcheck]
+    fn serialize_bytes(v: Vec<u8>) -> TestResult {
+        if is_inaccurately_counted_bytes(&v) {
+            return TestResult::discard();
+        }
+
+        let got = estimated_size_of(&v).unwrap();
+        let want = serde_json::to_string(&v).unwrap();
+
+        TestResult::from_bool(got == want.len())
+    }
+
+    #[quickcheck]
+    fn serialize_option(v: Option<bool>) -> bool {
+        let got = estimated_size_of(&v).unwrap();
+        let want = serde_json::to_string(&v).unwrap();
+
+        got == want.len()
+    }
+
+    #[quickcheck]
+    fn serialize_seq(v: Vec<bool>) -> bool {
+        let got = estimated_size_of(&v).unwrap();
+        let want = serde_json::to_string(&v).unwrap();
+
+        got == want.len()
+    }
+
+    #[quickcheck]
+    fn serialize_map(v: HashMap<ValidString, bool>) -> TestResult {
+        let got = estimated_size_of(&v).unwrap();
+        let want = serde_json::to_string(&v).unwrap();
+
+        TestResult::from_bool(got == want.len())
+    }
+
+    #[quickcheck]
+    fn serialize_struct(v: MyEvent) -> bool {
+        let got = estimated_size_of(&v).unwrap();
+        let want = serde_json::to_string(&v).unwrap();
+
+        got == want.len()
+    }
+
+    #[quickcheck]
+    fn serialize_json_encoded_byte_counting_value(v: Value) -> TestResult {
+        if is_inaccurately_counted_value(&v) {
+            return TestResult::discard();
+        }
+
+        let b = JsonEncodedByteCountingValue(&v);
+
+        let got = estimated_size_of(&b).unwrap();
+        let want = serde_json::to_string(&v).unwrap();
+
+        TestResult::from_bool(got == want.len())
+    }
+
+    fn is_inaccurately_counted_value(v: &Value) -> bool {
+        match v {
+            Value::Bytes(v) => is_inaccurately_counted_bytes(v),
+            Value::Object(v) => v.iter().any(|(k, v)| {
+                is_inaccurately_counted_bytes(k.as_bytes()) || is_inaccurately_counted_value(v)
+            }),
+            Value::Array(v) => v.iter().any(is_inaccurately_counted_value),
+            _ => false,
+        }
+    }
+
+    // Some strings are known to report invalid sizes with the byte size counting serializer. This
+    // is done for performance reasons.
+    fn is_inaccurately_counted_bytes<'a>(
+        v: impl IntoIterator<Item = &'a u8> + std::fmt::Debug + Clone,
+    ) -> bool {
+        // Taken from `serde_json`
+        const BB: u8 = b'b'; // \x08
+        const TT: u8 = b't'; // \x09
+        const NN: u8 = b'n'; // \x0A
+        const FF: u8 = b'f'; // \x0C
+        const RR: u8 = b'r'; // \x0D
+        const QU: u8 = b'"'; // \x22
+        const BS: u8 = b'\\'; // \x5C
+        const UU: u8 = b'u'; // \x00...\x1F except the ones above
+        const __: u8 = 0;
+
+        // Lookup table of escape sequences. A value of b'x' at index i means that byte
+        // i is escaped as "\x" in JSON. A value of 0 means that byte i is not escaped.
+        static ESCAPE: [u8; 256] = [
+            //   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F
+            UU, UU, UU, UU, UU, UU, UU, UU, BB, TT, NN, UU, FF, RR, UU, UU, // 0
+            UU, UU, UU, UU, UU, UU, UU, UU, UU, UU, UU, UU, UU, UU, UU, UU, // 1
+            __, __, QU, __, __, __, __, __, __, __, __, __, __, __, __, __, // 2
+            __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 3
+            __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 4
+            __, __, __, __, __, __, __, __, __, __, __, __, BS, __, __, __, // 5
+            __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 6
+            __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 7
+            __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 8
+            __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 9
+            __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // A
+            __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // B
+            __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // C
+            __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // D
+            __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // E
+            __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // F
+        ];
+
+        v.clone().into_iter().any(|b| ESCAPE[*b as usize] != 0)
+            || String::from_utf8(v.into_iter().copied().collect()).is_err()
+    }
 }
