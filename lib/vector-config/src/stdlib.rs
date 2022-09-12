@@ -259,7 +259,7 @@ impl Configurable for Duration {
     fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
         let mut properties = IndexMap::default();
         properties.insert("secs".into(), generate_number_schema::<u64>());
-        properties.insert("nsecs".into(), generate_number_schema::<u64>());
+        properties.insert("nsecs".into(), generate_number_schema::<u32>());
 
         let mut required = BTreeSet::default();
         required.insert("secs".into());
