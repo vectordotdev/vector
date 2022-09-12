@@ -1,6 +1,7 @@
 use std::convert::TryFrom;
 
 use headers::{Authorization, HeaderMapExt};
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use warp::http::HeaderMap;
 
@@ -15,10 +16,10 @@ use super::error::ErrorMessage;
 #[derive(Clone, Debug)]
 pub struct HttpSourceAuthConfig {
     /// The username for basic authentication.
-    pub username: String,
+    pub username: SensitiveString,
 
     /// The password for basic authentication.
-    pub password: String,
+    pub password: SensitiveString,
 }
 
 impl TryFrom<Option<&HttpSourceAuthConfig>> for HttpSourceAuth {
@@ -28,14 +29,19 @@ impl TryFrom<Option<&HttpSourceAuthConfig>> for HttpSourceAuth {
         match auth {
             Some(auth) => {
                 let mut headers = HeaderMap::new();
-                headers.typed_insert(Authorization::basic(&auth.username, &auth.password));
+                headers.typed_insert(Authorization::basic(
+                    auth.username.inner(),
+                    auth.password.inner(),
+                ));
                 match headers.get("authorization") {
                     Some(value) => {
                         let token = value
                             .to_str()
                             .map_err(|error| format!("Failed stringify HeaderValue: {:?}", error))?
                             .to_owned();
-                        Ok(HttpSourceAuth { token: Some(token) })
+                        Ok(HttpSourceAuth {
+                            token: Some(token.to_owned()),
+                        })
                     }
                     None => Err("Authorization headers wasn't generated".to_owned()),
                 }
