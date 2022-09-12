@@ -69,7 +69,7 @@ pub struct PulsarSinkConfig {
     pub acknowledgements: AcknowledgementsConfig,
 }
 
-/// Identifies the compression options that are available within Pulsar
+/// Identifies the compression options that are available within Pulsar.
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub enum PulsarCompression {
