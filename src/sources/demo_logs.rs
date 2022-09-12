@@ -292,7 +292,7 @@ mod tests {
     use futures::{poll, Stream, StreamExt};
 
     use super::*;
-    use crate::{config::log_schema, event::Event, shutdown::ShutdownSignal, SourceSender};
+    use crate::{config::log_schema, event::Event, shutdown::ShutdownSignal, SourceSender, test_util::components::{assert_source_compliance, SOURCE_TAGS}};
 
     #[test]
     fn generate_config() {
@@ -308,17 +308,21 @@ mod tests {
             LogNamespace::Legacy,
         )
         .build();
-        demo_logs_source(
-            config.interval,
-            config.count,
-            config.format,
-            decoder,
-            ShutdownSignal::noop(),
-            tx,
-            LogNamespace::Legacy,
-        )
-        .await
-        .unwrap();
+
+        assert_source_compliance(&SOURCE_TAGS, async {
+            demo_logs_source(
+                config.interval,
+                config.count,
+                config.format,
+                decoder,
+                ShutdownSignal::noop(),
+                tx,
+                LogNamespace::Legacy,
+            )
+            .await
+            .unwrap();
+        })
+        .await;
         rx
     }
 
