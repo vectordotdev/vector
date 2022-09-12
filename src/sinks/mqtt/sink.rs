@@ -97,6 +97,7 @@ impl MqttSink {
         })
     }
 
+    /// outgoing events main loop
     async fn handle_events<I>(
         &mut self,
         input: &mut I,
@@ -108,6 +109,7 @@ impl MqttSink {
     {
         loop {
             tokio::select! {
+                // handle connection errors
                 msg = connection.poll() => {
                     if let Err(error) = msg {
                         emit!(MqttConnectionError { error });
@@ -115,6 +117,7 @@ impl MqttSink {
                     }
                 },
 
+                // handle outgoing events
                 event = input.next() => {
                     let mut event = if let Some(event) = event {
                         event
