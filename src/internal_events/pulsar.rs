@@ -46,6 +46,7 @@ impl InternalEvent for PulsarPropertyExtractionError<'_> {
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::RECEIVING,
             property_field = self.property_field,
+            internal_log_rate_secs = 10,
         );
         counter!(
             "component_errors_total", 1,
