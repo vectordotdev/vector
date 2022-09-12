@@ -18,3 +18,9 @@ rustflags = "-Lnative=/lib/native-libs"
 
 [target.armv7-unknown-linux-musleabihf]
 rustflags = "-Lnative=/lib/native-libs"
+
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "link-args=-rdynamic"]
+
+[target.aarch64-unknown-linux-gnu]
+rustflags = ["-C", "link-args=-rdynamic"]

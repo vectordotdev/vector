@@ -7,7 +7,8 @@ use k8s_openapi::{
     apimachinery::pkg::apis::meta::v1::ObjectMeta,
 };
 use kube::runtime::reflector::{store::Store, ObjectRef};
-use lookup::lookup_v2::{parse_path, OwnedSegment};
+use lookup::lookup_v2::{parse_value_path, OwnedSegment};
+use lookup::PathPrefix;
 use vector_config::configurable_component;
 
 use super::path_helpers::{parse_log_file_path, LogFileInfo};
@@ -165,20 +166,20 @@ fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata
 
     if let Some(labels) = &metadata.labels {
         // Calculate and cache the prefix path.
-        let prefix_path = parse_path(&fields_spec.pod_labels);
+        let prefix_path = parse_value_path(&fields_spec.pod_labels);
         for (key, val) in labels.iter() {
             let mut path = prefix_path.clone().segments;
             path.push(OwnedSegment::Field(key.clone()));
-            log.insert(&path, val.to_owned());
+            log.insert((PathPrefix::Event, &path), val.to_owned());
         }
     }
 
     if let Some(annotations) = &metadata.annotations {
-        let prefix_path = parse_path(&fields_spec.pod_annotations);
+        let prefix_path = parse_value_path(&fields_spec.pod_annotations);
         for (key, val) in annotations.iter() {
             let mut path = prefix_path.clone().segments;
             path.push(OwnedSegment::Field(key.clone()));
-            log.insert(&path, val.to_owned());
+            log.insert((PathPrefix::Event, &path), val.to_owned());
         }
     }
 }

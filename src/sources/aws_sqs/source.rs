@@ -6,14 +6,16 @@ use aws_sdk_sqs::{
 };
 use chrono::{DateTime, TimeZone, Utc};
 use futures::{FutureExt, StreamExt};
-use tokio::{pin, select, time::Duration};
+use tokio::{pin, select};
 use tracing_futures::Instrument;
 use vector_common::finalizer::UnorderedFinalizer;
 
 use crate::{
     codecs::Decoder,
     event::{BatchNotifier, BatchStatus},
-    internal_events::{EndpointBytesReceived, SqsMessageDeleteError, StreamClosedError},
+    internal_events::{
+        EndpointBytesReceived, SqsMessageDeleteError, SqsMessageReceiveError, StreamClosedError,
+    },
     shutdown::ShutdownSignal,
     sources::util,
     SourceSender,
@@ -105,9 +107,7 @@ impl SqsSource {
         let receive_message_output = match result {
             Ok(output) => output,
             Err(err) => {
-                error!("SQS receive message error: {:?}.", err);
-                // prevent rapid errors from flooding the logs
-                tokio::time::sleep(Duration::from_secs(1)).await;
+                emit!(SqsMessageReceiveError { error: &err });
                 return;
             }
         };
@@ -135,6 +135,8 @@ impl SqsSource {
                         receipts_to_ack.push(receipt_handle);
                     }
                     let timestamp = get_timestamp(&message.attributes);
+                    // Error is logged by `crate::codecs::Decoder`, no further handling
+                    // is needed here.
                     let decoded = util::decode_message(
                         self.decoder.clone(),
                         "aws_sqs",

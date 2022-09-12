@@ -1,5 +1,5 @@
 use anymap::AnyMap;
-use lookup::TargetPath;
+use lookup::OwnedTargetPath;
 use std::collections::BTreeSet;
 
 pub struct CompileConfig {
@@ -32,12 +32,12 @@ impl CompileConfig {
     /// Marks everything as read only. Any mutations on read-only values will result in a
     /// compile time error.
     pub fn set_read_only(&mut self) {
-        self.set_read_only_path(TargetPath::event_root(), true);
-        self.set_read_only_path(TargetPath::metadata_root(), true);
+        self.set_read_only_path(OwnedTargetPath::event_root(), true);
+        self.set_read_only_path(OwnedTargetPath::metadata_root(), true);
     }
 
     #[must_use]
-    pub fn is_read_only_path(&self, path: &TargetPath) -> bool {
+    pub fn is_read_only_path(&self, path: &OwnedTargetPath) -> bool {
         for read_only_path in &self.read_only_paths {
             // any paths that are a parent of read-only paths also can't be modified
             if read_only_path.path.can_start_with(path) {
@@ -57,7 +57,7 @@ impl CompileConfig {
 
     /// Adds a path that is considered read only. Assignments to any paths that match
     /// will fail at compile time.
-    pub fn set_read_only_path(&mut self, path: TargetPath, recursive: bool) {
+    pub fn set_read_only_path(&mut self, path: OwnedTargetPath, recursive: bool) {
         self.read_only_paths
             .insert(ReadOnlyPath { path, recursive });
     }
@@ -74,6 +74,6 @@ impl Default for CompileConfig {
 
 #[derive(Debug, Clone, Ord, Eq, PartialEq, PartialOrd)]
 struct ReadOnlyPath {
-    path: TargetPath,
+    path: OwnedTargetPath,
     recursive: bool,
 }

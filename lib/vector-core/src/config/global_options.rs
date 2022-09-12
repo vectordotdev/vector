@@ -1,8 +1,8 @@
 use std::{fs::DirBuilder, path::PathBuf};
 
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use vector_common::TimeZone;
+use vector_config::configurable_component;
 
 use super::{proxy::ProxyConfig, AcknowledgementsConfig, LogSchema};
 use crate::serde::bool_or_struct;
@@ -28,26 +28,71 @@ pub(crate) enum DataDirError {
     },
 }
 
-// If this is modified, make sure those changes are reflected in the `ConfigBuilder::append` function!
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+/// Global configuration options.
+//
+// If this is modified, make sure those changes are reflected in the `ConfigBuilder::append`
+// function!
+#[configurable_component]
+#[derive(Clone, Debug, Default, PartialEq)]
 #[serde(default)]
 pub struct GlobalOptions {
+    /// The directory used for persisting Vector state data.
+    ///
+    /// This is the directory where Vector will store any state data, such as disk buffers, file
+    /// checkpoints, and more.
+    ///
+    /// Vector must have write permissions to this directory.
     #[serde(default = "crate::default_data_dir")]
     pub data_dir: Option<PathBuf>,
+
+    /// Default log schema for all events.
+    ///
+    /// This is used if a component does not have its own specific log schema. All events use a log
+    /// schema, whether or not the default is used, to assign event fields on incoming events.
     #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
     pub log_schema: LogSchema,
+
+    /// The name of the timezone to apply to timestamp conversions that do not contain an explicit timezone.
+    ///
+    /// The timezone name may be any name in the [TZ database][tzdb], or `local` to indicate system
+    /// local time.
+    ///
+    /// [tzdb]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
     #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
     pub timezone: TimeZone,
+
+    #[configurable(derived)]
     #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
     pub proxy: ProxyConfig,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "bool_or_struct",
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+
+    /// The amount of time, in seconds, that internal metrics will persist after having not been
+    /// updated before they expire and are removed.
+    ///
+    /// Not set by default, which allows all internal metrics to grow unbounded over time. If you
+    /// have a configuration that emits many high-cardinality metrics, you may want to consider
+    /// setting this to a value that ensures that metrics live long enough to be emitted and
+    /// captured, but not so long that they continue to build up indefinitely, as this will consume
+    /// a small amount of memory for each metric.
+    #[configurable(deprecated)]
     #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
     pub expire_metrics: Option<f64>,
+
+    /// The amount of time, in seconds, that internal metrics will persist after having not been
+    /// updated before they expire and are removed.
+    ///
+    /// Not set by default, which allows all internal metrics to grow unbounded over time. If you
+    /// have a configuration that emits many high-cardinality metrics, you may want to consider
+    /// setting this to a value that ensures that metrics live long enough to be emitted and
+    /// captured, but not so long that they continue to build up indefinitely, as this will consume
+    /// a small amount of memory for each metric.
     #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
     pub expire_metrics_secs: Option<f64>,
 }

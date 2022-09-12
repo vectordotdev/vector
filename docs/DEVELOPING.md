@@ -56,6 +56,14 @@ This is ideal for users who want it to "Just work" and just want to start contri
 export CONTAINER_TOOL="podman"
 ```
 
+If your Linux environment runs SELinux in Enforcing mode, you will need to relabel the vector source code checkout with `container_home_t` context. Otherwise the container environment cannot read/write the code:
+
+```bash
+cd your/checkout/of/vector/
+sudo semanage fcontext -a "${PWD}(/.*)?" -t container_file_t
+sudo restorecon . -R
+```
+
 By default, `make environment` style tasks will do a `docker pull` from Github's container repository, you can **optionally** build your own environment while you make your morning coffee ☕:
 
 ```bash

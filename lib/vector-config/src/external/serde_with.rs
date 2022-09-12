@@ -28,6 +28,16 @@ where
         T::metadata().convert::<Self>()
     }
 
+    fn validate_metadata(metadata: &Metadata<Self>) -> Result<(), GenerateError> {
+        // Forward to the underlying `T`.
+        //
+        // We have to convert from `Metadata<Self>` to `Metadata<T>` which erases the default value,
+        // notably, but `serde_with` helpers should never actually have default values, so this is
+        // essentially a no-op.
+        let converted = metadata.convert::<T>();
+        T::validate_metadata(&converted)
+    }
+
     fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
         // Forward to the underlying `T`.
         //
