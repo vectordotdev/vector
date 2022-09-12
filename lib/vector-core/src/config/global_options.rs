@@ -1,4 +1,4 @@
-use std::{fs::DirBuilder, path::PathBuf};
+use std::{fs::DirBuilder, path::PathBuf, time::Duration};
 
 use snafu::{ResultExt, Snafu};
 use vector_common::TimeZone;
@@ -83,7 +83,7 @@ pub struct GlobalOptions {
     /// a small amount of memory for each metric.
     #[configurable(deprecated)]
     #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
-    pub expire_metrics: Option<f64>,
+    pub expire_metrics: Option<Duration>,
 
     /// The amount of time, in seconds, that internal metrics will persist after having not been
     /// updated before they expire and are removed.
