@@ -39,9 +39,7 @@ impl TryFrom<Option<&HttpSourceAuthConfig>> for HttpSourceAuth {
                             .to_str()
                             .map_err(|error| format!("Failed stringify HeaderValue: {:?}", error))?
                             .to_owned();
-                        Ok(HttpSourceAuth {
-                            token: Some(token.to_owned()),
-                        })
+                        Ok(HttpSourceAuth { token: Some(token) })
                     }
                     None => Err("Authorization headers wasn't generated".to_owned()),
                 }
