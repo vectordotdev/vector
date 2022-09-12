@@ -209,7 +209,7 @@ impl Service<Vec<Metric>> for SematextMetricsService {
 
     fn call(&mut self, items: Vec<Metric>) -> Self::Future {
         let input = encode_events(
-            &self.config.token.inner(),
+            self.config.token.inner(),
             &self.config.default_namespace,
             items,
         );

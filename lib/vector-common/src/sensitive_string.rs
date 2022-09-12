@@ -38,6 +38,7 @@ impl std::fmt::Debug for SensitiveString {
 }
 
 impl SensitiveString {
+    #[must_use]
     pub fn inner(&self) -> &str {
         self.0.as_str()
     }
