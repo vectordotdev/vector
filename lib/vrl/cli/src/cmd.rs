@@ -9,7 +9,7 @@ use std::{
 
 use ::value::Value;
 use clap::Parser;
-use lookup::{owned_path, TargetPath};
+use lookup::{owned_value_path, OwnedTargetPath};
 use value::Secrets;
 use vector_common::TimeZone;
 use vrl::state::TypeState;
@@ -127,7 +127,7 @@ fn run(opts: &Opts) -> Result<(), Error> {
 
         // The CLI should be moved out of the "vrl" module, and then it can use the `vector-core::compile_vrl` function which includes this automatically
         let mut config = CompileConfig::default();
-        config.set_read_only_path(TargetPath::metadata(owned_path!("vector")), true);
+        config.set_read_only_path(OwnedTargetPath::metadata(owned_value_path!("vector")), true);
 
         let state = TypeState::default();
 

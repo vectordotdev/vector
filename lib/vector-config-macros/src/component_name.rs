@@ -107,6 +107,7 @@ fn attr_to_component_name(attr: &Attribute) -> Result<Option<String>, Error> {
             attrs::SINK_COMPONENT,
             attrs::SOURCE_COMPONENT,
             attrs::TRANSFORM_COMPONENT,
+            attrs::SECRETS_COMPONENT,
         ],
     ) {
         return Ok(None);

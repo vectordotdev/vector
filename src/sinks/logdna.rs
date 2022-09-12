@@ -9,9 +9,7 @@ use vector_config::configurable_component;
 
 use crate::{
     codecs::Transformer,
-    config::{
-        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
-    },
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::Event,
     http::{Auth, HttpClient},
     sinks::util::{
@@ -27,7 +25,7 @@ static HOST: Lazy<Uri> = Lazy::new(|| Uri::from_static("https://logs.logdna.com"
 const PATH: &str = "/logs/ingest";
 
 /// Configuration for the `logdna` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("logdna"))]
 #[derive(Clone, Debug)]
 pub struct LogdnaConfig {
     /// The Ingestion API key.
@@ -81,10 +79,6 @@ pub struct LogdnaConfig {
     acknowledgements: AcknowledgementsConfig,
 }
 
-inventory::submit! {
-    SinkDescription::new::<LogdnaConfig>("logdna")
-}
-
 impl GenerateConfig for LogdnaConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(
@@ -96,7 +90,6 @@ impl GenerateConfig for LogdnaConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "logdna")]
 impl SinkConfig for LogdnaConfig {
     async fn build(
         &self,
@@ -122,10 +115,6 @@ impl SinkConfig for LogdnaConfig {
 
     fn input(&self) -> Input {
         Input::log()
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "logdna"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

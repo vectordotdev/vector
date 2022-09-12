@@ -16,7 +16,7 @@ glob = "0.3.0"
 scan_fmt = "0.2.6"
 
 [dependencies.bstr]
-version = "0.2"
+version = "1.0"
 default-features = false
 features = []
 

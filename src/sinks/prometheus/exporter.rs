@@ -15,23 +15,21 @@ use hyper::{
     Body, Method, Request, Response, Server, StatusCode,
 };
 use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use snafu::Snafu;
 use stream_cancel::{Trigger, Tripwire};
 use tracing::{Instrument, Span};
 use vector_config::configurable_component;
 use vector_core::{
-    internal_event::{BytesSent, EventsSent},
+    internal_event::{
+        ByteSize, BytesSent, EventsSent, InternalEventHandle as _, Protocol, Registered,
+    },
     ByteSizeOf,
 };
 
 use super::collector::{MetricCollector, StringCollector};
 use crate::{
-    config::{
-        AcknowledgementsConfig, GenerateConfig, Input, Resource, SinkConfig, SinkContext,
-        SinkDescription,
-    },
+    config::{AcknowledgementsConfig, GenerateConfig, Input, Resource, SinkConfig, SinkContext},
     event::{
         metric::{Metric, MetricData, MetricKind, MetricSeries, MetricValue},
         Event, EventStatus, Finalizable,
@@ -58,7 +56,7 @@ enum BuildError {
 
 /// Configuration for the `prometheus_exporter` sink.
 #[serde_as]
-#[configurable_component(sink)]
+#[configurable_component(sink("prometheus_exporter"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct PrometheusExporterConfig {
@@ -167,14 +165,6 @@ const fn default_suppress_timestamp() -> bool {
     false
 }
 
-inventory::submit! {
-    SinkDescription::new::<PrometheusExporterConfig>("prometheus")
-}
-
-inventory::submit! {
-    SinkDescription::new::<PrometheusExporterConfig>("prometheus_exporter")
-}
-
 impl GenerateConfig for PrometheusExporterConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(&Self::default()).unwrap()
@@ -182,7 +172,6 @@ impl GenerateConfig for PrometheusExporterConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "prometheus_exporter")]
 impl SinkConfig for PrometheusExporterConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         if self.flush_period_secs.as_secs() < MIN_FLUSH_PERIOD_SECS {
@@ -203,48 +192,12 @@ impl SinkConfig for PrometheusExporterConfig {
         Input::metric()
     }
 
-    fn sink_type(&self) -> &'static str {
-        "prometheus_exporter"
-    }
-
     fn resources(&self) -> Vec<Resource> {
         vec![Resource::tcp(self.address)]
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-}
-
-// Add a compatibility alias to avoid breaking existing configs
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-struct PrometheusCompatConfig {
-    #[serde(flatten)]
-    config: PrometheusExporterConfig,
-}
-
-#[async_trait::async_trait]
-#[typetag::serde(name = "prometheus")]
-impl SinkConfig for PrometheusCompatConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        self.config.build(cx).await
-    }
-
-    fn input(&self) -> Input {
-        self.config.input()
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "prometheus"
-    }
-
-    fn resources(&self) -> Vec<Resource> {
-        self.config.resources()
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        self.config.acknowledgements()
     }
 }
 
@@ -386,6 +339,7 @@ fn handle(
     buckets: &[f64],
     quantiles: &[f64],
     metrics: &IndexMap<MetricRef, (Metric, MetricMetadata)>,
+    bytes_sent: &Registered<BytesSent>,
 ) -> Response<Body> {
     let mut response = Response::new(Body::empty());
 
@@ -407,10 +361,7 @@ fn handle(
                 HeaderValue::from_static("text/plain; version=0.0.4"),
             );
 
-            emit!(BytesSent {
-                byte_size: body_size,
-                protocol: "http",
-            });
+            bytes_sent.emit(ByteSize(body_size));
         }
         _ => {
             *response.status_mut() = StatusCode::NOT_FOUND;
@@ -434,6 +385,8 @@ impl PrometheusExporter {
             return;
         }
 
+        let bytes_sent = register!(BytesSent::from(Protocol::HTTP));
+
         let span = Span::current();
         let metrics = Arc::clone(&self.metrics);
         let default_namespace = self.config.default_namespace.clone();
@@ -446,6 +399,7 @@ impl PrometheusExporter {
             let default_namespace = default_namespace.clone();
             let buckets = buckets.clone();
             let quantiles = quantiles.clone();
+            let bytes_sent = bytes_sent.clone();
 
             async move {
                 Ok::<_, Infallible>(service_fn(move |req| {
@@ -464,6 +418,7 @@ impl PrometheusExporter {
                             &buckets,
                             &quantiles,
                             &metrics,
+                            &bytes_sent,
                         );
 
                         emit!(EventsSent {

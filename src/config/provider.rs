@@ -1,14 +1,24 @@
 use async_trait::async_trait;
+use enum_dispatch::enum_dispatch;
+use vector_config::NamedComponent;
 
-use crate::{providers, signal};
+use crate::{providers::BuildResult, signal};
 
+/// Generalized interface for constructing a configuration from a provider.
 #[async_trait]
-#[typetag::serde(tag = "type")]
-pub trait ProviderConfig: core::fmt::Debug + Send + Sync + dyn_clone::DynClone {
-    /// Builds a provider, returning a string containing the config. It's passed a signals
-    /// channel to control reloading and shutdown, as applicable.
-    async fn build(&mut self, signal_handler: &mut signal::SignalHandler) -> providers::Result;
-    fn provider_type(&self) -> &'static str;
+#[enum_dispatch]
+pub trait ProviderConfig: NamedComponent + core::fmt::Debug + Send + Sync {
+    /// Builds a configuration.
+    ///
+    /// Access to signal handling is given so that the provider can control reloading and shutdown
+    /// behavior as necessary.
+    ///
+    /// If a configuration is built successfully, `Ok(...)` is returned containing the
+    /// configuration.
+    ///
+    /// # Errors
+    ///
+    /// If an error occurs while building a configuration, an error variant explaining the
+    /// issue is returned.
+    async fn build(&mut self, signal_handler: &mut signal::SignalHandler) -> BuildResult;
 }
-
-dyn_clone::clone_trait_object!(ProviderConfig);

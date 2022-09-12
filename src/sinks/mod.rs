@@ -1,3 +1,4 @@
+use enum_dispatch::enum_dispatch;
 use futures::future::BoxFuture;
 use snafu::Snafu;
 
@@ -66,8 +67,6 @@ pub mod loki;
 pub mod nats;
 #[cfg(feature = "sinks-new_relic")]
 pub mod new_relic;
-#[cfg(feature = "sinks-new_relic_logs")]
-pub mod new_relic_logs;
 #[cfg(feature = "sinks-papertrail")]
 pub mod papertrail;
 #[cfg(feature = "sinks-prometheus")]
@@ -94,8 +93,12 @@ pub mod vector;
 #[cfg(feature = "sinks-websocket")]
 pub mod websocket;
 
-use vector_config::configurable_component;
-pub use vector_core::sink::VectorSink;
+use vector_config::{configurable_component, NamedComponent};
+pub use vector_core::{config::Input, sink::VectorSink};
+
+use crate::config::{
+    unit_test::UnitTestSinkConfig, AcknowledgementsConfig, Resource, SinkConfig, SinkContext,
+};
 
 pub type Healthcheck = BoxFuture<'static, crate::Result<()>>;
 
@@ -124,6 +127,7 @@ pub enum HealthcheckError {
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[enum_dispatch(SinkConfig)]
 pub enum Sinks {
     /// Apex Logs.
     #[cfg(feature = "sinks-apex")]
@@ -155,6 +159,10 @@ pub enum Sinks {
     #[cfg(feature = "sinks-aws_sqs")]
     AwsSqs(#[configurable(derived)] aws_sqs::SqsSinkConfig),
 
+    /// Axiom.
+    #[cfg(feature = "sinks-axiom")]
+    Axiom(#[configurable(derived)] axiom::AxiomConfig),
+
     /// Azure Blob Storage.
     #[cfg(feature = "sinks-azure_blob")]
     AzureBlob(#[configurable(derived)] azure_blob::AzureBlobSinkConfig),
@@ -174,10 +182,6 @@ pub enum Sinks {
     /// Console.
     #[cfg(feature = "sinks-console")]
     Console(#[configurable(derived)] console::ConsoleSinkConfig),
-
-    /// Datadog Archives.
-    #[cfg(feature = "sinks-datadog_archives")]
-    DatadogArchives(#[configurable(derived)] datadog_archives::DatadogArchivesSinkConfig),
 
     /// Datadog Events.
     #[cfg(feature = "sinks-datadog_events")]
@@ -251,7 +255,7 @@ pub enum Sinks {
 
     /// Kafka.
     #[cfg(feature = "sinks-kafka")]
-    Kafka(#[configurable(derived)] kafka::config::KafkaSinkConfig),
+    Kafka(#[configurable(derived)] kafka::KafkaSinkConfig),
 
     /// LogDNA.
     #[cfg(feature = "sinks-logdna")]
@@ -268,10 +272,6 @@ pub enum Sinks {
     /// New Relic.
     #[cfg(feature = "sinks-new_relic")]
     NewRelic(#[configurable(derived)] new_relic::NewRelicConfig),
-
-    /// New Relic Logs.
-    #[cfg(feature = "sinks-new_relic_logs")]
-    NewrelicLogs(#[configurable(derived)] new_relic_logs::NewRelicLogsConfig),
 
     /// Papertrail.
     #[cfg(feature = "sinks-papertrail")]
@@ -317,6 +317,35 @@ pub enum Sinks {
     #[cfg(feature = "sinks-statsd")]
     Statsd(#[configurable(derived)] statsd::StatsdSinkConfig),
 
+    /// Test (adaptive concurrency).
+    #[cfg(all(test, feature = "sources-demo_logs"))]
+    TestArc(#[configurable(derived)] self::util::adaptive_concurrency::tests::TestConfig),
+
+    /// Test (backpressure).
+    #[cfg(test)]
+    TestBackpressure(
+        #[configurable(derived)] crate::test_util::mock::sinks::BackpressureSinkConfig,
+    ),
+
+    /// Test (basic).
+    #[cfg(test)]
+    TestBasic(#[configurable(derived)] crate::test_util::mock::sinks::BasicSinkConfig),
+
+    /// Test (error).
+    #[cfg(test)]
+    TestError(#[configurable(derived)] crate::test_util::mock::sinks::ErrorSinkConfig),
+
+    /// Test (oneshot).
+    #[cfg(test)]
+    TestOneshot(#[configurable(derived)] crate::test_util::mock::sinks::OneshotSinkConfig),
+
+    /// Test (panic).
+    #[cfg(test)]
+    TestPanic(#[configurable(derived)] crate::test_util::mock::sinks::PanicSinkConfig),
+
+    /// Unit test.
+    UnitTest(#[configurable(derived)] UnitTestSinkConfig),
+
     /// Vector.
     #[cfg(feature = "sinks-vector")]
     Vector(#[configurable(derived)] vector::VectorConfig),
@@ -324,4 +353,122 @@ pub enum Sinks {
     /// Websocket.
     #[cfg(feature = "sinks-websocket")]
     Websocket(#[configurable(derived)] websocket::WebSocketSinkConfig),
+}
+
+impl NamedComponent for Sinks {
+    const NAME: &'static str = "_invalid_usage";
+
+    fn get_component_name(&self) -> &'static str {
+        match self {
+            #[cfg(feature = "sinks-apex")]
+            Self::Apex(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-aws_cloudwatch_logs")]
+            Self::AwsCloudwatchLogs(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-aws_cloudwatch_metrics")]
+            Self::AwsCloudwatchMetrics(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-aws_kinesis_firehose")]
+            Self::AwsKinesisFirehose(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-aws_kinesis_streams")]
+            Self::AwsKinesisStreams(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-aws_s3")]
+            Self::AwsS3(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-aws_sqs")]
+            Self::AwsSqs(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-axiom")]
+            Self::Axiom(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-azure_blob")]
+            Self::AzureBlob(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-azure_monitor_logs")]
+            Self::AzureMonitorLogs(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-blackhole")]
+            Self::Blackhole(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-clickhouse")]
+            Self::Clickhouse(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-console")]
+            Self::Console(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-datadog_events")]
+            Self::DatadogEvents(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-datadog_logs")]
+            Self::DatadogLogs(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-datadog_metrics")]
+            Self::DatadogMetrics(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-datadog_traces")]
+            Self::DatadogTraces(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-elasticsearch")]
+            Self::Elasticsearch(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-file")]
+            Self::File(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-gcp")]
+            Self::GcpChronicleUnstructured(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-gcp")]
+            Self::GcpStackdriverLogs(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-gcp")]
+            Self::GcpStackdriverMetrics(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-gcp")]
+            Self::GcpCloudStorage(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-gcp")]
+            Self::GcpPubsub(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-honeycomb")]
+            Self::Honeycomb(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-http")]
+            Self::Http(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-humio")]
+            Self::HumioLogs(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-humio")]
+            Self::HumioMetrics(config) => config.get_component_name(),
+            #[cfg(any(feature = "sinks-influxdb", feature = "prometheus-integration-tests"))]
+            Self::InfluxdbLogs(config) => config.get_component_name(),
+            #[cfg(any(feature = "sinks-influxdb", feature = "prometheus-integration-tests"))]
+            Self::InfluxdbMetrics(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-kafka")]
+            Self::Kafka(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-logdna")]
+            Self::Logdna(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-loki")]
+            Self::Loki(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-nats")]
+            Self::Nats(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-new_relic")]
+            Self::NewRelic(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-papertrail")]
+            Self::Papertrail(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-prometheus")]
+            Self::PrometheusExporter(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-prometheus")]
+            Self::PrometheusRemoteWrite(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-pulsar")]
+            Self::Pulsar(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-redis")]
+            Self::Redis(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-sematext")]
+            Self::SematextLogs(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-sematext")]
+            Self::SematextMetrics(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-socket")]
+            Self::Socket(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-splunk_hec")]
+            Self::SplunkHecLogs(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-splunk_hec")]
+            Self::SplunkHecMetrics(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-statsd")]
+            Self::Statsd(config) => config.get_component_name(),
+            #[cfg(all(test, feature = "sources-demo_logs"))]
+            Self::TestArc(config) => config.get_component_name(),
+            #[cfg(test)]
+            Self::TestBackpressure(config) => config.get_component_name(),
+            #[cfg(test)]
+            Self::TestBasic(config) => config.get_component_name(),
+            #[cfg(test)]
+            Self::TestError(config) => config.get_component_name(),
+            #[cfg(test)]
+            Self::TestOneshot(config) => config.get_component_name(),
+            #[cfg(test)]
+            Self::TestPanic(config) => config.get_component_name(),
+            Self::UnitTest(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-vector")]
+            Self::Vector(config) => config.get_component_name(),
+            #[cfg(feature = "sinks-websocket")]
+            Self::Websocket(config) => config.get_component_name(),
+        }
+    }
 }

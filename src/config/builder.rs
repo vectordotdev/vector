@@ -3,55 +3,84 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
 #[cfg(feature = "enterprise")]
 use serde_json::Value;
+use vector_config::configurable_component;
 use vector_core::{config::GlobalOptions, default_data_dir};
 
-use crate::{sources::Sources, transforms::Transforms};
+use crate::{
+    enrichment_tables::EnrichmentTables, providers::Providers, secrets::SecretBackends,
+    sinks::Sinks, sources::Sources, transforms::Transforms,
+};
 
 #[cfg(feature = "api")]
 use super::api;
 #[cfg(feature = "enterprise")]
 use super::enterprise;
 use super::{
-    compiler, provider, schema, ComponentKey, Config, EnrichmentTableConfig, EnrichmentTableOuter,
-    HealthcheckOptions, SecretBackend, SinkConfig, SinkOuter, SourceOuter, TestDefinition,
-    TransformOuter,
+    compiler, schema, ComponentKey, Config, EnrichmentTableOuter, HealthcheckOptions, SinkOuter,
+    SourceOuter, TestDefinition, TransformOuter,
 };
 
-#[derive(Deserialize, Serialize, Debug, Default)]
+/// A complete Vector configuration.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ConfigBuilder {
     #[serde(flatten)]
     pub global: GlobalOptions,
+
     #[cfg(feature = "api")]
+    #[configurable(derived)]
     #[serde(default)]
     pub api: api::Options,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub schema: schema::Options,
+
     #[cfg(feature = "enterprise")]
+    #[configurable(derived)]
     #[serde(default)]
     pub enterprise: Option<enterprise::Options>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub healthchecks: HealthcheckOptions,
+
+    /// All configured enrichment tables.
     #[serde(default)]
     pub enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter>,
+
+    /// All configured sources.
     #[serde(default)]
     pub sources: IndexMap<ComponentKey, SourceOuter>,
+
+    /// All configured sinks.
     #[serde(default)]
     pub sinks: IndexMap<ComponentKey, SinkOuter<String>>,
+
+    /// All configured transforms.
     #[serde(default)]
     pub transforms: IndexMap<ComponentKey, TransformOuter<String>>,
+
+    /// All configured unit tests.
     #[serde(default)]
     pub tests: Vec<TestDefinition<String>>,
-    pub provider: Option<Box<dyn provider::ProviderConfig>>,
+
+    /// Optional configuration provider to use.
+    ///
+    /// Configuration providers allow sourcing configuration information from a source other than
+    /// the typical configuration files that must be passed to Vector.
+    pub provider: Option<Providers>,
+
+    /// All configured secrets backends.
     #[serde(default)]
-    pub secret: IndexMap<ComponentKey, Box<dyn SecretBackend>>,
+    pub secret: IndexMap<ComponentKey, SecretBackends>,
 }
 
 #[cfg(feature = "enterprise")]
-#[derive(Serialize)]
+#[derive(::serde::Serialize)]
 struct ConfigBuilderHash<'a> {
     #[cfg(feature = "api")]
     api: &'a api::Options,
@@ -63,8 +92,8 @@ struct ConfigBuilderHash<'a> {
     sinks: BTreeMap<&'a ComponentKey, &'a SinkOuter<String>>,
     transforms: BTreeMap<&'a ComponentKey, &'a TransformOuter<String>>,
     tests: &'a Vec<TestDefinition<String>>,
-    provider: &'a Option<Box<dyn provider::ProviderConfig>>,
-    secret: BTreeMap<&'a ComponentKey, &'a dyn SecretBackend>,
+    provider: &'a Option<Providers>,
+    secret: BTreeMap<&'a ComponentKey, &'a SecretBackends>,
 }
 
 #[cfg(feature = "enterprise")]
@@ -97,7 +126,7 @@ impl ConfigBuilderHash<'_> {
 #[cfg(feature = "enterprise")]
 fn to_sorted_json_string<T>(value: T) -> String
 where
-    T: Serialize,
+    T: ::serde::Serialize,
 {
     let mut value = serde_json::to_value(value).expect("Should serialize to JSON. Please report.");
     sort_json_value(&mut value);
@@ -142,20 +171,8 @@ impl<'a> From<&'a ConfigBuilder> for ConfigBuilderHash<'a> {
             transforms: value.transforms.iter().collect(),
             tests: &value.tests,
             provider: &value.provider,
-            secret: value.secret.iter().map(|(k, v)| (k, v.as_ref())).collect(),
+            secret: value.secret.iter().collect(),
         }
-    }
-}
-
-impl Clone for ConfigBuilder {
-    fn clone(&self) -> Self {
-        // This is a hack around the issue of cloning
-        // trait objects. So instead to clone the config
-        // we first serialize it into JSON, then back from
-        // JSON. Originally we used TOML here but TOML does not
-        // support serializing `None`.
-        let json = serde_json::to_value(self).unwrap();
-        serde_json::from_value(json).unwrap()
     }
 }
 
@@ -225,35 +242,28 @@ impl ConfigBuilder {
         compiler::compile(self)
     }
 
-    pub fn add_enrichment_table<K: Into<String>, E: EnrichmentTableConfig + 'static>(
+    pub fn add_enrichment_table<K: Into<String>, E: Into<EnrichmentTables>>(
         &mut self,
         key: K,
         enrichment_table: E,
     ) {
         self.enrichment_tables.insert(
             ComponentKey::from(key.into()),
-            EnrichmentTableOuter::new(Box::new(enrichment_table)),
+            EnrichmentTableOuter::new(enrichment_table),
         );
     }
 
     pub fn add_source<K: Into<String>, S: Into<Sources>>(&mut self, key: K, source: S) {
-        self.sources.insert(
-            ComponentKey::from(key.into()),
-            SourceOuter::new(source.into()),
-        );
+        self.sources
+            .insert(ComponentKey::from(key.into()), SourceOuter::new(source));
     }
 
-    pub fn add_sink<K: Into<String>, S: SinkConfig + 'static>(
-        &mut self,
-        key: K,
-        inputs: &[&str],
-        sink: S,
-    ) {
+    pub fn add_sink<K: Into<String>, S: Into<Sinks>>(&mut self, key: K, inputs: &[&str], sink: S) {
         let inputs = inputs
             .iter()
             .map(|value| value.to_string())
             .collect::<Vec<_>>();
-        let sink = SinkOuter::new(inputs, Box::new(sink));
+        let sink = SinkOuter::new(inputs, sink);
         self.add_sink_outer(key, sink);
     }
 
@@ -273,7 +283,7 @@ impl ConfigBuilder {
             .iter()
             .map(|value| value.to_string())
             .collect::<Vec<_>>();
-        let transform = TransformOuter::new(inputs, transform.into());
+        let transform = TransformOuter::new(inputs, transform);
 
         self.transforms
             .insert(ComponentKey::from(key.into()), transform);

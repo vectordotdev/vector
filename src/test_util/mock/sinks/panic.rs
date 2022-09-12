@@ -18,7 +18,7 @@ use crate::{
 };
 
 /// Configuration for the `test_panic` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("test_panic"))]
 #[derive(Clone, Debug, Default)]
 pub struct PanicSinkConfig {
     /// Dummy field used for generating unique configurations to trigger reloads.
@@ -28,7 +28,6 @@ pub struct PanicSinkConfig {
 impl_generate_config_from_default!(PanicSinkConfig);
 
 #[async_trait]
-#[typetag::serde(name = "test_panic")]
 impl SinkConfig for PanicSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         Ok((VectorSink::from_event_sink(PanicSink), ok(()).boxed()))
@@ -36,10 +35,6 @@ impl SinkConfig for PanicSinkConfig {
 
     fn input(&self) -> Input {
         Input::log()
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "test_panic"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

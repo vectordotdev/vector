@@ -4,16 +4,17 @@ use codecs::decoding::{DeserializerConfig, FramingConfig, StreamDecodingError};
 use futures::{pin_mut, stream, Stream, StreamExt};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
-use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
+use vector_common::internal_event::{
+    ByteSize, BytesReceived, EventsReceived, InternalEventHandle as _, Protocol,
+};
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
-use vector_core::ByteSizeOf;
+use vector_core::{config::LogNamespace, ByteSizeOf};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{log_schema, GenerateConfig, Output, SourceConfig, SourceContext},
     event::Event,
-    internal_events::{OldEventsReceived, StreamClosedError},
+    internal_events::StreamClosedError,
     nats::{from_tls_auth_config, NatsAuthConfig, NatsConfigError},
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
@@ -152,9 +153,9 @@ async fn nats_source(
             match next {
                 Ok((events, _byte_size)) => {
                     let count = events.len();
-                    emit!(OldEventsReceived {
-                        byte_size: events.size_of(),
-                        count
+                    emit!(EventsReceived {
+                        count,
+                        byte_size: events.size_of()
                     });
 
                     let now = Utc::now();
