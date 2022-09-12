@@ -73,15 +73,27 @@ pub struct PulsarSinkConfig {
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub enum PulsarCompression {
-    /// No compression
+    /// No compression.
     None,
-    /// LZ4 compression
+    
+    /// [LZ4][lz4] compression.
+    ///
+    /// [lz4]: https://lz4.github.io/lz4/
     Lz4,
-    /// Zlib compression
+    
+    /// [Zlib][zlib] compression.
+    ///
+    /// [zlib]: https://www.zlib.net
     Zlib,
-    /// Zstd compression
+    
+    /// [Zstd][zstd] compression.
+    ///
+    /// [zstd]: https://zstd.net
     Zstd,
-    /// Snappy compression
+    
+    /// [Snappy][snappy] compression.
+    ///
+    /// [snappy]: https://google.github.io/snappy/
     Snappy,
 }
 
