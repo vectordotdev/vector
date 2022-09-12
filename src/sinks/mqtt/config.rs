@@ -56,6 +56,11 @@ pub struct MqttSinkConfig {
     pub encoding: EncodingConfig,
 
     #[configurable(derived)]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
     pub acknowledgements: AcknowledgementsConfig,
 }
 
