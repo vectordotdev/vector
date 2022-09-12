@@ -43,7 +43,9 @@ pub struct PulsarSinkConfig {
     /// If omitted, no properties will be written.
     pub properties_key: Option<String>,
 
-    /// Determines the default batch size, if not set, defaults to 1000
+    /// Determines the batch size.
+    ///
+    /// Defaults to 1000.
     #[configurable(derived)]
     #[serde(default)]
     pub batch_size: Option<u32>,
