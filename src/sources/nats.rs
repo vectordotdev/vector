@@ -292,7 +292,7 @@ mod integration_tests {
             tls: None,
             auth: Some(NatsAuthConfig::UserPassword {
                 user_password: NatsAuthUserPassword {
-                    user: "natsuser".to_string().into(),
+                    user: "natsuser".to_string(),
                     password: "natspass".to_string().into(),
                 },
             }),
@@ -322,7 +322,7 @@ mod integration_tests {
             tls: None,
             auth: Some(NatsAuthConfig::UserPassword {
                 user_password: NatsAuthUserPassword {
-                    user: "natsuser".to_string().into(),
+                    user: "natsuser".to_string(),
                     password: "wrongpass".to_string().into(),
                 },
             }),

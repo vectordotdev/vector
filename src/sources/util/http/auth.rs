@@ -16,7 +16,7 @@ use super::error::ErrorMessage;
 #[derive(Clone, Debug)]
 pub struct HttpSourceAuthConfig {
     /// The username for basic authentication.
-    pub username: SensitiveString,
+    pub username: String,
 
     /// The password for basic authentication.
     pub password: SensitiveString,
@@ -30,7 +30,7 @@ impl TryFrom<Option<&HttpSourceAuthConfig>> for HttpSourceAuth {
             Some(auth) => {
                 let mut headers = HeaderMap::new();
                 headers.typed_insert(Authorization::basic(
-                    auth.username.inner(),
+                    auth.username.as_str(),
                     auth.password.inner(),
                 ));
                 match headers.get("authorization") {

@@ -72,7 +72,7 @@ pub struct InfluxDb1Settings {
     /// The username to authenticate with.
     ///
     /// Only relevant when using InfluxDB v0.x/v1.x.
-    username: Option<SensitiveString>,
+    username: Option<String>,
 
     /// The password to authenticate with.
     ///
@@ -119,7 +119,7 @@ impl InfluxDbSettings for InfluxDb1Settings {
                 ("db", Some(self.database.clone())),
                 ("rp", self.retention_policy_name.clone()),
                 ("p", self.password.as_ref().map(|v| v.inner().to_owned())),
-                ("u", self.username.as_ref().map(|v| v.inner().to_owned())),
+                ("u", self.username.clone()),
                 ("precision", Some("ns".to_owned())),
             ],
         )
@@ -610,7 +610,7 @@ mod tests {
             consistency: Some("quorum".to_owned()),
             database: "vector_db".to_owned(),
             retention_policy_name: Some("autogen".to_owned()),
-            username: Some("writer".to_owned().into()),
+            username: Some("writer".to_owned()),
             password: Some("secret".to_owned().into()),
         };
 
@@ -643,7 +643,7 @@ mod tests {
             consistency: Some("quorum".to_owned()),
             database: "vector_db".to_owned(),
             retention_policy_name: Some("autogen".to_owned()),
-            username: Some("writer".to_owned().into()),
+            username: Some("writer".to_owned()),
             password: Some("secret".to_owned().into()),
         };
 

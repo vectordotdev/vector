@@ -63,7 +63,7 @@ pub struct KafkaSaslConfig {
     pub(crate) enabled: Option<bool>,
 
     /// The SASL username.
-    pub(crate) username: Option<SensitiveString>,
+    pub(crate) username: Option<String>,
 
     /// The SASL password.
     pub(crate) password: Option<SensitiveString>,
@@ -88,7 +88,7 @@ impl KafkaAuthConfig {
         if sasl_enabled {
             let sasl = self.sasl.as_ref().unwrap();
             if let Some(username) = &sasl.username {
-                client.set("sasl.username", username.inner());
+                client.set("sasl.username", username.as_str());
             }
             if let Some(password) = &sasl.password {
                 client.set("sasl.password", password.inner());

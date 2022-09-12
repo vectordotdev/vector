@@ -241,7 +241,7 @@ pub enum Auth {
     /// The username and password are concatenated and encoded via base64.
     Basic {
         /// The username to send.
-        user: SensitiveString,
+        user: String,
 
         /// The password to send.
         password: SensitiveString,
@@ -285,7 +285,7 @@ impl Auth {
     pub fn apply_headers_map(&self, map: &mut HeaderMap) {
         match &self {
             Auth::Basic { user, password } => {
-                let auth = Authorization::basic(user.inner(), password.inner());
+                let auth = Authorization::basic(user.as_str(), password.inner());
                 map.typed_insert(auth);
             }
             Auth::Bearer { token } => match Authorization::bearer(token.inner()) {

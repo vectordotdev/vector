@@ -145,7 +145,7 @@ fn get_basic_auth(authority: &Authority) -> (Authority, Option<Auth>) {
         (
             authority,
             Some(Auth::Basic {
-                user: user.into(),
+                user,
                 password: password.into(),
             }),
         )
@@ -196,7 +196,7 @@ mod tests {
             auth,
             expected_auth.map(|(user, password)| {
                 Auth::Basic {
-                    user: user.to_owned().into(),
+                    user: user.to_owned(),
                     password: password.to_owned().into(),
                 }
             })

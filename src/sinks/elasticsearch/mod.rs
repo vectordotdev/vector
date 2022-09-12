@@ -38,7 +38,7 @@ pub enum ElasticsearchAuth {
     /// HTTP Basic Authentication.
     Basic {
         /// Basic authentication username.
-        user: SensitiveString,
+        user: String,
 
         /// Basic authentication password.
         password: SensitiveString,

@@ -345,7 +345,7 @@ mod tests {
 
     fn make_auth() -> HttpSourceAuthConfig {
         HttpSourceAuthConfig {
-            username: random_string(16).into(),
+            username: random_string(16),
             password: random_string(16).into(),
         }
     }

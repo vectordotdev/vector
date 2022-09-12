@@ -68,7 +68,7 @@ impl std::fmt::Display for NatsAuthConfig {
 #[serde(deny_unknown_fields)]
 pub(crate) struct NatsAuthUserPassword {
     /// Username.
-    pub(crate) user: SensitiveString,
+    pub(crate) user: String,
 
     /// Password.
     pub(crate) password: SensitiveString,
@@ -113,7 +113,7 @@ impl NatsAuthConfig {
         match self {
             NatsAuthConfig::UserPassword { user_password } => {
                 Ok(nats::asynk::Options::with_user_pass(
-                    user_password.user.inner(),
+                    user_password.user.as_str(),
                     user_password.password.inner(),
                 ))
             }

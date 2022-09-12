@@ -72,7 +72,7 @@ struct AuthConfig {
     ///
     /// This can be used either for basic authentication (username/password) or JWT authentication.
     /// When used for JWT, the value should be `token`.
-    name: Option<SensitiveString>,
+    name: Option<String>,
 
     /// Basic authentication password/token.
     ///
@@ -197,7 +197,7 @@ impl PulsarSinkConfig {
                 auth.oauth2.as_ref(),
             ) {
                 (Some(name), Some(token), None) => builder.with_auth(Authentication {
-                    name: name.inner().to_owned(),
+                    name: name.clone(),
                     data: token.inner().as_bytes().to_vec(),
                 }),
                 (None, None, Some(oauth2)) => builder.with_auth_provider(

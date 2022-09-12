@@ -220,7 +220,7 @@ mod integration_test {
             kafka_address(9093),
             Some(KafkaSaslConfig {
                 enabled: Some(true),
-                username: Some("admin".to_string().into()),
+                username: Some("admin".to_string()),
                 password: Some("admin".to_string().into()),
                 mechanism: Some("PLAIN".to_owned()),
             }),
