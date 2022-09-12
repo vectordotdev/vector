@@ -129,7 +129,7 @@ where
         event.record(&mut limit_visitor);
 
         let limit = limit_visitor.limit.unwrap_or(false);
-        if limit == false {
+        if !limit {
             return self.inner.on_event(event, ctx);
         }
 
