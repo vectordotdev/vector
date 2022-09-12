@@ -370,12 +370,12 @@ async fn handle_stream<T>(
                                             BatchStatus::Delivered => TcpSourceAck::Ack,
                                             BatchStatus::Errored => {
                                                 warn!(message = "Error delivering events to sink.",
-                                                      internal_log_rate_secs = 5);
+                                                      internal_log_rate_limit = true);
                                                 TcpSourceAck::Error
                                             }
                                             BatchStatus::Rejected => {
                                                 warn!(message = "Failed to deliver events to sink.",
-                                                      internal_log_rate_secs = 5);
+                                                      internal_log_rate_limit = true);
                                                 TcpSourceAck::Reject
                                             }
                                         }

@@ -31,7 +31,7 @@ impl InternalEvent for ParserMatchError<'_> {
             error_type = error_type::CONDITION_FAILED,
             stage = error_stage::PROCESSING,
             field = &truncate_string_at(&String::from_utf8_lossy(self.value), 60)[..],
-            internal_log_rate_secs = 30
+            internal_log_rate_limit = true
         );
         counter!(
             "component_errors_total", 1,
@@ -57,7 +57,7 @@ impl InternalEvent for ParserMissingFieldError<'_> {
             error_code = "field_not_found",
             error_type = error_type::CONDITION_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_secs = 10
+            internal_log_rate_limit = true
         );
         counter!(
             "component_errors_total", 1,
@@ -86,7 +86,7 @@ impl<'a> InternalEvent for ParserConversionError<'a> {
             error_code = "type_conversion",
             error_type = error_type::CONVERSION_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_secs = 30
+            internal_log_rate_limit = true
         );
         counter!(
             "component_errors_total", 1,

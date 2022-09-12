@@ -22,7 +22,7 @@ use std::time::Instant;
 #[cfg(test)]
 use mock_instant::Instant;
 
-const RATE_LIMIT_SECS_FIELD: &str = "internal_log_rate_secs";
+const RATE_LIMIT_FIELD: &str = "internal_log_rate_limit";
 const MESSAGE_FIELD: &str = "message";
 
 // These fields will cause events to be independently rate limited by the values
@@ -43,7 +43,7 @@ where
 {
     events: DashMap<RateKeyIdentifier, State>,
     inner: L,
-
+    internal_log_rate_limit: u64,
     _subscriber: std::marker::PhantomData<S>,
 }
 
@@ -55,9 +55,15 @@ where
     pub fn new(layer: L) -> Self {
         RateLimitedLayer {
             events: Default::default(),
+            internal_log_rate_limit: 10,
             inner: layer,
             _subscriber: std::marker::PhantomData,
         }
+    }
+
+    pub fn with_limit(mut self, internal_log_rate_limit: u64) -> Self {
+        self.internal_log_rate_limit = internal_log_rate_limit;
+        self
     }
 }
 
@@ -117,13 +123,13 @@ where
     }
 
     fn on_event(&self, event: &Event<'_>, ctx: Context<'_, S>) {
-        // Visit the event, grabbing the limit if one is defined. If we can't find a rate limit field, or the rate limit
-        // is set as 0, then we let it pass through untouched.
+        // Visit the event, grabbing the limit status if one is defined. If we can't find a rate limit field, or the rate limit
+        // is set as false, then we let it pass through untouched.
         let mut limit_visitor = LimitVisitor::default();
         event.record(&mut limit_visitor);
 
-        let limit = limit_visitor.limit.unwrap_or(0);
-        if limit == 0 {
+        let limit = limit_visitor.limit.unwrap_or(false);
+        if limit == false {
             return self.inner.on_event(event, ctx);
         }
 
@@ -162,7 +168,7 @@ where
                 .message
                 .unwrap_or_else(|| metadata.name().into());
 
-            State::new(message, limit)
+            State::new(message, self.internal_log_rate_limit)
         });
 
         // Update our rate limiting state for this event, and see if we should still be rate limiting it.
@@ -252,7 +258,7 @@ where
             self.inner.on_event(&event, ctx.clone());
         } else {
             let values = [(
-                &fields.field(RATE_LIMIT_SECS_FIELD).unwrap(),
+                &fields.field(RATE_LIMIT_FIELD).unwrap(),
                 Some(&rate_limit as &dyn Value),
             )];
 
@@ -381,19 +387,13 @@ impl Visit for RateLimitedSpanKeys {
 
 #[derive(Default)]
 struct LimitVisitor {
-    pub limit: Option<u64>,
+    pub limit: Option<bool>,
 }
 
 impl Visit for LimitVisitor {
-    fn record_u64(&mut self, field: &Field, value: u64) {
-        if self.limit.is_none() && field.name() == RATE_LIMIT_SECS_FIELD {
+    fn record_bool(&mut self, field: &Field, value: bool) {
+        if self.limit.is_none() && field.name() == RATE_LIMIT_FIELD {
             self.limit = Some(value);
-        }
-    }
-
-    fn record_i64(&mut self, field: &Field, value: i64) {
-        if self.limit.is_none() && field.name() == RATE_LIMIT_SECS_FIELD {
-            self.limit = Some(u64::try_from(value).unwrap_or_default());
         }
     }
 
@@ -478,7 +478,7 @@ mod test {
             tracing_subscriber::registry::Registry::default().with(RateLimitedLayer::new(recorder));
         tracing::subscriber::with_default(sub, || {
             for _ in 0..21 {
-                info!(message = "Hello world!", internal_log_rate_secs = 1);
+                info!(message = "Hello world!", internal_log_rate_limit = true);
                 MockClock::advance(Duration::from_millis(100));
             }
         });
@@ -508,7 +508,7 @@ mod test {
 
         let recorder = RecordingLayer::new(Arc::clone(&events));
         let sub =
-            tracing_subscriber::registry::Registry::default().with(RateLimitedLayer::new(recorder));
+            tracing_subscriber::registry::Registry::default().with(RateLimitedLayer::new(recorder).with_limit(1));
         tracing::subscriber::with_default(sub, || {
             for _ in 0..21 {
                 for key in &["foo", "bar"] {
@@ -519,7 +519,7 @@ mod test {
                         info!(
                             message =
                                 format!("Hello {} on line_number {}!", key, line_number).as_str(),
-                            internal_log_rate_secs = 1
+                            internal_log_rate_limit = true
                         );
                     }
                 }
@@ -573,7 +573,7 @@ mod test {
 
         let recorder = RecordingLayer::new(Arc::clone(&events));
         let sub =
-            tracing_subscriber::registry::Registry::default().with(RateLimitedLayer::new(recorder));
+            tracing_subscriber::registry::Registry::default().with(RateLimitedLayer::new(recorder).with_limit(1));
         tracing::subscriber::with_default(sub, || {
             for _ in 0..21 {
                 for key in &["foo", "bar"] {
@@ -581,7 +581,7 @@ mod test {
                         info!(
                             message =
                                 format!("Hello {} on line_number {}!", key, line_number).as_str(),
-                            internal_log_rate_secs = 1,
+                            internal_log_rate_limit = true,
                             component_id = &key,
                             vrl_position = &line_number
                         );

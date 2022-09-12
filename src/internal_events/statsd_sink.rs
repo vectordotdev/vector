@@ -19,7 +19,7 @@ impl<'a> InternalEvent for StatsdInvalidMetricError<'a> {
             stage = error_stage::PROCESSING,
             value = ?self.value,
             kind = ?self.kind,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,

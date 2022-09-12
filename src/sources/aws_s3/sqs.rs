@@ -560,7 +560,7 @@ impl IngestorProcess {
                     BatchStatus::Rejected => {
                         error!(
                             message = "Sink reported events were rejected.",
-                            internal_log_rate_secs = 5,
+                            internal_log_rate_limit = true,
                         );
                         // Failed events cannot be retried, so continue to delete the SQS source message.
                         Ok(())

@@ -59,7 +59,7 @@ fn bench(c: &mut Criterion) {
                             bar = "bar",
                             baz = 3,
                             quuux = ?0.99,
-                            internal_log_rate_secs = 5
+                            internal_log_rate_limit = true
                         )
                     }
                 })

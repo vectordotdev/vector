@@ -35,7 +35,7 @@ impl<E: std::error::Error> InternalEvent for TcpSocketConnectionError<E> {
             error_code = "failed_connecting",
             error_type = error_type::WRITER_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -76,7 +76,7 @@ impl InternalEvent for TcpSocketTlsConnectionError {
                 debug!(
                     message = "Connection error, probably a healthcheck.",
                     error = %self.error,
-                    internal_log_rate_secs = 10,
+                    internal_log_rate_limit = true,
                 );
             }
             _ => {
@@ -86,7 +86,7 @@ impl InternalEvent for TcpSocketTlsConnectionError {
                     error_code = "connection_failed",
                     error_type = error_type::WRITER_FAILED,
                     stage = error_stage::SENDING,
-                    internal_log_rate_secs = 10,
+                    internal_log_rate_limit = true,
                 );
             }
         }
@@ -118,7 +118,7 @@ impl InternalEvent for TcpSocketError {
             error_code = "socket_failed",
             error_type = error_type::WRITER_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -148,7 +148,7 @@ impl InternalEvent for TcpSendAckError {
             error_code = "ack_failed",
             error_type = error_type::WRITER_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
