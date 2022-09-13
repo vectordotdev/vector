@@ -282,7 +282,7 @@ impl UnitTestStreamSinkConfig {
 }
 
 impl NamedComponent for UnitTestStreamSinkConfig {
-    const NAME: &'static str = "UnitTestStream";
+    const NAME: &'static str = "unit_test_stream";
 }
 
 impl std::fmt::Debug for UnitTestStreamSinkConfig {
@@ -292,7 +292,7 @@ impl std::fmt::Debug for UnitTestStreamSinkConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "unit_test_stream")]
+// #[typetag::serde(name = "unit_test_stream")]
 impl SinkConfig for UnitTestStreamSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink = self.sink.lock().await.take().unwrap();
@@ -301,9 +301,9 @@ impl SinkConfig for UnitTestStreamSinkConfig {
         Ok((VectorSink::from_event_sink(sink), healthcheck))
     }
 
-    fn sink_type(&self) -> &'static str {
-        "unit_test_stream"
-    }
+    // fn sink_type(&self) -> &'static str {
+    //     "unit_test_stream"
+    // }
 
     fn input(&self) -> Input {
         Input::all()
