@@ -122,7 +122,6 @@ pub async fn assert_metrics_present(
     let mut required_metrics: HashSet<_> = HashSet::from_iter(metrics_list.iter().cloned());
     for captures in metrics_regex().captures_iter(&metrics) {
         let metric_name = &captures["name"];
-        println!("{}", &metric_name);
         required_metrics.remove(metric_name);
     }
     if !required_metrics.is_empty() {
