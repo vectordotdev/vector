@@ -248,7 +248,7 @@ mod tests {
         crate::test_util::test_generate_config::<DedupeConfig>();
     }
 
-    const fn make_match_transform_config(num_events: usize, fields: Vec<String>) -> DedupeConfig {
+    fn make_match_transform_config(num_events: usize, fields: Vec<String>) -> DedupeConfig {
         DedupeConfig {
             cache: CacheConfig {
                 num_events: std::num::NonZeroUsize::new(num_events).expect("non-zero num_events"),
