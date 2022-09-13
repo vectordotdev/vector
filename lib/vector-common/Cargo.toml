@@ -11,7 +11,8 @@ default = [
   "btreemap",
   "conversion",
   "tokenize",
-  "encoding"
+  "encoding",
+  "json_encoded_size_of"
 ]
 
 aws_cloudwatch_logs_subscription = [
@@ -22,6 +23,8 @@ aws_cloudwatch_logs_subscription = [
 btreemap = []
 
 byte_size_of = ["dep:bytes", "dep:chrono"]
+
+json_encoded_size_of = ["serde", "dep:bytes", "dep:chrono"]
 
 conversion = [
   "dep:bytes",
