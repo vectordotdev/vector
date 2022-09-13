@@ -578,18 +578,22 @@ mod integration_tests {
             acknowledgements: Default::default(),
         };
 
-        // Publish events.
-        let conn = cnf.build_client().await.unwrap();
-
-        let sink = cnf.new(conn).unwrap();
         let mut events: Vec<Event> = Vec::new();
         for i in 0..num_events {
             let s: String = i.to_string();
             let e = LogEvent::from(s);
             events.push(e.into());
         }
+        let input = stream::iter(events.clone().into_iter().map(Into::into));
 
-        sink.run_events(events.clone()).await.unwrap();
+        // Publish events.
+        let cnf2 = cnf.clone();
+        assert_sink_compliance(&SINK_TAGS, async move {
+            let conn = cnf2.build_client().await.unwrap();
+            cnf2.new(conn).unwrap().run(input).await
+        })
+        .await
+        .expect("Running sink failed");
 
         let mut conn = cnf.build_client().await.unwrap();
 
@@ -652,11 +656,14 @@ mod integration_tests {
         };
 
         // Publish events.
-        let conn = cnf.build_client().await.unwrap();
-
-        let sink = cnf.new(conn).unwrap();
-        let (_input, events) = random_lines_with_stream(100, num_events, None);
-        sink.run(events).await.unwrap();
+        assert_sink_compliance(&SINK_TAGS, async move {
+            let conn = cnf.build_client().await.unwrap();
+            let sink = cnf.new(conn).unwrap();
+            let (_input, events) = random_lines_with_stream(100, num_events, None);
+            sink.run(events).await
+        })
+        .await
+        .expect("Running sink failed");
 
         // Receive events.
         let mut received_msg_num = 0;
