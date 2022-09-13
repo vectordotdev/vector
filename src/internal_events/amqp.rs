@@ -1,7 +1,7 @@
 #[cfg(feature = "sources-amqp")]
 pub mod source {
-    use crate::internal_events::prelude::{error_stage, error_type};
     use metrics::counter;
+    use vector_common::internal_event::{error_stage, error_type};
     use vector_core::internal_event::InternalEvent;
 
     #[derive(Debug)]
@@ -93,12 +93,10 @@ pub mod source {
 pub mod sink {
     use crate::{
         emit,
-        internal_events::{
-            prelude::{error_stage, error_type},
-            ComponentEventsDropped, UNINTENTIONAL,
-        },
+        internal_events::{ComponentEventsDropped, UNINTENTIONAL},
     };
     use metrics::counter;
+    use vector_common::internal_event::{error_stage, error_type};
     use vector_core::internal_event::InternalEvent;
 
     #[derive(Debug)]
