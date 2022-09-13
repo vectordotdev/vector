@@ -41,15 +41,32 @@ configuration: {
 			common: false
 			description: """
 				If set, Vector will configure the internal metrics system to automatically
-				remove all metrics that have not been updated in the given number of seconds.
+				remove all metrics that have not been updated in the given time.
 				This value must be positive.
 				"""
-			warnings: ["Deprecated, please use `expire_metrics_secs` instead."]
 			required: false
-			type: float: {
-				default: null
-				examples: [60.0]
-				unit: "seconds"
+			warnings: ["Deprecated, please use `expire_metrics_secs` instead."]
+			type: object: options: {
+				secs: {
+					common:      true
+					required:    false
+					description: "The whole number of seconds after which to expire metrics."
+					type: uint: {
+						default: null
+						examples: [60]
+						unit: "seconds"
+					}
+				}
+				nsecs: {
+					common:      true
+					required:    false
+					description: "The fractional number of seconds after which to expire metrics."
+					type: uint: {
+						default: null
+						examples: [0]
+						unit: "nanoseconds"
+					}
+				}
 			}
 		}
 
