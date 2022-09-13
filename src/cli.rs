@@ -151,7 +151,12 @@ pub struct RootOpts {
     pub watch_config: bool,
 
     /// Set the internal log rate limit
-    #[clap(short, long, env = "VECTOR_INTERNAL_LOG_RATE_LIMIT", default_value = "10")]
+    #[clap(
+        short,
+        long,
+        env = "VECTOR_INTERNAL_LOG_RATE_LIMIT",
+        default_value = "10"
+    )]
     pub internal_log_rate_limit: u64,
 }
 
