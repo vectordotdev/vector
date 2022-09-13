@@ -257,7 +257,9 @@ mod tests {
         fields.extend(given_fields);
 
         Dedupe::new(DedupeConfig {
-            cache: CacheConfig { num_events },
+            cache: CacheConfig {
+                num_events: std::num::NonZeroUsize::new(num_events).expect("non-zero num_events"),
+            },
             fields: Some(FieldMatchConfig::IgnoreFields(fields)),
         })
     }
