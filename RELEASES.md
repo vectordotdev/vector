@@ -87,7 +87,7 @@ version in your development environments and save stable for production.
 Otherwise, the stable release is your best bet.
 
 [Vector public calendar]: https://calendar.vector.dev
-[chat]: chat.vector.dev
+[chat]: https://chat.vector.dev
 [package manager]: https://vector.dev/docs/setup/installation/package-managers/
 [download page]: https://vector.dev/download/
 [nightly artifact list]: https://packages.timber.io/vector/nightly/
