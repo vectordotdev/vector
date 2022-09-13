@@ -58,9 +58,9 @@ pub struct DedupeConfig {
     pub cache: CacheConfig,
 }
 
-const fn default_cache_config() -> CacheConfig {
+fn default_cache_config() -> CacheConfig {
     CacheConfig {
-        num_events: unsafe { NonZeroUsize::new_unchecked(5000) },
+        num_events: NonZeroUsize::new(5000).expect("static non-zero number"),
     }
 }
 
