@@ -1,9 +1,11 @@
+use std::collections::HashSet;
 use std::time::Duration;
 
 use futures_util::future::join_all;
 use tokio::sync::oneshot;
 use url::Url;
 use vector_api_client::{connect_subscription_client, Client};
+use vector_common::config::ComponentKey;
 
 use super::{
     dashboard::{init_dashboard, is_tty},
@@ -42,9 +44,19 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
         None => return exitcode::UNAVAILABLE,
     };
 
+    let requested_component_ids = if let Some(requested_component_ids) = opts.component_id.clone() {
+        Some(HashSet::<ComponentKey>::from_iter(
+            requested_component_ids
+                .iter()
+                .map(|item| ComponentKey::from(item.as_str())),
+        ))
+    } else {
+        None
+    };
+
     // Create a channel for updating state via event messages
     let (tx, rx) = tokio::sync::mpsc::channel(20);
-    let state_rx = state::updater(rx).await;
+    let state_rx = state::updater(rx, requested_component_ids.clone()).await;
 
     // Change the HTTP schema to WebSockets
     let mut ws_url = url.clone();
@@ -64,13 +76,14 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
             // Initialize state. On future reconnects, we re-initialize state in
             // order to accurately capture added, removed, and edited
             // components.
-            let state = match metrics::init_components(&client).await {
-                Ok(state) => state,
-                Err(_) => {
-                    tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY)).await;
-                    continue;
-                }
-            };
+            let state =
+                match metrics::init_components(&client, requested_component_ids.clone()).await {
+                    Ok(state) => state,
+                    Err(_) => {
+                        tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY)).await;
+                        continue;
+                    }
+                };
             let _ = tx.send(EventType::InitializeState(state)).await;
 
             let subscription_client = match connect_subscription_client(ws_url.clone()).await {

@@ -26,4 +26,8 @@ pub struct Opts {
     /// Whether to reconnect if the underlying Vector API connection drops. By default, top will attempt to reconnect if the connection drops.
     #[clap(short, long)]
     no_reconnect: bool,
+
+    /// Show only specified component with provided id. Multiple component id must be comma-separated.
+    #[clap(short, long, value_delimiter = ',')]
+    component_id: Option<Vec<String>>,
 }

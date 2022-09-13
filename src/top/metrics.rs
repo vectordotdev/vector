@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, HashSet},
     sync::Arc,
 };
 
@@ -284,9 +284,12 @@ pub fn subscribe(
 
 /// Retrieve the initial components/metrics for first paint. Further updating the metrics
 /// will be handled by subscriptions.
-pub async fn init_components(client: &Client) -> Result<state::State, ()> {
+pub async fn init_components(
+    client: &Client,
+    requested_component_ids: Option<HashSet<ComponentKey>>,
+) -> Result<state::State, ()> {
     // Execute a query to get the latest components, and aggregate metrics for each resource.
-    // Since we don't know currently have a mechanism for scrolling/paging through results,
+    // Since we don't currently have a mechanism for scrolling/paging through results,
     // we're using an artificially high page size to capture all likely component configurations.
     let rows = client
         .components_query(i16::max_value() as i64)
@@ -325,6 +328,13 @@ pub async fn init_components(client: &Client) -> Result<state::State, ()> {
                     },
                 ))
             })
+        })
+        .filter(|item| {
+            if let Some(requested_component_ids) = &requested_component_ids {
+                requested_component_ids.contains(&item.0)
+            } else {
+                true
+            }
         })
         .collect::<BTreeMap<_, _>>();
 

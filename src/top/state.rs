@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::{
     collections::{BTreeMap, HashMap},
     fmt::Display,
@@ -133,7 +134,10 @@ impl ComponentRow {
 /// Takes the receiver `EventRx` channel, and returns a `StateRx` state receiver. This
 /// represents the single destination for handling subscriptions and returning 'immutable' state
 /// for re-rendering the dashboard. This approach uses channels vs. mutexes.
-pub async fn updater(mut event_rx: EventRx) -> StateRx {
+pub async fn updater(
+    mut event_rx: EventRx,
+    requested_component_ids: Option<HashSet<ComponentKey>>,
+) -> StateRx {
     let (tx, rx) = mpsc::channel(20);
 
     let mut state = State::new(BTreeMap::new());
@@ -209,7 +213,13 @@ pub async fn updater(mut event_rx: EventRx) -> StateRx {
                     }
                 }
                 EventType::ComponentAdded(c) => {
-                    let _ = state.components.insert(c.key.clone(), c);
+                    if let Some(requested_component_ids) = &requested_component_ids {
+                        if requested_component_ids.contains(&c.key) {
+                            let _ = state.components.insert(c.key.clone(), c);
+                        }
+                    } else {
+                        let _ = state.components.insert(c.key.clone(), c);
+                    }
                 }
                 EventType::ComponentRemoved(key) => {
                     let _ = state.components.remove(&key);
