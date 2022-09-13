@@ -6,9 +6,11 @@ use codecs::JsonSerializerConfig;
 use futures::{stream::BoxStream, FutureExt, StreamExt, TryFutureExt};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
-use vector_common::internal_event::{BytesSent, EventsSent};
+use vector_common::{
+    internal_event::{BytesSent, EventsSent},
+    json_encoded_size_of::EstimatedJsonEncodedSizeOf,
+};
 use vector_config::configurable_component;
-use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
@@ -190,7 +192,7 @@ impl StreamSink<Event> for NatsSink {
 
             self.transformer.transform(&mut event);
 
-            let event_byte_size = event.size_of();
+            let event_byte_size = event.estimated_json_encoded_size_of();
 
             let mut bytes = BytesMut::new();
             if self.encoder.encode(event, &mut bytes).is_err() {

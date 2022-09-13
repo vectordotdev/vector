@@ -25,7 +25,7 @@ use vector_core::{
     },
     internal_event::EventsSent,
     schema::Definition,
-    ByteSizeOf,
+    EstimatedJsonEncodedSizeOf,
 };
 
 use super::{
@@ -415,7 +415,7 @@ pub async fn build_pieces(
                     .inspect(|events| {
                         emit!(EventsReceived {
                             count: events.len(),
-                            byte_size: events.size_of(),
+                            byte_size: events.estimated_json_encoded_size_of(),
                         })
                     })
                     .take_until_if(tripwire),
@@ -623,7 +623,7 @@ impl Runner {
 
         emit!(EventsReceived {
             count: events.len(),
-            byte_size: events.size_of(),
+            byte_size: events.estimated_json_encoded_size_of(),
         });
     }
 
@@ -740,7 +740,7 @@ fn build_task_transform(
         .inspect(|events| {
             emit!(EventsReceived {
                 count: events.len(),
-                byte_size: events.size_of(),
+                byte_size: events.estimated_json_encoded_size_of(),
             })
         });
     let stream = t
@@ -748,7 +748,7 @@ fn build_task_transform(
         .inspect(|events: &EventArray| {
             emit!(EventsSent {
                 count: events.len(),
-                byte_size: events.size_of(),
+                byte_size: events.estimated_json_encoded_size_of(),
                 output: None,
             });
         });

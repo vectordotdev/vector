@@ -4,7 +4,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use codecs::encoding::Framer;
 use uuid::Uuid;
-use vector_core::{event::Finalizable, ByteSizeOf};
+use vector_core::{event::Finalizable, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     codecs::{Encoder, Transformer},
@@ -51,7 +51,7 @@ impl RequestBuilder<(String, Vec<Event>)> for S3RequestOptions {
         let metadata = S3Metadata {
             partition_key,
             count: events.len(),
-            byte_size: events.size_of(),
+            byte_size: events.estimated_json_encoded_size_of(),
             finalizers,
         };
 

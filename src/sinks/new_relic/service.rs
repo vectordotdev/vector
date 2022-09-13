@@ -56,7 +56,7 @@ impl DriverResponse for NewRelicApiResponse {
     fn events_sent(&self) -> EventsSent {
         EventsSent {
             count: self.metadata.event_count(),
-            byte_size: self.metadata.events_byte_size(),
+            byte_size: self.metadata.events_estimated_json_encoded_byte_size(),
             output: None,
         }
     }
