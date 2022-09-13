@@ -6,8 +6,8 @@ use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    config::{DataType, Output, SourceConfig, SourceContext},
-    internal_events::{EventsReceived, StreamClosedError},
+    config::{log_schema, DataType, Output, SourceConfig, SourceContext},
+    internal_events::{EventsReceived, InternalMetricsBytesReceived, StreamClosedError},
     metrics::Controller,
     shutdown::ShutdownSignal,
     SourceSender,
@@ -49,7 +49,7 @@ pub struct TagsConfig {
     ///
     /// The value will be the current hostname for wherever Vector is running.
     ///
-    /// By default, this is not set and the tag will not be automatically added.
+    /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     pub host_key: Option<String>,
 
     /// Sets the name of the tag to use to add the current process ID to each metric.
@@ -73,11 +73,15 @@ impl SourceConfig for InternalMetricsConfig {
         let interval = time::Duration::from_secs_f64(self.scrape_interval_secs);
         let namespace = self.namespace.clone();
 
-        let host_key = self
+        let host_key = match self
             .tags
             .host_key
             .as_deref()
-            .and_then(|tag| (!tag.is_empty()).then(|| tag.to_owned()));
+            .unwrap_or_else(|| log_schema().host_key())
+        {
+            "" => None,
+            s => Some(s.to_owned()),
+        };
         let pid_key = self
             .tags
             .pid_key
@@ -127,6 +131,8 @@ impl<'a> InternalMetrics<'a> {
             let metrics = self.controller.capture_metrics();
             let count = metrics.len();
             let byte_size = metrics.size_of();
+
+            emit!(InternalMetricsBytesReceived { byte_size });
             emit!(EventsReceived { count, byte_size });
 
             let batch = metrics.into_iter().map(|mut metric| {
@@ -170,7 +176,10 @@ mod tests {
             Event,
         },
         metrics::Controller,
-        test_util, SourceSender,
+        test_util::{
+            self,
+            components::{run_and_assert_source_compliance, SOURCE_TAGS},
+        },
     };
 
     #[test]
@@ -249,23 +258,15 @@ mod tests {
     }
 
     async fn event_from_config(config: InternalMetricsConfig) -> Event {
-        test_util::trace_init();
+        let mut events = run_and_assert_source_compliance(
+            config,
+            time::Duration::from_millis(100),
+            &SOURCE_TAGS,
+        )
+        .await;
 
-        let (sender, mut recv) = SourceSender::new_test();
-
-        tokio::spawn(async move {
-            config
-                .build(SourceContext::new_test(sender, None))
-                .await
-                .unwrap()
-                .await
-                .unwrap()
-        });
-
-        time::timeout(time::Duration::from_millis(100), recv.next())
-            .await
-            .expect("fetch metrics timeout")
-            .expect("failed to get metrics from a stream")
+        assert!(!events.is_empty());
+        events.remove(0)
     }
 
     #[tokio::test]
@@ -293,13 +294,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn no_tags_by_default() {
+    async fn only_host_tags_by_default() {
         let event = event_from_config(InternalMetricsConfig::default()).await;
 
         let metric = event.as_metric();
 
-        assert!(metric.tag_value("my_host_key").is_none());
-        assert!(metric.tag_value("my_pid_key").is_none());
+        assert!(metric.tag_value("host").is_some());
+        assert!(metric.tag_value("pid").is_none());
     }
 
     #[tokio::test]

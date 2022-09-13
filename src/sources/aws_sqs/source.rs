@@ -6,13 +6,16 @@ use aws_sdk_sqs::{
 };
 use chrono::{DateTime, TimeZone, Utc};
 use futures::{FutureExt, StreamExt};
-use tokio::{pin, select, time::Duration};
+use tokio::{pin, select};
+use tracing_futures::Instrument;
 use vector_common::finalizer::UnorderedFinalizer;
 
 use crate::{
     codecs::Decoder,
     event::{BatchNotifier, BatchStatus},
-    internal_events::{EndpointBytesReceived, SqsMessageDeleteError, StreamClosedError},
+    internal_events::{
+        EndpointBytesReceived, SqsMessageDeleteError, SqsMessageReceiveError, StreamClosedError,
+    },
     shutdown::ShutdownSignal,
     sources::util,
     SourceSender,
@@ -42,13 +45,16 @@ impl SqsSource {
             let (finalizer, mut ack_stream) = Finalizer::new(shutdown.clone());
             let client = self.client.clone();
             let queue_url = self.queue_url.clone();
-            tokio::spawn(async move {
-                while let Some((status, receipts)) = ack_stream.next().await {
-                    if status == BatchStatus::Delivered {
-                        delete_messages(client.clone(), receipts, queue_url.clone()).await;
+            tokio::spawn(
+                async move {
+                    while let Some((status, receipts)) = ack_stream.next().await {
+                        if status == BatchStatus::Delivered {
+                            delete_messages(client.clone(), receipts, queue_url.clone()).await;
+                        }
                     }
                 }
-            });
+                .in_current_span(),
+            );
             Arc::new(finalizer)
         });
 
@@ -57,16 +63,19 @@ impl SqsSource {
             let shutdown = shutdown.clone().fuse();
             let mut out = out.clone();
             let finalizer = finalizer.clone();
-            task_handles.push(tokio::spawn(async move {
-                let finalizer = finalizer.as_ref();
-                pin!(shutdown);
-                loop {
-                    select! {
-                        _ = &mut shutdown => break,
-                        _ = source.run_once(&mut out, finalizer) => {},
+            task_handles.push(tokio::spawn(
+                async move {
+                    let finalizer = finalizer.as_ref();
+                    pin!(shutdown);
+                    loop {
+                        select! {
+                            _ = &mut shutdown => break,
+                            _ = source.run_once(&mut out, finalizer) => {},
+                        }
                     }
                 }
-            }));
+                .in_current_span(),
+            ));
         }
 
         // Wait for all of the processes to finish.  If any one of them panics, we resume
@@ -98,9 +107,7 @@ impl SqsSource {
         let receive_message_output = match result {
             Ok(output) => output,
             Err(err) => {
-                error!("SQS receive message error: {:?}.", err);
-                // prevent rapid errors from flooding the logs
-                tokio::time::sleep(Duration::from_secs(1)).await;
+                emit!(SqsMessageReceiveError { error: &err });
                 return;
             }
         };
@@ -128,6 +135,8 @@ impl SqsSource {
                         receipts_to_ack.push(receipt_handle);
                     }
                     let timestamp = get_timestamp(&message.attributes);
+                    // Error is logged by `crate::codecs::Decoder`, no further handling
+                    // is needed here.
                     let decoded = util::decode_message(
                         self.decoder.clone(),
                         "aws_sqs",

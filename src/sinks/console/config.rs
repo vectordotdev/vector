@@ -27,7 +27,7 @@ pub enum Target {
 }
 
 /// Configuration for the `console` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("console"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct ConsoleSinkConfig {
@@ -59,7 +59,6 @@ impl GenerateConfig for ConsoleSinkConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "console")]
 impl SinkConfig for ConsoleSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let transformer = self.encoding.transformer();
@@ -84,10 +83,6 @@ impl SinkConfig for ConsoleSinkConfig {
 
     fn input(&self) -> Input {
         Input::new(self.encoding.config().1.input_type())
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "console"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

@@ -119,20 +119,31 @@ mod tests {
     use vector_core::event::Value;
 
     use super::*;
-    use crate::{event::Event, test_util::collect_ready, trace};
+    use crate::{
+        event::Event,
+        test_util::{
+            collect_ready,
+            components::{assert_source_compliance, SOURCE_TAGS},
+        },
+        trace,
+    };
 
     #[test]
     fn generates_config() {
         crate::test_util::test_generate_config::<InternalLogsConfig>();
     }
 
+    // This test is fairly overloaded with different cases.
+    //
+    // Unfortunately, this can't be easily split out into separate test
+    // cases because `consume_early_buffer` (called within the
+    // `start_source` helper) panics when called more than once.
     #[tokio::test]
     async fn receives_logs() {
-        // This test is fairly overloaded with different cases.
-        //
-        // Unfortunately, this can't be easily split out into separate test
-        // cases because `consume_early_buffer` (called within the
-        // `start_source` helper) panics when called more than once.
+        assert_source_compliance(&SOURCE_TAGS, run_test()).await;
+    }
+
+    async fn run_test() {
         let test_id: u8 = rand::random();
         let start = chrono::Utc::now();
         trace::init(false, false, "debug");

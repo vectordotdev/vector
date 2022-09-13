@@ -10,6 +10,12 @@ except:
 with open(filename, 'rb') as fh:
   config = tomlkit.load(fh)
 
+base_features = set()
+
+for key in ['api', 'enterprise']:
+  if config.get(key) is not None:
+    base_features.add(key)
+
 # Extract the set of features for a particular key from the config,
 # using the mapping to rewrite component names to their feature names.
 def get_features(config, key, mapping):
@@ -42,8 +48,16 @@ sink_feature_map = {
   'splunk_hec_logs': 'splunk_hec',
 }
 
-features = get_features(config, 'sources', source_feature_map) \
+# Set of always-compiled components, in terms of their computed feature flag, that should not be
+# emitted as they don't actually have a feature flag... because we always compile them.
+invalid_feature_flags = {
+  'transforms-log_to_metric',
+}
+
+features = base_features \
+  .union(get_features(config, 'sources', source_feature_map)) \
   .union(get_features(config, 'transforms', transform_feature_map)) \
-  .union(get_features(config, 'sinks', sink_feature_map))
+  .union(get_features(config, 'sinks', sink_feature_map)) \
+  .difference(invalid_feature_flags)
 
 print(','.join(sorted(features)))

@@ -1,5 +1,6 @@
 use std::num::{
     NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI8, NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU8,
+    NonZeroUsize,
 };
 
 use num_traits::{Bounded, One, ToPrimitive, Zero};
@@ -118,5 +119,5 @@ macro_rules! impl_configuable_number_nonzero {
 }
 
 impl_configuable_number!(u8, u16, u32, u64, usize, i8, i16, i32, i64, isize, f32, f64);
-impl_configuable_number_nonzero!(NonZeroU8 => u8, NonZeroU16 => u16, NonZeroU32 => u32, NonZeroU64 => u64);
+impl_configuable_number_nonzero!(NonZeroU8 => u8, NonZeroU16 => u16, NonZeroU32 => u32, NonZeroU64 => u64, NonZeroUsize => usize);
 impl_configuable_number_nonzero!(with_exclusion, NonZeroI8 => i8, NonZeroI16 => i16, NonZeroI32 => i32, NonZeroI64 => i64);

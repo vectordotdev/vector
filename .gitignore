@@ -2,6 +2,7 @@ cargo-timing*.html
 *.pyc
 *.iml
 *.tmp
+*~
 **/*.rs.bk
 .DS_Store
 .idea/

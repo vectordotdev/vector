@@ -9,8 +9,8 @@ pub mod proxy;
 use crate::event::LogEvent;
 pub use global_options::GlobalOptions;
 pub use log_schema::{init_log_schema, log_schema, LogSchema};
-use lookup::lookup_v2::Path;
-use lookup::path;
+use lookup::lookup_v2::ValuePath;
+use lookup::{path, PathPrefix};
 use serde::{Deserialize, Serialize};
 use value::Value;
 pub use vector_common::config::ComponentKey;
@@ -220,8 +220,8 @@ impl LogNamespace {
         &self,
         source_name: &'a str,
         log: &mut LogEvent,
-        legacy_key: impl Path<'a>,
-        metadata_key: impl Path<'a>,
+        legacy_key: impl ValuePath<'a>,
+        metadata_key: impl ValuePath<'a>,
         value: impl Into<Value>,
     ) {
         match self {
@@ -231,7 +231,7 @@ impl LogNamespace {
                     .insert(path!(source_name).concat(metadata_key), value);
             }
             LogNamespace::Legacy => {
-                log.try_insert(legacy_key, value);
+                log.try_insert((PathPrefix::Event, legacy_key), value);
             }
         }
     }
@@ -243,8 +243,8 @@ impl LogNamespace {
     pub fn insert_vector_metadata<'a>(
         &self,
         log: &mut LogEvent,
-        legacy_key: impl Path<'a>,
-        metadata_key: impl Path<'a>,
+        legacy_key: impl ValuePath<'a>,
+        metadata_key: impl ValuePath<'a>,
         value: impl Into<Value>,
     ) {
         match self {
@@ -253,7 +253,7 @@ impl LogNamespace {
                     .value_mut()
                     .insert(path!("vector").concat(metadata_key), value);
             }
-            LogNamespace::Legacy => log.try_insert(legacy_key, value),
+            LogNamespace::Legacy => log.try_insert((PathPrefix::Event, legacy_key), value),
         }
     }
 
