@@ -7,6 +7,7 @@ use vector_config::{configurable_component, ConfigurableString};
     derive(::serde::Deserialize, ::serde::Serialize),
     serde(from = "String", into = "String")
 )]
+#[configurable(metadata(sensitive))]
 #[derive(Clone, Default, PartialEq, Eq)]
 pub struct SensitiveString(String);
 
