@@ -16,7 +16,7 @@ use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
     config::{self, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::Event,
-    internal_events::{RedisSendEventError, TemplateRenderingError},
+    internal_events::TemplateRenderingError,
     sinks::util::{
         batch::BatchConfig,
         retries::{RetryAction, RetryLogic},
@@ -228,6 +228,7 @@ impl RedisSinkConfig {
 
         let sink = BatchSink::new(svc, buffer, batch.timeout)
             .with_flat_map(move |event| {
+                // Errors are handled by `Encoder`.
                 stream::iter(encode_event(event, &key, &transformer, &mut encoder)).map(Ok)
             })
             .sink_map_err(|error| error!(message = "Sink failed to flush.", %error));
@@ -293,6 +294,8 @@ fn encode_event(
     transformer.transform(&mut event);
 
     let mut bytes = BytesMut::new();
+
+    // Errors are handled by `Encoder`.
     encoder.encode(event, &mut bytes).ok()?;
     let value = bytes.freeze();
 
@@ -339,10 +342,12 @@ impl Service<Vec<RedisKvEntry>> for RedisSink {
     type Error = RedisError;
     type Future = BoxFuture<'static, RedisPipeResult>;
 
+    // Emission of Error internal event is handled upstream by the caller
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
+    // Emission of Error internal event is handled upstream by the caller
     fn call(&mut self, kvs: Vec<RedisKvEntry>) -> Self::Future {
         let count = kvs.len();
         let mut byte_size = 0;
@@ -382,16 +387,13 @@ impl Service<Vec<RedisKvEntry>> for RedisSink {
         let bytes_sent = self.bytes_sent.clone();
         Box::pin(async move {
             let result: RedisPipeResult = pipe.query_async(&mut conn).await;
-            match &result {
-                Ok(res) => {
-                    if res.is_successful() {
-                        bytes_sent.emit(ByteSize(byte_size));
-                    } else {
-                        warn!("Batch sending was not all successful and will be retried.")
-                    }
+            if let Ok(res) = &result {
+                if res.is_successful() {
+                    bytes_sent.emit(ByteSize(byte_size));
+                } else {
+                    warn!("Batch sending was not all successful and will be retried.")
                 }
-                Err(error) => emit!(RedisSendEventError::new(error)),
-            };
+            }
             result
         })
     }
