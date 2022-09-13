@@ -5,13 +5,12 @@ use vector_common::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
 };
 use vector_config::configurable_component;
-use vector_core::ByteSizeOf;
 
 use super::util::framestream::{build_framestream_unix_source, FrameHandler};
 use crate::{
     config::{log_schema, DataType, Output, SourceConfig, SourceContext},
     event::{Event, LogEvent},
-    internal_events::{DnstapParseError, EventsReceived},
+    internal_events::DnstapParseError,
     Result,
 };
 
@@ -190,6 +189,8 @@ impl FrameHandler for DnstapFrameHandler {
      * Takes a data frame from the unix socket and turns it into a Vector Event.
      **/
     fn handle_event(&self, received_from: Option<Bytes>, frame: Bytes) -> Option<Event> {
+        // SocketEventsReceived is emitted already
+
         self.bytes_received.emit(ByteSize(frame.len()));
 
         let mut log_event = LogEvent::default();
@@ -204,10 +205,6 @@ impl FrameHandler for DnstapFrameHandler {
                 base64::encode(&frame),
             );
             let event = Event::from(log_event);
-            emit!(EventsReceived {
-                count: 1,
-                byte_size: event.size_of(),
-            });
             Some(event)
         } else {
             match parse_dnstap_data(&self.schema, &mut log_event, frame) {
@@ -219,10 +216,6 @@ impl FrameHandler for DnstapFrameHandler {
                 }
                 Ok(_) => {
                     let event = Event::from(log_event);
-                    emit!(EventsReceived {
-                        count: 1,
-                        byte_size: event.size_of(),
-                    });
                     Some(event)
                 }
             }

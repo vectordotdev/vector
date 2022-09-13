@@ -3,8 +3,8 @@
 use core::fmt::Debug;
 
 use lookup::{
-    lookup_v2::{parse_path, OwnedPath},
-    path,
+    event_path,
+    lookup_v2::{parse_value_path, OwnedValuePath},
 };
 use serde::{Deserialize, Deserializer};
 use value::Value;
@@ -19,7 +19,7 @@ use crate::{event::Event, serde::skip_serializing_if_default};
 pub struct Transformer {
     /// List of fields that will be included in the encoded event.
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
-    only_fields: Option<Vec<OwnedPath>>,
+    only_fields: Option<Vec<OwnedValuePath>>,
 
     /// List of fields that will be excluded from the encoded event.
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
@@ -39,7 +39,7 @@ impl<'de> Deserialize<'de> for Transformer {
         #[serde(deny_unknown_fields)]
         struct TransformerInner {
             #[serde(default)]
-            only_fields: Option<Vec<OwnedPath>>,
+            only_fields: Option<Vec<OwnedValuePath>>,
             #[serde(default)]
             except_fields: Option<Vec<String>>,
             #[serde(default)]
@@ -62,7 +62,7 @@ impl Transformer {
     /// Returns `Err` if `only_fields` and `except_fields` fail validation, i.e. are not mutually
     /// exclusive.
     pub fn new(
-        only_fields: Option<Vec<OwnedPath>>,
+        only_fields: Option<Vec<OwnedValuePath>>,
         except_fields: Option<Vec<String>>,
         timestamp_format: Option<TimestampFormat>,
     ) -> Result<Self, crate::Error> {
@@ -76,7 +76,7 @@ impl Transformer {
     }
 
     /// Get the `Transformer`'s `only_fields`.
-    pub const fn only_fields(&self) -> &Option<Vec<OwnedPath>> {
+    pub const fn only_fields(&self) -> &Option<Vec<OwnedValuePath>> {
         &self.only_fields
     }
 
@@ -94,12 +94,12 @@ impl Transformer {
     ///
     /// If an error is returned, the entire encoding configuration should be considered inoperable.
     fn validate_fields(
-        only_fields: Option<&Vec<OwnedPath>>,
+        only_fields: Option<&Vec<OwnedValuePath>>,
         except_fields: Option<&Vec<String>>,
     ) -> crate::Result<()> {
         if let (Some(only_fields), Some(except_fields)) = (only_fields, except_fields) {
             if except_fields.iter().any(|f| {
-                let path_iter = parse_path(f);
+                let path_iter = parse_value_path(f);
                 only_fields.iter().any(|v| v == &path_iter)
             }) {
                 return Err(
@@ -126,7 +126,7 @@ impl Transformer {
             let mut to_remove = match log.keys() {
                 Some(keys) => keys
                     .filter(|field| {
-                        let field_path = parse_path(field);
+                        let field_path = parse_value_path(field);
                         !only_fields
                             .iter()
                             .any(|only| field_path.segments.starts_with(&only.segments[..]))
@@ -176,7 +176,7 @@ impl Transformer {
                             None
                         };
                         if let Some(ts) = timestamp {
-                            log.insert(path!(), Value::Integer(ts));
+                            log.insert(event_path!(), Value::Integer(ts));
                         }
                     }
                 }

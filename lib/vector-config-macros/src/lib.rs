@@ -99,6 +99,7 @@ pub fn derive_configurable(input: TokenStream) -> TokenStream {
     attributes(
         enrichment_table_component,
         provider_component,
+        secrets_component,
         sink_component,
         source_component,
         transform_component

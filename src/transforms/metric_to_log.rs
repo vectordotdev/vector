@@ -1,5 +1,5 @@
 use chrono::Utc;
-use lookup::path;
+use lookup::event_path;
 use serde_json::Value;
 use vector_common::TimeZone;
 use vector_config::configurable_component;
@@ -100,7 +100,7 @@ impl MetricToLog {
                     let mut log = LogEvent::new_with_metadata(metric.metadata().clone());
 
                     for (key, value) in object {
-                        log.insert(path!(&key), value);
+                        log.insert(event_path!(&key), value);
                     }
 
                     let timestamp = log

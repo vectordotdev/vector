@@ -57,6 +57,8 @@ mod http;
 pub mod http_client;
 #[cfg(feature = "sources-utils-http-scrape")]
 mod http_scrape;
+#[cfg(feature = "sinks-influxdb")]
+mod influxdb;
 #[cfg(feature = "sources-internal_logs")]
 mod internal_logs;
 #[cfg(feature = "sources-internal_metrics")]
@@ -115,7 +117,6 @@ mod template;
 mod throttle;
 mod udp;
 mod unix;
-mod vector;
 #[cfg(feature = "sinks-websocket")]
 mod websocket;
 
@@ -192,6 +193,8 @@ pub(crate) use self::host_metrics::*;
 pub(crate) use self::http::*;
 #[cfg(feature = "sources-utils-http-scrape")]
 pub(crate) use self::http_scrape::*;
+#[cfg(feature = "sinks-influxdb")]
+pub(crate) use self::influxdb::*;
 #[cfg(feature = "sources-internal_logs")]
 pub(crate) use self::internal_logs::*;
 #[cfg(feature = "sources-internal_metrics")]
@@ -257,8 +260,6 @@ pub(crate) use self::throttle::*;
     unix
 ))]
 pub(crate) use self::unix::*;
-#[cfg(feature = "sources-vector")]
-pub(crate) use self::vector::*;
 #[cfg(feature = "sinks-websocket")]
 pub(crate) use self::websocket::*;
 #[cfg(windows)]

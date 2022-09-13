@@ -85,7 +85,12 @@ that cannot import Vector's events.
 
 #### Error
 
-An `<Name>Error` event MUST be emitted when an error occurs.
+An `<Name>Error` event MUST be emitted when an error occurs during the running
+of a component.
+
+If an error occurs that prevents the component from starting up an event does
+not need to be emitted as this will prevent Vector from starting and the metric
+is unlikely to be collected. An error should still be logged however.
 
 - Properties
   - `error_code` - An error code for the failure, if applicable.

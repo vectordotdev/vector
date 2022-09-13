@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use chrono::{DateTime, Datelike, Utc};
-use lookup::path;
+use lookup::event_path;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use std::collections::BTreeMap;
@@ -120,10 +120,10 @@ fn insert_fields_from_syslog(
 ) {
     match log_namespace {
         LogNamespace::Legacy => {
-            log.insert(path!(log_schema().message_key()), parsed.msg);
+            log.insert(event_path!(log_schema().message_key()), parsed.msg);
         }
         LogNamespace::Vector => {
-            log.insert(path!("message"), parsed.msg);
+            log.insert(event_path!("message"), parsed.msg);
         }
     }
 
@@ -131,37 +131,37 @@ fn insert_fields_from_syslog(
         let timestamp = DateTime::<Utc>::from(timestamp);
         match log_namespace {
             LogNamespace::Legacy => {
-                log.insert(path!(log_schema().timestamp_key()), timestamp);
+                log.insert(event_path!(log_schema().timestamp_key()), timestamp);
             }
             LogNamespace::Vector => {
-                log.insert(path!("timestamp"), timestamp);
+                log.insert(event_path!("timestamp"), timestamp);
             }
         };
     }
     if let Some(host) = parsed.hostname {
-        log.insert(path!("hostname"), host.to_string());
+        log.insert(event_path!("hostname"), host.to_string());
     }
     if let Some(severity) = parsed.severity {
-        log.insert(path!("severity"), severity.as_str().to_owned());
+        log.insert(event_path!("severity"), severity.as_str().to_owned());
     }
     if let Some(facility) = parsed.facility {
-        log.insert(path!("facility"), facility.as_str().to_owned());
+        log.insert(event_path!("facility"), facility.as_str().to_owned());
     }
     if let Protocol::RFC5424(version) = parsed.protocol {
-        log.insert(path!("version"), version as i64);
+        log.insert(event_path!("version"), version as i64);
     }
     if let Some(app_name) = parsed.appname {
-        log.insert(path!("appname"), app_name.to_owned());
+        log.insert(event_path!("appname"), app_name.to_owned());
     }
     if let Some(msg_id) = parsed.msgid {
-        log.insert(path!("msgid"), msg_id.to_owned());
+        log.insert(event_path!("msgid"), msg_id.to_owned());
     }
     if let Some(procid) = parsed.procid {
         let value: Value = match procid {
             ProcId::PID(pid) => pid.into(),
             ProcId::Name(name) => name.to_string().into(),
         };
-        log.insert(path!("procid"), value);
+        log.insert(event_path!("procid"), value);
     }
 
     for element in parsed.structured_data.into_iter() {
@@ -169,7 +169,7 @@ fn insert_fields_from_syslog(
         for (name, value) in element.params() {
             sdata.insert(name.to_string(), value.into());
         }
-        log.insert(path!(element.id), sdata);
+        log.insert(event_path!(element.id), sdata);
     }
 }
 

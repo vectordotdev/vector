@@ -6,7 +6,7 @@ use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    config::{DataType, Output, SourceConfig, SourceContext},
+    config::{log_schema, DataType, Output, SourceConfig, SourceContext},
     internal_events::{EventsReceived, InternalMetricsBytesReceived, StreamClosedError},
     metrics::Controller,
     shutdown::ShutdownSignal,
@@ -49,7 +49,7 @@ pub struct TagsConfig {
     ///
     /// The value will be the current hostname for wherever Vector is running.
     ///
-    /// By default, this is not set and the tag will not be automatically added.
+    /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     pub host_key: Option<String>,
 
     /// Sets the name of the tag to use to add the current process ID to each metric.
@@ -73,11 +73,15 @@ impl SourceConfig for InternalMetricsConfig {
         let interval = time::Duration::from_secs_f64(self.scrape_interval_secs);
         let namespace = self.namespace.clone();
 
-        let host_key = self
+        let host_key = match self
             .tags
             .host_key
             .as_deref()
-            .and_then(|tag| (!tag.is_empty()).then(|| tag.to_owned()));
+            .unwrap_or_else(|| log_schema().host_key())
+        {
+            "" => None,
+            s => Some(s.to_owned()),
+        };
         let pid_key = self
             .tags
             .pid_key
@@ -290,13 +294,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn no_tags_by_default() {
+    async fn only_host_tags_by_default() {
         let event = event_from_config(InternalMetricsConfig::default()).await;
 
         let metric = event.as_metric();
 
-        assert!(metric.tag_value("my_host_key").is_none());
-        assert!(metric.tag_value("my_pid_key").is_none());
+        assert!(metric.tag_value("host").is_some());
+        assert!(metric.tag_value("pid").is_none());
     }
 
     #[tokio::test]

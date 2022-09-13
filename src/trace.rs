@@ -9,7 +9,7 @@ use std::{
 };
 
 use futures_util::{future::ready, Stream, StreamExt};
-use lookup::path;
+use lookup::event_path;
 use metrics_tracing_context::MetricsLayer;
 use once_cell::sync::OnceCell;
 use tokio::sync::{
@@ -288,7 +288,7 @@ where
                 for span in parent_span.scope().from_root() {
                     if let Some(fields) = span.extensions().get::<SpanFields>() {
                         for (k, v) in &fields.0 {
-                            log.insert(path!("vector", *k), v.clone());
+                            log.insert(event_path!("vector", *k), v.clone());
                         }
                     }
                 }

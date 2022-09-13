@@ -14,7 +14,7 @@ use crate::{
 };
 
 /// Configuration for the `websocket` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("websocket"))]
 #[derive(Clone, Debug)]
 pub struct WebSocketSinkConfig {
     /// The WebSocket URI to connect to.
@@ -64,7 +64,6 @@ impl GenerateConfig for WebSocketSinkConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "websocket")]
 impl SinkConfig for WebSocketSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let connector = self.build_connector()?;
@@ -78,10 +77,6 @@ impl SinkConfig for WebSocketSinkConfig {
 
     fn input(&self) -> Input {
         Input::log()
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "websocket"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

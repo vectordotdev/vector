@@ -5,9 +5,11 @@ use std::{
 
 use float_eq::FloatEq;
 use ordered_float::OrderedFloat;
-use serde::{Deserialize, Serialize};
+use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
+use serde_with::{serde_as, DeserializeAs, SerializeAs};
 use snafu::Snafu;
 use vector_common::byte_size_of::ByteSizeOf;
+use vector_config::configurable_component;
 
 use crate::event::{metric::Bucket, Metric, MetricValue};
 
@@ -156,9 +158,13 @@ impl Default for Config {
     }
 }
 
+/// A sketch bin.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Bin {
+    /// The bin index.
     k: i16,
+
+    /// The number of observations within the bin.
     n: u16,
 }
 
@@ -178,15 +184,15 @@ impl Bin {
     }
 }
 
-/// An implementation of [`DDSketch`][ddsketch] that mirrors the implementation from the Datadog agent.
+/// [DDSketch][ddsketch] implementation based on the [Datadog Agent][ddagent].
 ///
 /// This implementation is subtly different from the open-source implementations of `DDSketch`, as
 /// Datadog made some slight tweaks to configuration values and in-memory layout to optimize it for
 /// insertion performance within the agent.
 ///
-/// We've mimiced the agent version of `DDSketch` here in order to support a future where we can take
-/// sketches shipped by the agent, handle them internally, merge them, and so on, without any loss
-/// of accuracy, eventually forwarding them to Datadog ourselves.
+/// We've mimiced the agent version of `DDSketch` here in order to support a future where we can
+/// take sketches shipped by the agent, handle them internally, merge them, and so on, without any
+/// loss of accuracy, eventually forwarding them to Datadog ourselves.
 ///
 /// As such, this implementation is constrained in the same ways: the configuration parameters
 /// cannot be changed, the collapsing strategy is fixed, and we support a limited number of methods
@@ -197,16 +203,33 @@ impl Bin {
 /// emit useful default quantiles, rather than having to ship the buckets -- upper bound and count
 /// -- to a downstream system that might have no native way to do the same thing, basically
 /// providing no value as they have no way to render useful data from them.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+///
+/// [ddsketch]: https://www.vldb.org/pvldb/vol12/p2195-masson.pdf
+/// [ddagent]: https://github.com/DataDog/datadog-agent
+#[serde_as]
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct AgentDDSketch {
     #[serde(skip)]
     config: Config,
-    #[serde(with = "bin_serialization")]
+
+    /// The bins within the sketch.
+    #[serde_as(as = "BinMap")]
     bins: Vec<Bin>,
+
+    /// The number of observations within the sketch.
     count: u32,
+
+    /// The minimum value of all observations within the sketch.
     min: f64,
+
+    /// The maximum value of all observations within the sketch.
     max: f64,
+
+    /// The sum of all observations within the sketch.
     sum: f64,
+
+    /// The average value of all observations within the sketch.
     avg: f64,
 }
 
@@ -810,10 +833,22 @@ impl ByteSizeOf for AgentDDSketch {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+/// A split representation of sketch bins.
+///
+/// While internally we depend on a vector of bins, the serialized form used in Protocol Buffers
+/// splits the bins -- which contain their own key and bin count -- into two separate vectors, one
+/// for the keys and one for the bin counts.
+///
+/// This type provides the glue to go from our internal representation to the Protocol
+/// Buffers-specific representation.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct BinMap {
+    /// The bin keys.
     #[serde(rename = "k")]
     pub keys: Vec<i16>,
+
+    /// The bin counts.
     #[serde(rename = "n")]
     pub counts: Vec<u16>,
 }
@@ -855,24 +890,18 @@ impl BinMap {
     }
 }
 
-pub(self) mod bin_serialization {
-    use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
-
-    use super::{Bin, BinMap};
-
-    pub(crate) fn serialize<S>(bins: &[Bin], serializer: S) -> Result<S::Ok, S::Error>
+impl SerializeAs<Vec<Bin>> for BinMap {
+    fn serialize_as<S>(source: &Vec<Bin>, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        // We use a custom serializer here because while the summary stat fields are (de)serialized
-        // fine using the default derive implementation, we have to split the bins into an array of
-        // keys and an array of counts.  This is to keep serializing as close as possible to the
-        // Protocol Buffers definition that the Datadog Agent uses.
-        let bin_map = BinMap::from_bins(bins);
+        let bin_map = BinMap::from_bins(source);
         bin_map.serialize(serializer)
     }
+}
 
-    pub(crate) fn deserialize<'de, D>(deserializer: D) -> Result<Vec<Bin>, D::Error>
+impl<'de> DeserializeAs<'de, Vec<Bin>> for BinMap {
+    fn deserialize_as<D>(deserializer: D) -> Result<Vec<Bin>, D::Error>
     where
         D: Deserializer<'de>,
     {

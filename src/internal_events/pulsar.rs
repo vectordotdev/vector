@@ -1,8 +1,11 @@
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
-use super::prelude::{error_stage, error_type};
-use crate::{emit, internal_events::ComponentEventsDropped};
+use crate::{
+    emit,
+    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
+};
+use vector_common::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct PulsarSendingError {
@@ -24,9 +27,8 @@ impl InternalEvent for PulsarSendingError {
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::SENDING,
         );
-        emit!(ComponentEventsDropped {
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
             count: self.count,
-            intentional: false,
             reason,
         });
     }

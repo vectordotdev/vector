@@ -12,11 +12,12 @@ use vector_core::{
     event::proto as proto_event, internal_event::EventsSent, stream::DriverResponse,
 };
 
+use super::VectorSinkError;
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_events::EndpointBytesSent,
     proto::vector as proto_vector,
-    sinks::{util::uri, vector::v2::VectorSinkError},
+    sinks::util::uri,
     Error,
 };
 

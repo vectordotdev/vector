@@ -24,9 +24,3 @@ mod tests;
 #[cfg(feature = "loki-benches")]
 pub use self::config::valid_label_name;
 pub use self::config::{LokiConfig, OutOfOrderAction};
-
-use crate::config::SinkDescription;
-
-inventory::submit! {
-    SinkDescription::new::<LokiConfig>("loki")
-}
