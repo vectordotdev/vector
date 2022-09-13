@@ -1,5 +1,8 @@
 //! Encoding for the `AMQP` sink.
-use crate::{event::Event, sinks::util::encoding::Encoder};
+use crate::{
+    event::Event,
+    sinks::util::encoding::{write_all, Encoder},
+};
 use bytes::BytesMut;
 use std::io;
 use tokio_util::codec::Encoder as _;
@@ -20,7 +23,7 @@ impl Encoder<Event> for AmqpEncoder {
             .map_err(|_| io::Error::new(io::ErrorKind::Other, "unable to encode"))?;
 
         let body = body.freeze();
-        writer.write_all(body.as_ref())?;
+        write_all(writer, 1, body.as_ref())?;
 
         Ok(body.len())
     }
