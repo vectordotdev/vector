@@ -182,6 +182,14 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
 
     let json = serialize_to_json(source, &builder, opts.include_defaults, opts.pretty);
 
+    if builder
+        .enterprise
+        .map(|opts| opts.enabled)
+        .unwrap_or_default()
+    {
+        todo!()
+    }
+
     #[allow(clippy::print_stdout)]
     {
         println!("{}", json.expect("config should be serializable"));
