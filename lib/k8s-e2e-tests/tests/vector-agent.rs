@@ -82,6 +82,26 @@ async fn default_agent() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
+    let mut vector_metrics_port_forward = framework.port_forward(
+        &namespace,
+        &format!("daemonset/{}", override_name),
+        9090,
+        9090,
+    )?;
+    vector_metrics_port_forward.wait_until_ready().await?;
+    let vector_metrics_url = format!(
+        "http://{}/metrics",
+        vector_metrics_port_forward.local_addr_ipv4()
+    );
+
+    // Wait that `vector_started`-ish metric is present.
+    metrics::wait_for_vector_started(
+        &vector_metrics_url,
+        std::time::Duration::from_secs(5),
+        std::time::Instant::now() + std::time::Duration::from_secs(60),
+    )
+    .await?;
+
     let test_namespace = framework
         .namespace(namespace::Config::from_namespace(
             &namespace::make_namespace(pod_namespace.clone(), None),
@@ -142,8 +162,12 @@ async fn default_agent() -> Result<(), Box<dyn std::error::Error>> {
 
     assert!(got_marker);
 
+    metrics::assert_metrics_present(&vector_metrics_url, metrics::SOURCE_COMPLIANCE_METRICS)
+        .await?;
+
     drop(test_pod);
     drop(test_namespace);
+    drop(vector_metrics_port_forward);
     drop(vector);
     Ok(())
 }
@@ -1826,7 +1850,7 @@ async fn host_metrics() -> Result<(), Box<dyn std::error::Error>> {
     debug!("Done waiting for Vector bootstrap");
 
     // Ensure the host metrics are exposed in the Prometheus endpoint.
-    metrics::assert_host_metrics_present(&vector_metrics_url).await?;
+    metrics::assert_metrics_present(&vector_metrics_url, metrics::HOST_METRICS).await?;
 
     drop(vector_metrics_port_forward);
     drop(vector);
