@@ -556,6 +556,7 @@ impl IngestorProcess {
                     BatchStatus::Delivered => Ok(()),
                     BatchStatus::Errored => Err(ProcessingError::ErrorAcknowledgement),
                     BatchStatus::Rejected => {
+                        // Sinks are responsible for emitting ComponentEventsDropped.
                         // Failed events cannot be retried, so continue to delete the SQS source message.
                         Ok(())
                     }
