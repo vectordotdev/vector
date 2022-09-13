@@ -2,7 +2,10 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 use crate::event::Event;
-use crate::{emit, internal_events::ComponentEventsDropped};
+use crate::{
+    emit,
+    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
+};
 use vector_common::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
@@ -186,9 +189,8 @@ impl<E: std::fmt::Display> InternalEvent for KubernetesLifecycleError<E> {
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
-        emit!(ComponentEventsDropped {
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
             count: self.count,
-            intentional: false,
             reason: self.message,
         });
     }

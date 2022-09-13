@@ -98,14 +98,14 @@ pub async fn wait_for_vector_started(
     Ok(())
 }
 
-pub const HOST_METRICS: &'static [&'static str] = &[
+pub const HOST_METRICS: &[&str] = &[
     "host_load1",
     "host_load5",
     "host_cpu_seconds_total",
     "host_filesystem_total_bytes",
 ];
 
-pub const SOURCE_COMPLIANCE_METRICS: &'static [&'static str] = &[
+pub const SOURCE_COMPLIANCE_METRICS: &[&str] = &[
     "vector_component_received_events_total",
     "vector_component_received_event_bytes_total",
     "vector_component_sent_events_total",
