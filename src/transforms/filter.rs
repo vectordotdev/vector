@@ -6,7 +6,7 @@ use crate::{
     conditions::{AnyCondition, Condition},
     config::{DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext},
     event::Event,
-    internal_events::FilterEventDiscarded,
+    internal_events::FilterEventsDropped,
     schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
@@ -84,7 +84,7 @@ impl FunctionTransform for Filter {
         if result {
             output.push(event);
         } else if self.last_emission.elapsed() >= self.emissions_max_delay {
-            emit!(FilterEventDiscarded {
+            emit!(FilterEventsDropped {
                 total: self.emissions_deferred,
             });
             self.emissions_deferred = 0;
