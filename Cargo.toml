@@ -199,8 +199,8 @@ goauth = { version = "0.13.1", optional = true }
 smpl_jwt = { version = "0.7.1", default-features = false, optional = true }
 
 # API
-async-graphql = { version = "4.0.12", default-features = false, optional = true, features = ["chrono"] }
-async-graphql-warp = { version = "4.0.12", default-features = false, optional = true }
+async-graphql = { version = "4.0.13", default-features = false, optional = true, features = ["chrono"] }
+async-graphql-warp = { version = "4.0.13", default-features = false, optional = true }
 itertools = { version = "0.10.3", default-features = false, optional = true }
 
 # API client
@@ -223,7 +223,7 @@ vrl-stdlib = { path = "lib/vrl/stdlib" }
 arc-swap = { version = "1.5", default-features = false, optional = true }
 async-compression = { version = "0.3.12", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
 avro-rs = { version = "0.13.0", default-features = false, optional = true }
-axum = { version = "0.5.15", default-features = false }
+axum = { version = "0.5.16", default-features = false }
 base64 = { version = "0.13.0", default-features = false, optional = true }
 bloom = { version = "0.3.2", default-features = false, optional = true }
 bollard = { version = "0.13.0", default-features = false, features = ["ssl", "chrono"] }
@@ -231,7 +231,7 @@ bytes = { version = "1.2.1", default-features = false, features = ["serde"] }
 bytesize = { version = "1.1.0", default-features = false }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
 cidr-utils = { version = "0.5.7", default-features = false }
-clap = { version = "3.2.20", default-features = false, features = ["derive", "env", "std"] }
+clap = { version = "3.2.21", default-features = false, features = ["derive", "env", "std"] }
 colored = { version = "2.0.0", default-features = false }
 csv = { version = "1.1", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
@@ -275,7 +275,7 @@ openssl = { version = "0.10.41", default-features = false, features = ["vendored
 openssl-probe = { version = "0.1.5", default-features = false }
 openssl-src = { version = "111", default-features = false }
 ordered-float = { version = "3.0.0", default-features = false }
-percent-encoding = { version = "2.1.0", default-features = false }
+percent-encoding = { version = "2.2.0", default-features = false }
 pin-project = { version = "1.0.12", default-features = false }
 postgres-openssl = { version = "0.5.0", default-features = false, features = ["runtime"], optional = true }
 pulsar = { version = "4.1.2", default-features = false, features = ["tokio-runtime", "auth-oauth2"], optional = true }
@@ -284,7 +284,7 @@ rand_distr = { version = "0.4.3", default-features = false }
 rdkafka = { version = "0.28.0", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
 redis = { version = "0.21.6", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
 regex = { version = "1.6.0", default-features = false, features = ["std", "perf"] }
-roaring = { version = "0.10.0", default-features = false, optional = true }
+roaring = { version = "0.10.1", default-features = false, optional = true }
 seahash = { version = "4.1.0", default-features = false }
 semver = { version = "1.0.13", default-features = false, features = ["serde", "std"], optional = true }
 smallvec = { version = "1", default-features = false, features = ["union"] }
@@ -301,7 +301,7 @@ toml = { version = "0.5.9", default-features = false }
 tonic = { version = "0.7.2", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "compression"] }
 trust-dns-proto = { version = "0.21.0", default-features = false, features = ["dnssec"], optional = true }
 typetag = { version = "0.2.3", default-features = false }
-url = { version = "2.3.0", default-features = false, features = ["serde"] }
+url = { version = "2.3.1", default-features = false, features = ["serde"] }
 uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
 warp = { version = "0.3.1", default-features = false }
 
@@ -777,7 +777,7 @@ nats-integration-tests = ["sinks-nats", "sources-nats"]
 nginx-integration-tests = ["sources-nginx_metrics"]
 opentelemetry-integration-tests = ["sources-opentelemetry"]
 postgresql_metrics-integration-tests = ["sources-postgresql_metrics"]
-prometheus-integration-tests = ["sinks-prometheus", "sources-prometheus"]
+prometheus-integration-tests = ["sinks-prometheus", "sources-prometheus", "sinks-influxdb"]
 pulsar-integration-tests = ["sinks-pulsar"]
 redis-integration-tests = ["sinks-redis", "sources-redis"]
 splunk-integration-tests = ["sinks-splunk_hec"]

@@ -7,11 +7,11 @@ use metrics::counter;
 use prometheus_parser::ParserError;
 use vector_core::internal_event::InternalEvent;
 
-use super::prelude::{error_stage, error_type};
 use crate::{
     emit,
     internal_events::{ComponentEventsDropped, UNINTENTIONAL},
 };
+use vector_common::internal_event::{error_stage, error_type};
 
 #[cfg(feature = "sources-prometheus")]
 #[derive(Debug)]

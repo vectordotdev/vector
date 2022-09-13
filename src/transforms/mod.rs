@@ -184,9 +184,23 @@ impl NamedComponent for Transforms {
 
 #[cfg(test)]
 mod test {
+    use futures::Stream;
+    use futures_util::SinkExt;
+    use tokio::sync::mpsc;
+    use tokio_util::sync::PollSender;
     use vector_core::transform::FunctionTransform;
 
-    use crate::{event::Event, transforms::OutputBuffer};
+    use super::Transforms;
+    use crate::{
+        config::{
+            unit_test::{UnitTestStreamSinkConfig, UnitTestStreamSourceConfig},
+            ConfigBuilder,
+        },
+        event::Event,
+        test_util::start_topology,
+        topology::RunningTopology,
+        transforms::OutputBuffer,
+    };
 
     /// Transform a single `Event` through the `FunctionTransform`
     ///
@@ -204,5 +218,30 @@ mod test {
         ft.transform(&mut buf, event);
         assert!(buf.len() <= 1);
         buf.into_events().next()
+    }
+
+    #[allow(dead_code)]
+    pub async fn create_topology<T: Into<Transforms>>(
+        events: impl Stream<Item = Event> + Send + 'static,
+        transform_config: T,
+    ) -> (RunningTopology, mpsc::Receiver<Event>) {
+        let mut builder = ConfigBuilder::default();
+
+        let (tx, rx) = mpsc::channel(1);
+
+        builder.add_source("in", UnitTestStreamSourceConfig::new(events));
+        builder.add_transform("transform", &["in"], transform_config);
+        builder.add_sink(
+            "out",
+            &["transform"],
+            UnitTestStreamSinkConfig::new(
+                PollSender::new(tx).sink_map_err(|error| panic!("{}", error)),
+            ),
+        );
+
+        let config = builder.build().expect("building config should not fail");
+        let (topology, _) = start_topology(config, false).await;
+
+        (topology, rx)
     }
 }

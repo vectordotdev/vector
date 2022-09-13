@@ -4,7 +4,7 @@ pub use s3::*;
 use vector_core::internal_event::InternalEvent;
 
 #[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs"))]
-use crate::internal_events::prelude::{error_stage, error_type};
+use vector_common::internal_event::{error_stage, error_type};
 
 #[cfg(feature = "sources-aws_s3")]
 mod s3 {

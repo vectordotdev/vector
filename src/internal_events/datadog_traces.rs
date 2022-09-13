@@ -5,7 +5,7 @@ use crate::{
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
-use super::prelude::{error_stage, error_type};
+use vector_common::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct DatadogTracesEncodingError {
@@ -23,6 +23,7 @@ impl InternalEvent for DatadogTracesEncodingError {
             error_reason = %self.error_reason,
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::PROCESSING,
+            internal_log_rate_secs = 10,
         );
         counter!(
             "component_errors_total", 1,

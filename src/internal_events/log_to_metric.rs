@@ -3,8 +3,8 @@ use std::num::ParseFloatError;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
-use super::prelude::{error_stage, error_type};
 use crate::template::TemplateParseError;
+use vector_common::internal_event::{error_stage, error_type};
 
 pub struct LogToMetricFieldNullError<'a> {
     pub field: &'a str,
