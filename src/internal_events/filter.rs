@@ -1,3 +1,7 @@
+use crate::{
+    emit,
+    internal_events::{ComponentEventsDropped, INTENTIONAL},
+};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -8,15 +12,10 @@ pub struct FilterEventsDropped {
 
 impl InternalEvent for FilterEventsDropped {
     fn emit(self) {
-        debug!(
-            message = "Events dropped.",
-            count = self.total,
-            intentional = true,
-            reason = "Events matched filter condition."
-        );
-        counter!(
-            "events_discarded_total", self.total,
-            "intentional" => "true"
-        );
+        emit!(ComponentEventsDropped::<INTENTIONAL> {
+            count: self.total,
+            reason: "Events matched filter condition.",
+        });
+        counter!("events_discarded_total", self.total); // Deprecated
     }
 }
