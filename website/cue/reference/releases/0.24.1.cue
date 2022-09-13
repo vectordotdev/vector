@@ -34,16 +34,6 @@ releases: "0.24.1": {
 		},
 		{
 			type: "fix"
-			scopes: ["http sink"]
-			description: """
-				The `http` sink again accepts `metrics` and `traces` as events depending on the
-				configured codec. This was a regression in behavior in 0.23.0 where it was
-				incorrectly restricted.
-				"""
-			pr_numbers: [14320]
-		},
-		{
-			type: "fix"
 			scopes: ["observability"]
 			description: """
 				The newly added `expire_metrics` option was corrected to be named
