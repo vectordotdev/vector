@@ -1084,7 +1084,7 @@ components: sources: internal_metrics: {
 			description:       "The total number of seconds the Vector instance has been up."
 			type:              "gauge"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags:              _internal_metrics_tags
 		}
 		utf8_convert_errors_total: {
 			description:       "The total number of errors converting bytes to a UTF-8 string in UDP mode."
