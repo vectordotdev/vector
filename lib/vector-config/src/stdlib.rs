@@ -1,13 +1,15 @@
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     net::SocketAddr,
     num::{
         NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI8, NonZeroU16, NonZeroU32, NonZeroU64,
         NonZeroU8, NonZeroUsize,
     },
     path::PathBuf,
+    time::Duration,
 };
 
+use indexmap::IndexMap;
 use schemars::{gen::SchemaGenerator, schema::SchemaObject};
 use serde::Serialize;
 use vector_config_common::validation::Validation;
@@ -159,6 +161,15 @@ where
     }
 }
 
+impl<V> Configurable for BTreeSet<V>
+where
+    V: Configurable + Serialize + Eq + std::hash::Hash,
+{
+    fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+        generate_set_schema::<V>(gen)
+    }
+}
+
 impl<K, V> Configurable for HashMap<K, V>
 where
     K: ConfigurableString + Serialize + std::hash::Hash + Eq,
@@ -232,5 +243,30 @@ impl Configurable for PathBuf {
 
     fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
         Ok(generate_string_schema())
+    }
+}
+
+// The use of `Duration` is deprecated and will be removed in a future version
+impl Configurable for Duration {
+    fn referenceable_name() -> Option<&'static str> {
+        Some("stdlib::Duration")
+    }
+
+    fn description() -> Option<&'static str> {
+        Some("An duration of time.")
+    }
+
+    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+        let mut properties = IndexMap::default();
+        properties.insert("secs".into(), generate_number_schema::<u64>());
+        properties.insert("nsecs".into(), generate_number_schema::<u32>());
+
+        let mut required = BTreeSet::default();
+        required.insert("secs".into());
+        required.insert("nsecs".into());
+
+        Ok(crate::schema::generate_struct_schema(
+            properties, required, None,
+        ))
     }
 }

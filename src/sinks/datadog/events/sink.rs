@@ -3,14 +3,18 @@ use std::{fmt, num::NonZeroUsize};
 use async_trait::async_trait;
 use futures::{stream::BoxStream, StreamExt};
 use tower::Service;
+use vector_config::NamedComponent;
 use vector_core::stream::DriverResponse;
 
 use crate::{
     config::log_schema,
     event::Event,
-    internal_events::ParserMissingFieldError,
+    internal_events::{ParserMissingFieldError, SinkRequestBuildError},
     sinks::{
-        datadog::events::request_builder::{DatadogEventsRequest, DatadogEventsRequestBuilder},
+        datadog::events::{
+            request_builder::{DatadogEventsRequest, DatadogEventsRequestBuilder},
+            DatadogEventsConfig,
+        },
         util::{SinkBuilderExt, StreamSink},
     },
 };
@@ -34,8 +38,11 @@ where
             .request_builder(concurrency_limit, DatadogEventsRequestBuilder::new())
             .filter_map(|request| async move {
                 match request {
-                    Err(e) => {
-                        error!("Failed to build DatadogEvents request: {:?}.", e);
+                    Err(error) => {
+                        emit!(SinkRequestBuildError {
+                            name: DatadogEventsConfig::NAME,
+                            error
+                        });
                         None
                     }
                     Ok(req) => Some(req),

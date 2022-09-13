@@ -110,7 +110,7 @@ class Event
 
   # Scan for the emission of ComponentEventsDropped.
   def scan_component_dropped_events(block)
-    if block.match(/emit!\(\s*ComponentEventsDropped\s*\{/)
+    if block.match(/emit!\(\s*ComponentEventsDropped.*?\{/)
       @emits_component_events_dropped = true
     end
   end

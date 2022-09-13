@@ -10,7 +10,7 @@ use crate::{
         log_schema, DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
     },
     event::{Event, Value},
-    internal_events::DedupeEventDiscarded,
+    internal_events::DedupeEventsDropped,
     schema,
     transforms::{TaskTransform, Transform},
 };
@@ -168,7 +168,7 @@ impl Dedupe {
     fn transform_one(&mut self, event: Event) -> Option<Event> {
         let cache_entry = build_cache_entry(&event, &self.fields);
         if self.cache.put(cache_entry, true).is_some() {
-            emit!(DedupeEventDiscarded { event });
+            emit!(DedupeEventsDropped { count: 1 });
             None
         } else {
             Some(event)

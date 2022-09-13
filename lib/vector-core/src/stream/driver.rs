@@ -5,7 +5,7 @@ use futures_util::future::poll_fn;
 use tokio::{pin, select};
 use tower::Service;
 use tracing::Instrument;
-use vector_common::internal_event::BytesSent;
+use vector_common::internal_event::{service, BytesSent};
 
 use super::FuturesUnorderedCount;
 use crate::{
@@ -119,8 +119,8 @@ where
 
                         let svc = match maybe_ready {
                             Poll::Ready(Ok(())) => &mut service,
-                            Poll::Ready(Err(err)) => {
-                                error!(message = "Service return error from `poll_ready()`.", ?err);
+                            Poll::Ready(Err(error)) => {
+                                emit(service::PollReadyError{ error });
                                 return Err(())
                             }
                             Poll::Pending => {
@@ -168,6 +168,7 @@ where
     ) {
         match result {
             Err(error) => {
+                // `Error` and `EventsDropped` internal events are emitted in the sink retry logic.
                 error!(message = "Service call failed.", ?error, request_id);
                 finalizers.update_status(EventStatus::Rejected);
             }

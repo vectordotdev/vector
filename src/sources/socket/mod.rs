@@ -512,88 +512,87 @@ mod test {
         .await;
     }
 
+    // Intentially not using assert_source_compliance here because this is a round-trip test which
+    // means source and sink will both emit `EventsSent` , triggering multi-emission check.
     #[tokio::test]
     async fn tcp_shutdown_infinite_stream() {
-        assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
-            // We create our TCP source with a larger-than-normal send buffer, which helps ensure that
-            // the source doesn't block on sending the events downstream, otherwise if it was blocked on
-            // doing so, it wouldn't be able to wake up and loop to see that it had been signalled to
-            // shutdown.
-            let addr = next_addr();
+        // We create our TCP source with a larger-than-normal send buffer, which helps ensure that
+        // the source doesn't block on sending the events downstream, otherwise if it was blocked on
+        // doing so, it wouldn't be able to wake up and loop to see that it had been signalled to
+        // shutdown.
+        let addr = next_addr();
 
-            let (source_tx, source_rx) = SourceSender::new_with_buffer(10_000);
-            let source_key = ComponentKey::from("tcp_shutdown_infinite_stream");
-            let (source_cx, mut shutdown) = SourceContext::new_shutdown(&source_key, source_tx);
+        let (source_tx, source_rx) = SourceSender::new_with_buffer(10_000);
+        let source_key = ComponentKey::from("tcp_shutdown_infinite_stream");
+        let (source_cx, mut shutdown) = SourceContext::new_shutdown(&source_key, source_tx);
 
-            let mut source_config = TcpConfig::from_address(addr.into());
-            source_config.set_shutdown_timeout_secs(1);
-            let source_task = SocketConfig::from(source_config)
-                .build(source_cx)
-                .await
-                .unwrap();
+        let mut source_config = TcpConfig::from_address(addr.into());
+        source_config.set_shutdown_timeout_secs(1);
+        let source_task = SocketConfig::from(source_config)
+            .build(source_cx)
+            .await
+            .unwrap();
 
-            // Spawn the source task and wait until we're sure it's listening:
-            let source_handle = tokio::spawn(source_task);
-            wait_for_tcp(addr).await;
+        // Spawn the source task and wait until we're sure it's listening:
+        let source_handle = tokio::spawn(source_task);
+        wait_for_tcp(addr).await;
 
-            // Now we create a TCP _sink_ which we'll feed with an infinite stream of events to ship to
-            // our TCP source.  This will ensure that our TCP source is fully-loaded as we try to shut
-            // it down, exercising the logic we have to ensure timely shutdown even under load:
-            let message = random_string(512);
-            let message_bytes = Bytes::from(message.clone());
+        // Now we create a TCP _sink_ which we'll feed with an infinite stream of events to ship to
+        // our TCP source.  This will ensure that our TCP source is fully-loaded as we try to shut
+        // it down, exercising the logic we have to ensure timely shutdown even under load:
+        let message = random_string(512);
+        let message_bytes = Bytes::from(message.clone());
 
-            #[derive(Clone, Debug)]
-            struct Serializer {
-                bytes: Bytes,
+        #[derive(Clone, Debug)]
+        struct Serializer {
+            bytes: Bytes,
+        }
+        impl tokio_util::codec::Encoder<Event> for Serializer {
+            type Error = codecs::encoding::Error;
+
+            fn encode(&mut self, _: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
+                buffer.put(self.bytes.as_ref());
+                buffer.put_u8(b'\n');
+                Ok(())
             }
-            impl tokio_util::codec::Encoder<Event> for Serializer {
-                type Error = codecs::encoding::Error;
+        }
+        let sink_config = TcpSinkConfig::from_address(format!("localhost:{}", addr.port()));
+        let encoder = Serializer {
+            bytes: message_bytes,
+        };
+        let (sink, _healthcheck) = sink_config.build(Default::default(), encoder).unwrap();
 
-                fn encode(&mut self, _: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
-                    buffer.put(self.bytes.as_ref());
-                    buffer.put_u8(b'\n');
-                    Ok(())
-                }
-            }
-            let sink_config = TcpSinkConfig::from_address(format!("localhost:{}", addr.port()));
-            let encoder = Serializer {
-                bytes: message_bytes,
-            };
-            let (sink, _healthcheck) = sink_config.build(Default::default(), encoder).unwrap();
+        tokio::spawn(async move {
+            let input = stream::repeat_with(|| LogEvent::default().into()).boxed();
+            sink.run(input).await.unwrap();
+        });
 
-            tokio::spawn(async move {
-                let input = stream::repeat_with(|| LogEvent::default().into()).boxed();
-                sink.run(input).await.unwrap();
-            });
+        // Now with our sink running, feeding events to the source, collect 100 event arrays from
+        // the source and make sure each event within them matches the single message we repeatedly
+        // sent via the sink:
+        let events = collect_n_limited(source_rx, 100)
+            .await
+            .into_iter()
+            .collect::<Vec<_>>();
+        assert_eq!(100, events.len());
 
-            // Now with our sink running, feeding events to the source, collect 100 event arrays from
-            // the source and make sure each event within them matches the single message we repeatedly
-            // sent via the sink:
-            let events = collect_n_limited(source_rx, 100)
-                .await
-                .into_iter()
-                .collect::<Vec<_>>();
-            assert_eq!(100, events.len());
+        let message_key = log_schema().message_key();
+        let expected_message = message.clone().into();
+        for event in events.into_iter().flat_map(EventContainer::into_events) {
+            assert_eq!(event.as_log()[message_key], expected_message);
+        }
 
-            let message_key = log_schema().message_key();
-            let expected_message = message.clone().into();
-            for event in events.into_iter().flat_map(EventContainer::into_events) {
-                assert_eq!(event.as_log()[message_key], expected_message);
-            }
+        // Now trigger shutdown on the source and ensure that it shuts down before or at the
+        // deadline, and make sure the source task actually finished as well:
+        let shutdown_timeout_limit = Duration::from_secs(10);
+        let deadline = Instant::now() + shutdown_timeout_limit;
+        let shutdown_complete = shutdown.shutdown_source(&source_key, deadline);
 
-            // Now trigger shutdown on the source and ensure that it shuts down before or at the
-            // deadline, and make sure the source task actually finished as well:
-            let shutdown_timeout_limit = Duration::from_secs(10);
-            let deadline = Instant::now() + shutdown_timeout_limit;
-            let shutdown_complete = shutdown.shutdown_source(&source_key, deadline);
+        let shutdown_result = timeout(shutdown_timeout_limit, shutdown_complete).await;
+        assert_eq!(shutdown_result, Ok(true));
 
-            let shutdown_result = timeout(shutdown_timeout_limit, shutdown_complete).await;
-            assert_eq!(shutdown_result, Ok(true));
-
-            let source_result = source_handle.await.expect("source task should not panic");
-            assert_eq!(source_result, Ok(()));
-        })
-        .await;
+        let source_result = source_handle.await.expect("source task should not panic");
+        assert_eq!(source_result, Ok(()));
     }
 
     //////// UDP TESTS ////////

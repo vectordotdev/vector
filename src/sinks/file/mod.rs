@@ -239,7 +239,8 @@ impl FileSink {
                                         error,
                                         code: "failed_closing_file",
                                         message: "Failed to close file.",
-                                        path: Some(path),
+                                        path,
+                                        dropped_events: 0,
                                     });
                                 } else{
                                     trace!(message = "Successfully closed file.", path = ?path);
@@ -263,7 +264,13 @@ impl FileSink {
                             // We got an expired file. All we really want is to
                             // flush and close it.
                             if let Err(error) = expired_file.close().await {
-                                error!(message = "Failed to close file.", path = ?path, %error);
+                                emit!(FileIoError {
+                                    error,
+                                    code: "failed_closing_file",
+                                    message: "Failed to close file.",
+                                    path: &path,
+                                    dropped_events: 0,
+                                });
                             }
                             drop(expired_file); // ignore close error
                             emit!(FileOpen {
@@ -284,7 +291,7 @@ impl FileSink {
             None => {
                 // We weren't able to find the path to use for the
                 // file.
-                // This is already logged at `partition_event`, so
+                // The error is already handled at `partition_event`, so
                 // here we just skip the event.
                 event.metadata().update_status(EventStatus::Errored);
                 return;
@@ -309,7 +316,8 @@ impl FileSink {
                         code: "failed_opening_file",
                         message: "Unable to open the file.",
                         error,
-                        path: Some(&path),
+                        path: &path,
+                        dropped_events: 1,
                     });
                     event.metadata().update_status(EventStatus::Errored);
                     return;
@@ -347,7 +355,8 @@ impl FileSink {
                     code: "failed_writing_file",
                     message: "Failed to write the file.",
                     error,
-                    path: Some(&path),
+                    path: &path,
+                    dropped_events: 1,
                 });
             }
         }

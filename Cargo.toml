@@ -140,7 +140,7 @@ tokio = { version = "1.20.1", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1.9", default-features = false, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.7", default-features = false, features = ["io", "time"] }
-console-subscriber = { version = "0.1.7", default-features = false, optional = true }
+console-subscriber = { version = "0.1.8", default-features = false, optional = true }
 
 # Tracing
 tracing = { version = "0.1.34", default-features = false }
@@ -202,8 +202,8 @@ smpl_jwt = { version = "0.7.1", default-features = false, optional = true }
 lapin = { version = "2.1.1", default-features = false, optional = true }
 
 # API
-async-graphql = { version = "4.0.12", default-features = false, optional = true, features = ["chrono"] }
-async-graphql-warp = { version = "4.0.12", default-features = false, optional = true }
+async-graphql = { version = "4.0.13", default-features = false, optional = true, features = ["chrono"] }
+async-graphql-warp = { version = "4.0.13", default-features = false, optional = true }
 itertools = { version = "0.10.3", default-features = false, optional = true }
 
 # API client
@@ -226,7 +226,7 @@ vrl-stdlib = { path = "lib/vrl/stdlib" }
 arc-swap = { version = "1.5", default-features = false, optional = true }
 async-compression = { version = "0.3.12", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
 avro-rs = { version = "0.13.0", default-features = false, optional = true }
-axum = { version = "0.5.15", default-features = false }
+axum = { version = "0.5.16", default-features = false }
 base64 = { version = "0.13.0", default-features = false, optional = true }
 bloom = { version = "0.3.2", default-features = false, optional = true }
 bollard = { version = "0.13.0", default-features = false, features = ["ssl", "chrono"] }
@@ -236,7 +236,7 @@ chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
 cidr-utils = { version = "0.5.7", default-features = false }
 clap = { version = "3.2.20", default-features = false, features = ["derive", "env", "std"] }
 colored = { version = "2.0.0", default-features = false }
-csv = { version = "1.1", default-features = false, optional = true }
+csv = { version = "1.1", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
 dirs-next = { version = "2.0.0", default-features = false, optional = true }
 dyn-clone = { version = "1.0.9", default-features = false }
@@ -249,7 +249,7 @@ glob = { version = "0.3.0", default-features = false }
 governor = { version = "0.4.1", default-features = false, features = ["dashmap", "jitter", "std"], optional = true }
 grok = { version = "2.0.0", default-features = false, optional = true }
 h2 = { version = "0.3.13", default-features = false, optional = true }
-hash_hasher = { version = "2.0.0", default-features = false, optional  = true }
+hash_hasher = { version = "2.0.0", default-features = false }
 headers = { version = "0.3.8", default-features = false }
 hostname = { version = "0.3.1", default-features = false }
 http = { version = "0.2.8", default-features = false }
@@ -278,7 +278,7 @@ openssl = { version = "0.10.41", default-features = false, features = ["vendored
 openssl-probe = { version = "0.1.5", default-features = false }
 openssl-src = { version = "111", default-features = false }
 ordered-float = { version = "3.0.0", default-features = false }
-percent-encoding = { version = "2.1.0", default-features = false }
+percent-encoding = { version = "2.2.0", default-features = false }
 pin-project = { version = "1.0.12", default-features = false }
 postgres-openssl = { version = "0.5.0", default-features = false, features = ["runtime"], optional = true }
 pulsar = { version = "4.1.2", default-features = false, features = ["tokio-runtime", "auth-oauth2"], optional = true }
@@ -287,8 +287,8 @@ rand_distr = { version = "0.4.3", default-features = false }
 rdkafka = { version = "0.28.0", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
 redis = { version = "0.21.6", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
 regex = { version = "1.6.0", default-features = false, features = ["std", "perf"] }
-roaring = { version = "0.10.0", default-features = false, optional = true }
-seahash = { version = "4.1.0", default-features = false, optional = true }
+roaring = { version = "0.10.1", default-features = false, optional = true }
+seahash = { version = "4.1.0", default-features = false }
 semver = { version = "1.0.13", default-features = false, features = ["serde", "std"], optional = true }
 smallvec = { version = "1", default-features = false, features = ["union"] }
 snafu = { version = "0.7.1", default-features = false, features = ["futures"] }
@@ -304,7 +304,7 @@ toml = { version = "0.5.9", default-features = false }
 tonic = { version = "0.7.2", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "compression"] }
 trust-dns-proto = { version = "0.21.0", default-features = false, features = ["dnssec"], optional = true }
 typetag = { version = "0.2.3", default-features = false }
-url = { version = "2.2.2", default-features = false, features = ["serde"] }
+url = { version = "2.3.1", default-features = false, features = ["serde"] }
 uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
 warp = { version = "0.3.1", default-features = false }
 
@@ -438,8 +438,7 @@ protobuf-build = ["dep:tonic-build", "dep:prost-build"]
 gcp = ["dep:base64", "dep:goauth", "dep:smpl_jwt"]
 
 # Enrichment Tables
-enrichment-tables = ["enrichment-tables-file","enrichment-tables-geoip"]
-enrichment-tables-file = [ "dep:csv", "dep:seahash", "dep:hash_hasher" ]
+enrichment-tables = ["enrichment-tables-geoip"]
 enrichment-tables-geoip = ["dep:maxminddb"]
 
 # Sources
@@ -535,7 +534,7 @@ sources-utils-http-query = []
 sources-utils-http-scrape = ["sources-utils-http", "sources-http"]
 sources-utils-udp = []
 sources-utils-unix = []
-sources-vector = ["listenfd", "dep:tonic", "protobuf-build"]
+sources-vector = ["dep:tonic", "protobuf-build"]
 
 # Transforms
 transforms = ["transforms-logs", "transforms-metrics"]
@@ -575,7 +574,7 @@ transforms-pipelines = ["transforms-filter", "transforms-route"]
 transforms-reduce = []
 transforms-remap = []
 transforms-route = []
-transforms-sample = ["dep:seahash"]
+transforms-sample = []
 transforms-tag_cardinality_limit = ["dep:bloom"]
 transforms-throttle = ["dep:governor"]
 
@@ -833,12 +832,11 @@ dnstap-benches = ["sources-dnstap"]
 language-benches = ["sinks-socket", "sources-socket", "transforms-lua", "transforms-remap"]
 # Separate benching process for metrics due to the nature of the bootstrap procedures.
 statistic-benches = []
-metrics-benches = ["sinks-socket", "sources-socket"]
 remap-benches = ["transforms-remap"]
 transform-benches = ["transforms-filter", "transforms-dedupe", "transforms-reduce", "transforms-route"]
 codecs-benches = []
 loki-benches = ["sinks-loki"]
-enrichment-tables-benches = ["enrichment-tables-file","enrichment-tables-geoip"]
+enrichment-tables-benches = ["enrichment-tables-geoip"]
 
 [[bench]]
 name = "default"

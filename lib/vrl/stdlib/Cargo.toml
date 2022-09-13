@@ -28,7 +28,7 @@ hostname = { version = "0.3", optional = true }
 indexmap = { version = "~1.9.1", default-features = false, optional = true}
 md-5 = { version = "0.10", optional = true }
 nom = { version = "7", optional = true }
-percent-encoding = { version = "2.1", optional = true }
+percent-encoding = { version = "2.2", optional = true }
 once_cell = { version = "1.14", optional = true }
 rand = { version = "0.8.5", optional = true }
 regex = { version = "1", optional = true }

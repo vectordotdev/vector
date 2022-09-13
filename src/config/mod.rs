@@ -6,19 +6,19 @@ use std::{
     path::PathBuf,
 };
 
-use async_trait::async_trait;
-use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
-use serde::{Deserialize, Serialize};
+use indexmap::IndexMap;
 pub use vector_config::component::{GenerateConfig, SinkDescription, TransformDescription};
+use vector_config::configurable_component;
 pub use vector_core::config::{AcknowledgementsConfig, DataType, GlobalOptions, Input, Output};
 
-use crate::{conditions, event::Metric, serde::OneOrMany};
+use crate::{conditions, event::Metric, secrets::SecretBackends, serde::OneOrMany};
 
 pub mod api;
 mod builder;
 mod cmd;
 mod compiler;
 mod diff;
+mod enrichment_table;
 #[cfg(feature = "enterprise")]
 pub mod enterprise;
 pub mod format;
@@ -27,6 +27,7 @@ mod id;
 mod loading;
 pub mod provider;
 mod schema;
+mod secret;
 mod sink;
 mod source;
 mod transform;
@@ -38,13 +39,15 @@ pub mod watcher;
 pub use builder::ConfigBuilder;
 pub use cmd::{cmd, Opts};
 pub use diff::ConfigDiff;
+pub use enrichment_table::{EnrichmentTableConfig, EnrichmentTableOuter};
 pub use format::{Format, FormatHint};
 pub use id::{ComponentKey, OutputId};
 pub use loading::{
     load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider_and_secrets,
-    load_from_str, load_source_from_paths, merge_path_lists, process_paths, SecretBackend,
-    CONFIG_PATHS,
+    load_from_str, load_source_from_paths, merge_path_lists, process_paths, CONFIG_PATHS,
 };
+pub use provider::ProviderConfig;
+pub use secret::SecretBackend;
 pub use sink::{SinkConfig, SinkContext, SinkHealthcheckOptions, SinkOuter};
 pub use source::{SourceConfig, SourceContext, SourceOuter};
 pub use transform::{
@@ -108,7 +111,7 @@ pub struct Config {
     pub enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter>,
     tests: Vec<TestDefinition>,
     expansions: IndexMap<ComponentKey, Vec<ComponentKey>>,
-    secret: IndexMap<ComponentKey, Box<dyn SecretBackend>>,
+    secret: IndexMap<ComponentKey, SecretBackends>,
 }
 
 impl Config {
@@ -202,10 +205,21 @@ impl Config {
     }
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+/// Healthcheck options.
+#[configurable_component]
+#[derive(Clone, Copy, Debug)]
 #[serde(default)]
 pub struct HealthcheckOptions {
+    /// Whether or not healthchecks are enabled for all sinks.
+    ///
+    /// Can be overridden on a per-sink basis.
     pub enabled: bool,
+
+    /// Whether or not to require a sink to report as being healthy during startup.
+    ///
+    /// When enabled and a sink reports not being healthy, Vector will exit during start-up.
+    ///
+    /// Can be alternatively set, and overridden by, the `--require-healthy` command-line flag.
     pub require_healthy: bool,
 }
 
@@ -240,27 +254,6 @@ macro_rules! impl_generate_config_from_default {
             }
         }
     };
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct EnrichmentTableOuter {
-    #[serde(flatten)]
-    pub inner: Box<dyn EnrichmentTableConfig>,
-}
-
-impl EnrichmentTableOuter {
-    pub fn new(inner: Box<dyn EnrichmentTableConfig>) -> Self {
-        EnrichmentTableOuter { inner }
-    }
-}
-
-#[async_trait]
-#[typetag::serde(tag = "type")]
-pub trait EnrichmentTableConfig: core::fmt::Debug + Send + Sync + dyn_clone::DynClone {
-    async fn build(
-        &self,
-        globals: &GlobalOptions,
-    ) -> crate::Result<Box<dyn enrichment::Table + Send + Sync>>;
 }
 
 /// Unique thing, like port, of which only one owner can be.
@@ -349,15 +342,26 @@ impl Display for Resource {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+/// A unit test definition.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct TestDefinition<T = OutputId> {
+    /// The name of the unit test.
     pub name: String,
+
+    /// An input event to test against.
     pub input: Option<TestInput>,
+
+    /// A set of input events to test against.
     #[serde(default)]
     pub inputs: Vec<TestInput>,
+
+    /// A set of expected output events after the test has run.
     #[serde(default)]
     pub outputs: Vec<TestOutput<T>>,
+
+    /// A set of component outputs that should not have emitted any events.
     #[serde(default)]
     pub no_outputs_from: Vec<T>,
 }
@@ -388,7 +392,7 @@ impl TestDefinition<String> {
                 } = old;
 
                 let extract_from = extract_from
-                    .into_vec()
+                    .to_vec()
                     .into_iter()
                     .flat_map(|from| {
                         if let Some(expanded) = expansions.get(&from) {
@@ -466,14 +470,13 @@ impl TestDefinition<OutputId> {
         let outputs = outputs
             .into_iter()
             .map(|old| TestOutput {
-                extract_from: match old.extract_from {
-                    OneOrMany::One(value) => value.to_string().into(),
-                    OneOrMany::Many(values) => values
-                        .iter()
-                        .map(|item| item.to_string())
-                        .collect::<Vec<_>>()
-                        .into(),
-                },
+                extract_from: old
+                    .extract_from
+                    .to_vec()
+                    .into_iter()
+                    .map(|item| item.to_string())
+                    .collect::<Vec<_>>()
+                    .into(),
                 conditions: old.conditions,
             })
             .collect();
@@ -490,23 +493,55 @@ impl TestDefinition<OutputId> {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+/// Value for a log field.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(untagged)]
 pub enum TestInputValue {
-    String(String),
-    Integer(i64),
-    Float(f64),
-    Boolean(bool),
+    /// A string.
+    String(#[configurable(transparent)] String),
+
+    /// An integer.
+    Integer(#[configurable(transparent)] i64),
+
+    /// A floating-point number.
+    Float(#[configurable(transparent)] f64),
+
+    /// A boolean.
+    Boolean(#[configurable(transparent)] bool),
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+/// A unit test input.
+///
+/// An input describes not only the type of event to insert, but also which transform within the
+/// configuration to insert it to.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct TestInput {
+    /// The name of the transform to insert the input event to.
     pub insert_at: ComponentKey,
+
+    /// The type of the input event.
+    ///
+    /// Can be either `raw`, `log`, or `metric.
     #[serde(default = "default_test_input_type", rename = "type")]
     pub type_str: String,
+
+    /// The raw string value to use as the input event.
+    ///
+    /// Use this only when the input event should be a raw event (i.e. unprocessed/undecoded log
+    /// event) and when the input type is set to `raw`.
     pub value: Option<String>,
+
+    /// The set of log fields to use when creating a log input event.
+    ///
+    /// Only relevant when `type` is `log`.
     pub log_fields: Option<IndexMap<String, TestInputValue>>,
+
+    /// The metric to use as an input event.
+    ///
+    /// Only relevant when `type` is `metric`.
     pub metric: Option<Metric>,
 }
 
@@ -514,10 +549,18 @@ fn default_test_input_type() -> String {
     "raw".to_string()
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+/// A unit test output.
+///
+/// An output describes what we expect a transform to emit when fed a certain event, or events, when
+/// running a unit test.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct TestOutput<T = OutputId> {
+    /// The transform outputs to extract events from.
     pub extract_from: OneOrMany<T>,
+
+    /// The conditions to run against the output to validate that they were transformed as expected.
     pub conditions: Option<Vec<conditions::AnyCondition>>,
 }
 

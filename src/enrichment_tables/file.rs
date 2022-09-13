@@ -230,7 +230,6 @@ impl FileConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "file")]
 impl EnrichmentTableConfig for FileConfig {
     async fn build(
         &self,

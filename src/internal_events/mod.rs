@@ -117,7 +117,6 @@ mod template;
 mod throttle;
 mod udp;
 mod unix;
-mod vector;
 #[cfg(feature = "sinks-websocket")]
 mod websocket;
 
@@ -261,8 +260,6 @@ pub(crate) use self::throttle::*;
     unix
 ))]
 pub(crate) use self::unix::*;
-#[cfg(feature = "sources-vector")]
-pub(crate) use self::vector::*;
 #[cfg(feature = "sinks-websocket")]
 pub(crate) use self::websocket::*;
 #[cfg(windows)]

@@ -3,18 +3,23 @@ use std::fmt::Debug;
 use chrono::{DateTime, Local, ParseError, TimeZone as _, Utc};
 use chrono_tz::Tz;
 use derivative::Derivative;
-use vector_config::{
-    schema::generate_string_schema,
-    schemars::{gen::SchemaGenerator, schema::SchemaObject},
-    Configurable, GenerateError,
-};
+use vector_config::configurable_component;
 
+/// Timezone reference.
+#[configurable_component(no_deser, no_ser)]
 #[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
 #[derivative(Default)]
 pub enum TimeZone {
+    /// System local timezone.
     #[derivative(Default)]
     Local,
-    Named(Tz),
+
+    /// A named timezone.
+    ///
+    /// Must be a valid name in the [TZ database][tzdb].
+    ///
+    /// [tzdb]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+    Named(#[configurable(transparent)] Tz),
 }
 
 /// This is a wrapper trait to allow `TimeZone` types to be passed generically.
@@ -85,19 +90,5 @@ pub mod ser_de {
                 None => Err(de::Error::custom("No such time zone")),
             }
         }
-    }
-}
-
-impl Configurable for TimeZone {
-    fn referenceable_name() -> Option<&'static str> {
-        Some("vector_common::TimeZone")
-    }
-
-    fn description() -> Option<&'static str> {
-        Some("Strongly-typed list of timezones as defined in the `tz` database.")
-    }
-
-    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
-        Ok(generate_string_schema())
     }
 }

@@ -11,7 +11,7 @@ use futures::FutureExt;
 use tokio::time::{sleep, Sleep};
 use tower::{retry::Policy, timeout::error::Elapsed};
 
-use crate::Error;
+use crate::{internal_events::SinkSendError, Error};
 
 pub enum RetryAction {
     /// Indicate that this request should be retried with a reason
@@ -101,10 +101,11 @@ where
             Ok(response) => match self.logic.should_retry_response(response) {
                 RetryAction::Retry(reason) => {
                     if self.remaining_attempts == 0 {
-                        error!(
-                            message = "OK/retry response but retries exhausted; dropping the request.",
-                            reason = ?reason
-                        );
+                        emit!(SinkSendError {
+                            message:
+                                "OK/retry response but retries exhausted; dropping the request.",
+                            error: reason,
+                        });
                         return None;
                     }
 
@@ -113,7 +114,10 @@ where
                 }
 
                 RetryAction::DontRetry(reason) => {
-                    error!(message = "Not retriable; dropping the request.", reason = ?reason);
+                    emit!(SinkSendError {
+                        message: "Not retriable; dropping the request.",
+                        error: reason,
+                    });
                     None
                 }
 
@@ -121,7 +125,10 @@ where
             },
             Err(error) => {
                 if self.remaining_attempts == 0 {
-                    error!(message = "Retries exhausted; dropping the request.", %error);
+                    emit!(SinkSendError {
+                        message: "Retries exhausted; dropping the request.",
+                        error,
+                    });
                     return None;
                 }
 
@@ -130,20 +137,20 @@ where
                         warn!(message = "Retrying after error.", error = %expected);
                         Some(self.build_retry())
                     } else {
-                        error!(
-                            message = "Non-retriable error; dropping the request.",
-                            %error
-                        );
+                        emit!(SinkSendError {
+                            message: "Non-retriable error; dropping the request.",
+                            error,
+                        });
                         None
                     }
                 } else if error.downcast_ref::<Elapsed>().is_some() {
                     warn!("Request timed out. If this happens often while the events are actually reaching their destination, try decreasing `batch.max_bytes` and/or using `compression` if applicable. Alternatively `request.timeout_secs` can be increased.");
                     Some(self.build_retry())
                 } else {
-                    error!(
-                        message = "Unexpected error type; dropping the request.",
-                        %error
-                    );
+                    emit!(SinkSendError {
+                        message: "Unexpected error type; dropping the request.",
+                        error,
+                    });
                     None
                 }
             }
