@@ -303,7 +303,7 @@ mod tests {
         sinks::util::test::build_test_server,
         test_util::{
             self,
-            components::{assert_sink_compliance, SINK_TAGS},
+            components::{assert_sink_compliance, HTTP_SINK_TAGS},
         },
     };
 
@@ -432,7 +432,7 @@ mod tests {
         config: &str,
         events: Vec<Event>,
     ) -> Vec<(HeaderMap, proto::WriteRequest)> {
-        assert_sink_compliance(&SINK_TAGS, async {
+        assert_sink_compliance(&HTTP_SINK_TAGS, async {
             let addr = test_util::next_addr();
             let (rx, trigger, server) = build_test_server(addr);
             tokio::spawn(server);
