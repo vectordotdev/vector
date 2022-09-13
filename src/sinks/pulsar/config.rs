@@ -75,22 +75,22 @@ pub struct PulsarSinkConfig {
 pub enum PulsarCompression {
     /// No compression.
     None,
-    
+
     /// [LZ4][lz4] compression.
     ///
     /// [lz4]: https://lz4.github.io/lz4/
     Lz4,
-    
+
     /// [Zlib][zlib] compression.
     ///
     /// [zlib]: https://www.zlib.net
     Zlib,
-    
+
     /// [Zstd][zstd] compression.
     ///
     /// [zstd]: https://zstd.net
     Zstd,
-    
+
     /// [Snappy][snappy] compression.
     ///
     /// [snappy]: https://google.github.io/snappy/
@@ -166,7 +166,7 @@ impl PulsarSinkConfig {
 
         builder.build().await
     }
-    
+
     pub(crate) fn build_producer_options(&self) -> ProducerOptions {
         let mut opts = ProducerOptions {
             encrypted: None,
