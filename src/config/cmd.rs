@@ -187,7 +187,11 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
         .map(|opts| opts.enabled)
         .unwrap_or_default()
     {
-        todo!()
+        let _schema = match vector_config::schema::generate_root_schema::<ConfigBuilder>() {
+            Ok(schema) => schema,
+            Err(err) => return handle_config_errors(vec![format!("{:?}", err)]),
+        };
+        // TODO run schemars and check that the values contain a secret.
     }
 
     #[allow(clippy::print_stdout)]
