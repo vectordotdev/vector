@@ -1,4 +1,5 @@
 use std::{
+    collections::VecDeque,
     fmt::Debug,
 };
 
@@ -18,6 +19,7 @@ use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
 use vector_core::{
     internal_event::{BytesSent, EventsSent},
+    event::EventFinalizers,
     ByteSizeOf,
 };
 
@@ -79,6 +81,7 @@ pub struct MqttSink {
     transformer: Transformer,
     encoder: Encoder<()>,
     connector: MqttConnector,
+    finalizers_queue: VecDeque<EventFinalizers>,
 }
 
 impl MqttSink {
@@ -89,11 +92,13 @@ impl MqttSink {
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
+        let finalizers_queue = VecDeque::new();
 
         Ok(Self {
             transformer,
             encoder,
             connector,
+            finalizers_queue,
         })
     }
 
@@ -111,9 +116,18 @@ impl MqttSink {
             tokio::select! {
                 // handle connection errors
                 msg = connection.poll() => {
-                    if let Err(error) = msg {
-                        emit!(MqttConnectionError { error });
-                        return Err(());
+                    match msg {
+                        Ok(rumqttc::Event::Outgoing(rumqttc::Outgoing::PubRel(_))) => {
+                            // publish has been acknowledged by the MQTT server
+                            if let Some(finalizers) = self.finalizers_queue.pop_front() {
+                                finalizers.update_status(EventStatus::Delivered);
+                            }
+                        }
+                        Ok(_) => {}
+                        Err(error) => {
+                            emit!(MqttConnectionError { error });
+                            return Err(());
+                        }
                     }
                 },
 
@@ -169,7 +183,7 @@ impl MqttSink {
                                 byte_size: message_len,
                                 protocol: "mqtt".into(),
                             });
-                            finalizers.update_status(EventStatus::Delivered);
+                            self.finalizers_queue.push_back(finalizers);
                         }
                         Err(error) => {
                             emit!(MqttClientError { error });
