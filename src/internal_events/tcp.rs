@@ -236,3 +236,24 @@ impl<E: std::fmt::Display> InternalEvent for TcpSocketReceiveError<E> {
         );
     }
 }
+
+pub struct TcpDecoderFramingError<E> {
+    pub error: E,
+}
+
+impl<E: std::fmt::Display> InternalEvent for TcpDecoderFramingError<E> {
+    fn emit(self) {
+        counter!("decoder_framing_errors_total", 1);
+        error!(
+            message = "Failed framing bytes.",
+            error = %self.error,
+            error_type = error_type::PARSER_FAILED,
+            stage = error_stage::PROCESSING,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => error_type::PARSER_FAILED,
+            "stage" => error_stage::PROCESSING,
+        );
+    }
+}

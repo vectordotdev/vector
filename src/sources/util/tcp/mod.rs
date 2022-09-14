@@ -30,8 +30,8 @@ use crate::{
     event::{BatchNotifier, BatchStatus, Event},
     internal_events::{
         ConnectionOpen, OpenGauge, SocketEventsReceived, SocketMode, StreamClosedError,
-        TcpBytesReceived, TcpListenerError, TcpSendAckError, TcpSocketReceiveError,
-        TcpSocketTlsConnectionError,
+        TcpBytesReceived, TcpDecoderFramingError, TcpListenerError, TcpSendAckError,
+        TcpSocketReceiveError, TcpSocketTlsConnectionError,
     },
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
@@ -404,7 +404,7 @@ async fn handle_stream<T>(
                     }
                     Some(Err(error)) => {
                         if !<<T as TcpSource>::Error as StreamDecodingError>::can_continue(&error) {
-                            warn!(message = "Failed to read data from TCP source.", %error);
+                            emit!(TcpDecoderFramingError { error });
                             break;
                         }
                     }
