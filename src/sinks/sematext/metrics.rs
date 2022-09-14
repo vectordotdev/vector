@@ -304,7 +304,10 @@ mod tests {
     use crate::{
         event::{metric::MetricKind, Event},
         sinks::util::test::{build_test_server, load_sink},
-        test_util::{next_addr, test_generate_config, trace_init},
+        test_util::{
+            components::{assert_sink_compliance, HTTP_SINK_TAGS},
+            next_addr, test_generate_config,
+        },
     };
 
     #[test]
@@ -371,7 +374,7 @@ mod tests {
 
     #[tokio::test]
     async fn smoke() {
-        trace_init();
+        assert_sink_compliance(&HTTP_SINK_TAGS, async {
 
         let (mut config, cx) = load_sink::<SematextMetricsConfig>(indoc! {r#"
             region = "eu"
@@ -437,5 +440,6 @@ mod tests {
         assert_eq!("jvm,metric_type=counter,os.host=somehost,token=atoken pool.used=18874368 1597784400000000006", output[6].1);
         assert_eq!("jvm,metric_type=counter,os.host=somehost,token=atoken pool.committed=18868584 1597784400000000007", output[7].1);
         assert_eq!("jvm,metric_type=counter,os.host=somehost,token=atoken pool.max=18874368 1597784400000000008", output[8].1);
+        }).await;
     }
 }

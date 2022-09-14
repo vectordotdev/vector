@@ -1,7 +1,11 @@
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
-use crate::event::metric::Metric;
+use crate::{
+    emit,
+    event::metric::Metric,
+    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
+};
 use vector_common::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
@@ -11,8 +15,9 @@ pub struct SematextMetricsInvalidMetricError<'a> {
 
 impl<'a> InternalEvent for SematextMetricsInvalidMetricError<'a> {
     fn emit(self) {
+        let reason = "Invalid metric received.";
         error!(
-            message = "Invalid metric received; dropping event.",
+            message = reason,
             error_code = "invalid_metric",
             error_type =  error_type::ENCODER_FAILED,
             stage = error_stage::PROCESSING,
@@ -28,6 +33,8 @@ impl<'a> InternalEvent for SematextMetricsInvalidMetricError<'a> {
         );
         // deprecated
         counter!("processing_errors_total", 1);
+
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }
 
@@ -38,8 +45,9 @@ pub struct SematextMetricsEncodeEventError<E> {
 
 impl<E: std::fmt::Display> InternalEvent for SematextMetricsEncodeEventError<E> {
     fn emit(self) {
+        let reason = "Failed to encode event.";
         error!(
-            message = "Failed to encode event; dropping event.",
+            message = reason,
             error = %self.error,
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::PROCESSING,
@@ -52,5 +60,7 @@ impl<E: std::fmt::Display> InternalEvent for SematextMetricsEncodeEventError<E> 
         );
         // deprecated
         counter!("encode_errors_total", 1);
+
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }

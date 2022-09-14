@@ -1,4 +1,4 @@
-use std::{future::ready, pin::Pin};
+use std::{future::ready, num::NonZeroUsize, pin::Pin};
 
 use bytes::Bytes;
 use futures::{Stream, StreamExt};
@@ -41,7 +41,7 @@ pub enum FieldMatchConfig {
 #[serde(deny_unknown_fields)]
 pub struct CacheConfig {
     /// Number of events to cache and use for comparing incoming events to previously seen events.
-    pub num_events: usize,
+    pub num_events: NonZeroUsize,
 }
 
 /// Configuration for the `dedupe` transform.
@@ -58,8 +58,10 @@ pub struct DedupeConfig {
     pub cache: CacheConfig,
 }
 
-const fn default_cache_config() -> CacheConfig {
-    CacheConfig { num_events: 5000 }
+fn default_cache_config() -> CacheConfig {
+    CacheConfig {
+        num_events: NonZeroUsize::new(5000).expect("static non-zero number"),
+    }
 }
 
 impl DedupeConfig {
@@ -246,9 +248,11 @@ mod tests {
         crate::test_util::test_generate_config::<DedupeConfig>();
     }
 
-    const fn make_match_transform_config(num_events: usize, fields: Vec<String>) -> DedupeConfig {
+    fn make_match_transform_config(num_events: usize, fields: Vec<String>) -> DedupeConfig {
         DedupeConfig {
-            cache: CacheConfig { num_events },
+            cache: CacheConfig {
+                num_events: std::num::NonZeroUsize::new(num_events).expect("non-zero num_events"),
+            },
             fields: Some(FieldMatchConfig::MatchFields(fields)),
         }
     }
@@ -259,7 +263,9 @@ mod tests {
         fields.extend(given_fields);
 
         DedupeConfig {
-            cache: CacheConfig { num_events },
+            cache: CacheConfig {
+                num_events: std::num::NonZeroUsize::new(num_events).expect("non-zero num_events"),
+            },
             fields: Some(FieldMatchConfig::IgnoreFields(fields)),
         }
     }

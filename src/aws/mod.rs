@@ -6,10 +6,12 @@ use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 pub use auth::AwsAuthentication;
 use aws_config::meta::region::ProvideRegion;
+use aws_sigv4::http_request::{SignableRequest, SigningSettings};
+use aws_sigv4::SigningParams;
 use aws_smithy_async::rt::sleep::{AsyncSleep, Sleep};
 use aws_smithy_client::bounds::SmithyMiddleware;
 use aws_smithy_client::erase::{DynConnector, DynMiddleware};
@@ -19,8 +21,10 @@ use aws_smithy_http::endpoint::Endpoint;
 use aws_smithy_http::event_stream::BoxError;
 use aws_smithy_http::operation::{Request, Response};
 use aws_smithy_types::retry::RetryConfig;
+use aws_types::credentials::{ProvideCredentials, SharedCredentialsProvider};
 use aws_types::region::Region;
 use aws_types::SdkConfig;
+use bytes::Bytes;
 use once_cell::sync::OnceCell;
 use regex::RegexSet;
 pub use region::RegionOrEndpoint;
@@ -157,6 +161,32 @@ pub async fn create_client<T: ClientBuilder>(
         create_smithy_client::<T>(region, proxy, tls_options, is_sink, retry_config).await?;
 
     Ok(T::build(client, &config))
+}
+
+pub async fn sign_request(
+    service_name: &str,
+    request: &mut http::Request<Bytes>,
+    credentials_provider: &SharedCredentialsProvider,
+    region: &Option<Region>,
+) -> crate::Result<()> {
+    let signable_request = SignableRequest::from(&*request);
+    let credentials = credentials_provider.provide_credentials().await?;
+    let mut signing_params_builder = SigningParams::builder()
+        .access_key(credentials.access_key_id())
+        .secret_key(credentials.secret_access_key())
+        .region(region.as_ref().map(|r| r.as_ref()).unwrap_or(""))
+        .service_name(service_name)
+        .time(SystemTime::now())
+        .settings(SigningSettings::default());
+
+    signing_params_builder.set_security_token(credentials.session_token());
+
+    let (signing_instructions, _signature) =
+        aws_sigv4::http_request::sign(signable_request, &signing_params_builder.build()?)?
+            .into_parts();
+    signing_instructions.apply_to_request(request);
+
+    Ok(())
 }
 
 #[derive(Debug)]
