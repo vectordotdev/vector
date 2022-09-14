@@ -27,9 +27,7 @@ async fn sets_create_action_when_configured() {
         endpoint: String::from("https://example.com").into(),
         ..Default::default()
     };
-    let es = ElasticsearchCommon::parse_single_endpoint(&config)
-        .await
-        .unwrap();
+    let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
 
     let mut log = LogEvent::from("hello there");
     log.insert(
@@ -77,9 +75,7 @@ async fn encode_datastream_mode() {
         mode: ElasticsearchMode::DataStream,
         ..Default::default()
     };
-    let es = ElasticsearchCommon::parse_single_endpoint(&config)
-        .await
-        .unwrap();
+    let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
 
     let mut log = LogEvent::from("hello there");
     log.insert(
@@ -125,9 +121,7 @@ async fn encode_datastream_mode_no_routing() {
         }),
         ..Default::default()
     };
-    let es = ElasticsearchCommon::parse_single_endpoint(&config)
-        .await
-        .unwrap();
+    let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
 
     let mut log = LogEvent::from("hello there");
     log.insert("data_stream", data_stream_body());
@@ -162,9 +156,7 @@ async fn handle_metrics() {
         endpoint: String::from("https://example.com").into(),
         ..Default::default()
     };
-    let es = ElasticsearchCommon::parse_single_endpoint(&config)
-        .await
-        .unwrap();
+    let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
 
     let metric = Metric::new(
         "cpu",
@@ -205,9 +197,7 @@ async fn decode_bulk_action_error() {
         endpoint: String::from("https://example.com").into(),
         ..Default::default()
     };
-    let es = ElasticsearchCommon::parse_single_endpoint(&config)
-        .await
-        .unwrap();
+    let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
 
     let mut log = LogEvent::from("hello world");
     log.insert("foo", "bar");
@@ -226,9 +216,7 @@ async fn decode_bulk_action() {
         endpoint: String::from("https://example.com").into(),
         ..Default::default()
     };
-    let es = ElasticsearchCommon::parse_single_endpoint(&config)
-        .await
-        .unwrap();
+    let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
 
     let log = LogEvent::from("hello there");
     let action = es.mode.bulk_action(&log).unwrap();
@@ -256,9 +244,7 @@ async fn encode_datastream_mode_no_sync() {
         ..Default::default()
     };
 
-    let es = ElasticsearchCommon::parse_single_endpoint(&config)
-        .await
-        .unwrap();
+    let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
 
     let mut log = LogEvent::from("hello there");
     log.insert("data_stream", data_stream_body());
@@ -300,9 +286,7 @@ async fn allows_using_except_fields() {
         endpoint: String::from("https://example.com").into(),
         ..Default::default()
     };
-    let es = ElasticsearchCommon::parse_single_endpoint(&config)
-        .await
-        .unwrap();
+    let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
 
     let mut log = LogEvent::from("hello there");
     log.insert("foo", "bar");
@@ -336,9 +320,7 @@ async fn allows_using_only_fields() {
         endpoint: String::from("https://example.com").into(),
         ..Default::default()
     };
-    let es = ElasticsearchCommon::parse_single_endpoint(&config)
-        .await
-        .unwrap();
+    let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
 
     let mut log = LogEvent::from("hello there");
     log.insert("foo", "bar");

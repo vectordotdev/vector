@@ -85,7 +85,7 @@ async fn firehose_put_records() {
         aws: Some(region),
         ..Default::default()
     };
-    let common = ElasticsearchCommon::parse_single_endpoint(&config)
+    let common = ElasticsearchCommon::parse_single(&config)
         .await
         .expect("Config error");
 

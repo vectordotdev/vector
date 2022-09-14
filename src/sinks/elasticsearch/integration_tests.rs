@@ -115,7 +115,7 @@ async fn ensure_pipeline_in_params() {
         pipeline: Some(pipeline.clone()),
         ..config()
     };
-    let common = ElasticsearchCommon::parse_single_endpoint(&config)
+    let common = ElasticsearchCommon::parse_single(&config)
         .await
         .expect("Config error");
 
@@ -136,7 +136,7 @@ async fn structures_events_correctly() {
         compression: Compression::None,
         ..config()
     };
-    let common = ElasticsearchCommon::parse_single_endpoint(&config)
+    let common = ElasticsearchCommon::parse_single(&config)
         .await
         .expect("Config error");
     let base_url = common.base_url.clone();
@@ -315,7 +315,7 @@ async fn insert_events_in_data_stream() {
         }),
         ..config()
     };
-    let common = ElasticsearchCommon::parse_single_endpoint(&cfg)
+    let common = ElasticsearchCommon::parse_single(&cfg)
         .await
         .expect("Config error");
 
@@ -406,7 +406,7 @@ async fn run_insert_tests_with_config(
     break_events: bool,
     batch_status: BatchStatus,
 ) {
-    let common = ElasticsearchCommon::parse_single_endpoint(config)
+    let common = ElasticsearchCommon::parse_single(config)
         .await
         .expect("Config error");
     let index = match config.mode {
