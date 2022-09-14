@@ -597,7 +597,7 @@ cli: {
 			type: bool: default: false
 		}
 		VECTOR_INTERNAL_LOG_RATE_LIMIT: {
-			description: "Set the internal log rate limit"
+			description: "Set the internal log rate limit. This limits Vector from emitting identical logs more than once over the given number of seconds."
 			type: uint: {
 				default: 10
 				unit:    null

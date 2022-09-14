@@ -23,6 +23,7 @@ use std::time::Instant;
 use mock_instant::Instant;
 
 const RATE_LIMIT_FIELD: &str = "internal_log_rate_limit";
+const RATE_LIMIT_SECS_FIELD: &str = "internal_log_rate_secs";
 const MESSAGE_FIELD: &str = "message";
 
 // These fields will cause events to be independently rate limited by the values
@@ -128,10 +129,15 @@ where
         let mut limit_visitor = LimitVisitor::default();
         event.record(&mut limit_visitor);
 
-        let limit = limit_visitor.limit.unwrap_or(false);
-        if !limit {
+        let limit_exists = limit_visitor.limit.unwrap_or(false);
+        if !limit_exists {
             return self.inner.on_event(event, ctx);
         }
+
+        let limit = match limit_visitor.limit_secs {
+            Some(limit_secs) => limit_secs, // override the cli limit
+            None => self.internal_log_rate_limit,
+        };
 
         // Visit all of the spans in the scope of this event, looking for specific fields that we use to differentiate
         // rate-limited events. This ensures that we don't rate limit an event's _callsite_, but the specific usage of a
@@ -168,7 +174,7 @@ where
                 .message
                 .unwrap_or_else(|| metadata.name().into());
 
-            State::new(message, self.internal_log_rate_limit)
+            State::new(message, limit)
         });
 
         // Update our rate limiting state for this event, and see if we should still be rate limiting it.
@@ -388,12 +394,27 @@ impl Visit for RateLimitedSpanKeys {
 #[derive(Default)]
 struct LimitVisitor {
     pub limit: Option<bool>,
+    pub limit_secs: Option<u64>,
 }
 
 impl Visit for LimitVisitor {
     fn record_bool(&mut self, field: &Field, value: bool) {
-        if self.limit.is_none() && field.name() == RATE_LIMIT_FIELD {
+        if field.name() == RATE_LIMIT_FIELD {
             self.limit = Some(value);
+        }
+    }
+
+    fn record_i64(&mut self, field: &Field, value: i64) {
+        if field.name() == RATE_LIMIT_SECS_FIELD {
+            self.limit = Some(true); // limit if we have this field
+            self.limit_secs = Some(u64::try_from(value).unwrap_or_default()); // override the cli passed limit
+        }
+    }
+
+    fn record_u64(&mut self, field: &Field, value: u64) {
+        if field.name() == RATE_LIMIT_SECS_FIELD {
+            self.limit = Some(true); // limit if we have this field
+            self.limit_secs = Some(value); // override the cli passed limit
         }
     }
 
