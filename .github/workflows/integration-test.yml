@@ -102,6 +102,9 @@ jobs:
         if: always()
       - run: make test-integration-${{ matrix.test }}-cleanup
         if: ${{ always() }}
+        env:
+          TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
+          SPLUNK_VERSION: ${{ matrix.env.SPLUNK_VERSION }}
 
   test-integration-check:
     name: test-integration-check
