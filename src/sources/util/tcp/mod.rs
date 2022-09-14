@@ -23,6 +23,7 @@ use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use super::AfterReadExt as _;
+use crate::internal_events::TcpListenerError;
 use crate::sources::util::tcp::request_limiter::RequestLimiter;
 use crate::{
     codecs::ReadyFrames,
@@ -49,7 +50,10 @@ async fn make_listener(
         SocketListenAddr::SocketAddr(addr) => match tls.bind(&addr).await {
             Ok(listener) => Some(listener),
             Err(error) => {
-                error!(message = "Failed to bind to listener socket.", %error);
+                emit!(TcpListenerError {
+                    message: "Failed to bind to listener socket.",
+                    error
+                });
                 None
             }
         },
@@ -57,16 +61,25 @@ async fn make_listener(
             Ok(Some(listener)) => match TcpListener::from_std(listener) {
                 Ok(listener) => Some(listener.into()),
                 Err(error) => {
-                    error!(message = "Failed to bind to listener socket.", %error);
+                    emit!(TcpListenerError {
+                        message: "Failed to bind to listener socket.",
+                        error
+                    });
                     None
                 }
             },
             Ok(None) => {
-                error!("Failed to take listen FD, not open or already taken.");
+                emit!(TcpListenerError {
+                    message: "Failed to take listen FD.",
+                    error: "FD not open or already taken.",
+                });
                 None
             }
             Err(error) => {
-                error!(message = "Failed to take listen FD.", %error);
+                emit!(TcpListenerError {
+                    message: "Failed to take listen FD.",
+                    error
+                });
                 None
             }
         },
@@ -176,6 +189,7 @@ where
                         let socket = match connection {
                             Ok(socket) => socket,
                             Err(error) => {
+                                // TcpSocketError - but is sink specific
                                 error!(
                                     message = "Failed to accept socket.",
                                     %error
@@ -368,14 +382,9 @@ async fn handle_stream<T>(
                                     Some(receiver) =>
                                         match receiver.await {
                                             BatchStatus::Delivered => TcpSourceAck::Ack,
-                                            BatchStatus::Errored => {
-                                                warn!(message = "Error delivering events to sink.",
-                                                      internal_log_rate_secs = 5);
-                                                TcpSourceAck::Error
-                                            }
+                                            BatchStatus::Errored => {TcpSourceAck::Error},
                                             BatchStatus::Rejected => {
-                                                warn!(message = "Failed to deliver events to sink.",
-                                                      internal_log_rate_secs = 5);
+                                                // Sinks are responsible for emitting ComponentEventsDropped.
                                                 TcpSourceAck::Reject
                                             }
                                         }

@@ -8,7 +8,7 @@ use vector_common::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct TcpSocketConnectionEstablished {
-    pub peer_addr: Option<std::net::SocketAddr>,
+    pub peer_addr: Option<SocketAddr>,
 }
 
 impl InternalEvent for TcpSocketConnectionEstablished {
@@ -187,6 +187,23 @@ impl InternalEvent for TcpBytesReceived {
             "component_received_bytes_total", self.byte_size as u64,
             "protocol" => "tcp",
             "peer_addr" => self.peer_addr.to_string()
+        );
+    }
+}
+
+pub struct TcpListenerError<'a, E> {
+    pub error: E,
+    pub message: &'a str,
+}
+
+impl<E: std::fmt::Display> InternalEvent for TcpListenerError<'_, E> {
+    fn emit(self) {
+        error!(
+            message = %self.message,
+            error = %self.error,
+            error_type = error_type::CONFIGURATION_FAILED,
+            stage = error_stage::RECEIVING,
+            internal_log_rate_secs = 10,
         );
     }
 }
