@@ -156,13 +156,13 @@ impl Definition {
     #[must_use]
     pub fn with_standard_vector_source_metadata(self) -> Self {
         self.with_vector_metadata(
-            LookupBuf::from_str(log_schema().source_type_key()).expect("valid source_type key"),
+            LookupBuf::from_str(log_schema().source_type_key()).ok(),
             "source_type",
             Kind::bytes(),
             None,
         )
         .with_vector_metadata(
-            LookupBuf::from_str(log_schema().timestamp_key()).expect("valid timestamp key"),
+            LookupBuf::from_str(log_schema().timestamp_key()).ok(),
             "ingest_timestamp",
             Kind::timestamp(),
             None,
@@ -176,7 +176,7 @@ impl Definition {
     pub fn with_source_metadata(
         self,
         source_name: &str,
-        legacy_path: impl Into<LookupBuf>,
+        legacy_path: Option<impl Into<LookupBuf>>,
         vector_path: impl Into<LookupBuf>,
         kind: Kind,
         meaning: Option<&str>,
@@ -190,7 +190,7 @@ impl Definition {
     #[must_use]
     pub fn with_vector_metadata(
         self,
-        legacy_path: impl Into<LookupBuf>,
+        legacy_path: Option<impl Into<LookupBuf>>,
         vector_path: impl Into<LookupBuf>,
         kind: Kind,
         meaning: Option<&str>,
@@ -202,19 +202,21 @@ impl Definition {
     fn with_namespaced_metadata(
         self,
         prefix: &str,
-        legacy_path: impl Into<LookupBuf>,
+        legacy_path: Option<impl Into<LookupBuf>>,
         vector_path: impl Into<LookupBuf>,
         kind: Kind,
         meaning: Option<&str>,
     ) -> Self {
-        let legacy_definition = if self.log_namespaces.contains(&LogNamespace::Legacy) {
-            Some(
-                self.clone()
-                    .try_with_field(legacy_path, kind.clone(), meaning),
-            )
-        } else {
-            None
-        };
+        let legacy_definition = legacy_path.and_then(|legacy_path| {
+            if self.log_namespaces.contains(&LogNamespace::Legacy) {
+                Some(
+                    self.clone()
+                        .try_with_field(legacy_path, kind.clone(), meaning),
+                )
+            } else {
+                None
+            }
+        });
 
         let vector_definition = if self.log_namespaces.contains(&LogNamespace::Vector) {
             let mut path_with_prefix = vector_path.into();
@@ -424,6 +426,19 @@ mod tests {
     use std::collections::{BTreeMap, HashMap};
 
     use super::*;
+
+    #[test]
+    fn test_empty_legacy_field() {
+        let definition = Definition::default_legacy_namespace().with_vector_metadata(
+            LookupBuf::from_str("").ok(),
+            "",
+            Kind::integer(),
+            None,
+        );
+
+        // adding empty string legacy key doesn't change the definition (insertion will never succeed)
+        assert_eq!(definition, Definition::default_legacy_namespace());
+    }
 
     #[test]
     fn test_required_field() {

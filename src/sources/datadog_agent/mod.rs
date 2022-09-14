@@ -200,49 +200,49 @@ impl SourceConfig for DatadogAgentConfig {
             .schema_definition(global_log_namespace.merge(self.log_namespace))
             .with_source_metadata(
                 self.source_type(),
-                "message",
+                Some("message"),
                 "message",
                 Kind::bytes(),
                 Some("message"),
             )
             .with_source_metadata(
                 self.source_type(),
-                "status",
+                Some("status"),
                 "status",
                 Kind::bytes(),
                 Some("severity"),
             )
             .with_source_metadata(
                 self.source_type(),
-                "timestamp",
+                Some("timestamp"),
                 "timestamp",
                 Kind::timestamp(),
                 Some("timestamp"),
             )
             .with_source_metadata(
                 self.source_type(),
-                "hostname",
+                Some("hostname"),
                 "hostname",
                 Kind::bytes(),
                 Some("host"),
             )
             .with_source_metadata(
                 self.source_type(),
-                "service",
+                Some("service"),
                 "service",
                 Kind::bytes(),
                 Some("service"),
             )
             .with_source_metadata(
                 self.source_type(),
-                "ddsource",
+                Some("ddsource"),
                 "ddsource",
                 Kind::bytes(),
                 Some("source"),
             )
             .with_source_metadata(
                 self.source_type(),
-                "ddtags",
+                Some("ddtags"),
                 "ddtags",
                 Kind::bytes(),
                 Some("tags"),
