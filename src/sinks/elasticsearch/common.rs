@@ -161,7 +161,7 @@ impl ElasticsearchCommon {
     /// Parses a single endpoint, else panics.
     #[cfg(test)]
     pub async fn parse_single(config: &ElasticsearchConfig) -> crate::Result<Self> {
-        let commons = Self::parse_endpoints(config).await?;
+        let mut commons = Self::parse_endpoints(config).await?;
         assert!(commons.len() == 1);
         Ok(commons.remove(0))
     }
