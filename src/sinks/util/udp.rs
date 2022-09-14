@@ -24,7 +24,7 @@ use crate::{
     event::{Event, EventStatus, Finalizable},
     internal_events::{
         SocketEventsSent, SocketMode, UdpSendIncompleteError, UdpSocketConnectionError,
-        UdpSocketConnectionEstablished, UdpSocketError,
+        UdpSocketConnectionEstablished, UdpSocketSendError,
     },
     sinks::{
         util::{retries::ExponentialBackoff, StreamSink},
@@ -295,6 +295,8 @@ where
 
                 let finalizers = event.take_finalizers();
                 let mut bytes = BytesMut::new();
+
+                // Errors are handled by `Encoder`.
                 if encoder.encode(event, &mut bytes).is_err() {
                     continue;
                 }
@@ -311,7 +313,7 @@ where
                         finalizers.update_status(EventStatus::Delivered);
                     }
                     Err(error) => {
-                        emit!(UdpSocketError { error });
+                        emit!(UdpSocketSendError { error });
                         finalizers.update_status(EventStatus::Errored);
                         break;
                     }

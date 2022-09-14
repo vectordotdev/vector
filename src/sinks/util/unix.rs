@@ -14,7 +14,7 @@ use crate::{
     event::{Event, Finalizable},
     internal_events::{
         ConnectionOpen, OpenGauge, SocketMode, UnixSocketConnectionError,
-        UnixSocketConnectionEstablished, UnixSocketError,
+        UnixSocketConnectionEstablished, UnixSocketSendError,
     },
     sink::VecSinkExt,
     sinks::{
@@ -176,7 +176,7 @@ where
             };
 
             if let Err(error) = result {
-                emit!(UnixSocketError {
+                emit!(UnixSocketSendError {
                     error: &error,
                     path: &self.connector.path
                 });

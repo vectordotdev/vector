@@ -3,6 +3,10 @@ use std::{io::Error, path::Path};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
+use crate::{
+    emit,
+    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
+};
 use vector_common::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
@@ -67,8 +71,34 @@ impl<E: std::fmt::Display> InternalEvent for UnixSocketError<'_, E> {
         );
         // deprecated
         counter!("connection_errors_total", 1, "mode" => "unix");
+    }
+}
 
-        // TODO emit EventsDropped (1)
+#[derive(Debug)]
+pub struct UnixSocketSendError<'a, E> {
+    pub(crate) error: &'a E,
+    pub path: &'a std::path::Path,
+}
+
+impl<E: std::fmt::Display> InternalEvent for UnixSocketSendError<'_, E> {
+    fn emit(self) {
+        let reason = "Unix socket send error.";
+        error!(
+            message = reason,
+            error = %self.error,
+            path = ?self.path,
+            error_type = error_type::WRITER_FAILED,
+            stage = error_stage::SENDING,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => error_type::WRITER_FAILED,
+            "stage" => error_stage::SENDING,
+        );
+        // deprecated
+        counter!("connection_errors_total", 1, "mode" => "unix");
+
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }
 

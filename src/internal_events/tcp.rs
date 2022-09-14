@@ -3,7 +3,11 @@ use std::net::SocketAddr;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
-use crate::tls::TlsError;
+use crate::{
+    emit,
+    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
+    tls::TlsError,
+};
 use vector_common::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
@@ -53,7 +57,6 @@ pub struct TcpSocketConnectionShutdown;
 
 impl InternalEvent for TcpSocketConnectionShutdown {
     fn emit(self) {
-        // TODO why does this not emit Error  and EventsDropped ?
         debug!(message = "Received EOF from the server, shutdown.");
         counter!("connection_shutdown_total", 1, "mode" => "tcp");
     }
@@ -107,14 +110,15 @@ impl InternalEvent for TcpSocketTlsConnectionError {
 }
 
 #[derive(Debug)]
-pub struct TcpSocketError {
+pub struct TcpSocketSendError {
     pub error: std::io::Error,
 }
 
-impl InternalEvent for TcpSocketError {
+impl InternalEvent for TcpSocketSendError {
     fn emit(self) {
+        let reason = "TCP socket send error.";
         error!(
-            message = "TCP socket error.",
+            message = reason,
             error = %self.error,
             error_code = "socket_failed",
             error_type = error_type::WRITER_FAILED,
@@ -134,7 +138,7 @@ impl InternalEvent for TcpSocketError {
             "mode" => "tcp",
         );
 
-        // TODO emit events dropped
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }
 

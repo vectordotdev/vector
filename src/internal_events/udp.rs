@@ -1,6 +1,10 @@
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
+use crate::{
+    emit,
+    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
+};
 use vector_common::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
@@ -40,27 +44,28 @@ impl<E: std::error::Error> InternalEvent for UdpSocketConnectionError<E> {
 }
 
 #[derive(Debug)]
-pub struct UdpSocketError {
+pub struct UdpSocketSendError {
     pub error: std::io::Error,
 }
 
-impl InternalEvent for UdpSocketError {
+impl InternalEvent for UdpSocketSendError {
     fn emit(self) {
+        let reason = "UDP socket send error.";
         error!(
-            message = "UDP socket error.",
+            message = reason,
             error = %self.error,
-            error_type = error_type::READER_FAILED,
-            stage = error_stage::PROCESSING,
+            error_type = error_type::WRITER_FAILED,
+            stage = error_stage::SENDING,
         );
         counter!(
             "component_errors_total", 1,
-            "error_type" => error_type::READER_FAILED,
-            "stage" => error_stage::PROCESSING,
+            "error_type" => error_type::WRITER_FAILED,
+            "stage" => error_stage::SENDING,
         );
         // deprecated
         counter!("connection_errors_total", 1, "mode" => "udp");
 
-        // TODO emit EventsDropped (1)
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }
 
@@ -72,23 +77,24 @@ pub struct UdpSendIncompleteError {
 
 impl InternalEvent for UdpSendIncompleteError {
     fn emit(self) {
+        let reason = "Could not send all data in one UDP packet.";
         error!(
-            message = "Could not send all data in one UDP packet; dropping some data.",
+            message = reason,
             data_size = self.data_size,
             sent = self.sent,
             dropped = self.data_size - self.sent,
-            internal_log_rate_secs = 30,
             error_type = error_type::WRITER_FAILED,
-            stage = error_stage::PROCESSING,
+            stage = error_stage::SENDING,
+            internal_log_rate_secs = 10,
         );
         counter!(
             "component_errors_total", 1,
             "error_type" => error_type::WRITER_FAILED,
-            "stage" => error_stage::PROCESSING,
+            "stage" => error_stage::SENDING,
         );
         // deprecated
         counter!("connection_send_errors_total", 1, "mode" => "udp");
 
-        // TODO emit EventsDropped (1)
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }

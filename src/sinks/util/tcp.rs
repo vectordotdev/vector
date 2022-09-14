@@ -26,7 +26,7 @@ use crate::{
     event::Event,
     internal_events::{
         ConnectionOpen, OpenGauge, SocketMode, TcpSocketConnectionError,
-        TcpSocketConnectionEstablished, TcpSocketConnectionShutdown, TcpSocketError,
+        TcpSocketConnectionEstablished, TcpSocketConnectionShutdown, TcpSocketSendError,
     },
     sinks::{
         util::{
@@ -301,7 +301,7 @@ where
                 if error.kind() == ErrorKind::Other && error.to_string() == "ShutdownCheck::Close" {
                     emit!(TcpSocketConnectionShutdown {});
                 } else {
-                    emit!(TcpSocketError { error });
+                    emit!(TcpSocketSendError { error });
                 }
             }
         }
@@ -331,4 +331,3 @@ mod test {
         assert!(bad.healthcheck().await.is_err());
     }
 }
-
