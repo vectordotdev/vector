@@ -207,3 +207,32 @@ impl<E: std::fmt::Display> InternalEvent for TcpListenerError<'_, E> {
         );
     }
 }
+
+pub struct TcpSocketReceiveError<E> {
+    pub error: E,
+}
+
+impl<E: std::fmt::Display> InternalEvent for TcpSocketReceiveError<E> {
+    fn emit(self) {
+        error!(
+            message = "TCP socket error.",
+            error = %self.error,
+            error_code = "socket_failed",
+            error_type = error_type::READER_FAILED,
+            stage = error_stage::RECEIVING,
+            internal_log_rate_secs = 10,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "socket_failed",
+            "error_type" => error_type::READER_FAILED,
+            "stage" => error_stage::RECEIVING,
+            "mode" => "tcp",
+        );
+        // deprecated
+        counter!(
+            "connection_errors_total", 1,
+            "mode" => "tcp",
+        );
+    }
+}

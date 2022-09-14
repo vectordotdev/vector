@@ -23,7 +23,6 @@ use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use super::AfterReadExt as _;
-use crate::internal_events::TcpListenerError;
 use crate::sources::util::tcp::request_limiter::RequestLimiter;
 use crate::{
     codecs::ReadyFrames,
@@ -31,7 +30,8 @@ use crate::{
     event::{BatchNotifier, BatchStatus, Event},
     internal_events::{
         ConnectionOpen, OpenGauge, SocketEventsReceived, SocketMode, StreamClosedError,
-        TcpBytesReceived, TcpSendAckError, TcpSocketTlsConnectionError,
+        TcpBytesReceived, TcpListenerError, TcpSendAckError, TcpSocketReceiveError,
+        TcpSocketTlsConnectionError,
     },
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
@@ -189,11 +189,7 @@ where
                         let socket = match connection {
                             Ok(socket) => socket,
                             Err(error) => {
-                                // TcpSocketError - but is sink specific
-                                error!(
-                                    message = "Failed to accept socket.",
-                                    %error
-                                );
+                                emit!(TcpSocketReceiveError { error });
                                 return;
                             }
                         };
