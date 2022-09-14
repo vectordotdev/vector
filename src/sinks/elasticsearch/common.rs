@@ -1,9 +1,6 @@
 use std::collections::HashMap;
-use std::time::SystemTime;
 
-use aws_sigv4::http_request::{SignableRequest, SigningSettings};
-use aws_sigv4::SigningParams;
-use aws_types::credentials::{ProvideCredentials, SharedCredentialsProvider};
+use aws_types::credentials::SharedCredentialsProvider;
 use aws_types::region::Region;
 use bytes::Bytes;
 use http::{StatusCode, Uri};
@@ -170,22 +167,5 @@ pub async fn sign_request(
     credentials_provider: &SharedCredentialsProvider,
     region: &Option<Region>,
 ) -> crate::Result<()> {
-    let signable_request = SignableRequest::from(&*request);
-    let credentials = credentials_provider.provide_credentials().await?;
-    let mut signing_params_builder = SigningParams::builder()
-        .access_key(credentials.access_key_id())
-        .secret_key(credentials.secret_access_key())
-        .region(region.as_ref().map(|r| r.as_ref()).unwrap_or(""))
-        .service_name("es")
-        .time(SystemTime::now())
-        .settings(SigningSettings::default());
-
-    signing_params_builder.set_security_token(credentials.session_token());
-
-    let (signing_instructions, _signature) =
-        aws_sigv4::http_request::sign(signable_request, &signing_params_builder.build()?)?
-            .into_parts();
-    signing_instructions.apply_to_request(request);
-
-    Ok(())
+    crate::aws::sign_request("es", request, credentials_provider, region).await
 }

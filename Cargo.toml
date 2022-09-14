@@ -421,6 +421,7 @@ api-client = [
 
 aws-core = [
   "aws-config",
+  "dep:aws-sigv4",
   "dep:aws-types",
   "dep:aws-smithy-async",
   "dep:aws-smithy-client",
@@ -649,7 +650,7 @@ sinks-datadog_events = []
 sinks-datadog_logs = []
 sinks-datadog_metrics = ["protobuf-build"]
 sinks-datadog_traces = ["protobuf-build", "dep:rmpv", "dep:rmp-serde", "dep:serde_bytes"]
-sinks-elasticsearch = ["aws-core", "dep:aws-sigv4", "transforms-metric_to_log"]
+sinks-elasticsearch = ["aws-core", "transforms-metric_to_log"]
 sinks-file = ["dep:async-compression"]
 sinks-gcp = ["dep:base64", "gcp"]
 sinks-honeycomb = []
@@ -663,7 +664,7 @@ sinks-nats = ["dep:nats", "dep:nkeys"]
 sinks-new_relic_logs = ["sinks-http"]
 sinks-new_relic = []
 sinks-papertrail = ["dep:syslog"]
-sinks-prometheus = ["dep:prometheus-parser", "dep:snap", "dep:serde_with"]
+sinks-prometheus = ["aws-core", "dep:prometheus-parser", "dep:snap", "dep:serde_with"]
 sinks-pulsar = ["dep:avro-rs", "dep:pulsar"]
 sinks-redis = ["dep:redis"]
 sinks-sematext = ["sinks-elasticsearch", "sinks-influxdb"]

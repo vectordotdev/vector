@@ -1,8 +1,11 @@
+use std::sync::Arc;
 use std::task;
 
+use aws_types::credentials::SharedCredentialsProvider;
+use aws_types::region::Region;
 use bytes::{Bytes, BytesMut};
 use futures::{future::BoxFuture, stream, FutureExt, SinkExt};
-use http::Uri;
+use http::{Request, Uri};
 use prost::Message;
 use snafu::{ResultExt, Snafu};
 use vector_config::configurable_component;
@@ -10,12 +13,14 @@ use vector_core::ByteSizeOf;
 
 use super::collector::{self, MetricCollector as _};
 use crate::{
+    aws::RegionOrEndpoint,
     config::{self, AcknowledgementsConfig, Input, SinkConfig},
     event::{Event, Metric},
     http::{Auth, HttpClient},
     internal_events::TemplateRenderingError,
     sinks::{
         self,
+        prometheus::PrometheusRemoteWriteAuth,
         util::{
             batch::BatchConfig,
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
@@ -41,6 +46,8 @@ impl SinkBatchSettings for PrometheusRemoteWriteDefaultBatchSettings {
 enum Errors {
     #[snafu(display(r#"Prometheus remote_write sink cannot accept "set" metrics"#))]
     SetMetricInvalid,
+    #[snafu(display("aws.region required when AWS authentication is in use"))]
+    AwsRegionRequired,
 }
 
 /// Configuration for the `prometheus_remote_write` sink.
@@ -94,7 +101,10 @@ pub struct RemoteWriteConfig {
     pub tls: Option<TlsConfig>,
 
     #[configurable(derived)]
-    pub auth: Option<Auth>,
+    pub auth: Option<PrometheusRemoteWriteAuth>,
+
+    #[configurable(derived)]
+    pub aws: Option<RegionOrEndpoint>,
 
     #[configurable(derived)]
     #[serde(
@@ -122,16 +132,47 @@ impl SinkConfig for RemoteWriteConfig {
 
         let client = HttpClient::new(tls_settings, cx.proxy())?;
         let tenant_id = self.tenant_id.clone();
-        let auth = self.auth.clone();
 
-        let healthcheck = healthcheck(endpoint.clone(), client.clone()).boxed();
+        let (http_auth, credentials_provider, aws_region) = match &self.auth {
+            Some(PrometheusRemoteWriteAuth::Basic { user, password }) => (
+                Some(Auth::Basic {
+                    user: user.clone(),
+                    password: password.clone(),
+                }),
+                None,
+                None,
+            ),
+            Some(PrometheusRemoteWriteAuth::Aws(aws_auth)) => {
+                let region = self
+                    .aws
+                    .as_ref()
+                    .map(|config| config.region())
+                    .ok_or(Errors::AwsRegionRequired)?
+                    .ok_or(Errors::AwsRegionRequired)?;
+
+                (
+                    None,
+                    Some(aws_auth.credentials_provider(region.clone()).await?),
+                    Some(region),
+                )
+            }
+            None => (None, None, None),
+        };
+
+        let http_request_builder = Arc::new(HttpRequestBuilder {
+            endpoint: endpoint.clone(),
+            aws_region,
+            credentials_provider,
+            http_auth,
+        });
+
+        let healthcheck = healthcheck(client.clone(), Arc::clone(&http_request_builder)).boxed();
         let service = RemoteWriteService {
-            endpoint,
             default_namespace: self.default_namespace.clone(),
             client,
             buckets,
             quantiles,
-            auth,
+            http_request_builder,
         };
 
         let sink = {
@@ -184,11 +225,14 @@ struct PartitionKey {
     tenant_id: Option<String>,
 }
 
-async fn healthcheck(endpoint: Uri, client: HttpClient) -> crate::Result<()> {
-    let request = http::Request::get(endpoint)
-        .body(hyper::Body::empty())
-        .unwrap();
-
+async fn healthcheck(
+    client: HttpClient,
+    http_request_builder: Arc<HttpRequestBuilder>,
+) -> crate::Result<()> {
+    let body = bytes::Bytes::new();
+    let request = http_request_builder
+        .build_request(http::Method::GET, body.into(), None)
+        .await?;
     let response = client.send(request).await?;
 
     match response.status() {
@@ -208,12 +252,11 @@ impl MetricNormalize for PrometheusMetricNormalize {
 
 #[derive(Clone)]
 struct RemoteWriteService {
-    endpoint: Uri,
     default_namespace: Option<String>,
     client: HttpClient,
     buckets: Vec<f64>,
     quantiles: Vec<f64>,
-    auth: Option<Auth>,
+    http_request_builder: Arc<HttpRequestBuilder>,
 }
 
 impl RemoteWriteService {
@@ -249,21 +292,14 @@ impl tower::Service<PartitionInnerBuffer<Vec<Metric>, PartitionKey>> for RemoteW
         let body = self.encode_events(events);
         let body = snap_block(body);
 
-        let mut builder = http::Request::post(self.endpoint.clone())
-            .header("X-Prometheus-Remote-Write-Version", "0.1.0")
-            .header("Content-Encoding", "snappy")
-            .header("Content-Type", "application/x-protobuf");
-        if let Some(tenant_id) = key.tenant_id {
-            builder = builder.header("X-Scope-OrgID", tenant_id);
-        }
-
-        let mut request = builder.body(body.into()).unwrap();
-        if let Some(auth) = &self.auth {
-            auth.apply(&mut request);
-        }
         let client = self.client.clone();
+        let request_builder = Arc::clone(&self.http_request_builder);
 
         Box::pin(async move {
+            let request = request_builder
+                .build_request(http::Method::POST, body, key.tenant_id)
+                .await?;
+
             let response = client.send(request).await?;
             let (parts, body) = response.into_parts();
             let body = hyper::body::to_bytes(body).await?;
@@ -272,10 +308,59 @@ impl tower::Service<PartitionInnerBuffer<Vec<Metric>, PartitionKey>> for RemoteW
     }
 }
 
+pub struct HttpRequestBuilder {
+    pub endpoint: Uri,
+    pub aws_region: Option<Region>,
+    pub http_auth: Option<Auth>,
+    pub credentials_provider: Option<SharedCredentialsProvider>,
+}
+
+impl HttpRequestBuilder {
+    pub async fn build_request(
+        &self,
+        method: http::Method,
+        body: Vec<u8>,
+        tenant_id: Option<String>,
+    ) -> Result<Request<hyper::Body>, crate::Error> {
+        let mut builder = http::Request::builder()
+            .method(method)
+            .uri(self.endpoint.clone())
+            .header("X-Prometheus-Remote-Write-Version", "0.1.0")
+            .header("Content-Encoding", "snappy")
+            .header("Content-Type", "application/x-protobuf");
+
+        if let Some(tenant_id) = &tenant_id {
+            builder = builder.header("X-Scope-OrgID", tenant_id);
+        }
+
+        let mut request = builder.body(body.into()).unwrap();
+        if let Some(http_auth) = &self.http_auth {
+            http_auth.apply(&mut request);
+        }
+
+        if let Some(credentials_provider) = &self.credentials_provider {
+            sign_request(&mut request, credentials_provider, &self.aws_region).await?;
+        }
+
+        let (parts, body) = request.into_parts();
+        let request: Request<hyper::Body> = hyper::Request::from_parts(parts, body.into());
+
+        Ok(request)
+    }
+}
+
 fn snap_block(data: Bytes) -> Vec<u8> {
     snap::raw::Encoder::new()
         .compress_vec(&data)
         .expect("Out of memory")
+}
+
+async fn sign_request(
+    request: &mut http::Request<Bytes>,
+    credentials_provider: &SharedCredentialsProvider,
+    region: &Option<Region>,
+) -> crate::Result<()> {
+    crate::aws::sign_request("aps", request, credentials_provider, region).await
 }
 
 #[cfg(test)]
@@ -354,6 +439,31 @@ mod tests {
         assert_eq!(req.metadata.len(), 1);
         assert_eq!(req.metadata[0].r#type, proto::MetricType::Gauge as i32);
         assert_eq!(req.metadata[0].metric_family_name, "gauge-2");
+    }
+
+    #[tokio::test]
+    async fn sends_authenticated_aws_request() {
+        let outputs = send_request(
+            indoc! {r#"
+                tenant_id = "tenant-%Y"
+                [aws]
+                region = "foo"
+                [auth]
+                strategy = "aws"
+                access_key_id = "foo"
+                secret_access_key = "bar"
+            "#},
+            vec![create_event("gauge-2".into(), 32.0)],
+        )
+        .await;
+
+        assert_eq!(outputs.len(), 1);
+        let (headers, _req) = &outputs[0];
+
+        let auth = headers["authorization"]
+            .to_str()
+            .expect("Missing AWS authorization header");
+        assert!(auth.starts_with("AWS4-HMAC-SHA256"));
     }
 
     #[tokio::test]
