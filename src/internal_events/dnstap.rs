@@ -26,3 +26,20 @@ impl<'a> InternalEvent for DnstapParseError<'a> {
         counter!("parse_errors_total", 1);
     }
 }
+
+#[derive(Debug)]
+pub(crate) struct DnstapParseWarning<'a> {
+    pub error: &'a str,
+}
+
+impl<'a> InternalEvent for DnstapParseWarning<'a> {
+    fn emit(self) {
+        warn!(
+            message = "Recoverable error occurred while parsing dnstap data.",
+            error = ?self.error,
+            stage = error_stage::PROCESSING,
+            error_type = error_type::PARSER_FAILED,
+            internal_log_rate_secs = 10,
+        );
+    }
+}
