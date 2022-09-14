@@ -32,6 +32,7 @@ impl<E: std::error::Error> InternalEvent for UnixSocketConnectionError<'_, E> {
             error_code = "connection",
             error_type = error_type::CONNECTION_FAILED,
             stage = error_stage::PROCESSING,
+            internal_log_rate_secs = 10,
         );
         counter!(
             "component_errors_total", 1,
@@ -66,6 +67,8 @@ impl<E: std::fmt::Display> InternalEvent for UnixSocketError<'_, E> {
         );
         // deprecated
         counter!("connection_errors_total", 1, "mode" => "unix");
+
+        // TODO emit EventsDropped (1)
     }
 }
 

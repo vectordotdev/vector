@@ -26,6 +26,7 @@ impl<E: std::error::Error> InternalEvent for UdpSocketConnectionError<E> {
             error_code = "connection",
             error_type = error_type::READER_FAILED,
             stage = error_stage::PROCESSING,
+            internal_log_rate_secs = 10,
         );
         counter!(
             "component_errors_total", 1,
@@ -58,6 +59,8 @@ impl InternalEvent for UdpSocketError {
         );
         // deprecated
         counter!("connection_errors_total", 1, "mode" => "udp");
+
+        // TODO emit EventsDropped (1)
     }
 }
 
@@ -85,5 +88,7 @@ impl InternalEvent for UdpSendIncompleteError {
         );
         // deprecated
         counter!("connection_send_errors_total", 1, "mode" => "udp");
+
+        // TODO emit EventsDropped (1)
     }
 }

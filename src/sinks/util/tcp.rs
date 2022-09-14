@@ -272,6 +272,8 @@ where
             let finalizers = event.metadata_mut().take_finalizers();
             self.transformer.transform(&mut event);
             let mut bytes = BytesMut::new();
+
+            // Errors are handled by `Encoder`.
             if encoder.encode(event, &mut bytes).is_ok() {
                 let item = bytes.freeze();
                 EncodedEvent {
@@ -329,3 +331,4 @@ mod test {
         assert!(bad.healthcheck().await.is_err());
     }
 }
+

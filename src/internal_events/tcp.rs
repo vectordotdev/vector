@@ -53,6 +53,7 @@ pub struct TcpSocketConnectionShutdown;
 
 impl InternalEvent for TcpSocketConnectionShutdown {
     fn emit(self) {
+        // TODO why does this not emit Error  and EventsDropped ?
         debug!(message = "Received EOF from the server, shutdown.");
         counter!("connection_shutdown_total", 1, "mode" => "tcp");
     }
@@ -132,6 +133,8 @@ impl InternalEvent for TcpSocketError {
             "connection_errors_total", 1,
             "mode" => "tcp",
         );
+
+        // TODO emit events dropped
     }
 }
 
