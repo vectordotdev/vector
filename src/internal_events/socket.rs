@@ -128,3 +128,30 @@ impl<'a> InternalEvent for SocketReceiveError<'a> {
         counter!("connection_errors_total", 1, "mode" => mode);
     }
 }
+
+#[derive(Debug)]
+pub struct SocketSendConnectionError<E> {
+    pub error: E,
+    pub socket_mode: &'static str,
+}
+
+impl<E: std::error::Error> InternalEvent for SocketSendConnectionError<E> {
+    fn emit(self) {
+        error!(
+            message = "Unable to connect.",
+            error = %self.error,
+            error_code = "connection",
+            error_type = error_type::CONNECTION_FAILED,
+            stage = error_stage::SENDING,
+            internal_log_rate_secs = 10,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "connection",
+            "error_type" => error_type::CONNECTION_FAILED,
+            "stage" => error_stage::SENDING,
+        );
+        // deprecated
+        counter!("connection_failed_total", 1, "mode" => self.socket_mode);
+    }
+}

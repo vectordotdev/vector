@@ -18,32 +18,6 @@ impl InternalEvent for UdpSocketConnectionEstablished {
 }
 
 #[derive(Debug)]
-pub struct UdpSocketConnectionError<E> {
-    pub error: E,
-}
-
-impl<E: std::error::Error> InternalEvent for UdpSocketConnectionError<E> {
-    fn emit(self) {
-        error!(
-            message = "Unable to connect.",
-            error = %self.error,
-            error_code = "connection",
-            error_type = error_type::READER_FAILED,
-            stage = error_stage::PROCESSING,
-            internal_log_rate_secs = 10,
-        );
-        counter!(
-            "component_errors_total", 1,
-            "error_code" => "connection",
-            "error_type" => error_type::READER_FAILED,
-            "stage" => error_stage::PROCESSING,
-        );
-        // deprecated
-        counter!("connection_failed_total", 1, "mode" => "udp");
-    }
-}
-
-#[derive(Debug)]
 pub struct UdpSocketSendError {
     pub error: std::io::Error,
 }

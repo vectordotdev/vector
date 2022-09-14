@@ -27,32 +27,6 @@ impl InternalEvent for TcpSocketConnectionEstablished {
 }
 
 #[derive(Debug)]
-pub struct TcpSocketConnectionError<E> {
-    pub error: E,
-}
-
-impl<E: std::error::Error> InternalEvent for TcpSocketConnectionError<E> {
-    fn emit(self) {
-        error!(
-            message = "Unable to connect.",
-            error = %self.error,
-            error_code = "failed_connecting",
-            error_type = error_type::WRITER_FAILED,
-            stage = error_stage::SENDING,
-            internal_log_rate_secs = 10,
-        );
-        counter!(
-            "component_errors_total", 1,
-            "error_code" => "failed_connecting",
-            "error_type" => error_type::WRITER_FAILED,
-            "stage" => error_stage::SENDING,
-        );
-        // deprecated
-        counter!("connection_failed_total", 1, "mode" => "tcp");
-    }
-}
-
-#[derive(Debug)]
 pub struct TcpSocketConnectionShutdown;
 
 impl InternalEvent for TcpSocketConnectionShutdown {
