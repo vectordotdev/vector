@@ -1,5 +1,6 @@
 mod config_builder;
 mod loader;
+mod schema;
 mod secret;
 mod source;
 
@@ -16,6 +17,7 @@ pub use config_builder::*;
 use glob::glob;
 use loader::process::Process;
 pub use loader::*;
+pub(crate) use schema::*;
 pub use secret::*;
 pub use source::*;
 use vector_config::NamedComponent;

@@ -181,22 +181,22 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     };
 
     let json = serialize_to_json(source, &builder, opts.include_defaults, opts.pretty);
+    let json = json.expect("config should be serializable");
 
     if builder
         .enterprise
         .map(|opts| opts.enabled)
         .unwrap_or_default()
     {
-        let _schema = match vector_config::schema::generate_root_schema::<ConfigBuilder>() {
-            Ok(schema) => schema,
-            Err(err) => return handle_config_errors(vec![format!("{:?}", err)]),
-        };
-        // TODO run schemars and check that the values contain a secret.
+        tracing::info!("checking environment variables are used in sensitive strings");
+        if let Err(errs) = super::loading::check_sensitive_fields(&json) {
+            return handle_config_errors(errs);
+        }
     }
 
     #[allow(clippy::print_stdout)]
     {
-        println!("{}", json.expect("config should be serializable"));
+        println!("{}", json);
     }
 
     exitcode::OK

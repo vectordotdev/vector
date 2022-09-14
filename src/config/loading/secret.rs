@@ -140,9 +140,9 @@ pub fn interpolate(input: &str, secrets: &HashMap<String, String>) -> Result<Str
     }
 }
 
-pub(crate) fn has_secret(input: &str) -> bool {
-    COLLECTOR.is_match(input)
-}
+// pub(crate) fn has_secret(input: &str) -> bool {
+//     COLLECTOR.is_match(input)
+// }
 
 #[cfg(test)]
 mod tests {
