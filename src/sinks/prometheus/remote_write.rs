@@ -17,7 +17,7 @@ use crate::{
     config::{self, AcknowledgementsConfig, Input, SinkConfig},
     event::{Event, Metric},
     http::{Auth, HttpClient},
-    internal_events::TemplateRenderingError,
+    internal_events::{EndpointBytesSent, TemplateRenderingError},
     sinks::{
         self,
         prometheus::PrometheusRemoteWriteAuth,
@@ -25,7 +25,7 @@ use crate::{
             batch::BatchConfig,
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             http::HttpRetryLogic,
-            EncodedEvent, PartitionBuffer, PartitionInnerBuffer, SinkBatchSettings,
+            uri, EncodedEvent, PartitionBuffer, PartitionInnerBuffer, SinkBatchSettings,
             TowerRequestConfig,
         },
     },
@@ -191,7 +191,7 @@ impl SinkConfig for RemoteWriteConfig {
                                     emit!(TemplateRenderingError {
                                         error,
                                         field: Some("tenant_id"),
-                                        drop_event: false,
+                                        drop_event: true,
                                     })
                                 })
                                 .ok()
@@ -283,10 +283,12 @@ impl tower::Service<PartitionInnerBuffer<Vec<Metric>, PartitionKey>> for RemoteW
     type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
+    // Emission of Error internal event is handled upstream by the caller
     fn poll_ready(&mut self, _task: &mut task::Context<'_>) -> task::Poll<Result<(), Self::Error>> {
         task::Poll::Ready(Ok(()))
     }
 
+    // Emission of Error internal event is handled upstream by the caller
     fn call(&mut self, buffer: PartitionInnerBuffer<Vec<Metric>, PartitionKey>) -> Self::Future {
         let (events, key) = buffer.into_parts();
         let body = self.encode_events(events);
@@ -300,9 +302,18 @@ impl tower::Service<PartitionInnerBuffer<Vec<Metric>, PartitionKey>> for RemoteW
                 .build_request(http::Method::POST, body, key.tenant_id)
                 .await?;
 
+            let (protocol, endpoint) = uri::protocol_endpoint(request.uri().clone());
+
             let response = client.send(request).await?;
             let (parts, body) = response.into_parts();
             let body = hyper::body::to_bytes(body).await?;
+
+            emit!(EndpointBytesSent {
+                byte_size: body.len(),
+                protocol: &protocol,
+                endpoint: &endpoint
+            });
+
             Ok(hyper::Response::from_parts(parts, body))
         })
     }
@@ -375,7 +386,10 @@ mod tests {
         config::SinkContext,
         event::{MetricKind, MetricValue},
         sinks::util::test::build_test_server,
-        test_util,
+        test_util::{
+            self,
+            components::{assert_sink_compliance, HTTP_SINK_TAGS},
+        },
     };
 
     #[test]
@@ -528,39 +542,42 @@ mod tests {
         config: &str,
         events: Vec<Event>,
     ) -> Vec<(HeaderMap, proto::WriteRequest)> {
-        let addr = test_util::next_addr();
-        let (rx, trigger, server) = build_test_server(addr);
-        tokio::spawn(server);
+        assert_sink_compliance(&HTTP_SINK_TAGS, async {
+            let addr = test_util::next_addr();
+            let (rx, trigger, server) = build_test_server(addr);
+            tokio::spawn(server);
 
-        let config = format!("endpoint = \"http://{}/write\"\n{}", addr, config);
-        let config: RemoteWriteConfig = toml::from_str(&config).unwrap();
-        let cx = SinkContext::new_test();
+            let config = format!("endpoint = \"http://{}/write\"\n{}", addr, config);
+            let config: RemoteWriteConfig = toml::from_str(&config).unwrap();
+            let cx = SinkContext::new_test();
 
-        let (sink, _) = config.build(cx).await.unwrap();
-        sink.run_events(events).await.unwrap();
+            let (sink, _) = config.build(cx).await.unwrap();
+            sink.run_events(events).await.unwrap();
 
-        drop(trigger);
+            drop(trigger);
 
-        rx.map(|(parts, body)| {
-            assert_eq!(parts.method, "POST");
-            assert_eq!(parts.uri.path(), "/write");
-            let headers = parts.headers;
-            assert_eq!(headers["x-prometheus-remote-write-version"], "0.1.0");
-            assert_eq!(headers["content-encoding"], "snappy");
-            assert_eq!(headers["content-type"], "application/x-protobuf");
+            rx.map(|(parts, body)| {
+                assert_eq!(parts.method, "POST");
+                assert_eq!(parts.uri.path(), "/write");
+                let headers = parts.headers;
+                assert_eq!(headers["x-prometheus-remote-write-version"], "0.1.0");
+                assert_eq!(headers["content-encoding"], "snappy");
+                assert_eq!(headers["content-type"], "application/x-protobuf");
 
-            if config.auth.is_some() {
-                assert!(headers.contains_key("authorization"));
-            }
+                if config.auth.is_some() {
+                    assert!(headers.contains_key("authorization"));
+                }
 
-            let decoded = snap::raw::Decoder::new()
-                .decompress_vec(&body)
-                .expect("Invalid snappy compressed data");
-            let request =
-                proto::WriteRequest::decode(Bytes::from(decoded)).expect("Invalid protobuf");
-            (headers, request)
+                let decoded = snap::raw::Decoder::new()
+                    .decompress_vec(&body)
+                    .expect("Invalid snappy compressed data");
+                let request =
+                    proto::WriteRequest::decode(Bytes::from(decoded)).expect("Invalid protobuf");
+                (headers, request)
+            })
+            .collect::<Vec<_>>()
+            .await
         })
-        .collect::<Vec<_>>()
         .await
     }
 
@@ -600,6 +617,7 @@ mod integration_tests {
         config::{SinkConfig, SinkContext},
         event::{metric::MetricValue, Event},
         sinks::influxdb::test_util::{cleanup_v1, format_timestamp, onboarding_v1, query_v1},
+        test_util::components::{assert_sink_compliance, HTTP_SINK_TAGS},
         tls::{self, TlsConfig},
     };
 
@@ -617,57 +635,58 @@ mod integration_tests {
     }
 
     async fn insert_metrics(url: &str) {
-        crate::test_util::trace_init();
+        assert_sink_compliance(&HTTP_SINK_TAGS, async {
+            let database = onboarding_v1(url).await;
 
-        let database = onboarding_v1(url).await;
+            let cx = SinkContext::new_test();
 
-        let cx = SinkContext::new_test();
-
-        let config = RemoteWriteConfig {
-            endpoint: format!("{}/api/v1/prom/write?db={}", url, database),
-            tls: Some(TlsConfig {
-                ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
+            let config = RemoteWriteConfig {
+                endpoint: format!("{}/api/v1/prom/write?db={}", url, database),
+                tls: Some(TlsConfig {
+                    ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
+                    ..Default::default()
+                }),
                 ..Default::default()
-            }),
-            ..Default::default()
-        };
-        let events = create_events(0..5, |n| n * 11.0);
+            };
+            let events = create_events(0..5, |n| n * 11.0);
 
-        let (sink, _) = config.build(cx).await.expect("error building config");
-        sink.run_events(events.clone()).await.unwrap();
+            let (sink, _) = config.build(cx).await.expect("error building config");
+            sink.run_events(events.clone()).await.unwrap();
 
-        let result = query(url, &format!("show series on {}", database)).await;
+            let result = query(url, &format!("show series on {}", database)).await;
 
-        let values = &result["results"][0]["series"][0]["values"];
-        assert_eq!(values.as_array().unwrap().len(), 5);
+            let values = &result["results"][0]["series"][0]["values"];
+            assert_eq!(values.as_array().unwrap().len(), 5);
 
-        for event in events {
-            let metric = event.into_metric();
-            let result = query(
-                url,
-                &format!(r#"SELECT * FROM "{}".."{}""#, database, metric.name()),
-            )
-            .await;
+            for event in events {
+                let metric = event.into_metric();
+                let result = query(
+                    url,
+                    &format!(r#"SELECT * FROM "{}".."{}""#, database, metric.name()),
+                )
+                .await;
 
-            let metrics = decode_metrics(&result["results"][0]["series"][0]);
-            assert_eq!(metrics.len(), 1);
-            let output = &metrics[0];
+                let metrics = decode_metrics(&result["results"][0]["series"][0]);
+                assert_eq!(metrics.len(), 1);
+                let output = &metrics[0];
 
-            match metric.value() {
-                MetricValue::Gauge { value } => {
-                    assert_eq!(output["value"], Value::Number((*value as u32).into()))
+                match metric.value() {
+                    MetricValue::Gauge { value } => {
+                        assert_eq!(output["value"], Value::Number((*value as u32).into()))
+                    }
+                    _ => panic!("Unhandled metric value, fix the test"),
                 }
-                _ => panic!("Unhandled metric value, fix the test"),
+                for (tag, value) in metric.tags().unwrap() {
+                    assert_eq!(output[&tag[..]], Value::String(value.to_string()));
+                }
+                let timestamp =
+                    format_timestamp(metric.timestamp().unwrap(), chrono::SecondsFormat::Millis);
+                assert_eq!(output["time"], Value::String(timestamp));
             }
-            for (tag, value) in metric.tags().unwrap() {
-                assert_eq!(output[&tag[..]], Value::String(value.to_string()));
-            }
-            let timestamp =
-                format_timestamp(metric.timestamp().unwrap(), chrono::SecondsFormat::Millis);
-            assert_eq!(output["time"], Value::String(timestamp));
-        }
 
-        cleanup_v1(url, &database).await;
+            cleanup_v1(url, &database).await;
+        })
+        .await
     }
 
     async fn query(url: &str, query: &str) -> Value {
