@@ -115,10 +115,9 @@ async fn ensure_pipeline_in_params() {
         pipeline: Some(pipeline.clone()),
         ..config()
     };
-    let common = ElasticsearchCommon::parse_endpoints(&config)
+    let common = ElasticsearchCommon::parse_single_endpoint(&config)
         .await
-        .expect("Config error")
-        .remove(0);
+        .expect("Config error");
 
     assert_eq!(common.query_params["pipeline"], pipeline);
 }
@@ -137,10 +136,9 @@ async fn structures_events_correctly() {
         compression: Compression::None,
         ..config()
     };
-    let common = ElasticsearchCommon::parse_endpoints(&config)
+    let common = ElasticsearchCommon::parse_single_endpoint(&config)
         .await
-        .expect("Config error")
-        .remove(0);
+        .expect("Config error");
     let base_url = common.base_url.clone();
 
     let cx = SinkContext::new_test();
@@ -317,10 +315,9 @@ async fn insert_events_in_data_stream() {
         }),
         ..config()
     };
-    let common = ElasticsearchCommon::parse_endpoints(&cfg)
+    let common = ElasticsearchCommon::parse_single_endpoint(&cfg)
         .await
-        .expect("Config error")
-        .remove(0);
+        .expect("Config error");
 
     create_template_index(&common, &template_index)
         .await
@@ -409,10 +406,9 @@ async fn run_insert_tests_with_config(
     break_events: bool,
     batch_status: BatchStatus,
 ) {
-    let common = ElasticsearchCommon::parse_endpoints(config)
+    let common = ElasticsearchCommon::parse_single_endpoint(config)
         .await
-        .expect("Config error")
-        .remove(0);
+        .expect("Config error");
     let index = match config.mode {
         // Data stream mode uses an index name generated from the event.
         ElasticsearchMode::DataStream => format!(

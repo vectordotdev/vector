@@ -85,10 +85,9 @@ async fn firehose_put_records() {
         aws: Some(region),
         ..Default::default()
     };
-    let common = ElasticsearchCommon::parse_endpoints(&config)
+    let common = ElasticsearchCommon::parse_single_endpoint(&config)
         .await
-        .expect("Config error")
-        .remove(0);
+        .expect("Config error");
 
     let client = reqwest::Client::builder()
         .build()

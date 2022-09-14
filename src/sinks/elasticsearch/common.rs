@@ -141,8 +141,7 @@ impl ElasticsearchCommon {
         })
     }
 
-    /// Parses endpoints.
-    /// Not empty.
+    /// Parses endpoints into a vector ElasticsearchCommons. The resulting vector is guaranteed to not be empty.
     pub async fn parse_endpoints(config: &ElasticsearchConfig) -> crate::Result<Vec<Self>> {
         Ok(match config.endpoint {
             OneOrMany::One(ref endpoint) => vec![Self::parse_config(config, endpoint).await?],
@@ -157,6 +156,14 @@ impl ElasticsearchCommon {
                 commons
             }
         })
+    }
+
+    /// Parses a single endpoint, else panics.
+    #[cfg(test)]
+    pub async fn parse_single_endpoint(config: &ElasticsearchConfig) -> crate::Result<Self> {
+        let commons = Self::parse_endpoints(config).await?;
+        assert!(commons.len() == 1);
+        Ok(commons.remove(0))
     }
 
     pub async fn healthcheck(self, client: HttpClient) -> crate::Result<()> {
