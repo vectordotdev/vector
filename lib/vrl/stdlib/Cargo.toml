@@ -28,8 +28,8 @@ hostname = { version = "0.3", optional = true }
 indexmap = { version = "~1.9.1", default-features = false, optional = true}
 md-5 = { version = "0.10", optional = true }
 nom = { version = "7", optional = true }
-percent-encoding = { version = "2.1", optional = true }
-once_cell = { version = "1.13", optional = true }
+percent-encoding = { version = "2.2", optional = true }
+once_cell = { version = "1.14", optional = true }
 rand = { version = "0.8.5", optional = true }
 regex = { version = "1", optional = true }
 rust_decimal = { version = "1", optional = true }
@@ -139,6 +139,7 @@ default = [
     "match_datadog_query",
     "md5",
     "merge",
+    "mod",
     "now",
     "object",
     "parse_aws_alb_log",
@@ -279,6 +280,7 @@ match_array = ["dep:regex"]
 match_datadog_query = ["dep:datadog-search-syntax", "dep:datadog-filter", "dep:once_cell", "dep:regex", "dep:lookup_lib"]
 md5 = ["dep:md-5", "dep:hex"]
 merge = []
+mod = []
 now = ["dep:chrono"]
 object = []
 parse_apache_log = ["dep:chrono", "dep:once_cell", "dep:regex", "vector-common/conversion"]

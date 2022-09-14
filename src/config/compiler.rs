@@ -4,7 +4,7 @@ use indexmap::{IndexMap, IndexSet};
 
 use super::{
     builder::ConfigBuilder, graph::Graph, schema, validation, ComponentKey, Config, OutputId,
-    SourceConfig,
+    SourceConfig, TransformConfig,
 };
 
 /// to handle the expansions when building the graph we need to be able to get the list of inputs

@@ -8,6 +8,8 @@ use heim::memory::os::macos::MemoryExt;
 use heim::memory::os::SwapExt;
 use heim::units::information::byte;
 
+use crate::internal_events::HostMetricsScrapeDetailError;
+
 use super::HostMetrics;
 
 impl HostMetrics {
@@ -74,7 +76,10 @@ impl HostMetrics {
                 );
             }
             Err(error) => {
-                error!(message = "Failed to load memory info.", %error, internal_log_rate_secs = 60);
+                emit!(HostMetricsScrapeDetailError {
+                    message: "Failed to load memory info.",
+                    error,
+                });
             }
         }
     }
@@ -112,7 +117,10 @@ impl HostMetrics {
                 );
             }
             Err(error) => {
-                error!(message = "Failed to load swap info.", %error, internal_log_rate_secs = 60);
+                emit!(HostMetricsScrapeDetailError {
+                    message: "Failed to load swap info.",
+                    error,
+                });
             }
         }
     }

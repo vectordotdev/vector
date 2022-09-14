@@ -10,6 +10,7 @@ use snafu::Snafu;
 use std::task::Poll;
 use tokio::time::{self, Duration};
 use tokio_util::codec::FramedRead;
+use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
@@ -17,7 +18,7 @@ use vector_core::ByteSizeOf;
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{log_schema, Output, SourceConfig, SourceContext},
-    internal_events::{BytesReceived, DemoLogsEventProcessed, EventsReceived, StreamClosedError},
+    internal_events::{DemoLogsEventProcessed, EventsReceived, StreamClosedError},
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     SourceSender,
@@ -185,6 +186,8 @@ async fn demo_logs_source(
 
     let mut interval = maybe_interval.map(|i| time::interval(Duration::from_secs_f64(i)));
 
+    let bytes_received = register!(BytesReceived::from(Protocol::NONE));
+
     for n in 0..count {
         if matches!(futures::poll!(&mut shutdown), Poll::Ready(_)) {
             break;
@@ -193,10 +196,7 @@ async fn demo_logs_source(
         if let Some(interval) = &mut interval {
             interval.tick().await;
         }
-        emit!(BytesReceived {
-            byte_size: 0,
-            protocol: "none",
-        });
+        bytes_received.emit(ByteSize(0));
 
         let line = format.generate_line(n);
 
@@ -292,7 +292,13 @@ mod tests {
     use futures::{poll, Stream, StreamExt};
 
     use super::*;
-    use crate::{config::log_schema, event::Event, shutdown::ShutdownSignal, SourceSender};
+    use crate::{
+        config::log_schema,
+        event::Event,
+        shutdown::ShutdownSignal,
+        test_util::components::{assert_source_compliance, SOURCE_TAGS},
+        SourceSender,
+    };
 
     #[test]
     fn generate_config() {
@@ -308,17 +314,21 @@ mod tests {
             LogNamespace::Legacy,
         )
         .build();
-        demo_logs_source(
-            config.interval,
-            config.count,
-            config.format,
-            decoder,
-            ShutdownSignal::noop(),
-            tx,
-            LogNamespace::Legacy,
-        )
-        .await
-        .unwrap();
+
+        assert_source_compliance(&SOURCE_TAGS, async {
+            demo_logs_source(
+                config.interval,
+                config.count,
+                config.format,
+                decoder,
+                ShutdownSignal::noop(),
+                tx,
+                LogNamespace::Legacy,
+            )
+            .await
+            .unwrap();
+        })
+        .await;
         rx
     }
 

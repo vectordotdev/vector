@@ -15,7 +15,6 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  AUTOINSTALL: true
   AWS_ACCESS_KEY_ID: "dummy"
   AWS_SECRET_ACCESS_KEY: "dummy"
   CONTAINER_TOOL: "docker"

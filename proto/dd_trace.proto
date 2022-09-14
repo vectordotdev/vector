@@ -31,6 +31,9 @@ message TracerPayload {
 	string tracerVersion = 4;
 	string runtimeID = 5;
 	repeated TraceChunk chunks = 6;
+	map<string, string> tags = 7;
+	string env = 8;
+	string hostname = 9;
 	string appVersion = 10;
 }
 

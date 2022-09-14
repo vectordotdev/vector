@@ -11,9 +11,7 @@ use vector_core::ByteSizeOf;
 
 use super::Region;
 use crate::{
-    config::{
-        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
-    },
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::{
         metric::{Metric, MetricValue},
         Event,
@@ -48,7 +46,7 @@ impl SinkBatchSettings for SematextMetricsDefaultBatchSettings {
 }
 
 /// Configuration for the `sematext_metrics` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("sematext_metrics"))]
 #[derive(Clone, Debug, Default)]
 pub struct SematextMetricsConfig {
     /// Sets the default namespace for any metrics sent.
@@ -83,10 +81,6 @@ pub struct SematextMetricsConfig {
     acknowledgements: AcknowledgementsConfig,
 }
 
-inventory::submit! {
-    SinkDescription::new::<SematextMetricsConfig>("sematext_metrics")
-}
-
 impl GenerateConfig for SematextMetricsConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(indoc! {r#"
@@ -118,7 +112,6 @@ const ENDPOINT: &str = "https://spm-receiver.sematext.com";
 const EU_ENDPOINT: &str = "https://spm-receiver.eu.sematext.com";
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "sematext_metrics")]
 impl SinkConfig for SematextMetricsConfig {
     async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck)> {
         let client = HttpClient::new(None, cx.proxy())?;
@@ -143,10 +136,6 @@ impl SinkConfig for SematextMetricsConfig {
 
     fn input(&self) -> Input {
         Input::metric()
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "sematext_metrics"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

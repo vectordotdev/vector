@@ -155,15 +155,15 @@ impl<T> Metadata<T> {
     /// Converts this metadata from holding a default value of `T` to `U`.
     ///
     /// If a default value was present before, it is dropped.
-    pub fn convert<U>(self) -> Metadata<U> {
+    pub fn convert<U>(&self) -> Metadata<U> {
         Metadata {
             title: self.title,
             description: self.description,
             default_value: None,
-            custom_attributes: self.custom_attributes,
+            custom_attributes: self.custom_attributes.clone(),
             deprecated: self.deprecated,
             transparent: self.transparent,
-            validations: self.validations,
+            validations: self.validations.clone(),
         }
     }
 

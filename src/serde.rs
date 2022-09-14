@@ -96,33 +96,17 @@ impl<V: 'static> Fields<V> {
     }
 }
 
-/// Structure to handle when a configuration field can be a value
-/// or a list of values.
+/// A value which can be (de)serialized from one or many instances of `T`.
 #[configurable_component]
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[serde(untagged)]
 pub enum OneOrMany<T> {
-    /// A single value.
-    One(#[configurable(derived)] T),
-    /// A list of values.
-    Many(#[configurable(derived)] Vec<T>),
-}
-
-impl<T: ToString> OneOrMany<T> {
-    pub fn stringify(&self) -> OneOrMany<String> {
-        match self {
-            Self::One(value) => value.to_string().into(),
-            Self::Many(values) => values
-                .iter()
-                .map(ToString::to_string)
-                .collect::<Vec<_>>()
-                .into(),
-        }
-    }
+    One(#[configurable(transparent)] T),
+    Many(#[configurable(transparent)] Vec<T>),
 }
 
 impl<T> OneOrMany<T> {
-    pub fn into_vec(self) -> Vec<T> {
+    pub fn to_vec(self) -> Vec<T> {
         match self {
             Self::One(value) => vec![value],
             Self::Many(list) => list,

@@ -4,10 +4,7 @@ use serde::Serialize;
 use vector_config::configurable_component;
 
 use crate::{
-    config::{
-        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
-        TransformDescription,
-    },
+    config::{DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext},
     event::Event,
     internal_events::{GeoipIpAddressParseError, ParserMissingFieldError},
     schema,
@@ -16,7 +13,7 @@ use crate::{
 };
 
 /// Configuration for the `geoip` transform.
-#[configurable_component(transform)]
+#[configurable_component(transform("geoip"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct GeoipConfig {
@@ -25,10 +22,13 @@ pub struct GeoipConfig {
     /// This field should contain a valid IPv4 or IPv6 address.
     pub source: String,
 
-    /// Path to the [MaxMind GeoIP2](https://dev.maxmind.com/geoip/geoip2/downloadable) or [GeoLite2 binary city
-    /// database file](https://dev.maxmind.com/geoip/geoip2/geolite2/#Download_Access) (**GeoLite2-City.mmdb**).
+    /// Path to the [MaxMind GeoIP2][geoip2] or [GeoLite2 binary city database file][geolite2]
+    /// (**GeoLite2-City.mmdb**).
     ///
     /// Other databases, such as the country database, are not supported.
+    ///
+    /// [geoip2]: https://dev.maxmind.com/geoip/geoip2/downloadable
+    /// [geolite2]: https://dev.maxmind.com/geoip/geoip2/geolite2/#Download_Access
     pub database: String,
 
     /// The default field to insert the resulting GeoIP data into.
@@ -39,12 +39,14 @@ pub struct GeoipConfig {
 
     /// The locale to use when querying the database.
     ///
-    /// MaxMind includes localized versions of some of the fields within their database, such as country name. This
-    /// setting can control which of those localized versions are returned by the transform.
+    /// MaxMind includes localized versions of some of the fields within their database, such as
+    /// country name. This setting can control which of those localized versions are returned by the
+    /// transform.
     ///
-    /// More information on which portions of the geolocation data are localized, and what languages are available, can
-    /// be found
-    /// [here](https://support.maxmind.com/hc/en-us/articles/4414877149467-IP-Geolocation-Data#h_01FRRGRYTGZB29ERDBZCX3MR8Q).
+    /// More information on which portions of the geolocation data are localized, and what languages
+    /// are available, can be found [here][locale_docs].
+    ///
+    /// [locale_docs]: https://support.maxmind.com/hc/en-us/articles/4414877149467-IP-Geolocation-Data#h_01FRRGRYTGZB29ERDBZCX3MR8Q
     #[serde(default = "default_locale")]
     pub locale: String,
 }
@@ -64,17 +66,16 @@ fn default_geoip_target_field() -> String {
     "geoip".to_string()
 }
 
-// valid locales are: “de”, "en", “es”, “fr”, “ja”, “pt-BR”, “ru”, and “zh-CN”
-//
-// https://dev.maxmind.com/geoip/docs/databases/city-and-country?lang=en
-//
-// TODO try to determine the system locale and use that as default if it matches a valid locale?
 fn default_locale() -> String {
-    "en".to_string()
-}
+    // Valid locales at the time of writing are: "de”, "en", “es”, “fr”, “ja”, “pt-BR”, “ru”, and
+    // “zh-CN”.
+    //
+    // More information, including the up-to-date list of locales, can be found at
+    // https://dev.maxmind.com/geoip/docs/databases/city-and-country?lang=en.
 
-inventory::submit! {
-    TransformDescription::new::<GeoipConfig>("geoip")
+    // TODO: could we detect the system locale and use that as the default locale if it matches one
+    // of the available locales in the dataset, and then fallback to "en" otherwise?
+    "en".to_string()
 }
 
 impl GenerateConfig for GeoipConfig {
@@ -90,7 +91,6 @@ impl GenerateConfig for GeoipConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "geoip")]
 impl TransformConfig for GeoipConfig {
     async fn build(&self, _context: &TransformContext) -> Result<Transform> {
         Ok(Transform::function(Geoip::new(
@@ -107,10 +107,6 @@ impl TransformConfig for GeoipConfig {
 
     fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
-    }
-
-    fn transform_type(&self) -> &'static str {
-        "geoip"
     }
 }
 

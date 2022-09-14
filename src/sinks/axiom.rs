@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 use crate::{
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig,
-        SinkContext, SinkDescription,
+        SinkContext,
     },
     sinks::{
         elasticsearch::{ElasticsearchAuth, ElasticsearchConfig},
@@ -17,28 +17,45 @@ use crate::{
 
 static CLOUD_URL: &str = "https://cloud.axiom.co";
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub(self) struct AxiomConfig {
+/// Configuration for the `axiom` sink.
+#[configurable_component(sink("axiom"))]
+#[derive(Clone, Debug, Default)]
+pub struct AxiomConfig {
+    /// URI of the Axiom endpoint to send data to.
+    ///
+    /// Only required if not using Axiom Cloud.
+    #[configurable(validation(format = "uri"))]
     url: Option<String>,
+
+    /// The Axiom organization ID.
+    ///
+    /// Only required when using personal tokens.
     org_id: Option<String>,
+
+    /// The Axiom API token.
     token: String,
+
+    /// The Axiom dataset to write to.
     dataset: String,
 
+    #[configurable(derived)]
     #[serde(default)]
     request: RequestConfig,
+
+    #[configurable(derived)]
     #[serde(default)]
     compression: Compression,
+
+    #[configurable(derived)]
     tls: Option<TlsConfig>,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     acknowledgements: AcknowledgementsConfig,
-}
-
-inventory::submit! {
-    SinkDescription::new::<AxiomConfig>("axiom")
 }
 
 impl GenerateConfig for AxiomConfig {
@@ -54,7 +71,6 @@ impl GenerateConfig for AxiomConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "axiom")]
 impl SinkConfig for AxiomConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let mut request = self.request.clone();
@@ -93,10 +109,6 @@ impl SinkConfig for AxiomConfig {
         Input::new(DataType::Metric | DataType::Log)
     }
 
-    fn sink_type(&self) -> &'static str {
-        "axiom"
-    }
-
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
     }
@@ -128,6 +140,7 @@ mod integration_tests {
     use chrono::{DateTime, Duration, Utc};
     use futures::stream;
     use http::StatusCode;
+    use serde::{Deserialize, Serialize};
     use std::env;
     use tokio::time;
     use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
