@@ -188,6 +188,10 @@ impl GlobalOptions {
             errors.extend(merge_errors);
         }
 
+        if self.timezone != with.timezone {
+            errors.push("conflicting values for 'timezone' found".to_owned());
+        }
+
         if errors.is_empty() {
             Ok(Self {
                 data_dir,
