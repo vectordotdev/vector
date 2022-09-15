@@ -158,7 +158,6 @@ impl SinkConfig for NewRelicConfig {
 
         let sink = NewRelicSink {
             service,
-
             transformer: self.encoding.clone(),
             encoder: NewRelicEncoder,
             credentials,
