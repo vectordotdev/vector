@@ -507,7 +507,7 @@ async fn run_insert_tests_with_config(
 }
 
 async fn run_insert_tests_with_multiple_endpoints(config: &ElasticsearchConfig) {
-    let commons = ElasticsearchCommon::parse_endpoints(config)
+    let commons = ElasticsearchCommon::parse_many(config)
         .await
         .expect("Config error");
     let index = match config.mode {
