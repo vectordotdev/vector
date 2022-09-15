@@ -3,7 +3,7 @@ use std::{
     convert::TryFrom,
 };
 
-use futures::FutureExt;
+use futures::{FutureExt, TryFutureExt};
 use snafu::ResultExt;
 use tower::ServiceBuilder;
 use vector_config::configurable_component;
@@ -374,7 +374,7 @@ impl DataStreamConfig {
 #[async_trait::async_trait]
 impl SinkConfig for ElasticsearchConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let commons = ElasticsearchCommon::parse_endpoints(self).await?;
+        let commons = ElasticsearchCommon::parse_many(self).await?;
         let common = commons[0].clone();
 
         let client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
@@ -389,7 +389,8 @@ impl SinkConfig for ElasticsearchConfig {
             let health_config = self.distribution.clone().unwrap_or_default();
 
             let services = commons
-                .into_iter()
+                .iter()
+                .cloned()
                 .map(|common| {
                     let endpoint = common.base_url.clone();
 
@@ -412,7 +413,6 @@ impl SinkConfig for ElasticsearchConfig {
             VectorSink::from_event_streamsink(sink)
         } else {
             // Single service
-
             let service =
                 ElasticsearchService::new(client.clone(), HttpRequestBuilder::new(&common, self));
 
@@ -424,7 +424,13 @@ impl SinkConfig for ElasticsearchConfig {
             VectorSink::from_event_streamsink(sink)
         };
 
-        let healthcheck = common.healthcheck(client).boxed();
+        let healthcheck = futures::future::select_ok(
+            commons
+                .into_iter()
+                .map(move |common| common.healthcheck(client.clone()).boxed()),
+        )
+        .map_ok(|((), _)| ())
+        .boxed();
         Ok((stream, healthcheck))
     }
 
