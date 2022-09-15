@@ -183,13 +183,14 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     let json = serialize_to_json(source, &builder, opts.include_defaults, opts.pretty);
     let json = json.expect("config should be serializable");
 
+    #[cfg(feature = "enterprise")]
     if builder
         .enterprise
         .map(|opts| opts.enabled)
         .unwrap_or_default()
     {
         tracing::info!("checking environment variables are used in sensitive strings");
-        if let Err(errs) = super::loading::check_sensitive_fields(&json) {
+        if let Err(errs) = super::loading::schema::check_sensitive_fields(&json) {
             return handle_config_errors(errs);
         }
     }

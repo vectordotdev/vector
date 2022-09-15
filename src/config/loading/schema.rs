@@ -1,12 +1,9 @@
 use super::ConfigBuilder;
 
+const SECRET_AND_VARIABLES_REGEX: &str = "(:?\\$\\{.+\\})";
+
 fn into_errors<E: std::fmt::Debug>(err: E) -> Vec<String> {
     vec![format!("{:?}", err)]
-}
-
-fn sensitive_string_format(value: &str) -> bool {
-    dbg!(value);
-    false
 }
 
 fn generate_schema() -> Result<serde_json::Value, Vec<String>> {
@@ -22,12 +19,21 @@ fn generate_schema() -> Result<serde_json::Value, Vec<String>> {
         .and_then(|d| d.get_mut("vector_common::sensitive_string::SensitiveString"))
         .and_then(|d| d.as_object_mut())
     {
-        def.insert("format".into(), serde_json::json!("sensitive_string"));
+        def.insert(
+            "pattern".into(),
+            serde_json::json!(SECRET_AND_VARIABLES_REGEX),
+        );
 
         Ok(schema)
     } else {
         Err(vec!["Unable to get SensitiveString definition".into()])
     }
+}
+
+fn serialize_validation_errors<'a>(errors: jsonschema::ErrorIterator<'a>) -> Vec<String> {
+    errors
+        .map(|err| format!("{} at instance path {}", err, err.instance_path))
+        .collect::<Vec<String>>()
 }
 
 pub(crate) fn check_sensitive_fields(json_config: &str) -> Result<(), Vec<String>> {
@@ -36,50 +42,39 @@ pub(crate) fn check_sensitive_fields(json_config: &str) -> Result<(), Vec<String
 
     // compile the json schema with the custom format for sensitive strings
     let compiled = jsonschema::JSONSchema::options()
-        .with_format("sensitive_string", sensitive_string_format)
         .should_validate_formats(true)
         .compile(&schema)
         .map_err(into_errors)?;
 
-    compiled.validate(&json_value).map_err(|errors| {
-        errors
-            .map(|err| {
-                format!(
-                    "validation error ({}) as instance path {}",
-                    err, err.instance_path
-                )
-            })
-            .collect::<Vec<String>>()
-    })
+    compiled
+        .validate(&json_value)
+        .map_err(serialize_validation_errors)
 }
 
 #[cfg(test)]
 mod tests {
     use super::check_sensitive_fields;
+    use regex::Regex;
 
     #[test]
-    fn should_detect_api_keys() {
+    fn regex_should_detect_variables() {
+        let re = Regex::new(super::SECRET_AND_VARIABLES_REGEX).unwrap();
+        assert!(re.is_match("oewifn${foiwenf}wwefgno"));
+        assert!(!re.is_match("oewifn${wwefgno"));
+        assert!(!re.is_match("oewifn$}wwefgno"));
+    }
+
+    #[test]
+    fn schema_should_detect_missing_variable_in_keys() {
         let config = r#"{
     "enterprise": {
-        "enabled": true,
         "api_key": "aaaaa",
         "configuration_key": "bbbbb"
     },
-    "sources": {
-        "foo": {
-            "type": "demo_logs",
-            "format": "json",
-            "interval": 0.2
-        }
-    },
-    "sinks": {
-        "byebye": {
-            "type": "blackhole",
-            "inputs": ["foo"]
-        }
-    }
+    "sources": {},
+    "sinks": {}
 }"#;
         let errors = check_sensitive_fields(config).unwrap_err();
-        assert_eq!(errors[0], "oops");
+        assert_eq!(errors[0], "{\"api_key\":\"aaaaa\",\"configuration_key\":\"bbbbb\"} is not valid under any of the given schemas at instance path /enterprise");
     }
 }
