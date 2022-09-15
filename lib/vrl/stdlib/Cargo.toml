@@ -129,6 +129,7 @@ default = [
     "is_string",
     "is_timestamp",
     "join",
+    "keys",
     "length",
     "log",
     "map_keys",
@@ -207,6 +208,7 @@ default = [
     "unnest",
     "upcase",
     "uuid_v4",
+    "values"
 ]
 
 append = []
@@ -270,6 +272,7 @@ is_regex = ["dep:regex"]
 is_string = []
 is_timestamp = ["dep:chrono"]
 join = []
+keys = []
 length = []
 log = ["dep:tracing", "value/json"]
 map_keys = []
@@ -348,6 +351,7 @@ unique = ["dep:indexmap"]
 unnest = ["dep:lookup_lib"]
 upcase = []
 uuid_v4 = ["dep:bytes", "dep:uuid"]
+values = []
 
 [lib]
 bench = false
