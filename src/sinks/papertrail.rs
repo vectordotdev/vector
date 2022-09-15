@@ -6,7 +6,7 @@ use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig,
-        SinkContext,
+        SinkContext, SinkDescription,
     },
     event::Event,
     internal_events::TemplateRenderingError,
@@ -47,6 +47,10 @@ pub struct PapertrailConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     acknowledgements: AcknowledgementsConfig,
+}
+
+inventory::submit! {
+    SinkDescription::new::<PapertrailConfig>("papertrail")
 }
 
 impl GenerateConfig for PapertrailConfig {
