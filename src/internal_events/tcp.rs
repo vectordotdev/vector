@@ -191,23 +191,6 @@ impl InternalEvent for TcpBytesReceived {
     }
 }
 
-pub struct TcpListenerError<'a, E> {
-    pub error: E,
-    pub message: &'a str,
-}
-
-impl<E: std::fmt::Display> InternalEvent for TcpListenerError<'_, E> {
-    fn emit(self) {
-        error!(
-            message = %self.message,
-            error = %self.error,
-            error_type = error_type::CONFIGURATION_FAILED,
-            stage = error_stage::RECEIVING,
-            internal_log_rate_secs = 10,
-        );
-    }
-}
-
 pub struct TcpSocketReceiveError<E> {
     pub error: E,
 }
@@ -233,27 +216,6 @@ impl<E: std::fmt::Display> InternalEvent for TcpSocketReceiveError<E> {
         counter!(
             "connection_errors_total", 1,
             "mode" => "tcp",
-        );
-    }
-}
-
-pub struct TcpDecoderFramingError<E> {
-    pub error: E,
-}
-
-impl<E: std::fmt::Display> InternalEvent for TcpDecoderFramingError<E> {
-    fn emit(self) {
-        counter!("decoder_framing_errors_total", 1);
-        error!(
-            message = "Failed framing bytes.",
-            error = %self.error,
-            error_type = error_type::PARSER_FAILED,
-            stage = error_stage::PROCESSING,
-        );
-        counter!(
-            "component_errors_total", 1,
-            "error_type" => error_type::PARSER_FAILED,
-            "stage" => error_stage::PROCESSING,
         );
     }
 }

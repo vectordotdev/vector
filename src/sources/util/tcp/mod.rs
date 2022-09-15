@@ -29,9 +29,9 @@ use crate::{
     config::{AcknowledgementsConfig, Resource, SourceContext},
     event::{BatchNotifier, BatchStatus, Event},
     internal_events::{
-        ConnectionOpen, OpenGauge, SocketEventsReceived, SocketMode, StreamClosedError,
-        TcpBytesReceived, TcpDecoderFramingError, TcpListenerError, TcpSendAckError,
-        TcpSocketReceiveError, TcpSocketTlsConnectionError,
+        ConnectionOpen, DecoderFramingError, OpenGauge, SocketEventsReceived, SocketMode,
+        StreamClosedError, TcpBytesReceived, TcpSendAckError, TcpSocketReceiveError,
+        TcpSocketTlsConnectionError,
     },
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
@@ -50,10 +50,7 @@ async fn make_listener(
         SocketListenAddr::SocketAddr(addr) => match tls.bind(&addr).await {
             Ok(listener) => Some(listener),
             Err(error) => {
-                emit!(TcpListenerError {
-                    message: "Failed to bind to listener socket.",
-                    error
-                });
+                error!(message = "Failed to bind to listener socket.", %error);
                 None
             }
         },
@@ -61,25 +58,16 @@ async fn make_listener(
             Ok(Some(listener)) => match TcpListener::from_std(listener) {
                 Ok(listener) => Some(listener.into()),
                 Err(error) => {
-                    emit!(TcpListenerError {
-                        message: "Failed to bind to listener socket.",
-                        error
-                    });
+                    error!(message = "Failed to bind to listener socket.", %error);
                     None
                 }
             },
             Ok(None) => {
-                emit!(TcpListenerError {
-                    message: "Failed to take listen FD.",
-                    error: "FD not open or already taken.",
-                });
+                error!("Failed to take listen FD, not open or already taken.");
                 None
             }
             Err(error) => {
-                emit!(TcpListenerError {
-                    message: "Failed to take listen FD.",
-                    error
-                });
+                error!(message = "Failed to take listen FD.", %error);
                 None
             }
         },
@@ -404,7 +392,7 @@ async fn handle_stream<T>(
                     }
                     Some(Err(error)) => {
                         if !<<T as TcpSource>::Error as StreamDecodingError>::can_continue(&error) {
-                            emit!(TcpDecoderFramingError { error });
+                            emit!(DecoderFramingError { error });
                             break;
                         }
                     }

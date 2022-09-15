@@ -8,11 +8,11 @@ use vector_core::internal_event::InternalEvent;
 use vector_common::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
-pub struct DecoderFramingError<'a> {
-    pub error: &'a codecs::decoding::BoxedFramingError,
+pub struct DecoderFramingError<E> {
+    pub error: E,
 }
 
-impl<'a> InternalEvent for DecoderFramingError<'a> {
+impl<E: std::fmt::Display> InternalEvent for DecoderFramingError<E> {
     fn emit(self) {
         counter!("decoder_framing_errors_total", 1);
         error!(
