@@ -198,7 +198,7 @@ pub struct TcpSocketReceiveError<E> {
 impl<E: std::fmt::Display> InternalEvent for TcpSocketReceiveError<E> {
     fn emit(self) {
         error!(
-            message = "TCP socket error.",
+            message = "TCP socket receive error.",
             error = %self.error,
             error_code = "socket_failed",
             error_type = error_type::READER_FAILED,
