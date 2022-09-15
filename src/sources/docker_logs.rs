@@ -1129,15 +1129,12 @@ mod integration_tests {
 
     async fn source_with_config(config: DockerLogsConfig) -> impl Stream<Item = Event> + Unpin {
         let (sender, recv) = SourceSender::new_test();
-        //assert_source_compliance(&FILE_SOURCE_TAGS, async {
         let source = config
             .build(SourceContext::new_test(sender, None))
             .await
             .unwrap();
 
         tokio::spawn(async move { source.await.unwrap() });
-        //})
-        //.await;
 
         recv
     }
