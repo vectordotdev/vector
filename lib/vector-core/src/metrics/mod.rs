@@ -302,4 +302,18 @@ mod tests {
         metrics::counter!("test2", 3);
         assert_eq!(controller.capture_metrics().len(), 3);
     }
+
+    #[test]
+    fn expires_metrics_tags() {
+        let controller = init_metrics();
+        controller.set_expiry(Some(IDLE_TIMEOUT)).unwrap();
+
+        metrics::counter!("test4", 1, "tag" => "value1");
+        metrics::counter!("test4", 2, "tag" => "value2");
+        assert_eq!(controller.capture_metrics().len(), 4);
+
+        std::thread::sleep(Duration::from_secs_f64(IDLE_TIMEOUT * 2.0));
+        metrics::counter!("test4", 3, "tag" => "value1");
+        assert_eq!(controller.capture_metrics().len(), 3);
+    }
 }

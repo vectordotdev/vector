@@ -210,7 +210,7 @@ impl FrameHandler for DnstapFrameHandler {
             match parse_dnstap_data(&self.schema, &mut log_event, frame) {
                 Err(err) => {
                     emit!(DnstapParseError {
-                        error: format!("Dnstap protobuf decode error {:?}.", err).as_str()
+                        error: format!("Dnstap protobuf decode error {:?}.", err)
                     });
                     None
                 }
@@ -221,6 +221,7 @@ impl FrameHandler for DnstapFrameHandler {
             }
         }
     }
+
     fn socket_path(&self) -> PathBuf {
         self.socket_path.clone()
     }

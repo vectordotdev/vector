@@ -97,21 +97,48 @@ impl FunctionTransform for Filter {
 
 #[cfg(test)]
 mod test {
+    use tokio::sync::mpsc;
+    use tokio_stream::wrappers::ReceiverStream;
+    use vector_core::event::{Metric, MetricKind, MetricValue};
+
     use super::*;
-    use crate::event::{Event, LogEvent};
-    use crate::{conditions::Condition, transforms::test::transform_one};
+    use crate::{
+        conditions::ConditionConfig,
+        event::{Event, LogEvent},
+        test_util::components::assert_transform_compliance,
+        transforms::test::create_topology,
+    };
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<super::FilterConfig>();
     }
 
-    #[test]
-    fn passes_metadata() {
-        let mut filter = Filter::new(Condition::IsLog);
-        let event = Event::from(LogEvent::from("message"));
-        let metadata = event.metadata().clone();
-        let result = transform_one(&mut filter, event).unwrap();
-        assert_eq!(result.metadata(), &metadata);
+    #[tokio::test]
+    async fn filter_basic() {
+        assert_transform_compliance(async {
+            let transform_config = FilterConfig::from(AnyCondition::from(ConditionConfig::IsLog));
+
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) =
+                create_topology(ReceiverStream::new(rx), transform_config).await;
+
+            let log = Event::from(LogEvent::from("message"));
+            tx.send(log.clone()).await.unwrap();
+
+            assert_eq!(out.recv().await.unwrap(), log);
+
+            let metric = Event::from(Metric::new(
+                "test metric",
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 1.0 },
+            ));
+            tx.send(metric).await.unwrap();
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await;
     }
 }
