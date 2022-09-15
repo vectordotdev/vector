@@ -11,6 +11,7 @@ use crate::{
     config::{log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::{Event, Value},
     http::HttpClient,
+    internal_events::InfluxdbEncodingError,
     sinks::{
         influxdb::{
             encode_timestamp, healthcheck, influx_line_protocol, influxdb_settings, Field,
@@ -210,7 +211,7 @@ impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
         });
 
         let mut output = BytesMut::new();
-        if let Err(error) = influx_line_protocol(
+        if let Err(error_message) = influx_line_protocol(
             self.protocol_version,
             &self.measurement,
             Some(tags),
@@ -218,7 +219,10 @@ impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
             timestamp,
             &mut output,
         ) {
-            warn!(message = "Failed to encode event; dropping event.", %error, internal_log_rate_secs = 30);
+            emit!(InfluxdbEncodingError {
+                error_message,
+                count: 1
+            });
             return None;
         };
 
@@ -296,7 +300,7 @@ fn to_field(value: &Value) -> Field {
 #[cfg(test)]
 mod tests {
     use chrono::{offset::TimeZone, Utc};
-    use futures::{channel::mpsc, StreamExt};
+    use futures::{channel::mpsc, stream, StreamExt};
     use http::{request::Parts, StatusCode};
     use indoc::indoc;
     use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
@@ -307,7 +311,13 @@ mod tests {
             influxdb::test_util::{assert_fields, split_line_protocol, ts},
             util::test::{build_test_server_status, load_sink},
         },
-        test_util::{components, components::HTTP_SINK_TAGS, next_addr},
+        test_util::{
+            components::{
+                run_and_assert_sink_compliance, run_and_assert_sink_error, COMPONENT_ERROR_TAGS,
+                HTTP_SINK_TAGS,
+            },
+            next_addr,
+        },
     };
 
     type Receiver = mpsc::Receiver<(Parts, bytes::Bytes)>;
@@ -681,10 +691,10 @@ mod tests {
         }
         drop(batch);
 
-        components::init_test();
-        sink.run_events(events).await.unwrap();
         if batch_status == BatchStatus::Delivered {
-            components::SINK_TESTS.assert(&HTTP_SINK_TAGS);
+            run_and_assert_sink_compliance(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
+        } else {
+            run_and_assert_sink_error(sink, stream::iter(events), &COMPONENT_ERROR_TAGS).await;
         }
 
         assert_eq!(receiver.try_recv(), Ok(batch_status));

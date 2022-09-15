@@ -118,7 +118,7 @@ To build Vector on your own host will require a fairly complete development envi
 
 Loosely, you'll need the following:
 
-- **To build Vector:** Have working Rustup, Protobuf tools, C++/C build tools (LLVM, GCC, or MSVC), Python, and Perl, `make` (the GNU one preferably), `bash`, `cmake`, and `autotools`.
+- **To build Vector:** Have working Rustup, Protobuf tools, C++/C build tools (LLVM, GCC, or MSVC), Python, and Perl, `make` (the GNU one preferably), `bash`, `cmake`, `GNU coreutils`, and `autotools`.
 - **To run integration tests:** Have `docker` available, or a real live version of that service. (Use `AUTOSPAWN=false`)
 - **To run `make check-component-features`:** Have `remarshal` installed.
 
