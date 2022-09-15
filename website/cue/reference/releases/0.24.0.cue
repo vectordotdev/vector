@@ -17,6 +17,16 @@ releases: "0.24.0": {
 	]
 
 	known_issues: [
+		"""
+			The new `host_metrics` metrics for physical and logical CPU counts were incorrectly
+			implemented as new modes for the `cpu_seconds_total` when they were meant to be new gauges.
+			Fixed in 0.24.1.
+			""",
+		"""
+			`vector top` and some sinks like `file` incorrectly report metrics from the
+			`internal_metrics` source as they show the incremental metrics rather than absolute.
+			Fixed in 0.24.1.
+			""",
 	]
 
 	description: """

@@ -86,8 +86,8 @@ for the next nightly release. For example, you could choose to run the nightly
 version in your development environments and save stable for production.
 Otherwise, the stable release is your best bet.
 
-[Vector public calendar]: calendar.vector.dev
-[chat]: chat.vector.dev
+[Vector public calendar]: https://calendar.vector.dev
+[chat]: https://chat.vector.dev
 [package manager]: https://vector.dev/docs/setup/installation/package-managers/
 [download page]: https://vector.dev/download/
 [nightly artifact list]: https://packages.timber.io/vector/nightly/

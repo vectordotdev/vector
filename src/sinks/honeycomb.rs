@@ -130,7 +130,7 @@ impl HttpEventEncoder<serde_json::Value> for HoneycombEventEncoder {
         };
 
         let data = json!({
-            "timestamp": timestamp.to_rfc3339_opts(chrono::SecondsFormat::Nanos, true),
+            "time": timestamp.to_rfc3339_opts(chrono::SecondsFormat::Nanos, true),
             "data": log.convert_to_fields(),
         });
 

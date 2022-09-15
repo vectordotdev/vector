@@ -99,7 +99,8 @@ use vector_config::{configurable_component, NamedComponent};
 pub use vector_core::{config::Input, sink::VectorSink};
 
 use crate::config::{
-    unit_test::UnitTestSinkConfig, AcknowledgementsConfig, Resource, SinkConfig, SinkContext,
+    unit_test::{UnitTestSinkConfig, UnitTestStreamSinkConfig},
+    AcknowledgementsConfig, Resource, SinkConfig, SinkContext,
 };
 
 pub type Healthcheck = BoxFuture<'static, crate::Result<()>>;
@@ -352,6 +353,9 @@ pub enum Sinks {
     /// Unit test.
     UnitTest(#[configurable(derived)] UnitTestSinkConfig),
 
+    /// Unit test stream.
+    UnitTestStream(#[configurable(derived)] UnitTestStreamSinkConfig),
+
     /// Vector.
     #[cfg(feature = "sinks-vector")]
     Vector(#[configurable(derived)] vector::VectorConfig),
@@ -473,6 +477,7 @@ impl NamedComponent for Sinks {
             #[cfg(test)]
             Self::TestPanic(config) => config.get_component_name(),
             Self::UnitTest(config) => config.get_component_name(),
+            Self::UnitTestStream(config) => config.get_component_name(),
             #[cfg(feature = "sinks-vector")]
             Self::Vector(config) => config.get_component_name(),
             #[cfg(feature = "sinks-websocket")]
