@@ -18,8 +18,9 @@ use std::future::Future;
 use tokio::{pin, select};
 use tonic::{body::BoxBody, metadata::AsciiMetadataValue, Status};
 use tower::{Layer, Service};
-
-use crate::internal_events::BytesReceived;
+use vector_common::internal_event::{
+    ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
+};
 
 // Every gRPC message has a five byte header:
 // - a compressed flag (u8, 0/1 for compressed/decompressed)
@@ -242,6 +243,7 @@ async fn drive_request<F, E>(
     source: Body,
     destination: Sender,
     inner: F,
+    bytes_received: Registered<BytesReceived>,
 ) -> Result<Response<BoxBody>, E>
 where
     F: Future<Output = Result<Response<BoxBody>, E>>,
@@ -280,10 +282,7 @@ where
     };
 
     if should_emit {
-        emit!(BytesReceived {
-            byte_size: body_bytes_received,
-            protocol: "grpc",
-        });
+        bytes_received.emit(ByteSize(body_bytes_received));
     }
 
     result
@@ -292,6 +291,7 @@ where
 #[derive(Clone)]
 pub struct DecompressionAndMetrics<S> {
     inner: S,
+    bytes_received: Registered<BytesReceived>,
 }
 
 impl<S> Service<Request<Body>> for DecompressionAndMetrics<S>
@@ -324,7 +324,7 @@ where
 
                 let inner = self.inner.call(mapped_req);
 
-                drive_request(req_body, destination, inner).boxed()
+                drive_request(req_body, destination, inner, self.bytes_received.clone()).boxed()
             }
         }
     }
@@ -357,6 +357,9 @@ impl<S> Layer<S> for DecompressionAndMetricsLayer {
     type Service = DecompressionAndMetrics<S>;
 
     fn layer(&self, inner: S) -> Self::Service {
-        DecompressionAndMetrics { inner }
+        DecompressionAndMetrics {
+            inner,
+            bytes_received: register!(BytesReceived::from(Protocol::from("grpc"))),
+        }
     }
 }

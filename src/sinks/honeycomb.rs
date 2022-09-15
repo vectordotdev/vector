@@ -6,10 +6,7 @@ use vector_config::configurable_component;
 
 use crate::{
     codecs::Transformer,
-    config::{
-        log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
-        SinkDescription,
-    },
+    config::{log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::{Event, Value},
     http::HttpClient,
     sinks::util::{
@@ -19,7 +16,7 @@ use crate::{
 };
 
 /// Configuration for the `honeycomb` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("honeycomb"))]
 #[derive(Clone, Debug)]
 pub struct HoneycombConfig {
     #[serde(skip, default = "default_endpoint")]
@@ -70,10 +67,6 @@ impl SinkBatchSettings for HoneycombDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 1.0;
 }
 
-inventory::submit! {
-    SinkDescription::new::<HoneycombConfig>("honeycomb")
-}
-
 impl GenerateConfig for HoneycombConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(
@@ -85,7 +78,6 @@ impl GenerateConfig for HoneycombConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "honeycomb")]
 impl SinkConfig for HoneycombConfig {
     async fn build(
         &self,
@@ -116,10 +108,6 @@ impl SinkConfig for HoneycombConfig {
         Input::log()
     }
 
-    fn sink_type(&self) -> &'static str {
-        "honeycomb"
-    }
-
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
     }
@@ -142,7 +130,7 @@ impl HttpEventEncoder<serde_json::Value> for HoneycombEventEncoder {
         };
 
         let data = json!({
-            "timestamp": timestamp.to_rfc3339_opts(chrono::SecondsFormat::Nanos, true),
+            "time": timestamp.to_rfc3339_opts(chrono::SecondsFormat::Nanos, true),
             "data": log.convert_to_fields(),
         });
 

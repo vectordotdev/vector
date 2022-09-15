@@ -79,6 +79,24 @@ ca/intermediate_server/certs/elasticsearch-secure.cert.pem: ca/intermediate_serv
 ca/intermediate_server/certs/elasticsearch-secure-chain.cert.pem: ca/intermediate_server/certs/ca-chain.cert.pem ca/intermediate_server/certs/elasticsearch-secure.cert.pem
 	cat ca/intermediate_server/certs/elasticsearch-secure.cert.pem ca/intermediate_server/certs/ca-chain.cert.pem > ca/intermediate_server/certs/elasticsearch-secure-chain.cert.pem
 
+ca/intermediate_server/private/dufs-https.key.pem:
+	openssl genrsa -out ca/intermediate_server/private/dufs-https.key.pem 2048
+
+ca/intermediate_server/csr/dufs-https.csr.pem: ca/intermediate_server/private/dufs-https.key.pem
+	openssl req -config ca/intermediate_server/openssl.cnf \
+		-key ca/intermediate_server/private/dufs-https.key.pem \
+		-subj '/CN=dufs-https/OU=Vector/O=Datadog/ST=New York/L=New York/C=US' \
+		-new -sha256 -out ca/intermediate_server/csr/dufs-https.csr.pem
+
+ca/intermediate_server/certs/dufs-https.cert.pem: ca/intermediate_server/csr/dufs-https.csr.pem
+	openssl ca -batch -config ca/intermediate_server/openssl.cnf \
+		-extensions server_cert -days 3650 -notext -md sha256 \
+		-in ca/intermediate_server/csr/dufs-https.csr.pem \
+		-out ca/intermediate_server/certs/dufs-https.cert.pem
+
+ca/intermediate_server/certs/dufs-https-chain.cert.pem: ca/intermediate_server/certs/ca-chain.cert.pem ca/intermediate_server/certs/dufs-https.cert.pem
+	cat ca/intermediate_server/certs/dufs-https.cert.pem ca/intermediate_server/certs/ca-chain.cert.pem > ca/intermediate_server/certs/dufs-https-chain.cert.pem
+
 ca/intermediate_server/private/influxdb-v1-tls.key.pem:
 	openssl genrsa -out ca/intermediate_server/private/influxdb-v1-tls.key.pem 2048
 

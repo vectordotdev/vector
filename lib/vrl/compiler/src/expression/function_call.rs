@@ -29,6 +29,10 @@ pub(crate) struct Builder<'a> {
 }
 
 impl<'a> Builder<'a> {
+    pub(crate) fn get_arg_list(&self) -> &ArgumentList {
+        &self.list
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         call_span: Span,
@@ -540,10 +544,10 @@ pub struct FunctionCall {
     // used for enhancing runtime error messages (using abort-instruction).
     //
     // TODO: have span store line/col details to further improve this.
-    span: Span,
+    pub(crate) span: Span,
 
     // used for equality check
-    ident: &'static str,
+    pub(crate) ident: &'static str,
 
     // May be used by the LLVM runtime. If not, it should be removed
     #[allow(dead_code)]

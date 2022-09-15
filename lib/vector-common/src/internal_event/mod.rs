@@ -1,12 +1,17 @@
+mod bytes_received;
 mod bytes_sent;
 mod events_received;
 mod events_sent;
+mod prelude;
+pub mod service;
 
 pub use metrics::SharedString;
 
+pub use bytes_received::BytesReceived;
 pub use bytes_sent::BytesSent;
-pub use events_received::{EventsReceived, OldEventsReceived};
+pub use events_received::EventsReceived;
 pub use events_sent::{EventsSent, DEFAULT_OUTPUT};
+pub use prelude::{error_stage, error_type};
 
 pub trait InternalEvent: Sized {
     fn emit(self);
@@ -101,4 +106,10 @@ impl Protocol {
     pub const TCP: Protocol = Protocol(SharedString::const_str("tcp"));
     pub const UDP: Protocol = Protocol(SharedString::const_str("udp"));
     pub const UNIX: Protocol = Protocol(SharedString::const_str("unix"));
+}
+
+impl From<&'static str> for Protocol {
+    fn from(s: &'static str) -> Self {
+        Self(SharedString::const_str(s))
+    }
 }

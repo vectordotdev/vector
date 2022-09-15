@@ -1,7 +1,7 @@
 use crate::{
     config::Config,
     sinks::socket::SocketSinkConfig,
-    sources::{socket::SocketConfig, Sources},
+    sources::socket::SocketConfig,
     test_util::{
         mock::{error_sink, error_source, panic_sink, panic_source},
         next_addr, random_lines, send_lines, start_topology, trace_init, wait_for_tcp,
@@ -23,10 +23,7 @@ async fn test_source_error() {
     let out_addr = next_addr();
 
     let mut config = Config::builder();
-    config.add_source(
-        "in",
-        Sources::Socket(SocketConfig::make_basic_tcp_config(in_addr)),
-    );
+    config.add_source("in", SocketConfig::make_basic_tcp_config(in_addr));
     config.add_source("error", error_source());
     config.add_sink(
         "out",
@@ -70,10 +67,7 @@ async fn test_source_panic() {
     let out_addr = next_addr();
 
     let mut config = Config::builder();
-    config.add_source(
-        "in",
-        Sources::Socket(SocketConfig::make_basic_tcp_config(in_addr)),
-    );
+    config.add_source("in", SocketConfig::make_basic_tcp_config(in_addr));
     config.add_source("panic", panic_source());
     config.add_sink(
         "out",
@@ -120,14 +114,8 @@ async fn test_sink_error() {
     let out_addr = next_addr();
 
     let mut config = Config::builder();
-    config.add_source(
-        "in1",
-        Sources::Socket(SocketConfig::make_basic_tcp_config(in1_addr)),
-    );
-    config.add_source(
-        "in2",
-        Sources::Socket(SocketConfig::make_basic_tcp_config(in2_addr)),
-    );
+    config.add_source("in1", SocketConfig::make_basic_tcp_config(in1_addr));
+    config.add_source("in2", SocketConfig::make_basic_tcp_config(in2_addr));
     config.add_sink(
         "out",
         &["in1"],
@@ -174,14 +162,8 @@ async fn test_sink_panic() {
     let out_addr = next_addr();
 
     let mut config = Config::builder();
-    config.add_source(
-        "in1",
-        Sources::Socket(SocketConfig::make_basic_tcp_config(in1_addr)),
-    );
-    config.add_source(
-        "in2",
-        Sources::Socket(SocketConfig::make_basic_tcp_config(in2_addr)),
-    );
+    config.add_source("in1", SocketConfig::make_basic_tcp_config(in1_addr));
+    config.add_source("in2", SocketConfig::make_basic_tcp_config(in2_addr));
     config.add_sink(
         "out",
         &["in1"],

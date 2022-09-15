@@ -601,7 +601,9 @@ impl Arbitrary for MetricData {
 }
 
 impl Arbitrary for EventMetadata {
-    fn arbitrary(_g: &mut Gen) -> Self {
-        EventMetadata::default()
+    fn arbitrary(g: &mut Gen) -> Self {
+        let mut metadata = EventMetadata::default();
+        *metadata.value_mut() = Value::arbitrary(g);
+        metadata
     }
 }

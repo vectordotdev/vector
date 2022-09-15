@@ -24,7 +24,7 @@ use crate::{api, internal_events::ApiStarted};
 use crate::{
     cli::{handle_config_errors, Color, LogFormat, Opts, RootOpts, SubCommand},
     config::{self},
-    generate, graph, heartbeat, list,
+    generate, generate_schema, graph, heartbeat, list,
     signal::{self, SignalTo},
     topology::{self, RunningTopology},
     trace, unit_test, validate,
@@ -145,6 +145,7 @@ impl Application {
                 if let Some(s) = sub_command {
                     let code = match s {
                         SubCommand::Generate(g) => generate::cmd(&g),
+                        SubCommand::GenerateSchema => generate_schema::cmd(),
                         SubCommand::Graph(g) => graph::cmd(&g),
                         SubCommand::Config(c) => config::cmd(&c),
                         SubCommand::List(l) => list::cmd(&l),

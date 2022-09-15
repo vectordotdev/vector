@@ -1,12 +1,8 @@
-use serde::{Deserialize, Serialize};
 use vector_config::configurable_component;
 
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{
-        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
-        TransformDescription,
-    },
+    config::{DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext},
     event::Event,
     internal_events::SampleEventDiscarded,
     schema,
@@ -14,33 +10,26 @@ use crate::{
 };
 
 /// Configuration for the `sample` transform.
-#[configurable_component(transform)]
+#[configurable_component(transform("sample"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct SampleConfig {
     /// The rate at which events will be forwarded, expressed as `1/N`.
     ///
-    /// For example, `rate = 10` means 1 out of every 10 events will be forwarded and the rest will be dropped.
+    /// For example, `rate = 10` means 1 out of every 10 events will be forwarded and the rest will
+    /// be dropped.
     pub rate: u64,
 
-    /// The name of the log field whose value will be hashed to determine if the event should be passed.
+    /// The name of the log field whose value will be hashed to determine if the event should be
+    /// passed.
     ///
-    /// Consistently samples the same events. Actual rate of sampling may differ from the configured one if values in
-    /// the field are not uniformly distributed. If left unspecified, or if the event doesn’t have `key_field`, events
-    /// will be count rated.
+    /// Consistently samples the same events. Actual rate of sampling may differ from the configured
+    /// one if values in the field are not uniformly distributed. If left unspecified, or if the
+    /// event doesn’t have `key_field`, events will be count rated.
     pub key_field: Option<String>,
 
     /// A logical condition used to exclude events from sampling.
     pub exclude: Option<AnyCondition>,
-}
-
-// TODO: Deprecate the name `sampler`
-inventory::submit! {
-    TransformDescription::new::<SampleConfig>("sampler")
-}
-
-inventory::submit! {
-    TransformDescription::new::<SampleConfig>("sample")
 }
 
 impl GenerateConfig for SampleConfig {
@@ -55,7 +44,6 @@ impl GenerateConfig for SampleConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "sample")]
 impl TransformConfig for SampleConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(Sample::new(
@@ -74,34 +62,6 @@ impl TransformConfig for SampleConfig {
 
     fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log | DataType::Trace)]
-    }
-
-    fn transform_type(&self) -> &'static str {
-        "sample"
-    }
-}
-
-// Add a compatibility alias to avoid breaking existing configs
-#[derive(Deserialize, Serialize, Debug, Clone)]
-struct SampleCompatConfig(SampleConfig);
-
-#[async_trait::async_trait]
-#[typetag::serde(name = "sampler")]
-impl TransformConfig for SampleCompatConfig {
-    async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        self.0.build(context).await
-    }
-
-    fn input(&self) -> Input {
-        self.0.input()
-    }
-
-    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
-        self.0.outputs(merged_definition)
-    }
-
-    fn transform_type(&self) -> &'static str {
-        self.0.transform_type()
     }
 }
 

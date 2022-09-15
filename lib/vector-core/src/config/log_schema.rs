@@ -1,5 +1,5 @@
 use once_cell::sync::{Lazy, OnceCell};
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 static LOG_SCHEMA: OnceCell<LogSchema> = OnceCell::new();
 static LOG_SCHEMA_DEFAULT: Lazy<LogSchema> = Lazy::new(LogSchema::default);
@@ -34,17 +34,42 @@ pub fn log_schema() -> &'static LogSchema {
     LOG_SCHEMA.get().unwrap_or(&LOG_SCHEMA_DEFAULT)
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+/// Log schema.
+///
+/// A log schema is used by Vector not only to uniformly process the fields of an event, but also to
+/// specify which fields should hold speicifc data that is also set by Vector once an event is
+/// flowing through a topology.
+#[configurable_component]
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(default)]
 pub struct LogSchema {
+    /// The name of the event field to treat as the event message.
+    ///
+    /// This would be the field that holds the raw message, such as a raw log line.
     #[serde(default = "LogSchema::default_message_key")]
     message_key: String,
+
+    /// The name of the event field to treat as the event timestamp.
     #[serde(default = "LogSchema::default_timestamp_key")]
     timestamp_key: String,
+
+    /// The name of the event field to treat as the host which sent the message.
+    ///
+    /// This field will generally represent a real host, or container, that generated the message,
+    /// but is somewhat source-dependent.
     #[serde(default = "LogSchema::default_host_key")]
     host_key: String,
+
+    /// The name of the event field to set the source identifier in.
+    ///
+    /// This field will be set by the Vector source that the event was created in.
     #[serde(default = "LogSchema::default_source_type_key")]
     source_type_key: String,
+
+    /// The name of the event field to set the event metadata in.
+    ///
+    /// Generally, this field will be set by Vector to hold event-specific metadata, such as
+    /// annotations by the `remap` transform when an error or abort is encountered.
     #[serde(default = "LogSchema::default_metadata_key")]
     metadata_key: String,
 }

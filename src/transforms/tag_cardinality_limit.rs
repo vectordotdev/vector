@@ -11,10 +11,7 @@ use futures::{Stream, StreamExt};
 use vector_config::configurable_component;
 
 use crate::{
-    config::{
-        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
-        TransformDescription,
-    },
+    config::{DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext},
     event::Event,
     internal_events::{
         TagCardinalityLimitRejectingEvent, TagCardinalityLimitRejectingTag,
@@ -25,7 +22,7 @@ use crate::{
 };
 
 /// Configuration for the `tag_cardinality_limit` transform.
-#[configurable_component(transform)]
+#[configurable_component(transform("tag_cardinality_limit"))]
 #[derive(Clone, Debug)]
 pub struct TagCardinalityLimitConfig {
     /// How many distinct values to accept for any given key.
@@ -47,15 +44,16 @@ pub struct TagCardinalityLimitConfig {
 pub enum Mode {
     /// Tracks cardinality exactly.
     ///
-    /// This mode has higher memory requirements than `probabilistic`, but never falsely outputs metrics with new tags
-    /// after the limit has been hit.
+    /// This mode has higher memory requirements than `probabilistic`, but never falsely outputs
+    /// metrics with new tags after the limit has been hit.
     Exact,
 
     /// Tracks cardinality probabilistically.
     ///
-    /// This mode has lower memory requirements than `exact`, but may occasionally allow metric events to pass through
-    /// the transform even when they contain new tags that exceed the configured limit. The rate at which this happens
-    /// can be controlled by changing the value of `cache_size_per_tag`.
+    /// This mode has lower memory requirements than `exact`, but may occasionally allow metric
+    /// events to pass through the transform even when they contain new tags that exceed the
+    /// configured limit. The rate at which this happens can be controlled by changing the value of
+    /// `cache_size_per_tag`.
     Probabilistic(#[configurable(derived)] BloomFilterConfig),
 }
 
@@ -65,13 +63,14 @@ pub enum Mode {
 pub struct BloomFilterConfig {
     /// The size of the cache for detecting duplicate tags, in bytes.
     ///
-    /// The larger the cache size, the less likely it is to have a false positive, or a case where we allow a new value
-    /// for tag even after we have reached the configured limits.
+    /// The larger the cache size, the less likely it is to have a false positive, or a case where
+    /// we allow a new value for tag even after we have reached the configured limits.
     #[serde(default = "default_cache_size")]
     pub cache_size_per_key: usize,
 }
 
-/// Possible actions to take when an event arrives that would exceed the cardinality limit for one or more of its tags.
+/// Possible actions to take when an event arrives that would exceed the cardinality limit for one
+/// or more of its tags.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(rename_all = "snake_case")]
@@ -101,10 +100,6 @@ const fn default_cache_size() -> usize {
     5000 * 1024 // 5KB
 }
 
-inventory::submit! {
-    TransformDescription::new::<TagCardinalityLimitConfig>("tag_cardinality_limit")
-}
-
 impl GenerateConfig for TagCardinalityLimitConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
@@ -117,7 +112,6 @@ impl GenerateConfig for TagCardinalityLimitConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "tag_cardinality_limit")]
 impl TransformConfig for TagCardinalityLimitConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::event_task(TagCardinalityLimit::new(
@@ -131,10 +125,6 @@ impl TransformConfig for TagCardinalityLimitConfig {
 
     fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Metric)]
-    }
-
-    fn transform_type(&self) -> &'static str {
-        "tag_cardinality_limit"
     }
 }
 

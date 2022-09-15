@@ -18,5 +18,5 @@ mod r#macro;
 mod target;
 
 pub use expression::{ExpressionError, Resolved};
-pub use target::{MetadataTarget, SecretTarget, Target, TargetValue, TargetValueRef};
+pub use target::{SecretTarget, Target, TargetValue, TargetValueRef};
 pub use value::Value;

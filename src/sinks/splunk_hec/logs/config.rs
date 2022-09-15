@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use codecs::TextSerializerConfig;
 use futures_util::FutureExt;
-use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
 use vector_config::configurable_component;
 use vector_core::sink::VectorSink;
@@ -29,7 +28,7 @@ use crate::{
 };
 
 /// Configuration for the `splunk_hec_logs` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("splunk_hec_logs"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct HecLogsSinkConfig {
@@ -145,7 +144,6 @@ impl GenerateConfig for HecLogsSinkConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "splunk_hec_logs")]
 impl SinkConfig for HecLogsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = create_client(&self.tls, cx.proxy())?;
@@ -162,10 +160,6 @@ impl SinkConfig for HecLogsSinkConfig {
 
     fn input(&self) -> Input {
         Input::new(self.encoding.config().input_type() & DataType::Log)
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "splunk_hec_logs"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -237,33 +231,6 @@ impl HecLogsSinkConfig {
         };
 
         Ok(VectorSink::from_event_streamsink(sink))
-    }
-}
-
-// Add a compatibility alias to avoid breaking existing configs
-#[derive(Clone, Debug, Deserialize, Serialize)]
-struct HecSinkCompatConfig {
-    #[serde(flatten)]
-    config: HecLogsSinkConfig,
-}
-
-#[async_trait::async_trait]
-#[typetag::serde(name = "splunk_hec")]
-impl SinkConfig for HecSinkCompatConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        self.config.build(cx).await
-    }
-
-    fn input(&self) -> Input {
-        self.config.input()
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "splunk_hec"
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        self.config.acknowledgements()
     }
 }
 
