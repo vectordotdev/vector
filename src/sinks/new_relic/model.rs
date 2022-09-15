@@ -1,4 +1,4 @@
-use std::{collections::HashMap, convert::TryFrom, fmt::Debug, time::SystemTime};
+use std::{collections::{HashMap, BTreeMap}, convert::TryFrom, fmt::Debug, time::SystemTime};
 
 use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
@@ -21,12 +21,15 @@ type DataStore = HashMap<String, Vec<KeyValData>>;
 pub struct MetricsApiModel(pub Vec<DataStore>);
 
 impl MetricsApiModel {
-    pub fn new(metric_array: Vec<(Value, Value, Value)>) -> Self {
+    pub fn new(metric_array: Vec<(Value, Value, Value, Option<Value>)>) -> Self {
         let mut metric_data_array = vec![];
-        for (m_name, m_value, m_timestamp) in metric_array {
+        for (m_name, m_value, m_timestamp, m_attributes) in metric_array {
             let mut metric_data = KeyValData::new();
             metric_data.insert("name".to_owned(), m_name);
             metric_data.insert("value".to_owned(), m_value);
+            if let Some(attr) = m_attributes {
+                metric_data.insert("attributes".to_owned(), attr);
+            }
             match m_timestamp {
                 Value::Timestamp(ts) => {
                     metric_data.insert("timestamp".to_owned(), Value::from(ts.timestamp()));
@@ -57,30 +60,31 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
 
         for buf_event in buf_events {
             if let Event::Metric(metric) = buf_event {
-                // Future improvement: put metric type. If type = count, NR metric model requiere an interval.ms field, that is not provided by the Vector Metric model.
+                // Generate BTreeMap<String, Value> from &BTreeMap<String, String>
+                let attr = if let Some(tags) = metric.tags() {
+                    let mut bt = BTreeMap::new();
+                    for (key, value) in tags {
+                        bt.insert(key.clone(), Value::from(value.clone()));
+                    }
+                    Some(Value::from(bt))
+                }
+                else {
+                    None
+                };
+
                 match metric.value() {
-                    MetricValue::Gauge { value } => {
+                    MetricValue::Gauge { value } | MetricValue::Counter { value } => {
                         metric_array.push((
                             Value::from(metric.name().to_owned()),
                             Value::from(
                                 NotNan::new(*value).map_err(|_| {
-                                    NewRelicSinkError::new("NaN value not supported")
+                                    NewRelicSinkError::new(format!("NaN value not supported, metric name: {} , value: {}", metric.name(), *value).as_str())
                                 })?,
                             ),
                             Value::from(metric.timestamp()),
+                            attr,
                         ));
-                    }
-                    MetricValue::Counter { value } => {
-                        metric_array.push((
-                            Value::from(metric.name().to_owned()),
-                            Value::from(
-                                NotNan::new(*value).map_err(|_| {
-                                    NewRelicSinkError::new("NaN value not supported")
-                                })?,
-                            ),
-                            Value::from(metric.timestamp()),
-                        ));
-                    }
+                    },
                     _ => {
                         // Unrecognized metric type
                     }
