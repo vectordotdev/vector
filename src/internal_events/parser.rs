@@ -3,7 +3,11 @@ use std::borrow::Cow;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
-use super::prelude::{error_stage, error_type};
+use crate::{
+    emit,
+    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
+};
+use vector_common::internal_event::{error_stage, error_type};
 
 fn truncate_string_at(s: &str, maxlen: usize) -> Cow<str> {
     let ellipsis: &str = "[...]";
@@ -51,15 +55,14 @@ pub struct ParserMissingFieldError<'a> {
 
 impl InternalEvent for ParserMissingFieldError<'_> {
     fn emit(self) {
+        let reason = "Field does not exist.";
         error!(
-            message = "Events dropped.",
-            count = 1,
+            message = reason,
             field = %self.field,
             error_code = "field_not_found",
             error_type = error_type::CONDITION_FAILED,
             stage = error_stage::PROCESSING,
             internal_log_rate_secs = 10,
-            reason = "Field does not exist.",
         );
         counter!(
             "component_errors_total", 1,
@@ -68,15 +71,10 @@ impl InternalEvent for ParserMissingFieldError<'_> {
             "stage" => error_stage::PROCESSING,
             "field" => self.field.to_string(),
         );
-        counter!(
-            "component_discarded_events_total", 1,
-            "error_code" => "field_not_found",
-            "error_type" => error_type::CONDITION_FAILED,
-            "stage" => error_stage::PROCESSING,
-            "field" => self.field.to_string(),
-        );
         // deprecated
         counter!("processing_errors_total", 1, "error_type" => "missing_field");
+
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }
 

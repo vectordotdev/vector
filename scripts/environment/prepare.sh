@@ -1,6 +1,8 @@
 #! /usr/bin/env bash
 set -e -o verbose
 
+git config --global --add safe.directory /git/vectordotdev/vector
+
 rustup show # causes installation of version from rust-toolchain.toml
 rustup default "$(rustup show active-toolchain | awk '{print $1;}')"
 if [[ "$(cargo-deb --version)" != "1.29.2" ]] ; then

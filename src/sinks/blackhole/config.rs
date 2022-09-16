@@ -11,7 +11,7 @@ const fn default_print_interval_secs() -> u64 {
 }
 
 /// Configuration for the `blackhole` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("blackhole"))]
 #[derive(Clone, Debug, Derivative)]
 #[serde(deny_unknown_fields, default)]
 #[derivative(Default)]
@@ -38,7 +38,6 @@ pub struct BlackholeConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "blackhole")]
 impl SinkConfig for BlackholeConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink = BlackholeSink::new(self.clone());
@@ -49,10 +48,6 @@ impl SinkConfig for BlackholeConfig {
 
     fn input(&self) -> Input {
         Input::all()
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "blackhole"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

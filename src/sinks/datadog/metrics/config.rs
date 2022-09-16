@@ -1,6 +1,6 @@
 use futures::FutureExt;
-use http::{uri::InvalidUri, Uri};
-use snafu::{ResultExt, Snafu};
+use http::Uri;
+use snafu::ResultExt;
 use tower::ServiceBuilder;
 use vector_config::configurable_component;
 use vector_core::config::proxy::ProxyConfig;
@@ -47,12 +47,6 @@ impl SinkBatchSettings for DatadogMetricsDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 2.0;
 }
 
-#[derive(Debug, Snafu)]
-enum BuildError {
-    #[snafu(display("Invalid host {:?}: {:?}", host, source))]
-    InvalidHost { host: String, source: InvalidUri },
-}
-
 /// Various metric type-specific API types.
 ///
 /// Each of these corresponds to a specific request path when making a request to the agent API.
@@ -97,7 +91,7 @@ impl DatadogMetricsEndpointConfiguration {
 }
 
 /// Configuration for the `datadog_metrics` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("datadog_metrics"))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogMetricsConfig {
@@ -153,7 +147,6 @@ pub struct DatadogMetricsConfig {
 impl_generate_config_from_default!(DatadogMetricsConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "datadog_metrics")]
 impl SinkConfig for DatadogMetricsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.build_client(&cx.proxy)?;
@@ -165,10 +158,6 @@ impl SinkConfig for DatadogMetricsConfig {
 
     fn input(&self) -> Input {
         Input::metric()
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "datadog_metrics"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

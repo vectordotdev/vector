@@ -4,9 +4,7 @@ pub mod v2;
 use vector_config::configurable_component;
 
 use crate::{
-    config::{
-        GenerateConfig, Input, Output, TransformConfig, TransformContext, TransformDescription,
-    },
+    config::{GenerateConfig, Input, Output, TransformConfig, TransformContext},
     schema,
     transforms::Transform,
 };
@@ -52,7 +50,7 @@ pub struct LuaConfigV2 {
 }
 
 /// Configuration for the `lua` transform.
-#[configurable_component(transform)]
+#[configurable_component(transform("lua"))]
 #[derive(Clone, Debug)]
 #[serde(untagged)]
 pub enum LuaConfig {
@@ -61,10 +59,6 @@ pub enum LuaConfig {
 
     /// Configuration for version two.
     V2(#[configurable(derived)] LuaConfigV2),
-}
-
-inventory::submit! {
-    TransformDescription::new::<LuaConfig>("lua")
 }
 
 impl GenerateConfig for LuaConfig {
@@ -78,7 +72,6 @@ impl GenerateConfig for LuaConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "lua")]
 impl TransformConfig for LuaConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         match self {
@@ -98,13 +91,6 @@ impl TransformConfig for LuaConfig {
         match self {
             LuaConfig::V1(v1) => v1.config.outputs(merged_definition),
             LuaConfig::V2(v2) => v2.config.outputs(merged_definition),
-        }
-    }
-
-    fn transform_type(&self) -> &'static str {
-        match self {
-            LuaConfig::V1(v1) => v1.config.transform_type(),
-            LuaConfig::V2(v2) => v2.config.transform_type(),
         }
     }
 }

@@ -49,9 +49,9 @@ pub enum BuildError {
 pub struct LuaConfig {
     /// The Lua program to initialize the transform with.
     ///
-    /// The program can be used to to import external dependencies, as well as define the functions used for the various
-    /// lifecycle hooks. However, it's not strictly required, as the lifecycle hooks can be configured directly with
-    /// inline Lua source for each respective hook.
+    /// The program can be used to to import external dependencies, as well as define the functions
+    /// used for the various lifecycle hooks. However, it's not strictly required, as the lifecycle
+    /// hooks can be configured directly with inline Lua source for each respective hook.
     source: Option<String>,
 
     /// A list of directories to search when loading a Lua file via the `require` function.
@@ -134,12 +134,6 @@ struct TimerConfig {
     handler: String,
 }
 
-// Implementation of methods from `TransformConfig`
-// Note that they are implemented as struct methods instead of trait implementation methods
-// because `TransformConfig` trait requires specification of a unique `typetag::serde` name.
-// Specifying some name (for example, "lua_v*") results in this name being listed among
-// possible configuration options for `transforms` section, but such internal name should not
-// be exposed to users.
 impl LuaConfig {
     pub fn build(&self) -> crate::Result<Transform> {
         Lua::new(self).map(Transform::event_task)
@@ -151,10 +145,6 @@ impl LuaConfig {
 
     pub fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Metric | DataType::Log)]
-    }
-
-    pub const fn transform_type(&self) -> &'static str {
-        "lua"
     }
 }
 

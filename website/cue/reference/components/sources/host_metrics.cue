@@ -434,6 +434,14 @@ components: sources: host_metrics: {
 				}
 			}
 		}
+		host_logical_cpus: _host & {
+			description: "The number of logical CPUs."
+			type:        "gauge"
+		}
+		host_physical_cpus: _host & {
+			description: "The number of physical CPUs."
+			type:        "gauge"
+		}
 
 		// Host cgroups
 		cgroup_cpu_usage_seconds_total:  _host & _cgroup_cpu & {description:    "The total amount CPU time used by this cgroup and its descendants, in seconds."}

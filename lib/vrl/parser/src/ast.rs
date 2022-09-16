@@ -10,7 +10,7 @@ use std::{
 #[cfg(feature = "fuzz")]
 use arbitrary::Arbitrary;
 use diagnostic::Span;
-use lookup::LookupBuf;
+use lookup::lookup_v2::{OwnedTargetPath, OwnedValuePath, PathPrefix};
 use ordered_float::NotNan;
 
 use crate::{template_string::TemplateString, Error};
@@ -689,7 +689,6 @@ pub enum Opcode {
     Div,
     Add,
     Sub,
-    Rem,
     Or,
     And,
     Err,
@@ -711,14 +710,13 @@ impl fmt::Display for Opcode {
 impl Opcode {
     #[must_use]
     pub fn as_str(self) -> &'static str {
-        use Opcode::{Add, And, Div, Eq, Err, Ge, Gt, Le, Lt, Merge, Mul, Ne, Or, Rem, Sub};
+        use Opcode::{Add, And, Div, Eq, Err, Ge, Gt, Le, Lt, Merge, Mul, Ne, Or, Sub};
 
         match self {
             Mul => "*",
             Div => "/",
             Add => "+",
             Sub => "-",
-            Rem => "%",
             Merge => "|",
 
             Or => "||",
@@ -741,14 +739,13 @@ impl FromStr for Opcode {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, ()> {
-        use Opcode::{Add, And, Div, Eq, Err, Ge, Gt, Le, Lt, Merge, Mul, Ne, Or, Rem, Sub};
+        use Opcode::{Add, And, Div, Eq, Err, Ge, Gt, Le, Lt, Merge, Mul, Ne, Or, Sub};
 
         let op = match s {
             "*" => Mul,
             "/" => Div,
             "+" => Add,
             "-" => Sub,
-            "%" => Rem,
 
             "||" => Or,
             "&&" => And,
@@ -854,8 +851,8 @@ impl fmt::Debug for Assignment {
 pub enum AssignmentTarget {
     Noop,
     Query(Query),
-    Internal(Ident, Option<LookupBuf>),
-    External(Option<LookupBuf>),
+    Internal(Ident, Option<OwnedValuePath>),
+    External(Option<OwnedTargetPath>),
 }
 
 impl AssignmentTarget {
@@ -877,8 +874,14 @@ impl AssignmentTarget {
             AssignmentTarget::External(path) => Expr::Query(Node::new(
                 span,
                 Query {
-                    target: Node::new(span, QueryTarget::External),
-                    path: Node::new(span, path.clone().unwrap_or_else(LookupBuf::root)),
+                    target: {
+                        let prefix = path.as_ref().map_or(PathPrefix::Event, |x| x.prefix);
+                        Node::new(span, QueryTarget::External(prefix))
+                    },
+                    path: Node::new(
+                        span,
+                        path.clone().map_or(OwnedValuePath::root(), |x| x.path),
+                    ),
                 },
             )),
         }
@@ -894,7 +897,7 @@ impl fmt::Display for AssignmentTarget {
             Query(query) => query.fmt(f),
             Internal(ident, Some(path)) => write!(f, "{}{}", ident, path),
             Internal(ident, _) => ident.fmt(f),
-            External(Some(path)) => write!(f, ".{}", path),
+            External(Some(path)) => write!(f, "{}", path),
             External(_) => f.write_str("."),
         }
     }
@@ -922,7 +925,7 @@ impl fmt::Debug for AssignmentTarget {
 #[derive(Clone, PartialEq)]
 pub struct Query {
     pub target: Node<QueryTarget>,
-    pub path: Node<LookupBuf>,
+    pub path: Node<OwnedValuePath>,
 }
 
 impl fmt::Display for Query {
@@ -940,7 +943,7 @@ impl fmt::Debug for Query {
 #[derive(Clone, PartialEq)]
 pub enum QueryTarget {
     Internal(Ident),
-    External,
+    External(PathPrefix),
     FunctionCall(FunctionCall),
     Container(Container),
 }
@@ -951,7 +954,10 @@ impl fmt::Display for QueryTarget {
 
         match self {
             Internal(v) => v.fmt(f),
-            External => write!(f, "."),
+            External(prefix) => match prefix {
+                PathPrefix::Event => write!(f, "."),
+                PathPrefix::Metadata => write!(f, "&"),
+            },
             FunctionCall(v) => v.fmt(f),
             Container(v) => v.fmt(f),
         }
@@ -964,7 +970,10 @@ impl fmt::Debug for QueryTarget {
 
         match self {
             Internal(v) => write!(f, "Internal({:?})", v),
-            External => f.write_str("External"),
+            External(prefix) => match prefix {
+                PathPrefix::Event => f.write_str("External(Event)"),
+                PathPrefix::Metadata => f.write_str("External(Metadata)"),
+            },
             FunctionCall(v) => v.fmt(f),
             Container(v) => v.fmt(f),
         }

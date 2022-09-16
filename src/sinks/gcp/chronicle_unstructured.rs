@@ -21,7 +21,7 @@ use vector_core::{
 
 use crate::{
     codecs::{self, EncodingConfig},
-    config::{log_schema, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, GenerateConfig, SinkConfig, SinkContext},
     gcp::{GcpAuthConfig, GcpAuthenticator},
     http::{HttpClient, HttpError},
     sinks::{
@@ -42,8 +42,6 @@ use crate::{
     template::{Template, TemplateParseError},
     tls::{TlsConfig, TlsSettings},
 };
-
-const NAME: &str = "gcp_chronicle_unstructured";
 
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]
@@ -96,7 +94,7 @@ impl SinkBatchSettings for ChronicleUnstructuredDefaultBatchSettings {
 }
 
 /// Configuration for the `gcp_chronicle_unstructured` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("gcp_chronicle_unstructured"))]
 #[derive(Clone, Debug)]
 pub struct ChronicleUnstructuredConfig {
     /// The endpoint to send data to.
@@ -144,10 +142,6 @@ pub struct ChronicleUnstructuredConfig {
     acknowledgements: AcknowledgementsConfig,
 }
 
-inventory::submit! {
-    SinkDescription::new::<ChronicleUnstructuredConfig>(NAME)
-}
-
 impl GenerateConfig for ChronicleUnstructuredConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(indoc! {r#"
@@ -187,7 +181,6 @@ pub enum ChronicleError {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "gcp_chronicle_unstructured")]
 impl SinkConfig for ChronicleUnstructuredConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let creds = self.auth.build(Scope::MalachiteIngestion).await?;
@@ -208,10 +201,6 @@ impl SinkConfig for ChronicleUnstructuredConfig {
 
     fn input(&self) -> Input {
         Input::log()
-    }
-
-    fn sink_type(&self) -> &'static str {
-        NAME
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

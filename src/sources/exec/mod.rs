@@ -21,6 +21,7 @@ use tokio::{
 };
 use tokio_stream::wrappers::IntervalStream;
 use tokio_util::codec::FramedRead;
+use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::ByteSizeOf;
 
@@ -29,14 +30,14 @@ use crate::{
     config::{log_schema, Output, SourceConfig, SourceContext},
     event::Event,
     internal_events::{
-        BytesReceived, ExecCommandExecuted, ExecEventsReceived, ExecFailedError,
-        ExecFailedToSignalChild, ExecFailedToSignalChildError, ExecTimeoutError, StreamClosedError,
+        ExecCommandExecuted, ExecEventsReceived, ExecFailedError, ExecFailedToSignalChild,
+        ExecFailedToSignalChildError, ExecTimeoutError, StreamClosedError,
     },
     serde::default_decoding,
     shutdown::ShutdownSignal,
     SourceSender,
 };
-use lookup::path;
+use lookup::event_path;
 use vector_core::config::LogNamespace;
 
 pub mod sized_bytes_codec;
@@ -406,6 +407,8 @@ async fn run_command(
 
     spawn_reader_thread(stdout_reader, decoder.clone(), STDOUT, sender);
 
+    let bytes_received = register!(BytesReceived::from(Protocol::NONE));
+
     'outer: loop {
         tokio::select! {
             _ = &mut shutdown => {
@@ -417,10 +420,7 @@ async fn run_command(
                 match v {
                     None => break 'outer,
                     Some(((mut events, byte_size), stream)) => {
-                        emit!(BytesReceived {
-                            byte_size,
-                            protocol: "exec",
-                        });
+                        bytes_received.emit(ByteSize(byte_size));
 
                         let count = events.len();
                         emit!(ExecEventsReceived {
@@ -580,12 +580,12 @@ fn handle_event(
 
         // Add data stream of stdin or stderr (if needed)
         if let Some(data_stream) = data_stream {
-            log.try_insert(path!(STREAM_KEY), data_stream.clone());
+            log.try_insert(event_path!(STREAM_KEY), data_stream.clone());
         }
 
         // Add pid (if needed)
         if let Some(pid) = pid {
-            log.try_insert(path!(PID_KEY), pid as i64);
+            log.try_insert(event_path!(PID_KEY), pid as i64);
         }
 
         // Add hostname (if needed)
@@ -594,7 +594,7 @@ fn handle_event(
         }
 
         // Add command
-        log.try_insert(path!(COMMAND_KEY), config.command.clone());
+        log.try_insert(event_path!(COMMAND_KEY), config.command.clone());
     }
 }
 

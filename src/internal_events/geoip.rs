@@ -1,9 +1,13 @@
 use std::net::AddrParseError;
 
 use metrics::counter;
+use vector_common::internal_event::{error_stage, error_type};
 use vector_core::internal_event::InternalEvent;
 
-use super::prelude::{error_stage, error_type};
+use crate::{
+    emit,
+    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
+};
 
 #[derive(Debug)]
 pub struct GeoipIpAddressParseError<'a> {
@@ -13,15 +17,14 @@ pub struct GeoipIpAddressParseError<'a> {
 
 impl<'a> InternalEvent for GeoipIpAddressParseError<'a> {
     fn emit(self) {
+        let reason = format!("IP Address not parsed correctly: {:?}.", self.error);
         error!(
-            message = "Events dropped.",
-            count = 1,
+            message = &reason,
             error_code = "invalid_ip_address",
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
             address = %self.address,
-            intentional = false,
-            reason = %format!("IP Address not parsed correctly: {:?}.", self.error),
+            internal_log_rate_secs = 10,
         );
         counter!(
             "component_errors_total", 1,
@@ -30,18 +33,15 @@ impl<'a> InternalEvent for GeoipIpAddressParseError<'a> {
             "stage" => error_stage::PROCESSING,
             "address" => self.address.to_string(),
         );
-        counter!(
-            "component_discarded_events_total", 1,
-            "error_code" => "invalid_ip_address",
-            "error_type" => error_type::PARSER_FAILED,
-            "stage" => error_stage::PROCESSING,
-            "address" => self.address.to_string(),
-            "intentional" => "false",
-        );
         // deprecated
         counter!(
             "processing_errors_total", 1,
             "error_type" => "type_ip_address_parse_error",
         );
+
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+            count: 1,
+            reason: &reason
+        });
     }
 }
