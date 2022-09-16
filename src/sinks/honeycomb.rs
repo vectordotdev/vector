@@ -150,7 +150,7 @@ impl HttpSink for HoneycombConfig {
         }
     }
 
-    async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Bytes>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Bytes>> {
         let uri = self.build_uri();
         let request = Request::post(uri).header("X-Honeycomb-Team", self.api_key.clone());
         let body = crate::serde::json::to_bytes(&events).unwrap().freeze();
@@ -163,8 +163,7 @@ impl HoneycombConfig {
     fn build_uri(&self) -> Uri {
         let uri = format!("{}/{}", self.endpoint, self.dataset);
 
-        uri.parse::<http::Uri>()
-            .expect("This should be a valid uri")
+        uri.parse::<Uri>().expect("This should be a valid uri")
     }
 }
 
@@ -213,7 +212,7 @@ mod test {
     use crate::{
         config::{GenerateConfig, SinkConfig, SinkContext},
         test_util::{
-            components::{run_and_assert_sink_compliance, SINK_TAGS},
+            components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
             http::{always_200_response, spawn_blackhole_http_server},
         },
     };
@@ -222,7 +221,7 @@ mod test {
 
     #[test]
     fn generate_config() {
-        crate::test_util::test_generate_config::<super::HoneycombConfig>();
+        crate::test_util::test_generate_config::<HoneycombConfig>();
     }
 
     #[tokio::test]
@@ -238,6 +237,6 @@ mod test {
         let (sink, _healthcheck) = config.build(context).await.unwrap();
 
         let event = Event::Log(LogEvent::from("simple message"));
-        run_and_assert_sink_compliance(sink, stream::once(ready(event)), &SINK_TAGS).await;
+        run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
     }
 }

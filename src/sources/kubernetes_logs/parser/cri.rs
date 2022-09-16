@@ -6,7 +6,9 @@ use vector_common::conversion;
 
 use crate::{
     event::{self, Event, Value},
-    internal_events::{ParserConversionError, ParserMatchError, ParserMissingFieldError},
+    internal_events::{
+        ParserConversionError, ParserMatchError, ParserMissingFieldError, DROP_EVENT,
+    },
     transforms::{FunctionTransform, OutputBuffer},
 };
 
@@ -65,7 +67,7 @@ impl FunctionTransform for Cri {
             None => {
                 // The message field was missing, inexplicably. If we can't find the message field, there's nothing for
                 // us to actually decode, so there's no event we could emit, and so we just emit the error and return.
-                emit!(ParserMissingFieldError { field: self.field });
+                emit!(ParserMissingFieldError::<DROP_EVENT> { field: self.field });
                 return;
             }
             Some(s) => match self.pattern.captures_read(&mut self.capture_locations, &s) {
