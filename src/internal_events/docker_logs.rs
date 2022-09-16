@@ -1,9 +1,8 @@
 use bollard::errors::Error;
 use chrono::ParseError;
 use metrics::counter;
-use vector_core::internal_event::InternalEvent;
-
 use vector_common::internal_event::{error_stage, error_type};
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct DockerLogsEventsReceived<'a> {
@@ -210,6 +209,5 @@ impl InternalEvent for DockerLogsReceivedOldLogError<'_> {
             "stage" => error_stage::RECEIVING,
             "container_id" => self.container_id.to_owned(),
         );
-
     }
 }
