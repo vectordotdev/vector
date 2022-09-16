@@ -330,7 +330,7 @@ mod tests {
         let len = body.lines().count();
         let mut req = reqwest::Client::new().post(&format!("http://{}/events?{}", address, query));
         if let Some(auth) = auth {
-            req = req.basic_auth(auth.username, Some(auth.password));
+            req = req.basic_auth(auth.username, Some(auth.password.inner()));
         }
         req.header("Logplex-Msg-Count", len)
             .header("Logplex-Frame-Id", "frame-foo")
