@@ -64,7 +64,7 @@ pub fn init(color: bool, json: bool, levels: &str, internal_log_rate_limit: u64)
         .then(|| MetricsLayer::new().with_filter(tracing_subscriber::filter::LevelFilter::INFO));
 
     let broadcast_layer = RateLimitedLayer::new(BroadcastLayer::new())
-        .with_limit(internal_log_rate_limit)
+        .with_default_limit(internal_log_rate_limit)
         .with_filter(fmt_filter.clone());
 
     let subscriber = tracing_subscriber::registry()
