@@ -31,7 +31,7 @@ pub type MetricArray = Vec<Metric>;
 /// of events. This is effectively the same as the standard
 /// `IntoIterator<Item = Event>` implementations, but that would
 /// conflict with the base implementation for the type aliases below.
-pub trait EventContainer: ByteSizeOf {
+pub trait EventContainer: ByteSizeOf + EstimatedJsonEncodedSizeOf {
     /// The type of `Iterator` used to turn this container into events.
     type IntoIter: Iterator<Item = Event>;
 
@@ -246,7 +246,7 @@ impl EstimatedJsonEncodedSizeOf for EventArray {
                 .map(|v| JsonEncodedByteCountingValue(v.value()).estimated_json_encoded_size_of())
                 .sum(),
 
-            Self::Metrics(a) => a.estimated_json_encoded_size_of(),
+            Self::Metrics(a) => a.iter().map(|v| v.estimated_json_encoded_size_of()).sum(),
         }
     }
 }
