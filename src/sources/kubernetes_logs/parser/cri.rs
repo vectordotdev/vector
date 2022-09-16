@@ -6,7 +6,9 @@ use vector_common::conversion;
 
 use crate::{
     event::{self, Event, Value},
-    internal_events::{ParserConversionError, ParserMatchError, ParserMissingFieldError, DROP_EVENT},
+    internal_events::{
+        ParserConversionError, ParserMatchError, ParserMissingFieldError, DROP_EVENT,
+    },
     transforms::{FunctionTransform, OutputBuffer},
 };
 
