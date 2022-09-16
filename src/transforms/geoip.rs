@@ -280,198 +280,301 @@ impl FunctionTransform for Geoip {
 mod tests {
     use std::collections::HashMap;
 
+    use tokio::sync::mpsc;
+    use tokio_stream::wrappers::ReceiverStream;
+    use vector_common::btreemap;
     use vector_core::event::LogEvent;
 
     use super::*;
-    use crate::{event::Event, transforms::test::transform_one};
+    use crate::{
+        event::Event, test_util::components::assert_transform_compliance,
+        transforms::test::create_topology,
+    };
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<GeoipConfig>();
     }
 
-    #[test]
-    fn geoip_city_lookup_success() {
-        let mut log = LogEvent::default();
-        let _ = log.insert("remote_addr", "2.125.160.216");
-        let _ = log.insert("request_path", "foo/bar");
+    #[tokio::test]
+    async fn geoip_city_lookup_success() {
+        assert_transform_compliance(async {
+            let transform_config = GeoipConfig {
+                source: "remote_addr".to_owned(),
+                database: "tests/data/GeoIP2-City-Test.mmdb".to_owned(),
+                target: "geo".to_owned(),
+                locale: "en".to_owned(),
+            };
 
-        let new_event = parse_one(log.into(), "tests/data/GeoIP2-City-Test.mmdb");
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) =
+                create_topology(ReceiverStream::new(rx), transform_config).await;
 
-        let mut exp_geoip_attr = HashMap::new();
-        exp_geoip_attr.insert("city_name", "Boxford");
-        exp_geoip_attr.insert("country_code", "GB");
-        exp_geoip_attr.insert("continent_code", "EU");
-        exp_geoip_attr.insert("country_name", "United Kingdom");
-        exp_geoip_attr.insert("region_code", "WBK");
-        exp_geoip_attr.insert("region_name", "West Berkshire");
-        exp_geoip_attr.insert("timezone", "Europe/London");
-        exp_geoip_attr.insert("latitude", "51.75");
-        exp_geoip_attr.insert("longitude", "-1.25");
-        exp_geoip_attr.insert("postal_code", "OX1");
-        exp_geoip_attr.insert("metro_code", "");
+            let log = Event::Log(LogEvent::from(btreemap! {
+                "remote_addr" => "2.125.160.216"
+            }));
+            tx.send(log).await.unwrap();
+            let new_event = out.recv().await.unwrap();
 
-        for field in exp_geoip_attr.keys() {
-            let k = format!("geo.{}", field).to_string();
-            let geodata = new_event
-                .as_log()
-                .get(k.as_str())
-                .unwrap()
-                .to_string_lossy();
-            assert_eq!(&geodata, exp_geoip_attr.get(field).expect("field exists"));
-        }
+            let mut exp_geoip_attr = HashMap::new();
+            exp_geoip_attr.insert("city_name", "Boxford");
+            exp_geoip_attr.insert("country_code", "GB");
+            exp_geoip_attr.insert("continent_code", "EU");
+            exp_geoip_attr.insert("country_name", "United Kingdom");
+            exp_geoip_attr.insert("region_code", "WBK");
+            exp_geoip_attr.insert("region_name", "West Berkshire");
+            exp_geoip_attr.insert("timezone", "Europe/London");
+            exp_geoip_attr.insert("latitude", "51.75");
+            exp_geoip_attr.insert("longitude", "-1.25");
+            exp_geoip_attr.insert("postal_code", "OX1");
+            exp_geoip_attr.insert("metro_code", "");
+
+            for field in exp_geoip_attr.keys() {
+                let k = format!("geo.{}", field).to_string();
+                let geodata = new_event
+                    .as_log()
+                    .get(k.as_str())
+                    .unwrap()
+                    .to_string_lossy();
+                assert_eq!(&geodata, exp_geoip_attr.get(field).expect("field exists"));
+            }
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await;
     }
 
-    #[test]
-    fn geoip_city_lookup_partial_results() {
-        let mut log = LogEvent::default();
-        let _ = log.insert("remote_addr", "67.43.156.9");
-        let _ = log.insert("request_path", "foo/bar");
+    #[tokio::test]
+    async fn geoip_city_lookup_partial_results() {
+        assert_transform_compliance(async {
+            let transform_config = GeoipConfig {
+                source: "remote_addr".to_owned(),
+                database: "tests/data/GeoIP2-City-Test.mmdb".to_owned(),
+                target: "geo".to_owned(),
+                locale: "en".to_owned(),
+            };
 
-        let new_event = parse_one(log.into(), "tests/data/GeoIP2-City-Test.mmdb");
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) =
+                create_topology(ReceiverStream::new(rx), transform_config).await;
 
-        let mut exp_geoip_attr = HashMap::new();
-        exp_geoip_attr.insert("city_name", "");
-        exp_geoip_attr.insert("country_code", "BT");
-        exp_geoip_attr.insert("country_name", "Bhutan");
-        exp_geoip_attr.insert("continent_code", "AS");
-        exp_geoip_attr.insert("region_code", "");
-        exp_geoip_attr.insert("region_name", "");
-        exp_geoip_attr.insert("timezone", "Asia/Thimphu");
-        exp_geoip_attr.insert("latitude", "27.5");
-        exp_geoip_attr.insert("longitude", "90.5");
-        exp_geoip_attr.insert("postal_code", "");
-        exp_geoip_attr.insert("metro_code", "");
+            let log = Event::Log(LogEvent::from(btreemap! {
+                "remote_addr" => "67.43.156.9"
+            }));
+            tx.send(log).await.unwrap();
+            let new_event = out.recv().await.unwrap();
 
-        for field in exp_geoip_attr.keys() {
-            let k = format!("geo.{}", field).to_string();
-            let geodata = new_event
-                .as_log()
-                .get(k.as_str())
-                .unwrap()
-                .to_string_lossy();
-            assert_eq!(&geodata, exp_geoip_attr.get(field).expect("field exists"));
-        }
+            let mut exp_geoip_attr = HashMap::new();
+            exp_geoip_attr.insert("city_name", "");
+            exp_geoip_attr.insert("country_code", "BT");
+            exp_geoip_attr.insert("country_name", "Bhutan");
+            exp_geoip_attr.insert("continent_code", "AS");
+            exp_geoip_attr.insert("region_code", "");
+            exp_geoip_attr.insert("region_name", "");
+            exp_geoip_attr.insert("timezone", "Asia/Thimphu");
+            exp_geoip_attr.insert("latitude", "27.5");
+            exp_geoip_attr.insert("longitude", "90.5");
+            exp_geoip_attr.insert("postal_code", "");
+            exp_geoip_attr.insert("metro_code", "");
+
+            for field in exp_geoip_attr.keys() {
+                let k = format!("geo.{}", field).to_string();
+                let geodata = new_event
+                    .as_log()
+                    .get(k.as_str())
+                    .unwrap()
+                    .to_string_lossy();
+                assert_eq!(&geodata, exp_geoip_attr.get(field).expect("field exists"));
+            }
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await;
     }
 
-    #[test]
-    fn geoip_city_lookup_no_results() {
-        let mut log = LogEvent::default();
-        let _ = log.insert("remote_addr", "10.1.12.1");
-        let _ = log.insert("request_path", "foo/bar");
+    #[tokio::test]
+    async fn geoip_city_lookup_no_results() {
+        assert_transform_compliance(async {
+            let transform_config = GeoipConfig {
+                source: "remote_addr".to_owned(),
+                database: "tests/data/GeoIP2-City-Test.mmdb".to_owned(),
+                target: "geo".to_owned(),
+                locale: "en".to_owned(),
+            };
 
-        let new_event = parse_one(log.into(), "tests/data/GeoIP2-City-Test.mmdb");
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) =
+                create_topology(ReceiverStream::new(rx), transform_config).await;
 
-        let mut exp_geoip_attr = HashMap::new();
-        exp_geoip_attr.insert("city_name", "");
-        exp_geoip_attr.insert("country_code", "");
-        exp_geoip_attr.insert("country_name", "");
-        exp_geoip_attr.insert("region_code", "");
-        exp_geoip_attr.insert("region_name", "");
-        exp_geoip_attr.insert("continent_code", "");
-        exp_geoip_attr.insert("timezone", "");
-        exp_geoip_attr.insert("latitude", "");
-        exp_geoip_attr.insert("longitude", "");
-        exp_geoip_attr.insert("postal_code", "");
-        exp_geoip_attr.insert("metro_code", "");
+            let log = Event::Log(LogEvent::from(btreemap! {
+                "remote_addr" => "10.1.12.1"
+            }));
+            tx.send(log).await.unwrap();
+            let new_event = out.recv().await.unwrap();
 
-        for field in exp_geoip_attr.keys() {
-            let k = format!("geo.{}", field).to_string();
-            let geodata = new_event
-                .as_log()
-                .get(k.as_str())
-                .unwrap()
-                .to_string_lossy();
-            assert_eq!(&geodata, exp_geoip_attr.get(field).expect("fields exists"));
-        }
+            let mut exp_geoip_attr = HashMap::new();
+            exp_geoip_attr.insert("city_name", "");
+            exp_geoip_attr.insert("country_code", "");
+            exp_geoip_attr.insert("country_name", "");
+            exp_geoip_attr.insert("region_code", "");
+            exp_geoip_attr.insert("region_name", "");
+            exp_geoip_attr.insert("continent_code", "");
+            exp_geoip_attr.insert("timezone", "");
+            exp_geoip_attr.insert("latitude", "");
+            exp_geoip_attr.insert("longitude", "");
+            exp_geoip_attr.insert("postal_code", "");
+            exp_geoip_attr.insert("metro_code", "");
+
+            for field in exp_geoip_attr.keys() {
+                let k = format!("geo.{}", field).to_string();
+                let geodata = new_event
+                    .as_log()
+                    .get(k.as_str())
+                    .unwrap()
+                    .to_string_lossy();
+                assert_eq!(&geodata, exp_geoip_attr.get(field).expect("fields exists"));
+            }
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await;
     }
 
-    #[test]
-    fn geoip_isp_lookup_success() {
-        let mut log = LogEvent::default();
-        let _ = log.insert("remote_addr", "208.192.1.2");
-        let _ = log.insert("request_path", "foo/bar");
+    #[tokio::test]
+    async fn geoip_isp_lookup_success() {
+        assert_transform_compliance(async {
+            let transform_config = GeoipConfig {
+                source: "remote_addr".to_owned(),
+                database: "tests/data/GeoIP2-ISP-Test.mmdb".to_owned(),
+                target: "geo".to_owned(),
+                locale: "en".to_owned(),
+            };
 
-        let new_event = parse_one(log.into(), "tests/data/GeoIP2-ISP-Test.mmdb");
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) =
+                create_topology(ReceiverStream::new(rx), transform_config).await;
 
-        let mut exp_geoip_attr = HashMap::new();
-        exp_geoip_attr.insert("autonomous_system_number", "701");
-        exp_geoip_attr.insert(
-            "autonomous_system_organization",
-            "MCI Communications Services, Inc. d/b/a Verizon Business",
-        );
-        exp_geoip_attr.insert("isp", "Verizon Business");
-        exp_geoip_attr.insert("organization", "Verizon Business");
+            let log = Event::Log(LogEvent::from(btreemap! {
+                "remote_addr" => "208.192.1.2"
+            }));
+            tx.send(log).await.unwrap();
+            let new_event = out.recv().await.unwrap();
 
-        for field in exp_geoip_attr.keys() {
-            let k = format!("geo.{}", field).to_string();
-            let geodata = new_event
-                .as_log()
-                .get(k.as_str())
-                .unwrap()
-                .to_string_lossy();
-            assert_eq!(&geodata, exp_geoip_attr.get(field).expect("field exists"));
-        }
+            let mut exp_geoip_attr = HashMap::new();
+            exp_geoip_attr.insert("autonomous_system_number", "701");
+            exp_geoip_attr.insert(
+                "autonomous_system_organization",
+                "MCI Communications Services, Inc. d/b/a Verizon Business",
+            );
+            exp_geoip_attr.insert("isp", "Verizon Business");
+            exp_geoip_attr.insert("organization", "Verizon Business");
+
+            for field in exp_geoip_attr.keys() {
+                let k = format!("geo.{}", field).to_string();
+                let geodata = new_event
+                    .as_log()
+                    .get(k.as_str())
+                    .unwrap()
+                    .to_string_lossy();
+                assert_eq!(&geodata, exp_geoip_attr.get(field).expect("field exists"));
+            }
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await;
     }
 
-    #[test]
-    fn geoip_isp_lookup_partial_results() {
-        let mut log = LogEvent::default();
-        let _ = log.insert("remote_addr", "2600:7000::1");
-        let _ = log.insert("request_path", "foo/bar");
+    #[tokio::test]
+    async fn geoip_isp_lookup_partial_results() {
+        assert_transform_compliance(async {
+            let transform_config = GeoipConfig {
+                source: "remote_addr".to_owned(),
+                database: "tests/data/GeoLite2-ASN-Test.mmdb".to_owned(),
+                target: "geo".to_owned(),
+                locale: "en".to_owned(),
+            };
 
-        let new_event = parse_one(log.into(), "tests/data/GeoLite2-ASN-Test.mmdb");
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) =
+                create_topology(ReceiverStream::new(rx), transform_config).await;
 
-        let mut exp_geoip_attr = HashMap::new();
-        exp_geoip_attr.insert("autonomous_system_number", "6939");
-        exp_geoip_attr.insert("autonomous_system_organization", "Hurricane Electric, Inc.");
-        exp_geoip_attr.insert("isp", "");
-        exp_geoip_attr.insert("organization", "");
+            let log = Event::Log(LogEvent::from(btreemap! {
+                "remote_addr" => "2600:7000::1"
+            }));
+            tx.send(log).await.unwrap();
+            let new_event = out.recv().await.unwrap();
 
-        for field in exp_geoip_attr.keys() {
-            let k = format!("geo.{}", field).to_string();
-            let geodata = new_event
-                .as_log()
-                .get(k.as_str())
-                .unwrap()
-                .to_string_lossy();
-            assert_eq!(&geodata, exp_geoip_attr.get(field).expect("field exists"));
-        }
+            let mut exp_geoip_attr = HashMap::new();
+            exp_geoip_attr.insert("autonomous_system_number", "6939");
+            exp_geoip_attr.insert("autonomous_system_organization", "Hurricane Electric, Inc.");
+            exp_geoip_attr.insert("isp", "");
+            exp_geoip_attr.insert("organization", "");
+
+            for field in exp_geoip_attr.keys() {
+                let k = format!("geo.{}", field).to_string();
+                let geodata = new_event
+                    .as_log()
+                    .get(k.as_str())
+                    .unwrap()
+                    .to_string_lossy();
+                assert_eq!(&geodata, exp_geoip_attr.get(field).expect("field exists"));
+            }
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await;
     }
 
-    #[test]
-    fn geoip_isp_lookup_no_results() {
-        let mut log = LogEvent::default();
-        let _ = log.insert("remote_addr", "10.1.12.1");
-        let _ = log.insert("request_path", "foo/bar");
+    #[tokio::test]
+    async fn geoip_isp_lookup_no_results() {
+        assert_transform_compliance(async {
+            let transform_config = GeoipConfig {
+                source: "remote_addr".to_owned(),
+                database: "tests/data/GeoLite2-ASN-Test.mmdb".to_owned(),
+                target: "geo".to_owned(),
+                locale: "en".to_owned(),
+            };
 
-        let new_event = parse_one(log.into(), "tests/data/GeoLite2-ASN-Test.mmdb");
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) =
+                create_topology(ReceiverStream::new(rx), transform_config).await;
 
-        let mut exp_geoip_attr = HashMap::new();
-        exp_geoip_attr.insert("autonomous_system_number", "0");
-        exp_geoip_attr.insert("autonomous_system_organization", "");
-        exp_geoip_attr.insert("isp", "");
-        exp_geoip_attr.insert("organization", "");
+            let log = Event::Log(LogEvent::from(btreemap! {
+                "remote_addr" => "10.1.12.1"
+            }));
+            tx.send(log).await.unwrap();
+            let new_event = out.recv().await.unwrap();
 
-        for field in exp_geoip_attr.keys() {
-            let k = format!("geo.{}", field).to_string();
-            let geodata = new_event
-                .as_log()
-                .get(k.as_str())
-                .unwrap()
-                .to_string_lossy();
-            assert_eq!(&geodata, exp_geoip_attr.get(field).expect("fields exists"));
-        }
-    }
+            let mut exp_geoip_attr = HashMap::new();
+            exp_geoip_attr.insert("autonomous_system_number", "0");
+            exp_geoip_attr.insert("autonomous_system_organization", "");
+            exp_geoip_attr.insert("isp", "");
+            exp_geoip_attr.insert("organization", "");
 
-    fn parse_one(event: Event, database: &str) -> Event {
-        let mut augment = Geoip::new(
-            database.to_string(),
-            "remote_addr".to_string(),
-            "geo".to_string(),
-            "en".to_string(),
-        )
-        .unwrap();
-        transform_one(&mut augment, event).unwrap()
+            for field in exp_geoip_attr.keys() {
+                let k = format!("geo.{}", field).to_string();
+                let geodata = new_event
+                    .as_log()
+                    .get(k.as_str())
+                    .unwrap()
+                    .to_string_lossy();
+                assert_eq!(&geodata, exp_geoip_attr.get(field).expect("fields exists"));
+            }
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await;
     }
 }
