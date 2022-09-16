@@ -33,7 +33,8 @@ use crate::{
         DockerLogsCommunicationError, DockerLogsContainerEventReceived,
         DockerLogsContainerMetadataFetchError, DockerLogsContainerUnwatch,
         DockerLogsContainerWatch, DockerLogsEventsReceived,
-        DockerLogsLoggingDriverUnsupportedError, DockerLogsTimestampParseError, StreamClosedError,
+        DockerLogsLoggingDriverUnsupportedError, DockerLogsReceivedOldLogError,
+        DockerLogsTimestampParseError, StreamClosedError,
     },
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
@@ -863,10 +864,10 @@ impl ContainerLogInfo {
                     // Received log is not from before of creation
                     None if self.created <= timestamp.with_timezone(&Utc) => (),
                     _ => {
-                        trace!(
-                            message = "Received older log.",
-                            timestamp = %timestamp_str
-                        );
+                        emit!(DockerLogsReceivedOldLogError {
+                            container_id: self.id.as_str(),
+                            timestamp_str,
+                        });
                         return None;
                     }
                 }
