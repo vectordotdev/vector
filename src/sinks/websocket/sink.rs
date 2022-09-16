@@ -560,7 +560,7 @@ mod tests {
                                     if let Some(h) = hdr {
                                         match a {
                                             Auth::Bearer { token } => {
-                                                if format!("Bearer {}", token)
+                                                if format!("Bearer {}", token.inner())
                                                     != h.to_str().unwrap()
                                                 {
                                                     return Err(
