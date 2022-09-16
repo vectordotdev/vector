@@ -416,7 +416,7 @@ mod tests {
         // If we don't override the credentials path/API key, it tries to directly call out to the Google Instance
         // Metadata API, which we clearly don't have in unit tests. :)
         config.auth.credentials_path = None;
-        config.auth.api_key = Some("fake".to_string());
+        config.auth.api_key = Some("fake".to_string().into());
         config.endpoint = mock_endpoint.to_string();
 
         let context = SinkContext::new_test();

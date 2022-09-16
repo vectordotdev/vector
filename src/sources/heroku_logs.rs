@@ -330,7 +330,7 @@ mod tests {
         let len = body.lines().count();
         let mut req = reqwest::Client::new().post(&format!("http://{}/events?{}", address, query));
         if let Some(auth) = auth {
-            req = req.basic_auth(auth.username, Some(auth.password));
+            req = req.basic_auth(auth.username, Some(auth.password.inner()));
         }
         req.header("Logplex-Msg-Count", len)
             .header("Logplex-Frame-Id", "frame-foo")
@@ -346,7 +346,7 @@ mod tests {
     fn make_auth() -> HttpSourceAuthConfig {
         HttpSourceAuthConfig {
             username: random_string(16),
-            password: random_string(16),
+            password: random_string(16).into(),
         }
     }
 

@@ -16,6 +16,7 @@ use hyper_proxy::ProxyConnector;
 use snafu::{ResultExt, Snafu};
 use tower::Service;
 use tracing::Instrument;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
 use crate::{
@@ -243,7 +244,7 @@ pub enum Auth {
         user: String,
 
         /// The password to send.
-        password: String,
+        password: SensitiveString,
     },
 
     /// Bearer authentication.
@@ -251,7 +252,7 @@ pub enum Auth {
     /// A bearer token (OAuth2, JWT, etc) is passed as-is.
     Bearer {
         /// The bearer token to send.
-        token: String,
+        token: SensitiveString,
     },
 }
 
@@ -284,10 +285,10 @@ impl Auth {
     pub fn apply_headers_map(&self, map: &mut HeaderMap) {
         match &self {
             Auth::Basic { user, password } => {
-                let auth = Authorization::basic(user, password);
+                let auth = Authorization::basic(user.as_str(), password.inner());
                 map.typed_insert(auth);
             }
-            Auth::Bearer { token } => match Authorization::bearer(token) {
+            Auth::Bearer { token } => match Authorization::bearer(token.inner()) {
                 Ok(auth) => map.typed_insert(auth),
                 Err(error) => error!(message = "Invalid bearer token.", token = %token, %error),
             },

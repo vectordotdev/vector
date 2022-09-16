@@ -3,6 +3,7 @@ use std::{fmt::Debug, sync::Arc};
 use futures::FutureExt;
 use http::Uri;
 use tower::ServiceBuilder;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
 use super::{
@@ -79,10 +80,10 @@ impl RetryLogic for NewRelicApiRetry {
 #[serde(deny_unknown_fields)]
 pub struct NewRelicConfig {
     /// A valid New Relic license key.
-    pub license_key: String,
+    pub license_key: SensitiveString,
 
     /// The New Relic account ID.
-    pub account_id: String,
+    pub account_id: SensitiveString,
 
     #[configurable(derived)]
     pub region: Option<NewRelicRegion>,
@@ -224,8 +225,8 @@ impl NewRelicCredentials {
 impl From<&NewRelicConfig> for NewRelicCredentials {
     fn from(config: &NewRelicConfig) -> Self {
         Self {
-            license_key: config.license_key.clone(),
-            account_id: config.account_id.clone(),
+            license_key: config.license_key.inner().to_string(),
+            account_id: config.account_id.inner().to_string(),
             api: config.api,
             region: config.region.unwrap_or(NewRelicRegion::Us),
             override_uri: config.override_uri.clone(),

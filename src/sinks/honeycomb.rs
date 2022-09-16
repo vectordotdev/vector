@@ -2,6 +2,7 @@ use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
 use serde_json::json;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
 use crate::{
@@ -23,7 +24,7 @@ pub struct HoneycombConfig {
     endpoint: String,
 
     /// The team key that will be used to authenticate against Honeycomb.
-    api_key: String,
+    api_key: SensitiveString,
 
     /// The dataset that Vector will send logs to.
     // TODO: we probably want to make this a template
@@ -152,7 +153,7 @@ impl HttpSink for HoneycombConfig {
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Bytes>> {
         let uri = self.build_uri();
-        let request = Request::post(uri).header("X-Honeycomb-Team", self.api_key.clone());
+        let request = Request::post(uri).header("X-Honeycomb-Team", self.api_key.inner());
         let body = crate::serde::json::to_bytes(&events).unwrap().freeze();
 
         request.body(body).map_err(Into::into)

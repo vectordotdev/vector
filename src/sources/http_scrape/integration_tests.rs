@@ -178,7 +178,7 @@ async fn unauthorized_wrong_auth() {
         tls: None,
         auth: Some(Auth::Basic {
             user: "white_rabbit".to_string(),
-            password: "morpheus".to_string(),
+            password: "morpheus".to_string().into(),
         }),
         log_namespace: None,
     })
@@ -198,7 +198,7 @@ async fn authorized() {
         tls: None,
         auth: Some(Auth::Basic {
             user: "user".to_string(),
-            password: "pass".to_string(),
+            password: "pass".to_string().into(),
         }),
         log_namespace: None,
     })
