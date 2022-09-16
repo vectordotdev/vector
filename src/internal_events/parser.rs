@@ -48,12 +48,17 @@ impl InternalEvent for ParserMatchError<'_> {
     }
 }
 
+#[allow(dead_code)]
+pub const DROP_EVENT: bool = true;
+#[allow(dead_code)]
+pub const RETAIN_EVENT: bool = false;
+
 #[derive(Debug)]
-pub struct ParserMissingFieldError<'a> {
+pub struct ParserMissingFieldError<'a, const DROP_EVENT: bool> {
     pub field: &'a str,
 }
 
-impl InternalEvent for ParserMissingFieldError<'_> {
+impl<const DROP_EVENT: bool> InternalEvent for ParserMissingFieldError<'_, DROP_EVENT> {
     fn emit(self) {
         let reason = "Field does not exist.";
         error!(
@@ -62,7 +67,7 @@ impl InternalEvent for ParserMissingFieldError<'_> {
             error_code = "field_not_found",
             error_type = error_type::CONDITION_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_secs = 10
+            internal_log_rate_secs = 10,
         );
         counter!(
             "component_errors_total", 1,
@@ -74,7 +79,9 @@ impl InternalEvent for ParserMissingFieldError<'_> {
         // deprecated
         counter!("processing_errors_total", 1, "error_type" => "missing_field");
 
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
+        if DROP_EVENT {
+            emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
+        }
     }
 }
 

@@ -6,7 +6,7 @@ use vector_config::configurable_component;
 use crate::{
     config::{DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext},
     event::Event,
-    internal_events::{GeoipIpAddressParseError, ParserMissingFieldError},
+    internal_events::{GeoipIpAddressParseError, ParserMissingFieldError, RETAIN_EVENT},
     schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
     Result,
@@ -258,7 +258,7 @@ impl FunctionTransform for Geoip {
                 }
             }
         } else {
-            emit!(ParserMissingFieldError {
+            emit!(ParserMissingFieldError::<RETAIN_EVENT> {
                 field: &self.source
             });
         };

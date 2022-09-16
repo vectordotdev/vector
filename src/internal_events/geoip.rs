@@ -1,9 +1,8 @@
 use std::net::AddrParseError;
 
 use metrics::counter;
-use vector_core::internal_event::InternalEvent;
-
 use vector_common::internal_event::{error_stage, error_type};
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct GeoipIpAddressParseError<'a> {
@@ -14,12 +13,12 @@ pub struct GeoipIpAddressParseError<'a> {
 impl<'a> InternalEvent for GeoipIpAddressParseError<'a> {
     fn emit(self) {
         error!(
-            message = %format!("IP Address not parsed correctly: {:?}", self.error),
+            message = format!("IP Address not parsed correctly: {:?}.", self.error),
             error_code = "invalid_ip_address",
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
             address = %self.address,
-            internal_log_rate_secs = 30
+            internal_log_rate_secs = 10,
         );
         counter!(
             "component_errors_total", 1,
