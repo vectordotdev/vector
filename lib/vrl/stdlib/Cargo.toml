@@ -54,7 +54,7 @@ aes = { version = "0.8.1", optional = true }
 # Cryptography - Block Modes
 ctr = { version = "0.9.1", optional = true }
 cbc = { version = "0.1.2", optional = true, features = ["alloc"] }
-cfb-mode = { version = "0.8.1", optional = true }
+cfb-mode = { version = "0.8.2", optional = true }
 ofb = { version = "0.6.1", optional = true }
 
 
