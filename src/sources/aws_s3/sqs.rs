@@ -29,7 +29,7 @@ use crate::{
     config::{log_schema, AcknowledgementsConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, LogEvent},
     internal_events::{
-        OldEventsReceived, SqsMessageDeleteBatchError, SqsMessageDeletePartialError,
+        EventsReceived, SqsMessageDeleteBatchError, SqsMessageDeletePartialError,
         SqsMessageDeleteSucceeded, SqsMessageProcessingError, SqsMessageProcessingSucceeded,
         SqsMessageReceiveError, SqsMessageReceiveSucceeded, SqsS3EventRecordInvalidEventIgnored,
         StreamClosedError,
@@ -38,9 +38,9 @@ use crate::{
     shutdown::ShutdownSignal,
     SourceSender,
 };
-use lookup::path;
+use lookup::event_path;
 
-static SUPPORTED_S3S_EVENT_VERSION: Lazy<semver::VersionReq> =
+static SUPPORTED_S3_EVENT_VERSION: Lazy<semver::VersionReq> =
     Lazy::new(|| semver::VersionReq::parse("~2").unwrap());
 
 /// SQS configuration options.
@@ -399,7 +399,7 @@ impl IngestorProcess {
         s3_event: S3EventRecord,
     ) -> Result<(), ProcessingError> {
         let event_version: semver::Version = s3_event.event_version.clone().into();
-        if !SUPPORTED_S3S_EVENT_VERSION.matches(&event_version) {
+        if !SUPPORTED_S3_EVENT_VERSION.matches(&event_version) {
             return Err(ProcessingError::UnsupportedS3EventVersion {
                 version: event_version.clone(),
             });
@@ -504,9 +504,9 @@ impl IngestorProcess {
         let mut stream = lines.filter_map(move |line| {
             let mut log = LogEvent::from_bytes_legacy(&line).with_batch_notifier_option(&batch);
 
-            log.insert(path!("bucket"), bucket_name.clone());
-            log.insert(path!("object"), object_key.clone());
-            log.insert(path!("region"), aws_region.clone());
+            log.insert(event_path!("bucket"), bucket_name.clone());
+            log.insert(event_path!("object"), object_key.clone());
+            log.insert(event_path!("region"), aws_region.clone());
             log.insert(log_schema().source_type_key(), Bytes::from("aws_s3"));
             log.insert(log_schema().timestamp_key(), timestamp);
 
@@ -516,7 +516,7 @@ impl IngestorProcess {
                 }
             }
 
-            emit!(OldEventsReceived {
+            emit!(EventsReceived {
                 count: 1,
                 byte_size: log.size_of()
             });
@@ -527,10 +527,8 @@ impl IngestorProcess {
         let send_error = match self.out.send_event_stream(&mut stream).await {
             Ok(_) => None,
             Err(error) => {
-                // count is set to 0 to have no discarded events considering
-                // the events are not yet acknowledged and will be retried in
-                // case of error
-                emit!(StreamClosedError { error, count: 0 });
+                let (count, _) = stream.size_hint();
+                emit!(StreamClosedError { error, count });
                 Some(crate::source_sender::ClosedError)
             }
         };
@@ -558,10 +556,7 @@ impl IngestorProcess {
                     BatchStatus::Delivered => Ok(()),
                     BatchStatus::Errored => Err(ProcessingError::ErrorAcknowledgement),
                     BatchStatus::Rejected => {
-                        error!(
-                            message = "Sink reported events were rejected.",
-                            internal_log_rate_secs = 5,
-                        );
+                        // Sinks are responsible for emitting ComponentEventsDropped.
                         // Failed events cannot be retried, so continue to delete the SQS source message.
                         Ok(())
                     }

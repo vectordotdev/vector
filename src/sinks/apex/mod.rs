@@ -6,15 +6,12 @@ use hyper::Body;
 use serde_json::json;
 use vector_config::configurable_component;
 
-#[cfg(feature = "apex-integration-tests")]
-#[cfg(test)]
+#[cfg(all(test, feature = "apex-integration-tests"))]
 mod integration_tests;
 
 use crate::{
     codecs::Transformer,
-    config::{
-        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
-    },
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::Event,
     http::HttpClient,
     sinks::util::{
@@ -25,7 +22,7 @@ use crate::{
 };
 
 /// Configuration for the `apex` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("apex"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct ApexSinkConfig {
@@ -57,10 +54,6 @@ pub struct ApexSinkConfig {
     acknowledgements: AcknowledgementsConfig,
 }
 
-inventory::submit! {
-    SinkDescription::new::<ApexSinkConfig>("apex")
-}
-
 impl GenerateConfig for ApexSinkConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(
@@ -73,7 +66,6 @@ impl GenerateConfig for ApexSinkConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "apex")]
 impl SinkConfig for ApexSinkConfig {
     async fn build(
         &self,
@@ -103,10 +95,6 @@ impl SinkConfig for ApexSinkConfig {
 
     fn input(&self) -> Input {
         Input::log()
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "apex"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

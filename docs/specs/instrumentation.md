@@ -85,7 +85,12 @@ that cannot import Vector's events.
 
 #### Error
 
-An `<Name>Error` event MUST be emitted when an error occurs.
+An `<Name>Error` event MUST be emitted when an error occurs during the running
+of a component.
+
+If an error occurs that prevents the component from starting up an event does
+not need to be emitted as this will prevent Vector from starting and the metric
+is unlikely to be collected. An error should still be logged however.
 
 - Properties
   - `error_code` - An error code for the failure, if applicable.
@@ -154,7 +159,7 @@ know if the client will retry them.
   - MUST include the defined properties as key-value pairs.
   - If `intentional` is `true`, MUST log at the `debug` level.
   - If `intentional` is `false`, MUST log at the `error` level.
-  - SHOULD NOT be rate limited.
+  - SHOULD be rate limited to 10 seconds.
 
 [camelcase]: https://en.wikipedia.org/wiki/Camel_case
 [`eventsdropped`]: #EventsDropped

@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use chrono::{DateTime, NaiveDateTime, Utc};
-use lookup::path;
+use lookup::event_path;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use std::collections::HashMap;
@@ -154,7 +154,7 @@ impl GelfDeserializer {
                 // per GELF spec, Additional field values must be either strings or numbers
                 if val.is_string() || val.is_number() {
                     let vector_val: value::Value = val.into();
-                    log.insert(path!(key.as_str()), vector_val);
+                    log.insert(event_path!(key.as_str()), vector_val);
                 } else {
                     let type_ = match val {
                         serde_json::Value::Null => "null",
@@ -209,7 +209,7 @@ mod tests {
     use super::*;
     use bytes::Bytes;
     use chrono::{DateTime, NaiveDateTime, Utc};
-    use lookup::path;
+    use lookup::event_path;
     use pretty_assertions::assert_eq;
     use serde_json::json;
     use smallvec::SmallVec;
@@ -291,13 +291,13 @@ mod tests {
             Some(&Value::Bytes(Bytes::from_static(b"/tmp/bar")))
         );
         assert_eq!(
-            log.get(path!(add_on_int_in)),
+            log.get(event_path!(add_on_int_in)),
             Some(&Value::Float(
                 ordered_float::NotNan::new(2001.1002).unwrap()
             ))
         );
         assert_eq!(
-            log.get(path!(add_on_str_in)),
+            log.get(event_path!(add_on_str_in)),
             Some(&Value::Bytes(Bytes::from_static(b"A Space Odyssey")))
         );
     }

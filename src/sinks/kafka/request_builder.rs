@@ -6,7 +6,7 @@ use vector_core::{config::LogSchema, ByteSizeOf};
 use crate::{
     codecs::{Encoder, Transformer},
     event::{Event, Finalizable, Value},
-    internal_events::KafkaHeaderExtractionError,
+    internal_events::{KafkaHeaderExtractionError, TemplateRenderingError},
     sinks::kafka::service::{KafkaRequest, KafkaRequestMetadata},
     template::Template,
 };
@@ -22,7 +22,18 @@ pub struct KafkaRequestBuilder {
 
 impl KafkaRequestBuilder {
     pub fn build_request(&mut self, mut event: Event) -> Option<KafkaRequest> {
-        let topic = self.topic_template.render_string(&event).ok()?;
+        let topic = self
+            .topic_template
+            .render_string(&event)
+            .map_err(|error| {
+                emit!(TemplateRenderingError {
+                    field: None,
+                    drop_event: true,
+                    error,
+                });
+            })
+            .ok()?;
+
         let metadata = KafkaRequestMetadata {
             finalizers: event.take_finalizers(),
             key: get_key(&event, &self.key_field),

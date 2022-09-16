@@ -74,7 +74,7 @@ impl RetryLogic for NewRelicApiRetry {
 }
 
 /// Configuration for the `new_relic` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("new_relic"))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct NewRelicConfig {
@@ -134,7 +134,6 @@ impl NewRelicConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "new_relic")]
 impl SinkConfig for NewRelicConfig {
     async fn build(
         &self,
@@ -159,7 +158,6 @@ impl SinkConfig for NewRelicConfig {
 
         let sink = NewRelicSink {
             service,
-
             transformer: self.encoding.clone(),
             encoder: NewRelicEncoder,
             credentials,
@@ -172,10 +170,6 @@ impl SinkConfig for NewRelicConfig {
 
     fn input(&self) -> Input {
         Input::new(DataType::Log | DataType::Metric)
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "new_relic"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

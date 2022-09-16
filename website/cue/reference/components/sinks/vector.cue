@@ -92,13 +92,12 @@ components: sinks: vector: {
 			type: bool: default: false
 		}
 		version: {
-			description: "Sink API version. Specifying this version ensures that Vector does not break backward compatibility."
+			description: "Sink API version. Specifying this version ensures that Vector does not silently break backward compatibility."
 			common:      true
 			required:    false
 			warnings: ["Ensure you use the same version for both the sink and source."]
 			type: string: {
 				enum: {
-					"1": "Vector sink API version 1"
 					"2": "Vector sink API version 2"
 				}
 				default: "2"

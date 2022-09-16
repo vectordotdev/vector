@@ -1,4 +1,4 @@
-use crate::Metadata;
+use crate::{GenerateError, Metadata};
 
 /// A type that can be represented in a Vector configuration.
 ///
@@ -43,9 +43,17 @@ where
         metadata
     }
 
+    fn validate_metadata(_metadata: &Metadata<Self>) -> Result<(), GenerateError> {
+        Ok(())
+    }
+
     /// Generates the schema for this value.
+    ///
+    /// # Errors
+    ///
+    /// If an error occurs while generating the schema, an error variant will be returned describing
+    /// the issue.
     fn generate_schema(
         gen: &mut schemars::gen::SchemaGenerator,
-        overrides: Metadata<Self>,
-    ) -> schemars::schema::SchemaObject;
+    ) -> Result<schemars::schema::SchemaObject, GenerateError>;
 }

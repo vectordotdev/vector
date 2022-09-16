@@ -47,7 +47,7 @@ impl Function for MatchDatadogQuery {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let query_value = arguments.required_literal("query")?.to_value();

@@ -10,7 +10,7 @@ use vector_config::configurable_component;
 
 use crate::{
     codecs::Transformer,
-    config::{log_schema, AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     event::{Event, Value},
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
     http::HttpClient,
@@ -34,7 +34,7 @@ enum HealthcheckError {
 }
 
 /// Configuration for the `gcp_stackdriver_logs` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("gcp_stackdriver_logs"))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct StackdriverConfig {
@@ -172,14 +172,9 @@ pub struct StackdriverResource {
     pub labels: HashMap<String, Template>,
 }
 
-inventory::submit! {
-    SinkDescription::new::<StackdriverConfig>("gcp_stackdriver_logs")
-}
-
 impl_generate_config_from_default!(StackdriverConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "gcp_stackdriver_logs")]
 impl SinkConfig for StackdriverConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let auth = self.auth.build(Scope::LoggingWrite).await?;
@@ -220,10 +215,6 @@ impl SinkConfig for StackdriverConfig {
 
     fn input(&self) -> Input {
         Input::log()
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "gcp_stackdriver_logs"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

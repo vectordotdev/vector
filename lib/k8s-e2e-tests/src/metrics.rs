@@ -98,18 +98,28 @@ pub async fn wait_for_vector_started(
     Ok(())
 }
 
+pub const HOST_METRICS: &[&str] = &[
+    "host_load1",
+    "host_load5",
+    "host_cpu_seconds_total",
+    "host_filesystem_total_bytes",
+];
+
+pub const SOURCE_COMPLIANCE_METRICS: &[&str] = &[
+    "vector_component_received_events_total",
+    "vector_component_received_event_bytes_total",
+    "vector_component_sent_events_total",
+    "vector_component_sent_event_bytes_total",
+];
+
 /// This helper function performs an HTTP request to the specified URL and
-/// validates the presence of the host metrics.
-pub async fn assert_host_metrics_present(url: &str) -> Result<(), Box<dyn std::error::Error>> {
+/// validates the presence of the specified metrics.
+pub async fn assert_metrics_present(
+    url: &str,
+    metrics_list: &[&str],
+) -> Result<(), Box<dyn std::error::Error>> {
     let metrics = load(url).await?;
-    let mut required_metrics: HashSet<_> = vec![
-        "host_load1",
-        "host_load5",
-        "host_cpu_seconds_total",
-        "host_filesystem_total_bytes",
-    ]
-    .into_iter()
-    .collect();
+    let mut required_metrics: HashSet<_> = HashSet::from_iter(metrics_list.iter().cloned());
     for captures in metrics_regex().captures_iter(&metrics) {
         let metric_name = &captures["name"];
         required_metrics.remove(metric_name);

@@ -18,7 +18,7 @@ use vector_core::ByteSizeOf;
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::log_schema,
-    internal_events::{OldEventsReceived, StreamClosedError},
+    internal_events::{EventsReceived, StreamClosedError},
     shutdown::ShutdownSignal,
     SourceSender,
 };
@@ -122,7 +122,7 @@ async fn process_stream(
             match result {
                 Ok((events, byte_size)) => {
                     bytes_received.emit(ByteSize(byte_size));
-                    emit!(OldEventsReceived {
+                    emit!(EventsReceived {
                         byte_size: events.size_of(),
                         count: events.len()
                     });
@@ -156,7 +156,7 @@ async fn process_stream(
 
     match out.send_event_stream(&mut stream).await {
         Ok(()) => {
-            info!("Finished sending.");
+            debug!("Finished sending.");
             Ok(())
         }
         Err(error) => {

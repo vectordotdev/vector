@@ -127,6 +127,8 @@ pub mod schemars {
 pub mod component;
 mod configurable;
 pub use self::configurable::Configurable;
+mod errors;
+pub use self::errors::{BoundDirection, GenerateError};
 mod external;
 mod metadata;
 pub use self::metadata::Metadata;
@@ -155,7 +157,7 @@ pub mod validation {
 }
 
 #[doc(hidden)]
-pub fn __ensure_numeric_validation_bounds<N>(metadata: &Metadata<N>)
+pub fn __ensure_numeric_validation_bounds<N>(metadata: &Metadata<N>) -> Result<(), GenerateError>
 where
     N: Configurable + ConfigurableNumber,
 {
@@ -175,15 +177,27 @@ where
         if let validation::Validation::Range { minimum, maximum } = validation {
             if let Some(min_bound) = minimum {
                 if *min_bound < mechanical_min_bound {
-                    panic!("invalid minimum in range validation for {}: has mechanical lower bound of {}, but {} was given", std::any::type_name::<N>(), mechanical_min_bound, min_bound);
+                    return Err(GenerateError::IncompatibleNumericBounds {
+                        numeric_type: std::any::type_name::<N>(),
+                        bound_direction: BoundDirection::Minimum,
+                        mechanical_bound: mechanical_min_bound,
+                        specified_bound: *min_bound,
+                    });
                 }
             }
 
             if let Some(max_bound) = maximum {
                 if *max_bound > mechanical_max_bound {
-                    panic!("invalid maximum in range validation for {}: has mechanical upper bound of {}, but {} was given", std::any::type_name::<N>(), mechanical_max_bound, max_bound);
+                    return Err(GenerateError::IncompatibleNumericBounds {
+                        numeric_type: std::any::type_name::<N>(),
+                        bound_direction: BoundDirection::Maximum,
+                        mechanical_bound: mechanical_max_bound,
+                        specified_bound: *max_bound,
+                    });
                 }
             }
         }
     }
+
+    Ok(())
 }

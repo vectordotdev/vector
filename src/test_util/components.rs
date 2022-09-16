@@ -26,8 +26,8 @@ use crate::{
 /// The most basic set of tags for sources, regardless of whether or not they pull data or have it pushed in.
 pub const SOURCE_TAGS: [&str; 1] = ["protocol"];
 
-/// The most basic set of error tags for sources, regardless of whether or not they pull data or have it pushed in.
-pub const SOURCE_ERROR_TAGS: [&str; 1] = ["error_type"];
+/// The most basic set of error tags for components.
+pub const COMPONENT_ERROR_TAGS: [&str; 1] = ["error_type"];
 
 /// The standard set of tags for sources that have their data pushed in from an external source.
 pub const PUSH_SOURCE_TAGS: [&str; 2] = ["endpoint", "protocol"];
@@ -89,8 +89,8 @@ pub static SOURCE_TESTS: Lazy<ComponentTests> = Lazy::new(|| ComponentTests {
     ],
 });
 
-/// The component error test specification for all sources.
-pub static SOURCE_TESTS_ERROR: Lazy<ComponentTests> = Lazy::new(|| ComponentTests {
+/// The component error test specification (sources and sinks).
+pub static COMPONENT_TESTS_ERROR: Lazy<ComponentTests> = Lazy::new(|| ComponentTests {
     events: &["Error"],
     tagged_counters: &["component_errors_total"],
     untagged_counters: &[],
@@ -141,7 +141,7 @@ pub static COMPONENT_MULTIPLE_OUTPUTS_TESTS: Lazy<ComponentTests> = Lazy::new(||
 });
 
 impl ComponentTests {
-    /// Run the test specification, and assert that all tests passed
+    /// Run the test specification, and assert that all tests passed.
     #[track_caller]
     pub fn assert(&self, tags: &[&str]) {
         let mut test = ComponentTester::new();
@@ -237,9 +237,8 @@ impl ComponentTester {
 
     fn emitted_all_events(&mut self, names: &[&str]) {
         for name in names {
-            if !event_test_util::contains_name(name) {
-                self.errors
-                    .push(format!("  - Missing emitted event `{}`", name));
+            if let Err(err_msg) = event_test_util::contains_name_once(name) {
+                self.errors.push(format!("  - {}", err_msg));
             }
         }
     }
@@ -309,7 +308,7 @@ where
         |_| {},
         Some(timeout),
         None,
-        &SOURCE_TESTS_ERROR,
+        &COMPONENT_TESTS_ERROR,
         tags,
     )
     .await
@@ -455,6 +454,31 @@ pub async fn run_and_assert_nonsending_sink_compliance<S, I>(
     I: Into<EventArray>,
 {
     assert_nonsending_sink_compliance(tags, async move {
+        let events = events.map(Into::into);
+        sink.run(events).await.expect("Running sink failed")
+    })
+    .await;
+}
+
+/// Convenience wrapper for running sink error tests
+#[track_caller]
+pub async fn assert_sink_error<T>(tags: &[&str], f: impl Future<Output = T>) -> T {
+    init_test();
+
+    let result = f.await;
+
+    COMPONENT_TESTS_ERROR.assert(tags);
+
+    result
+}
+
+#[track_caller]
+pub async fn run_and_assert_sink_error<S, I>(sink: VectorSink, events: S, tags: &[&str])
+where
+    S: Stream<Item = I> + Send,
+    I: Into<EventArray>,
+{
+    assert_sink_error(tags, async move {
         let events = events.map(Into::into);
         sink.run(events).await.expect("Running sink failed")
     })

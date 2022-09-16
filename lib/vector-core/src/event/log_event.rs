@@ -12,7 +12,8 @@ use std::{
 };
 
 use crossbeam_utils::atomic::AtomicCell;
-use lookup::{lookup_v2::Path, LookupBuf};
+use lookup::lookup_v2::TargetPath;
+use lookup::PathPrefix;
 use serde::{Deserialize, Serialize, Serializer};
 use vector_common::{
     json_encoded_size_of::{EstimatedJsonEncodedSizeOf, JsonEncodedByteCountingValue},
@@ -261,16 +262,12 @@ impl LogEvent {
         self.metadata.add_finalizer(finalizer);
     }
 
-    pub fn get<'a>(&self, key: impl Path<'a>) -> Option<&Value> {
-        self.inner.fields.get(key)
-    }
-
-    pub fn lookup(&self, path: &LookupBuf) -> Option<&Value> {
-        self.inner.fields.get_by_path(path)
-    }
-
-    pub fn lookup_mut(&mut self, path: &LookupBuf) -> Option<&mut Value> {
-        self.value_mut().get_by_path_mut(path)
+    #[allow(clippy::needless_pass_by_value)] // TargetPath is always a reference
+    pub fn get<'a>(&self, key: impl TargetPath<'a>) -> Option<&Value> {
+        match key.prefix() {
+            PathPrefix::Event => self.inner.fields.get(key.value_path()),
+            PathPrefix::Metadata => self.metadata.value().get(key.value_path()),
+        }
     }
 
     pub fn get_by_meaning(&self, meaning: impl AsRef<str>) -> Option<&Value> {
@@ -288,20 +285,39 @@ impl LogEvent {
             .map(std::string::ToString::to_string)
     }
 
-    pub fn get_mut<'a>(&mut self, path: impl Path<'a>) -> Option<&mut Value> {
-        self.value_mut().get_mut(path)
+    #[allow(clippy::needless_pass_by_value)] // TargetPath is always a reference
+    pub fn get_mut<'a>(&mut self, path: impl TargetPath<'a>) -> Option<&mut Value> {
+        match path.prefix() {
+            PathPrefix::Event => self.value_mut().get_mut(path.value_path()),
+            PathPrefix::Metadata => self.metadata.value_mut().get_mut(path.value_path()),
+        }
     }
 
-    pub fn contains<'a>(&self, path: impl Path<'a>) -> bool {
-        self.value().get(path).is_some()
+    #[allow(clippy::needless_pass_by_value)] // TargetPath is always a reference
+    pub fn contains<'a>(&self, path: impl TargetPath<'a>) -> bool {
+        match path.prefix() {
+            PathPrefix::Event => self.value().contains(path.value_path()),
+            PathPrefix::Metadata => self.metadata.value().contains(path.value_path()),
+        }
     }
 
-    pub fn insert<'a>(&mut self, path: impl Path<'a>, value: impl Into<Value>) -> Option<Value> {
-        self.value_mut().insert(path, value.into())
+    #[allow(clippy::needless_pass_by_value)] // TargetPath is always a reference
+    pub fn insert<'a>(
+        &mut self,
+        path: impl TargetPath<'a>,
+        value: impl Into<Value>,
+    ) -> Option<Value> {
+        match path.prefix() {
+            PathPrefix::Event => self.value_mut().insert(path.value_path(), value.into()),
+            PathPrefix::Metadata => self
+                .metadata
+                .value_mut()
+                .insert(path.value_path(), value.into()),
+        }
     }
 
     // deprecated - using this means the schema is unknown
-    pub fn try_insert<'a>(&mut self, path: impl Path<'a>, value: impl Into<Value>) {
+    pub fn try_insert<'a>(&mut self, path: impl TargetPath<'a>, value: impl Into<Value>) {
         if !self.contains(path.clone()) {
             self.insert(path, value);
         }
@@ -310,18 +326,22 @@ impl LogEvent {
     /// Rename a key
     ///
     /// If `to_key` already exists in the structure its value will be overwritten.
-    pub fn rename_key<'a>(&mut self, from: impl Path<'a>, to: impl Path<'a>) {
+    pub fn rename_key<'a>(&mut self, from: impl TargetPath<'a>, to: impl TargetPath<'a>) {
         if let Some(val) = self.remove(from) {
             self.insert(to, val);
         }
     }
 
-    pub fn remove<'a>(&mut self, path: impl Path<'a>) -> Option<Value> {
+    pub fn remove<'a>(&mut self, path: impl TargetPath<'a>) -> Option<Value> {
         self.remove_prune(path, false)
     }
 
-    pub fn remove_prune<'a>(&mut self, path: impl Path<'a>, prune: bool) -> Option<Value> {
-        self.value_mut().remove(path, prune)
+    #[allow(clippy::needless_pass_by_value)] // TargetPath is always a reference
+    pub fn remove_prune<'a>(&mut self, path: impl TargetPath<'a>, prune: bool) -> Option<Value> {
+        match path.prefix() {
+            PathPrefix::Event => self.value_mut().remove(path.value_path(), prune),
+            PathPrefix::Metadata => self.metadata.value_mut().remove(path.value_path(), prune),
+        }
     }
 
     pub fn keys(&self) -> Option<impl Iterator<Item = String> + '_> {
@@ -583,7 +603,7 @@ impl tracing::field::Visit for LogEvent {
 mod test {
     use super::*;
     use crate::test_util::open_fixture;
-    use lookup::path;
+    use lookup::event_path;
     use vrl_lib::value;
 
     // The following two tests assert that renaming a key has no effect if the
@@ -596,7 +616,7 @@ mod test {
         });
 
         let mut base = LogEvent::from_parts(value.clone(), EventMetadata::default());
-        base.rename_key(path!("one"), path!("one"));
+        base.rename_key(event_path!("one"), event_path!("one"));
         let (actual_fields, _) = base.into_parts();
 
         assert_eq!(value, actual_fields);
@@ -609,7 +629,7 @@ mod test {
         });
 
         let mut base = LogEvent::from_parts(value.clone(), EventMetadata::default());
-        base.rename_key(path!("three"), path!("three"));
+        base.rename_key(event_path!("three"), event_path!("three"));
         let (actual_fields, _) = base.into_parts();
 
         assert_eq!(value, actual_fields);
@@ -624,7 +644,7 @@ mod test {
         });
 
         let mut base = LogEvent::from_parts(value.clone(), EventMetadata::default());
-        base.rename_key(path!("three"), path!("four"));
+        base.rename_key(event_path!("three"), event_path!("four"));
         let (actual_fields, _) = base.into_parts();
 
         assert_eq!(value, actual_fields);
@@ -643,7 +663,7 @@ mod test {
         expected_value.insert("three", one);
 
         let mut base = LogEvent::from_parts(value, EventMetadata::default());
-        base.rename_key(path!("one"), path!("three"));
+        base.rename_key(event_path!("one"), event_path!("three"));
         let (actual_fields, _) = base.into_parts();
 
         assert_eq!(expected_value, actual_fields);
@@ -663,7 +683,7 @@ mod test {
         expected_value.insert("two", val);
 
         let mut base = LogEvent::from_parts(value, EventMetadata::default());
-        base.rename_key(path!("one"), path!("two"));
+        base.rename_key(event_path!("one"), event_path!("two"));
         let (actual_value, _) = base.into_parts();
 
         assert_eq!(expected_value, actual_value);
@@ -716,7 +736,7 @@ mod test {
         log.try_insert("foo.bar", "foo");
 
         assert_eq!(log.get("foo.bar"), Some(&"foo".into()));
-        assert_eq!(log.get(path!("foo.bar")), None);
+        assert_eq!(log.get(event_path!("foo.bar")), None);
     }
 
     #[test]
@@ -727,46 +747,46 @@ mod test {
         log.try_insert("foo.bar", "bar");
 
         assert_eq!(log.get("foo.bar"), Some(&"foo".into()));
-        assert_eq!(log.get(path!("foo.bar")), None);
+        assert_eq!(log.get(event_path!("foo.bar")), None);
     }
 
     #[test]
     fn try_insert_flat() {
         let mut log = LogEvent::default();
 
-        log.try_insert(path!("foo"), "foo");
+        log.try_insert(event_path!("foo"), "foo");
 
-        assert_eq!(log.get(path!("foo")), Some(&"foo".into()));
+        assert_eq!(log.get(event_path!("foo")), Some(&"foo".into()));
     }
 
     #[test]
     fn try_insert_flat_existing() {
         let mut log = LogEvent::default();
-        log.insert(path!("foo"), "foo");
+        log.insert(event_path!("foo"), "foo");
 
-        log.try_insert(path!("foo"), "bar");
+        log.try_insert(event_path!("foo"), "bar");
 
-        assert_eq!(log.get(path!("foo")), Some(&"foo".into()));
+        assert_eq!(log.get(event_path!("foo")), Some(&"foo".into()));
     }
 
     #[test]
     fn try_insert_flat_dotted() {
         let mut log = LogEvent::default();
 
-        log.try_insert(path!("foo.bar"), "foo");
+        log.try_insert(event_path!("foo.bar"), "foo");
 
-        assert_eq!(log.get(path!("foo.bar")), Some(&"foo".into()));
+        assert_eq!(log.get(event_path!("foo.bar")), Some(&"foo".into()));
         assert_eq!(log.get("foo.bar"), None);
     }
 
     #[test]
     fn try_insert_flat_existing_dotted() {
         let mut log = LogEvent::default();
-        log.insert(path!("foo.bar"), "foo");
+        log.insert(event_path!("foo.bar"), "foo");
 
-        log.try_insert(path!("foo.bar"), "bar");
+        log.try_insert(event_path!("foo.bar"), "bar");
 
-        assert_eq!(log.get(path!("foo.bar")), Some(&"foo".into()));
+        assert_eq!(log.get(event_path!("foo.bar")), Some(&"foo".into()));
         assert_eq!(log.get("foo.bar"), None);
     }
 

@@ -188,7 +188,7 @@ impl Function for Encrypt {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let plaintext = arguments.required("plaintext");
         let algorithm = arguments.required("algorithm");

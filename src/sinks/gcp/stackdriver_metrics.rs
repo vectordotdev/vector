@@ -10,7 +10,7 @@ use http::Uri;
 use vector_config::configurable_component;
 
 use crate::{
-    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     event::{Event, Metric, MetricValue},
     gcp::{GcpAuthConfig, GcpAuthenticator},
     http::HttpClient,
@@ -36,7 +36,7 @@ impl SinkBatchSettings for StackdriverMetricsDefaultBatchSettings {
 }
 
 /// Configuration for the `gcp_stackdriver_metrics` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("gcp_stackdriver_metrics"))]
 #[derive(Clone, Debug, Default)]
 pub struct StackdriverConfig {
     /// The project ID to which to publish metrics.
@@ -85,12 +85,7 @@ fn default_metric_namespace_value() -> String {
 
 impl_generate_config_from_default!(StackdriverConfig);
 
-inventory::submit! {
-    SinkDescription::new::<StackdriverConfig>("gcp_stackdriver_metrics")
-}
-
 #[async_trait::async_trait]
-#[typetag::serde(name = "gcp_stackdriver_metrics")]
 impl SinkConfig for StackdriverConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let auth = self.auth.build(Scope::MonitoringWrite).await?;
@@ -128,10 +123,6 @@ impl SinkConfig for StackdriverConfig {
 
     fn input(&self) -> Input {
         Input::metric()
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "gcp_stackdriver_metrics"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

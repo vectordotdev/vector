@@ -56,6 +56,14 @@ This is ideal for users who want it to "Just work" and just want to start contri
 export CONTAINER_TOOL="podman"
 ```
 
+If your Linux environment runs SELinux in Enforcing mode, you will need to relabel the vector source code checkout with `container_home_t` context. Otherwise the container environment cannot read/write the code:
+
+```bash
+cd your/checkout/of/vector/
+sudo semanage fcontext -a "${PWD}(/.*)?" -t container_file_t
+sudo restorecon . -R
+```
+
 By default, `make environment` style tasks will do a `docker pull` from Github's container repository, you can **optionally** build your own environment while you make your morning coffee ☕:
 
 ```bash
@@ -110,7 +118,7 @@ To build Vector on your own host will require a fairly complete development envi
 
 Loosely, you'll need the following:
 
-- **To build Vector:** Have working Rustup, Protobuf tools, C++/C build tools (LLVM, GCC, or MSVC), Python, and Perl, `make` (the GNU one preferably), `bash`, `cmake`, and `autotools`.
+- **To build Vector:** Have working Rustup, Protobuf tools, C++/C build tools (LLVM, GCC, or MSVC), Python, and Perl, `make` (the GNU one preferably), `bash`, `cmake`, `GNU coreutils`, and `autotools`.
 - **To run integration tests:** Have `docker` available, or a real live version of that service. (Use `AUTOSPAWN=false`)
 - **To run `make check-component-features`:** Have `remarshal` installed.
 

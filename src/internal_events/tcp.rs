@@ -3,12 +3,12 @@ use std::net::SocketAddr;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
-use super::prelude::{error_stage, error_type};
 use crate::tls::TlsError;
+use vector_common::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct TcpSocketConnectionEstablished {
-    pub peer_addr: Option<std::net::SocketAddr>,
+    pub peer_addr: Option<SocketAddr>,
 }
 
 impl InternalEvent for TcpSocketConnectionEstablished {
@@ -187,6 +187,35 @@ impl InternalEvent for TcpBytesReceived {
             "component_received_bytes_total", self.byte_size as u64,
             "protocol" => "tcp",
             "peer_addr" => self.peer_addr.to_string()
+        );
+    }
+}
+
+pub struct TcpSocketReceiveError<E> {
+    pub error: E,
+}
+
+impl<E: std::fmt::Display> InternalEvent for TcpSocketReceiveError<E> {
+    fn emit(self) {
+        error!(
+            message = "TCP socket receive error.",
+            error = %self.error,
+            error_code = "socket_failed",
+            error_type = error_type::READER_FAILED,
+            stage = error_stage::RECEIVING,
+            internal_log_rate_secs = 10,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "socket_failed",
+            "error_type" => error_type::READER_FAILED,
+            "stage" => error_stage::RECEIVING,
+            "mode" => "tcp",
+        );
+        // deprecated
+        counter!(
+            "connection_errors_total", 1,
+            "mode" => "tcp",
         );
     }
 }

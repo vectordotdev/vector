@@ -43,7 +43,7 @@ impl Function for Merge {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let to = arguments.required("to");
         let from = arguments.required("from");

@@ -1,7 +1,11 @@
+use crate::{
+    emit,
+    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
+};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
-use super::prelude::{error_stage, error_type};
+use vector_common::internal_event::{error_stage, error_type};
 
 pub struct TemplateRenderingError<'a> {
     pub field: Option<&'a str>,
@@ -17,39 +21,30 @@ impl<'a> InternalEvent for TemplateRenderingError<'a> {
             let _ = write!(msg, " for \"{}\"", field);
         }
         msg.push('.');
-        if self.drop_event {
-            error!(
-                message = "Events dropped.",
-                count = 1,
-                error = %self.error,
-                error_type = error_type::TEMPLATE_FAILED,
-                intentional = false,
-                reason = %msg,
-                stage = error_stage::PROCESSING,
-            );
-        } else {
-            error!(
-                message = %msg,
-                error = %self.error,
-                error_type = error_type::TEMPLATE_FAILED,
-                stage = error_stage::PROCESSING,
-            )
-        }
+
+        error!(
+            message = %msg,
+            error = %self.error,
+            error_type = error_type::TEMPLATE_FAILED,
+            stage = error_stage::PROCESSING,
+        );
+
         counter!(
             "component_errors_total", 1,
             "error_type" => error_type::TEMPLATE_FAILED,
             "stage" => error_stage::PROCESSING,
         );
+
         // deprecated
         counter!("processing_errors_total", 1,
             "error_type" => "render_error");
+
         if self.drop_event {
-            counter!(
-                "component_discarded_events_total", 1,
-                "error_type" => error_type::TEMPLATE_FAILED,
-                "intentional" => "false",
-                "stage" => error_stage::PROCESSING,
-            );
+            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                count: 1,
+                reason: "Failed to render template.",
+            });
+
             // deprecated
             counter!("events_discarded_total", 1);
         }

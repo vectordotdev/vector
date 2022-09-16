@@ -45,8 +45,7 @@ pub use self::compile_config::CompileConfig;
 pub use self::deprecation_warning::DeprecationWarning;
 pub use compiler::{CompilationResult, Compiler};
 pub use core::{
-    value, ExpressionError, MetadataTarget, Resolved, SecretTarget, Target, TargetValue,
-    TargetValueRef,
+    value, ExpressionError, Resolved, SecretTarget, Target, TargetValue, TargetValueRef,
 };
 
 use std::fmt::Debug;

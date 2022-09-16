@@ -17,7 +17,7 @@ use crate::{
 };
 
 /// Configuration for the `test_basic` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("test_basic"))]
 #[derive(Clone, Debug, Default)]
 pub struct BasicSinkConfig {
     #[serde(skip)]
@@ -69,7 +69,6 @@ enum HealthcheckError {
 }
 
 #[async_trait]
-#[typetag::serde(name = "test_basic")]
 impl SinkConfig for BasicSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         // If this sink is set to not be healthy, just send the healthcheck error immediately over
@@ -96,10 +95,6 @@ impl SinkConfig for BasicSinkConfig {
 
     fn input(&self) -> Input {
         Input::all()
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "test_basic"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

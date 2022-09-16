@@ -6,9 +6,15 @@ use tonic::body::BoxBody;
 use tower::ServiceBuilder;
 use vector_config::configurable_component;
 
+use super::{
+    service::{VectorResponse, VectorService},
+    sink::VectorSink,
+    VectorSinkError,
+};
 use crate::{
     config::{
-        AcknowledgementsConfig, GenerateConfig, ProxyConfig, SinkContext, SinkHealthcheckOptions,
+        AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext,
+        SinkHealthcheckOptions,
     },
     proto::vector as proto,
     sinks::{
@@ -16,21 +22,19 @@ use crate::{
             retries::RetryLogic, BatchConfig, RealtimeEventBasedDefaultBatchSettings,
             ServiceBuilderExt, TowerRequestConfig,
         },
-        vector::v2::{
-            service::{VectorResponse, VectorService},
-            sink::VectorSink,
-            VectorSinkError,
-        },
         Healthcheck, VectorSink as VectorSinkType,
     },
     tls::{tls_connector_builder, MaybeTlsSettings, TlsEnableableConfig},
 };
 
-/// Configuration for version two of the `vector` sink.
-#[configurable_component]
+/// Configuration for the `vector` sink.
+#[configurable_component(sink("vector"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct VectorConfig {
+    /// Version of the configuration.
+    version: Option<super::VectorConfigVersion>,
+
     /// The downstream Vector address to connect to.
     ///
     /// The address _must_ include a port.
@@ -73,6 +77,7 @@ impl GenerateConfig for VectorConfig {
 
 fn default_config(address: &str) -> VectorConfig {
     VectorConfig {
+        version: None,
         address: address.to_owned(),
         compression: false,
         batch: BatchConfig::default(),
@@ -82,11 +87,9 @@ fn default_config(address: &str) -> VectorConfig {
     }
 }
 
-impl VectorConfig {
-    pub(crate) async fn build(
-        &self,
-        cx: SinkContext,
-    ) -> crate::Result<(VectorSinkType, Healthcheck)> {
+#[async_trait::async_trait]
+impl SinkConfig for VectorConfig {
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSinkType, Healthcheck)> {
         let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
         let uri = with_default_scheme(&self.address, tls.is_tls())?;
 
@@ -117,6 +120,14 @@ impl VectorConfig {
             VectorSinkType::from_event_streamsink(sink),
             Box::pin(healthcheck),
         ))
+    }
+
+    fn input(&self) -> Input {
+        Input::all()
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
