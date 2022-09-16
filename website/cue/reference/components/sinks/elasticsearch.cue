@@ -255,8 +255,9 @@ components: sinks: elasticsearch: {
 		endpoints: {
 			description: "The Elasticsearch endpoints to send logs to. This should be the full URL as shown in the example."
 			required:    true
-			type: list: {
+			type: array: {
 				examples: [["http://10.24.32.122:9000"], ["https://example.com", "https://user:password@example.com"]]
+				items: type: string: {}
 			}
 		}
 		id_key: {
