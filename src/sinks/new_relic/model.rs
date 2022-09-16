@@ -60,11 +60,12 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
 
         for buf_event in buf_events {
             if let Event::Metric(metric) = buf_event {
-                // Generate BTreeMap<String, Value> from &BTreeMap<String, String>
-                let attr = if let Some(tags) = metric.tags() {
+                // Generate Value::Object() from BTreeMap<String, String>
+                let (series, data, _) = metric.into_parts();
+                let attr = if let Some(tags) = series.tags {
                     let mut bt = BTreeMap::new();
                     for (key, value) in tags {
-                        bt.insert(key.clone(), Value::from(value.clone()));
+                        bt.insert(key, Value::from(value));
                     }
                     Some(Value::from(bt))
                 }
@@ -72,16 +73,16 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
                     None
                 };
 
-                match metric.value() {
+                match data.value {
                     MetricValue::Gauge { value } | MetricValue::Counter { value } => {
                         metric_array.push((
-                            Value::from(metric.name().to_owned()),
+                            Value::from(series.name.name),
                             Value::from(
-                                NotNan::new(*value).map_err(|_| {
-                                    NewRelicSinkError::new(format!("NaN value not supported, metric name: {} , value: {}", metric.name(), *value).as_str())
+                                NotNan::new(value).map_err(|_| {
+                                    NewRelicSinkError::new("NaN value not supported")
                                 })?,
                             ),
-                            Value::from(metric.timestamp()),
+                            Value::from(data.time.timestamp),
                             attr,
                         ));
                     },
