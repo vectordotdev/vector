@@ -15,7 +15,6 @@ use crate::{
     event::{EventRef, LogEvent, Value},
     http::HttpClient,
     internal_events::TemplateRenderingError,
-    serde::OneOrMany,
     sinks::{
         elasticsearch::{
             health::ElasticsearchHealthLogic,
@@ -45,11 +44,17 @@ pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ElasticsearchConfig {
-    /// The Elasticsearch endpoint(s) to send logs to.
+    /// DEPRECATED
+    /// The Elasticsearch endpoint to send logs to.
     ///
     /// This should be the full URL as shown in the example.
-    #[configurable(derived)]
-    pub endpoint: OneOrMany<String>,
+    pub endpoint: Option<String>,
+
+    /// The Elasticsearch endpoints to send logs to.
+    ///
+    /// This should be the full URL as shown in the example.
+    #[serde(default)]
+    pub endpoints: Vec<String>,
 
     /// The `doc_type` for your index data.
     ///
@@ -456,7 +461,7 @@ mod tests {
     fn parse_aws_auth() {
         toml::from_str::<ElasticsearchConfig>(
             r#"
-            endpoint = ""
+            endpoints = [""]
             auth.strategy = "aws"
             auth.assume_role = "role"
         "#,
@@ -465,7 +470,7 @@ mod tests {
 
         toml::from_str::<ElasticsearchConfig>(
             r#"
-            endpoint = ""
+            endpoints = [""]
             auth.strategy = "aws"
         "#,
         )
@@ -476,7 +481,7 @@ mod tests {
     fn parse_mode() {
         let config = toml::from_str::<ElasticsearchConfig>(
             r#"
-            endpoint = ""
+            endpoints = [""]
             mode = "data_stream"
             data_stream.type = "synthetics"
         "#,
@@ -490,7 +495,7 @@ mod tests {
     fn parse_distribution() {
         toml::from_str::<ElasticsearchConfig>(
             r#"
-            endpoint = ["", ""]
+            endpoints = ["", ""]
             distribution.retry_initial_backoff_secs = 10
         "#,
         )

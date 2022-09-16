@@ -185,4 +185,8 @@ pub enum ParseError {
     RegionRequired,
     #[snafu(display("Endpoint option must be specified"))]
     EndpointRequired,
+    #[snafu(display(
+        "`endpoint` and `endpoints` options are mutually exclusive. Please use `endpoints` option."
+    ))]
+    EndpointsExclusive,
 }

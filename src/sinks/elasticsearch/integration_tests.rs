@@ -107,7 +107,7 @@ async fn ensure_pipeline_in_params() {
     let pipeline = String::from("test-pipeline");
 
     let config = ElasticsearchConfig {
-        endpoint: "http://localhost:9200".to_string().into(),
+        endpoints: vec!["http://localhost:9200".to_string()],
         bulk: Some(BulkConfig {
             index: Some(index),
             action: None,
@@ -126,7 +126,7 @@ async fn ensure_pipeline_in_params() {
 async fn structures_events_correctly() {
     let index = gen_index();
     let config = ElasticsearchConfig {
-        endpoint: http_server().into(),
+        endpoints: vec![http_server()],
         bulk: Some(BulkConfig {
             index: Some(index.clone()),
             action: None,
@@ -208,7 +208,7 @@ async fn insert_events_over_http() {
 
     run_insert_tests(
         ElasticsearchConfig {
-            endpoint: http_server().into(),
+            endpoints: vec![http_server()],
             doc_type: Some("log_lines".into()),
             compression: Compression::None,
             ..config()
@@ -229,7 +229,7 @@ async fn insert_events_over_https() {
                 user: "elastic".into(),
                 password: "vector".into(),
             }),
-            endpoint: https_server().into(),
+            endpoints: vec![https_server()],
             doc_type: Some("log_lines".into()),
             compression: Compression::None,
             tls: Some(TlsConfig {
@@ -253,7 +253,7 @@ async fn insert_events_on_aws() {
             auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
                 load_timeout_secs: Some(5),
             })),
-            endpoint: aws_server().into(),
+            endpoints: vec![aws_server()],
             aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
             ..config()
         },
@@ -272,7 +272,7 @@ async fn insert_events_on_aws_with_compression() {
             auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
                 load_timeout_secs: Some(5),
             })),
-            endpoint: aws_server().into(),
+            endpoints: vec![aws_server()],
             aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
             compression: Compression::gzip_default(),
             ..config()
@@ -289,7 +289,7 @@ async fn insert_events_with_failure() {
 
     run_insert_tests(
         ElasticsearchConfig {
-            endpoint: http_server().into(),
+            endpoints: vec![http_server()],
             doc_type: Some("log_lines".into()),
             compression: Compression::None,
             ..config()
@@ -307,7 +307,7 @@ async fn insert_events_in_data_stream() {
     let stream_index = format!("my-stream-{}", gen_index());
 
     let cfg = ElasticsearchConfig {
-        endpoint: http_server().into(),
+        endpoints: vec![http_server()],
         mode: ElasticsearchMode::DataStream,
         bulk: Some(BulkConfig {
             index: Some(stream_index.clone()),
@@ -340,7 +340,7 @@ async fn distributed_insert_events() {
             user: "elastic".into(),
             password: "vector".into(),
         }),
-        endpoint: vec![https_server(), http_server()].into(),
+        endpoints: vec![https_server(), http_server()],
         doc_type: Some("log_lines".into()),
         compression: Compression::None,
         tls: Some(TlsConfig {
@@ -363,7 +363,7 @@ async fn distributed_insert_events_failover() {
     run_insert_tests(
         ElasticsearchConfig {
             // A valid endpoint and some random non elasticsearch endpoint
-            endpoint: vec![http_server(), "http://localhost:2347".into()].into(),
+            endpoints: vec![http_server(), "http://localhost:2347".into()],
             doc_type: Some("log_lines".into()),
             compression: Compression::None,
             ..config()

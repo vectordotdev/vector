@@ -77,7 +77,7 @@ async fn firehose_put_records() {
         auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
             load_timeout_secs: Some(5),
         })),
-        endpoint: elasticsearch_address().into(),
+        endpoints: vec![elasticsearch_address()],
         bulk: Some(BulkConfig {
             index: Some(stream.clone()),
             action: None,

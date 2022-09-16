@@ -24,7 +24,7 @@ async fn sets_create_action_when_configured() {
             action: Some(String::from("{{ action }}te")),
             index: Some(String::from("vector")),
         }),
-        endpoint: String::from("https://example.com").into(),
+        endpoints: vec![String::from("https://example.com")],
         ..Default::default()
     };
     let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
@@ -71,7 +71,7 @@ async fn encode_datastream_mode() {
             action: None,
             index: Some(String::from("vector")),
         }),
-        endpoint: String::from("https://example.com").into(),
+        endpoints: vec![String::from("https://example.com")],
         mode: ElasticsearchMode::DataStream,
         ..Default::default()
     };
@@ -112,7 +112,7 @@ async fn encode_datastream_mode_no_routing() {
             action: None,
             index: Some(String::from("vector")),
         }),
-        endpoint: String::from("https://example.com").into(),
+        endpoints: vec![String::from("https://example.com")],
         mode: ElasticsearchMode::DataStream,
         data_stream: Some(DataStreamConfig {
             auto_routing: false,
@@ -153,7 +153,7 @@ async fn handle_metrics() {
             action: Some(String::from("create")),
             index: Some(String::from("vector")),
         }),
-        endpoint: String::from("https://example.com").into(),
+        endpoints: vec![String::from("https://example.com")],
         ..Default::default()
     };
     let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
@@ -194,7 +194,7 @@ async fn decode_bulk_action_error() {
             action: Some(String::from("{{ action }}")),
             index: Some(String::from("vector")),
         }),
-        endpoint: String::from("https://example.com").into(),
+        endpoints: vec![String::from("https://example.com")],
         ..Default::default()
     };
     let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
@@ -213,7 +213,7 @@ async fn decode_bulk_action() {
             action: Some(String::from("create")),
             index: Some(String::from("vector")),
         }),
-        endpoint: String::from("https://example.com").into(),
+        endpoints: vec![String::from("https://example.com")],
         ..Default::default()
     };
     let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
@@ -234,7 +234,7 @@ async fn encode_datastream_mode_no_sync() {
             action: None,
             index: Some(String::from("vector")),
         }),
-        endpoint: String::from("https://example.com").into(),
+        endpoints: vec![String::from("https://example.com")],
         mode: ElasticsearchMode::DataStream,
         data_stream: Some(DataStreamConfig {
             namespace: Template::try_from("something").unwrap(),
@@ -283,7 +283,7 @@ async fn allows_using_except_fields() {
             None,
         )
         .unwrap(),
-        endpoint: String::from("https://example.com").into(),
+        endpoints: vec![String::from("https://example.com")],
         ..Default::default()
     };
     let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
@@ -317,7 +317,7 @@ async fn allows_using_only_fields() {
             index: Some(String::from("{{ idx }}")),
         }),
         encoding: Transformer::new(Some(vec!["foo".to_string().into()]), None, None).unwrap(),
-        endpoint: String::from("https://example.com").into(),
+        endpoints: vec![String::from("https://example.com")],
         ..Default::default()
     };
     let es = ElasticsearchCommon::parse_single(&config).await.unwrap();

@@ -117,7 +117,7 @@ components: sinks: elasticsearch: {
 				options: {
 					region: {
 						common:      true
-						description: "The [AWS region](\(urls.aws_regions)) of the target service. This defaults to the region named in the endpoint parameter, or the value of the `$AWS_REGION` or `$AWS_DEFAULT_REGION` environment variables if that cannot be determined, or \"us-east-1\"."
+						description: "The [AWS region](\(urls.aws_regions)) of the target service. This defaults to the region named in the endpoints parameter, or the value of the `$AWS_REGION` or `$AWS_DEFAULT_REGION` environment variables if that cannot be determined, or \"us-east-1\"."
 						required:    false
 						type: string: {
 							default: null
@@ -252,11 +252,11 @@ components: sinks: elasticsearch: {
 				default: "_doc"
 			}
 		}
-		endpoint: {
-			description: "The Elasticsearch endpoint(s) to send logs to. This should be the full URL as shown in the example."
+		endpoints: {
+			description: "The Elasticsearch endpoints to send logs to. This should be the full URL as shown in the example."
 			required:    true
-			type: string: {
-				examples: ["http://10.24.32.122:9000", "https://example.com", "https://user:password@example.com"]
+			type: list: {
+				examples: [["http://10.24.32.122:9000"], ["https://example.com", "https://user:password@example.com"]]
 			}
 		}
 		id_key: {
@@ -370,7 +370,7 @@ components: sinks: elasticsearch: {
 		distribution: {
 			title: "Distribution"
 			body: """
-				If multiple endpoints are specified in `endpoint` option, events will be distributed among them
+				If multiple endpoints are specified in `endpoints` option, events will be distributed among them
 				according to their estimated load with failover.
 
 				Rate limit is applied to the sink as a whole, while concurrency settings manage each endpoint individually.

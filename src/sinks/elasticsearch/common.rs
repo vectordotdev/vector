@@ -12,7 +12,6 @@ use snafu::ResultExt;
 use super::{
     request_builder::ElasticsearchRequestBuilder, ElasticsearchEncoder, InvalidHostSnafu, Request,
 };
-use crate::serde::OneOrMany;
 use crate::{
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
@@ -143,19 +142,22 @@ impl ElasticsearchCommon {
 
     /// Parses endpoints into a vector ElasticsearchCommons. The resulting vector is guaranteed to not be empty.
     pub async fn parse_many(config: &ElasticsearchConfig) -> crate::Result<Vec<Self>> {
-        Ok(match config.endpoint {
-            OneOrMany::One(ref endpoint) => vec![Self::parse_config(config, endpoint).await?],
-            OneOrMany::Many(ref endpoints) if endpoints.is_empty() => {
-                return Err(ParseError::EndpointRequired.into())
+        if let Some(endpoint) = config.endpoint.as_ref() {
+            warn!(message = "DEPRECATION, use of deprecated option `endpoint`. Please use `endpoints` option instead.");
+            if config.endpoints.is_empty() {
+                Ok(vec![Self::parse_config(config, endpoint).await?])
+            } else {
+                Err(ParseError::EndpointsExclusive.into())
             }
-            OneOrMany::Many(ref endpoints) => {
-                let mut commons = Vec::new();
-                for endpoint in endpoints {
-                    commons.push(Self::parse_config(config, endpoint).await?);
-                }
-                commons
+        } else if config.endpoints.is_empty() {
+            Err(ParseError::EndpointRequired.into())
+        } else {
+            let mut commons = Vec::new();
+            for endpoint in config.endpoints.iter() {
+                commons.push(Self::parse_config(config, endpoint).await?);
             }
-        })
+            Ok(commons)
+        }
     }
 
     /// Parses a single endpoint, else panics.
