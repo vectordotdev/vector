@@ -29,7 +29,7 @@ use crate::{
     },
     sinks::util::{
         builder::SinkBuilderExt,
-        metadata::{RequestMetadata, RequestMetadataBuilder},
+        metadata::RequestMetadataBuilder,
         request_builder::EncodeResult,
         service::{ServiceBuilderExt, Svc},
         Compression, RequestBuilder,
@@ -118,7 +118,7 @@ impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
         input: (PartitionKey, Vec<LokiRecord>),
     ) -> (Self::Metadata, Self::Events) {
         let (key, mut events) = input;
-        let metadata_builder = RequestMetadata::builder(&events);
+        let metadata_builder = RequestMetadataBuilder::from_events(&events);
         let finalizers = events.take_finalizers();
 
         ((key.tenant_id, finalizers, metadata_builder), events)

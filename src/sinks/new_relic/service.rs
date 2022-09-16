@@ -13,6 +13,7 @@ use http::{
 use hyper::Body;
 use tower::Service;
 use tracing::Instrument;
+use vector_common::metadata::RequestMetadata;
 use vector_core::{
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_event::EventsSent,
@@ -22,7 +23,7 @@ use vector_core::{
 use super::{NewRelicCredentials, NewRelicSinkError};
 use crate::{
     http::{get_http_scheme_from_uri, HttpClient},
-    sinks::util::{metadata::RequestMetadata, Compression},
+    sinks::util::Compression,
 };
 
 #[derive(Debug, Clone)]

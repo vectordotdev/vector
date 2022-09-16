@@ -47,6 +47,8 @@ pub use finalizer::EmptyStream;
 
 pub mod internal_event;
 
+pub mod metadata;
+
 pub mod shutdown;
 
 #[cfg(feature = "tokenize")]

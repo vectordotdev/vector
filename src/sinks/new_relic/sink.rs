@@ -17,9 +17,7 @@ use crate::{
     codecs::Transformer,
     event::Event,
     sinks::util::{
-        builder::SinkBuilderExt,
-        metadata::{RequestMetadata, RequestMetadataBuilder},
-        request_builder::EncodeResult,
+        builder::SinkBuilderExt, metadata::RequestMetadataBuilder, request_builder::EncodeResult,
         Compression, RequestBuilder, StreamSink,
     },
 };
@@ -95,7 +93,7 @@ impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
             self.transformer.transform(event);
         }
 
-        let metadata_builder = RequestMetadata::builder(&input);
+        let metadata_builder = RequestMetadataBuilder::from_events(&input);
 
         let finalizers = input.take_finalizers();
         let api_model = || -> Result<NewRelicApiModel, Self::Error> {

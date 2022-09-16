@@ -9,12 +9,12 @@ use http::{
 use hyper::Body;
 use tower::Service;
 use vector_core::{internal_event::EventsSent, stream::DriverResponse};
+use vector_common::metadata::RequestMetadata;
 
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
     gcp::GcpAuthenticator,
     http::{get_http_scheme_from_uri, HttpClient, HttpError},
-    sinks::util::metadata::RequestMetadata,
 };
 
 #[derive(Debug, Clone)]

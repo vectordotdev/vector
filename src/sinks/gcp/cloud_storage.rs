@@ -28,12 +28,9 @@ use crate::{
             sink::GcsSink,
         },
         util::{
-            batch::BatchConfig,
-            metadata::{RequestMetadata, RequestMetadataBuilder},
-            partitioner::KeyPartitioner,
-            request_builder::EncodeResult,
-            BulkSizeBasedDefaultBatchSettings, Compression, RequestBuilder, ServiceBuilderExt,
-            TowerRequestConfig,
+            batch::BatchConfig, metadata::RequestMetadataBuilder, partitioner::KeyPartitioner,
+            request_builder::EncodeResult, BulkSizeBasedDefaultBatchSettings, Compression,
+            RequestBuilder, ServiceBuilderExt, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -276,7 +273,7 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
 
     fn split_input(&self, input: (String, Vec<Event>)) -> (Self::Metadata, Self::Events) {
         let (partition_key, mut events) = input;
-        let metadata_builder = RequestMetadata::builder(&events);
+        let metadata_builder = RequestMetadataBuilder::from_events(&events);
         let finalizers = events.take_finalizers();
 
         ((partition_key, finalizers, metadata_builder), events)

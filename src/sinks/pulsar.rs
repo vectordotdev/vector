@@ -15,8 +15,11 @@ use pulsar::{
 };
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
-use vector_common::internal_event::{
-    ByteSize, BytesSent, EventsSent, InternalEventHandle as _, Protocol, Registered,
+use vector_common::{
+    internal_event::{
+        ByteSize, BytesSent, EventsSent, InternalEventHandle as _, Protocol, Registered,
+    },
+    metadata::RequestMetadata,
 };
 use vector_config::configurable_component;
 use vector_core::config::log_schema;
@@ -26,7 +29,7 @@ use crate::{
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::{Event, EventFinalizers, EventStatus, Finalizable},
     internal_events::PulsarSendingError,
-    sinks::util::metadata::RequestMetadata,
+    sinks::util::metadata::RequestMetadataBuilder,
 };
 
 #[derive(Debug, Snafu)]
@@ -289,7 +292,7 @@ impl Sink<Event> for PulsarSink {
                 .and_then(|v| v.as_timestamp().map(|dt| dt.timestamp_millis()))
         });
 
-        let metadata_builder = RequestMetadata::builder(&event);
+        let metadata_builder = RequestMetadataBuilder::from_events(&event);
         self.transformer.transform(&mut event);
 
         let finalizers = event.take_finalizers();

@@ -60,11 +60,9 @@ use crate::{
             sink::S3Sink,
         },
         util::{
-            metadata::{RequestMetadata, RequestMetadataBuilder},
-            partitioner::KeyPartitioner,
-            request_builder::EncodeResult,
-            BatchConfig, Compression, RequestBuilder, ServiceBuilderExt, SinkBatchSettings,
-            TowerRequestConfig,
+            metadata::RequestMetadataBuilder, partitioner::KeyPartitioner,
+            request_builder::EncodeResult, BatchConfig, Compression, RequestBuilder,
+            ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig,
         },
         VectorSink,
     },
@@ -688,7 +686,7 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogGcsRequestBuilder {
 
     fn split_input(&self, input: (String, Vec<Event>)) -> (Self::Metadata, Self::Events) {
         let (partition_key, mut events) = input;
-        let metadata_builder = RequestMetadata::builder(&events);
+        let metadata_builder = RequestMetadataBuilder::from_events(&events);
         let finalizers = events.take_finalizers();
 
         ((partition_key, finalizers, metadata_builder), events)

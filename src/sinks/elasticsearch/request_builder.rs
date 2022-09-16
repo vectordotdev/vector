@@ -8,7 +8,10 @@ use crate::{
             encoder::{ElasticsearchEncoder, ProcessedEvent},
             service::ElasticsearchRequest,
         },
-        util::{request_builder::EncodeResult, Compression, RequestBuilder},
+        util::{
+            metadata::RequestMetadataBuilder, request_builder::EncodeResult, Compression,
+            RequestBuilder,
+        },
     },
 };
 
@@ -25,7 +28,7 @@ pub struct Metadata {
 }
 
 impl RequestBuilder<Vec<ProcessedEvent>> for ElasticsearchRequestBuilder {
-    type Metadata = Metadata;
+    type Metadata = (Metadata, RequestMetadataBuilder);
     type Events = Vec<ProcessedEvent>;
     type Encoder = ElasticsearchEncoder;
     type Payload = Bytes;
@@ -47,12 +50,14 @@ impl RequestBuilder<Vec<ProcessedEvent>> for ElasticsearchRequestBuilder {
             .reduce(|a, b| a + b)
             .unwrap_or(0);
 
+        let metadata_builder = RequestMetadataBuilder::from_events(&events);
+
         let metadata = Metadata {
             finalizers: events.take_finalizers(),
             batch_size: events.len(),
             events_byte_size,
         };
-        (metadata, events)
+        ((metadata, metadata_builder), events)
     }
 
     fn build_request(
@@ -60,11 +65,13 @@ impl RequestBuilder<Vec<ProcessedEvent>> for ElasticsearchRequestBuilder {
         metadata: Self::Metadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
+        let (metadata, metadata_builder) = metadata;
         ElasticsearchRequest {
             payload: payload.into_payload(),
             finalizers: metadata.finalizers,
             batch_size: metadata.batch_size,
             events_byte_size: metadata.events_byte_size,
+            metadata: metadata_builder.build(&payload),
         }
     }
 }

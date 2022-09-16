@@ -12,6 +12,7 @@ use snafu::Snafu;
 use std::io;
 use tokio_util::codec::Encoder as _;
 use tower::{Service, ServiceBuilder};
+use vector_common::metadata::RequestMetadata;
 use vector_config::configurable_component;
 use vector_core::{
     config::{AcknowledgementsConfig, Input},
@@ -32,7 +33,7 @@ use crate::{
         },
         util::{
             encoding::{as_tracked_write, Encoder},
-            metadata::{RequestMetadata, RequestMetadataBuilder},
+            metadata::RequestMetadataBuilder,
             partitioner::KeyPartitioner,
             request_builder::EncodeResult,
             BatchConfig, Compression, RequestBuilder, SinkBatchSettings, TowerRequestConfig,
@@ -370,7 +371,7 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
         let (partition_key, mut events) = input;
         let finalizers = events.take_finalizers();
 
-        let metadata = RequestMetadata::builder(&events);
+        let metadata = RequestMetadataBuilder::from_events(&events);
         ((finalizers, metadata), (partition_key, events))
     }
 
