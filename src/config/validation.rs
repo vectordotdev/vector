@@ -199,12 +199,16 @@ pub fn check_buffer_preconditions(config: &Config) -> Result<(), Vec<String>> {
     // More subtly, we need to make sure we properly map a given buffer's data directory to the
     // appropriate mountpoint, as it is technically possible that individual buffers could be on
     // separate mountpoints.
+    //
+    // Notably, this does *not* cover other data usage by Vector on the same mountpoint because we
+    // don't always know the upper bound of that usage i.e. file checkpoint state.
 
-    // Query all the disks on the system, sorted by by their mountpoint -- longest to shortest --
+    // Query all the disks on the system, sorted by their mountpoint -- longest to shortest --
     // and create a map of mountpoint => total capacity.
     //
     // This is so that we can find the most specific mountpoint for a given disk buffer just by
-    // iterating from the beginning to end for the first prefix path.
+    // iterating in normal beginning-to-end fashion until we find a mountpoint path that is a prefix
+    // of the buffer's data directory path.
     let mut system_info = System::new();
     system_info.refresh_disks_list();
     system_info.sort_disks_by(|a, b| b.mount_point().cmp(a.mount_point()));
