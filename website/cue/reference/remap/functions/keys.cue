@@ -3,7 +3,7 @@ package metadata
 remap: functions: values: {
 	category: "Type"
 	description: """
-		Returns the `values` from the object passed into the function
+		Returns the `keys` from the object passed into the function
 		"""
 
 	arguments: [
@@ -17,7 +17,7 @@ remap: functions: values: {
 	return: {
 		types: ["array"]
 		rules: [
-			#"Returns an array for all the values"#,
+			#"Returns an array for all the keys"#,
 		]
 	}
 	examples: [
@@ -27,7 +27,7 @@ remap: functions: values: {
 			source: #"""
 				values({"key1": "val1", "key2": "val2"})
 				"""#
-			return: ["val1", "val2"]
+			return: ["key1", "key2"]
 		},
 	]
 }

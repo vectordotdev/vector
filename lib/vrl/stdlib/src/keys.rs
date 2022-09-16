@@ -1,32 +1,31 @@
 use ::value::Value;
-use vrl::prelude::*;
-use vrl::Function;
-use vrl::function::Example;
-use vrl::state::TypeState;
-use vrl::function::FunctionCompileContext;
 use vrl::function::ArgumentList;
 use vrl::function::Compiled;
+use vrl::function::Example;
+use vrl::function::FunctionCompileContext;
+use vrl::prelude::*;
+use vrl::state::TypeState;
 use vrl::Expression;
+use vrl::Function;
 
 fn keys(value: Value) -> Resolved {
     let mut vec: Vec<Value> = Vec::new();
     let value_btree = value.try_object()?;
-    
+
     for (k, _v) in value_btree {
         vec.push(Value::Bytes(Bytes::from(k.clone())))
     }
     Ok(Value::Array(vec))
 }
 
-
 #[derive(Debug)]
- pub struct Keys;
+pub struct Keys;
 
- impl Function for Keys {
+impl Function for Keys {
     fn identifier(&self) -> &'static str {
         "keys"
     }
-    
+
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
@@ -36,7 +35,18 @@ fn keys(value: Value) -> Resolved {
     }
 
     fn examples(&self) -> &'static [Example] {
-        unimplemented!();
+        &[
+            Example {
+                title: "get keys",
+                source: r#"keys({"key1": "val1", "key2": "val2"})"#,
+                result: Ok(r#"["key1", "key2"]"#),
+            },
+            Example {
+                title: "get keys",
+                source: r#"keys({"key3": "val3", "key4": "val4"})"#,
+                result: Ok(r#"["key3", "key4"]"#),
+            },
+        ]
     }
     fn compile(
         &self,
@@ -45,24 +55,21 @@ fn keys(value: Value) -> Resolved {
         arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
-        Ok(KeysFn{ value }.as_expr())
+        Ok(KeysFn { value }.as_expr())
     }
+}
 
- }
-
- #[derive(Debug, Clone)]
- struct KeysFn {
+#[derive(Debug, Clone)]
+struct KeysFn {
     value: Box<dyn Expression>,
 }
 
- impl FunctionExpression for KeysFn {
+impl FunctionExpression for KeysFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         keys(self.value.resolve(ctx)?)
     }
 
     fn type_def(&self, _state: &state::TypeState) -> TypeDef {
-
         TypeDef::array(Collection::empty().with_unknown(Kind::bytes())).infallible()
-         
     }
- }
+}

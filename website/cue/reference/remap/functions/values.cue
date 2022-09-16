@@ -1,38 +1,33 @@
 package metadata
 
-remap: functions: float: {
+remap: functions: values: {
 	category: "Type"
 	description: """
-		Returns the `value` if it's a float and errors otherwise. This enables the type checker to guarantee that the
-		returned value is a float and can be used in any function that expects one.
+		Returns the `values` from the object passed into the function
 		"""
 
 	arguments: [
 		{
 			name:        "value"
-			description: "The value that you need to ensure is a float."
+			description: "The value that you need to ensure is an object containing keys and values."
 			required:    true
 			type: ["any"]
 		},
 	]
-	internal_failure_reasons: [
-		"`value` isn't a float.",
-	]
 	return: {
-		types: ["float"]
+		types: ["array"]
 		rules: [
-			#"Returns the `value` if it's a float."#,
-			#"Raises an error if not a float."#,
+			#"Returns an array for all the values"#,
 		]
 	}
 	examples: [
 		{
-			title: "Declare a float type"
-			input: log: value: 42.0
+			title: "Get values from key value object"
+			input: log: value:
 			source: #"""
-				float!(.value)
+				values({"key1": "val1", "key2": "val2"})
 				"""#
-			return: input.log.value
+			return: ["val1", "val2"]
 		},
 	]
 }
