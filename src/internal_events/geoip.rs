@@ -4,11 +4,6 @@ use metrics::counter;
 use vector_common::internal_event::{error_stage, error_type};
 use vector_core::internal_event::InternalEvent;
 
-use crate::{
-    emit,
-    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
-};
-
 #[derive(Debug)]
 pub struct GeoipIpAddressParseError<'a> {
     pub(crate) error: AddrParseError,
@@ -17,9 +12,8 @@ pub struct GeoipIpAddressParseError<'a> {
 
 impl<'a> InternalEvent for GeoipIpAddressParseError<'a> {
     fn emit(self) {
-        let reason = format!("IP Address not parsed correctly: {:?}.", self.error);
         error!(
-            message = &reason,
+            message = format!("IP Address not parsed correctly: {:?}.", self.error),
             error_code = "invalid_ip_address",
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
@@ -38,10 +32,5 @@ impl<'a> InternalEvent for GeoipIpAddressParseError<'a> {
             "processing_errors_total", 1,
             "error_type" => "type_ip_address_parse_error",
         );
-
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
-            count: 1,
-            reason: &reason
-        });
     }
 }
