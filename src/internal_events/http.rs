@@ -89,7 +89,7 @@ impl<'a> InternalEvent for HttpBadRequest<'a> {
             error_type = error_type::REQUEST_FAILED,
             error_stage = error_stage::RECEIVING,
             http_code = %self.code,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -117,7 +117,7 @@ impl<'a> InternalEvent for HttpDecompressError<'a> {
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::RECEIVING,
             encoding = %self.encoding,
-            internal_log_rate_secs = 10
+            internal_log_rate_limit = true
         );
         counter!(
             "component_errors_total", 1,
@@ -140,7 +140,7 @@ impl InternalEvent for HttpInternalError {
             message = %self.message,
             error_type = error_type::CONNECTION_FAILED,
             stage = error_stage::RECEIVING,
-            internal_log_rate_secs = 10
+            internal_log_rate_limit = true
         );
         counter!(
             "component_errors_total", 1,

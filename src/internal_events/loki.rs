@@ -23,7 +23,7 @@ impl InternalEvent for LokiOutOfOrderEventDropped {
         debug!(
             message = "Received out-of-order events; dropping events.",
             count = %self.count,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!("events_discarded_total", self.count as u64,
                 "reason" => "out_of_order"); // deprecated
@@ -44,7 +44,7 @@ impl InternalEvent for LokiOutOfOrderEventRewritten {
         debug!(
             message = "Received out-of-order events, rewriting timestamps.",
             count = %self.count,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!("processing_errors_total", 1,
                 "error_type" => "out_of_order"); // deprecated

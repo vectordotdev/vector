@@ -249,7 +249,7 @@ fn line_to_events(mut decoder: Decoder, line: String) -> SmallVec<[Event; 1]> {
         warn!(
             message = "Line didn't match expected logplex format, so raw message is forwarded.",
             fields = parts.len(),
-            internal_log_rate_secs = 10
+            internal_log_rate_limit = true
         );
 
         events.push(LogEvent::from_str_legacy(line).into())

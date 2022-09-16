@@ -45,6 +45,7 @@ fn get_root_opts(config_path: PathBuf) -> RootOpts {
         threads: None,
         verbose: 0,
         quiet: 3,
+        internal_log_rate_limit: 10,
         log_format: LogFormat::from_str("text").unwrap(),
         color: Color::from_str("auto").unwrap(),
         watch_config: false,

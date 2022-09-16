@@ -64,7 +64,7 @@ impl<'a> InternalEvent for EncoderFramingError<'a> {
             error = %self.error,
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!("encoder_framing_errors_total", 1);
         counter!(
@@ -89,7 +89,7 @@ impl<'a> InternalEvent for EncoderSerializeError<'a> {
             error = %self.error,
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!("encoder_serialize_errors_total", 1);
         counter!(

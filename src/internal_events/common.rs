@@ -128,14 +128,14 @@ impl<'a, const INTENTIONAL: bool> InternalEvent for ComponentEventsDropped<'a, I
                 message,
                 intentional = INTENTIONAL,
                 reason = self.reason,
-                internal_log_rate_secs = 10,
+                internal_log_rate_limit = true,
             );
         } else {
             error!(
                 message,
                 intentional = INTENTIONAL,
                 reason = self.reason,
-                internal_log_rate_secs = 10,
+                internal_log_rate_limit = true,
             );
         }
         counter!(
