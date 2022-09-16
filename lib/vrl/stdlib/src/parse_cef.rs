@@ -2,7 +2,7 @@ use ::value::Value;
 use nom::{
     self,
     branch::alt,
-    bytes::complete::{escaped_transform, tag, take_till1},
+    bytes::complete::{escaped_transform, tag, take_till1, take_until},
     character::complete::{char, one_of, satisfy},
     combinator::{map, opt, value},
     error::{ErrorKind, ParseError, VerboseError},
@@ -45,6 +45,13 @@ impl Function for ParseCef {
                 ),
             },
             Example {
+                title: "with syslog prefix",
+                source: r#"parse_cef!("Sep 29 08:26:10 host CEF:1|Security|threatmanager|1.0|100|worm successfully stopped|10|")"#,
+                result: Ok(
+                    r#"{"cefVersion":"1","deviceVendor":"Security","deviceProduct":"threatmanager","deviceVersion":"1.0","deviceEventClassId":"100","name":"worm successfully stopped","severity":"10"}"#,
+                ),
+            },
+            Example {
                 title: "escapes",
                 source: r#"parse_cef!(s'CEF:0|security|threatmanager|1.0|100|Detected a \| in message. No action needed.|10|src=10.0.0.1 msg=Detected a threat.\n No action needed act=blocked a \= dst=1.1.1.1')"#,
                 result: Ok(
@@ -65,20 +72,6 @@ impl Function for ParseCef {
         Ok(ParseCefFn { value }.as_expr())
     }
 }
-
-// Version is an integer, delay type cast and type resolution until georges responds.
-
-// TODO: Parse Syslog header? Nope.
-
-// key=value whitespace key=value ...
-// Value can contain whitespace
-// Value trailling whitespaces belong to value except for the last one before a key
-// Final value can't have trailling whitespaces
-// If an equal sign (=) is used in the extensions, it has to be escaped with a backslash (\). Equal signs in the header need no escaping.
-// Multi-line fields can be sent by CEF by encoding the newline character as \n or \r . Note that multiple lines are only allowed in the value part of the extensions.
-
-// If a pipe (|) is used in the header, it has to be escaped with a backslash (\). But note that pipes in the extension do not need escaping.
-// If a backslash (\) is used in the header or the extension, it has to be escaped with another backslash (\).
 
 #[derive(Clone, Debug)]
 pub(crate) struct ParseCefFn {
@@ -136,7 +129,10 @@ fn parse<'a>(input: &'a str) -> Result<impl Iterator<Item = (String, Value)> + '
 }
 
 fn parse_header<'a>(input: &'a str) -> IResult<&'a str, Vec<String>, VerboseError<&'a str>> {
-    preceded(tag("CEF:"), count(parse_header_value, 7))(input)
+    preceded(
+        pair(take_until("CEF:"), tag("CEF:")),
+        count(parse_header_value, 7),
+    )(input)
 }
 
 fn parse_header_value<'a>(input: &'a str) -> IResult<&'a str, String, VerboseError<&'a str>> {
@@ -256,6 +252,26 @@ mod test {
                 ("spt".to_string(),"1232".into())
             ]),
             parse("CEF:1|Security|threatmanager|1.0|100|worm successfully stopped|10|src=10.0.0.1 dst=2.1.2.2 spt=1232")
+                .map(|iter| iter.collect())
+        );
+    }
+
+    #[test]
+    fn test_ignore_syslog_prefix() {
+        assert_eq!(
+            Ok(vec![
+                ("cefVersion".to_string(), "1".into()),
+                ("deviceVendor".to_string(), "Security".into()),
+                ("deviceProduct".to_string(), "threatmanager".into()),
+                ("deviceVersion".to_string(), "1.0".into()),
+                ("deviceEventClassId".to_string(), "100".into()),
+                ("name".to_string(), "worm successfully stopped".into()),
+                ("severity".to_string(), "10".into()),
+                ("src".to_string(), "10.0.0.1".into()),
+                ("dst".to_string(), "2.1.2.2".into()),
+                ("spt".to_string(),"1232".into())
+            ]),
+            parse("Sep 29 08:26:10 host CEF:1|Security|threatmanager|1.0|100|worm successfully stopped|10|src=10.0.0.1 dst=2.1.2.2 spt=1232")
                 .map(|iter| iter.collect())
         );
     }

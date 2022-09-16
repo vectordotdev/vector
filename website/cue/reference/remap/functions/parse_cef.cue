@@ -3,7 +3,7 @@ package metadata
 remap: functions: parse_cef: {
 	category: "Parse"
 	description: """
-		Parses the `value` in CEF(Common Event Format) format.
+		Parses the `value` in CEF(Common Event Format) format. Ignores everything up to CEF header.
 		"""
 	notices: [
 		"""
@@ -56,6 +56,26 @@ remap: functions: parse_cef: {
 				"cs3":                    "https://1.1.1.1/incidents/52b06812ec3500ed864c461e"
 				"cs4Label":               "ExternalLink"
 				"cs4":                    "None"
+			}
+		},
+		{
+			title: "Ignore syslog header"
+			source: #"""
+				parse_cef!(
+					"Sep 29 08:26:10 host CEF:1|Security|threatmanager|1.0|100|worm successfully stopped|10|src=10.0.0.1 dst=2.1.2.2 spt=1232"
+				)
+				"""#
+			return: {
+				"cefVersion":         "1"
+				"deviceVendor":       "Security"
+				"deviceProduct":      "threatmanager"
+				"deviceVersion":      "1.0"
+				"deviceEventClassId": "100"
+				"name":               "worm successfully stopped"
+				"severity":           "10"
+				"src":                "10.0.0.1"
+				"dst":                "2.1.2.2"
+				"spt":                "1232"
 			}
 		},
 
