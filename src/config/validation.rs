@@ -1,6 +1,8 @@
 use crate::config::schema;
 use crate::topology::schema::merged_definition;
+use indexmap::IndexMap;
 use std::collections::HashMap;
+use sysinfo::{DiskExt, System, SystemExt};
 use vector_core::internal_event::DEFAULT_OUTPUT;
 
 use super::{
@@ -178,6 +180,111 @@ pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
         {
             errors.push(format!(
                 "Transform {key} cannot have a named output with reserved name: `{DEFAULT_OUTPUT}`"
+            ));
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors)
+    }
+}
+
+pub fn check_buffer_preconditions(config: &Config) -> Result<(), Vec<String>> {
+    // We need to assert that Vector's data directory is located on a mountpoint that has enough
+    // capacity to allow all sinks with disk buffers configured to be able to use up to their
+    // maximum configured size without overrunning the total capacity.
+    //
+    // More subtly, we need to make sure we properly map a given buffer's data directory to the
+    // appropriate mountpoint, as it is technically possible that individual buffers could be on
+    // separate mountpoints.
+
+    // Query all the disks on the system, sorted by by their mountpoint -- longest to shortest --
+    // and create a map of mountpoint => total capacity.
+    //
+    // This is so that we can find the most specific mountpoint for a given disk buffer just by
+    // iterating from the beginning to end for the first prefix path.
+    let mut system_info = System::new();
+    system_info.refresh_disks_list();
+    system_info.sort_disks_by(|a, b| b.mount_point().cmp(a.mount_point()));
+    let mountpoints = system_info
+        .disks()
+        .iter()
+        .map(|disk| (disk.mount_point().to_path_buf(), disk.total_space()))
+        .collect::<IndexMap<_, _>>();
+
+    // Now build a mapping of buffer IDs/usage configuration to the mountpoint they reside on.
+    let global_data_dir = config.global.data_dir.clone();
+    let mountpoint_buffer_mapping = config
+        .sinks()
+        .flat_map(|(id, sink)| {
+            sink.buffer
+                .stages()
+                .iter()
+                .filter_map(|stage| stage.disk_usage(global_data_dir.clone(), id))
+        })
+        .fold(HashMap::new(), |mut mappings, usage| {
+            let mountpoint = mountpoints
+                .keys()
+                .find(|mountpoint| usage.data_dir().starts_with(mountpoint));
+
+            match mountpoint {
+                // TODO: Should this actually be an error?
+                //
+                // My inclination is that because we're trying to stop operators from landing in bad
+                // outcomes, like running out of space and panicking/corrupting some of the buffer
+                // data, we would want to be authoritative: if we can't be sure the mountpoints are
+                // large enough, we don't validate the configuration.
+                //
+                // On the other hand, we need to be sure this code works correctly on all of our
+                // "tier 1" platforms -- i.e. Linux, Windows, macOS, and in containerized
+                // environments -- before we could feel confident enough, I think, to block Vector
+                // startup on such a validation.
+                //
+                // If we can indeed show that this code works correctly on those environments, such
+                // that we can be reasonably confident that normal users won't encounter errors that
+                // hamstring them, then maybe we could make this an actual failure instead of just a
+                // warning log.
+                None => warn!(
+                    buffer_id = usage.id().id(),
+                    buffer_data_dir = usage.data_dir().to_string_lossy().as_ref(),
+                    message = "Found no matching mountpoint for buffer data directory.",
+                ),
+                Some(mountpoint) => {
+                    let entries = mappings.entry(mountpoint.clone()).or_insert_with(Vec::new);
+
+                    entries.push(usage);
+                }
+            }
+
+            mappings
+        });
+
+    // Finally, we have a mapping of disk buffers, based on their underlying mountpoint. Go through
+    // and check to make sure the sum total of `max_size` for all buffers associated with each
+    // mountpoint does not exceed that mountpoint's total capacity.
+    //
+    // We specifically do not do any sort of warning on free space because that has to be the
+    // responsibility of the operator to ensure there's enough total space for all buffers present.
+    let mut errors = Vec::new();
+
+    for (mountpoint, buffers) in mountpoint_buffer_mapping {
+        let buffer_max_size_total: u64 = buffers.iter().map(|usage| usage.max_size()).sum();
+        let mountpoint_total_capacity = mountpoints
+            .get(&mountpoint)
+            .copied()
+            .expect("mountpoint must exist");
+
+        if buffer_max_size_total > mountpoint_total_capacity {
+            let component_ids = buffers
+                .iter()
+                .map(|usage| usage.id().id())
+                .collect::<Vec<_>>();
+            errors.push(format!(
+                "Mountpoint '{}' has total capacity of {} bytes, but configured buffers using mountpoint have total maximum size of {} bytes. \
+Reduce the `max_size` of the buffers to fit within the total capacity of the mountpoint. (components associated with mountpoint: {})",
+                mountpoint.to_string_lossy(), mountpoint_total_capacity, buffer_max_size_total, component_ids.join(", "),
             ));
         }
     }

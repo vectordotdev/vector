@@ -7249,6 +7249,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "sysinfo"
+version = "0.26.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4ae2421f3e16b3afd4aa692d23b83d0ba42ee9b0081d5deeb7d21428d7195fb1"
+dependencies = [
+ "cfg-if 1.0.0",
+ "core-foundation-sys",
+ "libc",
+ "ntapi",
+ "once_cell",
+ "winapi 0.3.9",
+]
+
+[[package]]
 name = "syslog"
 version = "6.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8571,6 +8585,7 @@ dependencies = [
  "socket2",
  "stream-cancel",
  "strip-ansi-escapes",
+ "sysinfo",
  "syslog",
  "tempfile",
  "tikv-jemallocator",
