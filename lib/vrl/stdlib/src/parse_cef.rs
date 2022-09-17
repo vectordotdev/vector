@@ -83,7 +83,7 @@ impl FunctionExpression for ParseCefFn {
         let bytes = self.value.resolve(ctx)?;
         let bytes = bytes.try_bytes_utf8_lossy()?;
 
-        parse(&bytes).map(|iter| iter.collect())
+        parse(&bytes).map(Iterator::collect)
     }
 
     fn type_def(&self, _: &state::TypeState) -> TypeDef {
@@ -91,7 +91,7 @@ impl FunctionExpression for ParseCefFn {
     }
 }
 
-fn parse<'a>(input: &'a str) -> Result<impl Iterator<Item = (String, Value)> + 'a> {
+fn parse(input: &str) -> Result<impl Iterator<Item = (String, Value)> + '_> {
     let (rest, (header, mut extension)) =
         pair(parse_header, parse_extension)(input).map_err(|e| match e {
             nom::Err::Error(e) | nom::Err::Failure(e) => {
@@ -102,10 +102,10 @@ fn parse<'a>(input: &'a str) -> Result<impl Iterator<Item = (String, Value)> + '
         })?;
 
     // Trim trailing whitespace on last extension value
-    extension.last_mut().map(|(_, value)| {
+    if let Some((_, value)) = extension.last_mut() {
         let suffix = value.trim_end_matches(' ');
         value.truncate(suffix.len());
-    });
+    }
 
     if rest.trim().is_empty() {
         let result = [
@@ -128,14 +128,14 @@ fn parse<'a>(input: &'a str) -> Result<impl Iterator<Item = (String, Value)> + '
     }
 }
 
-fn parse_header<'a>(input: &'a str) -> IResult<&'a str, Vec<String>, VerboseError<&'a str>> {
+fn parse_header(input: &str) -> IResult<&str, Vec<String>, VerboseError<&str>> {
     preceded(
         pair(take_until("CEF:"), tag("CEF:")),
         count(parse_header_value, 7),
     )(input)
 }
 
-fn parse_header_value<'a>(input: &'a str) -> IResult<&'a str, String, VerboseError<&'a str>> {
+fn parse_header_value(input: &str) -> IResult<&str, String, VerboseError<&str>> {
     preceded(
         opt(char('|')),
         escaped_transform(
@@ -146,19 +146,15 @@ fn parse_header_value<'a>(input: &'a str) -> IResult<&'a str, String, VerboseErr
     )(input)
 }
 
-fn parse_extension<'a>(
-    input: &'a str,
-) -> IResult<&'a str, Vec<(&'a str, String)>, VerboseError<&'a str>> {
+fn parse_extension(input: &str) -> IResult<&str, Vec<(&str, String)>, VerboseError<&str>> {
     alt((many1(parse_key_value), map(tag("|"), |_| vec![])))(input)
 }
 
-fn parse_key_value<'a>(
-    input: &'a str,
-) -> IResult<&'a str, (&'a str, String), VerboseError<&'a str>> {
+fn parse_key_value(input: &str) -> IResult<&str, (&str, String), VerboseError<&str>> {
     pair(parse_key, parse_value)(input)
 }
 
-fn parse_value<'a>(input: &'a str) -> IResult<&'a str, String, VerboseError<&'a str>> {
+fn parse_value(input: &str) -> IResult<&str, String, VerboseError<&str>> {
     escaped_transform(
         take_till1_input(|input| alt((tag("\\"), tag("="), parse_key))(input).is_ok()),
         '\\',
@@ -171,7 +167,7 @@ fn parse_value<'a>(input: &'a str) -> IResult<&'a str, String, VerboseError<&'a 
 }
 
 /// As take take_till1 but can have condition on input instead of Input::Item.
-fn take_till1_input<'a, F: Fn(&str) -> bool, Error: ParseError<&'a str>>(
+fn take_till1_input<'a, F: Fn(&'a str) -> bool, Error: ParseError<&'a str>>(
     cond: F,
 ) -> impl Fn(&'a str) -> IResult<&'a str, &'a str, Error> {
     move |input: &'a str| {
@@ -191,7 +187,7 @@ fn take_till1_input<'a, F: Fn(&str) -> bool, Error: ParseError<&'a str>>(
     }
 }
 
-fn parse_key<'a>(input: &'a str) -> IResult<&'a str, &'a str, VerboseError<&'a str>> {
+fn parse_key(input: &str) -> IResult<&str, &str, VerboseError<&str>> {
     delimited(
         alt((char(' '), char('|'))),
         take_till1(|c| c == ' ' || c == '=' || c == '\\'),
@@ -232,7 +228,7 @@ mod test {
                 ("severity".to_string(), "10".into()),
             ]),
             parse("CEF:1|Security|threatmanager|1.0|100|worm successfully stopped|10|")
-                .map(|iter| iter.collect())
+                .map(Iterator::collect)
         );
     }
 
@@ -252,7 +248,7 @@ mod test {
                 ("spt".to_string(),"1232".into())
             ]),
             parse("CEF:1|Security|threatmanager|1.0|100|worm successfully stopped|10|src=10.0.0.1 dst=2.1.2.2 spt=1232")
-                .map(|iter| iter.collect())
+                .map(Iterator::collect)
         );
     }
 
@@ -272,7 +268,7 @@ mod test {
                 ("spt".to_string(),"1232".into())
             ]),
             parse("Sep 29 08:26:10 host CEF:1|Security|threatmanager|1.0|100|worm successfully stopped|10|src=10.0.0.1 dst=2.1.2.2 spt=1232")
-                .map(|iter| iter.collect())
+                .map(Iterator::collect)
         );
     }
 
@@ -289,7 +285,7 @@ mod test {
                 ("severity".to_string(), "10".into()),
             ]),
             parse(r#"CEF:1|Security|threatmanager|1.0|100|worm \| successfully \| stopped|10|"#)
-                .map(|iter| iter.collect())
+                .map(Iterator::collect)
         );
     }
 
@@ -306,7 +302,7 @@ mod test {
                 ("severity".to_string(), "10".into()),
             ]),
             parse(r#"CEF:1|Security|threatmanager|1.0|100|worm \\ successfully \\ stopped|10|"#)
-                .map(|iter| iter.collect())
+                .map(Iterator::collect)
         );
     }
 
@@ -326,7 +322,7 @@ mod test {
                 ("spt".to_string(),"1232".into())
             ]),
             parse(r#"CEF:1|Security|threatmanager|1.0|100|worm successfully stopped|10|src=ip\=10.0.0.1 dst=2.1.2.2 spt=1232"#)
-                .map(|iter| iter.collect())
+                .map(Iterator::collect)
         );
     }
 
@@ -346,7 +342,7 @@ mod test {
                 ("spt".to_string(),"1232".into())
             ]),
             parse(r#"CEF:1|Security|threatmanager|1.0|100|worm successfully stopped|10|dst=2.1.2.2 path=\\home\\ spt=1232"#)
-                .map(|iter| iter.collect())
+                .map(Iterator::collect)
         );
     }
 
@@ -366,7 +362,7 @@ mod test {
                 ("spt".to_string(),"1232".into())
             ]),
             parse(r#"CEF:1|Security|threatmanager|1.0|100|worm successfully stopped|10|dst=2.1.2.2 msg=Detected a threat.\r No action needed spt=1232"#)
-                .map(|iter| iter.collect())
+                .map(Iterator::collect)
         );
     }
 
@@ -386,7 +382,7 @@ mod test {
                 ("spt".to_string(),"1232".into())
             ]),
             parse(r#"CEF:1|Security|threatmanager|1.0|100|worm successfully stopped|10|dst=2.1.2.2 msg=Detected a threat. No action needed   spt=1232"#)
-                .map(|iter| iter.collect())
+                .map(Iterator::collect)
         );
     }
 
@@ -405,7 +401,7 @@ mod test {
                 ("msg".to_string(), "Detected a threat. No action needed".into()),
             ]),
             parse(r#"CEF:1|Security|threatmanager|1.0|100|worm successfully stopped|10|dst=2.1.2.2 msg=Detected a threat. No action needed   "#)
-                .map(|iter| iter.collect())
+                .map(Iterator::collect)
         );
     }
 
