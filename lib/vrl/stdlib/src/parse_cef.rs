@@ -340,7 +340,7 @@ mod test {
                 ("deviceVersion".to_string(), "1.0".into()),
                 ("deviceEventClassId".to_string(), "100".into()),
                 ("name".to_string(), "worm successfully stopped".into()),
-                ("severity".to_string(), "10".into()),                
+                ("severity".to_string(), "10".into()),
                 ("dst".to_string(), "2.1.2.2".into()),
                 ("path".to_string(), "\\home\\".into()),
                 ("spt".to_string(),"1232".into())
@@ -360,7 +360,7 @@ mod test {
                 ("deviceVersion".to_string(), "1.0".into()),
                 ("deviceEventClassId".to_string(), "100".into()),
                 ("name".to_string(), "worm successfully stopped".into()),
-                ("severity".to_string(), "10".into()),                
+                ("severity".to_string(), "10".into()),
                 ("dst".to_string(), "2.1.2.2".into()),
                 ("msg".to_string(), "Detected a threat.\n No action needed".into()),
                 ("spt".to_string(),"1232".into())
@@ -380,7 +380,7 @@ mod test {
                 ("deviceVersion".to_string(), "1.0".into()),
                 ("deviceEventClassId".to_string(), "100".into()),
                 ("name".to_string(), "worm successfully stopped".into()),
-                ("severity".to_string(), "10".into()),                
+                ("severity".to_string(), "10".into()),
                 ("dst".to_string(), "2.1.2.2".into()),
                 ("msg".to_string(), "Detected a threat. No action needed  ".into()),
                 ("spt".to_string(),"1232".into())
@@ -400,7 +400,7 @@ mod test {
                 ("deviceVersion".to_string(), "1.0".into()),
                 ("deviceEventClassId".to_string(), "100".into()),
                 ("name".to_string(), "worm successfully stopped".into()),
-                ("severity".to_string(), "10".into()),                
+                ("severity".to_string(), "10".into()),
                 ("dst".to_string(), "2.1.2.2".into()),
                 ("msg".to_string(), "Detected a threat. No action needed".into()),
             ]),
