@@ -338,7 +338,7 @@ async fn distributed_insert_events() {
     let mut config = ElasticsearchConfig {
         auth: Some(ElasticsearchAuth::Basic {
             user: "elastic".into(),
-            password: "vector".to_string(),
+            password: "vector".to_string().into(),
         }),
         endpoints: vec![https_server(), http_server()],
         doc_type: Some("log_lines".into()),
