@@ -86,7 +86,8 @@ pub fn init(color: bool, json: bool, levels: &str, internal_log_rate_limit: u64)
         #[cfg(test)]
         let formatter = formatter.with_test_writer();
 
-        let rate_limited = RateLimitedLayer::new(formatter);
+        let rate_limited =
+            RateLimitedLayer::new(formatter).with_default_limit(internal_log_rate_limit);
         let subscriber = subscriber.with(rate_limited.with_filter(fmt_filter));
 
         let _ = subscriber.try_init();
@@ -98,7 +99,8 @@ pub fn init(color: bool, json: bool, levels: &str, internal_log_rate_limit: u64)
         #[cfg(test)]
         let formatter = formatter.with_test_writer();
 
-        let rate_limited = RateLimitedLayer::new(formatter);
+        let rate_limited =
+            RateLimitedLayer::new(formatter).with_default_limit(internal_log_rate_limit);
         let subscriber = subscriber.with(rate_limited.with_filter(fmt_filter));
 
         let _ = subscriber.try_init();
