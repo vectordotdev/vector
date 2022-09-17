@@ -4,6 +4,7 @@ use aws_config::{
     default_provider::credentials::DefaultCredentialsChain, sts::AssumeRoleProviderBuilder,
 };
 use aws_types::{credentials::SharedCredentialsProvider, region::Region, Credentials};
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
 // matches default load timeout from the SDK as of 0.10.1, but lets us confidently document the
@@ -19,10 +20,10 @@ pub enum AwsAuthentication {
     /// Authenticate using a fixed access key and secret pair.
     Static {
         /// The AWS access key ID.
-        access_key_id: String,
+        access_key_id: SensitiveString,
 
         /// The AWS secret access key.
-        secret_access_key: String,
+        secret_access_key: SensitiveString,
     },
 
     /// Authenticate using credentials stored in a file.
@@ -69,8 +70,8 @@ impl AwsAuthentication {
                 access_key_id,
                 secret_access_key,
             } => Ok(SharedCredentialsProvider::new(Credentials::from_keys(
-                access_key_id,
-                secret_access_key,
+                access_key_id.inner(),
+                secret_access_key.inner(),
                 None,
             ))),
             AwsAuthentication::File { .. } => {
@@ -97,8 +98,8 @@ impl AwsAuthentication {
     #[cfg(test)]
     pub fn test_auth() -> AwsAuthentication {
         AwsAuthentication::Static {
-            access_key_id: "dummy".to_string(),
-            secret_access_key: "dummy".to_string(),
+            access_key_id: "dummy".to_string().into(),
+            secret_access_key: "dummy".to_string().into(),
         }
     }
 }

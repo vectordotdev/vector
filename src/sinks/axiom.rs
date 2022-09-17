@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
 use crate::{
@@ -33,7 +34,7 @@ pub struct AxiomConfig {
     org_id: Option<String>,
 
     /// The Axiom API token.
-    token: String,
+    token: SensitiveString,
 
     /// The Axiom dataset to write to.
     dataset: String,
@@ -335,7 +336,7 @@ mod integration_tests {
 
         let config = AxiomConfig {
             url: Some(url.clone()),
-            token: token.clone(),
+            token: token.clone().into(),
             dataset: dataset.clone(),
             ..Default::default()
         };

@@ -62,6 +62,7 @@ urls: {
 	aws_kinesis_streams_api:                    "\(aws_docs)/kinesis/latest/APIReference/API_PutRecords.html"
 	aws_kinesis_streams_service_limits:         "\(aws_docs)/streams/latest/dev/service-sizes-and-limits.html"
 	aws_kinesis_split_shards:                   "\(aws_docs)/streams/latest/dev/kinesis-using-sdk-java-resharding-split.html"
+	aws_prometheus:                             "\(aws_docs)/prometheus"
 	aws_regions:                                "\(aws_docs)/AmazonRDS/latest/UserGuide/Concepts.RegionsAndAvailabilityZones.html"
 	aws_s3:                                     "https://aws.amazon.com/s3/"
 	aws_s3_acl:                                 "\(aws_docs)/AmazonS3/latest/dev/acl-overview.html"

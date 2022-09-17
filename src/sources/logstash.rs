@@ -109,7 +109,7 @@ impl SourceConfig for LogstashConfig {
 
 #[derive(Debug, Clone)]
 struct LogstashSource {
-    timestamp_converter: crate::types::Conversion,
+    timestamp_converter: types::Conversion,
 }
 
 impl TcpSource for LogstashSource {
@@ -357,8 +357,8 @@ impl Decoder for LogstashDecoder {
                     use LogstashProtocolVersion::*;
 
                     match LogstashProtocolVersion::try_from(src.get_u8())? {
-                        V1 => LogstashDecoderReadState::ReadType(LogstashProtocolVersion::V1),
-                        V2 => LogstashDecoderReadState::ReadType(LogstashProtocolVersion::V2),
+                        V1 => LogstashDecoderReadState::ReadType(V1),
+                        V2 => LogstashDecoderReadState::ReadType(V2),
                     }
                 }
                 LogstashDecoderReadState::ReadType(protocol) => {
@@ -369,23 +369,11 @@ impl Decoder for LogstashDecoder {
                     use LogstashFrameType::*;
 
                     match LogstashFrameType::try_from(src.get_u8())? {
-                        WindowSize => LogstashDecoderReadState::ReadFrame(
-                            protocol,
-                            LogstashFrameType::WindowSize,
-                        ),
-                        Data => {
-                            LogstashDecoderReadState::ReadFrame(protocol, LogstashFrameType::Data)
-                        }
-                        Json => {
-                            LogstashDecoderReadState::ReadFrame(protocol, LogstashFrameType::Json)
-                        }
-                        Compressed => LogstashDecoderReadState::ReadFrame(
-                            protocol,
-                            LogstashFrameType::Compressed,
-                        ),
-                        Ack => {
-                            LogstashDecoderReadState::ReadFrame(protocol, LogstashFrameType::Ack)
-                        }
+                        WindowSize => LogstashDecoderReadState::ReadFrame(protocol, WindowSize),
+                        Data => LogstashDecoderReadState::ReadFrame(protocol, Data),
+                        Json => LogstashDecoderReadState::ReadFrame(protocol, Json),
+                        Compressed => LogstashDecoderReadState::ReadFrame(protocol, Compressed),
+                        Ack => LogstashDecoderReadState::ReadFrame(protocol, Ack),
                     }
                 }
                 // The window size indicates how many events the writer will send before waiting
@@ -665,7 +653,7 @@ mod test {
         req.into()
     }
 
-    async fn send_req(address: std::net::SocketAddr, pairs: &[(&str, &str)], sends_ack: bool) {
+    async fn send_req(address: SocketAddr, pairs: &[(&str, &str)], sends_ack: bool) {
         let seq = thread_rng().gen_range(1..u32::MAX);
         let mut socket = tokio::net::TcpStream::connect(address).await.unwrap();
 
@@ -775,7 +763,7 @@ mod integration_tests {
         tls: Option<TlsEnableableConfig>,
     ) -> impl Stream<Item = Event> + Unpin {
         let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
-        let address: std::net::SocketAddr = address.parse().unwrap();
+        let address: SocketAddr = address.parse().unwrap();
         let tls_options = match tls {
             Some(options) => options,
             None => TlsEnableableConfig::default(),

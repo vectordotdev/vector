@@ -18,7 +18,7 @@ impl<'a> InternalEvent for HerokuLogplexRequestReceived<'a> {
             msg_count = %self.msg_count,
             frame_id = %self.frame_id,
             drain_token = %self.drain_token,
-            internal_log_rate_secs = 10
+            internal_log_rate_limit = true
         );
         counter!("requests_received_total", 1);
     }
@@ -34,7 +34,7 @@ impl InternalEvent for HerokuLogplexRequestReadError {
         error!(
             message = "Error reading request body.",
             error = ?self.error,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
             error_type = error_type::READER_FAILED,
             error_code = io_error_code(&self.error),
             stage = error_stage::PROCESSING,

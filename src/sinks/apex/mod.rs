@@ -4,6 +4,7 @@ use futures_util::SinkExt;
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
 use serde_json::json;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
 #[cfg(all(test, feature = "apex-integration-tests"))]
@@ -35,7 +36,7 @@ pub struct ApexSinkConfig {
     project_id: String,
 
     /// The API token to use to authenticate with Apex.
-    api_token: String,
+    api_token: SensitiveString,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -131,7 +132,10 @@ impl HttpSink for ApexSinkConfig {
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Bytes>> {
         let uri: Uri = self.uri.append_path("/add_events")?.uri;
         let request = Request::post(uri)
-            .header("Authorization", format!("Bearer {}", &self.api_token))
+            .header(
+                "Authorization",
+                format!("Bearer {}", self.api_token.inner()),
+            )
             .header("Content-Type", "application/json");
 
         let full_body_string = json!({
@@ -149,7 +153,10 @@ impl HttpSink for ApexSinkConfig {
 async fn healthcheck(config: ApexSinkConfig, client: HttpClient) -> crate::Result<()> {
     let uri = config.uri.with_default_parts();
     let request = Request::head(&uri.uri)
-        .header("Authorization", format!("Bearer {}", &config.api_token))
+        .header(
+            "Authorization",
+            format!("Bearer {}", config.api_token.inner()),
+        )
         .body(Body::empty())
         .unwrap();
     let response = client.send(request).await?;

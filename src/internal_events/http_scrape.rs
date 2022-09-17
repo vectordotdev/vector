@@ -49,7 +49,7 @@ impl InternalEvent for HttpScrapeHttpResponseError {
             stage = error_stage::RECEIVING,
             error_type = error_type::REQUEST_FAILED,
             error_code = %http_error_code(self.code.as_u16()),
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -77,7 +77,7 @@ impl InternalEvent for HttpScrapeHttpError {
             error = ?self.error,
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::RECEIVING,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,

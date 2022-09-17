@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use futures::stream::{BoxStream, StreamExt};
 use indoc::indoc;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
 use super::Region;
@@ -30,7 +31,7 @@ pub struct SematextLogsConfig {
     endpoint: Option<String>,
 
     /// The token that will be used to write to Sematext.
-    token: String,
+    token: SensitiveString,
 
     #[configurable(derived)]
     #[serde(
@@ -89,7 +90,7 @@ impl SinkConfig for SematextLogsConfig {
             ),
             bulk: Some(BulkConfig {
                 action: None,
-                index: Some(self.token.clone()),
+                index: Some(self.token.inner().to_owned()),
             }),
             batch: self.batch,
             request: RequestConfig {

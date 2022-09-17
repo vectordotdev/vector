@@ -338,7 +338,7 @@ fn remap_severity(severity: Value) -> Value {
                         warn!(
                             message = "Unknown severity value string, using DEFAULT.",
                             value = %s,
-                            internal_log_rate_secs = 10
+                            internal_log_rate_limit = true
                         );
                         0
                     }
@@ -349,7 +349,7 @@ fn remap_severity(severity: Value) -> Value {
             warn!(
                 message = "Unknown severity value type, using DEFAULT.",
                 ?value,
-                internal_log_rate_secs = 10
+                internal_log_rate_limit = true
             );
             0
         }
@@ -416,7 +416,7 @@ mod tests {
         // If we don't override the credentials path/API key, it tries to directly call out to the Google Instance
         // Metadata API, which we clearly don't have in unit tests. :)
         config.auth.credentials_path = None;
-        config.auth.api_key = Some("fake".to_string());
+        config.auth.api_key = Some("fake".to_string().into());
         config.endpoint = mock_endpoint.to_string();
 
         let context = SinkContext::new_test();

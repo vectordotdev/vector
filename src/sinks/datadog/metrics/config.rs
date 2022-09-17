@@ -2,6 +2,7 @@ use futures::FutureExt;
 use http::Uri;
 use snafu::ResultExt;
 use tower::ServiceBuilder;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::config::proxy::ProxyConfig;
 
@@ -122,7 +123,7 @@ pub struct DatadogMetricsConfig {
     ///
     /// [api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
     #[serde(alias = "api_key")]
-    pub default_api_key: String,
+    pub default_api_key: SensitiveString,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -215,7 +216,12 @@ impl DatadogMetricsConfig {
     fn build_healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
         let validate_endpoint =
             get_api_validate_endpoint(self.endpoint.as_ref(), self.site.as_ref(), self.region)?;
-        Ok(healthcheck(client, validate_endpoint, self.default_api_key.clone()).boxed())
+        Ok(healthcheck(
+            client,
+            validate_endpoint,
+            self.default_api_key.inner().to_string(),
+        )
+        .boxed())
     }
 
     fn build_sink(&self, client: HttpClient) -> crate::Result<VectorSink> {
@@ -227,7 +233,7 @@ impl DatadogMetricsConfig {
             .settings(request_limits, DatadogMetricsRetryLogic)
             .service(DatadogMetricsService::new(
                 client,
-                self.default_api_key.as_str(),
+                self.default_api_key.inner(),
             ));
 
         let request_builder = DatadogMetricsRequestBuilder::new(
