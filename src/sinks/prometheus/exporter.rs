@@ -34,6 +34,7 @@ use crate::{
         metric::{Metric, MetricData, MetricKind, MetricSeries, MetricValue},
         Event, EventStatus, Finalizable,
     },
+    http::Auth,
     internal_events::{PrometheusNormalizationError, PrometheusServerRequestComplete},
     sinks::{
         util::{
@@ -76,6 +77,9 @@ pub struct PrometheusExporterConfig {
     /// The metrics are exposed at the typical Prometheus exporter path, `/metrics`.
     #[serde(default = "default_address")]
     pub address: SocketAddr,
+
+    #[configurable(derived)]
+    pub auth: Option<Auth>,
 
     #[configurable(derived)]
     pub tls: Option<TlsEnableableConfig>,
@@ -136,6 +140,7 @@ impl Default for PrometheusExporterConfig {
         Self {
             default_namespace: None,
             address: default_address(),
+            auth: None,
             tls: None,
             buckets: super::default_histogram_buckets(),
             quantiles: super::default_summary_quantiles(),
@@ -333,8 +338,42 @@ impl MetricNormalize for PrometheusExporterMetricNormalizer {
     }
 }
 
+fn check_auth(req: &Request<Body>, auth: &Option<Auth>) -> bool {
+    if let Some(auth) = auth {
+        let headers = req.headers();
+        if let Some(auth_header) = headers.get(hyper::header::AUTHORIZATION) {
+            let encoded_credentials;
+            match auth {
+                Auth::Basic { user, password } => {
+                    encoded_credentials = HeaderValue::from_str(
+                        format!("Basic {}", base64::encode(format!("{}:{}", user, password)))
+                            .as_str(),
+                    );
+                }
+                Auth::Bearer { token } => {
+                    encoded_credentials =
+                        HeaderValue::from_str(format!("Bearer {}", token).as_str());
+                }
+            }
+
+            if let Ok(encoded_credentials) = encoded_credentials {
+                if auth_header != encoded_credentials {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        } else {
+            return false;
+        }
+    }
+
+    true
+}
+
 fn handle(
     req: Request<Body>,
+    auth: &Option<Auth>,
     default_namespace: Option<&str>,
     buckets: &[f64],
     quantiles: &[f64],
@@ -342,6 +381,11 @@ fn handle(
     bytes_sent: &Registered<BytesSent>,
 ) -> Response<Body> {
     let mut response = Response::new(Body::empty());
+
+    if !check_auth(&req, auth) {
+        *response.status_mut() = StatusCode::UNAUTHORIZED;
+        return response;
+    }
 
     match (req.method(), req.uri().path()) {
         (&Method::GET, "/metrics") => {
@@ -392,6 +436,7 @@ impl PrometheusExporter {
         let default_namespace = self.config.default_namespace.clone();
         let buckets = self.config.buckets.clone();
         let quantiles = self.config.quantiles.clone();
+        let auth = self.config.auth.clone();
 
         let new_service = make_service_fn(move |_| {
             let span = Span::current();
@@ -400,6 +445,7 @@ impl PrometheusExporter {
             let buckets = buckets.clone();
             let quantiles = quantiles.clone();
             let bytes_sent = bytes_sent.clone();
+            let auth = auth.clone();
 
             async move {
                 Ok::<_, Infallible>(service_fn(move |req| {
@@ -414,6 +460,7 @@ impl PrometheusExporter {
 
                         let response = handle(
                             req,
+                            &auth,
                             default_namespace.as_deref(),
                             &buckets,
                             &quantiles,
