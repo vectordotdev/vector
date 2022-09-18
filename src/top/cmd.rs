@@ -44,15 +44,13 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
         None => return exitcode::UNAVAILABLE,
     };
 
-    let requested_component_ids = if let Some(requested_component_ids) = opts.component_id.clone() {
-        Some(HashSet::<ComponentKey>::from_iter(
+    let requested_component_ids = opts.component_id.clone().map(|requested_component_ids| {
+        HashSet::<ComponentKey>::from_iter(
             requested_component_ids
                 .iter()
                 .map(|item| ComponentKey::from(item.as_str())),
-        ))
-    } else {
-        None
-    };
+        )
+    });
 
     // Create a channel for updating state via event messages
     let (tx, rx) = tokio::sync::mpsc::channel(20);
