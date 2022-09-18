@@ -3,13 +3,13 @@ use std::collections::HashMap;
 use kube::core::ObjectMeta;
 
 pub struct MetaCache {
-    pub cache: HashMap<MetaDescribe, bool>
+    pub cache: HashMap<MetaDescribe, bool>,
 }
 
 impl MetaCache {
     pub fn new() -> Self {
         Self {
-            cache: HashMap::new()
+            cache: HashMap::new(),
         }
     }
     pub fn store(&mut self, meta_desc: MetaDescribe, active: bool) {
@@ -24,7 +24,6 @@ impl MetaCache {
             None => false,
         }
     }
-
 }
 
 #[derive(PartialEq, Eq, Hash, Clone)]
@@ -38,10 +37,7 @@ impl MetaDescribe {
         let meta = meta.clone();
         let name = meta.name.unwrap_or_default();
         let namespace = meta.namespace.unwrap_or_default();
-        Self {
-            name,
-            namespace,
-        }
+        Self { name, namespace }
     }
 }
 

@@ -125,7 +125,12 @@ mod tests {
             .await
             .unwrap();
         let meta_cache = MetaCache::new();
-        tokio::spawn(custom_reflector(store_w, meta_cache, rx, Duration::from_secs(1)));
+        tokio::spawn(custom_reflector(
+            store_w,
+            meta_cache,
+            rx,
+            Duration::from_secs(1),
+        ));
         tokio::time::sleep(Duration::from_secs(1)).await;
         assert_eq!(store.get(&ObjectRef::from_obj(&cm)).as_deref(), Some(&cm));
     }
@@ -149,7 +154,12 @@ mod tests {
             .await
             .unwrap();
         let meta_cache = MetaCache::new();
-        tokio::spawn(custom_reflector(store_w, meta_cache, rx, Duration::from_secs(2)));
+        tokio::spawn(custom_reflector(
+            store_w,
+            meta_cache,
+            rx,
+            Duration::from_secs(2),
+        ));
         // Ensure the Resource is still available after deletion
         tokio::time::sleep(Duration::from_secs(1)).await;
         assert_eq!(store.get(&ObjectRef::from_obj(&cm)).as_deref(), Some(&cm));
@@ -181,7 +191,12 @@ mod tests {
             .await
             .unwrap();
         let meta_cache = MetaCache::new();
-        tokio::spawn(custom_reflector(store_w, meta_cache, rx, Duration::from_secs(2)));
+        tokio::spawn(custom_reflector(
+            store_w,
+            meta_cache,
+            rx,
+            Duration::from_secs(2),
+        ));
         tokio::time::sleep(Duration::from_secs(1)).await;
         // Ensure the Resource is still available after deletion
         assert_eq!(store.get(&ObjectRef::from_obj(&cm)).as_deref(), Some(&cm));
