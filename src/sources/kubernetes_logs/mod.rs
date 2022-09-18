@@ -41,7 +41,7 @@ use crate::{
         KubernetesLogsEventNodeAnnotationError, KubernetesLogsEventsReceived,
         KubernetesLogsPodInfo, StreamClosedError,
     },
-    kubernetes::{custom_reflector, pod_deletion_logic::Cacher},
+    kubernetes::{custom_reflector, meta_cache::MetaCache},
     shutdown::ShutdownSignal,
     sources,
     transforms::{FunctionTransform, OutputBuffer},
@@ -349,7 +349,7 @@ impl Source {
         );
         let pod_store_w = reflector::store::Writer::default();
         let pod_state = pod_store_w.as_reader();
-        let pod_cacher = Cacher::new();
+        let pod_cacher = MetaCache::new();
 
         reflectors.push(tokio::spawn(custom_reflector(
             pod_store_w,
@@ -370,7 +370,7 @@ impl Source {
         );
         let ns_store_w = reflector::store::Writer::default();
         let ns_state = ns_store_w.as_reader();
-        let ns_cacher = Cacher::new();
+        let ns_cacher = MetaCache::new();
 
         reflectors.push(tokio::spawn(custom_reflector(
             ns_store_w,
@@ -391,7 +391,7 @@ impl Source {
         );
         let node_store_w = reflector::store::Writer::default();
         let node_state = node_store_w.as_reader();
-        let node_cacher = Cacher::new();
+        let node_cacher = MetaCache::new();
 
         reflectors.push(tokio::spawn(custom_reflector(
             node_store_w,
