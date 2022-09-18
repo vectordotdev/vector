@@ -342,19 +342,14 @@ fn check_auth(req: &Request<Body>, auth: &Option<Auth>) -> bool {
     if let Some(auth) = auth {
         let headers = req.headers();
         if let Some(auth_header) = headers.get(hyper::header::AUTHORIZATION) {
-            let encoded_credentials;
-            match auth {
-                Auth::Basic { user, password } => {
-                    encoded_credentials = HeaderValue::from_str(
-                        format!("Basic {}", base64::encode(format!("{}:{}", user, password)))
-                            .as_str(),
-                    );
-                }
+            let encoded_credentials = match auth {
+                Auth::Basic { user, password } => HeaderValue::from_str(
+                    format!("Basic {}", base64::encode(format!("{}:{}", user, password))).as_str(),
+                ),
                 Auth::Bearer { token } => {
-                    encoded_credentials =
-                        HeaderValue::from_str(format!("Bearer {}", token).as_str());
+                    HeaderValue::from_str(format!("Bearer {}", token).as_str())
                 }
-            }
+            };
 
             if let Ok(encoded_credentials) = encoded_credentials {
                 if auth_header != encoded_credentials {
