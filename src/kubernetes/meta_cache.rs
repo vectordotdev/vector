@@ -19,9 +19,17 @@ impl MetaCache {
         self.cache.retain(|x, _| *x != meta_desc);
     }
     pub fn is_active(&self, meta_descr: &MetaDescribe) -> bool {
-        match self.cache.get(&meta_descr) {
+        match self.cache.get(meta_descr) {
             Some(cache_value) => cache_value.to_owned(),
             None => false,
+        }
+    }
+}
+
+impl Default for MetaCache {
+    fn default() -> Self {
+        Self {
+            cache: HashMap::new(),
         }
     }
 }
@@ -91,8 +99,8 @@ mod tests {
         let meta_desc = MetaDescribe::from_meta(&obj_meta);
 
         meta_cache.store(meta_desc.clone(), true);
-        assert_eq!(meta_cache.is_active(&meta_desc), true);
+        assert!(meta_cache.is_active(&meta_desc));
         meta_cache.store(meta_desc.clone(), false);
-        assert_eq!(meta_cache.is_active(&meta_desc), false);
+        assert!(!meta_cache.is_active(&meta_desc));
     }
 }
