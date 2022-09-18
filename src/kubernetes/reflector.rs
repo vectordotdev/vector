@@ -11,9 +11,12 @@ use kube::{
 use tokio::pin;
 use tokio_util::time::DelayQueue;
 
+use super::pod_deletion_logic::{Cacher, MetaDescribe};
+
 /// Handles events from a [`kube::runtime::watcher`] to delay the application of Deletion events.
 pub async fn custom_reflector<K, W>(
     mut store: store::Writer<K>,
+    mut meta_cache: Cacher,
     stream: W,
     delay_deletion: Duration,
 ) where
@@ -30,13 +33,16 @@ pub async fn custom_reflector<K, W>(
                     Some(Ok(event)) => {
                         match event {
                             // Immediately reoncile `Applied` event
-                            watcher::Event::Applied(_) => {
+                            watcher::Event::Applied(ref obj) => {
+                                let meta_descr = MetaDescribe::from_meta(obj.meta());
+                                meta_cache.store(meta_descr, true);
                                 trace!(message = "Processing Applied event.", ?event);
                                 store.apply_watcher_event(&event);
                             }
                             // Delay reconciling any `Deleted` events
-                            watcher::Event::Deleted(_) => {
-                                trace!(message = "Queuing Deleted event.", ?event);
+                            watcher::Event::Deleted(ref obj) => {
+                                let meta_descr = MetaDescribe::from_meta(obj.meta());
+                                meta_cache.store(meta_descr, false);
                                 delay_queue.insert(event.to_owned(), delay_deletion);
                             }
                             // Clear all delayed events on `Restarted` events
@@ -60,8 +66,18 @@ pub async fn custom_reflector<K, W>(
             result = delay_queue.next(), if !delay_queue.is_empty() => {
                 match result {
                     Some(event) => {
-                        trace!(message = "Processing Deleted event.", ?event);
-                        store.apply_watcher_event(&event.into_inner());
+                        match event.get_ref() {
+                            &watcher::Event::Deleted(ref obj) => {
+                                let meta_descr = MetaDescribe::from_meta(obj.meta());
+                                if meta_cache.is_active(&meta_descr) {
+                                    trace!(message = "Skipping event because of using object")
+                                } else {
+                                    trace!(message = "Processing Deleted event.", ?event);
+                                    store.apply_watcher_event(&event.into_inner());
+                                }
+                            },
+                            _ => store.apply_watcher_event(&event.into_inner()),
+                        }
                     },
                     // DelayQueue returns None if the queue is exhausted,
                     // however we disable the DelayQueue branch if there are
@@ -88,6 +104,7 @@ mod tests {
     };
 
     use super::custom_reflector;
+    use super::Cacher;
 
     #[tokio::test]
     async fn applied_should_add_object() {
@@ -104,7 +121,8 @@ mod tests {
         tx.send(Ok(watcher::Event::Applied(cm.clone())))
             .await
             .unwrap();
-        tokio::spawn(custom_reflector(store_w, rx, Duration::from_secs(1)));
+        let mut meta_cache = Cacher::new();
+        tokio::spawn(custom_reflector(store_w, meta_cache, rx, Duration::from_secs(1)));
         tokio::time::sleep(Duration::from_secs(1)).await;
         assert_eq!(store.get(&ObjectRef::from_obj(&cm)).as_deref(), Some(&cm));
     }
@@ -127,7 +145,8 @@ mod tests {
         tx.send(Ok(watcher::Event::Deleted(cm.clone())))
             .await
             .unwrap();
-        tokio::spawn(custom_reflector(store_w, rx, Duration::from_secs(2)));
+        let mut meta_cache = Cacher::new();
+        tokio::spawn(custom_reflector(store_w, meta_cache, rx, Duration::from_secs(2)));
         // Ensure the Resource is still available after deletion
         tokio::time::sleep(Duration::from_secs(1)).await;
         assert_eq!(store.get(&ObjectRef::from_obj(&cm)).as_deref(), Some(&cm));

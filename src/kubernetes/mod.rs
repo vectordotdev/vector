@@ -8,5 +8,6 @@
 
 pub mod pod_manager_logic;
 pub mod reflector;
+pub mod meta_cache;
 
 pub use reflector::custom_reflector;
