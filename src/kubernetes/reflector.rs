@@ -66,19 +66,20 @@ pub async fn custom_reflector<K, W>(
             result = delay_queue.next(), if !delay_queue.is_empty() => {
                 match result {
                     Some(event) => {
-                        match event.get_ref() {
-                            &watcher::Event::Deleted(ref obj) => {
+                        let event = event.into_inner();
+                        match event {
+                            watcher::Event::Deleted(ref obj) => {
                                 let meta_desc = MetaDescribe::from_meta(obj.meta());
                                 if meta_cache.is_active(&meta_desc) {
                                     trace!(message = "Skipping event, object is still used.", ?event)
                                 } else {
                                     trace!(message = "Processing Deleted event.", ?event);
-                                    store.apply_watcher_event(&event.into_inner());
+                                    store.apply_watcher_event(&event);
                                     // delete information about object meta from meta cacher
                                     meta_cache.delete(meta_desc);
                                 }
                             },
-                            _ => store.apply_watcher_event(&event.into_inner()),
+                            _ => store.apply_watcher_event(&event),
                         }
                     },
                     // DelayQueue returns None if the queue is exhausted,
@@ -155,5 +156,37 @@ mod tests {
         // Ensure the Resource is removed once the `delay_deletion` has elapsed
         tokio::time::sleep(Duration::from_secs(5)).await;
         assert_eq!(store.get(&ObjectRef::from_obj(&cm)), None);
+    }
+
+    #[tokio::test]
+    async fn deleted_should_not_remove_object_that_stil_used() {
+        let store_w = store::Writer::default();
+        let store = store_w.as_reader();
+        let cm = ConfigMap {
+            metadata: ObjectMeta {
+                name: Some("name".to_string()),
+                namespace: Some("namespace".to_string()),
+                ..ObjectMeta::default()
+            },
+            ..ConfigMap::default()
+        };
+        let (mut tx, rx) = mpsc::channel::<_>(5);
+        tx.send(Ok(watcher::Event::Applied(cm.clone())))
+            .await
+            .unwrap();
+        tx.send(Ok(watcher::Event::Deleted(cm.clone())))
+            .await
+            .unwrap();
+        tx.send(Ok(watcher::Event::Applied(cm.clone())))
+            .await
+            .unwrap();
+        let meta_cache = MetaCache::new();
+        tokio::spawn(custom_reflector(store_w, meta_cache, rx, Duration::from_secs(2)));
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        // Ensure the Resource is still available after deletion
+        assert_eq!(store.get(&ObjectRef::from_obj(&cm)).as_deref(), Some(&cm));
+        tokio::time::sleep(Duration::from_secs(5)).await;
+        // Ensure the Resource is still available after Applied event
+        assert_eq!(store.get(&ObjectRef::from_obj(&cm)).as_deref(), Some(&cm));
     }
 }
