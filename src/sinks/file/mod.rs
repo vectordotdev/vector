@@ -84,16 +84,15 @@ impl GenerateConfig for FileSinkConfig {
 // TODO: Why doesn't this already use `crate::sinks::util::Compression`? :thinkies:
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-#[serde(rename_all = "snake_case", tag = "compression", content = "compression_level")]
-//#[serde(tag = "compression", content = "compression_level")]
+#[serde(rename_all = "snake_case", tag = "compression")]
 pub enum Compression {
     /// Gzip compression.
     Gzip {
         /// Precise quality based on the underlying compression algorithms’ qualities.
         /// The interpretation of this depends on the algorithm chosen and the specific implementation
         /// backing it. Qualities are implicitly clamped to the algorithm’s maximum.
-        #[serde(default)]
-        level: Option<u32>,
+        #[serde(flatten)]
+        compression_level: Option<u32>,
     },
 
     /// Zstandard compression.
@@ -101,8 +100,8 @@ pub enum Compression {
         /// Precise quality based on the underlying compression algorithms’ qualities.
         /// The interpretation of this depends on the algorithm chosen and the specific implementation
         /// backing it. Qualities are implicitly clamped to the algorithm’s maximum.
-        #[serde(default)]
-        level: Option<u32>,
+        #[serde(flatten)]
+        compression_level: Option<u32>,
     },
 
     /// No compression.
@@ -125,19 +124,19 @@ impl OutFile {
     fn new(file: File, compression: Compression) -> Self {
         match compression {
             Compression::None => OutFile::Regular(file),
-            Compression::Gzip { level } => {
-                if let Some(level) = level {
-                    println!("Gzip compression level: {}", level);
-                    OutFile::Gzip(GzipEncoder::with_quality(file, async_compression::Level::Precise(level)))
+            Compression::Gzip { compression_level } => {
+                if let Some(compression_level) = compression_level {
+                    println!("Gzip compression level: {}", compression_level);
+                    OutFile::Gzip(GzipEncoder::with_quality(file, async_compression::Level::Precise(compression_level)))
                 } else {
                     println!("Gzip no compression level");
                     OutFile::Gzip(GzipEncoder::new(file))
                 }
             },
-            Compression::Zstd { level } => {
-                if let Some(level) = level {
-                    println!("Zstd compression level: {}", level);
-                    OutFile::Zstd(ZstdEncoder::with_quality(file, async_compression::Level::Precise(level)))
+            Compression::Zstd { compression_level } => {
+                if let Some(compression_level) = compression_level {
+                    println!("Zstd compression level: {}", compression_level);
+                    OutFile::Zstd(ZstdEncoder::with_quality(file, async_compression::Level::Precise(compression_level)))
                 } else {
                     println!("Zstd no compression level");
                     OutFile::Zstd(ZstdEncoder::new(file))
