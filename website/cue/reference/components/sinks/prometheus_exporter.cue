@@ -66,6 +66,10 @@ components: sinks: prometheus_exporter: {
 				examples: ["0.0.0.0:\(_port)"]
 			}
 		}
+		auth: configuration._http_auth & {_args: {
+			password_example: "${CLICKHOUSE_PASSWORD}"
+			username_example: "${CLICKHOUSE_USERNAME}"
+		}}
 		buckets: {
 			common:      false
 			description: """
