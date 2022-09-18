@@ -115,12 +115,12 @@ pub const INTENTIONAL: bool = true;
 pub const UNINTENTIONAL: bool = false;
 
 #[derive(Debug)]
-pub struct ComponentEventsDropped<const INTENTIONAL: bool> {
+pub struct ComponentEventsDropped<'a, const INTENTIONAL: bool> {
     pub count: u64,
-    pub reason: &'static str,
+    pub reason: &'a str,
 }
 
-impl<const INTENTIONAL: bool> InternalEvent for ComponentEventsDropped<INTENTIONAL> {
+impl<'a, const INTENTIONAL: bool> InternalEvent for ComponentEventsDropped<'a, INTENTIONAL> {
     fn emit(self) {
         let message = "Events dropped";
         if INTENTIONAL {
@@ -128,14 +128,14 @@ impl<const INTENTIONAL: bool> InternalEvent for ComponentEventsDropped<INTENTION
                 message,
                 intentional = INTENTIONAL,
                 reason = self.reason,
-                internal_log_rate_secs = 10,
+                internal_log_rate_limit = true,
             );
         } else {
             error!(
                 message,
                 intentional = INTENTIONAL,
                 reason = self.reason,
-                internal_log_rate_secs = 10,
+                internal_log_rate_limit = true,
             );
         }
         counter!(

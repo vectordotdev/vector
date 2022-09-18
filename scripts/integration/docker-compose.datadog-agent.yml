@@ -6,7 +6,7 @@ services:
     networks:
       - backend
     environment:
-      - DD_API_KEY=${TEST_DATADOG_API_KEY}
+      - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
       - DD_APM_ENABLED=false
       - DD_LOGS_ENABLED=true
       - DD_LOGS_CONFIG_LOGS_DD_URL=runner:8080
@@ -23,7 +23,7 @@ services:
     networks:
       - backend
     environment:
-      - DD_API_KEY=${TEST_DATADOG_API_KEY}
+      - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
       - DD_APM_ENABLED=true
       - DD_APM_DD_URL=http://runner:8081
       - DD_HEALTH_PORT=8183

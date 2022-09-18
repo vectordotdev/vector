@@ -19,7 +19,7 @@ services:
       - "--lib"
       - "::datadog::traces::"
     environment:
-      - TEST_DATADOG_API_KEY
+      - TEST_DATADOG_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
     volumes:
       - ${PWD}:/code
       - target:/code/target

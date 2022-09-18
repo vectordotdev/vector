@@ -532,6 +532,7 @@ impl Source {
                     Err(error) => emit!(KubernetesLifecycleError {
                         message: "File server exited with an error.",
                         error,
+                        count: events_count as u64,
                     }),
                 });
             slot.bind(Box::pin(fut));
@@ -553,6 +554,7 @@ impl Source {
                     Err(error) => emit!(KubernetesLifecycleError {
                         error,
                         message: "Event processing loop timed out during the shutdown.",
+                        count: events_count as u64,
                     }),
                 };
             });

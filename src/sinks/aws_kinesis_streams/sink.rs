@@ -85,7 +85,7 @@ pub fn process_log(
             warn!(
                 message = "Partition key does not exist; dropping event.",
                 %partition_key_field,
-                internal_log_rate_secs = 30,
+                internal_log_rate_limit = true,
             );
             return None;
         }

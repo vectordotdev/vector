@@ -13,6 +13,7 @@ use once_cell::sync::Lazy;
 use smpl_jwt::Jwt;
 use snafu::{ResultExt, Snafu};
 use tokio::{sync::watch, time::Instant};
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
 use crate::{config::ProxyConfig, http::HttpClient, http::HttpError};
@@ -71,7 +72,7 @@ pub struct GcpAuthConfig {
     /// filename is named, Vector will attempt to fetch an instance service account for the compute instance the program is
     /// running on. If Vector is not running on a GCE instance, then you must define eith an API key or service account
     /// credentials JSON file.
-    pub api_key: Option<String>,
+    pub api_key: Option<SensitiveString>,
 
     /// Path to a service account credentials JSON file. ([documentation](https://cloud.google.com/docs/authentication/production#manually))
     ///
@@ -97,7 +98,7 @@ impl GcpAuthConfig {
             let creds_path = self.credentials_path.as_ref().or(gap.as_ref());
             match (&creds_path, &self.api_key) {
                 (Some(path), _) => GcpAuthenticator::from_file(path, scope).await?,
-                (None, Some(api_key)) => GcpAuthenticator::from_api_key(api_key)?,
+                (None, Some(api_key)) => GcpAuthenticator::from_api_key(api_key.inner())?,
                 (None, None) => GcpAuthenticator::new_implicit().await?,
             }
         })
