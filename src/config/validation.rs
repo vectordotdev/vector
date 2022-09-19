@@ -275,7 +275,7 @@ pub fn check_buffer_preconditions(config: &Config) -> Result<(), Vec<String>> {
     // mountpoint does not exceed that mountpoint's total capacity.
     //
     // We specifically do not do any sort of warning on free space because that has to be the
-    // responsibility of the o(perator to ensure there's enough total space for all buffers present.
+    // responsibility of the operator to ensure there's enough total space for all buffers present.
     let mut errors = Vec::new();
 
     for (mountpoint, buffers) in mountpoint_buffer_mapping {
