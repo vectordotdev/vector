@@ -30,7 +30,7 @@ fn generate_schema() -> Result<serde_json::Value, Vec<String>> {
     }
 }
 
-fn serialize_validation_errors<'a>(errors: jsonschema::ErrorIterator<'a>) -> Vec<String> {
+fn serialize_validation_errors(errors: jsonschema::ErrorIterator) -> Vec<String> {
     errors
         .map(|err| format!("{} at instance path {}", err, err.instance_path))
         .collect::<Vec<String>>()
