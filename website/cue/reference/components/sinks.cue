@@ -36,7 +36,7 @@ components: sinks: [Name=string]: {
 						options: {
 							max_bytes: {
 								common:      true
-								description: "The maximum size of a batch that will be processed by a sink. This is the uncompressed size of an event, before it is serialized / compressed."
+								description: "The maximum size of a batch that will be processed by a sink. This is based on the uncompressed size of the batched events, before they are serialized / compressed."
 								required:    false
 								type: uint: {
 									default: features.send.batch.max_bytes | *null
