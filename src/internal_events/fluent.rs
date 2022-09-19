@@ -29,7 +29,7 @@ impl<'a> InternalEvent for FluentMessageDecodeError<'a> {
             message = "Error decoding fluent message.",
             error = ?self.error,
             base64_encoded_message = %self.base64_encoded_message,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
         );

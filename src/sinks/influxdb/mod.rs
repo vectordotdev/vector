@@ -9,6 +9,7 @@ use futures::FutureExt;
 use http::{StatusCode, Uri};
 use snafu::{ResultExt, Snafu};
 use tower::Service;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
 use crate::http::HttpClient;
@@ -76,7 +77,7 @@ pub struct InfluxDb1Settings {
     /// The password to authenticate with.
     ///
     /// Only relevant when using InfluxDB v0.x/v1.x.
-    password: Option<String>,
+    password: Option<SensitiveString>,
 }
 
 /// Configuration settings for InfluxDB v2.x.
@@ -98,13 +99,13 @@ pub struct InfluxDb2Settings {
     /// Only relevant when using InfluxDB v2.x and above.
     ///
     /// [token_docs]: https://v2.docs.influxdata.com/v2.0/security/tokens/
-    token: String,
+    token: SensitiveString,
 }
 
 trait InfluxDbSettings: std::fmt::Debug {
     fn write_uri(&self, endpoint: String) -> crate::Result<Uri>;
     fn healthcheck_uri(&self, endpoint: String) -> crate::Result<Uri>;
-    fn token(&self) -> String;
+    fn token(&self) -> SensitiveString;
     fn protocol_version(&self) -> ProtocolVersion;
 }
 
@@ -117,7 +118,7 @@ impl InfluxDbSettings for InfluxDb1Settings {
                 ("consistency", self.consistency.clone()),
                 ("db", Some(self.database.clone())),
                 ("rp", self.retention_policy_name.clone()),
-                ("p", self.password.clone()),
+                ("p", self.password.as_ref().map(|v| v.inner().to_owned())),
                 ("u", self.username.clone()),
                 ("precision", Some("ns".to_owned())),
             ],
@@ -128,8 +129,8 @@ impl InfluxDbSettings for InfluxDb1Settings {
         encode_uri(&endpoint, "ping", &[])
     }
 
-    fn token(&self) -> String {
-        "".to_string()
+    fn token(&self) -> SensitiveString {
+        SensitiveString::default()
     }
 
     fn protocol_version(&self) -> ProtocolVersion {
@@ -154,7 +155,7 @@ impl InfluxDbSettings for InfluxDb2Settings {
         encode_uri(&endpoint, "ping", &[])
     }
 
-    fn token(&self) -> String {
+    fn token(&self) -> SensitiveString {
         self.token.clone()
     }
 
@@ -567,7 +568,7 @@ mod tests {
         let settings = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings);
         assert_eq!(
             settings.expect_err("expected error").to_string(),
-            "Unclear settings. Both version configured v1: InfluxDb1Settings { database: \"my-database\", consistency: None, retention_policy_name: None, username: None, password: None }, v2: InfluxDb2Settings { org: \"my-org\", bucket: \"my-bucket\", token: \"my-token\" }.".to_owned()
+            "Unclear settings. Both version configured v1: InfluxDb1Settings { database: \"my-database\", consistency: None, retention_policy_name: None, username: None, password: None }, v2: InfluxDb2Settings { org: \"my-org\", bucket: \"my-bucket\", token: \"**REDACTED**\" }.".to_owned()
         );
     }
 
@@ -610,7 +611,7 @@ mod tests {
             database: "vector_db".to_owned(),
             retention_policy_name: Some("autogen".to_owned()),
             username: Some("writer".to_owned()),
-            password: Some("secret".to_owned()),
+            password: Some("secret".to_owned().into()),
         };
 
         let uri = settings
@@ -624,7 +625,7 @@ mod tests {
         let settings = InfluxDb2Settings {
             org: "my-org".to_owned(),
             bucket: "my-bucket".to_owned(),
-            token: "my-token".to_owned(),
+            token: "my-token".to_owned().into(),
         };
 
         let uri = settings
@@ -643,7 +644,7 @@ mod tests {
             database: "vector_db".to_owned(),
             retention_policy_name: Some("autogen".to_owned()),
             username: Some("writer".to_owned()),
-            password: Some("secret".to_owned()),
+            password: Some("secret".to_owned().into()),
         };
 
         let uri = settings
@@ -657,7 +658,7 @@ mod tests {
         let settings = InfluxDb2Settings {
             org: "my-org".to_owned(),
             bucket: "my-bucket".to_owned(),
-            token: "my-token".to_owned(),
+            token: "my-token".to_owned().into(),
         };
 
         let uri = settings
@@ -899,7 +900,7 @@ mod integration_tests {
         let influxdb2_settings = Some(InfluxDb2Settings {
             org: ORG.to_string(),
             bucket: BUCKET.to_string(),
-            token: TOKEN.to_string(),
+            token: TOKEN.to_string().into(),
         });
         let proxy = ProxyConfig::default();
         let client = HttpClient::new(None, &proxy).unwrap();
@@ -920,7 +921,7 @@ mod integration_tests {
         let influxdb2_settings = Some(InfluxDb2Settings {
             org: ORG.to_string(),
             bucket: BUCKET.to_string(),
-            token: TOKEN.to_string(),
+            token: TOKEN.to_string().into(),
         });
         let proxy = ProxyConfig::default();
         let client = HttpClient::new(None, &proxy).unwrap();

@@ -325,8 +325,8 @@ mod integration_tests {
             tls: None,
             auth: Some(NatsAuthConfig::UserPassword {
                 user_password: NatsAuthUserPassword {
-                    user: "natsuser".into(),
-                    password: "natspass".into(),
+                    user: "natsuser".to_string(),
+                    password: "natspass".to_string().into(),
                 },
             }),
         };
@@ -353,8 +353,8 @@ mod integration_tests {
             tls: None,
             auth: Some(NatsAuthConfig::UserPassword {
                 user_password: NatsAuthUserPassword {
-                    user: "natsuser".into(),
-                    password: "wrongpass".into(),
+                    user: "natsuser".to_string(),
+                    password: "wrongpass".to_string().into(),
                 },
             }),
         };
@@ -384,7 +384,7 @@ mod integration_tests {
             tls: None,
             auth: Some(NatsAuthConfig::Token {
                 token: NatsAuthToken {
-                    value: "secret".into(),
+                    value: "secret".to_string().into(),
                 },
             }),
         };
@@ -414,7 +414,7 @@ mod integration_tests {
             tls: None,
             auth: Some(NatsAuthConfig::Token {
                 token: NatsAuthToken {
-                    value: "wrongsecret".into(),
+                    value: "wrongsecret".to_string().into(),
                 },
             }),
         };

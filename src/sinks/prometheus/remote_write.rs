@@ -137,7 +137,7 @@ impl SinkConfig for RemoteWriteConfig {
             Some(PrometheusRemoteWriteAuth::Basic { user, password }) => (
                 Some(Auth::Basic {
                     user: user.clone(),
-                    password: password.clone(),
+                    password: password.clone().into(),
                 }),
                 None,
                 None,

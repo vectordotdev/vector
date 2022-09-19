@@ -17,7 +17,7 @@ impl<'a> InternalEvent for AwsKinesisFirehoseRequestReceived<'a> {
             message = "Handling AWS Kinesis Firehose request.",
             request_id = %self.request_id.unwrap_or_default(),
             source_arn = %self.source_arn.unwrap_or_default(),
-            internal_log_rate_secs = 10
+            internal_log_rate_limit = true
         );
         counter!("requests_received_total", 1);
     }
@@ -48,7 +48,7 @@ impl<'a> InternalEvent for AwsKinesisFirehoseRequestError<'a> {
             stage = error_stage::RECEIVING,
             error_type = error_type::REQUEST_FAILED,
             error_code = %self.error_code,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
             request_id = %self.request_id.unwrap_or(""),
         );
         counter!(
@@ -76,7 +76,7 @@ impl InternalEvent for AwsKinesisFirehoseAutomaticRecordDecodeError {
             stage = error_stage::PROCESSING,
             error_type = error_type::PARSER_FAILED,
             error_code = %io_error_code(&self.error),
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
             compression = %self.compression,
         );
         counter!(

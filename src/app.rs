@@ -94,7 +94,6 @@ impl Application {
             });
 
         let root_opts = opts.root;
-
         let sub_command = opts.sub_command;
 
         let color = match root_opts.color {
@@ -137,7 +136,7 @@ impl Application {
             let require_healthy = root_opts.require_healthy;
 
             rt.block_on(async move {
-                trace::init(color, json, &level);
+                trace::init(color, json, &level, root_opts.internal_log_rate_limit);
                 // Signal handler for OS and provider messages.
                 let (mut signal_handler, signal_rx) = signal::SignalHandler::new();
                 signal_handler.forever(signal::os_signals());
