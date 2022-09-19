@@ -302,7 +302,7 @@ tokio-postgres = { version = "0.7.7", default-features = false, features = ["run
 tokio-tungstenite = {version = "0.17.2", default-features = false, features = ["connect"], optional = true}
 toml = { version = "0.5.9", default-features = false }
 tonic = { version = "0.8", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
-trust-dns-proto = { version = "0.21.0", default-features = false, features = ["dnssec"], optional = true }
+trust-dns-proto = { version = "0.22.0", default-features = false, features = ["dnssec"], optional = true }
 typetag = { version = "0.2.3", default-features = false }
 url = { version = "2.3.1", default-features = false, features = ["serde"] }
 uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
