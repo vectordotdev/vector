@@ -115,7 +115,7 @@ impl<E: std::fmt::Display> InternalEvent for EncoderWriteError<'_, E> {
             error = %self.error,
             error_type = error_type::IO_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
