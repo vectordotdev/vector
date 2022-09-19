@@ -3,21 +3,23 @@ use std::{
     task::{Context, Poll},
 };
 
-use aws_sdk_cloudwatch::error::PutMetricDataError;
-use aws_sdk_cloudwatch::model::{Dimension, MetricDatum};
-use aws_sdk_cloudwatch::types::DateTime as AwsDateTime;
-use aws_sdk_cloudwatch::types::SdkError;
-use aws_sdk_cloudwatch::{Client as CloudwatchClient, Region};
+use aws_sdk_cloudwatch::{
+    error::PutMetricDataError,
+    model::{Dimension, MetricDatum},
+    types::DateTime as AwsDateTime,
+    types::SdkError,
+    Client as CloudwatchClient, Region,
+};
 use futures::{future, future::BoxFuture, stream, FutureExt, SinkExt};
 use tower::Service;
 use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use super::util::SinkBatchSettings;
-use crate::aws::RegionOrEndpoint;
-use crate::aws::{create_client, is_retriable_error, ClientBuilder};
 use crate::{
-    aws::auth::AwsAuthentication,
+    aws::{
+        auth::AwsAuthentication, create_client, is_retriable_error, ClientBuilder, RegionOrEndpoint,
+    },
     config::{AcknowledgementsConfig, Input, ProxyConfig, SinkConfig, SinkContext},
     event::{
         metric::{Metric, MetricValue},
@@ -218,7 +220,6 @@ impl CloudWatchMetricsSvc {
             .into_iter()
             .filter_map(|event| {
                 let metric_name = event.name().to_string();
-                // let timestamp = event.timestamp().map(timestamp_to_string);
                 let timestamp = event
                     .timestamp()
                     .map(|x| AwsDateTime::from_millis(x.timestamp_millis()));
@@ -333,8 +334,7 @@ fn tags_to_dimensions(tags: &BTreeMap<String, String>) -> Vec<Dimension> {
 #[cfg(test)]
 mod tests {
     use aws_sdk_cloudwatch::types::DateTime;
-    use chrono::offset::TimeZone;
-    use chrono::Utc;
+    use chrono::{offset::TimeZone, Utc};
     use pretty_assertions::assert_eq;
 
     use super::*;
@@ -510,7 +510,7 @@ mod integration_tests {
     }
 
     #[tokio::test]
-    async fn cloudwatch_metrics_healthchecks() {
+    async fn cloudwatch_metrics_healthcheck() {
         let config = config();
         let client = config
             .create_client(&ProxyConfig::from_env())
