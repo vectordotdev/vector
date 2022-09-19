@@ -6,6 +6,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use snafu::Snafu;
 use tokio_util::codec::Encoder as _;
+use vector_config::NamedComponent;
 use vector_core::{
     event::{Event, EventFinalizers, Finalizable, Value},
     partition::Partitioner,
@@ -25,7 +26,7 @@ use crate::{
     http::HttpClient,
     internal_events::{
         LokiEventUnlabeled, LokiOutOfOrderEventDropped, LokiOutOfOrderEventRewritten,
-        TemplateRenderingError,
+        SinkRequestBuildError, TemplateRenderingError,
     },
     sinks::util::{
         builder::SinkBuilderExt,
@@ -400,19 +401,26 @@ impl LokiSink {
                         })
                         .collect::<Vec<_>>();
                     if count > 0 {
-                        emit!(LokiOutOfOrderEventRewritten { count });
+                        emit!(LokiOutOfOrderEventRewritten {
+                            count: count as u64
+                        });
                     }
                     Some((partition, result))
                 } else {
-                    emit!(LokiOutOfOrderEventDropped { count: batch.len() });
+                    emit!(LokiOutOfOrderEventDropped {
+                        count: batch.len() as u64
+                    });
                     None
                 }
             })
             .request_builder(Some(request_builder_concurrency), self.request_builder)
             .filter_map(|request| async move {
                 match request {
-                    Err(e) => {
-                        error!("Failed to build Loki request: {:?}.", e);
+                    Err(error) => {
+                        emit!(SinkRequestBuildError {
+                            name: LokiConfig::NAME,
+                            error,
+                        });
                         None
                     }
                     Ok(req) => Some(req),
