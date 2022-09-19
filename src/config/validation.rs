@@ -1,7 +1,10 @@
 use crate::config::schema;
 use crate::topology::schema::merged_definition;
 use indexmap::IndexMap;
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 use sysinfo::{DiskExt, System, SystemExt};
 use vector_core::internal_event::DEFAULT_OUTPUT;
 
@@ -229,9 +232,10 @@ pub fn check_buffer_preconditions(config: &Config) -> Result<(), Vec<String>> {
                 .filter_map(|stage| stage.disk_usage(global_data_dir.clone(), id))
         })
         .fold(HashMap::new(), |mut mappings, usage| {
+            let resolved_data_dir = get_resolved_dir_path(usage.data_dir());
             let mountpoint = mountpoints
                 .keys()
-                .find(|mountpoint| usage.data_dir().starts_with(mountpoint));
+                .find(|mountpoint| resolved_data_dir.starts_with(mountpoint));
 
             match mountpoint {
                 // TODO: Should this actually be an error?
@@ -253,6 +257,7 @@ pub fn check_buffer_preconditions(config: &Config) -> Result<(), Vec<String>> {
                 None => warn!(
                     buffer_id = usage.id().id(),
                     buffer_data_dir = usage.data_dir().to_string_lossy().as_ref(),
+                    resolved_buffer_data_dir = resolved_data_dir.to_string_lossy().as_ref(),
                     message = "Found no matching mountpoint for buffer data directory.",
                 ),
                 Some(mountpoint) => {
@@ -270,7 +275,7 @@ pub fn check_buffer_preconditions(config: &Config) -> Result<(), Vec<String>> {
     // mountpoint does not exceed that mountpoint's total capacity.
     //
     // We specifically do not do any sort of warning on free space because that has to be the
-    // responsibility of the operator to ensure there's enough total space for all buffers present.
+    // responsibility of the o(perator to ensure there's enough total space for all buffers present.
     let mut errors = Vec::new();
 
     for (mountpoint, buffers) in mountpoint_buffer_mapping {
@@ -298,6 +303,81 @@ Reduce the `max_size` of the buffers to fit within the total capacity of the mou
     } else {
         Err(errors)
     }
+}
+
+#[cfg(target_os = "macos")]
+fn get_resolved_dir_path(path: &Path) -> PathBuf {
+    // On more recent versions of macOS, they use a layered approach to the filesystem where the
+    // common "root" filesystem -- i.e. `/` -- is actually composed of various directories which are
+    // sourced from various underlying volumes, where some directories are read only (like OS base
+    // files) and some are read/write (like user home directories and `/tmp/` and so on).
+    //
+    // For the common paths like user folders, or `/tmp`, and so on, we can't actually directly
+    // resolve the volume that they're magically mapped to unless we specifically use information
+    // from the "firmlinks" mapping.
+
+    // We try to load the firmlinks mapping file, and if we can, we read it, and read the
+    // associations within it.
+    let firmlinks_data = std::fs::read_to_string("/usr/share/firmlinks");
+    match firmlinks_data {
+        // If we got an error trying to read the firmlinks mapping file, just return the original path.
+        Err(_) => path.to_path_buf(),
+        Ok(data) => {
+            let data_volume = PathBuf::from("/System/Volumes/Data");
+
+            // Parse the mapping data, which contains multiple lines with a tab-delimited
+            // key/value pair, the key being the path to map and the value being the relative
+            // directory within the data volume to map to.
+            let firmlink_mappings = data
+                .split('\n')
+                .filter_map(|line| {
+                    let parts = line.split('\t').collect::<Vec<_>>();
+                    if parts.len() != 2 {
+                        None
+                    } else {
+                        let overlay_destination_path = PathBuf::from(parts[0]);
+                        let overlay_source_path = data_volume.clone().join(parts[1]);
+
+                        // Make sure both paths exist on disk as a safeguard against the format
+                        // changing, or our understanding of how to utilize the file being
+                        // inaccurate, etc.
+                        if Path::exists(&overlay_destination_path)
+                            && Path::exists(&overlay_source_path)
+                        {
+                            Some((overlay_destination_path, overlay_source_path))
+                        } else {
+                            None
+                        }
+                    }
+                })
+                .collect::<HashMap<_, _>>();
+
+            // Now that we have the firmlinks mappings read and parsed, iterate through them to
+            // see if any of them is a prefix of the path we've been given, and if so, we'll
+            // replace that prefix with the mapping version.
+            match firmlink_mappings
+                .iter()
+                .find(|(prefix, _)| path.starts_with(prefix))
+            {
+                Some((prefix, replacement)) => {
+                    // Strip the prefix, and then join the stripped version to our data volume
+                    // path along with the prefix replacement.
+                    let stripped = path
+                        .strip_prefix(&prefix)
+                        .expect("path is known to be prefixed by value");
+                    replacement.clone().join(stripped)
+                }
+                // There was no firmlink mapping related to the path being resolved, so return
+                // it as-is.
+                None => path.to_path_buf(),
+            }
+        }
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn get_resolved_dir_path(path: &Path) -> PathBuf {
+    path.to_path_buf()
 }
 
 pub fn warnings(config: &Config) -> Vec<String> {
