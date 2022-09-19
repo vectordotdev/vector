@@ -197,7 +197,6 @@ impl tower::Service<BytesMut> for UdpService {
     type Error = UdpError;
     type Future = BoxFuture<'static, Result<(), Self::Error>>;
 
-    // Emission of Error internal event is handled upstream by the caller
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         loop {
             self.state = match &mut self.state {
@@ -224,7 +223,6 @@ impl tower::Service<BytesMut> for UdpService {
         Poll::Ready(Ok(()))
     }
 
-    // Emission of Error internal event is handled upstream by the caller
     fn call(&mut self, msg: BytesMut) -> Self::Future {
         let (sender, receiver) = oneshot::channel();
         let byte_size = msg.len();
