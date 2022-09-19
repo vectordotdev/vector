@@ -7,7 +7,7 @@ use regex::Regex;
 use snafu::Snafu;
 use tokio_util::codec::Encoder as _;
 use vector_core::{
-    event::{self, Event, EventFinalizers, Finalizable, Value},
+    event::{Event, EventFinalizers, Finalizable, Value},
     partition::Partitioner,
     sink::StreamSink,
     stream::BatcherSettings,
@@ -204,7 +204,7 @@ impl EventEncoder {
         let schema = log_schema();
         let timestamp_key = schema.timestamp_key();
         let timestamp = match event.as_log().get(timestamp_key) {
-            Some(event::Value::Timestamp(ts)) => ts.timestamp_nanos(),
+            Some(Value::Timestamp(ts)) => ts.timestamp_nanos(),
             _ => chrono::Utc::now().timestamp_nanos(),
         };
 
@@ -264,12 +264,12 @@ impl FilteredRecord {
 }
 
 impl ByteSizeOf for FilteredRecord {
-    fn allocated_bytes(&self) -> usize {
-        self.inner.allocated_bytes()
-    }
-
     fn size_of(&self) -> usize {
         self.inner.size_of()
+    }
+
+    fn allocated_bytes(&self) -> usize {
+        self.inner.allocated_bytes()
     }
 }
 
