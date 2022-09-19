@@ -15,8 +15,9 @@ pub struct AwsCloudwatchLogsMessageSizeError {
 
 impl InternalEvent for AwsCloudwatchLogsMessageSizeError {
     fn emit(self) {
+        let reason = "Encoded event is too long.";
         error!(
-            message = "Encoded event is too long.",
+            message = reason,
             size = self.size as u64,
             max_size = self.max_size as u64,
             error_code = "message_too_long",
@@ -29,9 +30,6 @@ impl InternalEvent for AwsCloudwatchLogsMessageSizeError {
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
-            count: 1,
-            reason: "Encoded event is too long.",
-        });
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }
