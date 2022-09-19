@@ -137,6 +137,10 @@ impl Application {
 
             rt.block_on(async move {
                 trace::init(color, json, &level, root_opts.internal_log_rate_limit);
+                info!(
+                    message = "Internal log rate limit configured.",
+                    internal_log_rate_secs = root_opts.internal_log_rate_limit
+                );
                 // Signal handler for OS and provider messages.
                 let (mut signal_handler, signal_rx) = signal::SignalHandler::new();
                 signal_handler.forever(signal::os_signals());
