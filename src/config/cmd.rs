@@ -105,7 +105,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
         .map(|opts| opts.enabled)
         .unwrap_or_default()
     {
-        tracing::info!("checking environment variables are used in sensitive strings");
+        tracing::debug!("Checking environment variables are used in sensitive strings.");
         if let Err(errs) = super::loading::schema::check_sensitive_fields(&json) {
             return handle_config_errors(errs);
         }

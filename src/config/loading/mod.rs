@@ -167,7 +167,7 @@ pub async fn load_from_paths_with_provider_and_secrets(
             .map(|opts| opts.enabled)
             .unwrap_or_default()
         {
-            tracing::info!("checking environment variables are used in sensitive strings");
+            tracing::debug!("Checking environment variables are used in sensitive strings.");
             crate::config::loading::schema::check_sensitive_fields(&json)?;
         }
     }

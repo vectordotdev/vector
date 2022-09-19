@@ -157,7 +157,7 @@ pub fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
             .map(|opts| opts.enabled)
             .unwrap_or_default()
         {
-            tracing::info!("checking environment variables are used in sensitive strings");
+            tracing::debug!("Checking environment variables are used in sensitive strings.");
             config::loading::schema::check_sensitive_fields(&json)
                 .map_err(&mut report_error)
                 .ok()?
