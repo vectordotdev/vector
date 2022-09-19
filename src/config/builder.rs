@@ -334,6 +334,11 @@ impl ConfigBuilder {
 
         self.global.expire_metrics = self.global.expire_metrics.or(with.global.expire_metrics);
 
+        self.global.expire_metrics_secs = self
+            .global
+            .expire_metrics_secs
+            .or(with.global.expire_metrics_secs);
+
         self.schema.append(with.schema, &mut errors);
 
         self.schema.log_namespace = self.schema.log_namespace.or(with.schema.log_namespace);

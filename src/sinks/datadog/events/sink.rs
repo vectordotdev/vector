@@ -9,7 +9,7 @@ use vector_core::stream::DriverResponse;
 use crate::{
     config::log_schema,
     event::Event,
-    internal_events::{ParserMissingFieldError, SinkRequestBuildError},
+    internal_events::{ParserMissingFieldError, SinkRequestBuildError, DROP_EVENT},
     sinks::{
         datadog::events::{
             request_builder::{DatadogEventsRequest, DatadogEventsRequestBuilder},
@@ -57,7 +57,7 @@ async fn ensure_required_fields(event: Event) -> Option<Event> {
     let mut log = event.into_log();
 
     if !log.contains("title") {
-        emit!(ParserMissingFieldError { field: "title" });
+        emit!(ParserMissingFieldError::<DROP_EVENT> { field: "title" });
         return None;
     }
 
@@ -67,7 +67,7 @@ async fn ensure_required_fields(event: Event) -> Option<Event> {
         if let Some(message) = log.remove(log_schema.message_key()) {
             log.insert("text", message);
         } else {
-            emit!(ParserMissingFieldError {
+            emit!(ParserMissingFieldError::<DROP_EVENT> {
                 field: log_schema.message_key()
             });
             return None;

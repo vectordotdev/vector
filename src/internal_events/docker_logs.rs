@@ -97,7 +97,7 @@ impl<'a> InternalEvent for DockerLogsCommunicationError<'a> {
             error_type = error_type::CONNECTION_FAILED,
             stage = error_stage::RECEIVING,
             container_id = ?self.container_id,
-            internal_log_rate_secs = 10
+            internal_log_rate_limit = true
         );
         counter!(
             "component_errors_total", 1,
@@ -123,7 +123,7 @@ impl<'a> InternalEvent for DockerLogsContainerMetadataFetchError<'a> {
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::RECEIVING,
             container_id = ?self.container_id,
-            internal_log_rate_secs = 10
+            internal_log_rate_limit = true
         );
         counter!(
             "component_errors_total", 1,
@@ -150,7 +150,7 @@ impl<'a> InternalEvent for DockerLogsTimestampParseError<'a> {
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
             container_id = ?self.container_id,
-            internal_log_rate_secs = 10
+            internal_log_rate_limit = true
         );
         counter!(
             "component_errors_total", 1,

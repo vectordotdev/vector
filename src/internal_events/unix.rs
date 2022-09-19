@@ -36,7 +36,7 @@ impl<E: std::error::Error> InternalEvent for UnixSocketConnectionError<'_, E> {
             error_code = "connection",
             error_type = error_type::CONNECTION_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,

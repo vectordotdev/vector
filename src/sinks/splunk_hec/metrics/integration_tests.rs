@@ -28,7 +28,7 @@ async fn config() -> HecMetricsSinkConfig {
 
     HecMetricsSinkConfig {
         default_namespace: None,
-        default_token: get_token().await,
+        default_token: get_token().await.into(),
         endpoint: splunk_hec_address(),
         host_key: "host".into(),
         index: None,
