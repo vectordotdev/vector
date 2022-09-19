@@ -44,7 +44,7 @@ pub struct LokiOutOfOrderEventRewritten {
 impl InternalEvent for LokiOutOfOrderEventRewritten {
     fn emit(self) {
         debug!(
-            message = "Timestamps rewritten",
+            message = "Timestamps rewritten.",
             count = self.count,
             reason = "out_of_order",
             internal_log_rate_limit = true,
