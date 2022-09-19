@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use kube::core::ObjectMeta;
 
+#[derive(Default)]
 pub struct MetaCache {
     pub cache: HashMap<MetaDescribe, bool>,
 }
@@ -22,14 +23,6 @@ impl MetaCache {
         match self.cache.get(meta_descr) {
             Some(cache_value) => cache_value.to_owned(),
             None => false,
-        }
-    }
-}
-
-impl Default for MetaCache {
-    fn default() -> Self {
-        Self {
-            cache: HashMap::new(),
         }
     }
 }
