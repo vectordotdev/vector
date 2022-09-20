@@ -1,4 +1,6 @@
 use super::ConfigBuilder;
+use vector_common::sensitive_string::SensitiveString;
+use vector_config::Configurable;
 
 const SECRET_AND_VARIABLES_REGEX: &str = "(:?\\$\\{.+\\})";
 
@@ -12,22 +14,21 @@ fn generate_schema() -> Result<serde_json::Value, Vec<String>> {
 
     let mut schema = serde_json::to_value(&schema).map_err(into_errors)?;
     // add format key to enforce check
-    if let Some(def) = schema
+    let name = <SensitiveString as Configurable>::referenceable_name()
+        .expect("Could not get SensitiveString referenceable name.");
+    let def = schema
         .as_object_mut()
         .and_then(|r| r.get_mut("definitions"))
         .and_then(|d| d.as_object_mut())
-        .and_then(|d| d.get_mut("vector_common::sensitive_string::SensitiveString"))
+        .and_then(|d| d.get_mut(name))
         .and_then(|d| d.as_object_mut())
-    {
-        def.insert(
-            "pattern".into(),
-            serde_json::json!(SECRET_AND_VARIABLES_REGEX),
-        );
+        .expect("Could not get SensitiveString definition.");
+    def.insert(
+        "pattern".into(),
+        serde_json::json!(SECRET_AND_VARIABLES_REGEX),
+    );
 
-        Ok(schema)
-    } else {
-        Err(vec!["Unable to get SensitiveString definition".into()])
-    }
+    Ok(schema)
 }
 
 fn serialize_validation_errors(errors: jsonschema::ErrorIterator) -> Vec<String> {
