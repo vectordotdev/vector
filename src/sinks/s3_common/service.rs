@@ -1,8 +1,10 @@
 use std::task::{Context, Poll};
 
-use aws_sdk_s3::error::PutObjectError;
-use aws_sdk_s3::types::{ByteStream, SdkError};
-use aws_sdk_s3::Client as S3Client;
+use aws_sdk_s3::{
+    error::PutObjectError,
+    types::{ByteStream, SdkError},
+    Client as S3Client,
+};
 use bytes::Bytes;
 use futures::future::BoxFuture;
 use md5::Digest;
