@@ -242,10 +242,9 @@ pub async fn check_buffer_preconditions(config: &Config) -> Result<(), Vec<Strin
             mountpoints
         }
         Err(e) => {
-            warn!("Failed to query disk partitions. Cannot ensure that buffer size limits are within physical storage capacity limits.");
-            debug!(
-                "Encountered unexpected error during disk partition query: {}.",
-                e
+            warn!(
+                cause = %e,
+                message = "Failed to query disk partitions. Cannot ensure that buffer size limits are within physical storage capacity limits.",
             );
             return Ok(());
         }
