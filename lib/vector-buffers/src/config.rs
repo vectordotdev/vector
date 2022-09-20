@@ -178,7 +178,7 @@ impl DiskUsage {
         &self.id
     }
 
-    /// Gets the maximum size, in bytes, that this buffer will consume on disk.
+    /// Gets the maximum size, in bytes, that this buffer can consume on disk.
     pub fn max_size(&self) -> u64 {
         self.max_size.get()
     }
@@ -247,7 +247,7 @@ impl BufferType {
         id: &ComponentKey,
     ) -> Option<DiskUsage> {
         // All disk-backed buffers require the global data directory to be specified, and
-        // non-disk-backed buffers do not require it to be set.. so if it's not set here, we ignore
+        // non-disk-backed buffers do not require it to be set... so if it's not set here, we ignore
         // it because either:
         // - it's a non-disk-backed buffer, in which case we can just ignore, or
         // - this method is being called at a point before we actually check that a global data
@@ -256,7 +256,8 @@ impl BufferType {
         // Since we're not able to emit/surface errors about a lack of a global data directory from
         // where this method is called, we simply return `None` to let it reach the code that _does_
         // emit/surface those errors... and once those errors are fixed, this code can return valid
-        // disk usage information, which will then be validated and emit any errors for _that_ aspect.
+        // disk usage information, which will then be validated and emit any errors for _that_
+        // aspect.
         match global_data_dir {
             None => None,
             Some(global_data_dir) => match self {
