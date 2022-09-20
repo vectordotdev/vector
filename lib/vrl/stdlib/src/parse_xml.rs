@@ -499,6 +499,18 @@ mod tests {
             tdef: type_def(),
         }
 
+        cdata_element {
+            args: func_args![ value: r#"<p><?xml?>[CDATA[]]Q</p>"# ],
+            want: Ok(value!(
+                {
+                    "p": {
+                        "text": "[CDATA[]]Q"
+                    }
+                }
+            )),
+            tdef: type_def(),
+        }
+
         mixed_types {
             args: func_args![ value: indoc!{r#"
                 <?xml version="1.0" encoding="ISO-8859-1"?>
