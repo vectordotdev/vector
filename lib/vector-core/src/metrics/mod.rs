@@ -1,5 +1,6 @@
 mod ddsketch;
 mod label_filter;
+mod recency;
 mod recorder;
 mod storage;
 
