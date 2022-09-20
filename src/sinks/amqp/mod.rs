@@ -12,12 +12,6 @@ mod integration_tests;
 pub use config::AmqpSinkConfig;
 use snafu::Snafu;
 
-use crate::config::SinkDescription;
-
-inventory::submit! {
-    SinkDescription::new::<AmqpSinkConfig>("amqp")
-}
-
 #[derive(Debug, Snafu)]
 enum BuildError {
     #[snafu(display("creating amqp producer failed: {}", source))]
