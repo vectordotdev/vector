@@ -36,7 +36,7 @@ vector-common = { path = "../vector-common", default-features = false, features 
 
 [dev-dependencies]
 clap = "3.2.21"
-criterion = { version = "0.3", features = ["html_reports", "async_tokio"] }
+criterion = { version = "0.4", features = ["html_reports", "async_tokio"] }
 crossbeam-queue = "0.3.6"
 hdrhistogram = "7.5.1"
 metrics-tracing-context = { version = "0.12.0", default-features = false }

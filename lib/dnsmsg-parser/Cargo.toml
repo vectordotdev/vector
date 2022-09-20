@@ -12,7 +12,7 @@ thiserror = "1.0"
 trust-dns-proto = { version = "0.21", features = ["dnssec"] }
 
 [dev-dependencies]
-criterion = "0.3"
+criterion = "0.4"
 
 [lib]
 bench = false
