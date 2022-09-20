@@ -1,5 +1,6 @@
 use crate::config::schema;
 use crate::topology::schema::merged_definition;
+use futures_util::StreamExt;
 use indexmap::IndexMap;
 use std::{
     collections::HashMap,
@@ -194,7 +195,7 @@ pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     }
 }
 
-pub fn check_buffer_preconditions(config: &Config) -> Result<(), Vec<String>> {
+pub async fn check_buffer_preconditions(config: &Config) -> Result<(), Vec<String>> {
     // We need to assert that Vector's data directory is located on a mountpoint that has enough
     // capacity to allow all sinks with disk buffers configured to be able to use up to their
     // maximum configured size without overrunning the total capacity.
@@ -220,6 +221,21 @@ pub fn check_buffer_preconditions(config: &Config) -> Result<(), Vec<String>> {
         .iter()
         .map(|disk| (disk.mount_point().to_path_buf(), disk.total_space()))
         .collect::<IndexMap<_, _>>();
+
+    let heim_mountpoints = heim::disk::partitions().await
+        .expect("getting partitions should not fail")
+        .filter_map(|result| async move {
+            match result {
+                Ok(partition) => Some(partition),
+                Err(e) => {
+                    println!("partition error: {}", e);
+                    None
+                },
+            }
+        })
+        .collect::<Vec<_>>()
+        .await;
+    println!("heim mountpoints: {:#?}", heim_mountpoints);
 
     // Now build a mapping of buffer IDs/usage configuration to the mountpoint they reside on.
     let global_data_dir = config.global.data_dir.clone();

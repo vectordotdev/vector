@@ -162,7 +162,7 @@ pub async fn load_from_paths_with_provider_and_secrets(
 
     let (new_config, build_warnings) = builder.build_with_warnings()?;
 
-    validation::check_buffer_preconditions(&new_config)?;
+    validation::check_buffer_preconditions(&new_config).await?;
 
     for warning in secrets_warning
         .into_iter()
