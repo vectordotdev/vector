@@ -97,3 +97,8 @@ pub(super) async fn healthcheck(channel: Arc<lapin::Channel>) -> crate::Result<(
     trace!("Healthcheck completed.");
     Ok(())
 }
+
+#[test]
+pub fn generate_config() {
+    crate::test_util::test_generate_config::<AmqpSinkConfig>();
+}

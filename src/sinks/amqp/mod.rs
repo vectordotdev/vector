@@ -6,8 +6,8 @@ mod request_builder;
 mod service;
 mod sink;
 
-#[cfg(test)]
-mod tests;
+#[cfg(all(test, feature = "amqp-integration-tests"))]
+mod integration_tests;
 
 pub use config::AmqpSinkConfig;
 use snafu::Snafu;
