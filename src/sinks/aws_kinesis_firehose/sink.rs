@@ -3,18 +3,17 @@ use std::{fmt, num::NonZeroUsize};
 use async_trait::async_trait;
 use futures::{stream::BoxStream, StreamExt};
 use tower::Service;
+use vector_config::NamedComponent;
 use vector_core::{
     sink::StreamSink,
     stream::{BatcherSettings, DriverResponse},
 };
 
-use crate::{
-    event::Event,
-    sinks::{
-        aws_kinesis_firehose::request_builder::{KinesisRequest, KinesisRequestBuilder},
-        util::SinkBuilderExt,
-    },
+use super::{
+    config::KinesisFirehoseSinkConfig,
+    request_builder::{KinesisRequest, KinesisRequestBuilder},
 };
+use crate::{event::Event, internal_events::SinkRequestBuildError, sinks::util::SinkBuilderExt};
 
 #[derive(Debug, Clone)]
 struct KinesisFirehoseRetryLogic;
@@ -43,8 +42,11 @@ where
             .request_builder(request_builder_concurrency_limit, self.request_builder)
             .filter_map(|request| async move {
                 match request {
-                    Err(e) => {
-                        error!("Failed to build Kinesis Firehose request: {:?}.", e);
+                    Err(error) => {
+                        emit!(SinkRequestBuildError {
+                            name: KinesisFirehoseSinkConfig::NAME,
+                            error,
+                        });
                         None
                     }
                     Ok(req) => Some(req),
