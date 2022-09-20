@@ -88,10 +88,14 @@ impl Service<S3Request> for S3Service {
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
+        // Emission of Error internal event is handled upstream by the caller
+
         Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, request: S3Request) -> Self::Future {
+        // Emission of Error internal event is handled upstream by the caller
+
         let options = request.options;
 
         let content_encoding = request.content_encoding;

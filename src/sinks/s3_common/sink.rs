@@ -4,12 +4,15 @@ use async_trait::async_trait;
 use futures::stream::BoxStream;
 use futures_util::StreamExt;
 use tower::Service;
+use vector_config::NamedComponent;
 use vector_core::{
     event::Finalizable,
     sink::StreamSink,
     stream::{BatcherSettings, DriverResponse},
 };
 
+use crate::internal_events::SinkRequestBuildError;
+use crate::sinks::aws_s3::S3SinkConfig;
 use crate::{
     event::Event,
     sinks::util::{partitioner::KeyPartitioner, RequestBuilder, SinkBuilderExt},
@@ -45,7 +48,7 @@ where
     Svc::Response: DriverResponse + Send + 'static,
     Svc::Error: fmt::Debug + Into<crate::Error> + Send,
     RB: RequestBuilder<(String, Vec<Event>)> + Send + Sync + 'static,
-    RB::Error: fmt::Debug + Send,
+    RB::Error: fmt::Display + Send,
     RB::Request: Finalizable + Send,
 {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
@@ -61,8 +64,11 @@ where
             .request_builder(builder_limit, request_builder)
             .filter_map(|request| async move {
                 match request {
-                    Err(e) => {
-                        error!("Failed to build S3 request: {:?}.", e);
+                    Err(error) => {
+                        emit!(SinkRequestBuildError {
+                            name: S3SinkConfig::NAME, // This is also used by the `datadog_archives` sink so...
+                            error
+                        });
                         None
                     }
                     Ok(req) => Some(req),
@@ -82,7 +88,7 @@ where
     Svc::Response: DriverResponse + Send + 'static,
     Svc::Error: fmt::Debug + Into<crate::Error> + Send,
     RB: RequestBuilder<(String, Vec<Event>)> + Send + Sync + 'static,
-    RB::Error: fmt::Debug + Send,
+    RB::Error: fmt::Display + Send,
     RB::Request: Finalizable + Send,
 {
     async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
