@@ -499,12 +499,12 @@ mod tests {
             tdef: type_def(),
         }
 
-        cdata_element {
-            args: func_args![ value: r#"<p><?xml?>[CDATA[]]Q</p>"# ],
+        header_inside_element {
+            args: func_args![ value: r#"<p><?xml?>text123</p>"# ],
             want: Ok(value!(
                 {
                     "p": {
-                        "text": "[CDATA[]]Q"
+                        "text": "text123"
                     }
                 }
             )),
