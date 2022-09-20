@@ -135,10 +135,14 @@ impl Service<TraceApiRequest> for TraceApiService {
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
+        // Emission of Error internal event is handled upstream by the caller
+
         self.client.poll_ready(cx)
     }
 
     fn call(&mut self, request: TraceApiRequest) -> Self::Future {
+        // Emission of Error internal event is handled upstream by the caller
+
         let client = self.client.clone();
         let protocol = request.uri.scheme_str().unwrap_or("http").to_string();
 

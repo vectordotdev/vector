@@ -83,10 +83,14 @@ impl Service<DatadogEventsRequest> for DatadogEventsService {
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        // Emission of Error internal event is handled upstream by the caller
+
         Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, req: DatadogEventsRequest) -> Self::Future {
+        // Emission of Error internal event is handled upstream by the caller
+
         let mut http_service = self.batch_http_service.clone();
 
         Box::pin(async move {

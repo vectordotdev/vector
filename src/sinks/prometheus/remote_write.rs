@@ -284,10 +284,14 @@ impl tower::Service<PartitionInnerBuffer<Vec<Metric>, PartitionKey>> for RemoteW
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, _task: &mut task::Context<'_>) -> task::Poll<Result<(), Self::Error>> {
+        // Emission of Error internal event is handled upstream by the caller
+
         task::Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, buffer: PartitionInnerBuffer<Vec<Metric>, PartitionKey>) -> Self::Future {
+        // Emission of Error internal event is handled upstream by the caller
+
         let (events, key) = buffer.into_parts();
         let body = self.encode_events(events);
         let body = snap_block(body);

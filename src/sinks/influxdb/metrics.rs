@@ -195,10 +195,14 @@ impl Service<Vec<Metric>> for InfluxDbSvc {
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, cx: &mut std::task::Context) -> Poll<Result<(), Self::Error>> {
+        // Emission of Error internal event is handled upstream by the caller
+
         self.inner.poll_ready(cx)
     }
 
     fn call(&mut self, items: Vec<Metric>) -> Self::Future {
+        // Emission of Error internal event is handled upstream by the caller
+
         let input = encode_events(
             self.protocol_version,
             items,
