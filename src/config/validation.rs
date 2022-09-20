@@ -1,9 +1,9 @@
 use crate::config::schema;
 use crate::topology::schema::merged_definition;
-use futures_util::{FutureExt, TryFutureExt, TryStreamExt};
-use heim::units::information::byte;
+use futures_util::{stream, FutureExt, StreamExt, TryFutureExt, TryStreamExt};
+use heim::{disk::Partition, units::information::byte};
 use indexmap::IndexMap;
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf};
 use vector_core::internal_event::DEFAULT_OUTPUT;
 
 use super::{
@@ -223,16 +223,11 @@ pub async fn check_buffer_preconditions(config: &Config) -> Result<(), Vec<Strin
     // Now query all the mountpoints on the system, and get their total capacity. We also have to
     // sort the mountpoints from longest to shortest so we can find the longest prefix match for
     // each buffer data directory by simply iterating from beginning to end.
-    let mountpoints = heim::disk::partitions_physical()
-        .and_then(|partitions| {
-            partitions
-                .and_then(|partition| {
-                    let mountpoint_path = partition.mount_point().to_path_buf();
-                    heim::disk::usage(mountpoint_path.clone()).map(|usage| {
-                        usage.map(|usage| (mountpoint_path, usage.total().get::<byte>()))
-                    })
-                })
-                .try_collect::<IndexMap<_, _>>()
+    let mountpoints = heim::disk::partitions()
+        .and_then(|stream| stream.try_collect::<Vec<_>>().and_then(process_partitions))
+        .or_else(|_| {
+            heim::disk::partitions_physical()
+                .and_then(|stream| stream.try_collect::<Vec<_>>().and_then(process_partitions))
         })
         .await;
 
@@ -255,15 +250,19 @@ pub async fn check_buffer_preconditions(config: &Config) -> Result<(), Vec<Strin
         configured_disk_buffers
             .into_iter()
             .fold(HashMap::new(), |mut mappings, usage| {
+                let canonicalized_data_dir = usage
+                    .data_dir()
+                    .canonicalize()
+                    .unwrap_or_else(|_| usage.data_dir().to_path_buf());
                 let mountpoint = mountpoints
                     .keys()
-                    .find(|mountpoint| usage.data_dir().starts_with(mountpoint));
+                    .find(|mountpoint| canonicalized_data_dir.starts_with(mountpoint));
 
                 match mountpoint {
                     None => warn!(
                         buffer_id = usage.id().id(),
-                        buffer_data_dir = usage.data_dir().to_string_lossy().as_ref(),
-                        resolved_buffer_data_dir = usage.data_dir().to_string_lossy().as_ref(),
+                        data_dir = usage.data_dir().to_string_lossy().as_ref(),
+                        canonicalized_data_dir = canonicalized_data_dir.to_string_lossy().as_ref(),
                         message = "Found no matching mountpoint for buffer data directory.",
                     ),
                     Some(mountpoint) => {
@@ -310,6 +309,18 @@ Reduce the `max_size` of the buffers to fit within the total capacity of the mou
     } else {
         Err(errors)
     }
+}
+
+async fn process_partitions(partitions: Vec<Partition>) -> heim::Result<IndexMap<PathBuf, u64>> {
+    stream::iter(partitions)
+        .map(Ok)
+        .and_then(|partition| {
+            let mountpoint_path = partition.mount_point().to_path_buf();
+            heim::disk::usage(mountpoint_path.clone())
+                .map(|usage| usage.map(|usage| (mountpoint_path, usage.total().get::<byte>())))
+        })
+        .try_collect::<IndexMap<_, _>>()
+        .await
 }
 
 pub fn warnings(config: &Config) -> Vec<String> {

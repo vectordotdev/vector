@@ -266,10 +266,7 @@ impl BufferType {
                     let data_dir = crate::variants::disk_v1::get_new_style_buffer_dir_path(
                         &global_data_dir,
                         id.id(),
-                    )
-                    .as_path()
-                    .canonicalize()
-                    .expect("Failed to canonicalize buffer data directory.");
+                    );
 
                     Some(DiskUsage::new(id.clone(), data_dir, *max_size))
                 }
@@ -277,10 +274,7 @@ impl BufferType {
                     let data_dir = crate::variants::disk_v2::get_disk_v2_data_dir_path(
                         &global_data_dir,
                         id.id(),
-                    )
-                    .as_path()
-                    .canonicalize()
-                    .expect("Failed to canonicalize buffer data directory.");
+                    );
 
                     Some(DiskUsage::new(id.clone(), data_dir, *max_size))
                 }
