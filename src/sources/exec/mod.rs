@@ -30,8 +30,8 @@ use crate::{
     config::{log_schema, Output, SourceConfig, SourceContext},
     event::Event,
     internal_events::{
-        ExecCommandExecuted, ExecEventsReceived, ExecFailedError, ExecFailedToSignalChild,
-        ExecFailedToSignalChildError, ExecTimeoutError, StreamClosedError,
+        ExecChannelClosedError, ExecCommandExecuted, ExecEventsReceived, ExecFailedError,
+        ExecFailedToSignalChild, ExecFailedToSignalChildError, ExecTimeoutError, StreamClosedError,
     },
     serde::default_decoding,
     shutdown::ShutdownSignal,
@@ -615,7 +615,7 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
                     if sender.send((next, origin)).await.is_err() {
                         // If the receive half of the channel is closed, either due to close being
                         // called or the Receiver handle dropping, the function returns an error.
-                        debug!("Receive channel closed, unable to send.");
+                        emit!(ExecChannelClosedError);
                         break;
                     }
                 }
@@ -759,13 +759,12 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(unix)]
-    async fn test_run_command_linux() {
+    async fn test_drop_receiver() {
         let config = standard_scheduled_test_config();
         let hostname = Some("Some.Machine".to_string());
         let decoder = Default::default();
         let shutdown = ShutdownSignal::noop();
-        let (tx, mut rx) = SourceSender::new_test();
+        let (tx, rx) = SourceSender::new_test();
 
         // Wait for our task to finish, wrapping it in a timeout
         let timeout = tokio::time::timeout(
@@ -773,28 +772,13 @@ mod tests {
             run_command(config.clone(), hostname, decoder, shutdown, tx),
         );
 
-        let timeout_result =
-            crate::test_util::components::assert_source_compliance(&[], timeout).await;
+        drop(rx);
 
-        let exit_status = timeout_result
-            .expect("command timed out")
-            .expect("command error");
-        assert_eq!(0_i32, exit_status.unwrap().code().unwrap());
-
-        if let Poll::Ready(Some(event)) = futures::poll!(rx.next()) {
-            let log = event.as_log();
-            assert_eq!(log[COMMAND_KEY], config.command.clone().into());
-            assert_eq!(log[STREAM_KEY], STDOUT.into());
-            assert_eq!(log[log_schema().source_type_key()], "exec".into());
-            assert_eq!(log[log_schema().message_key()], "Hello World!".into());
-            assert_eq!(log[log_schema().host_key()], "Some.Machine".into());
-            assert!(log.get(PID_KEY).is_some());
-            assert!(log.get(log_schema().timestamp_key()).is_some());
-
-            assert_eq!(8, log.all_fields().unwrap().count());
-        } else {
-            panic!("Expected to receive a linux event");
-        }
+        let _timeout_result = crate::test_util::components::assert_source_error(
+            &crate::test_util::components::COMPONENT_ERROR_TAGS,
+            timeout,
+        )
+        .await;
     }
 
     #[tokio::test]

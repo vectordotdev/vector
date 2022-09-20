@@ -219,3 +219,25 @@ impl InternalEvent for ExecFailedToSignalChildError<'_> {
         );
     }
 }
+
+pub struct ExecChannelClosedError;
+
+impl InternalEvent for ExecChannelClosedError {
+    fn emit(self) {
+        error!(
+            message = %format!("Receive channel closed, unable to send."),
+            error_type = error_type::COMMAND_FAILED,
+            stage = error_stage::RECEIVING,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => error_type::COMMAND_FAILED,
+            "stage" => error_stage::RECEIVING,
+        );
+        counter!(
+            "component_discarded_events_total", 1,
+            "error_type" => error_type::COMMAND_FAILED,
+            "stage" => error_stage::RECEIVING,
+        );
+    }
+}
