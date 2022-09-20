@@ -64,7 +64,7 @@ pub(crate) fn check_sensitive_fields_from_string(
         .map(|opts| opts.enabled)
         .unwrap_or_default()
     {
-        tracing::debug!("Checking environment variables are used in sensitive strings.");
+        debug!("Checking environment variables are used in sensitive strings.");
         check_sensitive_fields(json)?;
     }
 
