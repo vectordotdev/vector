@@ -159,7 +159,6 @@ pub async fn load_from_paths_with_provider_and_secrets(
         let (source, _) = crate::config::load_source_from_paths(config_paths)?;
 
         let json = crate::config::util::json::serialize(source, &builder, false, false);
-        let json = json.expect("config should be serializable");
 
         if builder
             .enterprise
@@ -167,6 +166,7 @@ pub async fn load_from_paths_with_provider_and_secrets(
             .map(|opts| opts.enabled)
             .unwrap_or_default()
         {
+            let json = json.expect("config should be serializable");
             tracing::debug!("Checking environment variables are used in sensitive strings.");
             crate::config::loading::schema::check_sensitive_fields(&json)?;
         }
