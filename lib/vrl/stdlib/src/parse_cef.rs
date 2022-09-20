@@ -238,16 +238,16 @@ mod test {
     fn test_parse_extension() {
         assert_eq!(
             Ok(vec![
+                ("src".to_string(), "10.0.0.1".into()),
+                ("dst".to_string(), "2.1.2.2".into()),
+                ("spt".to_string(),"1232".into()),
                 ("cefVersion".to_string(), "1".into()),
                 ("deviceVendor".to_string(), "Security".into()),
                 ("deviceProduct".to_string(), "threatmanager".into()),
                 ("deviceVersion".to_string(), "1.0".into()),
                 ("deviceEventClassId".to_string(), "100".into()),
                 ("name".to_string(), "worm successfully stopped".into()),
-                ("severity".to_string(), "10".into()),
-                ("src".to_string(), "10.0.0.1".into()),
-                ("dst".to_string(), "2.1.2.2".into()),
-                ("spt".to_string(),"1232".into())
+                ("severity".to_string(), "10".into()),                
             ]),
             parse("CEF:1|Security|threatmanager|1.0|100|worm successfully stopped|10|src=10.0.0.1 dst=2.1.2.2 spt=1232")
                 .map(Iterator::collect)
@@ -258,16 +258,16 @@ mod test {
     fn test_ignore_syslog_prefix() {
         assert_eq!(
             Ok(vec![
+                ("src".to_string(), "10.0.0.1".into()),
+                ("dst".to_string(), "2.1.2.2".into()),
+                ("spt".to_string(),"1232".into()),
                 ("cefVersion".to_string(), "1".into()),
                 ("deviceVendor".to_string(), "Security".into()),
                 ("deviceProduct".to_string(), "threatmanager".into()),
                 ("deviceVersion".to_string(), "1.0".into()),
                 ("deviceEventClassId".to_string(), "100".into()),
                 ("name".to_string(), "worm successfully stopped".into()),
-                ("severity".to_string(), "10".into()),
-                ("src".to_string(), "10.0.0.1".into()),
-                ("dst".to_string(), "2.1.2.2".into()),
-                ("spt".to_string(),"1232".into())
+                ("severity".to_string(), "10".into()),                
             ]),
             parse("Sep 29 08:26:10 host CEF:1|Security|threatmanager|1.0|100|worm successfully stopped|10|src=10.0.0.1 dst=2.1.2.2 spt=1232")
                 .map(Iterator::collect)
@@ -312,16 +312,16 @@ mod test {
     fn test_escape_extension_1() {
         assert_eq!(
             Ok(vec![
+                ("src".to_string(), "ip=10.0.0.1".into()),
+                ("dst".to_string(), "2.1.2.2".into()),
+                ("spt".to_string(),"1232".into()),
                 ("cefVersion".to_string(), "1".into()),
                 ("deviceVendor".to_string(), "Security".into()),
                 ("deviceProduct".to_string(), "threatmanager".into()),
                 ("deviceVersion".to_string(), "1.0".into()),
                 ("deviceEventClassId".to_string(), "100".into()),
                 ("name".to_string(), "worm successfully stopped".into()),
-                ("severity".to_string(), "10".into()),
-                ("src".to_string(), "ip=10.0.0.1".into()),
-                ("dst".to_string(), "2.1.2.2".into()),
-                ("spt".to_string(),"1232".into())
+                ("severity".to_string(), "10".into()),                
             ]),
             parse(r#"CEF:1|Security|threatmanager|1.0|100|worm successfully stopped|10|src=ip\=10.0.0.1 dst=2.1.2.2 spt=1232"#)
                 .map(Iterator::collect)
@@ -332,16 +332,16 @@ mod test {
     fn test_escape_extension_2() {
         assert_eq!(
             Ok(vec![
+                ("dst".to_string(), "2.1.2.2".into()),
+                ("path".to_string(), "\\home\\".into()),
+                ("spt".to_string(),"1232".into()),
                 ("cefVersion".to_string(), "1".into()),
                 ("deviceVendor".to_string(), "Security".into()),
                 ("deviceProduct".to_string(), "threatmanager".into()),
                 ("deviceVersion".to_string(), "1.0".into()),
                 ("deviceEventClassId".to_string(), "100".into()),
                 ("name".to_string(), "worm successfully stopped".into()),
-                ("severity".to_string(), "10".into()),
-                ("dst".to_string(), "2.1.2.2".into()),
-                ("path".to_string(), "\\home\\".into()),
-                ("spt".to_string(),"1232".into())
+                ("severity".to_string(), "10".into()),              
             ]),
             parse(r#"CEF:1|Security|threatmanager|1.0|100|worm successfully stopped|10|dst=2.1.2.2 path=\\home\\ spt=1232"#)
                 .map(Iterator::collect)
@@ -352,16 +352,16 @@ mod test {
     fn test_extension_newline() {
         assert_eq!(
             Ok(vec![
+                ("dst".to_string(), "2.1.2.2".into()),
+                ("msg".to_string(), "Detected a threat.\n No action needed".into()),
+                ("spt".to_string(),"1232".into()),
                 ("cefVersion".to_string(), "1".into()),
                 ("deviceVendor".to_string(), "Security".into()),
                 ("deviceProduct".to_string(), "threatmanager".into()),
                 ("deviceVersion".to_string(), "1.0".into()),
                 ("deviceEventClassId".to_string(), "100".into()),
                 ("name".to_string(), "worm successfully stopped".into()),
-                ("severity".to_string(), "10".into()),
-                ("dst".to_string(), "2.1.2.2".into()),
-                ("msg".to_string(), "Detected a threat.\n No action needed".into()),
-                ("spt".to_string(),"1232".into())
+                ("severity".to_string(), "10".into()),                
             ]),
             parse(r#"CEF:1|Security|threatmanager|1.0|100|worm successfully stopped|10|dst=2.1.2.2 msg=Detected a threat.\r No action needed spt=1232"#)
                 .map(Iterator::collect)
@@ -372,6 +372,9 @@ mod test {
     fn test_extension_trailing_whitespace() {
         assert_eq!(
             Ok(vec![
+                ("dst".to_string(), "2.1.2.2".into()),
+                ("msg".to_string(), "Detected a threat. No action needed  ".into()),
+                ("spt".to_string(),"1232".into()),
                 ("cefVersion".to_string(), "1".into()),
                 ("deviceVendor".to_string(), "Security".into()),
                 ("deviceProduct".to_string(), "threatmanager".into()),
@@ -379,9 +382,6 @@ mod test {
                 ("deviceEventClassId".to_string(), "100".into()),
                 ("name".to_string(), "worm successfully stopped".into()),
                 ("severity".to_string(), "10".into()),
-                ("dst".to_string(), "2.1.2.2".into()),
-                ("msg".to_string(), "Detected a threat. No action needed  ".into()),
-                ("spt".to_string(),"1232".into())
             ]),
             parse(r#"CEF:1|Security|threatmanager|1.0|100|worm successfully stopped|10|dst=2.1.2.2 msg=Detected a threat. No action needed   spt=1232"#)
                 .map(Iterator::collect)
@@ -392,15 +392,15 @@ mod test {
     fn test_extension_end_whitespace() {
         assert_eq!(
             Ok(vec![
+                ("dst".to_string(), "2.1.2.2".into()),
+                ("msg".to_string(), "Detected a threat. No action needed".into()),
                 ("cefVersion".to_string(), "1".into()),
                 ("deviceVendor".to_string(), "Security".into()),
                 ("deviceProduct".to_string(), "threatmanager".into()),
                 ("deviceVersion".to_string(), "1.0".into()),
                 ("deviceEventClassId".to_string(), "100".into()),
                 ("name".to_string(), "worm successfully stopped".into()),
-                ("severity".to_string(), "10".into()),
-                ("dst".to_string(), "2.1.2.2".into()),
-                ("msg".to_string(), "Detected a threat. No action needed".into()),
+                ("severity".to_string(), "10".into()),                
             ]),
             parse(r#"CEF:1|Security|threatmanager|1.0|100|worm successfully stopped|10|dst=2.1.2.2 msg=Detected a threat. No action needed   "#)
                 .map(Iterator::collect)
