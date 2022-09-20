@@ -100,15 +100,8 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     let json = json.expect("config should be serializable");
 
     #[cfg(feature = "enterprise")]
-    if builder
-        .enterprise
-        .map(|opts| opts.enabled)
-        .unwrap_or_default()
-    {
-        tracing::debug!("Checking environment variables are used in sensitive strings.");
-        if let Err(errs) = super::loading::schema::check_sensitive_fields(&json) {
-            return handle_config_errors(errs);
-        }
+    if let Err(errs) = super::loading::schema::check_sensitive_fields_from_string(&json, &builder) {
+        return handle_config_errors(errs);
     }
 
     #[allow(clippy::print_stdout)]

@@ -144,24 +144,9 @@ pub fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
     // Check secrets in configuration
     #[cfg(feature = "enterprise")]
     {
-        let (source, _) = config::load_source_from_paths(&paths)
+        config::loading::schema::check_sensitive_fields_from_paths(&paths, &builder)
             .map_err(&mut report_error)
             .ok()?;
-
-        let json = config::util::json::serialize(source, &builder, false, false);
-        let json = json.expect("config should be serializable");
-
-        if builder
-            .enterprise
-            .as_ref()
-            .map(|opts| opts.enabled)
-            .unwrap_or_default()
-        {
-            tracing::debug!("Checking environment variables are used in sensitive strings.");
-            config::loading::schema::check_sensitive_fields(&json)
-                .map_err(&mut report_error)
-                .ok()?
-        }
     }
 
     // Build

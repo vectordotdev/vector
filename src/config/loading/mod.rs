@@ -156,20 +156,7 @@ pub async fn load_from_paths_with_provider_and_secrets(
     // Check secrets in configuration
     #[cfg(feature = "enterprise")]
     {
-        let (source, _) = crate::config::load_source_from_paths(config_paths)?;
-
-        let json = crate::config::util::json::serialize(source, &builder, false, false);
-
-        if builder
-            .enterprise
-            .as_ref()
-            .map(|opts| opts.enabled)
-            .unwrap_or_default()
-        {
-            let json = json.expect("config should be serializable");
-            tracing::debug!("Checking environment variables are used in sensitive strings.");
-            crate::config::loading::schema::check_sensitive_fields(&json)?;
-        }
+        crate::config::loading::schema::check_sensitive_fields_from_paths(config_paths, &builder)?;
     }
 
     validation::check_provider(&builder)?;

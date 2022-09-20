@@ -1,4 +1,5 @@
 use super::ConfigBuilder;
+use crate::config;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::Configurable;
 
@@ -37,7 +38,7 @@ fn serialize_validation_errors(errors: jsonschema::ErrorIterator) -> Vec<String>
         .collect::<Vec<String>>()
 }
 
-pub(crate) fn check_sensitive_fields(json_config: &str) -> Result<(), Vec<String>> {
+fn check_sensitive_fields(json_config: &str) -> Result<(), Vec<String>> {
     let json_value = serde_json::from_str(json_config).map_err(into_errors)?;
     let schema = generate_schema()?;
 
@@ -50,6 +51,35 @@ pub(crate) fn check_sensitive_fields(json_config: &str) -> Result<(), Vec<String
     compiled
         .validate(&json_value)
         .map_err(serialize_validation_errors)
+}
+
+pub(crate) fn check_sensitive_fields_from_string(
+    json: &str,
+    builder: &crate::config::ConfigBuilder,
+) -> Result<(), Vec<String>> {
+    if builder
+        .enterprise
+        .as_ref()
+        .map(|opts| opts.enabled)
+        .unwrap_or_default()
+    {
+        tracing::debug!("Checking environment variables are used in sensitive strings.");
+        check_sensitive_fields(json)?;
+    }
+
+    Ok(())
+}
+
+pub(crate) fn check_sensitive_fields_from_paths(
+    paths: &[crate::config::ConfigPath],
+    builder: &crate::config::ConfigBuilder,
+) -> Result<(), Vec<String>> {
+    let (source, _) = config::load_source_from_paths(paths)?;
+
+    let json = config::util::json::serialize(source, builder, false, false);
+    let json = json.expect("config should be serializable");
+
+    check_sensitive_fields_from_string(&json, builder)
 }
 
 #[cfg(test)]
