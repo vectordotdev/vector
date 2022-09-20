@@ -349,6 +349,10 @@ test-integration-aws-sqs: ## Runs AWS SQS integration tests
 test-integration-aws-cloudwatch-logs: ## Runs AWS Cloudwatch Logs integration tests
 	FILTER=::aws_cloudwatch_logs make test-integration-aws
 
+.PHONY: test-integration-aws-cloudwatch-metrics
+test-integration-aws-cloudwatch-metrics: ## Runs AWS Cloudwatch Metrics integration tests
+	FILTER=::aws_cloudwatch_metrics make test-integration-aws
+
 .PHONY: test-integration-datadog-agent
 test-integration-datadog-agent: ## Runs Datadog Agent integration tests
 	@test $${TEST_DATADOG_API_KEY?TEST_DATADOG_API_KEY must be set}
