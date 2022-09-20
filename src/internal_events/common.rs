@@ -127,6 +127,7 @@ impl<'a, const INTENTIONAL: bool> InternalEvent for ComponentEventsDropped<'a, I
             debug!(
                 message,
                 intentional = INTENTIONAL,
+                count = self.count,
                 reason = self.reason,
                 internal_log_rate_limit = true,
             );
@@ -134,6 +135,7 @@ impl<'a, const INTENTIONAL: bool> InternalEvent for ComponentEventsDropped<'a, I
             error!(
                 message,
                 intentional = INTENTIONAL,
+                count = self.count,
                 reason = self.reason,
                 internal_log_rate_limit = true,
             );
