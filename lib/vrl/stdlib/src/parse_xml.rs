@@ -295,7 +295,7 @@ fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
             }
         }
 
-        for n in node.children().into_iter().filter(|n| !n.is_comment()) {
+        for n in node.children().into_iter().filter(|n| n.is_element() || n.is_text()) {
             let name = match n.node_type() {
                 NodeType::Element => n.tag_name().name().to_string(),
                 NodeType::Text => config.text_key.to_string(),
