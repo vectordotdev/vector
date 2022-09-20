@@ -2,6 +2,8 @@ pub mod prelude;
 
 mod adaptive_concurrency;
 mod aggregate;
+#[cfg(any(feature = "sources-amqp", feature = "sinks-amqp"))]
+mod amqp;
 #[cfg(feature = "sources-apache_metrics")]
 mod apache_metrics;
 #[cfg(feature = "api")]
@@ -133,6 +135,8 @@ pub(crate) use mongodb_metrics::*;
 
 #[cfg(feature = "transforms-aggregate")]
 pub(crate) use self::aggregate::*;
+#[cfg(any(feature = "sources-amqp", feature = "sinks-amqp"))]
+pub(crate) use self::amqp::*;
 #[cfg(feature = "sources-apache_metrics")]
 pub(crate) use self::apache_metrics::*;
 #[cfg(feature = "api")]

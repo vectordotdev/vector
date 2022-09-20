@@ -198,6 +198,9 @@ prost-types = { version = "0.10.1", default-features = false, optional = true }
 goauth = { version = "0.13.1", optional = true }
 smpl_jwt = { version = "0.7.1", default-features = false, optional = true }
 
+# AMQP
+lapin = { version = "2.1.1", default-features = false, optional = true }
+
 # API
 async-graphql = { version = "4.0.13", default-features = false, optional = true, features = ["chrono"] }
 async-graphql-warp = { version = "4.0.13", default-features = false, optional = true }
@@ -442,6 +445,7 @@ enrichment-tables-geoip = ["dep:maxminddb"]
 # Sources
 sources = ["sources-logs", "sources-metrics"]
 sources-logs = [
+  "sources-amqp",
   "sources-aws_kinesis_firehose",
   "sources-aws_s3",
   "sources-aws_sqs",
@@ -484,6 +488,7 @@ sources-metrics = [
   "sources-vector",
 ]
 
+sources-amqp = ["lapin"]
 sources-apache_metrics = []
 sources-aws_ecs_metrics = []
 sources-aws_kinesis_firehose = ["dep:base64", "dep:infer"]
@@ -577,6 +582,7 @@ transforms-throttle = ["dep:governor"]
 # Sinks
 sinks = ["sinks-logs", "sinks-metrics"]
 sinks-logs = [
+  "sinks-amqp",
   "sinks-apex",
   "sinks-aws_cloudwatch_logs",
   "sinks-aws_kinesis_firehose",
@@ -631,6 +637,7 @@ sinks-metrics = [
   "sinks-splunk_hec"
 ]
 
+sinks-amqp = ["lapin"]
 sinks-apex = []
 sinks-aws_cloudwatch_logs = ["aws-core", "dep:aws-sdk-cloudwatchlogs"]
 sinks-aws_cloudwatch_metrics = ["aws-core", "dep:aws-sdk-cloudwatch"]
@@ -693,6 +700,7 @@ nightly = []
 
 # Testing-related features
 all-integration-tests = [
+  "amqp-integration-tests",
   "apex-integration-tests",
   "aws-integration-tests",
   "axiom-integration-tests",
@@ -727,6 +735,8 @@ all-integration-tests = [
   "splunk-integration-tests",
   "dnstap-integration-tests",
 ]
+
+amqp-integration-tests = ["sources-amqp", "sinks-amqp"]
 
 aws-integration-tests = [
   "aws-cloudwatch-logs-integration-tests",
@@ -877,4 +887,3 @@ name = "codecs"
 path = "benches/codecs/main.rs"
 harness = false
 required-features = ["codecs-benches"]
-
