@@ -3,7 +3,8 @@ use crate::config;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::Configurable;
 
-const SECRET_AND_VARIABLES_REGEX: &str = "(:?\\$\\{.+\\})";
+const SECRET_AND_VARIABLES_REGEX: &str =
+    "(:?\\$\\{.+\\})|(:?SECRET\\[([[:word:]]+)\\.([[:word:].]+)\\])";
 
 fn into_errors<E: std::fmt::Debug>(err: E) -> Vec<String> {
     vec![format!("{:?}", err)]
@@ -96,6 +97,14 @@ mod tests {
     }
 
     #[test]
+    fn regex_should_detect_secrets() {
+        let re = Regex::new(super::SECRET_AND_VARIABLES_REGEX).unwrap();
+        assert!(re.is_match("SECRET[a.secret.key]"));
+        assert!(re.is_match("SECRET[a.secret.key] SECRET[a.secret.key]"));
+        assert!(re.is_match("xxxSECRET[a.secret.key]yyy"));
+    }
+
+    #[test]
     fn schema_should_detect_missing_variable_in_keys() {
         let config = r#"{
     "enterprise": {
@@ -107,5 +116,18 @@ mod tests {
 }"#;
         let errors = check_sensitive_fields(config).unwrap_err();
         assert_eq!(errors[0], "{\"api_key\":\"aaaaa\",\"configuration_key\":\"bbbbb\"} is not valid under any of the given schemas at instance path /enterprise");
+    }
+
+    #[test]
+    fn schema_should_detect_secrets() {
+        let config = r#"{
+    "enterprise": {
+        "api_key": "SECRET[foo.bar]",
+        "configuration_key": "SECRET[foo.baz]"
+    },
+    "sources": {},
+    "sinks": {}
+}"#;
+        check_sensitive_fields(config).unwrap();
     }
 }
