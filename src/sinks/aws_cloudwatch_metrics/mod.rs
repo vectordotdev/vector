@@ -308,10 +308,12 @@ impl Service<PartitionInnerBuffer<Vec<Metric>, String>> for CloudWatchMetricsSvc
     type Error = SdkError<PutMetricDataError>;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
+    // Emission of Error internal event is handled upstream by the caller
     fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
+    // Emission of Error internal event is handled upstream by the caller
     fn call(&mut self, items: PartitionInnerBuffer<Vec<Metric>, String>) -> Self::Future {
         let (items, namespace) = items.into_parts();
         let metric_data = self.encode_events(items);
