@@ -153,7 +153,7 @@ know if the client will retry them.
   - MUST increment the `<namespace>_discarded_events_total` counter by the
     number of events discarded.
   - MUST only include the `intentional` property and component properties that
-    are inherited implicitly.
+    are inherited implicitly (e.g. `component_type`).
 - Logs
   - MUST log a `Events dropped` message.
   - MUST include the defined properties as key-value pairs.
