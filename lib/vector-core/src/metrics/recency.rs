@@ -329,11 +329,14 @@ where
                     // If the value is the same as the latest value we have internally, and
                     // we're over the idle timeout period, then remove it and continue.
                     if *last_gen == gen {
-                        // Check if the key is referenced by an external handle.
+                        // We don't want to delete the metric if there is an outstanding handle that
+                        // could later update the shared value. So, here we look up the count of
+                        // references to the inner value to see if there are more than expected.
+                        //
                         // The magic value below comes from:
                         // 1. The handle in the registry
                         // 2. The handle held by the value
-                        // If there is another reference, then there is a handle.
+                        // If there is another reference, then there is handle elsewhere.
                         let referenced = Arc::strong_count(&value.inner) > 2;
                         // If the delete returns false, that means that our generation counter is
                         // out-of-date, and that the metric has been updated since, so we don't
