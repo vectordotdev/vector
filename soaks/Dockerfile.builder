@@ -9,7 +9,7 @@ RUN apt-get update && \
 RUN git clone https://github.com/rui314/mold.git && cd mold && git checkout v1.2.1 && make -j"$(nproc)" && make install
 
 # also update scripts/cross/bootstrap-ubuntu.sh
-ENV PROTOC_VERSION=3.19.4
+ENV PROTOC_VERSION=3.19.5
 ENV PROTOC_ZIP=protoc-${PROTOC_VERSION}-linux-x86_64.zip
 
 RUN \
