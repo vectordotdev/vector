@@ -1,12 +1,9 @@
 use crate::config::schema;
 use crate::topology::schema::merged_definition;
-use futures_util::StreamExt;
+use futures_util::{FutureExt, TryFutureExt, TryStreamExt};
+use heim::units::information::byte;
 use indexmap::IndexMap;
-use std::{
-    collections::HashMap,
-    path::{Path, PathBuf},
-};
-use sysinfo::{DiskExt, System, SystemExt};
+use std::collections::HashMap;
 use vector_core::internal_event::DEFAULT_OUTPUT;
 
 use super::{
@@ -207,39 +204,9 @@ pub async fn check_buffer_preconditions(config: &Config) -> Result<(), Vec<Strin
     // Notably, this does *not* cover other data usage by Vector on the same mountpoint because we
     // don't always know the upper bound of that usage i.e. file checkpoint state.
 
-    // Query all the disks on the system, sorted by their mountpoint -- longest to shortest --
-    // and create a map of mountpoint => total capacity.
-    //
-    // This is so that we can find the most specific mountpoint for a given disk buffer just by
-    // iterating in normal beginning-to-end fashion until we find a mountpoint path that is a prefix
-    // of the buffer's data directory path.
-    let mut system_info = System::new();
-    system_info.refresh_disks_list();
-    system_info.sort_disks_by(|a, b| b.mount_point().cmp(a.mount_point()));
-    let mountpoints = system_info
-        .disks()
-        .iter()
-        .map(|disk| (disk.mount_point().to_path_buf(), disk.total_space()))
-        .collect::<IndexMap<_, _>>();
-
-    let heim_mountpoints = heim::disk::partitions().await
-        .expect("getting partitions should not fail")
-        .filter_map(|result| async move {
-            match result {
-                Ok(partition) => Some(partition),
-                Err(e) => {
-                    println!("partition error: {}", e);
-                    None
-                },
-            }
-        })
-        .collect::<Vec<_>>()
-        .await;
-    println!("heim mountpoints: {:#?}", heim_mountpoints);
-
-    // Now build a mapping of buffer IDs/usage configuration to the mountpoint they reside on.
+    // Grab all configured disk buffers, and if none are present, simply return early.
     let global_data_dir = config.global.data_dir.clone();
-    let mountpoint_buffer_mapping = config
+    let configured_disk_buffers = config
         .sinks()
         .flat_map(|(id, sink)| {
             sink.buffer
@@ -247,44 +214,69 @@ pub async fn check_buffer_preconditions(config: &Config) -> Result<(), Vec<Strin
                 .iter()
                 .filter_map(|stage| stage.disk_usage(global_data_dir.clone(), id))
         })
-        .fold(HashMap::new(), |mut mappings, usage| {
-            let resolved_data_dir = get_resolved_dir_path(usage.data_dir());
-            let mountpoint = mountpoints
-                .keys()
-                .find(|mountpoint| resolved_data_dir.starts_with(mountpoint));
+        .collect::<Vec<_>>();
 
-            match mountpoint {
-                // TODO: Should this actually be an error?
-                //
-                // My inclination is that because we're trying to stop operators from landing in bad
-                // outcomes, like running out of space and panicking/corrupting some of the buffer
-                // data, we would want to be authoritative: if we can't be sure the mountpoints are
-                // large enough, we don't validate the configuration.
-                //
-                // On the other hand, we need to be sure this code works correctly on all of our
-                // "tier 1" platforms -- i.e. Linux, Windows, macOS, and in containerized
-                // environments -- before we could feel confident enough, I think, to block Vector
-                // startup on such a validation.
-                //
-                // If we can indeed show that this code works correctly on those environments, such
-                // that we can be reasonably confident that normal users won't encounter errors that
-                // hamstring them, then maybe we could make this an actual failure instead of just a
-                // warning log.
-                None => warn!(
-                    buffer_id = usage.id().id(),
-                    buffer_data_dir = usage.data_dir().to_string_lossy().as_ref(),
-                    resolved_buffer_data_dir = resolved_data_dir.to_string_lossy().as_ref(),
-                    message = "Found no matching mountpoint for buffer data directory.",
-                ),
-                Some(mountpoint) => {
-                    let entries = mappings.entry(mountpoint.clone()).or_insert_with(Vec::new);
+    if configured_disk_buffers.is_empty() {
+        return Ok(());
+    }
 
-                    entries.push(usage);
+    // Now query all the mountpoints on the system, and get their total capacity. We also have to
+    // sort the mountpoints from longest to shortest so we can find the longest prefix match for
+    // each buffer data directory by simply iterating from beginning to end.
+    let mountpoints = heim::disk::partitions_physical()
+        .and_then(|partitions| {
+            partitions
+                .and_then(|partition| {
+                    let mountpoint_path = partition.mount_point().to_path_buf();
+                    heim::disk::usage(mountpoint_path.clone()).map(|usage| {
+                        usage.map(|usage| (mountpoint_path, usage.total().get::<byte>()))
+                    })
+                })
+                .try_collect::<IndexMap<_, _>>()
+        })
+        .await;
+
+    let mountpoints = match mountpoints {
+        Ok(mut mountpoints) => {
+            mountpoints.sort_by(|m1, _, m2, _| m2.cmp(m1));
+            mountpoints
+        }
+        Err(e) => {
+            warn!("Failed to query disk partitions. Cannot ensure that buffer size limits are within physical storage capacity limits.");
+            debug!(
+                "Encountered unexpected error during disk partition query: {}.",
+                e
+            );
+            return Ok(());
+        }
+    };
+
+    // Now build a mapping of buffer IDs/usage configuration to the mountpoint they reside on.
+    let mountpoint_buffer_mapping =
+        configured_disk_buffers
+            .into_iter()
+            .fold(HashMap::new(), |mut mappings, usage| {
+                let mountpoint = mountpoints
+                    .keys()
+                    .find(|mountpoint| usage.data_dir().starts_with(mountpoint));
+
+                match mountpoint {
+                    None => warn!(
+                        buffer_id = usage.id().id(),
+                        buffer_data_dir = usage.data_dir().to_string_lossy().as_ref(),
+                        resolved_buffer_data_dir = usage.data_dir().to_string_lossy().as_ref(),
+                        message = "Found no matching mountpoint for buffer data directory.",
+                    ),
+                    Some(mountpoint) => {
+                        mappings
+                            .entry(mountpoint.clone())
+                            .or_insert_with(Vec::new)
+                            .push(usage);
+                    }
                 }
-            }
 
-            mappings
-        });
+                mappings
+            });
 
     // Finally, we have a mapping of disk buffers, based on their underlying mountpoint. Go through
     // and check to make sure the sum total of `max_size` for all buffers associated with each
@@ -319,81 +311,6 @@ Reduce the `max_size` of the buffers to fit within the total capacity of the mou
     } else {
         Err(errors)
     }
-}
-
-#[cfg(target_os = "macos")]
-fn get_resolved_dir_path(path: &Path) -> PathBuf {
-    // On more recent versions of macOS, they use a layered approach to the filesystem where the
-    // common "root" filesystem -- i.e. `/` -- is actually composed of various directories which are
-    // sourced from various underlying volumes, where some directories are read only (like OS base
-    // files) and some are read/write (like user home directories and `/tmp/` and so on).
-    //
-    // For the common paths like user folders, or `/tmp`, and so on, we can't actually directly
-    // resolve the volume that they're magically mapped to unless we specifically use information
-    // from the "firmlinks" mapping.
-
-    // We try to load the firmlinks mapping file, and if we can, we read it, and read the
-    // associations within it.
-    let firmlinks_data = std::fs::read_to_string("/usr/share/firmlinks");
-    match firmlinks_data {
-        // If we got an error trying to read the firmlinks mapping file, just return the original path.
-        Err(_) => path.to_path_buf(),
-        Ok(data) => {
-            let data_volume = PathBuf::from("/System/Volumes/Data");
-
-            // Parse the mapping data, which contains multiple lines with a tab-delimited
-            // key/value pair, the key being the path to map and the value being the relative
-            // directory within the data volume to map to.
-            let firmlink_mappings = data
-                .split('\n')
-                .filter_map(|line| {
-                    let parts = line.split('\t').collect::<Vec<_>>();
-                    if parts.len() != 2 {
-                        None
-                    } else {
-                        let overlay_destination_path = PathBuf::from(parts[0]);
-                        let overlay_source_path = data_volume.clone().join(parts[1]);
-
-                        // Make sure both paths exist on disk as a safeguard against the format
-                        // changing, or our understanding of how to utilize the file being
-                        // inaccurate, etc.
-                        if Path::exists(&overlay_destination_path)
-                            && Path::exists(&overlay_source_path)
-                        {
-                            Some((overlay_destination_path, overlay_source_path))
-                        } else {
-                            None
-                        }
-                    }
-                })
-                .collect::<HashMap<_, _>>();
-
-            // Now that we have the firmlinks mappings read and parsed, iterate through them to
-            // see if any of them is a prefix of the path we've been given, and if so, we'll
-            // replace that prefix with the mapping version.
-            match firmlink_mappings
-                .iter()
-                .find(|(prefix, _)| path.starts_with(prefix))
-            {
-                Some((prefix, replacement)) => {
-                    // Strip the prefix, and then join the stripped version to our data volume
-                    // path along with the prefix replacement.
-                    let stripped = path
-                        .strip_prefix(&prefix)
-                        .expect("path is known to be prefixed by value");
-                    replacement.clone().join(stripped)
-                }
-                // There was no firmlink mapping related to the path being resolved, so return
-                // it as-is.
-                None => path.to_path_buf(),
-            }
-        }
-    }
-}
-
-#[cfg(not(target_os = "macos"))]
-fn get_resolved_dir_path(path: &Path) -> PathBuf {
-    path.to_path_buf()
 }
 
 pub fn warnings(config: &Config) -> Vec<String> {

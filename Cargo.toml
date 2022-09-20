@@ -293,7 +293,6 @@ snap = { version = "1.0.5", default-features = false, optional = true }
 socket2 = { version = "0.4.7", default-features = false }
 stream-cancel = { version = "0.8.1", default-features = false }
 strip-ansi-escapes = { version = "0.1.1", default-features = false }
-sysinfo = { version = "0.26.2", default-features = false }
 syslog = { version = "6.0.1", default-features = false, optional = true }
 tikv-jemallocator = { version = "0.5.0", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.7", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
@@ -308,7 +307,7 @@ warp = { version = "0.3.1", default-features = false }
 
 # depending on fork for bumped nix dependency
 # https://github.com/heim-rs/heim/pull/360
-heim = { git = "https://github.com/vectordotdev/heim.git", branch="update-nix", default-features = false, features = ["cpu", "disk", "host", "memory", "net"], optional = true }
+heim = { git = "https://github.com/vectordotdev/heim.git", branch = "update-nix", default-features = false, features = ["disk"] }
 
 # make sure to update the external docs when the Lua version changes
 mlua = { version = "0.8.3", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
@@ -501,7 +500,7 @@ sources-file-descriptor = ["tokio-util/io"]
 sources-fluent = ["dep:base64", "listenfd", "tokio-util/net", "dep:rmpv", "dep:rmp-serde", "dep:serde_bytes"]
 sources-gcp_pubsub = ["gcp", "dep:h2", "dep:prost-types", "protobuf-build", "dep:tonic"]
 sources-heroku_logs = ["sources-utils-http", "sources-utils-http-query", "sources-http"]
-sources-host_metrics = ["dep:heim"]
+sources-host_metrics =  ["heim/cpu", "heim/host", "heim/memory", "heim/net"]
 sources-http = ["sources-utils-http", "sources-utils-http-query"]
 sources-http_scrape = ["sources-utils-http-scrape"]
 sources-internal_logs = []
@@ -520,7 +519,7 @@ sources-redis= ["dep:redis"]
 sources-socket = ["listenfd", "tokio-util/net", "sources-utils-udp", "sources-utils-unix"]
 sources-splunk_hec = ["dep:roaring"]
 sources-statsd = ["listenfd", "sources-utils-udp", "sources-utils-unix", "tokio-util/net"]
-sources-stdin = ["tokio-util/io", "dep:heim"]
+sources-stdin = ["tokio-util/io"]
 sources-syslog = ["listenfd", "tokio-util/net", "sources-utils-udp", "sources-utils-unix", "codecs/syslog"]
 sources-utils-http = ["dep:snap", "sources-utils-http-auth", "sources-utils-http-encoding", "sources-utils-http-error", "sources-utils-http-prelude"]
 sources-utils-http-auth = ["sources-utils-http-error"]
