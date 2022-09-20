@@ -48,7 +48,7 @@ impl Registry {
 
         for (key, counter) in self.registry.get_counter_handles() {
             if recency.map_or(true, |recency| {
-                recency.should_store_counter(&key, counter.get_generation(), &self.registry)
+                recency.should_store_counter(&key, &counter, &self.registry)
             }) {
                 // NOTE this will truncate if the value is greater than 2**52.
                 #[allow(clippy::cast_precision_loss)]
@@ -59,7 +59,7 @@ impl Registry {
         }
         for (key, gauge) in self.registry.get_gauge_handles() {
             if recency.map_or(true, |recency| {
-                recency.should_store_gauge(&key, gauge.get_generation(), &self.registry)
+                recency.should_store_gauge(&key, &gauge, &self.registry)
             }) {
                 let value = gauge.get_inner().load(Ordering::Relaxed);
                 let value = MetricValue::Gauge { value };
@@ -68,7 +68,7 @@ impl Registry {
         }
         for (key, histogram) in self.registry.get_histogram_handles() {
             if recency.map_or(true, |recency| {
-                recency.should_store_histogram(&key, histogram.get_generation(), &self.registry)
+                recency.should_store_histogram(&key, &histogram, &self.registry)
             }) {
                 let value = histogram.get_inner().make_metric();
                 metrics.push(Metric::from_metric_kv(&key, value, timestamp));

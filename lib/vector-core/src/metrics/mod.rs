@@ -317,4 +317,32 @@ mod tests {
         metrics::counter!("test4", 3, "tag" => "value1");
         assert_eq!(controller.capture_metrics().len(), 3);
     }
+
+    #[test]
+    fn skips_expiring_registered() {
+        let controller = init_metrics();
+        controller.set_expiry(Some(IDLE_TIMEOUT)).unwrap();
+
+        let a = metrics::register_counter!("test5");
+        metrics::counter!("test6", 5);
+        assert_eq!(controller.capture_metrics().len(), 4);
+        a.increment(1);
+        assert_eq!(controller.capture_metrics().len(), 4);
+
+        std::thread::sleep(Duration::from_secs_f64(IDLE_TIMEOUT * 2.0));
+        assert_eq!(controller.capture_metrics().len(), 3);
+
+        a.increment(1);
+        let metrics = controller.capture_metrics();
+        assert_eq!(metrics.len(), 3);
+        let metric = metrics
+            .into_iter()
+            .filter(|metric| metric.name() == "test5")
+            .next()
+            .unwrap();
+        match metric.value() {
+            MetricValue::Counter { value } => assert_eq!(*value, 2.0),
+            value => panic!("Invalid metric value {:?}", value),
+        }
+    }
 }

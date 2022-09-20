@@ -23,17 +23,19 @@
 //! observed, to build a complete picture that allows deciding if a given metric has gone "idle" or
 //! not, and thus whether it should actually be deleted.
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use metrics::{Counter, CounterFn, Gauge, GaugeFn, Histogram, HistogramFn};
+use metrics::{Counter, CounterFn, Gauge, GaugeFn, HistogramFn};
 use metrics_util::{
     registry::{Registry, Storage},
     Hashable, MetricKind, MetricKindMask,
 };
 use parking_lot::Mutex;
 use quanta::{Clock, Instant};
+
+use super::storage::{AtomicF64, Histogram};
 
 /// The generation of a metric.
 ///
@@ -132,7 +134,7 @@ where
     T: CounterFn + Send + Sync + 'static,
 {
     fn from(inner: Generational<T>) -> Self {
-        Counter::from_arc(Arc::new(inner))
+        Self::from_arc(Arc::new(inner))
     }
 }
 
@@ -141,16 +143,16 @@ where
     T: GaugeFn + Send + Sync + 'static,
 {
     fn from(inner: Generational<T>) -> Self {
-        Gauge::from_arc(Arc::new(inner))
+        Self::from_arc(Arc::new(inner))
     }
 }
 
-impl<T> From<Generational<T>> for Histogram
+impl<T> From<Generational<T>> for metrics::Histogram
 where
     T: HistogramFn + Send + Sync + 'static,
 {
     fn from(inner: Generational<T>) -> Self {
-        Histogram::from_arc(Arc::new(inner))
+        Self::from_arc(Arc::new(inner))
     }
 }
 
@@ -241,15 +243,19 @@ where
     pub(super) fn should_store_counter<S>(
         &self,
         key: &K,
-        gen: Generation,
+        counter: &Generational<Arc<AtomicU64>>,
         registry: &Registry<K, S>,
     ) -> bool
     where
         S: Storage<K>,
     {
-        self.should_store(key, gen, registry, MetricKind::Counter, |registry, key| {
-            registry.delete_counter(key)
-        })
+        self.should_store(
+            key,
+            counter,
+            registry,
+            MetricKind::Counter,
+            Registry::delete_counter,
+        )
     }
 
     /// Checks if the given gauge should be stored, based on its known recency.
@@ -261,15 +267,19 @@ where
     pub(super) fn should_store_gauge<S>(
         &self,
         key: &K,
-        gen: Generation,
+        gauge: &Generational<Arc<AtomicF64>>,
         registry: &Registry<K, S>,
     ) -> bool
     where
         S: Storage<K>,
     {
-        self.should_store(key, gen, registry, MetricKind::Gauge, |registry, key| {
-            registry.delete_gauge(key)
-        })
+        self.should_store(
+            key,
+            gauge,
+            registry,
+            MetricKind::Gauge,
+            Registry::delete_gauge,
+        )
     }
 
     /// Checks if the given histogram should be stored, based on its known recency.
@@ -281,7 +291,7 @@ where
     pub(super) fn should_store_histogram<S>(
         &self,
         key: &K,
-        gen: Generation,
+        hist: &Generational<Arc<Histogram>>,
         registry: &Registry<K, S>,
     ) -> bool
     where
@@ -289,17 +299,17 @@ where
     {
         self.should_store(
             key,
-            gen,
+            hist,
             registry,
             MetricKind::Histogram,
             Registry::delete_histogram,
         )
     }
 
-    fn should_store<F, S>(
+    fn should_store<F, S, T>(
         &self,
         key: &K,
-        gen: Generation,
+        value: &Generational<Arc<T>>,
         registry: &Registry<K, S>,
         kind: MetricKind,
         delete_op: F,
@@ -308,6 +318,7 @@ where
         F: Fn(&Registry<K, S>, &K) -> bool,
         S: Storage<K>,
     {
+        let gen = value.get_generation();
         if let Some(idle_timeout) = self.idle_timeout {
             if self.mask.matches(kind) {
                 let mut guard = self.inner.lock();
@@ -318,10 +329,18 @@ where
                     // If the value is the same as the latest value we have internally, and
                     // we're over the idle timeout period, then remove it and continue.
                     if *last_gen == gen {
+                        // Check if the key is referenced by an external handle.
+                        // The magic value below comes from:
+                        // 1. The handle in the registry
+                        // 2. The handle held by the value
+                        // If there is another reference, then there is a handle.
+                        let referenced = Arc::strong_count(&value.inner) > 2;
                         // If the delete returns false, that means that our generation counter is
                         // out-of-date, and that the metric has been updated since, so we don't
                         // actually want to delete it yet.
-                        (now - *last_update) > idle_timeout && delete_op(registry, key)
+                        !referenced
+                            && (now - *last_update) > idle_timeout
+                            && delete_op(registry, key)
                     } else {
                         // Value has changed, so mark it such.
                         *last_update = now;
