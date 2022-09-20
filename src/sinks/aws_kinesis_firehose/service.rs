@@ -44,11 +44,13 @@ impl Service<Vec<KinesisRequest>> for KinesisService {
 
     fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
         // Emission of Error internal event is handled upstream by the caller
+
         Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, requests: Vec<KinesisRequest>) -> Self::Future {
         // Emission of Error internal event is handled upstream by the caller
+
         let events_byte_size = requests.iter().map(|req| req.event_byte_size).sum();
         let count = requests.len();
 
