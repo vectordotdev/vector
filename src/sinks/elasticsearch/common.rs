@@ -137,7 +137,7 @@ impl ElasticsearchCommon {
         })
     }
 
-    /// Parses endpoints into a vector ElasticsearchCommons. The resulting vector is guaranteed to not be empty.
+    /// Parses endpoints into a vector of ElasticsearchCommons. The resulting vector is guaranteed to not be empty.
     pub async fn parse_many(config: &ElasticsearchConfig) -> crate::Result<Vec<Self>> {
         if let Some(endpoint) = config.endpoint.as_ref() {
             warn!(message = "DEPRECATION, use of deprecated option `endpoint`. Please use `endpoints` option instead.");

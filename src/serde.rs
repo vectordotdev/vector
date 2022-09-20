@@ -125,9 +125,3 @@ impl<T> From<Vec<T>> for OneOrMany<T> {
         Self::Many(value)
     }
 }
-
-impl<T: Default> Default for OneOrMany<T> {
-    fn default() -> Self {
-        Self::One(T::default())
-    }
-}

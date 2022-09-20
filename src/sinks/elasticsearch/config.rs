@@ -52,7 +52,7 @@ pub struct ElasticsearchConfig {
 
     /// The Elasticsearch endpoints to send logs to.
     ///
-    /// This should be the full URL as shown in the example.
+    /// Each endpoint should be the full URL as shown in the example.
     #[serde(default)]
     pub endpoints: Vec<String>,
 
