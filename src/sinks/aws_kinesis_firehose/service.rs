@@ -42,18 +42,13 @@ impl Service<Vec<KinesisRequest>> for KinesisService {
     type Error = SdkError<PutRecordBatchError>;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
-    // Emission of Error internal event is handled upstream by the caller
     fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
+        // Emission of Error internal event is handled upstream by the caller
         Poll::Ready(Ok(()))
     }
 
-    // Emission of Error internal event is handled upstream by the caller
     fn call(&mut self, requests: Vec<KinesisRequest>) -> Self::Future {
-        debug!(
-            message = "Sending records.",
-            events = %requests.len(),
-        );
-
+        // Emission of Error internal event is handled upstream by the caller
         let events_byte_size = requests.iter().map(|req| req.event_byte_size).sum();
         let count = requests.len();
 
