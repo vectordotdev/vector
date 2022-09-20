@@ -383,7 +383,10 @@ name = "foo pipeline"
 [[transforms.my_pipelines.logs]]
 name = "bar pipeline"
 filter.type = "vrl"
-filter.source = """false"""
+filter.source = """true"""
+
+
+
             "#,
             )
             .unwrap();
