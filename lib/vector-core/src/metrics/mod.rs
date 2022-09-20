@@ -337,9 +337,8 @@ mod tests {
         assert_eq!(metrics.len(), 3);
         let metric = metrics
             .into_iter()
-            .filter(|metric| metric.name() == "test5")
-            .next()
-            .unwrap();
+            .find(|metric| metric.name() == "test5")
+            .expect("Test metric is not present");
         match metric.value() {
             MetricValue::Counter { value } => assert_eq!(*value, 2.0),
             value => panic!("Invalid metric value {:?}", value),
