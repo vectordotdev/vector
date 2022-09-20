@@ -1,14 +1,15 @@
 use std::task::{Context, Poll};
 
-use aws_sdk_firehose::error::PutRecordBatchError;
-use aws_sdk_firehose::types::SdkError;
-use aws_sdk_firehose::{Client as KinesisFirehoseClient, Region};
+use aws_sdk_firehose::{
+    error::PutRecordBatchError, types::SdkError, Client as KinesisFirehoseClient, Region,
+};
 use futures::future::BoxFuture;
 use hyper::service::Service;
 use tracing::Instrument;
 use vector_core::{internal_event::EventsSent, stream::DriverResponse};
 
-use crate::{event::EventStatus, sinks::aws_kinesis_firehose::request_builder::KinesisRequest};
+use super::request_builder::KinesisRequest;
+use crate::event::EventStatus;
 
 #[derive(Clone)]
 pub struct KinesisService {
@@ -41,10 +42,12 @@ impl Service<Vec<KinesisRequest>> for KinesisService {
     type Error = SdkError<PutRecordBatchError>;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
+    // Emission of Error internal event is handled upstream by the caller
     fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
+    // Emission of Error internal event is handled upstream by the caller
     fn call(&mut self, requests: Vec<KinesisRequest>) -> Self::Future {
         debug!(
             message = "Sending records.",
