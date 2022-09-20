@@ -1,6 +1,8 @@
 use enum_dispatch::enum_dispatch;
 use snafu::Snafu;
 
+#[cfg(feature = "sources-amqp")]
+pub mod amqp;
 #[cfg(feature = "sources-apache_metrics")]
 pub mod apache_metrics;
 #[cfg(feature = "sources-aws_ecs_metrics")]
@@ -104,6 +106,10 @@ enum BuildError {
 #[serde(tag = "type", rename_all = "snake_case")]
 #[enum_dispatch(SourceConfig)]
 pub enum Sources {
+    /// AMQP.
+    #[cfg(feature = "sources-amqp")]
+    Amqp(#[configurable(derived)] amqp::AmqpSourceConfig),
+
     /// Apache HTTP Server (HTTPD) Metrics.
     #[cfg(feature = "sources-apache_metrics")]
     ApacheMetrics(#[configurable(derived)] apache_metrics::ApacheMetricsConfig),
@@ -297,6 +303,8 @@ impl NamedComponent for Sources {
 
     fn get_component_name(&self) -> &'static str {
         match self {
+            #[cfg(feature = "sources-amqp")]
+            Self::Amqp(config) => config.get_component_name(),
             #[cfg(feature = "sources-apache_metrics")]
             Self::ApacheMetrics(config) => config.get_component_name(),
             #[cfg(feature = "sources-aws_ecs_metrics")]

@@ -4,6 +4,8 @@ use snafu::Snafu;
 
 pub mod util;
 
+#[cfg(feature = "sinks-amqp")]
+pub mod amqp;
 #[cfg(feature = "sinks-apex")]
 pub mod apex;
 #[cfg(feature = "sinks-aws_cloudwatch_logs")]
@@ -130,6 +132,10 @@ pub enum HealthcheckError {
 #[serde(tag = "type", rename_all = "snake_case")]
 #[enum_dispatch(SinkConfig)]
 pub enum Sinks {
+    /// AMQP.
+    #[cfg(feature = "sinks-amqp")]
+    Amqp(#[configurable(derived)] amqp::AmqpSinkConfig),
+
     /// Apex Logs.
     #[cfg(feature = "sinks-apex")]
     Apex(#[configurable(derived)] apex::ApexSinkConfig),
@@ -364,6 +370,8 @@ impl NamedComponent for Sinks {
 
     fn get_component_name(&self) -> &'static str {
         match self {
+            #[cfg(feature = "sinks-amqp")]
+            Self::Amqp(config) => config.get_component_name(),
             #[cfg(feature = "sinks-apex")]
             Self::Apex(config) => config.get_component_name(),
             #[cfg(feature = "sinks-aws_cloudwatch_logs")]

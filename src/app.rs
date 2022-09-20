@@ -88,6 +88,7 @@ impl Application {
                     "tower_limit=trace".to_owned(),
                     format!("rdkafka={}", level),
                     format!("buffers={}", level),
+                    format!("lapin={}", level),
                     format!("kube={}", level),
                 ]
                 .join(","),
