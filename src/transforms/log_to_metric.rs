@@ -486,8 +486,12 @@ impl FunctionTransform for LogToMetric {
 #[cfg(test)]
 mod tests {
     use chrono::{offset::TimeZone, DateTime, Utc};
+    use tokio::sync::mpsc;
+    use tokio_stream::wrappers::ReceiverStream;
 
     use super::*;
+    use crate::test_util::components::assert_transform_compliance;
+    use crate::transforms::test::create_topology;
     use crate::{
         config::log_schema,
         event::{
@@ -517,8 +521,22 @@ mod tests {
         log
     }
 
-    #[test]
-    fn count_http_status_codes() {
+    async fn do_transform(config: LogToMetricConfig, event: Event) -> Event {
+        assert_transform_compliance(async move {
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
+            tx.send(event).await.unwrap();
+            let result = out.recv().await.unwrap();
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+            result
+        })
+        .await
+    }
+
+    #[tokio::test]
+    async fn count_http_status_codes() {
         let config = parse_config(
             r#"
             [[metrics]]
@@ -529,8 +547,7 @@ mod tests {
 
         let event = create_event("status", "42");
         let metadata = event.metadata().clone();
-        let mut transform = LogToMetric::new(config);
-        let metric = transform_one(&mut transform, event).unwrap();
+        let metric = do_transform(config, event).await;
 
         assert_eq!(
             metric.into_metric(),
