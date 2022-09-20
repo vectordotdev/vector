@@ -194,7 +194,7 @@ fn decode_datadog_sketches(
         // The datadog agent may send an empty payload as a keep alive
         debug!(
             message = "Empty payload ignored.",
-            internal_log_rate_secs = 30
+            internal_log_rate_limit = true
         );
         return Ok(Vec::new());
     }
@@ -223,7 +223,7 @@ fn decode_datadog_series_v2(
         // The datadog agent may send an empty payload as a keep alive
         debug!(
             message = "Empty payload ignored.",
-            internal_log_rate_secs = 30
+            internal_log_rate_limit = true
         );
         return Ok(Vec::new());
     }
@@ -367,7 +367,7 @@ fn decode_datadog_series_v1(
         // The datadog agent may send an empty payload as a keep alive
         debug!(
             message = "Empty payload ignored.",
-            internal_log_rate_secs = 30
+            internal_log_rate_limit = true
         );
         return Ok(Vec::new());
     }

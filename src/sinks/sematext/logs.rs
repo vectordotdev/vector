@@ -1,14 +1,13 @@
 use async_trait::async_trait;
 use futures::stream::{BoxStream, StreamExt};
 use indoc::indoc;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
 use super::Region;
 use crate::{
     codecs::Transformer,
-    config::{
-        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
-    },
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::EventArray,
     sinks::{
         elasticsearch::{BulkConfig, ElasticsearchConfig},
@@ -21,7 +20,7 @@ use crate::{
 };
 
 /// Configuration for the `sematext_logs` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("sematext_logs"))]
 #[derive(Clone, Debug)]
 pub struct SematextLogsConfig {
     #[configurable(derived)]
@@ -32,7 +31,7 @@ pub struct SematextLogsConfig {
     endpoint: Option<String>,
 
     /// The token that will be used to write to Sematext.
-    token: String,
+    token: SensitiveString,
 
     #[configurable(derived)]
     #[serde(
@@ -58,10 +57,6 @@ pub struct SematextLogsConfig {
     acknowledgements: AcknowledgementsConfig,
 }
 
-inventory::submit! {
-    SinkDescription::new::<SematextLogsConfig>("sematext_logs")
-}
-
 impl GenerateConfig for SematextLogsConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(indoc! {r#"
@@ -73,7 +68,6 @@ impl GenerateConfig for SematextLogsConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "sematext_logs")]
 impl SinkConfig for SematextLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let endpoint = match (&self.endpoint, &self.region) {
@@ -96,7 +90,7 @@ impl SinkConfig for SematextLogsConfig {
             ),
             bulk: Some(BulkConfig {
                 action: None,
-                index: Some(self.token.clone()),
+                index: Some(self.token.inner().to_owned()),
             }),
             batch: self.batch,
             request: RequestConfig {
@@ -117,10 +111,6 @@ impl SinkConfig for SematextLogsConfig {
 
     fn input(&self) -> Input {
         Input::log()
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "sematext_logs"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

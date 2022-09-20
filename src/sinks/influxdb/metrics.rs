@@ -15,12 +15,13 @@ use vector_core::{
 };
 
 use crate::{
-    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     event::{
         metric::{Metric, MetricValue, Sample, StatisticKind},
         Event,
     },
     http::HttpClient,
+    internal_events::InfluxdbEncodingError,
     sinks::{
         influxdb::{
             encode_timestamp, healthcheck, influx_line_protocol, influxdb_settings, Field,
@@ -55,7 +56,7 @@ impl SinkBatchSettings for InfluxDbDefaultBatchSettings {
 }
 
 /// Configuration for the `influxdb_metrics` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("influxdb_metrics"))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct InfluxDbConfig {
@@ -112,14 +113,9 @@ struct InfluxDbRequest {
     series: Vec<String>,
 }
 
-inventory::submit! {
-    SinkDescription::new::<InfluxDbConfig>("influxdb_metrics")
-}
-
 impl_generate_config_from_default!(InfluxDbConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "influxdb_metrics")]
 impl SinkConfig for InfluxDbConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let tls_settings = TlsSettings::from_options(&self.tls)?;
@@ -137,10 +133,6 @@ impl SinkConfig for InfluxDbConfig {
 
     fn input(&self) -> Input {
         Input::metric()
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "influxdb_metrics"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -167,7 +159,7 @@ impl InfluxDbSvc {
 
         let uri = settings.write_uri(endpoint)?;
 
-        let http_service = HttpBatchService::new(client, create_build_request(uri, token));
+        let http_service = HttpBatchService::new(client, create_build_request(uri, token.inner()));
 
         let influxdb_http_service = InfluxDbSvc {
             config,
@@ -222,7 +214,7 @@ impl Service<Vec<Metric>> for InfluxDbSvc {
 
 fn create_build_request(
     uri: http::Uri,
-    token: String,
+    token: &str,
 ) -> impl Fn(Bytes) -> BoxFuture<'static, crate::Result<hyper::Request<Bytes>>> + Sync + Send + 'static
 {
     let auth = format!("Token {}", token);
@@ -282,6 +274,8 @@ fn encode_events(
     quantiles: &[f64],
 ) -> BytesMut {
     let mut output = BytesMut::new();
+    let count = events.len() as u64;
+
     for event in events.into_iter() {
         let fullname = encode_namespace(event.namespace().or(default_namespace), '.', event.name());
         let ts = encode_timestamp(event.timestamp());
@@ -290,7 +284,8 @@ fn encode_events(
 
         let mut unwrapped_tags = tags.unwrap_or_default();
         unwrapped_tags.insert("metric_type".to_owned(), metric_type.to_owned());
-        if let Err(error) = influx_line_protocol(
+
+        if let Err(error_message) = influx_line_protocol(
             protocol_version,
             &fullname,
             Some(unwrapped_tags),
@@ -298,7 +293,10 @@ fn encode_events(
             ts,
             &mut output,
         ) {
-            warn!(message = "Failed to encode event; dropping event.", %error, internal_log_rate_secs = 30);
+            emit!(InfluxdbEncodingError {
+                error_message,
+                count,
+            });
         };
     }
 
@@ -1090,7 +1088,7 @@ mod integration_tests {
             influxdb2_settings: Some(InfluxDb2Settings {
                 org: ORG.to_string(),
                 bucket: BUCKET.to_string(),
-                token: TOKEN.to_string(),
+                token: TOKEN.to_string().into(),
             }),
             quantiles: default_summary_quantiles(),
             batch: Default::default(),

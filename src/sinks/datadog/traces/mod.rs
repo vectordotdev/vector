@@ -28,8 +28,3 @@ pub(crate) mod dd_proto {
 }
 
 pub use self::config::DatadogTracesConfig;
-use crate::config::SinkDescription;
-
-inventory::submit! {
-    SinkDescription::new::<DatadogTracesConfig>("datadog_traces")
-}

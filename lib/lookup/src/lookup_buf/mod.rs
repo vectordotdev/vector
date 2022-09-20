@@ -161,64 +161,6 @@ impl LookupBuf {
     pub fn as_segments(&self) -> &VecDeque<SegmentBuf> {
         &self.segments
     }
-
-    /// Create the possible fields that can be followed by this lookup.
-    /// Because of coalesced paths there can be a number of different combinations.
-    /// There is the potential for this function to create a vast number of different
-    /// combinations if there are multiple coalesced segments in a path.
-    ///
-    /// The limit specifies the limit of the path depth we are interested in.
-    /// Metrics is only interested in fields that are up to 3 levels deep (2 levels + 1 to check it
-    /// terminates).
-    ///
-    /// eg, .tags.nork.noog will never be an accepted path so we don't need to spend the time
-    /// collecting it.
-    pub fn to_alternative_components(&self, limit: usize) -> Vec<Vec<&str>> {
-        let mut components = vec![vec![]];
-        for segment in self.segments.iter().take(limit) {
-            match segment {
-                SegmentBuf::Field(FieldBuf { name, .. }) => {
-                    for component in &mut components {
-                        component.push(name.as_str());
-                    }
-                }
-
-                SegmentBuf::Coalesce(fields) => {
-                    components = components
-                        .iter()
-                        .flat_map(|path| {
-                            fields.iter().map(move |field| {
-                                let mut path = path.clone();
-                                path.push(field.name.as_str());
-                                path
-                            })
-                        })
-                        .collect();
-                }
-
-                SegmentBuf::Index(_) => {
-                    return Vec::new();
-                }
-            }
-        }
-
-        components
-    }
-
-    pub fn can_start_with(&self, prefix: &LookupBuf) -> bool {
-        let mut self_iter = self.iter();
-        for prefix_segment in prefix.iter() {
-            match self_iter.next() {
-                None => return false,
-                Some(self_segment) => {
-                    if !self_segment.can_equal(prefix_segment) {
-                        return false;
-                    }
-                }
-            }
-        }
-        true
-    }
 }
 
 #[inherent]

@@ -4,16 +4,17 @@ use codecs::decoding::{DeserializerConfig, FramingConfig, StreamDecodingError};
 use futures::{pin_mut, stream, Stream, StreamExt};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
+use vector_common::internal_event::{
+    ByteSize, BytesReceived, EventsReceived, InternalEventHandle as _, Protocol,
+};
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
-
-use vector_core::ByteSizeOf;
+use vector_core::{config::LogNamespace, ByteSizeOf};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{log_schema, GenerateConfig, Output, SourceConfig, SourceContext},
     event::Event,
-    internal_events::{BytesReceived, OldEventsReceived, StreamClosedError},
+    internal_events::StreamClosedError,
     nats::{from_tls_auth_config, NatsAuthConfig, NatsConfigError},
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
@@ -144,19 +145,17 @@ async fn nats_source(
 ) -> Result<(), ()> {
     let stream = get_subscription_stream(subscription).take_until(shutdown);
     pin_mut!(stream);
+    let bytes_received = register!(BytesReceived::from(Protocol::TCP));
     while let Some(msg) = stream.next().await {
-        emit!(BytesReceived {
-            byte_size: msg.data.len(),
-            protocol: "tcp",
-        });
+        bytes_received.emit(ByteSize(msg.data.len()));
         let mut stream = FramedRead::new(msg.data.as_ref(), decoder.clone());
         while let Some(next) = stream.next().await {
             match next {
                 Ok((events, _byte_size)) => {
                     let count = events.len();
-                    emit!(OldEventsReceived {
-                        byte_size: events.size_of(),
-                        count
+                    emit!(EventsReceived {
+                        count,
+                        byte_size: events.size_of()
                     });
 
                     let now = Utc::now();
@@ -294,8 +293,8 @@ mod integration_tests {
             tls: None,
             auth: Some(NatsAuthConfig::UserPassword {
                 user_password: NatsAuthUserPassword {
-                    user: "natsuser".into(),
-                    password: "natspass".into(),
+                    user: "natsuser".to_string(),
+                    password: "natspass".to_string().into(),
                 },
             }),
         };
@@ -324,8 +323,8 @@ mod integration_tests {
             tls: None,
             auth: Some(NatsAuthConfig::UserPassword {
                 user_password: NatsAuthUserPassword {
-                    user: "natsuser".into(),
-                    password: "wrongpass".into(),
+                    user: "natsuser".to_string(),
+                    password: "wrongpass".to_string().into(),
                 },
             }),
         };
@@ -354,7 +353,7 @@ mod integration_tests {
             tls: None,
             auth: Some(NatsAuthConfig::Token {
                 token: NatsAuthToken {
-                    value: "secret".into(),
+                    value: "secret".to_string().into(),
                 },
             }),
         };
@@ -383,7 +382,7 @@ mod integration_tests {
             tls: None,
             auth: Some(NatsAuthConfig::Token {
                 token: NatsAuthToken {
-                    value: "wrongsecret".into(),
+                    value: "wrongsecret".to_string().into(),
                 },
             }),
         };

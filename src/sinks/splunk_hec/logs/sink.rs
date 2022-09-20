@@ -26,7 +26,7 @@ use crate::{
     },
     template::Template,
 };
-use lookup::path;
+use lookup::event_path;
 
 pub struct HecLogsSink<S> {
     pub context: SinkContext,
@@ -253,7 +253,7 @@ pub fn process_log(event: Event, data: &HecLogData) -> HecProcessedEvent {
             Some(Value::Timestamp(ts)) => {
                 // set nanos in log if valid timestamp in event and timestamp_nanos_key is configured
                 if let Some(key) = data.timestamp_nanos_key {
-                    log.try_insert(path!(key), ts.timestamp_subsec_nanos() % 1_000_000);
+                    log.try_insert(event_path!(key), ts.timestamp_subsec_nanos() % 1_000_000);
                 }
                 Some((ts.timestamp_millis() as f64) / 1000f64)
             }

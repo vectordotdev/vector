@@ -37,6 +37,8 @@ use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::{Encoder, FramedRead, FramedWrite, LinesCodec};
 use vector_buffers::topology::channel::LimitedReceiver;
 use vector_core::event::{BatchNotifier, Event, EventArray, LogEvent};
+#[cfg(test)]
+use zstd::Decoder as ZstdDecoder;
 
 use crate::{
     config::{Config, ConfigDiff, GenerateConfig},
@@ -127,7 +129,7 @@ pub fn trace_init() {
 
     let levels = std::env::var("TEST_LOG").unwrap_or_else(|_| "error".to_string());
 
-    trace::init(color, false, &levels);
+    trace::init(color, false, &levels, 10);
 
     // Initialize metrics as well
     if let Err(error) = vector_core::metrics::init_test() {
@@ -407,6 +409,18 @@ pub fn lines_from_gzip_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     file.read_to_end(&mut gzip_bytes).unwrap();
     let mut output = String::new();
     MultiGzDecoder::new(&gzip_bytes[..])
+        .read_to_string(&mut output)
+        .unwrap();
+    output.lines().map(|s| s.to_owned()).collect()
+}
+
+#[cfg(test)]
+pub fn lines_from_zstd_file<P: AsRef<Path>>(path: P) -> Vec<String> {
+    trace!(message = "Reading zstd file.", path = %path.as_ref().display());
+    let file = File::open(path).unwrap();
+    let mut output = String::new();
+    ZstdDecoder::new(file)
+        .unwrap()
         .read_to_string(&mut output)
         .unwrap();
     output.lines().map(|s| s.to_owned()).collect()

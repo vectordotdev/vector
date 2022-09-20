@@ -4,6 +4,7 @@ use bytes::{Buf, Bytes};
 use chrono::Utc;
 use flate2::read::MultiGzDecoder;
 use snafu::ResultExt;
+use vector_common::internal_event::{BytesReceived, Protocol};
 use warp::{http::StatusCode, Filter};
 
 use super::{
@@ -26,6 +27,14 @@ pub fn firehose(
     acknowledgements: bool,
     out: SourceSender,
 ) -> impl Filter<Extract = impl warp::Reply, Error = Infallible> + Clone {
+    let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
+    let context = handlers::Context {
+        compression: record_compression,
+        decoder,
+        acknowledgements,
+        bytes_received,
+        out,
+    };
     warp::post()
         .and(emit_received())
         .and(authenticate(access_key))
@@ -44,10 +53,7 @@ pub fn firehose(
                 .untuple_one(),
         )
         .and(parse_body())
-        .and(warp::any().map(move || record_compression))
-        .and(warp::any().map(move || decoder.clone()))
-        .and(warp::any().map(move || acknowledgements))
-        .and(warp::any().map(move || out.clone()))
+        .and(warp::any().map(move || context.clone()))
         .and_then(handlers::firehose)
         .recover(handle_firehose_rejection)
 }

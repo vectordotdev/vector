@@ -3,12 +3,6 @@ mod sink;
 
 pub use config::BlackholeConfig;
 
-use crate::config::SinkDescription;
-
-inventory::submit! {
-    SinkDescription::new::<BlackholeConfig>("blackhole")
-}
-
 #[cfg(test)]
 mod tests {
 

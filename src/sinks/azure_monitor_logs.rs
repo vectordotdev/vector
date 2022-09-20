@@ -11,11 +11,12 @@ use openssl::{base64, hash, pkey, sign};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
 use crate::{
     codecs::Transformer,
-    config::{log_schema, AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     event::{Event, Value},
     http::HttpClient,
     sinks::{
@@ -34,7 +35,7 @@ fn default_host() -> String {
 }
 
 /// Configuration for the `azure_monitor_logs` sink.
-#[configurable_component]
+#[configurable_component(sink("azure_monitor_logs"))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct AzureMonitorLogsConfig {
@@ -46,7 +47,7 @@ pub struct AzureMonitorLogsConfig {
     /// The [primary or the secondary key][shared_key] for the Log Analytics workspace.
     ///
     /// [shared_key]: https://docs.microsoft.com/en-us/azure/azure-monitor/platform/data-collector-api#authorization
-    pub shared_key: String,
+    pub shared_key: SensitiveString,
 
     /// The [record type][record_type] of the data that is being submitted.
     ///
@@ -111,10 +112,6 @@ static TIME_GENERATED_FIELD_HEADER: Lazy<HeaderName> =
     Lazy::new(|| HeaderName::from_static("time-generated-field"));
 static CONTENT_TYPE_VALUE: Lazy<HeaderValue> = Lazy::new(|| HeaderValue::from_static(CONTENT_TYPE));
 
-inventory::submit! {
-    SinkDescription::new::<AzureMonitorLogsConfig>("azure_monitor_logs")
-}
-
 impl_generate_config_from_default!(AzureMonitorLogsConfig);
 
 /// Max number of bytes in request body
@@ -131,7 +128,6 @@ const SHARED_KEY: &str = "SharedKey";
 const API_VERSION: &str = "2016-04-01";
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "azure_monitor_logs")]
 impl SinkConfig for AzureMonitorLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let batch_settings = self
@@ -162,10 +158,6 @@ impl SinkConfig for AzureMonitorLogsConfig {
 
     fn input(&self) -> Input {
         Input::log()
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "azure_monitor_logs"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -237,11 +229,11 @@ impl AzureMonitorLogsSink {
         );
         let uri: Uri = url.parse()?;
 
-        if config.shared_key.is_empty() {
+        if config.shared_key.inner().is_empty() {
             return Err("shared_key can't be an empty string".into());
         }
 
-        let shared_key_bytes = base64::decode_block(&config.shared_key)?;
+        let shared_key_bytes = base64::decode_block(config.shared_key.inner())?;
         let shared_key = pkey::PKey::hmac(&shared_key_bytes)?;
         let mut default_headers = HeaderMap::with_capacity(3);
 
