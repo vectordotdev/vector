@@ -108,7 +108,7 @@ fn parse(input: &str) -> Result<impl Iterator<Item = (String, Value)> + '_> {
     }
 
     if rest.trim().is_empty() {
-        let result = [
+        let headers = [
             "cefVersion",
             "deviceVendor",
             "deviceProduct",
@@ -118,9 +118,11 @@ fn parse(input: &str) -> Result<impl Iterator<Item = (String, Value)> + '_> {
             "severity",
         ]
         .into_iter()
-        .zip(header)
-        .chain(extension)
-        .map(|(key, value)| (key.to_string(), value.into()));
+        .zip(header);
+        let result = extension
+            .into_iter()
+            .chain(headers)
+            .map(|(key, value)| (key.to_string(), value.into()));
 
         Ok(result)
     } else {
