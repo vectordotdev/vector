@@ -48,7 +48,7 @@ _All buffers_ MUST emit a `BufferCreated` event upon creation. To avoid stale me
 #### BufferEventsReceived
 
 _All buffers_ MUST emit a `BufferEventsReceived` event:
-  - upon startup if there are existing events in the buffer. 
+  - upon startup if there are existing events in the buffer.
   - after receiving one or more Vector events.
 
 - Properties
