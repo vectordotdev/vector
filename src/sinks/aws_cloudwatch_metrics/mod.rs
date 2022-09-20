@@ -138,7 +138,7 @@ impl SinkConfig for CloudWatchMetricsSinkConfig {
 
 impl CloudWatchMetricsSinkConfig {
     async fn healthcheck(self, client: CloudwatchClient) -> crate::Result<()> {
-        let _ = client
+        client
             .put_metric_data()
             .metric_data(
                 MetricDatum::builder()
@@ -310,11 +310,13 @@ impl Service<PartitionInnerBuffer<Vec<Metric>, String>> for CloudWatchMetricsSvc
 
     fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
         // Emission of Error internal event is handled upstream by the caller
+
         Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, items: PartitionInnerBuffer<Vec<Metric>, String>) -> Self::Future {
         // Emission of Error internal event is handled upstream by the caller
+
         let (items, namespace) = items.into_parts();
         let metric_data = self.encode_events(items);
         if metric_data.is_empty() {
