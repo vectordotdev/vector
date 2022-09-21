@@ -334,7 +334,7 @@ test-enterprise: ## Runs enterprise related behavioral tests
 
 .PHONY: test-integration
 test-integration: ## Runs all integration tests
-test-integration: test-integration-apex test-integration-aws test-integration-axiom test-integration-azure test-integration-clickhouse test-integration-docker-logs test-integration-elasticsearch
+test-integration: test-integration-amqp test-integration-apex test-integration-aws test-integration-axiom test-integration-azure test-integration-clickhouse test-integration-docker-logs test-integration-elasticsearch
 test-integration: test-integration-eventstoredb test-integration-fluent test-integration-gcp test-integration-humio test-integration-http-scrape test-integration-influxdb
 test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb test-integration-nats
 test-integration: test-integration-nginx test-integration-opentelemetry test-integration-postgres test-integration-prometheus test-integration-pulsar
@@ -348,6 +348,10 @@ test-integration-aws-sqs: ## Runs AWS SQS integration tests
 .PHONY: test-integration-aws-cloudwatch-logs
 test-integration-aws-cloudwatch-logs: ## Runs AWS Cloudwatch Logs integration tests
 	FILTER=::aws_cloudwatch_logs make test-integration-aws
+
+.PHONY: test-integration-aws-cloudwatch-metrics
+test-integration-aws-cloudwatch-metrics: ## Runs AWS Cloudwatch Metrics integration tests
+	FILTER=::aws_cloudwatch_metrics make test-integration-aws
 
 .PHONY: test-integration-datadog-agent
 test-integration-datadog-agent: ## Runs Datadog Agent integration tests

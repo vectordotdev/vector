@@ -6,7 +6,7 @@ use indexmap::IndexMap;
 #[cfg(feature = "enterprise")]
 use serde_json::Value;
 use vector_config::configurable_component;
-use vector_core::{config::GlobalOptions, default_data_dir};
+use vector_core::config::GlobalOptions;
 
 use crate::{
     enrichment_tables::EnrichmentTables, providers::Providers, secrets::SecretBackends,
@@ -318,46 +318,14 @@ impl ConfigBuilder {
 
         self.provider = with.provider;
 
-        if self.global.proxy.http.is_some() && with.global.proxy.http.is_some() {
-            errors.push("conflicting values for 'proxy.http' found".to_owned());
+        match self.global.merge(with.global) {
+            Err(errs) => errors.extend(errs),
+            Ok(new_global) => self.global = new_global,
         }
-
-        if self.global.proxy.https.is_some() && with.global.proxy.https.is_some() {
-            errors.push("conflicting values for 'proxy.https' found".to_owned());
-        }
-
-        if !self.global.proxy.no_proxy.is_empty() && !with.global.proxy.no_proxy.is_empty() {
-            errors.push("conflicting values for 'proxy.no_proxy' found".to_owned());
-        }
-
-        self.global.proxy = self.global.proxy.merge(&with.global.proxy);
-
-        self.global.expire_metrics = self.global.expire_metrics.or(with.global.expire_metrics);
-
-        self.global.expire_metrics_secs = self
-            .global
-            .expire_metrics_secs
-            .or(with.global.expire_metrics_secs);
 
         self.schema.append(with.schema, &mut errors);
 
         self.schema.log_namespace = self.schema.log_namespace.or(with.schema.log_namespace);
-
-        if self.global.data_dir.is_none() || self.global.data_dir == default_data_dir() {
-            self.global.data_dir = with.global.data_dir;
-        } else if with.global.data_dir != default_data_dir()
-            && self.global.data_dir != with.global.data_dir
-        {
-            // If two configs both set 'data_dir' and have conflicting values
-            // we consider this an error.
-            errors.push("conflicting values for 'data_dir' found".to_owned());
-        }
-
-        // If the user has multiple config files, we must *merge* log schemas
-        // until we meet a conflict, then we are allowed to error.
-        if let Err(merge_errors) = self.global.log_schema.merge(&with.global.log_schema) {
-            errors.extend(merge_errors);
-        }
 
         self.healthchecks.merge(with.healthchecks);
 
