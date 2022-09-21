@@ -305,7 +305,7 @@ test-docs: ## Run the docs test suite
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --doc --workspace --no-fail-fast --no-default-features --features "${FEATURES}" ${SCOPE}
 
 .PHONY: test-all
-test-all: test test-docs test-behavior test-integration ## Runs all tests: unit, docs, behaviorial, and integration.
+test-all: test test-docs test-behavior test-integration ## Runs all tests: unit, docs, behavioral, and integration.
 
 .PHONY: test-x86_64-unknown-linux-gnu
 test-x86_64-unknown-linux-gnu: cross-test-x86_64-unknown-linux-gnu ## Runs unit tests on the x86_64-unknown-linux-gnu triple
@@ -316,16 +316,16 @@ test-aarch64-unknown-linux-gnu: cross-test-aarch64-unknown-linux-gnu ## Runs uni
 	${EMPTY}
 
 .PHONY: test-behavior-config
-test-behavior-config: ## Runs configuration related behaviorial tests
+test-behavior-config: ## Runs configuration related behavioral tests
 	${MAYBE_ENVIRONMENT_EXEC} cargo build --bin secret-backend-example
 	${MAYBE_ENVIRONMENT_EXEC} cargo run -- test tests/behavior/config/*
 
 .PHONY: test-behavior-%
-test-behavior-%: ## Runs behaviorial test for a given category
+test-behavior-%: ## Runs behavioral test for a given category
 	${MAYBE_ENVIRONMENT_EXEC} cargo run -- test tests/behavior/$*/*
 
 .PHONY: test-behavior
-test-behavior: ## Runs all behaviorial tests
+test-behavior: ## Runs all behavioral tests
 test-behavior: test-behavior-transforms test-behavior-formats test-behavior-config
 
 .PHONY: test-enterprise

@@ -90,7 +90,7 @@ of a component.
 
 If an error occurs that prevents the component from starting up an event does
 not need to be emitted as this will prevent Vector from starting and the metric
-is unlikely to be collected. An error should still be logged however.
+is unlikely to be collected. An error should still be logged, however.
 
 - Properties
   - `error_code` - An error code for the failure, if applicable.
@@ -114,7 +114,7 @@ is unlikely to be collected. An error should still be logged however.
   - MUST include the defined properties as tags.
   - MUST increment `<namespace>_errors_total` metric.
 - Logs
-  - MUST log a descriptive, user friendly error message that sufficiently
+  - MUST log a descriptive, user-friendly error message that sufficiently
     describes the error.
   - MUST include the defined properties as key-value pairs.
   - MUST log a message at the `error` level.
@@ -138,7 +138,7 @@ example, a failed HTTP request that will be retried does not result in data loss
 succeeds.
 
 Note that this event is independent of any clients of Vector that may retry when end-to-end
-acknowledgements are enabled. From Vector's perspective, it has dropped the events and it cannot
+acknowledgements are enabled. From Vector's perspective, it has dropped the events, and it cannot
 know if the client will retry them.
 
 - Properties
