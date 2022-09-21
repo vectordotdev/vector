@@ -11,7 +11,7 @@ fn main() {
     prost_build
         .compile_protos(
             &["proto/prometheus-remote.proto"],
-            &["proto/", "../../proto"],
+            &["proto", "../../proto"],
         )
         .unwrap();
 }
