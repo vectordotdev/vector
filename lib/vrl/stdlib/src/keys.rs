@@ -9,13 +9,9 @@ use vrl::Expression;
 use vrl::Function;
 
 fn keys(value: Value) -> Resolved {
-    let mut vec: Vec<Value> = Vec::new();
-    let value_btree = value.try_object()?;
-
-    for (k, _v) in value_btree {
-        vec.push(Value::Bytes(Bytes::from(k.clone())))
-    }
-    Ok(Value::Array(vec))
+    let object = value.try_object()?;
+    let keys = object.into_keys().map(Value::from);
+    Ok(Value::Array(keys.collect()))
 }
 
 #[derive(Debug)]

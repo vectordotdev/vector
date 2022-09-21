@@ -9,13 +9,9 @@ use vrl::Expression;
 use vrl::Function;
 
 fn values(value: Value) -> Resolved {
-    let mut vec: Vec<Value> = Vec::new();
-    let value_btree = value.try_object()?;
-
-    for (_k, v) in value_btree {
-        vec.push(v)
-    }
-    Ok(Value::Array(vec))
+    let object = value.try_object()?;
+    let values = object.into_values();
+    Ok(Value::Array(values.collect()))
 }
 
 #[derive(Debug)]
@@ -37,13 +33,13 @@ impl Function for Values {
     fn examples(&self) -> &'static [Example] {
         &[
             Example {
-                title: "get keys",
-                source: r#"keys({"key1": "val1", "key2": "val2"})"#,
+                title: "get values",
+                source: r#"values({"key1": "val1", "key2": "val2"})"#,
                 result: Ok(r#"["val1", "val2"]"#),
             },
             Example {
-                title: "get keys",
-                source: r#"keys({"key3": "val3", "key4": "val4"})"#,
+                title: "get values",
+                source: r#"values({"key3": "val3", "key4": "val4"})"#,
                 result: Ok(r#"["val3", "val4"]"#),
             },
         ]

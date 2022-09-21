@@ -943,7 +943,7 @@ bench_function! {
 
     literal {
         args: func_args![value: value!({"key1": "val1", "key2": "val2"})],
-        want: Ok(["key1", "key2"]),
+        want: Ok(value!(["key1", "key2"])),
     }
 }
 
@@ -2527,6 +2527,6 @@ bench_function! {
 
     literal {
         args: func_args![value: value!({"key1": "val1", "key2": "val2"})],
-        want: Ok(["val1", "val2"]),
+        want: Ok(value!(["val1", "val2"])),
     }
 }
