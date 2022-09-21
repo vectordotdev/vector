@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use futures::stream::{BoxStream, StreamExt};
 use tower::Service;
+use vector_config::NamedComponent;
 use vector_core::{
     event::{EventFinalizers, Finalizable},
     stream::{BatcherSettings, DriverResponse},
@@ -16,6 +17,8 @@ use super::{
 use crate::{
     codecs::Transformer,
     event::Event,
+    internal_events::SinkRequestBuildError,
+    sinks::new_relic::NewRelicConfig,
     sinks::util::{
         builder::SinkBuilderExt,
         metadata::{RequestMetadata, RequestMetadataBuilder},
@@ -162,8 +165,11 @@ where
             .filter_map(
                 |request: Result<NewRelicApiRequest, NewRelicSinkError>| async move {
                     match request {
-                        Err(e) => {
-                            error!("Failed to build New Relic request: {:?}.", e);
+                        Err(error) => {
+                            emit!(SinkRequestBuildError {
+                                name: NewRelicConfig::NAME,
+                                error
+                            });
                             None
                         }
                         Ok(req) => Some(req),

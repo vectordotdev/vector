@@ -229,7 +229,7 @@ class Event
         # Make sure EventsDropped events contain the required parameters
         handle.logs.each do |type, message, parameters|
           if type == 'error'
-            ['intentional', 'reason'].each do |parameter|
+            ['count', 'intentional', 'reason'].each do |parameter|
               unless parameters.include? parameter
                 append("Error log for EventsDropped event MUST include parameter \"#{parameter}\".")
               end

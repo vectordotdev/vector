@@ -115,27 +115,29 @@ pub const INTENTIONAL: bool = true;
 pub const UNINTENTIONAL: bool = false;
 
 #[derive(Debug)]
-pub struct ComponentEventsDropped<const INTENTIONAL: bool> {
+pub struct ComponentEventsDropped<'a, const INTENTIONAL: bool> {
     pub count: u64,
-    pub reason: &'static str,
+    pub reason: &'a str,
 }
 
-impl<const INTENTIONAL: bool> InternalEvent for ComponentEventsDropped<INTENTIONAL> {
+impl<'a, const INTENTIONAL: bool> InternalEvent for ComponentEventsDropped<'a, INTENTIONAL> {
     fn emit(self) {
         let message = "Events dropped";
         if INTENTIONAL {
             debug!(
                 message,
                 intentional = INTENTIONAL,
+                count = self.count,
                 reason = self.reason,
-                internal_log_rate_secs = 10,
+                internal_log_rate_limit = true,
             );
         } else {
             error!(
                 message,
                 intentional = INTENTIONAL,
+                count = self.count,
                 reason = self.reason,
-                internal_log_rate_secs = 10,
+                internal_log_rate_limit = true,
             );
         }
         counter!(
@@ -159,7 +161,7 @@ impl<E: std::fmt::Display> InternalEvent for SinkRequestBuildError<E> {
             error = %self.error,
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -182,7 +184,7 @@ impl<E: std::fmt::Display> InternalEvent for SinkSendError<E> {
             error = %self.error,
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,

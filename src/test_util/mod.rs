@@ -129,7 +129,7 @@ pub fn trace_init() {
 
     let levels = std::env::var("TEST_LOG").unwrap_or_else(|_| "error".to_string());
 
-    trace::init(color, false, &levels);
+    trace::init(color, false, &levels, 10);
 
     // Initialize metrics as well
     if let Err(error) = vector_core::metrics::init_test() {

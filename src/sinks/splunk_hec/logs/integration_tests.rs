@@ -102,7 +102,7 @@ async fn config(encoding: EncodingConfig, indexed_fields: Vec<String>) -> HecLog
     batch.max_events = Some(5);
 
     HecLogsSinkConfig {
-        default_token: get_token().await,
+        default_token: get_token().await.into(),
         endpoint: splunk_hec_address(),
         host_key: "host".into(),
         indexed_fields,
@@ -171,7 +171,7 @@ async fn splunk_insert_broken_token() {
     let cx = SinkContext::new_test();
 
     let mut config = config(TextSerializerConfig::new().into(), vec![]).await;
-    config.default_token = "BROKEN_TOKEN".into();
+    config.default_token = "BROKEN_TOKEN".to_string().into();
     let (sink, _) = config.build(cx).await.unwrap();
 
     let message = random_string(100);
@@ -356,7 +356,7 @@ async fn splunk_indexer_acknowledgements() {
     };
 
     let config = HecLogsSinkConfig {
-        default_token: String::from(ACK_TOKEN),
+        default_token: String::from(ACK_TOKEN).into(),
         acknowledgements: acknowledgements_config,
         ..config(JsonSerializerConfig::new().into(), vec!["asdf".to_string()]).await
     };

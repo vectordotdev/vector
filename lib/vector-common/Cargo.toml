@@ -11,7 +11,8 @@ default = [
   "btreemap",
   "conversion",
   "tokenize",
-  "encoding"
+  "encoding",
+  "sensitive_string"
 ]
 
 aws_cloudwatch_logs_subscription = [
@@ -35,6 +36,8 @@ encoding = [
   "dep:snafu",
   "btreemap"
 ]
+
+sensitive_string = []
 
 test = []
 
@@ -63,6 +66,7 @@ tokio = { version = "1.20.1", default-features = false, features = ["macros", "t
 tracing = { version = "0.1.34", default-features = false }
 value = { path = "../value", features = ["json"] }
 vector-config = { path = "../vector-config" }
+vector-config-common = { path = "../vector-config-common" }
 vector-config-macros = { path = "../vector-config-macros" }
 
 [dev-dependencies]

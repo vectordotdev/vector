@@ -137,7 +137,7 @@ impl SinkConfig for RemoteWriteConfig {
             Some(PrometheusRemoteWriteAuth::Basic { user, password }) => (
                 Some(Auth::Basic {
                     user: user.clone(),
-                    password: password.clone(),
+                    password: password.clone().into(),
                 }),
                 None,
                 None,
@@ -283,12 +283,10 @@ impl tower::Service<PartitionInnerBuffer<Vec<Metric>, PartitionKey>> for RemoteW
     type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
-    // Emission of Error internal event is handled upstream by the caller
     fn poll_ready(&mut self, _task: &mut task::Context<'_>) -> task::Poll<Result<(), Self::Error>> {
         task::Poll::Ready(Ok(()))
     }
 
-    // Emission of Error internal event is handled upstream by the caller
     fn call(&mut self, buffer: PartitionInnerBuffer<Vec<Metric>, PartitionKey>) -> Self::Future {
         let (events, key) = buffer.into_parts();
         let body = self.encode_events(events);

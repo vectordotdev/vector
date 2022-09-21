@@ -102,7 +102,7 @@ impl InternalEvent for BufferReadError {
             error_code = self.error_code,
             error_type = "reader_failed",
             stage = "processing",
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!(
             "buffer_errors_total", 1,

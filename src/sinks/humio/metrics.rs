@@ -3,6 +3,7 @@ use codecs::JsonSerializerConfig;
 use futures::StreamExt;
 use futures_util::stream::BoxStream;
 use indoc::indoc;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::{sink::StreamSink, transform::Transform};
 
@@ -39,7 +40,7 @@ pub struct HumioMetricsConfig {
     transform: MetricToLogConfig,
 
     /// The Humio ingestion token.
-    token: String,
+    token: SensitiveString,
 
     /// The base URL of the Humio instance.
     #[serde(alias = "host")]

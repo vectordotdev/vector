@@ -1,4 +1,5 @@
 use codecs::JsonSerializerConfig;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
 use super::host_key;
@@ -28,7 +29,7 @@ const HOST: &str = "https://cloud.humio.com";
 #[serde(deny_unknown_fields)]
 pub struct HumioLogsConfig {
     /// The Humio ingestion token.
-    pub(super) token: String,
+    pub(super) token: SensitiveString,
 
     /// The base URL of the Humio instance.
     #[serde(alias = "host")]
@@ -125,7 +126,7 @@ pub fn timestamp_nanos_key() -> Option<String> {
 impl GenerateConfig for HumioLogsConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            token: "${HUMIO_TOKEN}".to_owned(),
+            token: "${HUMIO_TOKEN}".to_owned().into(),
             endpoint: None,
             source: None,
             encoding: JsonSerializerConfig::new().into(),
@@ -354,7 +355,7 @@ mod integration_tests {
         batch.max_events = Some(1);
 
         HumioLogsConfig {
-            token: token.to_string(),
+            token: token.to_string().into(),
             endpoint: Some(humio_address()),
             source: None,
             encoding: JsonSerializerConfig::new().into(),

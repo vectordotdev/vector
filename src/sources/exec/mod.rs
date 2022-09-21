@@ -30,8 +30,8 @@ use crate::{
     config::{log_schema, Output, SourceConfig, SourceContext},
     event::Event,
     internal_events::{
-        ExecCommandExecuted, ExecEventsReceived, ExecFailedError, ExecFailedToSignalChild,
-        ExecFailedToSignalChildError, ExecTimeoutError, StreamClosedError,
+        ExecChannelClosedError, ExecCommandExecuted, ExecEventsReceived, ExecFailedError,
+        ExecFailedToSignalChild, ExecFailedToSignalChildError, ExecTimeoutError, StreamClosedError,
     },
     serde::default_decoding,
     shutdown::ShutdownSignal,
@@ -615,7 +615,7 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
                     if sender.send((next, origin)).await.is_err() {
                         // If the receive half of the channel is closed, either due to close being
                         // called or the Receiver handle dropping, the function returns an error.
-                        debug!("Receive channel closed, unable to send.");
+                        emit!(ExecChannelClosedError);
                         break;
                     }
                 }
@@ -756,6 +756,29 @@ mod tests {
         }
 
         assert_eq!(counter, 2);
+    }
+
+    #[tokio::test]
+    async fn test_drop_receiver() {
+        let config = standard_scheduled_test_config();
+        let hostname = Some("Some.Machine".to_string());
+        let decoder = Default::default();
+        let shutdown = ShutdownSignal::noop();
+        let (tx, rx) = SourceSender::new_test();
+
+        // Wait for our task to finish, wrapping it in a timeout
+        let timeout = tokio::time::timeout(
+            time::Duration::from_secs(5),
+            run_command(config.clone(), hostname, decoder, shutdown, tx),
+        );
+
+        drop(rx);
+
+        let _timeout_result = crate::test_util::components::assert_source_error(
+            &crate::test_util::components::COMPONENT_ERROR_TAGS,
+            timeout,
+        )
+        .await;
     }
 
     #[tokio::test]
