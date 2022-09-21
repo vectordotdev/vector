@@ -1112,7 +1112,7 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags & {
 				debug: {
-					description: "Level of debug info for Vector."
+					description: "Whether this is a debug build of Vector"
 					required:    true
 				}
 				version: {
