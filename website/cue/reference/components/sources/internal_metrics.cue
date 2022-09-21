@@ -1106,6 +1106,12 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		vector_info: {
+			description:       "Has a fixed value of 1.0. Contains build information such as rust and vector versions."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags
+		}
 		value_limit_reached_total: {
 			description: """
 				The total number of times new values for a key have been rejected because the
