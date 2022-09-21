@@ -73,6 +73,21 @@ Documentation is incredibly important to Vector; it is a feature and
 differentiator for Vector. Pull requests should not be merged without adequate
 documentation, nor should they be merged with "TODOs" opened for documentation.
 
+Ideally all modules should have module level documentation. Module level
+documentation can be omitted for modules where the purpose is obvious and covered
+by a general pattern. With the sinks there is typically a standard number of modules
+included (config.rs, request_builder.rs, service.rs, sink.rs, tests.rs),
+these modules don't need documentation as they will be covered with higher level
+documentation.
+
+All `pub` and `pub(crate)` functions, structs and macros must have documentation.
+
+Consider including examples for modules, structs, functions or macros that
+will be well used throughout Vector.
+
+See the [rustdoc](https://doc.rust-lang.org/rustdoc/how-to-write-documentation.html)
+book for more details on writing documentation.
+
 ## Performance Testing
 
 Vector currently offers 2 methods for performance testing:
