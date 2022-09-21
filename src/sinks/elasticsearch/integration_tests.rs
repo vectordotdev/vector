@@ -535,7 +535,7 @@ async fn run_insert_tests_with_multiple_endpoints(config: &ElasticsearchConfig) 
     let (input, events) = random_events_with_stream(100, 100, Some(batch));
     run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
 
-    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered,));
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
     let base_urls = commons
         .iter()
