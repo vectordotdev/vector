@@ -20,7 +20,6 @@ use vector_common::internal_event::{
 };
 use vector_config::configurable_component;
 use vector_core::config::log_schema;
-
 use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
@@ -59,6 +58,9 @@ pub struct PulsarSinkConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+
+    /// Log field to use as Pulsar message key
+    key_field: Option<String>,
 }
 
 /// Authentication configuration.
@@ -122,6 +124,7 @@ enum PulsarSinkState {
 struct PulsarSink {
     transformer: Transformer,
     encoder: Encoder<()>,
+    key_field: Option<String>,
     state: PulsarSinkState,
     in_flight: FuturesUnordered<
         BoxFuture<
@@ -141,6 +144,7 @@ impl GenerateConfig for PulsarSinkConfig {
         toml::Value::try_from(Self {
             endpoint: "pulsar://127.0.0.1:6650".to_string(),
             topic: "topic-1234".to_string(),
+            key_field: Some("message".to_string()),
             encoding: TextSerializerConfig::new().into(),
             auth: None,
             acknowledgements: Default::default(),
@@ -164,7 +168,7 @@ impl SinkConfig for PulsarSinkConfig {
         let serializer = self.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
 
-        let sink = PulsarSink::new(producer, transformer, encoder)?;
+        let sink = PulsarSink::new(producer, transformer, encoder, self.key_field.clone())?;
 
         let producer = self
             .create_pulsar_producer()
@@ -242,6 +246,7 @@ impl PulsarSink {
         producer: PulsarProducer,
         transformer: Transformer,
         encoder: Encoder<()>,
+        key_field: Option<String>
     ) -> crate::Result<Self> {
         Ok(Self {
             transformer,
@@ -249,6 +254,7 @@ impl PulsarSink {
             state: PulsarSinkState::Ready(Box::new(producer)),
             in_flight: FuturesUnordered::new(),
             bytes_sent: register!(BytesSent::from(Protocol::TCP)),
+            key_field,
         })
     }
 
@@ -284,10 +290,18 @@ impl Sink<Event> for PulsarSink {
             "Expected `poll_ready` to be called first."
         );
 
-        let event_time = event.maybe_as_log().and_then(|log| {
-            log.get(log_schema().timestamp_key())
-                .and_then(|v| v.as_timestamp().map(|dt| dt.timestamp_millis()))
-        });
+        let key_value: Option<String> = match (event.maybe_as_log(), &self.key_field) {
+            (Some(log), Some(field)) => log.get(field.as_str())
+                .map(|x| x.to_string()),
+            _ => None,
+        };
+
+        let event_time: Option<u64> = event.maybe_as_log()
+            .and_then(|log| log.get(log_schema().timestamp_key()))
+            .and_then(|value| value.as_timestamp())
+            .map(|ts| ts.timestamp_millis())
+            .map(|i| i as u64);
+
 
         let metadata_builder = RequestMetadata::builder(&event);
         self.transformer.transform(&mut event);
@@ -312,9 +326,13 @@ impl Sink<Event> for PulsarSink {
             &mut self.state,
             PulsarSinkState::Sending(Box::pin(async move {
                 let mut builder = producer.create_message().with_content(bytes.as_ref());
-                if let Some(et) = event_time {
-                    builder = builder.event_time(et as u64);
-                }
+                if let Some(ts) = event_time {
+                    builder = builder.event_time(ts);
+                };
+
+                if let Some(key) = key_value {
+                    builder = builder.with_key(key);
+                };
                 let result = builder.send().await;
                 (producer, result, metadata, finalizers)
             })),
@@ -409,6 +427,7 @@ mod integration_tests {
             encoding: TextSerializerConfig::new().into(),
             auth: None,
             acknowledgements: Default::default(),
+            key_field: Some("message".to_string()),
         };
 
         let pulsar = Pulsar::<TokioExecutor>::builder(&cnf.endpoint, TokioExecutor)
@@ -435,7 +454,7 @@ mod integration_tests {
         let encoder = Encoder::<()>::new(serializer);
 
         assert_sink_compliance(&SINK_TAGS, async move {
-            let sink = PulsarSink::new(producer, transformer, encoder).unwrap();
+            let sink = PulsarSink::new(producer, transformer, encoder, cnf.key_field).unwrap();
             VectorSink::from_event_sink(sink).run(events).await
         })
         .await
@@ -448,6 +467,8 @@ mod integration_tests {
             };
             consumer.ack(&msg).await.unwrap();
             assert_eq!(String::from_utf8_lossy(&msg.payload.data), line);
+            assert_eq!(msg.key(), Some(String::from_utf8_lossy(&msg.payload.data).to_string()));
+            assert_ne!(msg.metadata().event_time.is_some(), false);
         }
     }
 }
