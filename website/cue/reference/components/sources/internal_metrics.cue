@@ -1106,11 +1106,32 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		vector_info: {
+		build_info: {
 			description:       "Has a fixed value of 1.0. Contains build information such as rust and vector versions."
 			type:              "gauge"
 			default_namespace: "vector"
-			tags:              _internal_metrics_tags
+			tags:              _internal_metrics_tags & {
+				debug: {
+					description: "Level of debug info for Vector."
+					required:    true
+				}
+				version: {
+					description: "Vector version."
+					required:    true
+				}
+				rust_version: {
+					description: "The rust version from the package manifest."
+					required:    true
+				}
+				arch: {
+					description: "The target architecture being compiled for. (e.g. x86_64)"
+					required:    true
+				}
+				revision: {
+					description: "Revision identifer, related to versioned releases."
+					required:    true
+				}
+			}
 		}
 		value_limit_reached_total: {
 			description: """
