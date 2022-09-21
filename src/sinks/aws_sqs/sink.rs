@@ -55,11 +55,12 @@ impl SqsSink {
             .request_builder(request_builder_concurrency_limit, self.request_builder)
             .filter_map(|req| async move {
                 req.map_err(|error| {
-                        emit!(SinkRequestBuildError {
-                            name: SqsSinkConfig::NAME,
-                            error,
-                        });
-                }).ok()
+                    emit!(SinkRequestBuildError {
+                        name: SqsSinkConfig::NAME,
+                        error,
+                    });
+                })
+                .ok()
             })
             .into_driver(service);
 
