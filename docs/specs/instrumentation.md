@@ -121,8 +121,7 @@ is unlikely to be collected. An error should still be logged however.
   - SHOULD be rate limited to 10 seconds.
 - Events
   - MUST emit an [`EventsDropped`] event if the error results in dropping
-    events, or the error event itself MUST meet the `EventsDropped`
-    requirements.
+    events.
 
 #### EventsDropped
 
@@ -153,7 +152,8 @@ know if the client will retry them.
 - Metrics
   - MUST increment the `<namespace>_discarded_events_total` counter by the
     number of events discarded.
-  - MUST include the listed properties as tags except the `count` and `reason` properties.
+  - MUST only include the `intentional` property and component properties that
+    are inherited implicitly (e.g. `component_type`).
 - Logs
   - MUST log a `Events dropped` message.
   - MUST include the defined properties as key-value pairs.
