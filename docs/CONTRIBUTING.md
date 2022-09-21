@@ -56,7 +56,7 @@ Vector team member will find this document useful.
 ### New sources, sinks, and transforms
 
 If you're contributing a new source, sink, or transform to Vector, thank you that's way cool! There's a few steps you
-need think about if you want to make sure we can merge your contribution. We're here to help you along with these steps,
+need to think about if you want to make sure we can merge your contribution. We're here to help you along with these steps,
 but they are a blocker to getting a new integration released.
 
 To merge a new source, sink, or transform, you need to:
