@@ -48,6 +48,7 @@ use crate::{
 };
 
 const MIN_FLUSH_PERIOD_SECS: u64 = 1;
+const SUPPORTED_AUTHENTICATION_SCHEMAS: HeaderValue = HeaderValue::from_static("Basic, Bearer");
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -344,10 +345,14 @@ fn authorized(req: &Request<Body>, auth: &Option<Auth>) -> bool {
         if let Some(auth_header) = headers.get(hyper::header::AUTHORIZATION) {
             let encoded_credentials = match auth {
                 Auth::Basic { user, password } => HeaderValue::from_str(
-                    format!("Basic {}", base64::encode(format!("{}:{}", user, password))).as_str(),
+                    format!(
+                        "Basic {}",
+                        base64::encode(format!("{}:{}", user, password.inner()))
+                    )
+                    .as_str(),
                 ),
                 Auth::Bearer { token } => {
-                    HeaderValue::from_str(format!("Bearer {}", token).as_str())
+                    HeaderValue::from_str(format!("Bearer {}", token.inner()).as_str())
                 }
             };
 
@@ -377,11 +382,9 @@ fn handle(
 
     if !authorized(&req, auth) {
         *response.status_mut() = StatusCode::UNAUTHORIZED;
-        let supported_authentication_schemas = http::header::HeaderValue::from_str("Basic, Bearer")
-            .expect("Cannot convert authentication schemas to a header value");
         response.headers_mut().insert(
             http::header::WWW_AUTHENTICATE,
-            supported_authentication_schemas,
+            SUPPORTED_AUTHENTICATION_SCHEMAS,
         );
         return response;
     }
@@ -593,7 +596,10 @@ mod tests {
     use indoc::indoc;
     use pretty_assertions::assert_eq;
     use tokio::{sync::oneshot::error::TryRecvError, time};
-    use vector_common::finalization::{BatchNotifier, BatchStatus};
+    use vector_common::{
+        finalization::{BatchNotifier, BatchStatus},
+        sensitive_string::SensitiveString,
+    };
     use vector_core::{event::StatisticKind, samples};
 
     use super::*;
@@ -664,7 +670,7 @@ mod tests {
 
         let auth_config = Auth::Basic {
             user: "user".to_string(),
-            password: "password".to_string(),
+            password: SensitiveString::from("password".to_string()),
         };
 
         let response_result =
@@ -700,7 +706,7 @@ mod tests {
         let events = vec![event1, event2];
 
         let auth_config = Auth::Bearer {
-            token: "token".to_string(),
+            token: SensitiveString::from("token".to_string()),
         };
 
         let response_result =
@@ -736,7 +742,7 @@ mod tests {
         let events = vec![event1, event2];
 
         let server_auth_config = Auth::Bearer {
-            token: "token".to_string(),
+            token: SensitiveString::from("token".to_string()),
         };
 
         let response_result =
@@ -753,12 +759,12 @@ mod tests {
         let events = vec![event1, event2];
 
         let server_auth_config = Auth::Bearer {
-            token: "token".to_string(),
+            token: SensitiveString::from("token".to_string()),
         };
 
         let client_auth_config = Auth::Basic {
             user: "user".to_string(),
-            password: "password".to_string(),
+            password: SensitiveString::from("password".to_string()),
         };
 
         let response_result = export_and_fetch_with_auth(
