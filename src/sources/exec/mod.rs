@@ -641,11 +641,7 @@ mod tests {
     use futures::task::Poll;
 
     use super::*;
-    use crate::{
-        event::LogEvent,
-        test_util::components::{assert_source_compliance, SOURCE_TAGS},
-        test_util::trace_init,
-    };
+    use crate::{event::LogEvent, test_util::trace_init};
 
     #[test]
     fn test_generate_config() {
@@ -765,95 +761,92 @@ mod tests {
     #[tokio::test]
     #[cfg(unix)]
     async fn test_run_command_linux() {
-        assert_source_compliance(&SOURCE_TAGS, async {
-            let config = standard_scheduled_test_config();
-            let hostname = Some("Some.Machine".to_string());
-            let decoder = Default::default();
-            let shutdown = ShutdownSignal::noop();
-            let (tx, mut rx) = SourceSender::new_test();
+        let config = standard_scheduled_test_config();
+        let hostname = Some("Some.Machine".to_string());
+        let decoder = Default::default();
+        let shutdown = ShutdownSignal::noop();
+        let (tx, mut rx) = SourceSender::new_test();
 
-            // Wait for our task to finish, wrapping it in a timeout
-            let timeout = tokio::time::timeout(
-                time::Duration::from_secs(5),
-                run_command(config.clone(), hostname, decoder, shutdown, tx),
-            );
+        // Wait for our task to finish, wrapping it in a timeout
+        let timeout = tokio::time::timeout(
+            time::Duration::from_secs(5),
+            run_command(config.clone(), hostname, decoder, shutdown, tx),
+        );
 
-            let timeout_result =
-                crate::test_util::components::assert_source_compliance(&[], timeout).await;
+        let timeout_result = crate::test_util::components::assert_source_compliance(
+            &crate::test_util::components::SOURCE_TAGS,
+            timeout,
+        )
+        .await;
 
-            let exit_status = timeout_result
-                .expect("command timed out")
-                .expect("command error");
-            assert_eq!(0_i32, exit_status.unwrap().code().unwrap());
+        let exit_status = timeout_result
+            .expect("command timed out")
+            .expect("command error");
+        assert_eq!(0_i32, exit_status.unwrap().code().unwrap());
 
-            if let Poll::Ready(Some(event)) = futures::poll!(rx.next()) {
-                let log = event.as_log();
-                assert_eq!(log[COMMAND_KEY], config.command.clone().into());
-                assert_eq!(log[STREAM_KEY], STDOUT.into());
-                assert_eq!(log[log_schema().source_type_key()], "exec".into());
-                assert_eq!(log[log_schema().message_key()], "Hello World!".into());
-                assert_eq!(log[log_schema().host_key()], "Some.Machine".into());
-                assert!(log.get(PID_KEY).is_some());
-                assert!(log.get(log_schema().timestamp_key()).is_some());
+        if let Poll::Ready(Some(event)) = futures::poll!(rx.next()) {
+            let log = event.as_log();
+            assert_eq!(log[COMMAND_KEY], config.command.clone().into());
+            assert_eq!(log[STREAM_KEY], STDOUT.into());
+            assert_eq!(log[log_schema().source_type_key()], "exec".into());
+            assert_eq!(log[log_schema().message_key()], "Hello World!".into());
+            assert_eq!(log[log_schema().host_key()], "Some.Machine".into());
+            assert!(log.get(PID_KEY).is_some());
+            assert!(log.get(log_schema().timestamp_key()).is_some());
 
-                assert_eq!(8, log.all_fields().unwrap().count());
-            } else {
-                panic!("Expected to receive a linux event");
-            }
-        })
-        .await
+            assert_eq!(8, log.all_fields().unwrap().count());
+        } else {
+            panic!("Expected to receive a linux event");
+        }
     }
 
     #[tokio::test]
     #[cfg(unix)]
     async fn test_graceful_shutdown() {
-        assert_source_compliance(&SOURCE_TAGS, async {
-            trace_init();
-            let mut config = standard_streaming_test_config();
-            config.command = vec![
-                String::from("bash"),
-                String::from("-c"),
-                String::from(
-                    r#"trap 'echo signal received ; sleep 1; echo slept ; exit' SIGTERM; while true ; do sleep 10 ; done"#,
-                ),
-            ];
-            let hostname = Some("Some.Machine".to_string());
-            let decoder = Default::default();
-            let (trigger, shutdown, _) = ShutdownSignal::new_wired();
-            let (tx, mut rx) = SourceSender::new_test();
+        trace_init();
+        let mut config = standard_streaming_test_config();
+        config.command = vec![
+            String::from("bash"),
+            String::from("-c"),
+            String::from(
+                r#"trap 'echo signal received ; sleep 1; echo slept ; exit' SIGTERM; while true ; do sleep 10 ; done"#,
+            ),
+        ];
+        let hostname = Some("Some.Machine".to_string());
+        let decoder = Default::default();
+        let (trigger, shutdown, _) = ShutdownSignal::new_wired();
+        let (tx, mut rx) = SourceSender::new_test();
 
-            let task = tokio::spawn(run_command(config.clone(), hostname, decoder, shutdown, tx));
+        let task = tokio::spawn(run_command(config.clone(), hostname, decoder, shutdown, tx));
 
-            tokio::time::sleep(Duration::from_secs(1)).await; // let the source start the command
+        tokio::time::sleep(Duration::from_secs(1)).await; // let the source start the command
 
-            drop(trigger); // start shutdown
+        drop(trigger); // start shutdown
 
-            let exit_status = tokio::time::timeout(time::Duration::from_secs(30), task)
-                .await
-                .expect("join failed")
-                .expect("command timed out")
-                .expect("command error");
+        let exit_status = tokio::time::timeout(time::Duration::from_secs(30), task)
+            .await
+            .expect("join failed")
+            .expect("command timed out")
+            .expect("command error");
 
-            assert_eq!(
-                0_i32,
-                exit_status.expect("missing exit status").code().unwrap()
-            );
+        assert_eq!(
+            0_i32,
+            exit_status.expect("missing exit status").code().unwrap()
+        );
 
-            if let Poll::Ready(Some(event)) = futures::poll!(rx.next()) {
-                let log = event.as_log();
-                assert_eq!(log[log_schema().message_key()], "signal received".into());
-            } else {
-                panic!("Expected to receive event");
-            }
+        if let Poll::Ready(Some(event)) = futures::poll!(rx.next()) {
+            let log = event.as_log();
+            assert_eq!(log[log_schema().message_key()], "signal received".into());
+        } else {
+            panic!("Expected to receive event");
+        }
 
-            if let Poll::Ready(Some(event)) = futures::poll!(rx.next()) {
-                let log = event.as_log();
-                assert_eq!(log[log_schema().message_key()], "slept".into());
-            } else {
-                panic!("Expected to receive event");
-            }
-        })
-        .await;
+        if let Poll::Ready(Some(event)) = futures::poll!(rx.next()) {
+            let log = event.as_log();
+            assert_eq!(log[log_schema().message_key()], "slept".into());
+        } else {
+            panic!("Expected to receive event");
+        }
     }
 
     fn standard_scheduled_test_config() -> ExecConfig {
