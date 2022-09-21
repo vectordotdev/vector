@@ -54,16 +54,12 @@ impl SqsSink {
         let sink = input
             .request_builder(request_builder_concurrency_limit, self.request_builder)
             .filter_map(|req| async move {
-                match req {
-                    Err(error) => {
+                req.map_err(|error| {
                         emit!(SinkRequestBuildError {
                             name: SqsSinkConfig::NAME,
                             error,
                         });
-                        None
-                    }
-                    Ok(msg) => Some(msg),
-                }
+                }).ok()
             })
             .into_driver(service);
 
