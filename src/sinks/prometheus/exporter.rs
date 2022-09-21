@@ -338,7 +338,7 @@ impl MetricNormalize for PrometheusExporterMetricNormalizer {
     }
 }
 
-fn check_auth(req: &Request<Body>, auth: &Option<Auth>) -> bool {
+fn authorized(req: &Request<Body>, auth: &Option<Auth>) -> bool {
     if let Some(auth) = auth {
         let headers = req.headers();
         if let Some(auth_header) = headers.get(hyper::header::AUTHORIZATION) {
@@ -375,8 +375,14 @@ fn handle(
 ) -> Response<Body> {
     let mut response = Response::new(Body::empty());
 
-    if !check_auth(&req, auth) {
+    if !authorized(&req, auth) {
         *response.status_mut() = StatusCode::UNAUTHORIZED;
+        let supported_authentication_schemas = http::header::HeaderValue::from_str("Basic, Bearer")
+            .expect("Cannot convert authentication schemas to a header value");
+        response.headers_mut().insert(
+            http::header::WWW_AUTHENTICATE,
+            supported_authentication_schemas,
+        );
         return response;
     }
 
