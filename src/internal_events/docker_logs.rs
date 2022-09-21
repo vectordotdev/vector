@@ -197,7 +197,7 @@ pub struct DockerLogsReceivedOldLogError<'a> {
 impl InternalEvent for DockerLogsReceivedOldLogError<'_> {
     fn emit(self) {
         error!(
-            message = "Received older log.",
+            message = "Received out of order log message.",
             error_type = error_type::CONDITION_FAILED,
             stage = error_stage::RECEIVING,
             container_id = ?self.container_id,
