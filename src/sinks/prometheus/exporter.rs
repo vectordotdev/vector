@@ -444,11 +444,11 @@ impl PrometheusExporter {
 
         tokio::spawn(async move {
             let tls = MaybeTlsSettings::from_config(&tls, true)
-                .map_err(|error| error!("Server TLS error: {}", error))?;
+                .map_err(|error| error!("Server TLS error: {}.", error))?;
             let listener = tls
                 .bind(&address)
                 .await
-                .map_err(|error| error!("Server bind error: {}", error))?;
+                .map_err(|error| error!("Server bind error: {}.", error))?;
 
             info!(message = "Building HTTP server.", address = %address);
 
@@ -457,7 +457,7 @@ impl PrometheusExporter {
                 .with_graceful_shutdown(tripwire.then(crate::shutdown::tripwire_handler))
                 .instrument(span)
                 .await
-                .map_err(|error| error!("Server error: {}", error))?;
+                .map_err(|error| error!("Server error: {}.", error))?;
 
             Ok::<(), ()>(())
         });
