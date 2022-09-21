@@ -116,6 +116,7 @@ impl<'a> InternalEvent for SocketReceiveError<'a> {
             error_type = error_type::CONNECTION_FAILED,
             stage = error_stage::RECEIVING,
             %mode,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
