@@ -333,9 +333,9 @@ where
                         // could later update the shared value. So, here we look up the count of
                         // references to the inner value to see if there are more than expected.
                         //
-                        // The magic value below comes from:
-                        // 1. The handle in the registry
-                        // 2. The handle held by the value
+                        // The magic value for `strong_count` below comes from:
+                        // 1. The reference in the registry
+                        // 2. The reference held by the value passed in here
                         // If there is another reference, then there is handle elsewhere.
                         let referenced = Arc::strong_count(&value.inner) > 2;
                         // If the delete returns false, that means that our generation counter is
