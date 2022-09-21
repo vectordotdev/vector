@@ -352,18 +352,16 @@ fn check_auth(req: &Request<Body>, auth: &Option<Auth>) -> bool {
             };
 
             if let Ok(encoded_credentials) = encoded_credentials {
-                if auth_header != encoded_credentials {
-                    return false;
+                if auth_header == encoded_credentials {
+                    return true;
                 }
-            } else {
-                return false;
             }
-        } else {
-            return false;
         }
+    } else {
+        return true;
     }
 
-    true
+    false
 }
 
 fn handle(
@@ -623,6 +621,153 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn prometheus_noauth() {
+        let (name1, event1) = create_metric_gauge(None, 123.4);
+        let (name2, event2) = tests::create_metric_set(None, vec!["0", "1", "2"]);
+        let events = vec![event1, event2];
+
+        let response_result = export_and_fetch_with_auth(None, None, events, false).await;
+
+        assert!(response_result.is_ok());
+
+        let body = response_result.expect("Cannot extract body from the response");
+
+        assert!(body.contains(&format!(
+            indoc! {r#"
+               # HELP {name} {name}
+               # TYPE {name} gauge
+               {name}{{some_tag="some_value"}} 123.4
+            "#},
+            name = name1
+        )));
+        assert!(body.contains(&format!(
+            indoc! {r#"
+               # HELP {name} {name}
+               # TYPE {name} gauge
+               {name}{{some_tag="some_value"}} 3
+            "#},
+            name = name2
+        )));
+    }
+
+    #[tokio::test]
+    async fn prometheus_successful_basic_auth() {
+        let (name1, event1) = create_metric_gauge(None, 123.4);
+        let (name2, event2) = tests::create_metric_set(None, vec!["0", "1", "2"]);
+        let events = vec![event1, event2];
+
+        let auth_config = Auth::Basic {
+            user: "user".to_string(),
+            password: "password".to_string(),
+        };
+
+        let response_result =
+            export_and_fetch_with_auth(Some(auth_config.clone()), Some(auth_config), events, false)
+                .await;
+
+        assert!(response_result.is_ok());
+
+        let body = response_result.expect("Cannot extract body from the response");
+
+        assert!(body.contains(&format!(
+            indoc! {r#"
+               # HELP {name} {name}
+               # TYPE {name} gauge
+               {name}{{some_tag="some_value"}} 123.4
+            "#},
+            name = name1
+        )));
+        assert!(body.contains(&format!(
+            indoc! {r#"
+               # HELP {name} {name}
+               # TYPE {name} gauge
+               {name}{{some_tag="some_value"}} 3
+            "#},
+            name = name2
+        )));
+    }
+
+    #[tokio::test]
+    async fn prometheus_successful_token_auth() {
+        let (name1, event1) = create_metric_gauge(None, 123.4);
+        let (name2, event2) = tests::create_metric_set(None, vec!["0", "1", "2"]);
+        let events = vec![event1, event2];
+
+        let auth_config = Auth::Bearer {
+            token: "token".to_string(),
+        };
+
+        let response_result =
+            export_and_fetch_with_auth(Some(auth_config.clone()), Some(auth_config), events, false)
+                .await;
+
+        assert!(response_result.is_ok());
+
+        let body = response_result.expect("Cannot extract body from the response");
+
+        assert!(body.contains(&format!(
+            indoc! {r#"
+               # HELP {name} {name}
+               # TYPE {name} gauge
+               {name}{{some_tag="some_value"}} 123.4
+            "#},
+            name = name1
+        )));
+        assert!(body.contains(&format!(
+            indoc! {r#"
+               # HELP {name} {name}
+               # TYPE {name} gauge
+               {name}{{some_tag="some_value"}} 3
+            "#},
+            name = name2
+        )));
+    }
+
+    #[tokio::test]
+    async fn prometheus_missing_auth() {
+        let (_, event1) = create_metric_gauge(None, 123.4);
+        let (_, event2) = tests::create_metric_set(None, vec!["0", "1", "2"]);
+        let events = vec![event1, event2];
+
+        let server_auth_config = Auth::Bearer {
+            token: "token".to_string(),
+        };
+
+        let response_result =
+            export_and_fetch_with_auth(Some(server_auth_config), None, events, false).await;
+
+        assert!(response_result.is_err());
+        assert_eq!(response_result.unwrap_err(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn prometheus_wrong_auth() {
+        let (_, event1) = create_metric_gauge(None, 123.4);
+        let (_, event2) = tests::create_metric_set(None, vec!["0", "1", "2"]);
+        let events = vec![event1, event2];
+
+        let server_auth_config = Auth::Bearer {
+            token: "token".to_string(),
+        };
+
+        let client_auth_config = Auth::Basic {
+            user: "user".to_string(),
+            password: "password".to_string(),
+        };
+
+        let response_result = export_and_fetch_with_auth(
+            Some(server_auth_config),
+            Some(client_auth_config),
+            events,
+            false,
+        )
+        .await;
+
+        assert!(response_result.is_err());
+        assert_eq!(response_result.unwrap_err(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
     async fn updates_timestamps() {
         let timestamp1 = Utc::now();
         let (name, event1) = create_metric_gauge(None, 123.4);
@@ -729,6 +874,77 @@ mod tests {
         sink_handle.await.unwrap();
 
         result
+    }
+
+    async fn export_and_fetch_with_auth(
+        server_auth_config: Option<Auth>,
+        client_auth_config: Option<Auth>,
+        mut events: Vec<Event>,
+        suppress_timestamp: bool,
+    ) -> Result<String, http::status::StatusCode> {
+        trace_init();
+
+        let client_settings = MaybeTlsSettings::from_config(&None, false).unwrap();
+        let proto = client_settings.http_protocol_name();
+
+        let address = next_addr();
+        let config = PrometheusExporterConfig {
+            address,
+            auth: server_auth_config,
+            tls: None,
+            suppress_timestamp,
+            ..Default::default()
+        };
+
+        // Set up acknowledgement notification
+        let mut receiver = BatchNotifier::apply_to(&mut events[..]);
+        assert_eq!(receiver.try_recv(), Err(TryRecvError::Empty));
+
+        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
+        let (_, delayed_event) = create_metric_gauge(Some("delayed".to_string()), 123.4);
+        let sink_handle = tokio::spawn(run_and_assert_sink_compliance(
+            sink,
+            stream::iter(events).chain(stream::once(async move {
+                // Wait a bit to have time to scrape metrics
+                time::sleep(time::Duration::from_millis(500)).await;
+                delayed_event
+            })),
+            &SINK_TAGS,
+        ));
+
+        time::sleep(time::Duration::from_millis(100)).await;
+
+        // Events are marked as delivered as soon as they are aggregated.
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+        let mut request = Request::get(format!("{}://{}/metrics", proto, address))
+            .body(Body::empty())
+            .expect("Error creating request.");
+
+        if let Some(client_auth_config) = client_auth_config {
+            client_auth_config.apply(&mut request);
+        }
+
+        let proxy = ProxyConfig::default();
+        let result = HttpClient::new(client_settings, &proxy)
+            .unwrap()
+            .send(request)
+            .await
+            .expect("Could not fetch query");
+
+        if !result.status().is_success() {
+            return Err(result.status());
+        }
+
+        let body = result.into_body();
+        let bytes = hyper::body::to_bytes(body)
+            .await
+            .expect("Reading body failed");
+        let result = String::from_utf8(bytes.to_vec()).unwrap();
+
+        sink_handle.await.unwrap();
+
+        Ok(result)
     }
 
     async fn export_and_fetch_simple(tls_config: Option<TlsEnableableConfig>) {
