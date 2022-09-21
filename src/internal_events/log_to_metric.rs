@@ -47,8 +47,9 @@ pub struct LogToMetricParseFloatError<'a> {
 
 impl<'a> InternalEvent for LogToMetricParseFloatError<'a> {
     fn emit(self) {
+        let reason = "Failed to parse field as float.";
         error!(
-            message = "Failed to parse field as float.",
+            message = reason,
             error = ?self.error,
             field = %self.field,
             error_code = "failed_parsing_float",
@@ -68,6 +69,8 @@ impl<'a> InternalEvent for LogToMetricParseFloatError<'a> {
             "processing_errors_total", 1,
             "error_type" => "parse_error",
         );
+
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason })
     }
 }
 
@@ -77,8 +80,9 @@ pub struct LogToMetricTemplateParseError {
 
 impl InternalEvent for LogToMetricTemplateParseError {
     fn emit(self) {
+        let reason = "Failed to parse template.";
         error!(
-            message = "Failed to parse template.",
+            message = reason,
             error = ?self.error,
             error_code = "failed_parsing_template",
             error_type = error_type::TEMPLATE_FAILED,
@@ -96,5 +100,7 @@ impl InternalEvent for LogToMetricTemplateParseError {
             "processing_errors_total", 1,
             "error_type" => "template_error",
         );
+
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason })
     }
 }

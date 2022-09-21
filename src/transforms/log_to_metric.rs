@@ -449,36 +449,50 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 
 impl FunctionTransform for LogToMetric {
     fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
+        // Metrics are "all or none" for a specific log. If a single fails, none are produced.
+        let mut buffer = Vec::with_capacity(self.config.metrics.len());
+
         for config in self.config.metrics.iter() {
             match to_metric(config, &event) {
                 Ok(metric) => {
-                    output.push(Event::Metric(metric));
+                    buffer.push(Event::Metric(metric));
                 }
-                Err(TransformError::FieldNull { field }) => emit!(LogToMetricFieldNullError {
-                    field: field.as_ref()
-                }),
-                Err(TransformError::FieldNotFound { field }) => {
-                    emit!(ParserMissingFieldError::<DROP_EVENT> {
-                        field: field.as_ref()
-                    })
-                }
-                Err(TransformError::ParseFloatError { field, error }) => {
-                    emit!(LogToMetricParseFloatError {
-                        field: field.as_ref(),
-                        error
-                    })
-                }
-                Err(TransformError::TemplateRenderingError(error)) => {
-                    emit!(crate::internal_events::TemplateRenderingError {
-                        error,
-                        drop_event: false,
-                        field: None,
-                    })
-                }
-                Err(TransformError::TemplateParseError(error)) => {
-                    emit!(LogToMetricTemplateParseError { error })
+                Err(err) => {
+                    match err {
+                        TransformError::FieldNull { field } => emit!(LogToMetricFieldNullError {
+                            field: field.as_ref()
+                        }),
+                        TransformError::FieldNotFound { field } => {
+                            emit!(ParserMissingFieldError::<DROP_EVENT> {
+                                field: field.as_ref()
+                            })
+                        }
+                        TransformError::ParseFloatError { field, error } => {
+                            emit!(LogToMetricParseFloatError {
+                                field: field.as_ref(),
+                                error
+                            })
+                        }
+                        TransformError::TemplateRenderingError(error) => {
+                            emit!(crate::internal_events::TemplateRenderingError {
+                                error,
+                                drop_event: true,
+                                field: None,
+                            })
+                        }
+                        TransformError::TemplateParseError(error) => {
+                            emit!(LogToMetricTemplateParseError { error })
+                        }
+                    };
+                    // early return to prevent the partial buffer from being sent
+                    return;
                 }
             }
+        }
+
+        // Metric generation was successful, publish them all.
+        for event in buffer {
+            output.push(event);
         }
     }
 }
@@ -486,6 +500,7 @@ impl FunctionTransform for LogToMetric {
 #[cfg(test)]
 mod tests {
     use chrono::{offset::TimeZone, DateTime, Utc};
+    use std::time::Duration;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
 
@@ -525,7 +540,9 @@ mod tests {
             let (tx, rx) = mpsc::channel(1);
             let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
             tx.send(event).await.unwrap();
-            let result = out.recv().await;
+            let result = tokio::time::timeout(Duration::from_secs(5), out.recv())
+                .await
+                .unwrap_or(None);
             drop(tx);
             topology.stop().await;
             assert_eq!(out.recv().await, None);
