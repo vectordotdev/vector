@@ -16,7 +16,7 @@ impl InternalEvent for VectorStarted {
             debug = built_info::DEBUG,
             version = built_info::PKG_VERSION,
             arch = built_info::TARGET_ARCH,
-            build_id = built_info::VECTOR_BUILD_DESC.unwrap_or("none"),
+            revision = built_info::VECTOR_BUILD_DESC.unwrap_or(""),
         );
         gauge!(
             "build_info",
