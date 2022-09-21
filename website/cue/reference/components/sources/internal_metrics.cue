@@ -1107,7 +1107,7 @@ components: sources: internal_metrics: {
 			tags:              _component_tags
 		}
 		build_info: {
-			description:       "Has a fixed value of 1.0. Contains build information such as rust and vector versions."
+			description:       "Has a fixed value of 1.0. Contains build information such as Rust and Vector versions."
 			type:              "gauge"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags & {
