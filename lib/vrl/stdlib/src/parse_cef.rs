@@ -247,7 +247,7 @@ mod test {
                 ("deviceVersion".to_string(), "1.0".into()),
                 ("deviceEventClassId".to_string(), "100".into()),
                 ("name".to_string(), "worm successfully stopped".into()),
-                ("severity".to_string(), "10".into()),                
+                ("severity".to_string(), "10".into()),
             ]),
             parse("CEF:1|Security|threatmanager|1.0|100|worm successfully stopped|10|src=10.0.0.1 dst=2.1.2.2 spt=1232")
                 .map(Iterator::collect)
@@ -267,7 +267,7 @@ mod test {
                 ("deviceVersion".to_string(), "1.0".into()),
                 ("deviceEventClassId".to_string(), "100".into()),
                 ("name".to_string(), "worm successfully stopped".into()),
-                ("severity".to_string(), "10".into()),                
+                ("severity".to_string(), "10".into()),
             ]),
             parse("Sep 29 08:26:10 host CEF:1|Security|threatmanager|1.0|100|worm successfully stopped|10|src=10.0.0.1 dst=2.1.2.2 spt=1232")
                 .map(Iterator::collect)
@@ -321,7 +321,7 @@ mod test {
                 ("deviceVersion".to_string(), "1.0".into()),
                 ("deviceEventClassId".to_string(), "100".into()),
                 ("name".to_string(), "worm successfully stopped".into()),
-                ("severity".to_string(), "10".into()),                
+                ("severity".to_string(), "10".into()),
             ]),
             parse(r#"CEF:1|Security|threatmanager|1.0|100|worm successfully stopped|10|src=ip\=10.0.0.1 dst=2.1.2.2 spt=1232"#)
                 .map(Iterator::collect)
@@ -341,7 +341,7 @@ mod test {
                 ("deviceVersion".to_string(), "1.0".into()),
                 ("deviceEventClassId".to_string(), "100".into()),
                 ("name".to_string(), "worm successfully stopped".into()),
-                ("severity".to_string(), "10".into()),              
+                ("severity".to_string(), "10".into()),
             ]),
             parse(r#"CEF:1|Security|threatmanager|1.0|100|worm successfully stopped|10|dst=2.1.2.2 path=\\home\\ spt=1232"#)
                 .map(Iterator::collect)
@@ -361,7 +361,7 @@ mod test {
                 ("deviceVersion".to_string(), "1.0".into()),
                 ("deviceEventClassId".to_string(), "100".into()),
                 ("name".to_string(), "worm successfully stopped".into()),
-                ("severity".to_string(), "10".into()),                
+                ("severity".to_string(), "10".into()),
             ]),
             parse(r#"CEF:1|Security|threatmanager|1.0|100|worm successfully stopped|10|dst=2.1.2.2 msg=Detected a threat.\r No action needed spt=1232"#)
                 .map(Iterator::collect)
@@ -400,7 +400,7 @@ mod test {
                 ("deviceVersion".to_string(), "1.0".into()),
                 ("deviceEventClassId".to_string(), "100".into()),
                 ("name".to_string(), "worm successfully stopped".into()),
-                ("severity".to_string(), "10".into()),                
+                ("severity".to_string(), "10".into()),
             ]),
             parse(r#"CEF:1|Security|threatmanager|1.0|100|worm successfully stopped|10|dst=2.1.2.2 msg=Detected a threat. No action needed   "#)
                 .map(Iterator::collect)
@@ -423,7 +423,8 @@ mod test {
                 "name":"Suspected credentials theft",
                 "severity":"8",
                 "suser":"mike2@prod1.domain.com",
-                "shost":"prod1.domain.com","src":"1.1.1.1"
+                "shost":"prod1.domain.com",
+                "src":"1.1.1.1"
             })),
             tdef: type_def(),
         }
