@@ -1120,7 +1120,7 @@ components: sources: internal_metrics: {
 					required:    true
 				}
 				rust_version: {
-					description: "The rust version from the package manifest."
+					description: "The Rust version from the package manifest."
 					required:    true
 				}
 				arch: {
