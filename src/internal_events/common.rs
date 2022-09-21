@@ -150,14 +150,13 @@ impl<'a, const INTENTIONAL: bool> InternalEvent for ComponentEventsDropped<'a, I
 
 #[derive(Debug)]
 pub struct SinkRequestBuildError<E> {
-    pub name: &'static str,
     pub error: E,
 }
 
 impl<E: std::fmt::Display> InternalEvent for SinkRequestBuildError<E> {
     fn emit(self) {
         error!(
-            message = format!("Failed to build request for {}", self.name),
+            message = format!("Failed to build request"),
             error = %self.error,
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::PROCESSING,
