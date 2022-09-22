@@ -315,6 +315,9 @@ heim = { git = "https://github.com/vectordotdev/heim.git", branch = "update-nix"
 # make sure to update the external docs when the Lua version changes
 mlua = { version = "0.8.3", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 
+# enterprise related dependencies
+jsonschema = { version = "0.16.0", default-features = false }
+
 [target.'cfg(windows)'.dependencies]
 windows-service = "0.5.0"
 

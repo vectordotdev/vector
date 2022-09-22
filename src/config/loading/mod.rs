@@ -1,5 +1,7 @@
 mod config_builder;
 mod loader;
+#[cfg(feature = "enterprise")]
+pub(crate) mod schema;
 mod secret;
 mod source;
 
@@ -150,6 +152,12 @@ pub async fn load_from_paths_with_provider_and_secrets(
         debug!(message = "No secret placeholder found, skipping secret resolution.");
         load_builder_from_paths(config_paths)?
     };
+
+    // Check secrets in configuration
+    #[cfg(feature = "enterprise")]
+    {
+        crate::config::loading::schema::check_sensitive_fields_from_paths(config_paths, &builder)?;
+    }
 
     validation::check_provider(&builder)?;
     signal_handler.clear();
