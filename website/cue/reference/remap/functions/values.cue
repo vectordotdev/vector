@@ -1,33 +1,37 @@
 package metadata
 
 remap: functions: values: {
-	category: "Type"
-	description: """
-		Returns the `values` from the object passed into the function
-		"""
+	category: "Enumerate"
+	description: #"""
+		Returns the values from the object passed into the function.
+		"""#
 
 	arguments: [
 		{
 			name:        "value"
-			description: "The value that you need to ensure is an object containing keys and values."
+			description: "The key, value object to extract values from."
 			required:    true
-			type: ["any"]
+			type: ["object"]
 		},
 	]
+	internal_failure_reasons: []
 	return: {
 		types: ["array"]
 		rules: [
-			#"Returns an array for all the values"#,
+			#"Returns an array for all the values."#,
 		]
 	}
 	examples: [
 		{
 			title: "Get values from key value object"
-			input: log: value:
+			input: log: {
+				"key3": "val3"
+				"key4": "val4"
+			}
 			source: #"""
-				values({"key1": "val1", "key2": "val2"})
+				values(.)
 				"""#
-			return: ["val1", "val2"]
+			return: ["val3", "val4"]
 		},
 	]
 }
