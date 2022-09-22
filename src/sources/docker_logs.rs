@@ -46,7 +46,7 @@ const CREATED_AT: &str = "container_created_at";
 const NAME: &str = "container_name";
 const STREAM: &str = "stream";
 const CONTAINER: &str = "container_id";
-// Prevent short hostname from being wrongly regconized as a container's short ID.
+// Prevent short hostname from being wrongly recognized as a container's short ID.
 const MIN_HOSTNAME_LENGTH: usize = 6;
 
 static STDERR: Lazy<Bytes> = Lazy::new(|| "stderr".into());
@@ -706,7 +706,7 @@ impl EventStreamBuilder {
     }
 
     fn finish(self, result: Result<ContainerLogInfo, (ContainerId, ErrorPersistence)>) {
-        // This can legaly fail when shutting down, and any other
+        // This can legally fail when shutting down, and any other
         // reason should have been logged in the main future.
         let _ = self.main_send.send(result);
     }
