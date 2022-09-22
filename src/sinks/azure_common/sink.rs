@@ -12,6 +12,7 @@ use vector_core::{
 
 use crate::{
     event::Event,
+    internal_events::SinkRequestBuildError,
     sinks::util::{partitioner::KeyPartitioner, RequestBuilder, SinkBuilderExt},
 };
 
@@ -61,8 +62,11 @@ where
             .request_builder(builder_limit, request_builder)
             .filter_map(|request| async move {
                 match request {
-                    Err(e) => {
-                        error!("Failed to build Azure Blob request: {:?}.", e);
+                    Err(error) => {
+                        emit!(SinkRequestBuildError {
+                            name: "this will be deleted soon",
+                            error
+                        });
                         None
                     }
                     Ok(req) => Some(req),
