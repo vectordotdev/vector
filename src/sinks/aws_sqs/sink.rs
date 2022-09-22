@@ -3,7 +3,6 @@ use std::num::NonZeroUsize;
 use aws_sdk_sqs::Client as SqsClient;
 use futures::stream::BoxStream;
 use futures_util::StreamExt;
-use vector_config::NamedComponent;
 use vector_core::sink::StreamSink;
 
 use super::{config::SqsSinkConfig, request_builder::SqsRequestBuilder, service::SqsService};
@@ -55,10 +54,7 @@ impl SqsSink {
             .request_builder(request_builder_concurrency_limit, self.request_builder)
             .filter_map(|req| async move {
                 req.map_err(|error| {
-                    emit!(SinkRequestBuildError {
-                        name: SqsSinkConfig::NAME,
-                        error,
-                    });
+                    emit!(SinkRequestBuildError { error });
                 })
                 .ok()
             })

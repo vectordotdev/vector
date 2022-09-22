@@ -4,10 +4,8 @@ use async_trait::async_trait;
 use futures::{future, stream::BoxStream, StreamExt};
 use rand::random;
 use tower::Service;
-use vector_config::NamedComponent;
 use vector_core::stream::{BatcherSettings, DriverResponse};
 
-use super::KinesisSinkConfig;
 use crate::{
     event::{Event, LogEvent},
     internal_events::SinkRequestBuildError,
@@ -51,10 +49,7 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError {
-                            name: KinesisSinkConfig::NAME,
-                            error,
-                        });
+                        emit!(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),
