@@ -150,13 +150,14 @@ impl<'a, const INTENTIONAL: bool> InternalEvent for ComponentEventsDropped<'a, I
 
 #[derive(Debug)]
 pub struct SinkRequestBuildError<E> {
-    // This event had a `name` field which would contain the type of sink,
-    // emitted logs contain this already due to `tracing` spans.
     pub error: E,
 }
 
 impl<E: std::fmt::Display> InternalEvent for SinkRequestBuildError<E> {
     fn emit(self) {
+        // Providing the name of the sink with the build error is not necessary because the emitted log
+        // message contains the sink name in `component_type` field thanks to `tracing` spans. For example:
+        // "<timestamp> ERROR sink{component_kind="sink" component_id=sink0 component_type=aws_s3 component_name=sink0}: vector::internal_events::common: Failed to build request."
         error!(
             message = format!("Failed to build request."),
             error = %self.error,
