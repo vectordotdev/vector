@@ -82,6 +82,7 @@ pub struct ConfigBuilder {
 #[cfg(feature = "enterprise")]
 #[derive(::serde::Serialize)]
 struct ConfigBuilderHash<'a> {
+    version: &'static str,
     #[cfg(feature = "api")]
     api: &'a api::Options,
     schema: &'a schema::Options,
@@ -160,6 +161,7 @@ fn sort_json_value(value: &mut Value) {
 impl<'a> From<&'a ConfigBuilder> for ConfigBuilderHash<'a> {
     fn from(value: &'a ConfigBuilder) -> Self {
         ConfigBuilderHash {
+            version: env!("CARGO_PKG_VERSION"),
             #[cfg(feature = "api")]
             api: &value.api,
             schema: &value.schema,
@@ -430,6 +432,7 @@ mod tests {
             "sources",
             "tests",
             "transforms",
+            "version",
         ];
 
         let builder = ConfigBuilder::default();
@@ -452,10 +455,14 @@ mod tests {
     /// serializes, or the implementation of `serde_json` has changed. If this test fails, we
     /// should ideally be able to fix so that the original hash passes!
     fn version_hash_match() {
-        assert_eq!(
-            "bc0825487e137ee1d1fc76c616795d041c4825b4ca5a7236455ea4515238885c",
-            ConfigBuilder::default().sha256_hash()
-        );
+        let expected_hash = "6c98bea9d9e2f3133e2d39ba04592d17f96340a9bc4c8d697b09f5af388a76bd";
+        let builder = ConfigBuilder::default();
+        let mut hash_builder = ConfigBuilderHash::from(&builder);
+        hash_builder.version = "1.2.3";
+        assert_eq!(expected_hash, hash_builder.into_hash());
+        let mut hash_builder = ConfigBuilderHash::from(&builder);
+        hash_builder.version = "1.2.4";
+        assert_ne!(expected_hash, hash_builder.into_hash());
     }
 
     #[test]
