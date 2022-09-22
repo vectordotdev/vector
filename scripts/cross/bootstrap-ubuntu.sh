@@ -1,8 +1,10 @@
 #!/bin/sh
+set -o errexit
 
 apt-get update
 apt-get install -y \
   apt-transport-https \
+  gnupg \
   wget
 
 # we need LLVM >= 3.9 for onig_sys/bindgen
@@ -24,6 +26,7 @@ apt-get install -y \
 
 # Protoc. No guard because we want to override Ubuntu's old version in
 # case it is already installed by a dependency.
+TEMP=$(mktemp -d)
 PROTOC_VERSION=3.19.5
 PROTOC_ZIP=protoc-${PROTOC_VERSION}-linux-x86_64.zip
 curl -fsSL https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOC_VERSION/$PROTOC_ZIP \
@@ -31,3 +34,4 @@ curl -fsSL https://github.com/protocolbuffers/protobuf/releases/download/v$PROTO
 unzip "$TEMP/$PROTOC_ZIP" bin/protoc -d "$TEMP"
 chmod +x "$TEMP"/bin/protoc
 mv --force --verbose "$TEMP"/bin/protoc /usr/bin/protoc
+rm -fr "$TEMP"

@@ -2,7 +2,6 @@
 set -o errexit -o verbose
 
 TEMP=$(mktemp -d)
-trap 'rm -fr "$TEMP"' EXIT
 
 # Protoc. No guard because we want to override Ubuntu's old version in
 # case it is already installed by a dependency.
@@ -13,3 +12,4 @@ curl -fsSL https://github.com/protocolbuffers/protobuf/releases/download/v$PROTO
 unzip "$TEMP/$PROTOC_ZIP" bin/protoc -d "$TEMP"
 chmod +x "$TEMP"/bin/protoc
 mv --force --verbose "$TEMP"/bin/protoc /usr/bin/protoc
+rm -fr "$TEMP"
