@@ -4,7 +4,6 @@ use async_trait::async_trait;
 use futures::stream::BoxStream;
 use futures_util::StreamExt;
 use tower::Service;
-use vector_config::NamedComponent;
 use vector_core::{
     event::Finalizable,
     sink::StreamSink,
@@ -12,7 +11,6 @@ use vector_core::{
 };
 
 use crate::internal_events::SinkRequestBuildError;
-use crate::sinks::aws_s3::S3SinkConfig;
 use crate::{
     event::Event,
     sinks::util::{partitioner::KeyPartitioner, RequestBuilder, SinkBuilderExt},
@@ -65,10 +63,7 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError {
-                            name: S3SinkConfig::NAME, // This is also used by the `datadog_archives` sink so...
-                            error
-                        });
+                        emit!(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),
