@@ -1,9 +1,8 @@
 use bollard::errors::Error;
 use chrono::ParseError;
 use metrics::counter;
-use vector_core::internal_event::InternalEvent;
-
 use vector_common::internal_event::{error_stage, error_type};
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct DockerLogsEventsReceived<'a> {
@@ -12,7 +11,7 @@ pub struct DockerLogsEventsReceived<'a> {
     pub container_name: &'a str,
 }
 
-impl<'a> InternalEvent for DockerLogsEventsReceived<'a> {
+impl InternalEvent for DockerLogsEventsReceived<'_> {
     fn emit(self) {
         trace!(
             message = "Events received.",
@@ -42,7 +41,7 @@ pub struct DockerLogsContainerEventReceived<'a> {
     pub action: &'a str,
 }
 
-impl<'a> InternalEvent for DockerLogsContainerEventReceived<'a> {
+impl InternalEvent for DockerLogsContainerEventReceived<'_> {
     fn emit(self) {
         debug!(
             message = "Received one container event.",
@@ -58,7 +57,7 @@ pub struct DockerLogsContainerWatch<'a> {
     pub container_id: &'a str,
 }
 
-impl<'a> InternalEvent for DockerLogsContainerWatch<'a> {
+impl InternalEvent for DockerLogsContainerWatch<'_> {
     fn emit(self) {
         info!(
             message = "Started watching for container logs.",
@@ -73,7 +72,7 @@ pub struct DockerLogsContainerUnwatch<'a> {
     pub container_id: &'a str,
 }
 
-impl<'a> InternalEvent for DockerLogsContainerUnwatch<'a> {
+impl InternalEvent for DockerLogsContainerUnwatch<'_> {
     fn emit(self) {
         info!(
             message = "Stopped watching for container logs.",
@@ -89,7 +88,7 @@ pub struct DockerLogsCommunicationError<'a> {
     pub container_id: Option<&'a str>,
 }
 
-impl<'a> InternalEvent for DockerLogsCommunicationError<'a> {
+impl InternalEvent for DockerLogsCommunicationError<'_> {
     fn emit(self) {
         error!(
             message = "Error in communication with Docker daemon.",
@@ -115,7 +114,7 @@ pub struct DockerLogsContainerMetadataFetchError<'a> {
     pub container_id: &'a str,
 }
 
-impl<'a> InternalEvent for DockerLogsContainerMetadataFetchError<'a> {
+impl InternalEvent for DockerLogsContainerMetadataFetchError<'_> {
     fn emit(self) {
         error!(
             message = "Failed to fetch container metadata.",
@@ -142,7 +141,7 @@ pub struct DockerLogsTimestampParseError<'a> {
     pub container_id: &'a str,
 }
 
-impl<'a> InternalEvent for DockerLogsTimestampParseError<'a> {
+impl InternalEvent for DockerLogsTimestampParseError<'_> {
     fn emit(self) {
         error!(
             message = "Failed to parse timestamp as RFC3339 timestamp.",
@@ -169,7 +168,7 @@ pub struct DockerLogsLoggingDriverUnsupportedError<'a> {
     pub error: Error,
 }
 
-impl<'a> InternalEvent for DockerLogsLoggingDriverUnsupportedError<'a> {
+impl InternalEvent for DockerLogsLoggingDriverUnsupportedError<'_> {
     fn emit(self) {
         error!(
             message = "Docker engine is not using either the `jsonfile` or `journald` logging driver. Please enable one of these logging drivers to get logs from the Docker daemon.",
@@ -186,5 +185,29 @@ impl<'a> InternalEvent for DockerLogsLoggingDriverUnsupportedError<'a> {
         );
         // deprecated
         counter!("logging_driver_errors_total", 1);
+    }
+}
+
+#[derive(Debug)]
+pub struct DockerLogsReceivedOutOfOrderError<'a> {
+    pub timestamp_str: &'a str,
+    pub container_id: &'a str,
+}
+
+impl InternalEvent for DockerLogsReceivedOutOfOrderError<'_> {
+    fn emit(self) {
+        error!(
+            message = "Received out of order log message.",
+            error_type = error_type::CONDITION_FAILED,
+            stage = error_stage::RECEIVING,
+            container_id = ?self.container_id,
+            timestamp = ?self.timestamp_str,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => error_type::CONDITION_FAILED,
+            "stage" => error_stage::RECEIVING,
+            "container_id" => self.container_id.to_owned(),
+        );
     }
 }

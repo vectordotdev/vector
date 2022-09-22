@@ -796,8 +796,11 @@ mod tests {
             run_command(config.clone(), hostname, decoder, shutdown, tx),
         );
 
-        let timeout_result =
-            crate::test_util::components::assert_source_compliance(&[], timeout).await;
+        let timeout_result = crate::test_util::components::assert_source_compliance(
+            &crate::test_util::components::SOURCE_TAGS,
+            timeout,
+        )
+        .await;
 
         let exit_status = timeout_result
             .expect("command timed out")

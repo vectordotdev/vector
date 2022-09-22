@@ -8965,6 +8965,7 @@ dependencies = [
  "once_cell",
  "openssl",
  "ordered-float 3.0.0",
+ "parking_lot",
  "pin-project",
  "pretty_assertions",
  "proptest",
