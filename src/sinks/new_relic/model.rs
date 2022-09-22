@@ -67,7 +67,7 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
                         }
                     );
                     if let Some(attr) = attr {
-                        metric_data.insert("atttributes".to_owned(), attr);
+                        metric_data.insert("attributes".to_owned(), attr);
                     }
                 }
 
