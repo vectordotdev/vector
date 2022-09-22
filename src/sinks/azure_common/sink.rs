@@ -68,10 +68,7 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError {
-                            name: "this will be deleted soon",
-                            error
-                        });
+                        emit!(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),
