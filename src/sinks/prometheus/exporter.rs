@@ -8,7 +8,6 @@ use std::{
 };
 
 use async_trait::async_trait;
-use base64;
 use futures::{future, stream::BoxStream, FutureExt, StreamExt};
 use hyper::{
     header::HeaderValue,
