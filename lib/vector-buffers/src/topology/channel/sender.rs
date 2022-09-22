@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{error, fmt, sync::Arc};
 
 use async_recursion::async_recursion;
 use tokio::sync::Mutex;
@@ -12,6 +12,39 @@ use crate::{
     },
     Bufferable, WhenFull,
 };
+
+/// Error related to sending an item via `BufferSender`.
+///
+/// This error type is meant to opaquely wrap the various error types returned by different buffer
+/// implementations in order to pass along the underlying error message to higher-level callers.
+#[derive(Debug)]
+pub struct SendError {
+    inner: Box<dyn error::Error + Send + Sync>,
+}
+
+impl SendError {
+    fn new(inner: impl error::Error + Send + Sync + 'static) -> Self {
+        Self {
+            inner: Box::new(inner),
+        }
+    }
+}
+
+impl error::Error for SendError {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        self.inner.source()
+    }
+
+    fn cause(&self) -> Option<&dyn error::Error> {
+        self.source()
+    }
+}
+
+impl fmt::Display for SendError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.inner.fmt(f)
+    }
+}
 
 /// Adapter for papering over various sender backends.
 #[derive(Clone, Debug)]
@@ -48,9 +81,9 @@ impl<T> SenderAdapter<T>
 where
     T: Bufferable,
 {
-    pub(crate) async fn send(&mut self, item: T) -> Result<(), ()> {
+    pub(crate) async fn send(&mut self, item: T) -> Result<(), SendError> {
         match self {
-            Self::InMemory(tx) => tx.send(item).await.map_err(|_| ()),
+            Self::InMemory(tx) => tx.send(item).await.map_err(SendError::new),
             Self::DiskV1(writer) => {
                 writer.send(item).await;
                 Ok(())
@@ -59,8 +92,24 @@ where
                 let mut writer = writer.lock().await;
 
                 if let Err(e) = writer.write_record(item).await {
-                    // Can't really do much except panic here. :sweat:
-                    panic!("writer hit unrecoverable error during write: {}", e);
+                    // TODO: Actually handle recoverable errors when we have sink error handling
+                    // capabilities i.e. a record that's too big to encode/serialize could
+                    // theoretically be passed back and handled somewhere else... we don't have to
+                    // drop it.
+
+                    // We want to get right to the meat of things by emitting an error message here,
+                    // because otherwise the bubbled-up error will be a bit plain without more
+                    // context.
+                    //
+                    // TODO: Should we actually take the Go-style approach and just build new errors
+                    // that are chained together e.g. `disk buffer error: i/o error: no space left
+                    // on device`. That one would be more useful when emitted by the component
+                    // task's error handling code... but it's also not our typical pattern.
+                    if !e.is_recoverable() {
+                        error!("Disk buffer writer has encountered an unrecoverable error.");
+                    }
+
+                    return Err(SendError::new(e));
                 }
 
                 Ok(())
@@ -68,7 +117,7 @@ where
         }
     }
 
-    pub(crate) async fn try_send(&mut self, item: T) -> Result<Option<T>, ()> {
+    pub(crate) async fn try_send(&mut self, item: T) -> Result<Option<T>, SendError> {
         match self {
             Self::InMemory(tx) => tx
                 .try_send(item)
@@ -78,27 +127,31 @@ where
             Self::DiskV2(writer) => {
                 let mut writer = writer.lock().await;
 
-                match writer.try_write_record(item).await {
-                    Ok(item) => match item {
-                        None => {
-                            if let Err(e) = writer.flush().await {
-                                // Can't really do much except panic here. :sweat:
-                                panic!("writer hit unrecoverable error during flush: {}", e);
-                            }
-                            Ok(None)
-                        }
-                        Some(item) => Ok(Some(item)),
-                    },
-                    Err(e) => {
-                        // Can't really do much except panic here. :sweat:
-                        panic!("writer hit unrecoverable error during write: {}", e);
+                writer.try_write_record(item).await.map_err(|e| {
+                    // TODO: Actually handle recoverable errors when we have sink error handling
+                    // capabilities i.e. a record that's too big to encode/serialize could
+                    // theoretically be passed back and handled somewhere else... we don't have to
+                    // drop it.
+
+                    // We want to get right to the meat of things by emitting an error message here,
+                    // because otherwise the bubbled-up error will be a bit plain without more
+                    // context.
+                    //
+                    // TODO: Should we actually take the Go-style approach and just build new errors
+                    // that are chained together e.g. `disk buffer error: i/o error: no space left
+                    // on device`. That one would be more useful when emitted by the component
+                    // task's error handling code... but it's also not our typical pattern.
+                    if !e.is_recoverable() {
+                        error!("Disk buffer writer has encountered an unrecoverable error.");
                     }
-                }
+
+                    SendError::new(e)
+                })
             }
         }
     }
 
-    pub(crate) async fn flush(&mut self) -> Result<(), ()> {
+    pub(crate) async fn flush(&mut self) -> Result<(), SendError> {
         match self {
             Self::InMemory(_) => Ok(()),
             Self::DiskV1(writer) => {
@@ -107,13 +160,12 @@ where
             }
             Self::DiskV2(writer) => {
                 let mut writer = writer.lock().await;
+                writer.flush().await.map_err(|e| {
+                    // Errors on the I/O path, which is all that flushing touches, are never recoverable.
+                    error!("Disk buffer writer has encountered an unrecoverable error.");
 
-                if let Err(e) = writer.flush().await {
-                    // Can't really do much except panic here. :sweat:
-                    panic!("writer hit unrecoverable error during flush: {}", e);
-                }
-
-                Ok(())
+                    SendError::new(e)
+                })
             }
         }
     }
@@ -205,7 +257,7 @@ impl<T: Bufferable> BufferSender<T> {
     }
 
     #[async_recursion]
-    pub async fn send(&mut self, item: T) -> Result<(), ()> {
+    pub async fn send(&mut self, item: T) -> Result<(), SendError> {
         let item_sizing = self
             .instrumentation
             .as_ref()
@@ -255,7 +307,7 @@ impl<T: Bufferable> BufferSender<T> {
     }
 
     #[async_recursion]
-    pub async fn flush(&mut self) -> Result<(), ()> {
+    pub async fn flush(&mut self) -> Result<(), SendError> {
         self.base.flush().await?;
         if let Some(overflow) = self.overflow.as_mut() {
             overflow.flush().await?;

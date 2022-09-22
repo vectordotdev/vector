@@ -133,6 +133,29 @@ where
     EmptyRecord,
 }
 
+impl<T> WriterError<T>
+where
+    T: Bufferable,
+{
+    /// Whether or not this error can be recovered from.
+    ///
+    /// Recovery may be specific to the caller or context. For example, a record that is too large
+    /// to be encoded/serialized could potentially be handled in another codepath, and a data file
+    /// being full be generally be handled by writing to the next data file. However, we can't
+    /// recover from an I/O error, and so on.
+    ///
+    /// TODO: Encoding is currently an operation that consumes the event, due to the constraints of
+    /// the `prost::Message` trait, and by extension, the `Encodable` trait. Similarly, other "event
+    /// has nonsensicial data" errors do not return the event, so _right now_, nothing is recoverable.
+    ///
+    /// In the future, we could likely rework some of the errors to allow passing the event back,
+    /// especially when we have sink error handling and could actually _do_ something with it.
+    #[allow(clippy::unused_self)]
+    pub fn is_recoverable(&self) -> bool {
+        false
+    }
+}
+
 impl<T: Bufferable + PartialEq> PartialEq for WriterError<T> {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -1323,6 +1346,7 @@ where
             Ok(())
         }
     }
+
     /// Flushes the writer.
     ///
     /// This must be called for the reader to be able to make progress.
