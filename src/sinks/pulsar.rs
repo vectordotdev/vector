@@ -259,7 +259,7 @@ impl PulsarSink {
             state: PulsarSinkState::Ready(Box::new(producer)),
             in_flight: FuturesUnordered::new(),
             bytes_sent: register!(BytesSent::from(Protocol::TCP)),
-            partition_key_field: partition_key_field,
+            partition_key_field,
         })
     }
 
@@ -476,7 +476,7 @@ mod integration_tests {
                 msg.key(),
                 Some(String::from_utf8_lossy(&msg.payload.data).to_string())
             );
-            assert_ne!(msg.metadata().event_time.is_some(), false);
+            assert!(msg.metadata().event_time.is_some());
         }
     }
 }
