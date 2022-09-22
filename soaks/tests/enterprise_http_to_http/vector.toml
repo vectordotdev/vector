@@ -17,7 +17,7 @@ type = "internal_metrics"
 
 [sources.http_source]
 type = "http"
-acknowledgements = false
+acknowledgements.enabled = false
 address = "0.0.0.0:8282"
 
 ##
