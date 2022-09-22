@@ -101,7 +101,7 @@ pub struct Config {
     #[cfg(feature = "api")]
     pub api: api::Options,
     pub schema: schema::Options,
-    pub version: Option<String>,
+    pub hash: Option<String>,
     #[cfg(feature = "enterprise")]
     pub enterprise: Option<enterprise::Options>,
     pub global: GlobalOptions,

@@ -192,7 +192,7 @@ impl From<Config> for ConfigBuilder {
             transforms,
             tests,
             secret,
-            version: _,
+            hash: _,
             expansions: _,
         } = config;
 
