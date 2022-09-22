@@ -9,9 +9,6 @@ use azure_storage_blobs::prelude::*;
 use futures::{future::BoxFuture, TryFutureExt};
 use tower::Service;
 use tracing::Instrument;
-use vector_common::internal_event::{
-    ByteSize, BytesSent, InternalEventHandle, Protocol, Registered,
-};
 
 use crate::{
     internal_events::azure_blob::{AzureBlobHttpError, AzureBlobResponseError},
@@ -21,13 +18,11 @@ use crate::{
 #[derive(Clone)]
 pub(crate) struct AzureBlobService {
     client: Arc<ContainerClient>,
-    bytes_sent: Registered<BytesSent>,
 }
 
 impl AzureBlobService {
     pub fn new(client: Arc<ContainerClient>) -> AzureBlobService {
-        let bytes_sent = register!(BytesSent::from(Protocol::HTTPS));
-        AzureBlobService { client, bytes_sent }
+        AzureBlobService { client }
     }
 }
 
@@ -68,7 +63,6 @@ impl Service<AzureBlobRequest> for AzureBlobService {
                         }),
                     };
                 })
-                .inspect_ok(|_| this.bytes_sent.emit(ByteSize(byte_size)))
                 .instrument(info_span!("request").or_current())
                 .await;
 
@@ -76,6 +70,7 @@ impl Service<AzureBlobRequest> for AzureBlobService {
                 inner,
                 count: request.metadata.count,
                 events_byte_size: request.metadata.byte_size,
+                byte_size,
             })
         })
     }
