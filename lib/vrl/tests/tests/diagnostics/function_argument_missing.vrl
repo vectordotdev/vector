@@ -8,5 +8,6 @@
 #   │
 #   = learn more about error code 107 at https://errors.vrl.dev/107
 #   = see language documentation at https://vrl.dev
+#   = try your code in the VRL REPL, learn more at https://vrl.dev/examples
 
 to_string()

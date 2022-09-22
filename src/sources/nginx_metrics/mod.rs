@@ -5,14 +5,14 @@ use chrono::Utc;
 use futures::{future::join_all, StreamExt, TryFutureExt};
 use http::{Request, StatusCode};
 use hyper::{body::to_bytes as body_to_bytes, Body, Uri};
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    config::{DataType, Output, SourceConfig, SourceContext, SourceDescription},
+    config::{DataType, Output, SourceConfig, SourceContext},
     event::metric::{Metric, MetricKind, MetricValue},
     http::{Auth, HttpClient},
     internal_events::{
@@ -24,6 +24,7 @@ use crate::{
 
 pub mod parser;
 use parser::NginxStubStatus;
+use vector_core::config::LogNamespace;
 
 macro_rules! counter {
     ($value:expr) => {
@@ -53,15 +54,33 @@ enum NginxError {
     InvalidResponseStatus { status: StatusCode },
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default)]
+/// Configuration for the `nginx_metrics` source.
+#[configurable_component(source("nginx_metrics"))]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
-struct NginxMetricsConfig {
+pub struct NginxMetricsConfig {
+    /// A list of NGINX instances to scrape.
+    ///
+    /// Each endpoint must be a valid HTTP/HTTPS URI pointing to an NGINX instance that has the
+    /// `ngx_http_stub_status_module` module enabled.
     endpoints: Vec<String>,
+
+    /// The interval between scrapes, in seconds.
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
+
+    /// Overrides the default namespace for the metrics emitted by the source.
+    ///
+    /// If set to an empty string, no namespace is added to the metrics.
+    ///
+    /// By default, `nginx` is used.
     #[serde(default = "default_namespace")]
     namespace: String,
+
+    #[configurable(derived)]
     tls: Option<TlsConfig>,
+
+    #[configurable(derived)]
     auth: Option<Auth>,
 }
 
@@ -73,14 +92,9 @@ pub fn default_namespace() -> String {
     "nginx".to_string()
 }
 
-inventory::submit! {
-    SourceDescription::new::<NginxMetricsConfig>("nginx_metrics")
-}
-
 impl_generate_config_from_default!(NginxMetricsConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "nginx_metrics")]
 impl SourceConfig for NginxMetricsConfig {
     async fn build(&self, mut cx: SourceContext) -> crate::Result<super::Source> {
         let tls = TlsSettings::from_options(&self.tls)?;
@@ -122,12 +136,8 @@ impl SourceConfig for NginxMetricsConfig {
         }))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Metric)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "nginx_metrics"
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -311,7 +321,7 @@ mod integration_tests {
             url,
             Some(Auth::Basic {
                 user: "vector".to_owned(),
-                password: "vector".to_owned(),
+                password: "vector".to_owned().into(),
             }),
             ProxyConfig::default(),
         )

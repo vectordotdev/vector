@@ -1,10 +1,11 @@
 [transforms.add_fields_nested_toml]
   inputs = []
-  type = "add_fields"
-  [transforms.add_fields_nested_toml.fields]
-    "a.b" = 123
-    x.y = 456
-    "x.z" = 789
+  type = "remap"
+  source = '''
+  .a.b = 123
+  .x.y = 456
+  .x.z = 789
+  '''
 
 [[tests]]
   name = "add_fields_nested_toml"

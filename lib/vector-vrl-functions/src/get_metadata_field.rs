@@ -1,11 +1,20 @@
+use crate::{get_metadata_key, MetadataKey};
 use ::value::Value;
 use vrl::prelude::*;
+use vrl::state::TypeState;
 
-fn get_metadata_field(ctx: &mut Context, key: &str) -> std::result::Result<Value, ExpressionError> {
-    ctx.target()
-        .get_metadata(key)
-        .map(|value| value.unwrap_or(Value::Null))
-        .map_err(Into::into)
+fn get_metadata_field(
+    ctx: &mut Context,
+    key: &MetadataKey,
+) -> std::result::Result<Value, ExpressionError> {
+    Ok(match key {
+        MetadataKey::Legacy(key) => Value::from(ctx.target().get_secret(key)),
+        MetadataKey::Query(target_path) => ctx
+            .target()
+            .target_get(target_path)?
+            .cloned()
+            .unwrap_or(Value::Null),
+    })
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -19,73 +28,48 @@ impl Function for GetMetadataField {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "key",
-            kind: kind::BYTES,
+            kind: kind::ANY,
             required: true,
         }]
     }
 
     fn examples(&self) -> &'static [Example] {
         &[Example {
-            title: "Get the datadog api key",
-            source: r#"get_metadata_field("datadog_api_key")"#,
+            title: "Get metadata",
+            source: r#"get_metadata_field(.my_metadata_field)"#,
             result: Ok("null"),
         }]
     }
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        state: &TypeState,
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
-        let key = arguments
-            .required_enum("key", &super::keys())?
-            .try_bytes_utf8_lossy()
-            .expect("key not bytes")
-            .to_string();
-
-        Ok(Box::new(GetMetadataFieldFn { key }))
-    }
-
-    fn compile_argument(
-        &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        match (name, expr) {
-            ("key", Some(expr)) => {
-                let key = expr
-                    .as_enum("key", super::keys())?
-                    .try_bytes_utf8_lossy()
-                    .expect("key not bytes")
-                    .to_string();
-                Ok(Some(Box::new(key) as _))
+        let key = get_metadata_key(&mut arguments)?;
+        let kind = match &key {
+            MetadataKey::Legacy(_) => Kind::bytes().or_null(),
+            MetadataKey::Query(target_path) => {
+                state.external.metadata_kind().at_path(&target_path.path)
             }
-            _ => Ok(None),
-        }
-    }
-
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let key = args.required_any("key").downcast_ref::<String>().unwrap();
-        get_metadata_field(ctx, key)
+        };
+        Ok(GetMetadataFieldFn { key, kind }.as_expr())
     }
 }
 
 #[derive(Debug, Clone)]
 struct GetMetadataFieldFn {
-    key: String,
+    key: MetadataKey,
+    kind: Kind,
 }
 
-impl Expression for GetMetadataFieldFn {
+impl FunctionExpression for GetMetadataFieldFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let key = &self.key;
-
-        get_metadata_field(ctx, key)
+        get_metadata_field(ctx, &self.key)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
-        TypeDef::bytes().add_null().infallible()
+    fn type_def(&self, _: &TypeState) -> TypeDef {
+        TypeDef::from(self.kind.clone()).infallible()
     }
 }

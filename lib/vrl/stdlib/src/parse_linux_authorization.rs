@@ -35,18 +35,13 @@ impl Function for ParseLinuxAuthorization {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
         // The parse_linux_authorization function is just an alias for parse_syslog
-        Ok(Box::new(ParseSyslogFn { value }))
-    }
-
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        super::parse_syslog::parse_syslog(value, ctx)
+        Ok(ParseSyslogFn { value }.as_expr())
     }
 }

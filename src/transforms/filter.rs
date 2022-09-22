@@ -1,22 +1,22 @@
 use std::time::{Duration, Instant};
 
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{
-        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
-        TransformDescription,
-    },
+    config::{DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext},
     event::Event,
-    internal_events::FilterEventDiscarded,
+    internal_events::FilterEventsDropped,
     schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+/// Configuration for the `filter` transform.
+#[configurable_component(transform("filter"))]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct FilterConfig {
+    #[configurable(derived)]
     condition: AnyCondition,
 }
 
@@ -24,10 +24,6 @@ impl From<AnyCondition> for FilterConfig {
     fn from(condition: AnyCondition) -> Self {
         Self { condition }
     }
-}
-
-inventory::submit! {
-    TransformDescription::new::<FilterConfig>("filter")
 }
 
 impl GenerateConfig for FilterConfig {
@@ -41,7 +37,6 @@ impl GenerateConfig for FilterConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "filter")]
 impl TransformConfig for FilterConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(Filter::new(
@@ -59,10 +54,6 @@ impl TransformConfig for FilterConfig {
 
     fn enable_concurrency(&self) -> bool {
         true
-    }
-
-    fn transform_type(&self) -> &'static str {
-        "filter"
     }
 }
 
@@ -89,10 +80,11 @@ impl Filter {
 
 impl FunctionTransform for Filter {
     fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
-        if self.condition.check(&event) {
+        let (result, event) = self.condition.check(event);
+        if result {
             output.push(event);
         } else if self.last_emission.elapsed() >= self.emissions_max_delay {
-            emit!(FilterEventDiscarded {
+            emit!(FilterEventsDropped {
                 total: self.emissions_deferred,
             });
             self.emissions_deferred = 0;
@@ -105,11 +97,16 @@ impl FunctionTransform for Filter {
 
 #[cfg(test)]
 mod test {
+    use tokio::sync::mpsc;
+    use tokio_stream::wrappers::ReceiverStream;
+    use vector_core::event::{Metric, MetricKind, MetricValue};
+
     use super::*;
     use crate::{
-        conditions::{is_log::IsLogConfig, ConditionConfig},
-        event::Event,
-        transforms::test::transform_one,
+        conditions::ConditionConfig,
+        event::{Event, LogEvent},
+        test_util::components::assert_transform_compliance,
+        transforms::test::create_topology,
     };
 
     #[test]
@@ -117,12 +114,31 @@ mod test {
         crate::test_util::test_generate_config::<super::FilterConfig>();
     }
 
-    #[test]
-    fn passes_metadata() {
-        let mut filter = Filter::new(IsLogConfig {}.build(&Default::default()).unwrap());
-        let event = Event::from("message");
-        let metadata = event.metadata().clone();
-        let result = transform_one(&mut filter, event).unwrap();
-        assert_eq!(result.metadata(), &metadata);
+    #[tokio::test]
+    async fn filter_basic() {
+        assert_transform_compliance(async {
+            let transform_config = FilterConfig::from(AnyCondition::from(ConditionConfig::IsLog));
+
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) =
+                create_topology(ReceiverStream::new(rx), transform_config).await;
+
+            let log = Event::from(LogEvent::from("message"));
+            tx.send(log.clone()).await.unwrap();
+
+            assert_eq!(out.recv().await.unwrap(), log);
+
+            let metric = Event::from(Metric::new(
+                "test metric",
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 1.0 },
+            ));
+            tx.send(metric).await.unwrap();
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await;
     }
 }

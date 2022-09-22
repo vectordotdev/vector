@@ -24,14 +24,14 @@ impl Function for TallyValue {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let array = arguments.required("array");
         let value = arguments.required("value");
 
-        Ok(Box::new(TallyValueFn { array, value }))
+        Ok(TallyValueFn { array, value }.as_expr())
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -48,13 +48,6 @@ impl Function for TallyValue {
             },
         ]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let array = args.required("array");
-        let value = args.required("value");
-
-        tally_value(array, value)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -63,7 +56,7 @@ pub(crate) struct TallyValueFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for TallyValueFn {
+impl FunctionExpression for TallyValueFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let array = self.array.resolve(ctx)?;
         let value = self.value.resolve(ctx)?;
@@ -71,7 +64,7 @@ impl Expression for TallyValueFn {
         tally_value(array, value)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::integer().infallible()
     }
 }

@@ -1,134 +1,115 @@
 use std::convert::TryInto;
 use std::io::ErrorKind;
-use std::sync::Arc;
 
 use async_compression::tokio::bufread;
 use aws_sdk_s3::types::ByteStream;
-use aws_sdk_s3::{Endpoint, Region};
-use aws_smithy_async::rt::sleep::AsyncSleep;
-use aws_smithy_client::erase::DynConnector;
-use aws_smithy_types::retry::RetryConfig;
-use aws_types::credentials::SharedCredentialsProvider;
 use futures::stream;
 use futures::{stream::StreamExt, TryStreamExt};
-use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tokio_util::io::StreamReader;
+use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 
 use super::util::MultilineConfig;
+use crate::aws::create_client;
 use crate::aws::RegionOrEndpoint;
-use crate::aws::{create_client, ClientBuilder};
+use crate::common::s3::S3ClientBuilder;
 use crate::common::sqs::SqsClientBuilder;
 use crate::tls::TlsConfig;
 use crate::{
     aws::auth::AwsAuthentication,
-    config::{
-        AcknowledgementsConfig, DataType, Output, ProxyConfig, SourceConfig, SourceContext,
-        SourceDescription,
-    },
+    config::{AcknowledgementsConfig, DataType, Output, ProxyConfig, SourceConfig, SourceContext},
     line_agg,
     serde::bool_or_struct,
 };
 
 pub mod sqs;
 
-#[derive(Derivative, Copy, Clone, Debug, Deserialize, Serialize, PartialEq)]
+/// Compression scheme for objects retrieved from S3.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 #[derivative(Default)]
 pub enum Compression {
+    /// Automatically attempt to determine the compression scheme.
+    ///
+    /// Vector will try to determine the compression scheme of the object from its: `Content-Encoding` and
+    /// `Content-Type` metadata, as well as the key suffix (e.g. `.gz`).
+    ///
+    /// It will fallback to 'none' if the compression scheme cannot be determined.
     #[derivative(Default)]
     Auto,
+    /// Uncompressed.
     None,
+    /// GZIP.
     Gzip,
+    /// ZSTD.
     Zstd,
 }
 
-#[derive(Derivative, Copy, Clone, Debug, Deserialize, Serialize)]
+/// Strategies for consuming objects from S3.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative)]
 #[serde(rename_all = "lowercase")]
 #[derivative(Default)]
 enum Strategy {
+    /// Consumes objects by processing bucket notification events sent to an [AWS SQS queue][aws_sqs].
+    ///
+    /// [aws_sqs]: https://aws.amazon.com/sqs/
     #[derivative(Default)]
     Sqs,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+/// Configuration for the `aws_s3` source.
+// TODO: The `Default` impl here makes the configuration schema output look pretty weird, especially because all the
+// usage of optionals means we're spewing out a ton of `"foo": null` stuff in the default value, and that's not helpful
+// when there's required fields.
+//
+// Maybe showing defaults at all, when there are required properties, doesn't actually make sense? :thinkies:
+#[configurable_component(source("aws_s3"))]
+#[derive(Clone, Debug, Default)]
 #[serde(default, deny_unknown_fields)]
-struct AwsS3Config {
+pub struct AwsS3Config {
     #[serde(flatten)]
     region: RegionOrEndpoint,
 
+    /// The compression scheme used for decompressing objects retrieved from S3.
     compression: Compression,
 
+    /// The strategy to use to consume objects from S3.
     strategy: Strategy,
 
+    /// Configuration options for SQS.
+    ///
+    /// Only relevant when `strategy = "sqs"`.
     sqs: Option<sqs::Config>,
 
-    // Deprecated name. Moved to auth.
+    /// The ARN of an [IAM role][iam_role] to assume at startup.
+    ///
+    /// [iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
+    #[configurable(deprecated)]
     assume_role: Option<String>,
+
+    #[configurable(derived)]
     #[serde(default)]
     auth: AwsAuthentication,
 
+    /// Multiline aggregation configuration.
+    ///
+    /// If not specified, multiline aggregation is disabled.
     multiline: Option<MultilineConfig>,
 
+    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
 
+    #[configurable(derived)]
     tls_options: Option<TlsConfig>,
-}
-
-inventory::submit! {
-    SourceDescription::new::<AwsS3Config>("aws_s3")
 }
 
 impl_generate_config_from_default!(AwsS3Config);
 
-struct S3ClientBuilder {}
-
-impl ClientBuilder for S3ClientBuilder {
-    type ConfigBuilder = aws_sdk_s3::config::Builder;
-    type Client = aws_sdk_s3::Client;
-
-    fn create_config_builder(
-        credentials_provider: SharedCredentialsProvider,
-    ) -> Self::ConfigBuilder {
-        aws_sdk_s3::Config::builder().credentials_provider(credentials_provider)
-    }
-
-    fn with_endpoint_resolver(
-        builder: Self::ConfigBuilder,
-        endpoint: Endpoint,
-    ) -> Self::ConfigBuilder {
-        builder.endpoint_resolver(endpoint)
-    }
-
-    fn with_region(builder: Self::ConfigBuilder, region: Region) -> Self::ConfigBuilder {
-        builder.region(region)
-    }
-
-    fn with_sleep_impl(
-        builder: Self::ConfigBuilder,
-        sleep_impl: Arc<dyn AsyncSleep>,
-    ) -> Self::ConfigBuilder {
-        builder.sleep_impl(sleep_impl)
-    }
-
-    fn with_retry_config(
-        builder: Self::ConfigBuilder,
-        retry_config: RetryConfig,
-    ) -> Self::ConfigBuilder {
-        builder.retry_config(retry_config)
-    }
-
-    fn client_from_conf_conn(
-        builder: Self::ConfigBuilder,
-        connector: DynConnector,
-    ) -> Self::Client {
-        Self::Client::from_conf_conn(builder.build(), connector)
-    }
-}
-
 #[async_trait::async_trait]
-#[typetag::serde(name = "aws_s3")]
 impl SourceConfig for AwsS3Config {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let multiline_config: Option<line_agg::Config> = self
@@ -146,12 +127,8 @@ impl SourceConfig for AwsS3Config {
         }
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "aws_s3"
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -181,6 +158,7 @@ impl AwsS3Config {
             endpoint.clone(),
             proxy,
             &self.tls_options,
+            false,
         )
         .await?;
 
@@ -192,6 +170,7 @@ impl AwsS3Config {
                     endpoint,
                     proxy,
                     &sqs.tls_options,
+                    false,
                 )
                 .await?;
 
@@ -272,12 +251,12 @@ async fn s3_object_decoder(
     }
 }
 
-/// try to determine the compression given the:
-/// * content-encoding
-/// * content-type
-/// * key name (for file extension)
-///
-/// It will use this information in this order
+// try to determine the compression given the:
+// * content-encoding
+// * content-type
+// * key name (for file extension)
+//
+// It will use this information in this order
 fn determine_compression(
     content_encoding: Option<&str>,
     content_type: Option<&str>,
@@ -401,8 +380,9 @@ mod integration_tests {
         line_agg,
         sources::util::MultilineConfig,
         test_util::{
-            collect_n, components::assert_source_compliance, lines_from_gzip_file, random_lines,
-            trace_init,
+            collect_n,
+            components::{assert_source_compliance, SOURCE_TAGS},
+            lines_from_gzip_file, random_lines, trace_init,
         },
         SourceSender,
     };
@@ -618,7 +598,7 @@ mod integration_tests {
         expected_lines: Vec<String>,
         status: EventStatus,
     ) {
-        assert_source_compliance(&["protocol"], async move {
+        assert_source_compliance(&SOURCE_TAGS, async move {
             let key = key.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
 
             let s3 = s3_client().await;
@@ -794,6 +774,7 @@ mod integration_tests {
             region_endpoint.endpoint().unwrap(),
             &proxy_config,
             &None,
+            false,
         )
         .await
         .unwrap()
@@ -812,6 +793,7 @@ mod integration_tests {
             region_endpoint.endpoint().unwrap(),
             &proxy_config,
             &None,
+            false,
         )
         .await
         .unwrap()

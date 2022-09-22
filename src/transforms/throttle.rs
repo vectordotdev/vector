@@ -3,12 +3,12 @@ use std::{num::NonZeroU32, pin::Pin, time::Duration};
 use async_stream::stream;
 use futures::{stream, Stream, StreamExt};
 use governor::{clock, Quota, RateLimiter};
-use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use vector_config::configurable_component;
 
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, Input, Output, TransformConfig, TransformContext},
     event::Event,
     internal_events::{TemplateRenderingError, ThrottleEventDiscarded},
     schema,
@@ -16,23 +16,35 @@ use crate::{
     transforms::{TaskTransform, Transform},
 };
 
-#[derive(Deserialize, Default, Serialize, Debug, Clone)]
+/// Configuration for the `throttle` transform.
+#[configurable_component(transform("throttle"))]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields, default)]
 pub struct ThrottleConfig {
+    /// The number of events allowed for a given bucket per configured `window_secs`.
+    ///
+    /// Each unique key will have its own `threshold`.
     threshold: u32,
-    window_secs: f64,
-    key_field: Option<Template>,
-    exclude: Option<AnyCondition>,
-}
 
-inventory::submit! {
-    TransformDescription::new::<ThrottleConfig>("throttle")
+    /// The time window in which the configured `threshold` is applied, in seconds.
+    window_secs: f64,
+
+    /// The name of the log field whose value will be hashed to determine if the event should be
+    /// rate limited.
+    ///
+    /// Each unique key will create a bucket of related events to be rate limited separately. If
+    /// left unspecified, or if the event doesn’t have `key_field`, the event be will not be rate
+    /// limited separately.
+    #[configurable(metadata(templatable))]
+    key_field: Option<Template>,
+
+    /// A logical condition used to exclude events from sampling.
+    exclude: Option<AnyCondition>,
 }
 
 impl_generate_config_from_default!(ThrottleConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "throttle")]
 impl TransformConfig for ThrottleConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         Throttle::new(self, context, clock::MonotonicClock).map(Transform::event_task)
@@ -44,10 +56,6 @@ impl TransformConfig for ThrottleConfig {
 
     fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
-    }
-
-    fn transform_type(&self) -> &'static str {
-        "throttle"
     }
 }
 
@@ -128,9 +136,14 @@ where
                         match maybe_event {
                             None => true,
                             Some(event) => {
-                                match self.exclude.as_ref() {
-                                  Some(condition) if condition.check(&event) => output.push(event),
-                                  _ => {
+                                let (throttle, event) = match self.exclude.as_ref() {
+                                        Some(condition) => {
+                                            let (result, event) = condition.check(event);
+                                            (!result, event)
+                                        },
+                                        _ => (true, event)
+                                    };
+                                    if throttle {
                                         let key = self.key_field.as_ref().and_then(|t| {
                                             t.render_string(&event)
                                                 .map_err(|error| {
@@ -155,8 +168,9 @@ where
                                                 }
                                             }
                                         }
+                                    } else {
+                                        output.push(event)
                                     }
-                                }
                                 false
                             }
                         }
@@ -191,7 +205,7 @@ mod tests {
     use futures::SinkExt;
 
     use super::*;
-    use crate::event::Event;
+    use crate::event::LogEvent;
 
     #[test]
     fn generate_config() {
@@ -222,8 +236,8 @@ window_secs = 5
         // we trip it/set the interval in the future
         assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
 
-        tx.send(Event::new_empty_log()).await.unwrap();
-        tx.send(Event::new_empty_log()).await.unwrap();
+        tx.send(LogEvent::default().into()).await.unwrap();
+        tx.send(LogEvent::default().into()).await.unwrap();
 
         let mut count = 0_u8;
         while count < 2 {
@@ -237,14 +251,14 @@ window_secs = 5
 
         clock.advance(Duration::from_secs(2));
 
-        tx.send(Event::new_empty_log()).await.unwrap();
+        tx.send(LogEvent::default().into()).await.unwrap();
 
         // We should be back to pending, having the second event dropped
         assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
 
         clock.advance(Duration::from_secs(3));
 
-        tx.send(Event::new_empty_log()).await.unwrap();
+        tx.send(LogEvent::default().into()).await.unwrap();
 
         // The rate limiter should now be refreshed and allow an additional event through
         if let Some(_event) = out_stream.next().await {
@@ -288,8 +302,8 @@ exists(.special)
         // we trip it/set the interval in the future
         assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
 
-        tx.send(Event::new_empty_log()).await.unwrap();
-        tx.send(Event::new_empty_log()).await.unwrap();
+        tx.send(LogEvent::default().into()).await.unwrap();
+        tx.send(LogEvent::default().into()).await.unwrap();
 
         let mut count = 0_u8;
         while count < 2 {
@@ -303,14 +317,14 @@ exists(.special)
 
         clock.advance(Duration::from_secs(2));
 
-        tx.send(Event::new_empty_log()).await.unwrap();
+        tx.send(LogEvent::default().into()).await.unwrap();
 
         // We should be back to pending, having the second event dropped
         assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
 
-        let mut special_log = Event::new_empty_log();
-        special_log.as_mut_log().insert("special", "true");
-        tx.send(special_log).await.unwrap();
+        let mut special_log = LogEvent::default();
+        special_log.insert("special", "true");
+        tx.send(special_log.into()).await.unwrap();
         // The rate limiter should allow this log through regardless of current limit
         if let Some(_event) = out_stream.next().await {
         } else {
@@ -319,7 +333,7 @@ exists(.special)
 
         clock.advance(Duration::from_secs(3));
 
-        tx.send(Event::new_empty_log()).await.unwrap();
+        tx.send(LogEvent::default().into()).await.unwrap();
 
         // The rate limiter should now be refreshed and allow an additional event through
         if let Some(_event) = out_stream.next().await {
@@ -361,12 +375,12 @@ key_field = "{{ bucket }}"
         // we trip it/set the interval in the future
         assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
 
-        let mut log_a = Event::new_empty_log();
-        log_a.as_mut_log().insert("bucket", "a");
-        let mut log_b = Event::new_empty_log();
-        log_b.as_mut_log().insert("bucket", "b");
-        tx.send(log_a).await.unwrap();
-        tx.send(log_b).await.unwrap();
+        let mut log_a = LogEvent::default();
+        log_a.insert("bucket", "a");
+        let mut log_b = LogEvent::default();
+        log_b.insert("bucket", "b");
+        tx.send(log_a.into()).await.unwrap();
+        tx.send(log_b.into()).await.unwrap();
 
         let mut count = 0_u8;
         while count < 2 {

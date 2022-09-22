@@ -4,8 +4,7 @@ use value::Value;
 
 use crate::{
     expression::{Expr, Resolved},
-    state::{ExternalEnv, LocalEnv},
-    vm::OpCode,
+    state::{TypeInfo, TypeState},
     Context, Expression, TypeDef,
 };
 
@@ -40,21 +39,29 @@ impl Expression for Array {
     fn as_value(&self) -> Option<Value> {
         self.inner
             .iter()
-            .map(|expr| expr.as_value())
+            .map(Expr::as_value)
             .collect::<Option<Vec<_>>>()
             .map(Value::Array)
     }
 
-    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
-        let type_defs = self
-            .inner
-            .iter()
-            .map(|expr| expr.type_def(state))
-            .collect::<Vec<_>>();
+    fn type_info(&self, state: &TypeState) -> TypeInfo {
+        let mut state = state.clone();
 
-        // If any of the stored expressions is fallible, the entire array is
-        // fallible.
-        let fallible = type_defs.iter().any(TypeDef::is_fallible);
+        let mut type_defs = vec![];
+        let mut fallible = false;
+
+        for expr in &self.inner {
+            let type_def = expr.apply_type_info(&mut state);
+
+            // If any expression is fallible, the entire array is fallible.
+            fallible |= type_def.is_fallible();
+
+            // If any expression aborts, the entire array aborts
+            if type_def.is_never() {
+                return TypeInfo::new(state, TypeDef::never().with_fallibility(fallible));
+            }
+            type_defs.push(type_def);
+        }
 
         let collection = type_defs
             .into_iter()
@@ -62,29 +69,7 @@ impl Expression for Array {
             .map(|(index, type_def)| (index.into(), type_def.into()))
             .collect::<BTreeMap<_, _>>();
 
-        TypeDef::array(collection).with_fallibility(fallible)
-    }
-
-    fn compile_to_vm(
-        &self,
-        vm: &mut crate::vm::Vm,
-        state: (&mut LocalEnv, &mut ExternalEnv),
-    ) -> Result<(), String> {
-        let (local, external) = state;
-
-        // Evaluate each of the elements of the array, the result of each
-        // will be added to the stack.
-        for value in self.inner.iter().rev() {
-            value.compile_to_vm(vm, (local, external))?;
-        }
-
-        vm.write_opcode(OpCode::CreateArray);
-
-        // Add the length of the array as a primitive so the VM knows how
-        // many elements to move into the array.
-        vm.write_primitive(self.inner.len());
-
-        Ok(())
+        TypeInfo::new(state, TypeDef::array(collection).with_fallibility(fallible))
     }
 }
 
@@ -93,7 +78,7 @@ impl fmt::Display for Array {
         let exprs = self
             .inner
             .iter()
-            .map(|e| e.to_string())
+            .map(Expr::to_string)
             .collect::<Vec<_>>()
             .join(", ");
 

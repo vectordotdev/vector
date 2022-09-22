@@ -4,6 +4,7 @@
 #![deny(unused_allocation)]
 #![deny(unused_assignments)]
 #![deny(unused_comparisons)]
+#![deny(warnings)]
 #![allow(clippy::approx_constant)]
 #![allow(clippy::float_cmp)]
 #![allow(clippy::match_wild_err_arm)]
@@ -12,7 +13,7 @@
 #![allow(clippy::unit_arg)]
 #![deny(clippy::clone_on_ref_ptr)]
 #![deny(clippy::trivially_copy_pass_by_ref)]
-#![deny(clippy::disallowed_method)] // [nursery] mark some functions as verboten
+#![deny(clippy::disallowed_methods)] // [nursery] mark some functions as verboten
 #![deny(clippy::missing_const_for_fn)] // [nursery] valuable to the optimizer,
                                        // but may produce false positives
 
@@ -35,9 +36,12 @@ pub mod dns;
 pub mod docker;
 pub mod expiring_hash_map;
 pub mod generate;
+pub mod generate_schema;
 #[macro_use]
 #[allow(unreachable_pub)]
 pub mod internal_events;
+#[cfg(feature = "lapin")]
+pub mod amqp;
 #[cfg(feature = "api")]
 #[allow(unreachable_pub)]
 pub mod api;
@@ -55,8 +59,9 @@ pub mod gcp;
 pub(crate) mod graph;
 pub mod heartbeat;
 pub mod http;
+#[allow(unreachable_pub)]
 #[cfg(any(feature = "sources-kafka", feature = "sinks-kafka"))]
-pub(crate) mod kafka;
+pub mod kafka;
 #[allow(unreachable_pub)]
 pub mod kubernetes;
 pub mod line_agg;
@@ -66,10 +71,10 @@ pub(crate) mod nats;
 #[allow(unreachable_pub)]
 pub(crate) mod proto;
 pub mod providers;
+pub mod secrets;
 pub mod serde;
 #[cfg(windows)]
 pub mod service;
-pub mod shutdown;
 pub mod signal;
 pub(crate) mod sink;
 #[allow(unreachable_pub)]
@@ -78,15 +83,11 @@ pub mod source_sender;
 #[allow(unreachable_pub)]
 pub mod sources;
 pub mod stats;
-pub(crate) mod stream;
 #[cfg(feature = "api-client")]
 #[allow(unreachable_pub)]
 mod tap;
-pub(crate) mod tcp;
 pub mod template;
 pub mod test_util;
-#[allow(unreachable_pub)]
-pub(crate) mod tls;
 #[cfg(feature = "api-client")]
 #[allow(unreachable_pub)]
 pub(crate) mod top;
@@ -95,7 +96,6 @@ pub mod topology;
 pub mod trace;
 #[allow(unreachable_pub)]
 pub mod transforms;
-pub mod trigger;
 pub mod types;
 pub mod udp;
 pub mod unit_test;
@@ -105,7 +105,8 @@ pub mod validate;
 pub mod vector_windows;
 
 pub use source_sender::SourceSender;
-pub use vector_core::{event, metrics, schema, Error, Result};
+pub use vector_common::shutdown;
+pub use vector_core::{event, metrics, schema, tcp, tls, Error, Result};
 
 pub fn vector_version() -> impl std::fmt::Display {
     #[cfg(feature = "nightly")]
@@ -137,7 +138,7 @@ pub fn get_version() -> String {
     format!("{} ({})", pkg_version, build_string)
 }
 
-#[allow(unused)]
+#[allow(warnings)]
 pub mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }
@@ -159,4 +160,15 @@ where
 
     #[cfg(not(tokio_unstable))]
     tokio::spawn(task)
+}
+
+pub fn num_threads() -> usize {
+    let count = match std::thread::available_parallelism() {
+        Ok(count) => count,
+        Err(error) => {
+            warn!(message = "Failed to determine available parallelism for thread count, defaulting to 1.", %error);
+            std::num::NonZeroUsize::new(1).unwrap()
+        }
+    };
+    usize::from(count)
 }

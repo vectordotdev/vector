@@ -6,20 +6,24 @@ use std::{
 
 use async_stream::stream;
 use futures::{Stream, StreamExt};
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 use crate::{
-    config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, Input, Output, TransformConfig, TransformContext},
     event::{metric, Event, EventMetadata},
     internal_events::{AggregateEventRecorded, AggregateFlushed, AggregateUpdateFailed},
     schema,
     transforms::{TaskTransform, Transform},
 };
 
-#[derive(Deserialize, Serialize, Debug, Default, Clone)]
+/// Configuration for the `aggregate` transform.
+#[configurable_component(transform("aggregate"))]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields, default)]
 pub struct AggregateConfig {
-    /// The interval between flushes in milliseconds.
+    /// The interval between flushes, in milliseconds.
+    ///
+    /// Over this period metrics with the same series data (name, namespace, tags, …) will be aggregated.
     #[serde(default = "default_interval_ms")]
     pub interval_ms: u64,
 }
@@ -28,14 +32,9 @@ const fn default_interval_ms() -> u64 {
     10 * 1000
 }
 
-inventory::submit! {
-    TransformDescription::new::<AggregateConfig>("aggregate")
-}
-
 impl_generate_config_from_default!(AggregateConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "aggregate")]
 impl TransformConfig for AggregateConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Aggregate::new(self).map(Transform::event_task)
@@ -48,15 +47,9 @@ impl TransformConfig for AggregateConfig {
     fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Metric)]
     }
-
-    fn transform_type(&self) -> &'static str {
-        "aggregate"
-    }
 }
 
 type MetricEntry = (metric::MetricData, EventMetadata);
-
-//------------------------------------------------------------------------------
 
 #[derive(Debug)]
 pub struct Aggregate {
@@ -151,10 +144,16 @@ impl TaskTransform<Event> for Aggregate {
 mod tests {
     use std::{collections::BTreeSet, task::Poll};
 
-    use futures::{stream, SinkExt};
+    use futures::stream;
+    use tokio::sync::mpsc;
+    use tokio_stream::wrappers::ReceiverStream;
 
     use super::*;
-    use crate::event::{metric, Event, Metric};
+    use crate::{
+        event::{metric, Event, Metric},
+        test_util::components::assert_transform_compliance,
+        transforms::test::create_topology,
+    };
 
     #[test]
     fn generate_config() {
@@ -479,16 +478,7 @@ interval_ms = 999999
 
     #[tokio::test]
     async fn transform_interval() {
-        let agg = toml::from_str::<AggregateConfig>(
-            r#"
-"#,
-        )
-        .unwrap()
-        .build(&TransformContext::default())
-        .await
-        .unwrap();
-
-        let agg = agg.into_task();
+        let transform_config = toml::from_str::<AggregateConfig>("").unwrap();
 
         let counter_a_1 = make_metric(
             "counter_a",
@@ -516,45 +506,48 @@ interval_ms = 999999
             metric::MetricValue::Gauge { value: 43.0 },
         );
 
-        let (mut tx, rx) = futures::channel::mpsc::channel(10);
-        let mut out_stream = agg.transform_events(Box::pin(rx));
+        assert_transform_compliance(async {
+            let (tx, rx) = mpsc::channel(10);
+            let (topology, out) = create_topology(ReceiverStream::new(rx), transform_config).await;
+            let mut out = ReceiverStream::new(out);
 
-        tokio::time::pause();
+            tokio::time::pause();
 
-        // tokio interval is always immediately ready, so we poll once to make sure
-        // we trip it/set the interval in the future
-        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
+            // tokio interval is always immediately ready, so we poll once to make sure
+            // we trip it/set the interval in the future
+            assert_eq!(Poll::Pending, futures::poll!(out.next()));
 
-        // Now send our events
-        tx.send(counter_a_1).await.unwrap();
-        tx.send(counter_a_2).await.unwrap();
-        tx.send(gauge_a_1).await.unwrap();
-        tx.send(gauge_a_2.clone()).await.unwrap();
-        // We won't have flushed yet b/c the interval hasn't elapsed, so no outputs
-        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
-        // Now fast forward time enough that our flush should trigger.
-        tokio::time::advance(Duration::from_secs(11)).await;
-        // We should have had an interval fire now and our output aggregate events should be
-        // available.
-        let mut count = 0_u8;
-        while count < 2 {
-            if let Some(event) = out_stream.next().await {
-                match event.as_metric().series().name.name.as_str() {
-                    "counter_a" => assert_eq!(counter_a_summed, event),
-                    "gauge_a" => assert_eq!(gauge_a_2, event),
-                    _ => panic!("Unexpected metric name in aggregate output"),
-                };
-                count += 1;
-            } else {
-                panic!("Unexpectedly received None in output stream");
+            // Now send our events
+            tx.send(counter_a_1).await.unwrap();
+            tx.send(counter_a_2).await.unwrap();
+            tx.send(gauge_a_1).await.unwrap();
+            tx.send(gauge_a_2.clone()).await.unwrap();
+            // We won't have flushed yet b/c the interval hasn't elapsed, so no outputs
+            assert_eq!(Poll::Pending, futures::poll!(out.next()));
+            // Now fast forward time enough that our flush should trigger.
+            tokio::time::advance(Duration::from_secs(11)).await;
+            // We should have had an interval fire now and our output aggregate events should be
+            // available.
+            let mut count = 0_u8;
+            while count < 2 {
+                if let Some(event) = out.next().await {
+                    match event.as_metric().series().name.name.as_str() {
+                        "counter_a" => assert_eq!(counter_a_summed, event),
+                        "gauge_a" => assert_eq!(gauge_a_2, event),
+                        _ => panic!("Unexpected metric name in aggregate output"),
+                    };
+                    count += 1;
+                } else {
+                    panic!("Unexpectedly received None in output stream");
+                }
             }
-        }
-        // We should be back to pending, having nothing waiting for us
-        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
-        // Close the input stream which should trigger the shutting down flush
-        tx.disconnect();
+            // We should be back to pending, having nothing waiting for us
+            assert_eq!(Poll::Pending, futures::poll!(out.next()));
 
-        // And still nothing there
-        assert_eq!(Poll::Ready(None), futures::poll!(out_stream.next()));
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.next().await, None);
+        })
+        .await;
     }
 }

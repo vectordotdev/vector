@@ -73,8 +73,11 @@ impl<'a> ToLua<'a> for Metric {
         if let Some(namespace) = self.namespace() {
             tbl.raw_set("namespace", namespace)?;
         }
-        if let Some(ts) = self.data.timestamp {
+        if let Some(ts) = self.data.time.timestamp {
             tbl.raw_set("timestamp", timestamp_to_table(lua, ts)?)?;
+        }
+        if let Some(i) = self.data.time.interval_ms {
+            tbl.raw_set("interval_ms", i.get())?;
         }
         if let Some(tags) = self.series.tags {
             tbl.raw_set("tags", tags)?;
@@ -179,6 +182,7 @@ impl<'a> FromLua<'a> for Metric {
             .raw_get::<_, Option<LuaTable>>("timestamp")?
             .map(table_to_timestamp)
             .transpose()?;
+        let interval_ms: Option<u32> = table.raw_get("interval_ms")?;
         let namespace: Option<String> = table.raw_get("namespace")?;
         let tags: Option<BTreeMap<String, String>> = table.raw_get("tags")?;
         let kind = table
@@ -207,7 +211,7 @@ impl<'a> FromLua<'a> for Metric {
         } else if let Some(aggregated_histogram) =
             table.raw_get::<_, Option<LuaTable>>("aggregated_histogram")?
         {
-            let counts: Vec<u32> = aggregated_histogram.raw_get("counts")?;
+            let counts: Vec<u64> = aggregated_histogram.raw_get("counts")?;
             let buckets: Vec<f64> = aggregated_histogram.raw_get("buckets")?;
             let count = counts.iter().sum();
             MetricValue::AggregatedHistogram {
@@ -268,7 +272,8 @@ impl<'a> FromLua<'a> for Metric {
         Ok(Metric::new(name, kind, value)
             .with_namespace(namespace)
             .with_tags(tags)
-            .with_timestamp(timestamp))
+            .with_timestamp(timestamp)
+            .with_interval_ms(interval_ms.and_then(std::num::NonZeroU32::new)))
     }
 }
 

@@ -36,19 +36,13 @@ impl Function for ToRegex {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         warn!("`to_regex` is an expensive function that could impact throughput.");
         let value = arguments.required("value");
-        Ok(Box::new(ToRegexFn { value }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-
-        to_regex(value)
+        Ok(ToRegexFn { value }.as_expr())
     }
 }
 
@@ -57,13 +51,13 @@ struct ToRegexFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ToRegexFn {
+impl FunctionExpression for ToRegexFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         to_regex(value)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::regex().fallible()
     }
 }

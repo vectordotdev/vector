@@ -1,9 +1,9 @@
+use indexmap::{set::IndexSet, IndexMap};
 use std::collections::{HashMap, HashSet, VecDeque};
 
-use indexmap::{set::IndexSet, IndexMap};
-
 use super::{
-    schema, ComponentKey, DataType, Output, OutputId, SinkOuter, SourceOuter, TransformOuter,
+    schema, ComponentKey, DataType, Output, OutputId, SinkConfig, SinkOuter, SourceConfig,
+    SourceOuter, TransformConfig, TransformOuter,
 };
 
 #[derive(Debug, Clone)]
@@ -38,8 +38,9 @@ impl Graph {
         transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
         sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
         expansions: &IndexMap<String, Vec<String>>,
+        schema: schema::Options,
     ) -> Result<Self, Vec<String>> {
-        Self::new_inner(sources, transforms, sinks, expansions, false)
+        Self::new_inner(sources, transforms, sinks, expansions, false, schema)
     }
 
     pub fn new_unchecked(
@@ -47,8 +48,10 @@ impl Graph {
         transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
         sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
         expansions: &IndexMap<String, Vec<String>>,
+        schema: schema::Options,
     ) -> Self {
-        Self::new_inner(sources, transforms, sinks, expansions, true).expect("errors ignored")
+        Self::new_inner(sources, transforms, sinks, expansions, true, schema)
+            .expect("errors ignored")
     }
 
     fn new_inner(
@@ -57,6 +60,7 @@ impl Graph {
         sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
         expansions: &IndexMap<String, Vec<String>>,
         ignore_errors: bool,
+        schema: schema::Options,
     ) -> Result<Self, Vec<String>> {
         let mut graph = Graph::default();
         let mut errors = Vec::new();
@@ -66,17 +70,17 @@ impl Graph {
             graph.nodes.insert(
                 id.clone(),
                 Node::Source {
-                    outputs: config.inner.outputs(),
+                    outputs: config.inner.outputs(schema.log_namespace()),
                 },
             );
         }
 
-        for (id, config) in transforms.iter() {
+        for (id, transform) in transforms.iter() {
             graph.nodes.insert(
                 id.clone(),
                 Node::Transform {
-                    in_ty: config.inner.input().data_type(),
-                    outputs: config.inner.outputs(&schema::Definition::empty()),
+                    in_ty: transform.inner.input().data_type(),
+                    outputs: transform.inner.outputs(&schema::Definition::any()),
                 },
             );
         }

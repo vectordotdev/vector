@@ -69,18 +69,13 @@ impl Function for ToSyslogFacility {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(ToSyslogFacilityFn { value }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        to_syslog_facility(value)
+        Ok(ToSyslogFacilityFn { value }.as_expr())
     }
 }
 
@@ -89,14 +84,14 @@ struct ToSyslogFacilityFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ToSyslogFacilityFn {
+impl FunctionExpression for ToSyslogFacilityFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
 
         to_syslog_facility(value)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::bytes().fallible()
     }
 }

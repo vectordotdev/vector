@@ -30,7 +30,7 @@ impl RawMessageSerializerConfig {
 
     /// The schema required by the serializer.
     pub fn schema_requirement(&self) -> schema::Requirement {
-        schema::Requirement::empty().require_meaning(log_schema().message_key(), Kind::any())
+        schema::Requirement::empty().required_meaning(log_schema().message_key(), Kind::any())
     }
 }
 
@@ -68,12 +68,13 @@ impl Encoder<Event> for RawMessageSerializer {
 #[cfg(test)]
 mod tests {
     use bytes::{Bytes, BytesMut};
+    use vector_core::event::LogEvent;
 
     use super::*;
 
     #[test]
     fn serialize_bytes() {
-        let input = Event::from("foo");
+        let input = Event::from(LogEvent::from_str_legacy("foo"));
         let mut serializer = RawMessageSerializer;
 
         let mut buffer = BytesMut::new();

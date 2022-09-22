@@ -1,32 +1,28 @@
-use std::sync::Arc;
-
-use aws_sdk_kinesis::error::{DescribeStreamError, PutRecordsError, PutRecordsErrorKind};
-use aws_sdk_kinesis::types::SdkError;
-use aws_sdk_kinesis::{Client as KinesisClient, Endpoint, Region};
-use aws_smithy_async::rt::sleep::AsyncSleep;
-use aws_smithy_client::erase::DynConnector;
-use aws_smithy_types::retry::RetryConfig;
-use aws_types::credentials::SharedCredentialsProvider;
+use aws_sdk_kinesis::{
+    error::{DescribeStreamError, PutRecordsError, PutRecordsErrorKind},
+    types::SdkError,
+    Client as KinesisClient,
+};
 use futures::FutureExt;
-use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tower::ServiceBuilder;
+use vector_config::configurable_component;
 
-use super::service::KinesisResponse;
+use super::{
+    request_builder::KinesisRequestBuilder, service::KinesisResponse, service::KinesisService,
+    sink::KinesisSink,
+};
 use crate::{
     aws::{create_client, is_retriable_error, AwsAuthentication, ClientBuilder, RegionOrEndpoint},
-    codecs::Encoder,
-    config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
+    codecs::{Encoder, EncodingConfig},
+    config::{
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig,
+        SinkContext,
+    },
     sinks::{
-        aws_kinesis_streams::{
-            request_builder::KinesisRequestBuilder, service::KinesisService, sink::KinesisSink,
-        },
         util::{
-            encoding::{
-                EncodingConfig, EncodingConfigAdapter, StandardEncodings, StandardEncodingsMigrator,
-            },
-            retries::RetryLogic,
-            BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig,
+            retries::RetryLogic, BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings,
+            TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -52,45 +48,16 @@ enum HealthcheckError {
 pub struct KinesisClientBuilder;
 
 impl ClientBuilder for KinesisClientBuilder {
-    type ConfigBuilder = aws_sdk_kinesis::config::Builder;
-    type Client = KinesisClient;
+    type Config = aws_sdk_kinesis::config::Config;
+    type Client = aws_sdk_kinesis::client::Client;
+    type DefaultMiddleware = aws_sdk_kinesis::middleware::DefaultMiddleware;
 
-    fn create_config_builder(
-        credentials_provider: SharedCredentialsProvider,
-    ) -> Self::ConfigBuilder {
-        Self::ConfigBuilder::new().credentials_provider(credentials_provider)
+    fn default_middleware() -> Self::DefaultMiddleware {
+        aws_sdk_kinesis::middleware::DefaultMiddleware::new()
     }
 
-    fn with_endpoint_resolver(
-        builder: Self::ConfigBuilder,
-        endpoint: Endpoint,
-    ) -> Self::ConfigBuilder {
-        builder.endpoint_resolver(endpoint)
-    }
-
-    fn with_region(builder: Self::ConfigBuilder, region: Region) -> Self::ConfigBuilder {
-        builder.region(region)
-    }
-
-    fn with_sleep_impl(
-        builder: Self::ConfigBuilder,
-        sleep_impl: Arc<dyn AsyncSleep>,
-    ) -> Self::ConfigBuilder {
-        builder.sleep_impl(sleep_impl)
-    }
-
-    fn with_retry_config(
-        builder: Self::ConfigBuilder,
-        retry_config: RetryConfig,
-    ) -> Self::ConfigBuilder {
-        builder.retry_config(retry_config)
-    }
-
-    fn client_from_conf_conn(
-        builder: Self::ConfigBuilder,
-        connector: DynConnector,
-    ) -> Self::Client {
-        Self::Client::from_conf_conn(builder.build(), connector)
+    fn build(client: aws_smithy_client::Client, config: &aws_types::SdkConfig) -> Self::Client {
+        aws_sdk_kinesis::client::Client::with_config(client, config.into())
     }
 }
 
@@ -103,24 +70,47 @@ impl SinkBatchSettings for KinesisDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 1.0;
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the `aws_kinesis_streams` sink.
+#[configurable_component(sink("aws_kinesis_streams"))]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct KinesisSinkConfig {
+    /// The [stream name][stream_name] of the target Kinesis Logs stream.
+    ///
+    /// [stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
     pub stream_name: String,
+
+    /// The log field used as the Kinesis record’s partition key value.
+    ///
+    /// If not specified, a unique partition key will be generated for each Kinesis record.
     pub partition_key_field: Option<String>,
+
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    pub encoding:
-        EncodingConfigAdapter<EncodingConfig<StandardEncodings>, StandardEncodingsMigrator>,
+
+    #[configurable(derived)]
+    pub encoding: EncodingConfig,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub compression: Compression,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<KinesisDefaultBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub auth: AwsAuthentication,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -164,13 +154,13 @@ impl KinesisSinkConfig {
             self.region.endpoint()?,
             proxy,
             &self.tls,
+            true,
         )
         .await
     }
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "aws_kinesis_streams")]
 impl SinkConfig for KinesisSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.create_client(&cx.proxy).await?;
@@ -190,7 +180,7 @@ impl SinkConfig for KinesisSinkConfig {
             });
 
         let transformer = self.encoding.transformer();
-        let serializer = self.encoding.encoding();
+        let serializer = self.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
 
         let request_builder = KinesisRequestBuilder {
@@ -200,7 +190,7 @@ impl SinkConfig for KinesisSinkConfig {
 
         let sink = KinesisSink {
             batch_settings,
-            acker: cx.acker(),
+
             service,
             request_builder,
             partition_key_field: self.partition_key_field.clone(),
@@ -209,15 +199,11 @@ impl SinkConfig for KinesisSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::new(self.encoding.config().input_type())
+        Input::new(self.encoding.config().input_type() & DataType::Log)
     }
 
-    fn sink_type(&self) -> &'static str {
-        "aws_kinesis_streams"
-    }
-
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 

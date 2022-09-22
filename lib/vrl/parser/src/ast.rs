@@ -10,7 +10,7 @@ use std::{
 #[cfg(feature = "fuzz")]
 use arbitrary::Arbitrary;
 use diagnostic::Span;
-use lookup::LookupBuf;
+use lookup::lookup_v2::{OwnedTargetPath, OwnedValuePath, PathPrefix};
 use ordered_float::NotNan;
 
 use crate::{template_string::TemplateString, Error};
@@ -35,6 +35,14 @@ impl<T> Node<T> {
             span,
             node: f(node),
         }
+    }
+
+    pub fn map_option<R>(self, mut f: impl FnMut(T) -> Option<R>) -> Option<Node<R>> {
+        let Node { span, node } = self;
+
+        let node = f(node)?;
+
+        Some(Node { span, node })
     }
 
     pub fn new(span: Span, node: T) -> Self {
@@ -83,7 +91,7 @@ impl<T> Node<T> {
     where
         T: Deref,
     {
-        self.as_ref().deref()
+        &**self.as_ref()
     }
 }
 
@@ -174,7 +182,7 @@ impl IntoIterator for Program {
 // root expression
 // -----------------------------------------------------------------------------
 
-#[allow(clippy::large_enum_variant)] // discovered during Rust upgrade to 1.57; just allowing for now since we did previously
+#[allow(clippy::large_enum_variant)]
 #[derive(PartialEq)]
 pub enum RootExpr {
     Expr(Node<Expr>),
@@ -186,7 +194,7 @@ pub enum RootExpr {
 
 impl fmt::Debug for RootExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use RootExpr::*;
+        use RootExpr::{Error, Expr};
 
         let value = match self {
             Expr(v) => format!("{:?}", v),
@@ -199,7 +207,7 @@ impl fmt::Debug for RootExpr {
 
 impl fmt::Display for RootExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use RootExpr::*;
+        use RootExpr::{Error, Expr};
 
         match self {
             Expr(v) => v.fmt(f),
@@ -229,7 +237,10 @@ pub enum Expr {
 
 impl fmt::Debug for Expr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Expr::*;
+        use Expr::{
+            Abort, Assignment, Container, FunctionCall, IfStatement, Literal, Op, Query, Unary,
+            Variable,
+        };
 
         let value = match self {
             Literal(v) => format!("{:?}", v),
@@ -250,7 +261,10 @@ impl fmt::Debug for Expr {
 
 impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Expr::*;
+        use Expr::{
+            Abort, Assignment, Container, FunctionCall, IfStatement, Literal, Op, Query, Unary,
+            Variable,
+        };
 
         match self {
             Literal(v) => v.fmt(f),
@@ -279,6 +293,7 @@ impl Ident {
         Self(ident.into())
     }
 
+    #[must_use]
     pub fn into_inner(self) -> String {
         self.0
     }
@@ -320,7 +335,7 @@ impl From<String> for Ident {
 // literals
 // -----------------------------------------------------------------------------
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum Literal {
     String(TemplateString),
     RawString(String),
@@ -334,7 +349,7 @@ pub enum Literal {
 
 impl fmt::Display for Literal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Literal::*;
+        use Literal::{Boolean, Float, Integer, Null, RawString, Regex, String, Timestamp};
 
         match self {
             String(v) => write!(f, r#""{}""#, v),
@@ -369,7 +384,7 @@ pub enum Container {
 
 impl fmt::Display for Container {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Container::*;
+        use Container::{Array, Block, Group, Object};
 
         match self {
             Group(v) => v.fmt(f),
@@ -382,7 +397,7 @@ impl fmt::Display for Container {
 
 impl fmt::Debug for Container {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Container::*;
+        use Container::{Array, Block, Group, Object};
 
         let value = match self {
             Group(v) => format!("{:?}", v),
@@ -403,6 +418,7 @@ impl fmt::Debug for Container {
 pub struct Block(pub Vec<Node<Expr>>);
 
 impl Block {
+    #[must_use]
     pub fn into_inner(self) -> Vec<Node<Expr>> {
         self.0
     }
@@ -459,6 +475,7 @@ impl fmt::Debug for Block {
 pub struct Group(pub Node<Expr>);
 
 impl Group {
+    #[must_use]
     pub fn into_inner(self) -> Node<Expr> {
         self.0
     }
@@ -488,7 +505,7 @@ impl fmt::Display for Array {
         let exprs = self
             .0
             .iter()
-            .map(|e| e.to_string())
+            .map(std::string::ToString::to_string)
             .collect::<Vec<_>>()
             .join(", ");
 
@@ -567,19 +584,15 @@ impl IntoIterator for Object {
 #[derive(Clone, PartialEq)]
 pub struct IfStatement {
     pub predicate: Node<Predicate>,
-    pub consequent: Node<Block>,
-    pub alternative: Option<Node<Block>>,
+    pub if_node: Node<Block>,
+    pub else_node: Option<Node<Block>>,
 }
 
 impl fmt::Debug for IfStatement {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.alternative {
-            Some(alt) => write!(
-                f,
-                "{:?} ? {:?} : {:?}",
-                self.predicate, self.consequent, alt
-            ),
-            None => write!(f, "{:?} ? {:?}", self.predicate, self.consequent),
+        match &self.else_node {
+            Some(alt) => write!(f, "{:?} ? {:?} : {:?}", self.predicate, self.if_node, alt),
+            None => write!(f, "{:?} ? {:?}", self.predicate, self.if_node),
         }
     }
 }
@@ -589,9 +602,9 @@ impl fmt::Display for IfStatement {
         f.write_str("if ")?;
         self.predicate.fmt(f)?;
         f.write_str(" ")?;
-        self.consequent.fmt(f)?;
+        self.if_node.fmt(f)?;
 
-        if let Some(alt) = &self.alternative {
+        if let Some(alt) = &self.else_node {
             f.write_str(" else")?;
             alt.fmt(f)?;
         }
@@ -676,7 +689,6 @@ pub enum Opcode {
     Div,
     Add,
     Sub,
-    Rem,
     Or,
     And,
     Err,
@@ -696,15 +708,15 @@ impl fmt::Display for Opcode {
 }
 
 impl Opcode {
+    #[must_use]
     pub fn as_str(self) -> &'static str {
-        use Opcode::*;
+        use Opcode::{Add, And, Div, Eq, Err, Ge, Gt, Le, Lt, Merge, Mul, Ne, Or, Sub};
 
         match self {
             Mul => "*",
             Div => "/",
             Add => "+",
             Sub => "-",
-            Rem => "%",
             Merge => "|",
 
             Or => "||",
@@ -727,14 +739,13 @@ impl FromStr for Opcode {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, ()> {
-        use Opcode::*;
+        use Opcode::{Add, And, Div, Eq, Err, Ge, Gt, Le, Lt, Merge, Mul, Ne, Or, Sub};
 
         let op = match s {
             "*" => Mul,
             "/" => Div,
             "+" => Add,
             "-" => Sub,
-            "%" => Rem,
 
             "||" => Or,
             "&&" => And,
@@ -784,7 +795,7 @@ pub enum Assignment {
 }
 
 #[cfg_attr(feature = "fuzz", derive(Arbitrary))]
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum AssignmentOp {
     Assign,
     Merge,
@@ -792,7 +803,7 @@ pub enum AssignmentOp {
 
 impl fmt::Display for AssignmentOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use AssignmentOp::*;
+        use AssignmentOp::{Assign, Merge};
 
         match self {
             Assign => write!(f, "="),
@@ -803,7 +814,7 @@ impl fmt::Display for AssignmentOp {
 
 impl fmt::Debug for AssignmentOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use AssignmentOp::*;
+        use AssignmentOp::{Assign, Merge};
 
         match self {
             Assign => write!(f, "AssignmentOp(=)"),
@@ -814,7 +825,7 @@ impl fmt::Debug for AssignmentOp {
 
 impl fmt::Display for Assignment {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Assignment::*;
+        use Assignment::{Infallible, Single};
 
         match self {
             Single { target, op, expr } => write!(f, "{} {} {}", target, op, expr),
@@ -825,7 +836,7 @@ impl fmt::Display for Assignment {
 
 impl fmt::Debug for Assignment {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Assignment::*;
+        use Assignment::{Infallible, Single};
 
         match self {
             Single { target, op, expr } => write!(f, "{:?} {:?} {:?}", target, op, expr),
@@ -840,11 +851,12 @@ impl fmt::Debug for Assignment {
 pub enum AssignmentTarget {
     Noop,
     Query(Query),
-    Internal(Ident, Option<LookupBuf>),
-    External(Option<LookupBuf>),
+    Internal(Ident, Option<OwnedValuePath>),
+    External(Option<OwnedTargetPath>),
 }
 
 impl AssignmentTarget {
+    #[must_use]
     pub fn to_expr(&self, span: Span) -> Expr {
         match self {
             AssignmentTarget::Noop => Expr::Literal(Node::new(span, Literal::Null)),
@@ -862,8 +874,14 @@ impl AssignmentTarget {
             AssignmentTarget::External(path) => Expr::Query(Node::new(
                 span,
                 Query {
-                    target: Node::new(span, QueryTarget::External),
-                    path: Node::new(span, path.clone().unwrap_or_else(LookupBuf::root)),
+                    target: {
+                        let prefix = path.as_ref().map_or(PathPrefix::Event, |x| x.prefix);
+                        Node::new(span, QueryTarget::External(prefix))
+                    },
+                    path: Node::new(
+                        span,
+                        path.clone().map_or(OwnedValuePath::root(), |x| x.path),
+                    ),
                 },
             )),
         }
@@ -872,14 +890,14 @@ impl AssignmentTarget {
 
 impl fmt::Display for AssignmentTarget {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use AssignmentTarget::*;
+        use AssignmentTarget::{External, Internal, Noop, Query};
 
         match self {
             Noop => f.write_str("_"),
             Query(query) => query.fmt(f),
             Internal(ident, Some(path)) => write!(f, "{}{}", ident, path),
             Internal(ident, _) => ident.fmt(f),
-            External(Some(path)) => write!(f, ".{}", path),
+            External(Some(path)) => write!(f, "{}", path),
             External(_) => f.write_str("."),
         }
     }
@@ -887,7 +905,7 @@ impl fmt::Display for AssignmentTarget {
 
 impl fmt::Debug for AssignmentTarget {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use AssignmentTarget::*;
+        use AssignmentTarget::{External, Internal, Noop, Query};
 
         match self {
             Noop => f.write_str("Noop"),
@@ -907,7 +925,7 @@ impl fmt::Debug for AssignmentTarget {
 #[derive(Clone, PartialEq)]
 pub struct Query {
     pub target: Node<QueryTarget>,
-    pub path: Node<LookupBuf>,
+    pub path: Node<OwnedValuePath>,
 }
 
 impl fmt::Display for Query {
@@ -925,18 +943,21 @@ impl fmt::Debug for Query {
 #[derive(Clone, PartialEq)]
 pub enum QueryTarget {
     Internal(Ident),
-    External,
+    External(PathPrefix),
     FunctionCall(FunctionCall),
     Container(Container),
 }
 
 impl fmt::Display for QueryTarget {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use QueryTarget::*;
+        use QueryTarget::{Container, External, FunctionCall, Internal};
 
         match self {
             Internal(v) => v.fmt(f),
-            External => write!(f, "."),
+            External(prefix) => match prefix {
+                PathPrefix::Event => write!(f, "."),
+                PathPrefix::Metadata => write!(f, "&"),
+            },
             FunctionCall(v) => v.fmt(f),
             Container(v) => v.fmt(f),
         }
@@ -945,11 +966,14 @@ impl fmt::Display for QueryTarget {
 
 impl fmt::Debug for QueryTarget {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use QueryTarget::*;
+        use QueryTarget::{Container, External, FunctionCall, Internal};
 
         match self {
             Internal(v) => write!(f, "Internal({:?})", v),
-            External => f.write_str("External"),
+            External(prefix) => match prefix {
+                PathPrefix::Event => f.write_str("External(Event)"),
+                PathPrefix::Metadata => f.write_str("External(Metadata)"),
+            },
             FunctionCall(v) => v.fmt(f),
             Container(v) => v.fmt(f),
         }
@@ -1108,7 +1132,7 @@ pub enum Unary {
 
 impl fmt::Display for Unary {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Unary::*;
+        use Unary::Not;
 
         match self {
             Not(v) => v.fmt(f),
@@ -1118,7 +1142,7 @@ impl fmt::Display for Unary {
 
 impl fmt::Debug for Unary {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Unary::*;
+        use Unary::Not;
 
         let value = match self {
             Not(v) => format!("{:?}", v),
@@ -1136,6 +1160,7 @@ impl fmt::Debug for Unary {
 pub struct Not(pub(crate) Node<()>, pub(crate) Box<Node<Expr>>);
 
 impl Not {
+    #[must_use]
     pub fn take(self) -> (Node<()>, Box<Node<Expr>>) {
         (self.0, self.1)
     }
@@ -1168,8 +1193,7 @@ impl fmt::Display for Abort {
             &self
                 .message
                 .as_ref()
-                .map(|m| format!("abort: {}", m))
-                .unwrap_or_else(|| "abort".to_owned()),
+                .map_or_else(|| "abort".to_owned(), |m| format!("abort: {}", m)),
         )
     }
 }
@@ -1179,61 +1203,3 @@ impl fmt::Debug for Abort {
         write!(f, "Abort({:?})", self.message)
     }
 }
-
-// -----------------------------------------------------------------------------
-// testing utilities
-// -----------------------------------------------------------------------------
-
-macro_rules! test_enum {
-    ($(($variant:tt, $func:expr, $ret:ty)),+ $(,)*) => {
-        /// A "test" node used to expose individual non-root nodes for
-        /// unit-testing purposes.
-        ///
-        /// This node should **only be used for testing** and is allowed to be
-        /// changed in **backward incompatible ways**.
-        #[derive(Debug, PartialEq)]
-        pub enum Test {
-            $($variant($ret)),+
-        }
-
-        impl Test {
-            $(paste::paste! {
-                /// Quickly get the relevant variant under test from the enum.
-                ///
-                /// This function panics if the variant does not match the
-                /// expectation.
-                pub fn [<$func>](self) -> $ret {
-                    match self {
-                        Test::$variant(v) => v,
-                        v => panic!("{:?}", v),
-                    }
-                }
-            })+
-        }
-    };
-}
-
-test_enum![
-    // root
-    (Expr, expr, Node<Expr>),
-    // expression
-    (Literal, literal, Literal),
-    (Container, container, Container),
-    // arithmetic
-    (Arithmetic, arithmetic, Node<Expr>),
-    // atoms
-    (String, string, String),
-    (Integer, integer, i64),
-    (Float, float, NotNan<f64>),
-    (Boolean, boolean, bool),
-    (Null, null, ()),
-    (Regex, regex, String),
-    // containers
-    (Block, block, Block),
-    (Array, array, Array),
-    (Object, object, Object),
-    // other
-    (Assignment, assignment, Node<Assignment>),
-    (FunctionCall, function_call, FunctionCall),
-    (Query, query, Query),
-];

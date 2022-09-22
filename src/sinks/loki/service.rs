@@ -7,15 +7,14 @@ use snafu::Snafu;
 use tower::Service;
 use tracing::Instrument;
 use vector_core::{
-    buffers::Ackable,
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_event::EventsSent,
     stream::DriverResponse,
 };
 
 use crate::{
-    http::{Auth, HttpClient},
-    sinks::util::{retries::RetryLogic, Compression, UriSerde},
+    http::{get_http_scheme_from_uri, Auth, HttpClient},
+    sinks::util::{metadata::RequestMetadata, retries::RetryLogic, Compression, UriSerde},
 };
 
 #[derive(Clone)]
@@ -48,8 +47,8 @@ pub enum LokiError {
 
 #[derive(Debug, Snafu)]
 pub struct LokiResponse {
-    batch_size: usize,
-    events_byte_size: usize,
+    protocol: &'static str,
+    metadata: RequestMetadata,
 }
 
 impl DriverResponse for LokiResponse {
@@ -59,32 +58,29 @@ impl DriverResponse for LokiResponse {
 
     fn events_sent(&self) -> EventsSent {
         EventsSent {
-            count: self.batch_size,
-            byte_size: self.events_byte_size,
+            count: self.metadata.event_count(),
+            byte_size: self.metadata.events_byte_size(),
             output: None,
         }
+    }
+
+    fn bytes_sent(&self) -> Option<(usize, &str)> {
+        Some((self.metadata.request_encoded_size(), self.protocol))
     }
 }
 
 #[derive(Clone)]
 pub struct LokiRequest {
     pub compression: Compression,
-    pub batch_size: usize,
     pub finalizers: EventFinalizers,
     pub payload: Bytes,
     pub tenant_id: Option<String>,
-    pub events_byte_size: usize,
-}
-
-impl Ackable for LokiRequest {
-    fn ack_size(&self) -> usize {
-        self.batch_size
-    }
+    pub metadata: RequestMetadata,
 }
 
 impl Finalizable for LokiRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
-        std::mem::take(&mut self.finalizers)
+        self.finalizers.take_finalizers()
     }
 }
 
@@ -114,6 +110,7 @@ impl Service<LokiRequest> for LokiService {
     fn call(&mut self, request: LokiRequest) -> Self::Future {
         let mut req =
             http::Request::post(&self.endpoint.uri).header("Content-Type", "application/json");
+        let protocol = get_http_scheme_from_uri(&self.endpoint.uri);
 
         if let Some(tenant_id) = request.tenant_id {
             req = req.header("X-Scope-OrgID", tenant_id);
@@ -132,18 +129,14 @@ impl Service<LokiRequest> for LokiService {
 
         let mut client = self.client.clone();
 
-        let batch_size = request.batch_size;
-        let events_byte_size = request.events_byte_size;
+        let metadata = request.metadata;
         Box::pin(async move {
             match client.call(req).in_current_span().await {
                 Ok(response) => {
                     let status = response.status();
 
                     if status.is_success() {
-                        Ok(LokiResponse {
-                            batch_size,
-                            events_byte_size,
-                        })
+                        Ok(LokiResponse { protocol, metadata })
                     } else {
                         Err(LokiError::ServerError { code: status })
                     }

@@ -11,14 +11,16 @@ use openssl::{base64, hash, pkey, sign};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
+use vector_common::sensitive_string::SensitiveString;
+use vector_config::configurable_component;
 
 use crate::{
-    config::{log_schema, AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    codecs::Transformer,
+    config::{log_schema, AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     event::{Event, Value},
     http::HttpClient,
     sinks::{
         util::{
-            encoding::{EncodingConfigWithDefault, EncodingConfiguration},
             http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
             BatchConfig, BoxedRawValue, JsonArrayBuffer, RealtimeSizeBasedDefaultBatchSettings,
             TowerRequestConfig,
@@ -32,25 +34,59 @@ fn default_host() -> String {
     "ods.opinsights.azure.com".into()
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+/// Configuration for the `azure_monitor_logs` sink.
+#[configurable_component(sink("azure_monitor_logs"))]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct AzureMonitorLogsConfig {
+    /// The [unique identifier][uniq_id] for the Log Analytics workspace.
+    ///
+    /// [uniq_id]: https://docs.microsoft.com/en-us/azure/azure-monitor/platform/data-collector-api#request-uri-parameters
     pub customer_id: String,
-    pub shared_key: String,
+
+    /// The [primary or the secondary key][shared_key] for the Log Analytics workspace.
+    ///
+    /// [shared_key]: https://docs.microsoft.com/en-us/azure/azure-monitor/platform/data-collector-api#authorization
+    pub shared_key: SensitiveString,
+
+    /// The [record type][record_type] of the data that is being submitted.
+    ///
+    /// Can only contain letters, numbers, and underscores (_), and may not exceed 100 characters.
+    ///
+    /// [record_type]: https://docs.microsoft.com/en-us/azure/azure-monitor/platform/data-collector-api#request-headers
+    #[configurable(validation(pattern = "[a-zA-Z0-9_]{1,100}"))]
     pub log_type: String,
+
+    /// The [Resource ID][resource_id] of the Azure resource the data should be associated with.
+    ///
+    /// [resource_id]: https://docs.microsoft.com/en-us/azure/azure-monitor/platform/data-collector-api#request-headers
     pub azure_resource_id: Option<String>,
+
+    /// [Alternative host][alt_host] for dedicated Azure regions.
+    ///
+    /// [alt_host]: https://docs.azure.cn/en-us/articles/guidance/developerdifferences#check-endpoints-in-azure
     #[serde(default = "default_host")]
     pub(super) host: String,
+
+    #[configurable(derived)]
     #[serde(
-        skip_serializing_if = "crate::serde::skip_serializing_if_default",
-        default
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    pub encoding: EncodingConfigWithDefault<Encoding>,
+    pub encoding: Transformer,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -76,10 +112,6 @@ static TIME_GENERATED_FIELD_HEADER: Lazy<HeaderName> =
     Lazy::new(|| HeaderName::from_static("time-generated-field"));
 static CONTENT_TYPE_VALUE: Lazy<HeaderValue> = Lazy::new(|| HeaderValue::from_static(CONTENT_TYPE));
 
-inventory::submit! {
-    SinkDescription::new::<AzureMonitorLogsConfig>("azure_monitor_logs")
-}
-
 impl_generate_config_from_default!(AzureMonitorLogsConfig);
 
 /// Max number of bytes in request body
@@ -96,7 +128,6 @@ const SHARED_KEY: &str = "SharedKey";
 const API_VERSION: &str = "2016-04-01";
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "azure_monitor_logs")]
 impl SinkConfig for AzureMonitorLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let batch_settings = self
@@ -119,7 +150,6 @@ impl SinkConfig for AzureMonitorLogsConfig {
             request_settings,
             batch_settings.timeout,
             client,
-            cx.acker(),
         )
         .sink_map_err(|error| error!(message = "Fatal azure_monitor_logs sink error.", %error));
 
@@ -130,12 +160,8 @@ impl SinkConfig for AzureMonitorLogsConfig {
         Input::log()
     }
 
-    fn sink_type(&self) -> &'static str {
-        "azure_monitor_logs"
-    }
-
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
@@ -143,18 +169,18 @@ impl SinkConfig for AzureMonitorLogsConfig {
 struct AzureMonitorLogsSink {
     uri: Uri,
     customer_id: String,
-    encoding: EncodingConfigWithDefault<Encoding>,
+    transformer: Transformer,
     shared_key: pkey::PKey<pkey::Private>,
     default_headers: HeaderMap,
 }
 
 struct AzureMonitorLogsEventEncoder {
-    encoding: EncodingConfigWithDefault<Encoding>,
+    transformer: Transformer,
 }
 
 impl HttpEventEncoder<serde_json::Value> for AzureMonitorLogsEventEncoder {
     fn encode_event(&mut self, mut event: Event) -> Option<serde_json::Value> {
-        self.encoding.apply_rules(&mut event);
+        self.transformer.transform(&mut event);
 
         // it seems like Azure Monitor doesn't support full 9-digit nanosecond precision
         // adjust the timestamp format accordingly, keeping only milliseconds
@@ -186,7 +212,7 @@ impl HttpSink for AzureMonitorLogsSink {
 
     fn build_encoder(&self) -> Self::Encoder {
         AzureMonitorLogsEventEncoder {
-            encoding: self.encoding.clone(),
+            transformer: self.transformer.clone(),
         }
     }
 
@@ -203,11 +229,11 @@ impl AzureMonitorLogsSink {
         );
         let uri: Uri = url.parse()?;
 
-        if config.shared_key.is_empty() {
+        if config.shared_key.inner().is_empty() {
             return Err("shared_key can't be an empty string".into());
         }
 
-        let shared_key_bytes = base64::decode_block(&config.shared_key)?;
+        let shared_key_bytes = base64::decode_block(config.shared_key.inner())?;
         let shared_key = pkey::PKey::hmac(&shared_key_bytes)?;
         let mut default_headers = HeaderMap::with_capacity(3);
 
@@ -242,7 +268,7 @@ impl AzureMonitorLogsSink {
 
         Ok(AzureMonitorLogsSink {
             uri,
-            encoding: config.encoding.clone(),
+            transformer: config.encoding.clone(),
             customer_id: config.customer_id.clone(),
             shared_key,
             default_headers,
@@ -319,14 +345,69 @@ async fn healthcheck(sink: AzureMonitorLogsSink, client: HttpClient) -> crate::R
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
+    use futures::{future::ready, stream};
     use serde_json::value::RawValue;
 
     use super::*;
-    use crate::event::LogEvent;
+    use crate::{
+        event::LogEvent,
+        sinks::util::BatchSize,
+        test_util::{
+            components::{run_and_assert_sink_compliance, SINK_TAGS},
+            http::{always_200_response, spawn_blackhole_http_server},
+        },
+    };
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<AzureMonitorLogsConfig>();
+    }
+
+    #[tokio::test]
+    async fn component_spec_compliance() {
+        let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
+
+        // This is just a dummy shared key.
+        let shared_key_bytes = base64::decode_block(
+            "ZnNkO2Zhc2RrbGZqYXNkaixmaG5tZXF3dWlsamtmYXNjZmouYXNkbmZrbHFhc2ZtYXNrbA==",
+        )
+        .expect("should not fail to decode base64");
+        let shared_key =
+            pkey::PKey::hmac(&shared_key_bytes).expect("should not fail to create HMAC key");
+
+        let sink = AzureMonitorLogsSink {
+            uri: mock_endpoint,
+            customer_id: "weee".to_string(),
+            transformer: Default::default(),
+            shared_key,
+            default_headers: HeaderMap::new(),
+        };
+
+        let context = SinkContext::new_test();
+        let client =
+            HttpClient::new(None, &context.proxy).expect("should not fail to create HTTP client");
+
+        let request_settings =
+            TowerRequestConfig::default().unwrap_with(&TowerRequestConfig::default());
+
+        let sink = BatchedHttpSink::new(
+            sink,
+            JsonArrayBuffer::new(BatchSize::const_default()),
+            request_settings,
+            Duration::from_secs(1),
+            client,
+        )
+        .sink_map_err(|error| error!(message = "Fatal azure_monitor_logs sink error.", %error));
+
+        let event = Event::Log(LogEvent::from("simple message"));
+        run_and_assert_sink_compliance(
+            VectorSink::from_event_sink(sink),
+            stream::once(ready(event)),
+            &SINK_TAGS,
+        )
+        .await;
     }
 
     fn insert_timestamp_kv(log: &mut LogEvent) -> (String, String) {

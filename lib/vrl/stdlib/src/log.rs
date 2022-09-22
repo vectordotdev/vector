@@ -30,16 +30,6 @@ fn log(
     Ok(Value::Null)
 }
 
-fn levels() -> Vec<Bytes> {
-    vec![
-        Bytes::from("trace"),
-        Bytes::from("debug"),
-        Bytes::from("info"),
-        Bytes::from("warn"),
-        Bytes::from("error"),
-    ]
-}
-
 #[derive(Clone, Copy, Debug)]
 pub struct Log;
 
@@ -85,9 +75,9 @@ impl Function for Log {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let levels = vec![
             "trace".into(),
@@ -105,64 +95,14 @@ impl Function for Log {
             .expect("log level not bytes");
         let rate_limit_secs = arguments.optional("rate_limit_secs");
 
-        Ok(Box::new(LogFn {
+        Ok(LogFn {
             span: ctx.span(),
             value,
             level,
             rate_limit_secs,
-        }))
-    }
-
-    fn compile_argument(
-        &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
-        ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        if name == "level" {
-            let level = match expr {
-                Some(expr) => match expr.as_value() {
-                    Some(value) => levels()
-                        .into_iter()
-                        .find(|level| Some(level) == value.as_bytes())
-                        .ok_or_else(|| vrl::function::Error::InvalidEnumVariant {
-                            keyword: "level",
-                            value,
-                            variants: levels().into_iter().map(Value::from).collect::<Vec<_>>(),
-                        })?,
-                    None => return Ok(None),
-                },
-                None => Bytes::from("info"),
-            };
-
-            let level = LogInfo {
-                level,
-                span: ctx.span(),
-            };
-            Ok(Some(Box::new(level) as Box<dyn std::any::Any + Send + Sync>))
-        } else {
-            Ok(None)
         }
+        .as_expr())
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let info = args
-            .required_any("level")
-            .downcast_ref::<LogInfo>()
-            .unwrap();
-        let rate_limit_secs = args
-            .optional("rate_limit_secs")
-            .unwrap_or_else(|| value!(1));
-        log(rate_limit_secs, &info.level, value, info.span)
-    }
-}
-
-#[derive(Debug)]
-struct LogInfo {
-    level: Bytes,
-    span: vrl::diagnostic::Span,
 }
 
 #[derive(Debug, Clone)]
@@ -173,7 +113,7 @@ struct LogFn {
     rate_limit_secs: Option<Box<dyn Expression>>,
 }
 
-impl Expression for LogFn {
+impl FunctionExpression for LogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let rate_limit_secs = match &self.rate_limit_secs {
@@ -186,7 +126,7 @@ impl Expression for LogFn {
         log(rate_limit_secs, &self.level, value, span)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::null().infallible()
     }
 }

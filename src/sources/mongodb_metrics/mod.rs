@@ -11,14 +11,14 @@ use mongodb::{
     options::ClientOptions,
     Client,
 };
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    config::{self, Output, SourceConfig, SourceContext, SourceDescription},
+    config::{self, Output, SourceConfig, SourceContext},
     event::metric::{Metric, MetricKind, MetricValue},
     internal_events::{
         CollectionCompleted, EndpointBytesReceived, MongoDbMetricsBsonParseError,
@@ -28,6 +28,7 @@ use crate::{
 
 mod types;
 use types::{CommandBuildInfo, CommandIsMaster, CommandServerStatus, NodeType};
+use vector_core::config::LogNamespace;
 
 macro_rules! tags {
     ($tags:expr) => { $tags.clone() };
@@ -72,12 +73,25 @@ enum CollectError {
     Bson(bson::de::Error),
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default)]
+/// Configuration for the `mongodb_metrics` source.
+#[configurable_component(source("mongodb_metrics"))]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
-struct MongoDbMetricsConfig {
+pub struct MongoDbMetricsConfig {
+    /// A list of MongoDB instances to scrape.
+    ///
+    /// Each endpoint must be in the [Connection String URI Format](https://www.mongodb.com/docs/manual/reference/connection-string/).
     endpoints: Vec<String>,
+
+    /// The interval between scrapes, in seconds.
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
+
+    /// Overrides the default namespace for the metrics emitted by the source.
+    ///
+    /// If set to an empty string, no namespace is added to the metrics.
+    ///
+    /// By default, `mongodb` is used.
     #[serde(default = "default_namespace")]
     namespace: String,
 }
@@ -98,14 +112,9 @@ pub fn default_namespace() -> String {
     "mongodb".to_string()
 }
 
-inventory::submit! {
-    SourceDescription::new::<MongoDbMetricsConfig>("mongodb_metrics")
-}
-
 impl_generate_config_from_default!(MongoDbMetricsConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "mongodb_metrics")]
 impl SourceConfig for MongoDbMetricsConfig {
     async fn build(&self, mut cx: SourceContext) -> crate::Result<super::Source> {
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
@@ -142,12 +151,8 @@ impl SourceConfig for MongoDbMetricsConfig {
         }))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(config::DataType::Metric)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "mongodb_metrics"
     }
 
     fn can_acknowledge(&self) -> bool {

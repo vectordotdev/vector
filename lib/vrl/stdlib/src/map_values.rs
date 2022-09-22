@@ -65,19 +65,20 @@ impl Function for MapValues {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let recursive = arguments.optional("recursive");
         let closure = arguments.required_closure()?;
 
-        Ok(Box::new(MapValuesFn {
+        Ok(MapValuesFn {
             value,
-            closure,
             recursive,
-        }))
+            closure,
+        }
+        .as_expr())
     }
 
     fn closure(&self) -> Option<closure::Definition> {
@@ -100,20 +101,6 @@ impl Function for MapValues {
             is_iterator: true,
         })
     }
-
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
-        let value = args.required("value");
-        let recursive = args
-            .optional("recursive")
-            .map(|v| v.try_boolean())
-            .transpose()?
-            .unwrap_or_default();
-
-        let VmFunctionClosure { variables, vm } = args.closure();
-        let runner = closure::Runner::new(variables, |ctx| vm.interpret(ctx));
-
-        map_values(value, recursive, ctx, runner)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -123,7 +110,7 @@ struct MapValuesFn {
     closure: FunctionClosure,
 }
 
-impl Expression for MapValuesFn {
+impl FunctionExpression for MapValuesFn {
     fn resolve(&self, ctx: &mut Context) -> Result<Value> {
         let recursive = match &self.recursive {
             None => false,
@@ -131,18 +118,22 @@ impl Expression for MapValuesFn {
         };
 
         let value = self.value.resolve(ctx)?;
-        let FunctionClosure { variables, block } = &self.closure;
+        let FunctionClosure {
+            variables,
+            block,
+            block_type_def: _,
+        } = &self.closure;
         let runner = closure::Runner::new(variables, |ctx| block.resolve(ctx));
 
         map_values(value, recursive, ctx, runner)
     }
 
-    fn type_def(&self, ctx: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, ctx: &state::TypeState) -> TypeDef {
         let mut value = self.value.type_def(ctx);
-        let closure = self.closure.block.type_def(ctx);
+        let closure = self.closure.block_type_def.kind().clone();
 
-        recursive_type_def(&mut value, closure.kind().clone(), true);
-        value.with_fallibility(closure.is_fallible())
+        recursive_type_def(&mut value, closure, true);
+        value
     }
 }
 

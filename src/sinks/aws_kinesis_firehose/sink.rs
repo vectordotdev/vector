@@ -4,18 +4,12 @@ use async_trait::async_trait;
 use futures::{stream::BoxStream, StreamExt};
 use tower::Service;
 use vector_core::{
-    buffers::Acker,
     sink::StreamSink,
     stream::{BatcherSettings, DriverResponse},
 };
 
-use crate::{
-    event::Event,
-    sinks::{
-        aws_kinesis_firehose::request_builder::{KinesisRequest, KinesisRequestBuilder},
-        util::SinkBuilderExt,
-    },
-};
+use super::request_builder::{KinesisRequest, KinesisRequestBuilder};
+use crate::{event::Event, internal_events::SinkRequestBuildError, sinks::util::SinkBuilderExt};
 
 #[derive(Debug, Clone)]
 struct KinesisFirehoseRetryLogic;
@@ -23,7 +17,6 @@ struct KinesisFirehoseRetryLogic;
 pub struct KinesisSink<S> {
     pub batch_settings: BatcherSettings,
     pub service: S,
-    pub acker: Acker,
     pub request_builder: KinesisRequestBuilder,
 }
 
@@ -45,15 +38,15 @@ where
             .request_builder(request_builder_concurrency_limit, self.request_builder)
             .filter_map(|request| async move {
                 match request {
-                    Err(e) => {
-                        error!("Failed to build Kinesis Firehose request: {:?}.", e);
+                    Err(error) => {
+                        emit!(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),
                 }
             })
             .batched(self.batch_settings.into_byte_size_config())
-            .into_driver(self.service, self.acker);
+            .into_driver(self.service);
 
         sink.run().await
     }

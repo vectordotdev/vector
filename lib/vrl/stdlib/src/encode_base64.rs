@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use ::value::Value;
+use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
 
 use crate::util::Base64Charset;
@@ -8,11 +9,11 @@ use crate::util::Base64Charset;
 fn encode_base64(value: Value, padding: Option<Value>, charset: Option<Value>) -> Resolved {
     let value = value.try_bytes()?;
     let padding = padding
-        .map(|v| v.try_boolean())
+        .map(VrlValueConvert::try_boolean)
         .transpose()?
         .unwrap_or(true);
     let charset = charset
-        .map(|v| v.try_bytes())
+        .map(VrlValueConvert::try_bytes)
         .transpose()?
         .map(|c| Base64Charset::from_str(&String::from_utf8_lossy(&c)))
         .transpose()?
@@ -52,19 +53,20 @@ impl Function for EncodeBase64 {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let padding = arguments.optional("padding");
         let charset = arguments.optional("charset");
 
-        Ok(Box::new(EncodeBase64Fn {
+        Ok(EncodeBase64Fn {
             value,
             padding,
             charset,
-        }))
+        }
+        .as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -73,14 +75,6 @@ impl Function for EncodeBase64 {
             source: r#"encode_base64("some string value", padding: false, charset: "url_safe")"#,
             result: Ok("c29tZSBzdHJpbmcgdmFsdWU"),
         }]
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let padding = args.optional("padding");
-        let charset = args.optional("charset");
-
-        encode_base64(value, padding, charset)
     }
 }
 
@@ -91,7 +85,7 @@ struct EncodeBase64Fn {
     charset: Option<Box<dyn Expression>>,
 }
 
-impl Expression for EncodeBase64Fn {
+impl FunctionExpression for EncodeBase64Fn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let padding = self.padding.as_ref().map(|p| p.resolve(ctx)).transpose()?;
@@ -100,7 +94,7 @@ impl Expression for EncodeBase64Fn {
         encode_base64(value, padding, charset)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::bytes().infallible()
     }
 }

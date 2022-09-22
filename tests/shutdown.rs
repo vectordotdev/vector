@@ -35,7 +35,7 @@ const STDIO_CONFIG: &'static str = r#"
     [sinks.out_console]
         inputs = ["in_console"]
         type = "console"
-        encoding = "text"
+        encoding.codec = "text"
 "#;
 
 const PROMETHEUS_SINK_CONFIG: &'static str = r#"
@@ -172,7 +172,7 @@ fn log_schema() {
         [sinks.out_console]
             inputs = ["in_console"]
             type = "console"
-            encoding = "json"
+            encoding.codec = "json"
     "#,
         ))
         .env("VECTOR_DATA_DIR", create_directory());
@@ -330,7 +330,7 @@ fn timely_shutdown_http() {
         r#"
     type = "http"
     address = "${VECTOR_TEST_ADDRESS}"
-    encoding = "text""#,
+    decoding.codec = "bytes""#,
     ));
 }
 
@@ -345,7 +345,7 @@ fn timely_shutdown_heroku_logs() {
 
 #[test]
 fn timely_shutdown_docker() {
-    test_timely_shutdown(source_vector(r#"type = "docker""#));
+    test_timely_shutdown(source_vector(r#"type = "docker_logs""#));
 }
 
 #[test]
@@ -473,16 +473,6 @@ fn timely_shutdown_syslog_unix() {
 }
 
 #[test]
-fn timely_shutdown_vector_v1() {
-    test_timely_shutdown(source_vector(
-        r#"
-    type = "vector"
-    version = "1"
-    address = "${VECTOR_TEST_ADDRESS}""#,
-    ));
-}
-
-#[test]
 fn timely_shutdown_vector_v2() {
     test_timely_shutdown(source_vector(
         r#"
@@ -536,7 +526,7 @@ fn timely_shutdown_lua_timer() {
 [sinks.sink]
   type = "console"
   inputs = ["transform"]
-  encoding = "text"
+  encoding.codec = "text"
   target = "stdout"
 "#,
     ));

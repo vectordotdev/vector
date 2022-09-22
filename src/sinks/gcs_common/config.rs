@@ -1,11 +1,11 @@
 use futures::FutureExt;
 use http::{StatusCode, Uri};
 use hyper::Body;
-use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use vector_config::configurable_component;
 
 use crate::{
-    gcp::{GcpCredentials, GcpError},
+    gcp::{GcpAuthenticator, GcpError},
     http::HttpClient,
     sinks::{
         gcs_common::service::GcsResponse,
@@ -16,27 +16,84 @@ use crate::{
 
 pub const BASE_URL: &str = "https://storage.googleapis.com/";
 
-#[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
+/// GCS Predefined ACLs.
+///
+/// For more information, see [Predefined ACLs][predefined_acls].
+///
+/// [predefined_acls]: https://cloud.google.com/storage/docs/access-control/lists#predefined-acl
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(rename_all = "kebab-case")]
 pub enum GcsPredefinedAcl {
+    /// Bucket/object can be read by authenticated users.
+    ///
+    /// The bucket/object owner is granted the `OWNER` permission, and anyone authenticated Google
+    /// account holder is granted the `READER` permission.
     AuthenticatedRead,
+
+    /// Object is semi-private.
+    ///
+    /// Both the object owner and bucket owner are granted the `OWNER` permission.
+    ///
+    /// Only relevant when specified for an object: this predefined ACL is otherwise ignored when
+    /// specified for a bucket.
     BucketOwnerFullControl,
+
+    /// Object is private, except to the bucket owner.
+    ///
+    /// The object owner is granted the `OWNER` permission, and the bucket owner is granted the
+    /// `READER` permission.
+    ///
+    /// Only relevant when specified for an object: this predefined ACL is otherwise ignored when
+    /// specified for a bucket.
     BucketOwnerRead,
+
+    /// Bucket/object are private.
+    ///
+    /// The bucket/object owner is granted the `OWNER` permission, and no one else has
+    /// access.
     Private,
+
+    /// Bucket/object are private within the project.
+    ///
+    /// Project owners and project editors are granted the `OWNER` permission, and anyone who is
+    /// part of the project team is granted the `READER` permission.
+    ///
+    /// This is the default.
     #[derivative(Default)]
     ProjectPrivate,
+
+    /// Bucket/object can be read publically.
+    ///
+    /// The bucket/object owner is granted the `OWNER` permission, and all other users, whether
+    /// authenticated or anonymous, are granted the `READER` permission.
     PublicRead,
 }
 
-#[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
+/// GCS storage classes.
+///
+/// For more information, see [Storage classes][storage_classes].
+///
+/// [storage_classes]: https://cloud.google.com/storage/docs/storage-classes
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative, PartialEq, Eq)]
 #[derivative(Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum GcsStorageClass {
+    /// Standard storage.
+    ///
+    /// This is the default.
     #[derivative(Default)]
     Standard,
+
+    /// Nearline storage.
     Nearline,
+
+    /// Coldline storage.
     Coldline,
+
+    /// Archive storage.
     Archive,
 }
 
@@ -50,20 +107,18 @@ pub fn build_healthcheck(
     bucket: String,
     client: HttpClient,
     base_url: String,
-    creds: Option<GcpCredentials>,
+    auth: GcpAuthenticator,
 ) -> crate::Result<Healthcheck> {
     let healthcheck = async move {
         let uri = base_url.parse::<Uri>()?;
         let mut request = http::Request::head(uri).body(Body::empty())?;
 
-        if let Some(creds) = creds.as_ref() {
-            creds.apply(&mut request);
-        }
+        auth.apply(&mut request);
 
         let not_found_error = GcsError::BucketNotFound { bucket }.into();
 
         let response = client.send(request).await?;
-        healthcheck_response(response, creds, not_found_error)
+        healthcheck_response(response, auth, not_found_error)
     };
 
     Ok(healthcheck.boxed())
@@ -72,16 +127,14 @@ pub fn build_healthcheck(
 // Use this to map a healthcheck response, as it handles setting up the renewal task.
 pub fn healthcheck_response(
     response: http::Response<hyper::Body>,
-    creds: Option<GcpCredentials>,
+    auth: GcpAuthenticator,
     not_found_error: crate::Error,
 ) -> crate::Result<()> {
     // If there are credentials configured, the generated OAuth
     // token needs to be periodically regenerated. Since the
     // health check runs at startup, after a health check is a
     // good place to create the regeneration task.
-    if let Some(creds) = creds {
-        creds.spawn_regenerate_token();
-    }
+    auth.spawn_regenerate_token();
     match response.status() {
         StatusCode::OK => Ok(()),
         StatusCode::FORBIDDEN => Err(GcpError::HealthcheckForbidden.into()),

@@ -1,35 +1,52 @@
-use std::{hash::Hash, marker::PhantomData, sync::Arc, time::Duration};
+use std::{hash::Hash, marker::PhantomData, pin::Pin, sync::Arc, time::Duration};
 
-use serde::{Deserialize, Serialize};
+use futures_util::stream::{self, BoxStream};
 use tower::{
+    balance::p2c::Balance,
+    buffer::{Buffer, BufferLayer},
+    discover::Change,
     layer::{util::Stack, Layer},
     limit::RateLimit,
     retry::Retry,
     timeout::Timeout,
     Service, ServiceBuilder,
 };
-use vector_buffers::Acker;
+use vector_config::configurable_component;
 
 pub use crate::sinks::util::service::{
     concurrency::{concurrency_is_none, Concurrency},
+    health::{HealthConfig, HealthLogic, HealthService},
     map::Map,
 };
-use crate::sinks::util::{
-    adaptive_concurrency::{
-        AdaptiveConcurrencyLimit, AdaptiveConcurrencyLimitLayer, AdaptiveConcurrencySettings,
+use crate::{
+    internal_events::OpenGauge,
+    sinks::util::{
+        adaptive_concurrency::{
+            AdaptiveConcurrencyLimit, AdaptiveConcurrencyLimitLayer, AdaptiveConcurrencySettings,
+        },
+        retries::{FixedRetryPolicy, RetryLogic},
+        service::map::MapLayer,
+        sink::Response,
+        Batch, BatchSink, Partition, PartitionBatchSink,
     },
-    retries::{FixedRetryPolicy, RetryLogic},
-    service::map::MapLayer,
-    sink::Response,
-    Batch, BatchSink, Partition, PartitionBatchSink,
 };
 
 mod concurrency;
+mod health;
 mod map;
 
 pub type Svc<S, L> = RateLimit<AdaptiveConcurrencyLimit<Retry<FixedRetryPolicy<L>, Timeout<S>>, L>>;
 pub type TowerBatchedSink<S, B, RL> = BatchSink<Svc<S, RL>, B>;
 pub type TowerPartitionSink<S, B, RL, K> = PartitionBatchSink<Svc<S, RL>, B, K>;
+
+// Distributed service types
+pub type DistributedService<S, RL, HL, K, Req> = RateLimit<
+    Retry<FixedRetryPolicy<RL>, Buffer<Balance<DiscoveryService<S, RL, HL, K>, Req>, Req>>,
+>;
+pub type DiscoveryService<S, RL, HL, K> =
+    BoxStream<'static, Result<Change<K, SingleDistributedService<S, RL, HL>>, crate::Error>>;
+pub type SingleDistributedService<S, RL, HL> =
+    AdaptiveConcurrencyLimit<HealthService<Timeout<S>, HL>, RL>;
 
 pub trait ServiceBuilderExt<L> {
     fn map<R1, R2, F>(self, f: F) -> ServiceBuilder<Stack<MapLayer<R1, R2>, L>>
@@ -64,29 +81,54 @@ impl<L> ServiceBuilderExt<L> for ServiceBuilder<L> {
     }
 }
 
-/// Tower Request based configuration
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+/// Middleware settings for outbound requests.
+///
+/// Various settings can be configured, such as concurrency and rate limits, timeouts, etc.
+#[configurable_component]
+#[derive(Clone, Copy, Debug)]
 pub struct TowerRequestConfig {
+    #[configurable(derived)]
     #[serde(default)]
     #[serde(skip_serializing_if = "concurrency_is_none")]
-    pub concurrency: Concurrency, // adaptive
-    pub timeout_secs: Option<u64>,             // 1 minute
-    pub rate_limit_duration_secs: Option<u64>, // 1 second
-    pub rate_limit_num: Option<u64>,           // i64::MAX
-    pub retry_attempts: Option<usize>,         // isize::MAX
+    pub concurrency: Concurrency,
+
+    /// The maximum time a request can take before being aborted.
+    ///
+    /// It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
+    /// create orphaned requests, pile on retries, and result in duplicate data downstream.
+    pub timeout_secs: Option<u64>,
+
+    /// The time window, in seconds, used for the `rate_limit_num` option.
+    pub rate_limit_duration_secs: Option<u64>,
+
+    /// The maximum number of requests allowed within the `rate_limit_duration_secs` time window.
+    pub rate_limit_num: Option<u64>,
+
+    /// The maximum number of retries to make for failed requests.
+    ///
+    /// The default, for all intents and purposes, represents an infinite number of retries.
+    pub retry_attempts: Option<usize>,
+
+    /// The maximum amount of time, in seconds, to wait between retries.
     pub retry_max_duration_secs: Option<u64>,
-    pub retry_initial_backoff_secs: Option<u64>, // 1
+
+    /// The amount of time to wait before attempting the first retry for a failed request.
+    ///
+    /// After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
+    pub retry_initial_backoff_secs: Option<u64>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub adaptive_concurrency: AdaptiveConcurrencySettings,
 }
 
 pub const CONCURRENCY_DEFAULT: Concurrency = Concurrency::None;
-pub const RATE_LIMIT_DURATION_SECONDS_DEFAULT: u64 = 1; // one second
+pub const RATE_LIMIT_DURATION_SECONDS_DEFAULT: u64 = 1;
 pub const RATE_LIMIT_NUM_DEFAULT: u64 = i64::max_value() as u64; // i64 avoids TOML deserialize issue
 pub const RETRY_ATTEMPTS_DEFAULT: usize = isize::max_value() as usize; // isize avoids TOML deserialize issue
-pub const RETRY_MAX_DURATION_SECONDS_DEFAULT: u64 = 3_600; // one hour
-pub const RETRY_INITIAL_BACKOFF_SECONDS_DEFAULT: u64 = 1; // one second
-pub const TIMEOUT_SECONDS_DEFAULT: u64 = 60; // one minute
+pub const RETRY_MAX_DURATION_SECONDS_DEFAULT: u64 = 3_600;
+pub const RETRY_INITIAL_BACKOFF_SECONDS_DEFAULT: u64 = 1;
+pub const TIMEOUT_SECONDS_DEFAULT: u64 = 60;
 
 impl Default for TowerRequestConfig {
     fn default() -> Self {
@@ -191,7 +233,7 @@ pub struct TowerRequestSettings {
 }
 
 impl TowerRequestSettings {
-    pub fn retry_policy<L: RetryLogic>(&self, logic: L) -> FixedRetryPolicy<L> {
+    pub const fn retry_policy<L: RetryLogic>(&self, logic: L) -> FixedRetryPolicy<L> {
         FixedRetryPolicy::new(
             self.retry_attempts,
             self.retry_initial_backoff_secs,
@@ -200,13 +242,13 @@ impl TowerRequestSettings {
         )
     }
 
+    /// Note: This has been deprecated, please do not use when creating new Sinks.
     pub fn partition_sink<B, RL, S, K>(
         &self,
         retry_logic: RL,
         service: S,
         batch: B,
         batch_timeout: Duration,
-        acker: Acker,
     ) -> TowerPartitionSink<S, B, RL, K>
     where
         RL: RetryLogic<Response = S::Response>,
@@ -222,16 +264,16 @@ impl TowerRequestSettings {
         let service = ServiceBuilder::new()
             .settings(self.clone(), retry_logic)
             .service(service);
-        PartitionBatchSink::new(service, batch, batch_timeout, acker)
+        PartitionBatchSink::new(service, batch, batch_timeout)
     }
 
+    /// Note: This has been deprecated, please do not use when creating new Sinks.
     pub fn batch_sink<B, RL, S>(
         &self,
         retry_logic: RL,
         service: S,
         batch: B,
         batch_timeout: Duration,
-        acker: Acker,
     ) -> TowerBatchedSink<S, B, RL>
     where
         RL: RetryLogic<Response = S::Response>,
@@ -245,7 +287,65 @@ impl TowerRequestSettings {
         let service = ServiceBuilder::new()
             .settings(self.clone(), retry_logic)
             .service(service);
-        BatchSink::new(service, batch, batch_timeout, acker)
+        BatchSink::new(service, batch, batch_timeout)
+    }
+
+    /// Distributes requests to services [(Endpoint, service, healthcheck)]
+    pub fn distributed_service<Req, RL, HL, S>(
+        self,
+        retry_logic: RL,
+        services: Vec<(String, S)>,
+        health_config: HealthConfig,
+        health_logic: HL,
+    ) -> DistributedService<S, RL, HL, usize, Req>
+    where
+        Req: Clone + Send + 'static,
+        RL: RetryLogic<Response = S::Response>,
+        HL: HealthLogic<Response = S::Response, Error = crate::Error>,
+        S: Service<Req> + Clone + Send + 'static,
+        S::Error: Into<crate::Error> + Send + Sync + 'static,
+        S::Response: Send,
+        S::Future: Send + 'static,
+    {
+        let policy = self.retry_policy(retry_logic.clone());
+        let settings = self.clone();
+
+        // Build services
+        let open = OpenGauge::new();
+        let max_concurrency = services.len() * AdaptiveConcurrencySettings::max_concurrency();
+        let services = services
+            .into_iter()
+            .map(|(endpoint, inner)| {
+                // Build individual service
+                ServiceBuilder::new()
+                    .layer(AdaptiveConcurrencyLimitLayer::new(
+                        settings.concurrency,
+                        settings.adaptive_concurrency,
+                        retry_logic.clone(),
+                    ))
+                    .service(
+                        health_config.build(
+                            health_logic.clone(),
+                            ServiceBuilder::new()
+                                .timeout(settings.timeout)
+                                .service(inner),
+                            open.clone(),
+                            endpoint,
+                        ), // NOTE: there is a version conflict for crate `tracing` between `tracing_tower` crate
+                           // and Vector. Once that is resolved, this can be used instead of passing endpoint everywhere.
+                           // .trace_service(|_| info_span!("endpoint", %endpoint)),
+                    )
+            })
+            .enumerate()
+            .map(|(i, service)| Ok(Change::Insert(i, service)))
+            .collect::<Vec<_>>();
+
+        // Build sink service
+        ServiceBuilder::new()
+            .rate_limit(self.rate_limit_num, self.rate_limit_duration)
+            .retry(policy)
+            .layer(BufferLayer::new(max_concurrency))
+            .service(Balance::new(Box::pin(stream::iter(services)) as Pin<Box<_>>))
     }
 }
 
@@ -345,7 +445,6 @@ mod tests {
         };
         let settings = cfg.unwrap_with(&TowerRequestConfig::default());
 
-        let (acker, _) = Acker::basic();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = {
@@ -372,7 +471,6 @@ mod tests {
             svc,
             PartitionBuffer::new(VecBuffer::new(batch_settings.size)),
             TIMEOUT,
-            acker,
         );
         sink.ordered();
 

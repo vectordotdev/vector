@@ -1,9 +1,7 @@
-use aws_sdk_sqs::error::SendMessageError;
-use aws_sdk_sqs::types::SdkError;
+use aws_sdk_sqs::{error::SendMessageError, types::SdkError};
 
 use super::service::SendMessageResponse;
-use crate::aws::is_retriable_error;
-use crate::sinks::util::retries::RetryLogic;
+use crate::{aws::is_retriable_error, sinks::util::retries::RetryLogic};
 
 #[derive(Debug, Clone)]
 pub(super) struct SqsRetryLogic;

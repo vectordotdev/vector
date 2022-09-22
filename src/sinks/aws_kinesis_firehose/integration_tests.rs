@@ -3,28 +3,22 @@
 
 use aws_sdk_elasticsearch::Client as EsClient;
 use aws_sdk_firehose::model::ElasticsearchDestinationConfiguration;
-use futures::{StreamExt, TryFutureExt};
+use codecs::JsonSerializerConfig;
+use futures::TryFutureExt;
 use serde_json::{json, Value};
 use tokio::time::{sleep, Duration};
 
-use super::*;
-use crate::aws::create_client;
-use crate::config::ProxyConfig;
-use crate::sinks::aws_kinesis_firehose::config::KinesisFirehoseClientBuilder;
-use crate::sinks::elasticsearch::BulkConfig;
+use super::{config::KinesisFirehoseClientBuilder, *};
 use crate::{
-    aws::{AwsAuthentication, RegionOrEndpoint},
-    config::{SinkConfig, SinkContext},
+    aws::{create_client, AwsAuthentication, RegionOrEndpoint},
+    config::{ProxyConfig, SinkConfig, SinkContext},
     sinks::{
-        elasticsearch::{ElasticsearchAuth, ElasticsearchCommon, ElasticsearchConfig},
-        util::{
-            encoding::{EncodingConfig, StandardEncodings},
-            BatchConfig, Compression, TowerRequestConfig,
-        },
+        elasticsearch::{BulkConfig, ElasticsearchAuth, ElasticsearchCommon, ElasticsearchConfig},
+        util::{BatchConfig, Compression, TowerRequestConfig},
     },
     test_util::{
-        components, components::AWS_SINK_TAGS, random_events_with_stream, random_string,
-        wait_for_duration,
+        components::{run_and_assert_sink_compliance, AWS_SINK_TAGS},
+        random_events_with_stream, random_string, wait_for_duration,
     },
 };
 
@@ -52,7 +46,7 @@ async fn firehose_put_records() {
     let config = KinesisFirehoseSinkConfig {
         stream_name: stream.clone(),
         region: region.clone(),
-        encoding: EncodingConfig::from(StandardEncodings::Json).into(), // required for ES destination w/ localstack
+        encoding: JsonSerializerConfig::new().into(), // required for ES destination w/ localstack
         compression: Compression::None,
         batch,
         request: TowerRequestConfig {
@@ -67,15 +61,13 @@ async fn firehose_put_records() {
 
     let cx = SinkContext::new_test();
 
-    let sink = config.build(cx).await.unwrap();
+    let (sink, _) = config.build(cx).await.unwrap();
 
     let (input, events) = random_events_with_stream(100, 100, None);
 
-    components::init_test();
-    sink.0.run(events.map(Into::into)).await.unwrap();
+    run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
     sleep(Duration::from_secs(5)).await;
-    components::SINK_TESTS.assert(&AWS_SINK_TAGS);
 
     let config = ElasticsearchConfig {
         auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
@@ -145,6 +137,7 @@ async fn firehose_client() -> aws_sdk_firehose::Client {
         region_endpoint.endpoint().unwrap(),
         &proxy,
         &None,
+        true,
     )
     .await
     .unwrap()

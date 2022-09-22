@@ -33,18 +33,13 @@ impl Function for StripAnsiEscapeCodes {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(StripAnsiEscapeCodesFn { value }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        strip_ansi_escape_codes(value)
+        Ok(StripAnsiEscapeCodesFn { value }.as_expr())
     }
 }
 
@@ -53,14 +48,14 @@ struct StripAnsiEscapeCodesFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for StripAnsiEscapeCodesFn {
+impl FunctionExpression for StripAnsiEscapeCodesFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?;
 
         strip_ansi_escape_codes(bytes)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         // We're marking this as infallible, because `strip_ansi_escapes` only
         // fails if it can't write to the buffer, which is highly unlikely to
         // occur.

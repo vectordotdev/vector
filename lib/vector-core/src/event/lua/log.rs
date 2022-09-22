@@ -20,12 +20,10 @@ impl<'a> FromLua<'a> for LogEvent {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::event::Event;
 
     #[test]
     fn to_lua() {
-        let mut event = Event::new_empty_log();
-        let log = event.as_mut_log();
+        let mut log = LogEvent::default();
         log.insert("a", 1);
         log.insert("nested.field", "2");
         log.insert("nested.array[0]", "example value");

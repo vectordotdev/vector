@@ -170,6 +170,13 @@ components: sources: syslog: {
 					examples: ["127.0.0.1"]
 				}
 			}
+			source_type: {
+				description: "The name of the source type."
+				required:    true
+				type: string: {
+					examples: ["syslog"]
+				}
+			}
 			timestamp: {
 				description: "The time extracted from the Syslog formatted line. If parsing fails, then the exact time the event was ingested into Vector is used."
 				required:    true
@@ -183,6 +190,7 @@ components: sources: syslog: {
 					unit: null
 				}
 			}
+			client_metadata: fields._client_metadata
 			"*": {
 				description: "In addition to the defined fields, any [Syslog 5424 structured fields](https://datatracker.ietf.org/doc/html/rfc5424#section-6.3) are parsed and inserted, namespaced under the name of each structured data section."
 				required:    true
@@ -210,15 +218,16 @@ components: sources: syslog: {
 				<13>1 \(_timestamp) \(_hostname) \(_app_name) \(_procid) \(_msgid) [exampleSDID@32473 iut="\(_iut)" eventSource="\(_event_source)" eventID="\(_event_id)"] \(_message)
 				"""
 			output: log: {
-				severity:  "notice"
-				facility:  "user"
-				timestamp: _timestamp
-				host:      _values.local_host
-				source_ip: _values.remote_host
-				hostname:  _hostname
-				appname:   _app_name
-				procid:    _procid
-				msgid:     _msgid
+				severity:    "notice"
+				facility:    "user"
+				timestamp:   _timestamp
+				host:        _values.local_host
+				source_ip:   _values.remote_host
+				source_type: "syslog"
+				hostname:    _hostname
+				appname:     _app_name
+				procid:      _procid
+				msgid:       _msgid
 				"exampleSDID@32473": {
 					iut:         _iut
 					eventSource: _event_source

@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use ::value::Value;
+use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
 
 use crate::util;
@@ -122,9 +123,9 @@ impl Function for Compact {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let recursive = arguments.optional("recursive");
@@ -134,7 +135,7 @@ impl Function for Compact {
         let array = arguments.optional("array");
         let nullish = arguments.optional("nullish");
 
-        Ok(Box::new(CompactFn {
+        Ok(CompactFn {
             value,
             recursive,
             null,
@@ -142,19 +143,8 @@ impl Function for Compact {
             object,
             array,
             nullish,
-        }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let recursive = args.optional("recursive");
-        let null = args.optional("null");
-        let string = args.optional("string");
-        let object = args.optional("object");
-        let array = args.optional("array");
-        let nullish = args.optional("nullish");
-
-        compact(recursive, null, string, object, array, nullish, value)
+        }
+        .as_expr())
     }
 }
 
@@ -209,7 +199,7 @@ impl CompactOptions {
     }
 }
 
-impl Expression for CompactFn {
+impl FunctionExpression for CompactFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let recursive = self
             .recursive
@@ -246,7 +236,7 @@ impl Expression for CompactFn {
         compact(recursive, null, string, object, array, nullish, value)
     }
 
-    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &state::TypeState) -> TypeDef {
         if self.value.type_def(state).is_array() {
             TypeDef::array(Collection::any())
         } else {

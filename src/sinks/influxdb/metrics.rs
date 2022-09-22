@@ -6,20 +6,22 @@ use std::{
 
 use bytes::{Bytes, BytesMut};
 use futures::{future::BoxFuture, stream, SinkExt};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use tower::Service;
+use vector_config::configurable_component;
 use vector_core::{
     event::metric::{MetricSketch, Quantile},
     ByteSizeOf,
 };
 
 use crate::{
-    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     event::{
         metric::{Metric, MetricValue, Sample, StatisticKind},
         Event,
     },
     http::HttpClient,
+    internal_events::InfluxdbEncodingError,
     sinks::{
         influxdb::{
             encode_timestamp, healthcheck, influx_line_protocol, influxdb_settings, Field,
@@ -53,24 +55,46 @@ impl SinkBatchSettings for InfluxDbDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 1.0;
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+/// Configuration for the `influxdb_metrics` sink.
+#[configurable_component(sink("influxdb_metrics"))]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct InfluxDbConfig {
+    /// Sets the default namespace for any metrics sent.
+    ///
+    /// This namespace is only used if a metric has no existing namespace. When a namespace is
+    /// present, it is used as a prefix to the metric name, and separated with a period (`.`).
     #[serde(alias = "namespace")]
     pub default_namespace: Option<String>,
+
+    /// The endpoint to send data to.
     pub endpoint: String,
+
     #[serde(flatten)]
     pub influxdb1_settings: Option<InfluxDb1Settings>,
+
     #[serde(flatten)]
     pub influxdb2_settings: Option<InfluxDb2Settings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<InfluxDbDefaultBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    /// A map of additional tags, in the form of key/value pairs, to add to each measurement.
     pub tags: Option<HashMap<String, String>>,
+
+    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
+
+    /// The list of quantiles to calculate when sending distribution metrics.
     #[serde(default = "default_summary_quantiles")]
     pub quantiles: Vec<f64>,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -89,14 +113,9 @@ struct InfluxDbRequest {
     series: Vec<String>,
 }
 
-inventory::submit! {
-    SinkDescription::new::<InfluxDbConfig>("influxdb_metrics")
-}
-
 impl_generate_config_from_default!(InfluxDbConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "influxdb_metrics")]
 impl SinkConfig for InfluxDbConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let tls_settings = TlsSettings::from_options(&self.tls)?;
@@ -108,7 +127,7 @@ impl SinkConfig for InfluxDbConfig {
             client.clone(),
         )?;
         validate_quantiles(&self.quantiles)?;
-        let sink = InfluxDbSvc::new(self.clone(), cx, client)?;
+        let sink = InfluxDbSvc::new(self.clone(), client)?;
         Ok((sink, healthcheck))
     }
 
@@ -116,21 +135,13 @@ impl SinkConfig for InfluxDbConfig {
         Input::metric()
     }
 
-    fn sink_type(&self) -> &'static str {
-        "influxdb_metrics"
-    }
-
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
 impl InfluxDbSvc {
-    pub fn new(
-        config: InfluxDbConfig,
-        cx: SinkContext,
-        client: HttpClient,
-    ) -> crate::Result<VectorSink> {
+    pub fn new(config: InfluxDbConfig, client: HttpClient) -> crate::Result<VectorSink> {
         let settings = influxdb_settings(
             config.influxdb1_settings.clone(),
             config.influxdb2_settings.clone(),
@@ -148,7 +159,7 @@ impl InfluxDbSvc {
 
         let uri = settings.write_uri(endpoint)?;
 
-        let http_service = HttpBatchService::new(client, create_build_request(uri, token));
+        let http_service = HttpBatchService::new(client, create_build_request(uri, token.inner()));
 
         let influxdb_http_service = InfluxDbSvc {
             config,
@@ -163,7 +174,6 @@ impl InfluxDbSvc {
                 influxdb_http_service,
                 MetricsBuffer::new(batch.size),
                 batch.timeout,
-                cx.acker(),
             )
             .with_flat_map(move |event: Event| {
                 stream::iter({
@@ -204,7 +214,7 @@ impl Service<Vec<Metric>> for InfluxDbSvc {
 
 fn create_build_request(
     uri: http::Uri,
-    token: String,
+    token: &str,
 ) -> impl Fn(Bytes) -> BoxFuture<'static, crate::Result<hyper::Request<Bytes>>> + Sync + Send + 'static
 {
     let auth = format!("Token {}", token);
@@ -264,6 +274,8 @@ fn encode_events(
     quantiles: &[f64],
 ) -> BytesMut {
     let mut output = BytesMut::new();
+    let count = events.len() as u64;
+
     for event in events.into_iter() {
         let fullname = encode_namespace(event.namespace().or(default_namespace), '.', event.name());
         let ts = encode_timestamp(event.timestamp());
@@ -272,7 +284,8 @@ fn encode_events(
 
         let mut unwrapped_tags = tags.unwrap_or_default();
         unwrapped_tags.insert("metric_type".to_owned(), metric_type.to_owned());
-        if let Err(error) = influx_line_protocol(
+
+        if let Err(error_message) = influx_line_protocol(
             protocol_version,
             &fullname,
             Some(unwrapped_tags),
@@ -280,7 +293,10 @@ fn encode_events(
             ts,
             &mut output,
         ) {
-            warn!(message = "Failed to encode event; dropping event.", %error, internal_log_rate_secs = 30);
+            emit!(InfluxdbEncodingError {
+                error_message,
+                count,
+            });
         };
     }
 
@@ -362,7 +378,10 @@ fn get_type_and_fields(
                         )
                     })
                     .collect::<HashMap<_, _>>();
-                fields.insert("count".to_owned(), Field::UnsignedInt(ddsketch.count()));
+                fields.insert(
+                    "count".to_owned(),
+                    Field::UnsignedInt(u64::from(ddsketch.count())),
+                );
                 fields.insert(
                     "min".to_owned(),
                     Field::Float(ddsketch.min().unwrap_or(f64::MAX)),
@@ -923,6 +942,7 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use chrono::{SecondsFormat, Utc};
+    use futures::stream;
     use pretty_assertions::assert_eq;
 
     use crate::{
@@ -940,6 +960,7 @@ mod integration_tests {
             },
             InfluxDb1Settings, InfluxDb2Settings,
         },
+        test_util::components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
         tls::{self, TlsConfig},
     };
 
@@ -987,7 +1008,7 @@ mod integration_tests {
 
         let events: Vec<_> = (0..10).map(create_event).collect();
         let (sink, _) = config.build(cx).await.expect("error when building config");
-        sink.run_events(events.clone()).await.unwrap();
+        run_and_assert_sink_compliance(sink, stream::iter(events.clone()), &HTTP_SINK_TAGS).await;
 
         let res = query_v1_json(url, &format!("show series on {}", database)).await;
 
@@ -1067,7 +1088,7 @@ mod integration_tests {
             influxdb2_settings: Some(InfluxDb2Settings {
                 org: ORG.to_string(),
                 bucket: BUCKET.to_string(),
-                token: TOKEN.to_string(),
+                token: TOKEN.to_string().into(),
             }),
             quantiles: default_summary_quantiles(),
             batch: Default::default(),
@@ -1101,8 +1122,8 @@ mod integration_tests {
         }
 
         let client = HttpClient::new(None, cx.proxy()).unwrap();
-        let sink = InfluxDbSvc::new(config, cx, client).unwrap();
-        sink.run_events(events).await.unwrap();
+        let sink = InfluxDbSvc::new(config, client).unwrap();
+        run_and_assert_sink_compliance(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
 
         let mut body = std::collections::HashMap::new();
         body.insert("query", format!("from(bucket:\"my-bucket\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"ns.{}\")", metric));

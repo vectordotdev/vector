@@ -46,12 +46,12 @@ impl Function for ParseRubyHash {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
-        Ok(Box::new(ParseRubyHashFn { value }))
+        Ok(ParseRubyHashFn { value }.as_expr())
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -61,11 +61,6 @@ impl Function for ParseRubyHash {
             required: true,
         }]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        parse_ruby_hash(value)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -73,13 +68,13 @@ struct ParseRubyHashFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ParseRubyHashFn {
+impl FunctionExpression for ParseRubyHashFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         parse_ruby_hash(value)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::object(Collection::from_unknown(inner_kinds())).fallible()
     }
 }
@@ -268,12 +263,12 @@ fn parse(input: &str) -> Result<Value> {
                 // Create a descriptive error message if possible.
                 nom::error::convert_error(input, err)
             }
-            _ => err.to_string(),
+            nom::Err::Incomplete(_) => err.to_string(),
         })
         .and_then(|(rest, result)| {
             rest.trim()
                 .is_empty()
-                .then(|| result)
+                .then_some(result)
                 .ok_or_else(|| "could not parse whole line successfully".into())
         })?;
 

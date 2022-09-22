@@ -62,14 +62,14 @@ impl Function for ParseAwsVpcFlowLog {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let format = arguments.optional("format");
 
-        Ok(Box::new(ParseAwsVpcFlowLogFn::new(value, format)))
+        Ok(ParseAwsVpcFlowLogFn::new(value, format).as_expr())
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -86,13 +86,6 @@ impl Function for ParseAwsVpcFlowLog {
             },
         ]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let format = args.optional("format");
-
-        parse_aws_vpc_flow_log(value, format)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -107,7 +100,7 @@ impl ParseAwsVpcFlowLogFn {
     }
 }
 
-impl Expression for ParseAwsVpcFlowLogFn {
+impl FunctionExpression for ParseAwsVpcFlowLogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let format = self
@@ -119,7 +112,7 @@ impl Expression for ParseAwsVpcFlowLogFn {
         parse_aws_vpc_flow_log(value, format)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::object(inner_kind()).fallible(/* log parsing error */)
     }
 }
@@ -299,19 +292,19 @@ mod tests {
         default {
              args: func_args![value: "2 123456789010 eni-1235b8ca123456789 172.31.16.139 172.31.16.21 20641 22 6 20 4249 1418530010 1418530070 ACCEPT OK"],
              want: Ok(value!({
-                 "account_id": 123456789010_i64,
+                 "account_id": 123_456_789_010_i64,
                  "action": "ACCEPT",
                  "bytes": 4249,
                  "dstaddr": "172.31.16.21",
                  "dstport": 22,
-                 "end": 1418530070,
+                 "end": 1_418_530_070,
                  "interface_id": "eni-1235b8ca123456789",
                  "log_status": "OK",
                  "packets": 20,
                  "protocol": 6,
                  "srcaddr": "172.31.16.139",
                  "srcport": 20641,
-                 "start": 1418530010,
+                 "start": 1_418_530_010,
                  "version": 2
              })),
              tdef: TypeDef::object(inner_kind()).fallible(),
@@ -321,12 +314,12 @@ mod tests {
              args: func_args![value: "3 vpc-abcdefab012345678 subnet-aaaaaaaa012345678 i-01234567890123456 eni-1235b8ca123456789 123456789010 IPv4 52.213.180.42 10.0.0.62 43416 5001 52.213.180.42 10.0.0.62 6 568 8 1566848875 1566848933 ACCEPT 2 OK",
                               format: "version vpc_id subnet_id instance_id interface_id account_id type srcaddr dstaddr srcport dstport pkt_srcaddr pkt_dstaddr protocol bytes packets start end action tcp_flags log_status"],
              want: Ok(value!({
-                 "account_id": 123456789010_i64,
+                 "account_id": 123_456_789_010_i64,
                  "action": "ACCEPT",
                  "bytes": 568,
                  "dstaddr": "10.0.0.62",
                  "dstport": 5001,
-                 "end": 1566848933,
+                 "end": 1_566_848_933,
                  "instance_id": "i-01234567890123456",
                  "interface_id": "eni-1235b8ca123456789",
                  "log_status": "OK",
@@ -336,7 +329,7 @@ mod tests {
                  "protocol": 6,
                  "srcaddr": "52.213.180.42",
                  "srcport": 43416,
-                 "start": 1566848875,
+                 "start": 1_566_848_875,
                  "subnet_id": "subnet-aaaaaaaa012345678",
                  "tcp_flags": 2,
                  "type": "IPv4",

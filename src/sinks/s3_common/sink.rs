@@ -5,20 +5,18 @@ use futures::stream::BoxStream;
 use futures_util::StreamExt;
 use tower::Service;
 use vector_core::{
-    buffers::{Ackable, Acker},
     event::Finalizable,
     sink::StreamSink,
     stream::{BatcherSettings, DriverResponse},
 };
 
+use crate::internal_events::SinkRequestBuildError;
 use crate::{
-    config::SinkContext,
     event::Event,
     sinks::util::{partitioner::KeyPartitioner, RequestBuilder, SinkBuilderExt},
 };
 
 pub struct S3Sink<Svc, RB> {
-    acker: Acker,
     service: Svc,
     request_builder: RB,
     partitioner: KeyPartitioner,
@@ -26,8 +24,7 @@ pub struct S3Sink<Svc, RB> {
 }
 
 impl<Svc, RB> S3Sink<Svc, RB> {
-    pub fn new(
-        cx: SinkContext,
+    pub const fn new(
         service: Svc,
         request_builder: RB,
         partitioner: KeyPartitioner,
@@ -35,7 +32,6 @@ impl<Svc, RB> S3Sink<Svc, RB> {
     ) -> Self {
         Self {
             partitioner,
-            acker: cx.acker(),
             service,
             request_builder,
             batcher_settings,
@@ -50,8 +46,8 @@ where
     Svc::Response: DriverResponse + Send + 'static,
     Svc::Error: fmt::Debug + Into<crate::Error> + Send,
     RB: RequestBuilder<(String, Vec<Event>)> + Send + Sync + 'static,
-    RB::Error: fmt::Debug + Send,
-    RB::Request: Ackable + Finalizable + Send,
+    RB::Error: fmt::Display + Send,
+    RB::Request: Finalizable + Send,
 {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let partitioner = self.partitioner;
@@ -66,14 +62,14 @@ where
             .request_builder(builder_limit, request_builder)
             .filter_map(|request| async move {
                 match request {
-                    Err(e) => {
-                        error!("Failed to build S3 request: {:?}.", e);
+                    Err(error) => {
+                        emit!(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(self.service, self.acker);
+            .into_driver(self.service);
 
         sink.run().await
     }
@@ -87,8 +83,8 @@ where
     Svc::Response: DriverResponse + Send + 'static,
     Svc::Error: fmt::Debug + Into<crate::Error> + Send,
     RB: RequestBuilder<(String, Vec<Event>)> + Send + Sync + 'static,
-    RB::Error: fmt::Debug + Send,
-    RB::Request: Ackable + Finalizable + Send,
+    RB::Error: fmt::Display + Send,
+    RB::Request: Finalizable + Send,
 {
     async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await

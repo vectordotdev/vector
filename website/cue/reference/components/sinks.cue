@@ -36,7 +36,7 @@ components: sinks: [Name=string]: {
 						options: {
 							max_bytes: {
 								common:      true
-								description: "The maximum size of a batch, in bytes, before it is flushed."
+								description: "The maximum size of a batch that will be processed by a sink. This is based on the uncompressed size of the batched events, before they are serialized / compressed."
 								required:    false
 								type: uint: {
 									default: features.send.batch.max_bytes | *null
@@ -85,7 +85,9 @@ components: sinks: [Name=string]: {
 						}
 					}
 					max_size: {
-						description:   "The maximum size of the buffer on the disk."
+						description: """
+							The maximum size of the buffer on the disk. Must be at least ~256 megabytes (268435488 bytes).
+							"""
 						required:      true
 						relevant_when: "type = \"disk\""
 						type: uint: {
@@ -134,6 +136,7 @@ components: sinks: [Name=string]: {
 					description: """
 						The compression strategy used to compress the encoded event data before transmission.
 
+						The default compression level of the chosen algorithm is used.
 						Some cloud storage API clients and browsers will handle decompression transparently,
 						so files may not always appear to be compressed depending how they are accessed.
 						"""
@@ -146,7 +149,7 @@ components: sinks: [Name=string]: {
 									none: "No compression."
 								}
 								if algo == "gzip" {
-									gzip: "[Gzip](\(urls.gzip)) standard DEFLATE compression."
+									gzip: "[Gzip](\(urls.gzip)) standard DEFLATE compression. Compression level is `6` unless otherwise specified."
 								}
 								if algo == "snappy" {
 									snappy: "[Snappy](\(urls.snappy)) compression."
@@ -155,7 +158,7 @@ components: sinks: [Name=string]: {
 									lz4: "[lz4](\(urls.lz4)) compression."
 								}
 								if algo == "zstd" {
-									zstd: "[zstd](\(urls.zstd)) compression."
+									zstd: "[zstd](\(urls.zstd)) compression. Compression level is `3` unless otherwise specified. Dictionaries are not supported."
 								}
 							}
 						}
@@ -169,10 +172,8 @@ components: sinks: [Name=string]: {
 				encoding: {
 					description: """
 						Configures the encoding specific sink behavior.
-
-						Note: When data in `encoding` is malformed, currently only a very generic error "data did not match any variant of untagged enum EncodingConfig" is reported. Follow this [issue](\(urls.vector_encoding_config_improve_error_message)) to track progress on improving these error messages.
 						"""
-					required:    features.send.encoding.codec.enabled
+					required: features.send.encoding.codec.enabled
 					if !features.send.encoding.codec.enabled {common: true}
 					type: object: {
 						if features.send.encoding.codec.enabled {
@@ -182,35 +183,22 @@ components: sinks: [Name=string]: {
 								required:    true
 								type: string: {
 									examples: features.send.encoding.codec.enum
-									let batched = features.send.encoding.codec.batched
 									enum: {
 										for codec in features.send.encoding.codec.enum {
 											if codec == "text" {
-												if batched {
-													text: "Newline delimited list of messages generated from the message key from each event."
-												}
-												if !batched {
-													text: "The message field from the event."
-												}
+												text: "The message field from the event."
 											}
 											if codec == "logfmt" {
-												if batched {
-													logfmt: "Newline delimited list of events encoded by [logfmt](\(urls.logfmt))."
-												}
-												if !batched {
-													logfmt: "[logfmt](\(urls.logfmt)) encoded event."
-												}
+												logfmt: "[logfmt](\(urls.logfmt)) encoded event."
 											}
 											if codec == "json" {
-												if batched {
-													json: "Array of JSON encoded events, each element representing one event."
-												}
-												if !batched {
-													json: "JSON encoded event."
-												}
+												json: "JSON encoded event."
 											}
-											if codec == "ndjson" {
-												ndjson: "Newline delimited list of JSON encoded events."
+											if codec == "gelf" {
+												gelf: "[GELF](https://docs.graylog.org/docs/gelf) encoded event."
+											}
+											if codec == "avro" {
+												avro: "Avro encoded event with a given schema."
 											}
 										}
 									}
@@ -218,6 +206,31 @@ components: sinks: [Name=string]: {
 							}
 						}
 						options: {
+							if features.send.encoding.codec.enabled {
+								for codec in features.send.encoding.codec.enum {
+									if codec == "avro" {
+										avro: {
+											description:   "Options for the `avro` codec."
+											required:      true
+											relevant_when: "codec = `avro`"
+											type: object: options: {
+												schema: {
+													description: "The Avro schema declaration."
+													required:    true
+													type: string: {
+														examples: [
+															"""
+															["{ "type": "record", "name": "log", "fields": [{ "name": "message", "type": "string" }] }"]
+															""",
+														]
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+
 							except_fields: {
 								common:      false
 								description: "Prevent the sink from encoding the specified fields."
@@ -253,6 +266,46 @@ components: sinks: [Name=string]: {
 									enum: {
 										rfc3339: "Formats as a RFC3339 string"
 										unix:    "Formats as a unix timestamp"
+									}
+								}
+							}
+						}
+					}
+				}
+
+				if features.send.encoding.codec.enabled {
+					if features.send.encoding.codec.framing {
+						framing: {
+							common:      false
+							description: "Configures in which way events encoded as byte frames should be separated in a payload."
+							required:    false
+							type: object: options: {
+								method: {
+									description: "The framing method."
+									required:    false
+									common:      true
+									type: string: {
+										default: "A suitable default is chosen depending on the sink type and the selected codec."
+										enum: {
+											bytes:               "Byte frames are concatenated."
+											character_delimited: "Byte frames are delimited by a chosen character."
+											length_delimited:    "Byte frames are prefixed by an unsigned big-endian 32-bit integer indicating the length."
+											newline_delimited:   "Byte frames are delimited by a newline character."
+										}
+									}
+								}
+								character_delimited: {
+									description:   "Options for `character_delimited` framing."
+									required:      true
+									relevant_when: "method = `character_delimited`"
+									type: object: options: {
+										delimiter: {
+											description: "The character used to separate frames."
+											required:    true
+											type: ascii_char: {
+												examples: ["\n", "\t"]
+											}
+										}
 									}
 								}
 							}
@@ -466,6 +519,7 @@ components: sinks: [Name=string]: {
 					can_verify_certificate: features.send.tls.can_verify_certificate
 					can_verify_hostname:    features.send.tls.can_verify_hostname
 					enabled_default:        features.send.tls.enabled_default
+					enabled_by_scheme:      features.send.tls.enabled_by_scheme
 				}}
 			}
 		}
@@ -577,7 +631,7 @@ components: sinks: [Name=string]: {
 		if features.send != _|_ {
 			if features.send.request.enabled {
 				rate_limits: {
-					title: "Rate limits & adapative concurrency"
+					title: "Rate limits & adaptive concurrency"
 					body:  null
 					sub_sections: [
 						{
@@ -652,6 +706,7 @@ components: sinks: [Name=string]: {
 	}
 
 	telemetry: metrics: {
+		component_received_events_count:      components.sources.internal_metrics.output.metrics.component_received_events_count
 		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
 		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
 		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total

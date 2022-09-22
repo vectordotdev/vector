@@ -5,7 +5,7 @@ use compiler::state;
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use indoc::indoc;
 use vector_common::TimeZone;
-use vrl::Runtime;
+use vrl::{CompilationResult, Runtime};
 
 struct Source {
     name: &'static str,
@@ -95,30 +95,13 @@ static SOURCES: &[Source] = &[
 fn benchmark_vrl_runtimes(c: &mut Criterion) {
     let mut group = c.benchmark_group("vrl/runtime");
     for source in SOURCES {
-        let state = state::Runtime::default();
-        let runtime = Runtime::new(state);
         let tz = TimeZone::default();
         let functions = vrl_stdlib::all();
-        let (program, _) = vrl::compile(source.program, &functions).unwrap();
-        let mut external_env = state::ExternalEnv::default();
-        let vm = runtime
-            .compile(functions, &program, &mut external_env)
-            .unwrap();
-
-        group.bench_with_input(BenchmarkId::new(source.name, "vm"), &vm, |b, vm| {
-            let state = state::Runtime::default();
-            let mut runtime = Runtime::new(state);
-            let target: Value = serde_json::from_str(source.target).expect("valid json");
-
-            b.iter_with_setup(
-                || target.clone(),
-                |mut obj| {
-                    let _ = black_box(runtime.run_vm(vm, &mut obj, &tz));
-                    runtime.clear();
-                    obj
-                },
-            )
-        });
+        let CompilationResult {
+            program,
+            warnings: _,
+            config: _,
+        } = vrl::compile(source.program, &functions).unwrap();
 
         group.bench_with_input(BenchmarkId::new(source.name, "ast"), &(), |b, _| {
             let state = state::Runtime::default();

@@ -69,21 +69,14 @@ impl Function for IpCidrContains {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let cidr = arguments.required("cidr");
         let value = arguments.required("value");
 
-        Ok(Box::new(IpCidrContainsFn { cidr, value }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let cidr = args.required("cidr");
-        let value = args.required("value");
-
-        ip_cidr_contains(value, cidr)
+        Ok(IpCidrContainsFn { cidr, value }.as_expr())
     }
 }
 
@@ -93,7 +86,7 @@ struct IpCidrContainsFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for IpCidrContainsFn {
+impl FunctionExpression for IpCidrContainsFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let cidr = self.cidr.resolve(ctx)?;
@@ -101,7 +94,7 @@ impl Expression for IpCidrContainsFn {
         ip_cidr_contains(value, cidr)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::boolean().fallible()
     }
 }

@@ -78,9 +78,7 @@ fn get_processed_event(
 
 fn get_event_with_token(token: &str) -> Event {
     let mut event = Event::from(get_counter());
-    event
-        .metadata_mut()
-        .set_splunk_hec_token(Some(Arc::from(token)));
+    event.metadata_mut().set_splunk_hec_token(Arc::from(token));
     event
 }
 
@@ -320,7 +318,7 @@ fn test_encode_event_gauge_overridden_namespace_returns_expected_json() {
 async fn splunk_passthrough_token() {
     let addr = next_addr();
     let config = HecMetricsSinkConfig {
-        default_token: "token".into(),
+        default_token: "token".to_owned().into(),
         endpoint: format!("http://{}", addr),
         host_key: "host".into(),
         index: None,
@@ -346,7 +344,7 @@ async fn splunk_passthrough_token() {
         Event::from(get_counter()),
     ];
 
-    let _ = sink.run_events(events).await.unwrap();
+    sink.run_events(events).await.unwrap();
 
     let mut tokens = rx
         .take(3)

@@ -1,9 +1,44 @@
+use lookup::PathPrefix;
 use std::collections::{hash_map::Entry, HashMap};
-
-use anymap::AnyMap;
 use value::{Kind, Value};
 
-use crate::{parser::ast::Ident, type_def::Details};
+use crate::{parser::ast::Ident, type_def::Details, value::Collection, TypeDef};
+
+#[derive(Debug, Clone)]
+pub struct TypeInfo {
+    pub state: TypeState,
+    pub result: TypeDef,
+}
+
+impl TypeInfo {
+    pub fn new(state: impl Into<TypeState>, result: TypeDef) -> Self {
+        Self {
+            state: state.into(),
+            result,
+        }
+    }
+}
+
+impl From<&TypeState> for TypeState {
+    fn from(state: &TypeState) -> Self {
+        state.clone()
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct TypeState {
+    pub local: LocalEnv,
+    pub external: ExternalEnv,
+}
+
+impl TypeState {
+    pub fn merge(self, other: Self) -> Self {
+        Self {
+            local: self.local.merge(other.local),
+            external: self.external.merge(other.external),
+        }
+    }
+}
 
 /// Local environment, limited to a given scope.
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -30,73 +65,97 @@ impl LocalEnv {
         self.bindings.remove(ident)
     }
 
-    /// Merge state present in both `self` and `other`.
-    pub(crate) fn merge_mutations(mut self, other: Self) -> Self {
-        for (ident, other_details) in other.bindings.into_iter() {
+    /// Any state the child scope modified that was part of the parent is copied to the parent scope
+    pub(crate) fn apply_child_scope(mut self, child: Self) -> Self {
+        for (ident, child_details) in child.bindings {
             if let Some(self_details) = self.bindings.get_mut(&ident) {
-                *self_details = other_details;
+                *self_details = child_details;
             }
         }
 
         self
     }
+
+    /// Merges two local envs together. This is useful in cases such as if statements
+    /// where different `LocalEnv`'s can be created, and the result is decided at runtime.
+    /// The compile-time type must be the union of the options.
+    pub(crate) fn merge(mut self, other: Self) -> Self {
+        for (ident, other_details) in other.bindings {
+            if let Some(self_details) = self.bindings.get_mut(&ident) {
+                *self_details = self_details.clone().merge(other_details);
+            }
+        }
+        self
+    }
 }
 
 /// A lexical scope within the program.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ExternalEnv {
     /// The external target of the program.
-    target: Option<Details>,
+    target: Details,
 
-    /// Custom context injected by the external environment
-    custom: AnyMap,
+    /// The type of metadata
+    metadata: Kind,
 }
 
 impl Default for ExternalEnv {
     fn default() -> Self {
-        Self {
-            custom: AnyMap::new(),
-            target: None,
-        }
+        Self::new_with_kind(
+            Kind::object(Collection::any()),
+            Kind::object(Collection::any()),
+        )
     }
 }
 
 impl ExternalEnv {
-    /// Creates a new external environment that starts with an initial given
-    /// [`Kind`].
-    pub fn new_with_kind(kind: Kind) -> Self {
+    pub fn merge(self, other: Self) -> Self {
         Self {
-            target: Some(Details {
-                type_def: kind.into(),
-                value: None,
-            }),
-            ..Default::default()
+            target: self.target.merge(other.target),
+            metadata: self.metadata.union(other.metadata),
         }
     }
 
-    pub(crate) fn target(&self) -> Option<&Details> {
-        self.target.as_ref()
+    /// Creates a new external environment that starts with an initial given
+    /// [`Kind`].
+    #[must_use]
+    pub fn new_with_kind(target: Kind, metadata: Kind) -> Self {
+        Self {
+            target: Details {
+                type_def: target.into(),
+                value: None,
+            },
+            metadata,
+        }
     }
 
-    pub fn target_kind(&self) -> Option<&Kind> {
-        self.target().map(|details| details.type_def.kind())
+    pub(crate) fn target(&self) -> &Details {
+        &self.target
+    }
+
+    pub fn target_kind(&self) -> &Kind {
+        self.target().type_def.kind()
+    }
+
+    pub fn kind(&self, prefix: PathPrefix) -> Kind {
+        match prefix {
+            PathPrefix::Event => self.target_kind(),
+            PathPrefix::Metadata => self.metadata_kind(),
+        }
+        .clone()
+    }
+
+    pub fn metadata_kind(&self) -> &Kind {
+        &self.metadata
     }
 
     #[cfg(any(feature = "expr-assignment", feature = "expr-query"))]
     pub(crate) fn update_target(&mut self, details: Details) {
-        self.target = Some(details);
+        self.target = details;
     }
 
-    /// Sets the external context data for VRL functions to use.
-    pub fn set_external_context<T: 'static>(&mut self, data: T) {
-        self.custom.insert::<T>(data);
-    }
-
-    /// Swap the existing external contexts with new ones, returning the old ones.
-    #[must_use]
-    #[cfg(feature = "expr-function_call")]
-    pub(crate) fn swap_external_context(&mut self, ctx: AnyMap) -> AnyMap {
-        std::mem::replace(&mut self.custom, ctx)
+    pub fn update_metadata(&mut self, kind: Kind) {
+        self.metadata = kind;
     }
 }
 
@@ -108,6 +167,7 @@ pub struct Runtime {
 }
 
 impl Runtime {
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.variables.is_empty()
     }
@@ -116,6 +176,7 @@ impl Runtime {
         self.variables.clear();
     }
 
+    #[must_use]
     pub fn variable(&self, ident: &Ident) -> Option<&Value> {
         self.variables.get(ident)
     }

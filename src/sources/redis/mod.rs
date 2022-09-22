@@ -5,16 +5,20 @@ use codecs::{
     StreamDecodingError,
 };
 use futures::StreamExt;
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
+use vector_common::internal_event::{
+    ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
+};
+use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{log_schema, GenerateConfig, Output, SourceConfig, SourceContext, SourceDescription},
+    config::{log_schema, GenerateConfig, Output, SourceConfig, SourceContext},
     event::Event,
-    internal_events::{BytesReceived, EventsReceived, StreamClosedError},
+    internal_events::{EventsReceived, StreamClosedError},
     serde::{default_decoding, default_framing_message_based},
     SourceSender,
 };
@@ -28,27 +32,42 @@ enum BuildError {
     Client { source: redis::RedisError },
 }
 
-#[derive(Copy, Clone, Debug, Derivative, Deserialize, Serialize)]
+/// Data type to use for reading messages from Redis.
+#[configurable_component]
+#[derive(Copy, Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(rename_all = "lowercase")]
 pub enum DataTypeConfig {
+    /// The `list` data type.
     #[derivative(Default)]
     List,
+
+    /// The `channel` data type.
+    ///
+    /// This is based on Redis' Pub/Sub capabilities.
     Channel,
 }
 
-#[derive(Copy, Clone, Debug, Default, Derivative, Deserialize, Serialize, Eq, PartialEq)]
-#[serde(rename_all = "lowercase")]
+/// Options for the Redis `list` data type.
+#[configurable_component]
+#[derive(Copy, Clone, Debug, Default, Derivative, Eq, PartialEq)]
+#[serde(deny_unknown_fields, rename_all = "lowercase")]
 pub struct ListOption {
+    #[configurable(derived)]
     method: Method,
 }
 
-#[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
+/// Method for getting events from the `list` data type.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
 #[derivative(Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Method {
+    /// Pop messages from the head of the list.
     #[derivative(Default)]
     Lpop,
+
+    /// Pop messages from the tail of the list.
     Rpop,
 }
 
@@ -71,18 +90,39 @@ impl From<&redis::ConnectionInfo> for ConnectionInfo {
     }
 }
 
-#[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
+/// Configuration for the `redis` source.
+#[configurable_component(source("redis"))]
+#[derive(Clone, Debug, Derivative)]
 #[serde(deny_unknown_fields)]
 pub struct RedisSourceConfig {
+    /// The Redis data type (`list` or `channel`) to use.
     #[serde(default)]
     data_type: DataTypeConfig,
+
+    #[configurable(derived)]
     list: Option<ListOption>,
+
+    /// The Redis URL to connect to.
+    ///
+    /// The URL must take the form of `protocol://server:port/db` where the `protocol` can either be `redis` or `rediss` for connections secured via TLS.
     url: String,
+
+    /// The Redis key to read messages from.
     key: String,
+
+    /// Sets the name of the log field to use to add the key to each event.
+    ///
+    /// The value will be the Redis key that the event was read from.
+    ///
+    /// By default, this is not set and the field will not be automatically added.
     redis_key: Option<String>,
+
+    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     framing: FramingConfig,
+
+    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     decoding: DeserializerConfig,
@@ -103,12 +143,7 @@ impl GenerateConfig for RedisSourceConfig {
     }
 }
 
-inventory::submit! {
-    SourceDescription::new::<RedisSourceConfig>("redis")
-}
-
 #[async_trait::async_trait]
-#[typetag::serde(name = "redis")]
 impl SourceConfig for RedisSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         // A key must be specified to actually query i.e. the list to pop from, or the channel to subscribe to.
@@ -117,15 +152,24 @@ impl SourceConfig for RedisSourceConfig {
         }
 
         let client = redis::Client::open(self.url.as_str()).context(ClientSnafu {})?;
-        let connection_info = client.get_connection_info().into();
-        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
+        let connection_info = ConnectionInfo::from(client.get_connection_info());
+        let decoder = DecodingConfig::new(
+            self.framing.clone(),
+            self.decoding.clone(),
+            LogNamespace::Legacy,
+        )
+        .build();
+
+        let bytes_received = register!(BytesReceived::from(Protocol::from(
+            connection_info.protocol
+        )));
 
         match self.data_type {
             DataTypeConfig::List => {
                 let list = self.list.unwrap_or_default();
                 list::watch(
                     client,
-                    connection_info,
+                    bytes_received.clone(),
                     self.key.clone(),
                     self.redis_key.clone(),
                     list.method,
@@ -138,6 +182,7 @@ impl SourceConfig for RedisSourceConfig {
                 channel::subscribe(
                     client,
                     connection_info,
+                    bytes_received.clone(),
                     self.key.clone(),
                     self.redis_key.clone(),
                     decoder,
@@ -148,12 +193,8 @@ impl SourceConfig for RedisSourceConfig {
         }
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(self.decoding.output_type())]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "redis"
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -162,19 +203,16 @@ impl SourceConfig for RedisSourceConfig {
 }
 
 async fn handle_line(
-    connection_info: &ConnectionInfo,
     line: String,
     key: &str,
     redis_key: Option<&str>,
     decoder: Decoder,
+    bytes_received: &Registered<BytesReceived>,
     out: &mut SourceSender,
 ) -> Result<(), ()> {
     let now = Utc::now();
 
-    emit!(BytesReceived {
-        byte_size: line.len(),
-        protocol: connection_info.protocol,
-    });
+    bytes_received.emit(ByteSize(line.len()));
 
     let mut stream = FramedRead::new(line.as_ref(), decoder.clone());
     while let Some(next) = stream.next().await {

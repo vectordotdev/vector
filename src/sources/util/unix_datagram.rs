@@ -6,13 +6,14 @@ use futures::StreamExt;
 use tokio::net::UnixDatagram;
 use tokio_util::codec::FramedRead;
 use tracing::field;
+use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::Decoder,
     event::Event,
     internal_events::{
-        BytesReceived, SocketEventsReceived, SocketMode, SocketReceiveError, StreamClosedError,
+        SocketEventsReceived, SocketMode, SocketReceiveError, StreamClosedError,
         UnixSocketFileDeleteError,
     },
     shutdown::ShutdownSignal,
@@ -34,12 +35,13 @@ pub fn build_unix_datagram_source(
     shutdown: ShutdownSignal,
     out: SourceSender,
 ) -> crate::Result<Source> {
-    let socket = UnixDatagram::bind(&listen_path).expect("Failed to bind to datagram socket");
-    info!(message = "Listening.", path = ?listen_path, r#type = "unix_datagram");
-
-    change_socket_permissions(&listen_path, socket_file_mode)?;
-
     Ok(Box::pin(async move {
+        let socket = UnixDatagram::bind(&listen_path).expect("Failed to bind to datagram socket");
+        info!(message = "Listening.", path = ?listen_path, r#type = "unix_datagram");
+
+        change_socket_permissions(&listen_path, socket_file_mode)
+            .expect("Failed to set socket permissions");
+
         let result = listen(socket, max_length, decoder, shutdown, handle_events, out).await;
 
         // Delete socket file.
@@ -63,6 +65,7 @@ async fn listen(
     mut out: SourceSender,
 ) -> Result<(), ()> {
     let mut buf = BytesMut::with_capacity(max_length);
+    let bytes_received = register!(BytesReceived::from(Protocol::UNIX));
     loop {
         buf.resize(max_length, 0);
         tokio::select! {
@@ -75,10 +78,7 @@ async fn listen(
                     })
                 })?;
 
-                emit!(BytesReceived {
-                    protocol: "unix",
-                    byte_size,
-                });
+                bytes_received.emit(ByteSize(byte_size));
 
                 let payload = buf.split_to(byte_size);
 

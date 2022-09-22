@@ -104,41 +104,43 @@
 //! # any sink configuration
 //! ```
 mod config;
+pub use self::config::PipelineConfig;
 
 use std::{collections::HashSet, fmt::Debug};
 
 use config::EventTypeConfig;
 use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
+use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
     config::{ComponentKey, DataType, Input, Output},
-    transform::{
-        InnerTopology, InnerTopologyTransform, Transform, TransformConfig, TransformContext,
-    },
+    transform::Transform,
 };
 
 use crate::{
-    conditions::is_log::IsLogConfig,
-    conditions::is_metric::IsMetricConfig,
     conditions::AnyCondition,
-    config::{GenerateConfig, TransformDescription},
+    conditions::ConditionConfig,
+    config::{
+        GenerateConfig, InnerTopology, InnerTopologyTransform, TransformConfig, TransformContext,
+    },
     schema,
     transforms::route::{RouteConfig, UNMATCHED_ROUTE},
 };
 
-//------------------------------------------------------------------------------
-
-inventory::submit! {
-    TransformDescription::new::<PipelinesConfig>("pipelines")
-}
-
-/// The configuration of the pipelines transform itself.
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub(crate) struct PipelinesConfig {
+/// Configuration for the `pipelines` transform.
+#[configurable_component(transform("pipelines"))]
+#[derive(Clone, Debug, Default)]
+pub struct PipelinesConfig {
+    /// Configuration for the logs-specific side of the pipeline.
     #[serde(default)]
     logs: EventTypeConfig,
+
+    /// Configuration for the metrics-specific side of the pipeline.
     #[serde(default)]
     metrics: EventTypeConfig,
+
+    /// Configuration for the traces-specific side of the pipeline.
+    #[serde(default)]
+    traces: EventTypeConfig,
 }
 
 #[cfg(test)]
@@ -152,19 +154,26 @@ impl PipelinesConfig {
     pub(crate) const fn metrics(&self) -> &EventTypeConfig {
         &self.metrics
     }
+
+    #[allow(dead_code)] // for some small subset of feature flags this code is dead
+    pub(crate) const fn traces(&self) -> &EventTypeConfig {
+        &self.traces
+    }
 }
 
 impl PipelinesConfig {
     fn validate_nesting(&self) -> crate::Result<()> {
-        let parents = &[self.transform_type()].into_iter().collect::<HashSet<_>>();
+        let parents = &[self.get_component_name()]
+            .into_iter()
+            .collect::<HashSet<_>>();
         self.logs.validate_nesting(parents)?;
         self.metrics.validate_nesting(parents)?;
+        self.traces.validate_nesting(parents)?;
         Ok(())
     }
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "pipelines")]
 impl TransformConfig for PipelinesConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Err("this transform must be expanded".into())
@@ -190,7 +199,7 @@ impl TransformConfig for PipelinesConfig {
             let logs_route = name.join("logs");
             conditions.insert(
                 "logs".to_string(),
-                AnyCondition::Map(Box::new(IsLogConfig {})),
+                AnyCondition::from(ConditionConfig::IsLog),
             );
             let logs_inputs = vec![router_name.port("logs")];
             let inner_topology = self
@@ -204,7 +213,7 @@ impl TransformConfig for PipelinesConfig {
             let metrics_route = name.join("metrics");
             conditions.insert(
                 "metrics".to_string(),
-                AnyCondition::Map(Box::new(IsMetricConfig {})),
+                AnyCondition::from(ConditionConfig::IsMetric),
             );
             let metrics_inputs = vec![router_name.port("metrics")];
             let inner_topology = self
@@ -214,11 +223,25 @@ impl TransformConfig for PipelinesConfig {
             result.inner.extend(inner_topology.inner.into_iter());
             result.outputs.extend(inner_topology.outputs.into_iter());
         }
+        if !self.traces.is_empty() {
+            let traces_route = name.join("traces");
+            conditions.insert(
+                "traces".to_string(),
+                AnyCondition::from(ConditionConfig::IsMetric),
+            );
+            let traces_inputs = vec![router_name.port("traces")];
+            let inner_topology = self
+                .traces
+                .expand(&traces_route, &traces_inputs)?
+                .ok_or("Unable to expand pipeline stream")?;
+            result.inner.extend(inner_topology.inner.into_iter());
+            result.outputs.extend(inner_topology.outputs.into_iter());
+        }
         result.inner.insert(
             router_name,
             InnerTopologyTransform {
                 inputs: inputs.to_vec(),
-                inner: Box::new(RouteConfig::new(conditions)),
+                inner: RouteConfig::new(conditions).into(),
             },
         );
         Ok(Some(result))
@@ -232,13 +255,9 @@ impl TransformConfig for PipelinesConfig {
         vec![Output::default(DataType::all())]
     }
 
-    fn transform_type(&self) -> &'static str {
-        "pipelines"
-    }
-
-    /// The pipelines transform shouldn't be embedded in another pipelines transform.
     fn nestable(&self, parents: &HashSet<&'static str>) -> bool {
-        !parents.contains(&self.transform_type())
+        // The pipelines transform shouldn't be embedded in another pipelines transform.
+        !parents.contains(self.get_component_name())
     }
 }
 
@@ -300,10 +319,7 @@ mod tests {
     fn expanding() {
         let config = PipelinesConfig::generate_config();
         let config: PipelinesConfig = config.try_into().unwrap();
-        let outer = TransformOuter {
-            inputs: vec!["source".to_string()],
-            inner: Box::new(config),
-        };
+        let outer = TransformOuter::new(vec!["source".to_string()], config);
         let name = ComponentKey::from("foo");
         let mut transforms = IndexMap::new();
         let mut expansions = IndexMap::new();

@@ -1,11 +1,12 @@
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{stream, StreamExt};
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
+    config::{log_schema, DataType, Output, SourceConfig, SourceContext},
     event::Event,
     internal_events::{InternalLogsBytesReceived, InternalLogsEventsReceived, StreamClosedError},
     shutdown::ShutdownSignal,
@@ -13,21 +14,31 @@ use crate::{
     SourceSender,
 };
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+/// Configuration for the `internal_logs` source.
+#[configurable_component(source("internal_logs"))]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct InternalLogsConfig {
+    /// Overrides the name of the log field used to add the current hostname to each event.
+    ///
+    /// The value will be the current hostname for wherever Vector is running.
+    ///
+    /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
+    ///
+    /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     pub host_key: Option<String>,
-    pub pid_key: Option<String>,
-}
 
-inventory::submit! {
-    SourceDescription::new::<InternalLogsConfig>("internal_logs")
+    /// Overrides the name of the log field used to add the current process ID to each event.
+    ///
+    /// The value will be the current process ID for Vector itself.
+    ///
+    /// By default, `"pid"` is used.
+    pub pid_key: Option<String>,
 }
 
 impl_generate_config_from_default!(InternalLogsConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "internal_logs")]
 impl SourceConfig for InternalLogsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let host_key = self
@@ -48,12 +59,8 @@ impl SourceConfig for InternalLogsConfig {
         )))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "internal_logs"
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -112,24 +119,63 @@ mod tests {
     use vector_core::event::Value;
 
     use super::*;
-    use crate::{event::Event, test_util::collect_ready, trace};
+    use crate::{
+        event::Event,
+        test_util::{
+            collect_ready,
+            components::{assert_source_compliance, SOURCE_TAGS},
+        },
+        trace,
+    };
 
     #[test]
     fn generates_config() {
         crate::test_util::test_generate_config::<InternalLogsConfig>();
     }
 
+    // This test is fairly overloaded with different cases.
+    //
+    // Unfortunately, this can't be easily split out into separate test
+    // cases because `consume_early_buffer` (called within the
+    // `start_source` helper) panics when called more than once.
     #[tokio::test]
     async fn receives_logs() {
+        assert_source_compliance(&SOURCE_TAGS, run_test()).await;
+    }
+
+    async fn run_test() {
         let test_id: u8 = rand::random();
         let start = chrono::Utc::now();
-        trace::init(false, false, "debug");
+        trace::init(false, false, "debug", 10);
         trace::reset_early_buffer();
+
+        error!(message = "Before source started without span.", %test_id);
+
+        let span = error_span!(
+            "source",
+            component_kind = "source",
+            component_id = "foo",
+            component_type = "internal_logs",
+        );
+        let _enter = span.enter();
+
         error!(message = "Before source started.", %test_id);
 
         let rx = start_source().await;
 
         error!(message = "After source started.", %test_id);
+
+        {
+            let nested_span = error_span!(
+                "nested span",
+                component_kind = "bar",
+                component_new_field = "baz",
+                component_numerical_field = 1,
+                ignored_field = "foobarbaz",
+            );
+            let _enter = nested_span.enter();
+            error!(message = "In a nested span.", %test_id);
+        }
 
         sleep(Duration::from_millis(1)).await;
         let mut events = collect_ready(rx).await;
@@ -138,18 +184,23 @@ mod tests {
 
         let end = chrono::Utc::now();
 
-        assert_eq!(events.len(), 2);
+        assert_eq!(events.len(), 4);
 
         assert_eq!(
             events[0].as_log()["message"],
-            "Before source started.".into()
+            "Before source started without span.".into()
         );
         assert_eq!(
             events[1].as_log()["message"],
+            "Before source started.".into()
+        );
+        assert_eq!(
+            events[2].as_log()["message"],
             "After source started.".into()
         );
+        assert_eq!(events[3].as_log()["message"], "In a nested span.".into());
 
-        for event in events {
+        for (i, event) in events.iter().enumerate() {
             let log = event.as_log();
             let timestamp = *log["timestamp"]
                 .as_timestamp()
@@ -158,10 +209,30 @@ mod tests {
             assert!(timestamp <= end);
             assert_eq!(log["metadata.kind"], "event".into());
             assert_eq!(log["metadata.level"], "ERROR".into());
+            // The first log event occurs outside our custom span
+            if i == 0 {
+                assert!(log.get("vector.component_id").is_none());
+                assert!(log.get("vector.component_kind").is_none());
+                assert!(log.get("vector.component_type").is_none());
+            } else if i < 3 {
+                assert_eq!(log["vector.component_id"], "foo".into());
+                assert_eq!(log["vector.component_kind"], "source".into());
+                assert_eq!(log["vector.component_type"], "internal_logs".into());
+            } else {
+                // The last event occurs in a nested span. Here, we expect
+                // parent fields to be preservered (unless overwritten), new
+                // fields to be added, and filtered fields to not exist.
+                assert_eq!(log["vector.component_id"], "foo".into());
+                assert_eq!(log["vector.component_kind"], "bar".into());
+                assert_eq!(log["vector.component_type"], "internal_logs".into());
+                assert_eq!(log["vector.component_new_field"], "baz".into());
+                assert_eq!(log["vector.component_numerical_field"], 1.into());
+                assert!(log.get("vector.ignored_field").is_none());
+            }
         }
     }
 
-    async fn start_source() -> impl Stream<Item = Event> {
+    async fn start_source() -> impl Stream<Item = Event> + Unpin {
         let (tx, rx) = SourceSender::new_test();
 
         let source = InternalLogsConfig::default()

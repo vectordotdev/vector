@@ -1,19 +1,14 @@
 use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 use vector_core::transform::SyncTransform;
 
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{
-        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
-        TransformDescription,
-    },
+    config::{DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext},
     event::Event,
     schema,
     transforms::Transform,
 };
-
-//------------------------------------------------------------------------------
 
 pub(crate) const UNMATCHED_ROUTE: &str = "_unmatched";
 
@@ -41,8 +36,9 @@ impl SyncTransform for Route {
     ) {
         let mut check_failed: usize = 0;
         for (output_name, condition) in &self.conditions {
-            if condition.check(&event) {
-                output.push_named(output_name, event.clone());
+            let (result, event) = condition.check(event.clone());
+            if result {
+                output.push_named(output_name, event);
             } else {
                 check_failed += 1;
             }
@@ -53,12 +49,19 @@ impl SyncTransform for Route {
     }
 }
 
-//------------------------------------------------------------------------------
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the `route` transform.
+#[configurable_component(transform("route"))]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct RouteConfig {
-    // Deprecated name
+    /// A table of route identifiers to logical conditions representing the filter of the route.
+    ///
+    /// Each route can then be referenced as an input by other components with the name
+    /// `<transform_name>.<route_id>`. If an event doesn’t match any route, it will be sent to the
+    /// `<transform_name>._unmatched` output.
+    ///
+    /// Both `_unmatched`, as well as `_default`, are reserved output names and cannot be used as a
+    /// route name.
     #[serde(alias = "lanes")]
     route: IndexMap<String, AnyCondition>,
 }
@@ -68,14 +71,6 @@ impl RouteConfig {
     pub(crate) const fn new(route: IndexMap<String, AnyCondition>) -> Self {
         Self { route }
     }
-}
-
-inventory::submit! {
-    TransformDescription::new::<RouteConfig>("swimlanes")
-}
-
-inventory::submit! {
-    TransformDescription::new::<RouteConfig>("route")
 }
 
 impl GenerateConfig for RouteConfig {
@@ -88,7 +83,6 @@ impl GenerateConfig for RouteConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "route")]
 impl TransformConfig for RouteConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         let route = Route::new(self, context)?;
@@ -119,40 +113,10 @@ impl TransformConfig for RouteConfig {
         result
     }
 
-    fn transform_type(&self) -> &'static str {
-        "route"
-    }
-
     fn enable_concurrency(&self) -> bool {
         true
     }
 }
-
-// Add a compatibility alias to avoid breaking existing configs
-#[derive(Deserialize, Serialize, Debug, Clone)]
-struct RouteCompatConfig(RouteConfig);
-
-#[async_trait::async_trait]
-#[typetag::serde(name = "swimlanes")]
-impl TransformConfig for RouteCompatConfig {
-    async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        self.0.build(context).await
-    }
-
-    fn input(&self) -> Input {
-        self.0.input()
-    }
-
-    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
-        self.0.outputs(merged_definition)
-    }
-
-    fn transform_type(&self) -> &'static str {
-        self.0.transform_type()
-    }
-}
-
-//------------------------------------------------------------------------------
 
 #[cfg(test)]
 mod test {

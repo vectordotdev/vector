@@ -4,38 +4,46 @@ mod udp;
 mod unix;
 
 use codecs::NewlineDelimitedDecoderConfig;
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 
 #[cfg(unix)]
 use crate::serde::default_framing_message_based;
 use crate::{
     codecs::DecodingConfig,
-    config::{
-        log_schema, DataType, GenerateConfig, Output, Resource, SourceConfig, SourceContext,
-        SourceDescription,
-    },
+    config::{log_schema, DataType, GenerateConfig, Output, Resource, SourceConfig, SourceContext},
     sources::util::TcpSource,
     tls::MaybeTlsSettings,
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
-// TODO: add back when https://github.com/serde-rs/serde/issues/1358 is addressed
-// #[serde(deny_unknown_fields)]
+/// Configuration for the `socket` source.
+#[configurable_component(source("socket"))]
+#[derive(Clone, Debug)]
 pub struct SocketConfig {
     #[serde(flatten)]
     pub mode: Mode,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Listening mode for the `socket` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case")]
+#[allow(clippy::large_enum_variant)] // just used for configuration
 pub enum Mode {
-    Tcp(tcp::TcpConfig),
-    Udp(udp::UdpConfig),
+    /// Listen on TCP.
+    Tcp(#[configurable(derived)] tcp::TcpConfig),
+
+    /// Listen on UDP.
+    Udp(#[configurable(derived)] udp::UdpConfig),
+
+    /// Listen on UDS, in datagram mode. (Unix domain socket)
     #[cfg(unix)]
-    UnixDatagram(unix::UnixConfig),
+    UnixDatagram(#[configurable(derived)] unix::UnixConfig),
+
+    /// Listen on UDS, in stream mode. (Unix domain socket)
     #[cfg(unix)]
     #[serde(alias = "unix")]
-    UnixStream(unix::UnixConfig),
+    UnixStream(#[configurable(derived)] unix::UnixConfig),
 }
 
 impl SocketConfig {
@@ -75,10 +83,6 @@ impl From<udp::UdpConfig> for SocketConfig {
     }
 }
 
-inventory::submit! {
-    SourceDescription::new::<SocketConfig>("socket")
-}
-
 impl GenerateConfig for SocketConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(
@@ -90,7 +94,6 @@ impl GenerateConfig for SocketConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "socket")]
 impl SourceConfig for SocketConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         match self.mode.clone() {
@@ -117,15 +120,21 @@ impl SourceConfig for SocketConfig {
                     }
                 };
 
-                let decoder = DecodingConfig::new(framing, decoding).build();
+                let decoder = DecodingConfig::new(framing, decoding, LogNamespace::Legacy).build();
 
                 let tcp = tcp::RawTcpSource::new(config.clone(), decoder);
-                let tls = MaybeTlsSettings::from_config(config.tls(), true)?;
+                let tls_config = config.tls().as_ref().map(|tls| tls.tls_config.clone());
+                let tls_client_metadata_key = config
+                    .tls()
+                    .as_ref()
+                    .and_then(|tls| tls.client_metadata_key.clone());
+                let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
                 tcp.run(
                     config.address(),
                     config.keepalive(),
                     config.shutdown_timeout_secs(),
                     tls,
+                    tls_client_metadata_key,
                     config.receive_buffer_bytes(),
                     cx,
                     false.into(),
@@ -137,9 +146,12 @@ impl SourceConfig for SocketConfig {
                     .host_key()
                     .clone()
                     .unwrap_or_else(|| log_schema().host_key().to_string());
-                let decoder =
-                    DecodingConfig::new(config.framing().clone(), config.decoding().clone())
-                        .build();
+                let decoder = DecodingConfig::new(
+                    config.framing().clone(),
+                    config.decoding().clone(),
+                    LogNamespace::Legacy,
+                )
+                .build();
                 Ok(udp::udp(config, host_key, decoder, cx.shutdown, cx.out))
             }
             #[cfg(unix)]
@@ -150,6 +162,7 @@ impl SourceConfig for SocketConfig {
                 let decoder = DecodingConfig::new(
                     config.framing.unwrap_or_else(default_framing_message_based),
                     config.decoding.clone(),
+                    LogNamespace::Legacy,
                 )
                 .build();
                 unix::unix_datagram(
@@ -187,7 +200,7 @@ impl SourceConfig for SocketConfig {
                     }
                 };
 
-                let decoder = DecodingConfig::new(framing, decoding).build();
+                let decoder = DecodingConfig::new(framing, decoding, LogNamespace::Legacy).build();
 
                 let host_key = config
                     .host_key
@@ -204,12 +217,8 @@ impl SourceConfig for SocketConfig {
         }
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(self.output_type())]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "socket"
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -231,7 +240,7 @@ impl SourceConfig for SocketConfig {
 #[cfg(test)]
 mod test {
     use std::{
-        collections::HashMap,
+        collections::{BTreeMap, HashMap},
         net::{SocketAddr, UdpSocket},
         sync::{
             atomic::{AtomicBool, Ordering},
@@ -249,11 +258,14 @@ mod test {
         task::JoinHandle,
         time::{timeout, Duration, Instant},
     };
+    use vector_common::btreemap;
     use vector_core::event::EventContainer;
     #[cfg(unix)]
     use {
         super::{unix::UnixConfig, Mode},
+        crate::test_util::wait_for,
         futures::{SinkExt, Stream},
+        std::future::ready,
         std::os::unix::fs::PermissionsExt,
         std::path::PathBuf,
         tokio::{
@@ -266,10 +278,8 @@ mod test {
 
     use super::{tcp::TcpConfig, udp::UdpConfig, SocketConfig};
     use crate::{
-        config::{
-            log_schema, ComponentKey, GlobalOptions, SinkContext, SourceConfig, SourceContext,
-        },
-        event::Event,
+        config::{log_schema, ComponentKey, GlobalOptions, SourceConfig, SourceContext},
+        event::{Event, LogEvent},
         shutdown::{ShutdownSignal, SourceShutdownCoordinator},
         sinks::util::tcp::TcpSinkConfig,
         test_util::{
@@ -277,7 +287,7 @@ mod test {
             components::{assert_source_compliance, SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS},
             next_addr, random_string, send_lines, send_lines_tls, wait_for_tcp,
         },
-        tls::{self, TlsConfig, TlsEnableableConfig},
+        tls::{self, TlsConfig, TlsEnableableConfig, TlsSourceConfig},
         SourceSender,
     };
 
@@ -409,50 +419,18 @@ mod test {
             let addr = next_addr();
 
             let mut config = TcpConfig::from_address(addr.into());
-            config.set_tls(Some(TlsEnableableConfig::test_config()));
-
-            let server = SocketConfig::from(config)
-                .build(SourceContext::new_test(tx, None))
-                .await
-                .unwrap();
-            tokio::spawn(server);
-
-            let lines = vec!["one line".to_owned(), "another line".to_owned()];
-
-            wait_for_tcp(addr).await;
-            send_lines_tls(addr, "localhost".into(), lines.into_iter(), None)
-                .await
-                .unwrap();
-
-            let event = rx.next().await.unwrap();
-            assert_eq!(
-                event.as_log()[log_schema().message_key()],
-                "one line".into()
-            );
-
-            let event = rx.next().await.unwrap();
-            assert_eq!(
-                event.as_log()[log_schema().message_key()],
-                "another line".into()
-            );
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    async fn tcp_with_tls_intermediate_ca() {
-        assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
-            let (tx, mut rx) = SourceSender::new_test();
-            let addr = next_addr();
-
-            let mut config = TcpConfig::from_address(addr.into());
-            config.set_tls(Some(TlsEnableableConfig {
-                enabled: Some(true),
-                options: TlsConfig {
-                    crt_file: Some("tests/data/Chain_with_intermediate.crt".into()),
-                    key_file: Some("tests/data/Crt_from_intermediate.key".into()),
-                    ..Default::default()
+            config.set_tls(Some(TlsSourceConfig {
+                tls_config: TlsEnableableConfig {
+                    enabled: Some(true),
+                    options: TlsConfig {
+                        verify_certificate: Some(true),
+                        crt_file: Some(tls::TEST_PEM_CRT_PATH.into()),
+                        key_file: Some(tls::TEST_PEM_KEY_PATH.into()),
+                        ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
+                        ..Default::default()
+                    },
                 },
+                client_metadata_key: Some("tls_peer".into()),
             }));
 
             let server = SocketConfig::from(config)
@@ -469,21 +447,31 @@ mod test {
                 "localhost".into(),
                 lines.into_iter(),
                 std::path::Path::new(tls::TEST_PEM_CA_PATH),
+                std::path::Path::new(tls::TEST_PEM_CLIENT_CRT_PATH),
+                std::path::Path::new(tls::TEST_PEM_CLIENT_KEY_PATH),
             )
             .await
             .unwrap();
 
             let event = rx.next().await.unwrap();
             assert_eq!(
-                event.as_log()[crate::config::log_schema().message_key()],
+                event.as_log()[log_schema().message_key()],
                 "one line".into()
             );
 
+            let tls_meta: BTreeMap<String, value::Value> = btreemap!(
+                "subject" => "CN=localhost,OU=Vector,O=Datadog,L=New York,ST=New York,C=US"
+            );
+
+            assert_eq!(event.as_log()["tls_peer"], tls_meta.clone().into(),);
+
             let event = rx.next().await.unwrap();
             assert_eq!(
-                event.as_log()[crate::config::log_schema().message_key()],
+                event.as_log()[log_schema().message_key()],
                 "another line".into()
             );
+
+            assert_eq!(event.as_log()["tls_peer"], tls_meta.clone().into(),);
         })
         .await;
     }
@@ -524,91 +512,87 @@ mod test {
         .await;
     }
 
+    // Intentially not using assert_source_compliance here because this is a round-trip test which
+    // means source and sink will both emit `EventsSent` , triggering multi-emission check.
     #[tokio::test]
     async fn tcp_shutdown_infinite_stream() {
-        assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
-            // We create our TCP source with a larger-than-normal send buffer, which helps ensure that
-            // the source doesn't block on sending the events downstream, otherwise if it was blocked on
-            // doing so, it wouldn't be able to wake up and loop to see that it had been signalled to
-            // shutdown.
-            let addr = next_addr();
+        // We create our TCP source with a larger-than-normal send buffer, which helps ensure that
+        // the source doesn't block on sending the events downstream, otherwise if it was blocked on
+        // doing so, it wouldn't be able to wake up and loop to see that it had been signalled to
+        // shutdown.
+        let addr = next_addr();
 
-            let (source_tx, source_rx) = SourceSender::new_with_buffer(10_000);
-            let source_key = ComponentKey::from("tcp_shutdown_infinite_stream");
-            let (source_cx, mut shutdown) = SourceContext::new_shutdown(&source_key, source_tx);
+        let (source_tx, source_rx) = SourceSender::new_with_buffer(10_000);
+        let source_key = ComponentKey::from("tcp_shutdown_infinite_stream");
+        let (source_cx, mut shutdown) = SourceContext::new_shutdown(&source_key, source_tx);
 
-            let mut source_config = TcpConfig::from_address(addr.into());
-            source_config.set_shutdown_timeout_secs(1);
-            let source_task = SocketConfig::from(source_config)
-                .build(source_cx)
-                .await
-                .unwrap();
+        let mut source_config = TcpConfig::from_address(addr.into());
+        source_config.set_shutdown_timeout_secs(1);
+        let source_task = SocketConfig::from(source_config)
+            .build(source_cx)
+            .await
+            .unwrap();
 
-            // Spawn the source task and wait until we're sure it's listening:
-            let source_handle = tokio::spawn(source_task);
-            wait_for_tcp(addr).await;
+        // Spawn the source task and wait until we're sure it's listening:
+        let source_handle = tokio::spawn(source_task);
+        wait_for_tcp(addr).await;
 
-            // Now we create a TCP _sink_ which we'll feed with an infinite stream of events to ship to
-            // our TCP source.  This will ensure that our TCP source is fully-loaded as we try to shut
-            // it down, exercising the logic we have to ensure timely shutdown even under load:
-            let message = random_string(512);
-            let message_bytes = Bytes::from(message.clone());
+        // Now we create a TCP _sink_ which we'll feed with an infinite stream of events to ship to
+        // our TCP source.  This will ensure that our TCP source is fully-loaded as we try to shut
+        // it down, exercising the logic we have to ensure timely shutdown even under load:
+        let message = random_string(512);
+        let message_bytes = Bytes::from(message.clone());
 
-            let cx = SinkContext::new_test();
-            #[derive(Clone, Debug)]
-            struct Serializer {
-                bytes: Bytes,
+        #[derive(Clone, Debug)]
+        struct Serializer {
+            bytes: Bytes,
+        }
+        impl tokio_util::codec::Encoder<Event> for Serializer {
+            type Error = codecs::encoding::Error;
+
+            fn encode(&mut self, _: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
+                buffer.put(self.bytes.as_ref());
+                buffer.put_u8(b'\n');
+                Ok(())
             }
-            impl tokio_util::codec::Encoder<Event> for Serializer {
-                type Error = codecs::encoding::Error;
+        }
+        let sink_config = TcpSinkConfig::from_address(format!("localhost:{}", addr.port()));
+        let encoder = Serializer {
+            bytes: message_bytes,
+        };
+        let (sink, _healthcheck) = sink_config.build(Default::default(), encoder).unwrap();
 
-                fn encode(&mut self, _: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
-                    buffer.put(self.bytes.as_ref());
-                    buffer.put_u8(b'\n');
-                    Ok(())
-                }
-            }
-            let sink_config = TcpSinkConfig::from_address(format!("localhost:{}", addr.port()));
-            let encoder = Serializer {
-                bytes: message_bytes,
-            };
-            let (sink, _healthcheck) = sink_config.build(cx, Default::default(), encoder).unwrap();
+        tokio::spawn(async move {
+            let input = stream::repeat_with(|| LogEvent::default().into()).boxed();
+            sink.run(input).await.unwrap();
+        });
 
-            tokio::spawn(async move {
-                let input = stream::repeat(())
-                    .map(move |_| Event::new_empty_log().into())
-                    .boxed();
-                sink.run(input).await.unwrap();
-            });
+        // Now with our sink running, feeding events to the source, collect 100 event arrays from
+        // the source and make sure each event within them matches the single message we repeatedly
+        // sent via the sink:
+        let events = collect_n_limited(source_rx, 100)
+            .await
+            .into_iter()
+            .collect::<Vec<_>>();
+        assert_eq!(100, events.len());
 
-            // Now with our sink running, feeding events to the source, collect 100 event arrays from
-            // the source and make sure each event within them matches the single message we repeatedly
-            // sent via the sink:
-            let events = collect_n_limited(source_rx, 100)
-                .await
-                .into_iter()
-                .collect::<Vec<_>>();
-            assert_eq!(100, events.len());
+        let message_key = log_schema().message_key();
+        let expected_message = message.clone().into();
+        for event in events.into_iter().flat_map(EventContainer::into_events) {
+            assert_eq!(event.as_log()[message_key], expected_message);
+        }
 
-            let message_key = log_schema().message_key();
-            let expected_message = message.clone().into();
-            for event in events.into_iter().flat_map(EventContainer::into_events) {
-                assert_eq!(event.as_log()[message_key], expected_message);
-            }
+        // Now trigger shutdown on the source and ensure that it shuts down before or at the
+        // deadline, and make sure the source task actually finished as well:
+        let shutdown_timeout_limit = Duration::from_secs(10);
+        let deadline = Instant::now() + shutdown_timeout_limit;
+        let shutdown_complete = shutdown.shutdown_source(&source_key, deadline);
 
-            // Now trigger shutdown on the source and ensure that it shuts down before or at the
-            // deadline, and make sure the source task actually finished as well:
-            let shutdown_timeout_limit = Duration::from_secs(10);
-            let deadline = Instant::now() + shutdown_timeout_limit;
-            let shutdown_complete = shutdown.shutdown_source(&source_key, deadline);
+        let shutdown_result = timeout(shutdown_timeout_limit, shutdown_complete).await;
+        assert_eq!(shutdown_result, Ok(true));
 
-            let shutdown_result = timeout(shutdown_timeout_limit, shutdown_complete).await;
-            assert_eq!(shutdown_result, Ok(true));
-
-            let source_result = source_handle.await.expect("source task should not panic");
-            assert_eq!(source_result, Ok(()));
-        })
-        .await;
+        let source_result = source_handle.await.expect("source task should not panic");
+        assert_eq!(source_result, Ok(()));
     }
 
     //////// UDP TESTS ////////
@@ -692,6 +676,7 @@ mod test {
                 out: sender,
                 proxy: Default::default(),
                 acknowledgements: false,
+                schema: Default::default(),
                 schema_definitions: HashMap::default(),
             })
             .await
@@ -1113,9 +1098,19 @@ mod test {
             .unwrap();
         tokio::spawn(server);
 
-        let meta = std::fs::metadata(in_path).unwrap();
-        // S_IFSOCK   0140000   socket
-        assert_eq!(0o140555, meta.permissions().mode());
+        wait_for(|| {
+            match std::fs::metadata(&in_path) {
+                Ok(meta) => {
+                    match meta.permissions().mode() {
+                        // S_IFSOCK   0140000   socket
+                        0o140555 => ready(true),
+                        _ => ready(false),
+                    }
+                }
+                Err(_) => ready(false),
+            }
+        })
+        .await;
     }
 
     ////////////// UNIX STREAM TESTS //////////////
@@ -1219,8 +1214,18 @@ mod test {
             .unwrap();
         tokio::spawn(server);
 
-        let meta = std::fs::metadata(in_path).unwrap();
-        // S_IFSOCK   0140000   socket
-        assert_eq!(0o140421, meta.permissions().mode());
+        wait_for(|| {
+            match std::fs::metadata(&in_path) {
+                Ok(meta) => {
+                    match meta.permissions().mode() {
+                        // S_IFSOCK   0140000   socket
+                        0o140421 => ready(true),
+                        _ => ready(false),
+                    }
+                }
+                Err(_) => ready(false),
+            }
+        })
+        .await;
     }
 }

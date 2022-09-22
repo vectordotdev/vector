@@ -1,6 +1,6 @@
 use ::value::Value;
 use regex::Regex;
-use vrl::{function::Error, prelude::*};
+use vrl::prelude::*;
 
 use crate::util;
 
@@ -9,7 +9,7 @@ fn parse_regex_all(value: Value, numeric_groups: bool, pattern: &Regex) -> Resol
     let value = String::from_utf8_lossy(&bytes);
     Ok(pattern
         .captures_iter(&value)
-        .map(|capture| util::capture_regex_to_map(pattern, capture, numeric_groups).into())
+        .map(|capture| util::capture_regex_to_map(pattern, &capture, numeric_groups).into())
         .collect::<Vec<Value>>()
         .into())
 }
@@ -44,9 +44,9 @@ impl Function for ParseRegexAll {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let pattern = arguments.required_regex("pattern")?;
@@ -54,11 +54,12 @@ impl Function for ParseRegexAll {
             .optional("numeric_groups")
             .unwrap_or_else(|| expr!(false));
 
-        Ok(Box::new(ParseRegexAllFn {
+        Ok(ParseRegexAllFn {
             value,
             pattern,
             numeric_groups,
-        }))
+        }
+        .as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -89,47 +90,6 @@ impl Function for ParseRegexAll {
             },
         ]
     }
-
-    fn compile_argument(
-        &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        match (name, expr) {
-            ("pattern", Some(expr)) => {
-                let regex: regex::Regex = match expr {
-                    expression::Expr::Literal(expression::Literal::Regex(regex)) => {
-                        Ok((**regex).clone())
-                    }
-                    expr => Err(Error::UnexpectedExpression {
-                        keyword: "pattern",
-                        expected: "regex",
-                        expr: expr.clone(),
-                    }),
-                }?;
-
-                Ok(Some(Box::new(regex) as _))
-            }
-            _ => Ok(None),
-        }
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let pattern = args
-            .required_any("pattern")
-            .downcast_ref::<regex::Regex>()
-            .ok_or("no pattern")?;
-        let value = args.required("value");
-        let numeric_groups = args
-            .optional("numeric_groups")
-            .map(|value| value.try_boolean())
-            .transpose()?
-            .unwrap_or(false);
-
-        parse_regex_all(value, numeric_groups, pattern)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -139,7 +99,7 @@ pub(crate) struct ParseRegexAllFn {
     numeric_groups: Box<dyn Expression>,
 }
 
-impl Expression for ParseRegexAllFn {
+impl FunctionExpression for ParseRegexAllFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let numeric_groups = self.numeric_groups.resolve(ctx)?;
@@ -148,7 +108,7 @@ impl Expression for ParseRegexAllFn {
         parse_regex_all(value, numeric_groups.try_boolean()?, pattern)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::array(Collection::from_unknown(
             Kind::object(util::regex_kind(&self.pattern)).or_null(),
         ))

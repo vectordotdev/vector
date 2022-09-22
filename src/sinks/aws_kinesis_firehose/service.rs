@@ -1,17 +1,15 @@
 use std::task::{Context, Poll};
 
-use aws_sdk_firehose::error::PutRecordBatchError;
-use aws_sdk_firehose::types::SdkError;
-use aws_sdk_firehose::{Client as KinesisFirehoseClient, Region};
+use aws_sdk_firehose::{
+    error::PutRecordBatchError, types::SdkError, Client as KinesisFirehoseClient, Region,
+};
 use futures::future::BoxFuture;
 use hyper::service::Service;
 use tracing::Instrument;
 use vector_core::{internal_event::EventsSent, stream::DriverResponse};
 
-use crate::{
-    event::EventStatus, internal_events::AwsBytesSent,
-    sinks::aws_kinesis_firehose::request_builder::KinesisRequest,
-};
+use super::request_builder::KinesisRequest;
+use crate::event::EventStatus;
 
 #[derive(Clone)]
 pub struct KinesisService {
@@ -45,28 +43,16 @@ impl Service<Vec<KinesisRequest>> for KinesisService {
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
+        // Emission of Error internal event is handled upstream by the caller
+
         Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, requests: Vec<KinesisRequest>) -> Self::Future {
-        debug!(
-            message = "Sending records.",
-            events = %requests.len(),
-        );
+        // Emission of Error internal event is handled upstream by the caller
 
-        let processed_bytes_total = requests
-            .iter()
-            .map(|req| {
-                req.record
-                    .data
-                    .as_ref()
-                    .map(|x| x.as_ref().len())
-                    .unwrap_or(0)
-            })
-            .sum();
         let events_byte_size = requests.iter().map(|req| req.event_byte_size).sum();
         let count = requests.len();
-        let region = self.region.clone();
 
         let records = requests.into_iter().map(|req| req.record).collect();
 
@@ -81,11 +67,6 @@ impl Service<Vec<KinesisRequest>> for KinesisService {
                 .send()
                 .instrument(info_span!("request").or_current())
                 .await?;
-
-            emit!(AwsBytesSent {
-                byte_size: processed_bytes_total,
-                region
-            });
 
             Ok(KinesisResponse {
                 events_byte_size,

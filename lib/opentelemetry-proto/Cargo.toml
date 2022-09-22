@@ -1,0 +1,20 @@
+[package]
+name = "opentelemetry-proto"
+version = "0.0.0"
+authors = ["Vector Contributors <vector@datadoghq.com>"]
+edition = "2021"
+publish = false
+
+[build-dependencies]
+prost-build = { version = "0.10.4", default-features = false}
+tonic-build = { version = "0.7", default-features = false, features = ["compression", "prost", "transport"] }
+
+[dependencies]
+tonic = { version = "0.7.2", default-features = false, features = ["codegen", "compression", "prost", "tls", "tls-roots", "transport"] }
+chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
+prost = { version = "0.10.4", default-features = false, features = ["std"] }
+bytes = { version = "1.1.0", default-features = false, features = ["serde"] }
+vector-core = { path = "../vector-core", default-features = false }
+value = {path = "../value"}
+hex = { version = "0.4.3", default-features = false, features = ["std"] }
+ordered-float = { version = "3.0.0", default-features = false }

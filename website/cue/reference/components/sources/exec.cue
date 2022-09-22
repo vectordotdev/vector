@@ -159,6 +159,13 @@ components: sources: exec: {
 					}
 				}
 			}
+			source_type: {
+				description: "The name of the source type."
+				required:    true
+				type: string: {
+					examples: ["exec"]
+				}
+			}
 		}
 	}
 
@@ -175,6 +182,7 @@ components: sources: exec: {
 				timestamp:   _timestamp
 				host:        _values.local_host
 				message:     _line
+				source_type: "exec"
 			}
 		},
 	]
@@ -185,6 +193,20 @@ components: sources: exec: {
 			body: """
 				Each line is read until a new line delimiter, the `0xA` byte, is found or the end of the
 				[`maximum_buffer_size_bytes`](#maximum_buffer_size_bytes) is reached.
+				"""
+		}
+		shutdown: {
+			title: "Shutting Down"
+			body: """
+				When Vector begins shutting down (typically due to a SIGTERM), this source will
+				signal to the child process to terminate, if it is running, to shut down.
+
+				On *nix platforms, Vector will issue a SIGTERM to the child process, allowing it to
+				gracefully shutdown, and the source will continue reading until the process exits or
+				Vector's shutdown grace period expires.
+
+				On Windows, the subprocess will be issued a SIGKILL and terminate abruptly. In the
+				future we hope to support graceful shutdown of Windows processes as well.
 				"""
 		}
 	}

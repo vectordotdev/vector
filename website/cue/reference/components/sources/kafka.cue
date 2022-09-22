@@ -7,7 +7,13 @@ components: sources: kafka: {
 		acknowledgements: true
 		collect: {
 			checkpoint: enabled: false
-			tls: enabled:        false
+			tls: {
+				enabled:                true
+				can_verify_certificate: false
+				can_verify_hostname:    false
+				enabled_default:        false
+				enabled_by_scheme:      false
+			}
 			from: components._kafka.features.collect.from
 		}
 		multiline: enabled: false
@@ -207,6 +213,13 @@ components: sources: kafka: {
 				required:    true
 				type: string: {
 					examples: ["partition"]
+				}
+			}
+			source_type: {
+				description: "The name of the source type."
+				required:    true
+				type: string: {
+					examples: ["kafka"]
 				}
 			}
 			timestamp: fields._current_timestamp & {

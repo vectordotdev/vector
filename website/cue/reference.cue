@@ -7,6 +7,9 @@ _values: {
 	local_host:        "my-host.local"
 	remote_host:       "34.33.222.212"
 	instance:          "vector:9598"
+	client_metadata: {
+		subject: "CN=localhost,OU=Vector,O=Datadog,L=New York,ST=New York,C=US"
+	}
 }
 
 // `#Any` allows for any value.
@@ -52,7 +55,7 @@ _values: {
 // * `removed` - The component has been removed.
 #DevelopmentStatus: "beta" | "stable" | "deprecated" | "removed"
 
-#EncodingCodec: "json" | "logfmt" | "ndjson" | "text" | "native" | "native_json"
+#EncodingCodec: "json" | "logfmt" | "text" | "native" | "native_json" | "avro" | "gelf"
 
 #Endpoint: {
 	description: string
@@ -526,7 +529,7 @@ _values: {
 	// `examples` clarify values through examples. This should be used
 	// when examples cannot be derived from the `default` or `enum`
 	// options.
-	examples: [#Object] | *[]
+	examples: [#Object, ...#Object] | *[]
 
 	// `options` represent the child options for this option.
 	options: #Schema
@@ -610,7 +613,7 @@ _values: {
 	unit: #Unit | null
 }
 
-#Unit: "bytes" | "events" | "milliseconds" | "requests" | "seconds" | "lines" | "concurrency"
+#Unit: "bytes" | "events" | "milliseconds" | "nanoseconds" | "requests" | "seconds" | "lines" | "concurrency"
 
 administration: _
 components:     _

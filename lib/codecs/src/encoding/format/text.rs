@@ -30,7 +30,7 @@ impl TextSerializerConfig {
 
     /// The schema required by the serializer.
     pub fn schema_requirement(&self) -> schema::Requirement {
-        schema::Requirement::empty().require_meaning(log_schema().message_key(), Kind::any())
+        schema::Requirement::empty().required_meaning(log_schema().message_key(), Kind::any())
     }
 }
 
@@ -79,13 +79,13 @@ impl Encoder<Event> for TextSerializer {
 #[cfg(test)]
 mod tests {
     use bytes::{Bytes, BytesMut};
-    use vector_core::event::{Metric, MetricKind, MetricValue};
+    use vector_core::event::{LogEvent, Metric, MetricKind, MetricValue};
 
     use super::*;
 
     #[test]
     fn serialize_bytes_event() {
-        let input = Event::from("foo");
+        let input = Event::from(LogEvent::from_str_legacy("foo"));
         let mut serializer = TextSerializer;
 
         let mut buffer = BytesMut::new();

@@ -11,16 +11,28 @@ use futures::{
 use http::request::Parts;
 use hyper::StatusCode;
 use indoc::indoc;
-use vector_core::event::{BatchNotifier, BatchStatus, Event};
+use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
 use crate::{
     config::SinkConfig,
+    http::HttpError,
     sinks::{
         datadog::logs::DatadogLogsConfig,
+        datadog::DatadogApiError,
+        util::retries::RetryLogic,
         util::test::{build_test_server_status, load_sink},
     },
-    test_util::{next_addr, random_lines_with_stream},
+    test_util::{
+        components::{
+            run_and_assert_sink_compliance, run_and_assert_sink_error, COMPONENT_ERROR_TAGS,
+            SINK_TAGS,
+        },
+        next_addr, random_lines_with_stream,
+    },
+    tls::TlsError,
 };
+
+use super::service::LogApiRetry;
 
 // The sink must support v1 and v2 API endpoints which have different codes for
 // signaling status. This enum allows us to signal which API endpoint and what
@@ -54,10 +66,10 @@ fn test_server(
 }
 
 fn event_with_api_key(msg: &str, key: &str) -> Event {
-    let mut e = Event::from(msg);
+    let mut e = Event::Log(LogEvent::from(msg));
     e.as_mut_log()
         .metadata_mut()
-        .set_datadog_api_key(Some(Arc::from(key)));
+        .set_datadog_api_key(Arc::from(key));
     e
 }
 
@@ -67,12 +79,13 @@ fn event_with_api_key(msg: &str, key: &str) -> Event {
 /// runs random lines through it, returning a vector of the random lines and a
 /// Receiver populated with the result of the sink's operation.
 ///
-/// Testers may set `http_status` and `batch_status`. The first controls what
+/// Testers may set `api_status` and `batch_status`. The first controls what
 /// status code faked HTTP responses will have, the second acts as a check on
 /// the `Receiver`'s status before being returned to the caller.
-async fn start_test(
+async fn start_test_detail(
     api_status: ApiStatus,
     batch_status: BatchStatus,
+    is_error: bool,
 ) -> (Vec<String>, Receiver<(http::request::Parts, Bytes)>) {
     let config = indoc! {r#"
             default_api_key = "atoken"
@@ -94,10 +107,29 @@ async fn start_test(
     let (batch, receiver) = BatchNotifier::new_with_receiver();
     let (expected, events) = random_lines_with_stream(100, 10, Some(batch));
 
-    let _ = sink.run(events).await.unwrap();
+    if is_error {
+        run_and_assert_sink_error(sink, events, &COMPONENT_ERROR_TAGS).await;
+    } else {
+        run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
+    }
+
     assert_eq!(receiver.await, batch_status);
 
     (expected, rx)
+}
+
+async fn start_test_success(
+    api_status: ApiStatus,
+    batch_status: BatchStatus,
+) -> (Vec<String>, Receiver<(http::request::Parts, Bytes)>) {
+    start_test_detail(api_status, batch_status, false).await
+}
+
+async fn start_test_error(
+    api_status: ApiStatus,
+    batch_status: BatchStatus,
+) -> (Vec<String>, Receiver<(http::request::Parts, Bytes)>) {
+    start_test_detail(api_status, batch_status, true).await
 }
 
 #[tokio::test]
@@ -107,7 +139,7 @@ async fn start_test(
 /// were delivered and then asserts that every message is able to be
 /// deserialized.
 async fn smoke() {
-    let (expected, rx) = start_test(ApiStatus::OKv1, BatchStatus::Delivered).await;
+    let (expected, rx) = start_test_success(ApiStatus::OKv1, BatchStatus::Delivered).await;
 
     let output = rx.take(expected.len()).collect::<Vec<_>>().await;
 
@@ -151,7 +183,8 @@ async fn smoke() {
 /// there should be no outbound messages from the sink. That is, receiving from
 /// its Receiver must fail.
 async fn handles_failure_v1() {
-    let (_expected, mut rx) = start_test(ApiStatus::BadRequestv1, BatchStatus::Rejected).await;
+    let (_expected, mut rx) =
+        start_test_error(ApiStatus::BadRequestv1, BatchStatus::Rejected).await;
     let res = rx.try_next();
 
     assert!(matches!(res, Err(TryRecvError { .. })));
@@ -164,7 +197,8 @@ async fn handles_failure_v1() {
 /// there should be no outbound messages from the sink. That is, receiving from
 /// its Receiver must fail.
 async fn handles_failure_v2() {
-    let (_expected, mut rx) = start_test(ApiStatus::BadRequestv2, BatchStatus::Rejected).await;
+    let (_expected, mut rx) =
+        start_test_error(ApiStatus::BadRequestv2, BatchStatus::Rejected).await;
     let res = rx.try_next();
 
     assert!(matches!(res, Err(TryRecvError { .. })));
@@ -214,14 +248,13 @@ async fn api_key_in_metadata_inner(api_status: ApiStatus) {
     let api_key = "0xDECAFBAD";
     let events = events.map(|mut e| {
         println!("EVENT: {:?}", e);
-        e.for_each_log(|log| {
-            log.metadata_mut()
-                .set_datadog_api_key(Some(Arc::from(api_key)));
+        e.iter_logs_mut().for_each(|log| {
+            log.metadata_mut().set_datadog_api_key(Arc::from(api_key));
         });
         e
     });
 
-    let () = sink.run(events).await.unwrap();
+    sink.run(events).await.unwrap();
     // The log API takes payloads in units of 1,000 and, as a result, we ship in
     // units of 1,000. There will only be a single response on the stream.
     let output: (Parts, Bytes) = rx.take(1).collect::<Vec<_>>().await.pop().unwrap();
@@ -293,10 +326,10 @@ async fn multiple_api_keys_inner(api_status: ApiStatus) {
     let events = vec![
         event_with_api_key("mow", "pkc"),
         event_with_api_key("pnh", "vvo"),
-        Event::from("no API key in metadata"),
+        Event::Log(LogEvent::from("no API key in metadata")),
     ];
 
-    let _ = sink.run_events(events).await.unwrap();
+    sink.run_events(events).await.unwrap();
 
     let mut keys = rx
         .take(3)
@@ -333,7 +366,7 @@ async fn enterprise_headers_v1() {
 }
 
 async fn enterprise_headers_inner(api_status: ApiStatus) {
-    let (mut config, mut cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
+    let (mut config, cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
             default_api_key = "atoken"
             compression = "none"
         "#})
@@ -344,7 +377,7 @@ async fn enterprise_headers_inner(api_status: ApiStatus) {
     let endpoint = format!("http://{}", addr);
     config.endpoint = Some(endpoint.clone());
 
-    cx.globals.enterprise = true;
+    config.enterprise = true;
     let (sink, _) = config.build(cx).await.unwrap();
 
     let (rx, _trigger, server) = test_server(addr, api_status);
@@ -355,14 +388,13 @@ async fn enterprise_headers_inner(api_status: ApiStatus) {
     let api_key = "0xDECAFBAD";
     let events = events.map(|mut e| {
         println!("EVENT: {:?}", e);
-        e.for_each_log(|log| {
-            log.metadata_mut()
-                .set_datadog_api_key(Some(Arc::from(api_key)));
+        e.iter_logs_mut().for_each(|log| {
+            log.metadata_mut().set_datadog_api_key(Arc::from(api_key));
         });
         e
     });
 
-    let () = sink.run(events).await.unwrap();
+    sink.run(events).await.unwrap();
     let output: (Parts, Bytes) = rx.take(1).collect::<Vec<_>>().await.pop().unwrap();
     let parts = output.0;
 
@@ -398,7 +430,7 @@ async fn no_enterprise_headers_v1() {
 }
 
 async fn no_enterprise_headers_inner(api_status: ApiStatus) {
-    let (mut config, mut cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
+    let (mut config, cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
             default_api_key = "atoken"
             compression = "none"
         "#})
@@ -409,7 +441,6 @@ async fn no_enterprise_headers_inner(api_status: ApiStatus) {
     let endpoint = format!("http://{}", addr);
     config.endpoint = Some(endpoint.clone());
 
-    cx.globals.enterprise = false;
     let (sink, _) = config.build(cx).await.unwrap();
 
     let (rx, _trigger, server) = test_server(addr, api_status);
@@ -420,17 +451,48 @@ async fn no_enterprise_headers_inner(api_status: ApiStatus) {
     let api_key = "0xDECAFBAD";
     let events = events.map(|mut e| {
         println!("EVENT: {:?}", e);
-        e.for_each_log(|log| {
-            log.metadata_mut()
-                .set_datadog_api_key(Some(Arc::from(api_key)));
+        e.iter_logs_mut().for_each(|log| {
+            log.metadata_mut().set_datadog_api_key(Arc::from(api_key));
         });
         e
     });
 
-    let () = sink.run(events).await.unwrap();
+    sink.run(events).await.unwrap();
     let output: (Parts, Bytes) = rx.take(1).collect::<Vec<_>>().await.pop().unwrap();
     let parts = output.0;
 
     assert_eq!(parts.headers.get("DD-EVP-ORIGIN").unwrap(), "vector");
     assert!(parts.headers.get("DD-EVP-ORIGIN-VERSION").is_some());
+}
+
+#[tokio::test]
+/// Assert the RetryLogic implementation of LogApiRetry
+async fn error_is_retriable() {
+    let retry = LogApiRetry;
+
+    // not retry-able
+    assert!(!retry.is_retriable_error(&DatadogApiError::BadRequest));
+    assert!(!retry.is_retriable_error(&DatadogApiError::PayloadTooLarge));
+    assert!(!retry.is_retriable_error(&DatadogApiError::HttpError {
+        error: HttpError::BuildRequest {
+            source: http::status::StatusCode::from_u16(6666).unwrap_err().into()
+        }
+    }));
+    assert!(!retry.is_retriable_error(&DatadogApiError::HttpError {
+        error: HttpError::MakeProxyConnector {
+            source: http::Uri::try_from("").unwrap_err()
+        }
+    }));
+
+    // retry-able
+    assert!(retry.is_retriable_error(&DatadogApiError::ServerError));
+    assert!(retry.is_retriable_error(&DatadogApiError::Forbidden));
+    assert!(retry.is_retriable_error(&DatadogApiError::HttpError {
+        error: HttpError::BuildTlsConnector {
+            source: TlsError::MissingKey
+        }
+    }));
+    // note: HttpError::CallRequest and HttpError::MakeHttpsConnector are all retry-able,
+    //       but are not straightforward to instantiate due to the design of
+    //       the crates they originate from.
 }

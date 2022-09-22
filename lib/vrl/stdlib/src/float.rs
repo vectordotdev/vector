@@ -43,18 +43,13 @@ impl Function for Float {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(FloatFn { value }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        float(value)
+        Ok(FloatFn { value }.as_expr())
     }
 }
 
@@ -63,12 +58,12 @@ struct FloatFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for FloatFn {
+impl FunctionExpression for FloatFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         float(self.value.resolve(ctx)?)
     }
 
-    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &state::TypeState) -> TypeDef {
         let non_float = !self.value.type_def(state).is_float();
 
         TypeDef::float().with_fallibility(non_float)

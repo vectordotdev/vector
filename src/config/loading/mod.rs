@@ -16,16 +16,16 @@ pub use config_builder::*;
 use glob::glob;
 use loader::process::Process;
 pub use loader::*;
-use once_cell::sync::Lazy;
 pub use secret::*;
 pub use source::*;
+use vector_config::NamedComponent;
 
 use super::{
     builder::ConfigBuilder, format, validation, vars, Config, ConfigPath, Format, FormatHint,
 };
-use crate::signal;
+use crate::{config::ProviderConfig, signal};
 
-pub static CONFIG_PATHS: Lazy<Mutex<Vec<ConfigPath>>> = Lazy::new(Mutex::default);
+pub static CONFIG_PATHS: Mutex<Vec<ConfigPath>> = Mutex::new(Vec::new());
 
 pub(super) fn read_dir<P: AsRef<Path> + Debug>(path: P) -> Result<ReadDir, Vec<String>> {
     path.as_ref()
@@ -157,10 +157,12 @@ pub async fn load_from_paths_with_provider_and_secrets(
     // If there's a provider, overwrite the existing config builder with the remote variant.
     if let Some(mut provider) = builder.provider {
         builder = provider.build(signal_handler).await?;
-        debug!(message = "Provider configured.", provider = ?provider.provider_type());
+        debug!(message = "Provider configured.", provider = ?provider.get_component_name());
     }
 
     let (new_config, build_warnings) = builder.build_with_warnings()?;
+
+    validation::check_buffer_preconditions(&new_config).await?;
 
     for warning in secrets_warning
         .into_iter()
@@ -325,7 +327,6 @@ fn default_config_paths() -> Vec<ConfigPath> {
     test,
     feature = "sinks-elasticsearch",
     feature = "transforms-pipelines",
-    feature = "transforms-regex_parser",
     feature = "transforms-sample",
     feature = "sources-demo_logs",
     feature = "sinks-console"

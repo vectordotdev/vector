@@ -1,11 +1,9 @@
 use std::{
     cmp,
     collections::BTreeMap,
-    convert::TryInto,
     io::{self, Write},
     mem,
     sync::Arc,
-    time::Instant,
 };
 
 use bytes::{BufMut, Bytes};
@@ -29,7 +27,8 @@ const SERIES_PAYLOAD_HEADER: &[u8] = b"{\"series\":[";
 const SERIES_PAYLOAD_FOOTER: &[u8] = b"]}";
 const SERIES_PAYLOAD_DELIMITER: &[u8] = b",";
 
-mod ddsketch_proto {
+#[allow(warnings)]
+mod ddmetric_proto {
     include!(concat!(env!("OUT_DIR"), "/datadog.agentpayload.rs"));
 }
 
@@ -120,7 +119,6 @@ pub struct DatadogMetricsEncoder {
     compressed_limit: usize,
 
     state: EncoderState,
-    last_sent: Option<Instant>,
     log_schema: &'static LogSchema,
 }
 
@@ -157,7 +155,6 @@ impl DatadogMetricsEncoder {
             uncompressed_limit,
             compressed_limit,
             state: EncoderState::default(),
-            last_sent: None,
             log_schema: log_schema(),
         })
     }
@@ -165,7 +162,6 @@ impl DatadogMetricsEncoder {
 
 impl DatadogMetricsEncoder {
     fn reset_state(&mut self) -> EncoderState {
-        self.last_sent = Some(Instant::now());
         mem::take(&mut self.state)
     }
 
@@ -187,12 +183,8 @@ impl DatadogMetricsEncoder {
             // Series metrics are encoded via JSON, in an incremental fashion.
             DatadogMetricsEndpoint::Series => {
                 // A single `Metric` might generate multiple Datadog series metrics.
-                let all_series = generate_series_metrics(
-                    &metric,
-                    &self.default_namespace,
-                    self.log_schema,
-                    self.last_sent,
-                )?;
+                let all_series =
+                    generate_series_metrics(&metric, &self.default_namespace, self.log_schema)?;
 
                 // We handle adding the JSON array separator (comma) manually since the encoding is
                 // happening incrementally.
@@ -204,7 +196,7 @@ impl DatadogMetricsEncoder {
                     {
                         return Ok(Some(metric));
                     }
-                    let _ = serde_json::to_writer(&mut self.state.buf, series)
+                    serde_json::to_writer(&mut self.state.buf, series)
                         .context(JsonEncodingFailedSnafu)?;
                 }
             }
@@ -268,7 +260,7 @@ impl DatadogMetricsEncoder {
         }
 
         // We should be safe to write our holding buffer to the compressor and store the metric.
-        let _ = self.state.writer.write_all(&self.state.buf)?;
+        self.state.writer.write_all(&self.state.buf)?;
         self.state.written += n;
         Ok(true)
     }
@@ -323,7 +315,7 @@ impl DatadogMetricsEncoder {
 
         // Consume of all of the "pending" metrics and try to write them out as sketches.
         let pending = mem::take(&mut self.state.pending);
-        let _ = write_sketches(
+        write_sketches(
             &pending,
             &self.default_namespace,
             self.log_schema,
@@ -349,7 +341,7 @@ impl DatadogMetricsEncoder {
 
     pub fn finish(&mut self) -> Result<(Bytes, Vec<Metric>, usize), FinishError> {
         // Try to encode any pending metrics we had stored up.
-        let _ = self.try_encode_pending()?;
+        self.try_encode_pending()?;
 
         // Write any payload footer necessary for the configured endpoint.
         let n = write_payload_footer(self.endpoint, &mut self.state.writer)
@@ -421,7 +413,6 @@ fn generate_series_metrics(
     metric: &Metric,
     default_namespace: &Option<Arc<str>>,
     log_schema: &'static LogSchema,
-    last_sent: Option<Instant>,
 ) -> Result<Vec<DatadogSeriesMetric>, EncoderError> {
     let name = get_namespaced_name(metric, default_namespace);
 
@@ -431,22 +422,32 @@ fn generate_series_metrics(
     let device = tags.remove("device");
     let ts = encode_timestamp(metric.timestamp());
     let tags = Some(encode_tags(&tags));
-    let interval = last_sent
-        .map(|then| then.elapsed())
-        .map(|d| d.as_secs().try_into().unwrap_or(i64::MAX));
 
-    let results = match metric.value() {
-        MetricValue::Counter { value } => vec![DatadogSeriesMetric {
-            metric: name,
-            r#type: DatadogMetricType::Count,
-            interval,
-            points: vec![DatadogPoint(ts, *value)],
-            tags,
-            host,
-            source_type_name,
-            device,
-        }],
-        MetricValue::Set { values } => vec![DatadogSeriesMetric {
+    let results = match (metric.value(), metric.interval_ms()) {
+        (MetricValue::Counter { value }, maybe_interval_ms) => {
+            let (value, interval) = match maybe_interval_ms {
+                None => (*value, None),
+                // When an interval is defined, it implies the value should be in a per-second form,
+                // so we need to get back to seconds from our milliseconds-based interval, and then
+                // divide our value by that amount as well.
+                Some(interval_ms) => (
+                    (*value) * 1000.0 / (interval_ms.get() as f64),
+                    Some(interval_ms.get() / 1000),
+                ),
+            };
+
+            vec![DatadogSeriesMetric {
+                metric: name,
+                r#type: DatadogMetricType::Count,
+                interval,
+                points: vec![DatadogPoint(ts, value)],
+                tags,
+                host,
+                source_type_name,
+                device,
+            }]
+        }
+        (MetricValue::Set { values }, _) => vec![DatadogSeriesMetric {
             metric: name,
             r#type: DatadogMetricType::Gauge,
             interval: None,
@@ -456,7 +457,7 @@ fn generate_series_metrics(
             source_type_name,
             device,
         }],
-        MetricValue::Gauge { value } => vec![DatadogSeriesMetric {
+        (MetricValue::Gauge { value }, _) => vec![DatadogSeriesMetric {
             metric: name,
             r#type: DatadogMetricType::Gauge,
             interval: None,
@@ -466,7 +467,7 @@ fn generate_series_metrics(
             source_type_name,
             device,
         }],
-        value => {
+        (value, _) => {
             return Err(EncoderError::InvalidMetric {
                 expected: "series",
                 metric_value: value.as_name(),
@@ -520,12 +521,12 @@ where
                     let k = bins.into_iter().map(Into::into).collect();
                     let n = counts.into_iter().map(Into::into).collect();
 
-                    let sketch = ddsketch_proto::sketch_payload::Sketch {
+                    let sketch = ddmetric_proto::sketch_payload::Sketch {
                         metric: name,
                         tags,
                         host,
                         distributions: Vec::new(),
-                        dogsketches: vec![ddsketch_proto::sketch_payload::sketch::Dogsketch {
+                        dogsketches: vec![ddmetric_proto::sketch_payload::sketch::Dogsketch {
                             ts,
                             cnt,
                             min,
@@ -546,7 +547,7 @@ where
         }
     }
 
-    let sketch_payload = ddsketch_proto::SketchPayload {
+    let sketch_payload = ddmetric_proto::SketchPayload {
         // TODO: The "common metadata" fields are things that only very loosely apply to Vector, or
         // are hard to characterize -- for example, what's the API key for a sketch that didn't originate
         // from the Datadog Agent? -- so we're just omitting it here in the hopes it doesn't
@@ -678,13 +679,14 @@ mod tests {
 
     fn get_simple_counter() -> Metric {
         let value = MetricValue::Counter { value: 3.14 };
-        Metric::new("basic_counter", MetricKind::Incremental, value)
+        Metric::new("basic_counter", MetricKind::Incremental, value).with_timestamp(Some(ts()))
     }
 
     fn get_simple_sketch() -> Metric {
         let mut ddsketch = AgentDDSketch::with_agent_defaults();
         ddsketch.insert(3.14);
         Metric::new("basic_counter", MetricKind::Incremental, ddsketch.into())
+            .with_timestamp(Some(ts()))
     }
 
     fn get_compressed_empty_series_payload() -> Bytes {

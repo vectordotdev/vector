@@ -2,15 +2,12 @@ use std::fmt;
 
 use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 use parser::ast::Node;
-use value::Value;
 
 use super::Expr;
 use crate::{
     expression::{ExpressionError, Resolved},
-    state::{ExternalEnv, LocalEnv},
-    value::Kind,
-    value::VrlValueConvert,
-    vm::OpCode,
+    state::{TypeInfo, TypeState},
+    value::{Kind, VrlValueConvert},
     Context, Expression, Span, TypeDef,
 };
 
@@ -21,15 +18,15 @@ pub struct Abort {
 }
 
 impl Abort {
-    pub fn new(
-        span: Span,
-        message: Option<Node<Expr>>,
-        state: (&LocalEnv, &ExternalEnv),
-    ) -> Result<Self, Error> {
+    /// # Errors
+    ///
+    /// * The optional message is fallible.
+    /// * The optional message does not resolve to a string.
+    pub fn new(span: Span, message: Option<Node<Expr>>, state: &TypeState) -> Result<Self, Error> {
         let message = message
             .map(|node| {
                 let (expr_span, expr) = node.take();
-                let type_def = expr.type_def(state);
+                let type_def = expr.type_info(state).result;
 
                 if type_def.is_fallible() {
                     Err(Error {
@@ -49,13 +46,6 @@ impl Abort {
 
         Ok(Self { span, message })
     }
-
-    pub fn noop(span: Span) -> Self {
-        Self {
-            span,
-            message: None,
-        }
-    }
 }
 
 impl Expression for Abort {
@@ -74,32 +64,8 @@ impl Expression for Abort {
         })
     }
 
-    fn type_def(&self, _: (&LocalEnv, &ExternalEnv)) -> TypeDef {
-        TypeDef::null().infallible()
-    }
-
-    fn compile_to_vm(
-        &self,
-        vm: &mut crate::vm::Vm,
-        state: (&mut LocalEnv, &mut ExternalEnv),
-    ) -> Result<(), String> {
-        match &self.message {
-            None => {
-                // If there is no message, just write a Null to the stack which
-                // the abort instruction will use to know not to attach a message.
-                let nullidx = vm.add_constant(Value::Null);
-                vm.write_opcode(OpCode::Constant);
-                vm.write_primitive(nullidx);
-            }
-            Some(message) => message.compile_to_vm(vm, state)?,
-        }
-
-        vm.write_opcode(OpCode::Abort);
-
-        // The `Abort` `OpCode` needs the span of the expression to return in the abort error.
-        vm.write_primitive(self.span.start());
-        vm.write_primitive(self.span.end());
-        Ok(())
+    fn type_info(&self, state: &TypeState) -> TypeInfo {
+        TypeInfo::new(state, TypeDef::never())
     }
 }
 
@@ -139,7 +105,7 @@ impl std::error::Error for Error {
 
 impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
-        use ErrorVariant::*;
+        use ErrorVariant::{FallibleExpr, NonString};
 
         match self.variant {
             FallibleExpr => 631,

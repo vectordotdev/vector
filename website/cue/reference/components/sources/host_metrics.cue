@@ -430,9 +430,17 @@ components: sources: host_metrics: {
 				mode: {
 					description: "Which mode the CPU was running in during the given time."
 					required:    true
-					examples: ["idle", "system", "user", "nice"]
+					examples: ["idle", "system", "user", "nice", "io_wait"]
 				}
 			}
+		}
+		host_logical_cpus: _host & {
+			description: "The number of logical CPUs."
+			type:        "gauge"
+		}
+		host_physical_cpus: _host & {
+			description: "The number of physical CPUs."
+			type:        "gauge"
 		}
 
 		// Host cgroups

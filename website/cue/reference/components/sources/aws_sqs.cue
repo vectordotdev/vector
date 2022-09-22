@@ -10,7 +10,8 @@ components: sources: aws_sqs: components._aws & {
 				enabled:                true
 				can_verify_certificate: true
 				can_verify_hostname:    true
-				enabled_default:        false
+				enabled_default:        true
+				enabled_by_scheme:      true
 			}
 			checkpoint: enabled: false
 			proxy: enabled:      true
@@ -45,7 +46,7 @@ components: sources: aws_sqs: components._aws & {
 		}
 		requirements: [
 			"""
-					The AWS SQS source requires an SQS queue.
+				The AWS SQS source requires an SQS queue.
 				""",
 		]
 		warnings: []
@@ -114,6 +115,13 @@ components: sources: aws_sqs: components._aws & {
 				type: string: {
 					examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
 					syntax: "literal"
+				}
+			}
+			source_type: {
+				description: "The name of the source type."
+				required:    true
+				type: string: {
+					examples: ["aws_sqs"]
 				}
 			}
 			timestamp: fields._current_timestamp & {

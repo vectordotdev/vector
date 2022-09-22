@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use vector_config::configurable_component;
 pub use vector_core::event::lua;
 use vector_core::transform::runtime_transform::{RuntimeTransform, Timer};
 
@@ -42,15 +42,30 @@ pub enum BuildError {
     RuntimeErrorGc { source: mlua::Error },
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the version two of the `lua` transform.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct LuaConfig {
+    /// The Lua program to initialize the transform with.
+    ///
+    /// The program can be used to to import external dependencies, as well as define the functions
+    /// used for the various lifecycle hooks. However, it's not strictly required, as the lifecycle
+    /// hooks can be configured directly with inline Lua source for each respective hook.
+    source: Option<String>,
+
+    /// A list of directories to search when loading a Lua file via the `require` function.
+    ///
+    /// If not specified, the modules are looked up in the directories of Vector’s configs.
     #[serde(default = "default_config_paths")]
     search_dirs: Vec<PathBuf>,
+
+    #[configurable(derived)]
     hooks: HooksConfig,
+
+    /// A list of timers which should be configured and executed periodically.
     #[serde(default)]
     timers: Vec<TimerConfig>,
-    source: Option<String>,
 }
 
 fn default_config_paths() -> Vec<PathBuf> {
@@ -70,26 +85,55 @@ fn default_config_paths() -> Vec<PathBuf> {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Lifecycle hooks.
+///
+/// These hooks can be set to perform additional processing during the lifecycle of the transform.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 struct HooksConfig {
+    /// A function which is called when the first event comes, before calling `hooks.process`.
+    ///
+    /// It can produce new events using the `emit` function.
+    ///
+    /// This can either be inline Lua that defines a closure to use, or the name of the Lua function to call. In both
+    /// cases, the closure/function takes a single parameter, `emit`, which is a reference to a function for emitting events.
     init: Option<String>,
+
+    /// A function which is called for each incoming event.
+    ///
+    /// It can produce new events using the `emit` function.
+    ///
+    /// This can either be inline Lua that defines a closure to use, or the name of the Lua function to call. In both
+    /// cases, the closure/function takes two parameters. The first parameter, `event`, is the event being processed,
+    /// while the second parameter, `emit`, is a reference to a function for emitting events.
     process: String,
+
+    /// A function which is called when Vector is stopped.
+    ///
+    /// It can produce new events using the `emit` function.
+    ///
+    /// This can either be inline Lua that defines a closure to use, or the name of the Lua function to call. In both
+    /// cases, the closure/function takes a single parameter, `emit`, which is a reference to a function for emitting events.
     shutdown: Option<String>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// A Lua timer.
+#[configurable_component]
+#[derive(Clone, Debug)]
 struct TimerConfig {
+    /// The interval to execute the handler, in seconds.
     interval_seconds: u64,
+
+    /// The handler function which is called when the timer ticks.
+    ///
+    /// It can produce new events using the `emit` function.
+    ///
+    /// This can either be inline Lua that defines a closure to use, or the name of the Lua function to call. In both
+    /// cases, the closure/function takes a single parameter, `emit`, which is a reference to a function for emitting events.
     handler: String,
 }
 
-// Implementation of methods from `TransformConfig`
-// Note that they are implemented as struct methods instead of trait implementation methods
-// because `TransformConfig` trait requires specification of a unique `typetag::serde` name.
-// Specifying some name (for example, "lua_v*") results in this name being listed among
-// possible configuration options for `transforms` section, but such internal name should not
-// be exposed to users.
 impl LuaConfig {
     pub fn build(&self) -> crate::Result<Transform> {
         Lua::new(self).map(Transform::event_task)
@@ -101,10 +145,6 @@ impl LuaConfig {
 
     pub fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Metric | DataType::Log)]
-    }
-
-    pub const fn transform_type(&self) -> &'static str {
-        "lua"
     }
 }
 
@@ -351,7 +391,7 @@ mod tests {
     use crate::{
         event::{
             metric::{Metric, MetricKind, MetricValue},
-            Event, Value,
+            Event, LogEvent, Value,
         },
         test_util::trace_init,
         transforms::TaskTransform,
@@ -376,7 +416,7 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::from("program me");
+        let event = Event::Log(LogEvent::from("program me"));
         let in_stream = Box::pin(stream::iter(vec![event]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
@@ -401,7 +441,7 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::from("Hello, my name is Bob.");
+        let event = Event::Log(LogEvent::from("Hello, my name is Bob."));
         let in_stream = Box::pin(stream::iter(vec![event]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
@@ -425,10 +465,10 @@ mod tests {
         )
         .unwrap();
 
-        let mut event = Event::new_empty_log();
-        event.as_mut_log().insert("name", "Bob");
+        let mut event = LogEvent::default();
+        event.insert("name", "Bob");
 
-        let in_stream = Box::pin(stream::iter(vec![event]));
+        let in_stream = Box::pin(stream::iter(vec![event.into()]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
 
@@ -450,7 +490,7 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::new_empty_log();
+        let event = LogEvent::default().into();
         let in_stream = Box::pin(stream::iter(vec![event]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await;
@@ -474,9 +514,9 @@ mod tests {
         )
         .unwrap();
 
-        let mut event = Event::new_empty_log();
-        event.as_mut_log().insert("host", "127.0.0.1");
-        let input = Box::pin(stream::iter(vec![event]));
+        let mut event = LogEvent::default();
+        event.insert("host", "127.0.0.1");
+        let input = Box::pin(stream::iter(vec![event.into()]));
         let output = transform.transform(input);
         let out = output.collect::<Vec<_>>().await;
 
@@ -503,7 +543,7 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::new_empty_log();
+        let event = LogEvent::default().into();
 
         let in_stream = Box::pin(stream::iter(vec![event]));
         let mut out_stream = transform.transform(in_stream);
@@ -528,7 +568,7 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::new_empty_log();
+        let event = LogEvent::default().into();
         let in_stream = Box::pin(stream::iter(vec![event]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
@@ -552,7 +592,7 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::new_empty_log();
+        let event = LogEvent::default().into();
         let in_stream = Box::pin(stream::iter(vec![event]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
@@ -576,7 +616,7 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::new_empty_log();
+        let event = LogEvent::default().into();
         let in_stream = Box::pin(stream::iter(vec![event]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
@@ -600,7 +640,7 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::new_empty_log();
+        let event = LogEvent::default().into();
         let in_stream = Box::pin(stream::iter(vec![event]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
@@ -625,7 +665,7 @@ mod tests {
         .unwrap();
 
         let err = transform
-            .process_single(Event::new_empty_log())
+            .process_single(LogEvent::default().into())
             .unwrap_err();
         let err = format_error(&err);
         assert!(
@@ -651,7 +691,7 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::new_empty_log();
+        let event = LogEvent::default().into();
         let in_stream = Box::pin(stream::iter(vec![event]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
@@ -674,7 +714,7 @@ mod tests {
         .unwrap();
 
         let err = transform
-            .process_single(Event::new_empty_log())
+            .process_single(LogEvent::default().into())
             .unwrap_err();
         let err = format_error(&err);
         assert!(err.contains("this is an error"), "{}", err);
@@ -737,7 +777,7 @@ mod tests {
         );
         let transform = from_config(&config).unwrap();
 
-        let event = Event::new_empty_log();
+        let event = LogEvent::default().into();
         let in_stream = Box::pin(stream::iter(vec![event]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
@@ -763,11 +803,11 @@ mod tests {
         )
         .unwrap();
 
-        let mut event = Event::new_empty_log();
-        event.as_mut_log().insert("name", "Bob");
-        event.as_mut_log().insert("friend", "Alice");
+        let mut event = LogEvent::default();
+        event.insert("name", "Bob");
+        event.insert("friend", "Alice");
 
-        let in_stream = Box::pin(stream::iter(vec![event]));
+        let in_stream = Box::pin(stream::iter(vec![event.into()]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
 
@@ -826,7 +866,7 @@ mod tests {
 
         let n: usize = 10;
 
-        let events = (0..n).map(|i| Event::from(format!("program me {}", i)));
+        let events = (0..n).map(|i| Event::Log(LogEvent::from(format!("program me {}", i))));
 
         let in_stream = Box::pin(stream::iter(events));
         let out_stream = transform.transform(in_stream);

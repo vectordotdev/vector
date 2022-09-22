@@ -1,4 +1,4 @@
-use std::{cmp, future::ready, panic, sync::Arc};
+use std::{future::ready, panic, sync::Arc};
 
 use aws_sdk_s3::error::GetObjectError;
 use aws_sdk_s3::Client as S3Client;
@@ -18,6 +18,10 @@ use snafu::{ResultExt, Snafu};
 use tokio::{pin, select};
 use tokio_util::codec::FramedRead;
 use tracing::Instrument;
+use vector_common::internal_event::{
+    ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
+};
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use crate::tls::TlsConfig;
@@ -25,7 +29,7 @@ use crate::{
     config::{log_schema, AcknowledgementsConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, LogEvent},
     internal_events::{
-        BytesReceived, OldEventsReceived, SqsMessageDeleteBatchError, SqsMessageDeletePartialError,
+        EventsReceived, SqsMessageDeleteBatchError, SqsMessageDeletePartialError,
         SqsMessageDeleteSucceeded, SqsMessageProcessingError, SqsMessageProcessingSucceeded,
         SqsMessageReceiveError, SqsMessageReceiveSucceeded, SqsS3EventRecordInvalidEventIgnored,
         StreamClosedError,
@@ -34,36 +38,63 @@ use crate::{
     shutdown::ShutdownSignal,
     SourceSender,
 };
-use lookup::path;
+use lookup::event_path;
 
-static SUPPORTED_S3S_EVENT_VERSION: Lazy<semver::VersionReq> =
+static SUPPORTED_S3_EVENT_VERSION: Lazy<semver::VersionReq> =
     Lazy::new(|| semver::VersionReq::parse("~2").unwrap());
 
-#[derive(Derivative, Clone, Debug, Deserialize, Serialize)]
+/// SQS configuration options.
+//
+// TODO: It seems awfully likely that we could re-use the existing configuration type for the `aws_sqs` source in some
+// way, given the near 100% overlap in configurable values.
+#[configurable_component]
+#[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Config {
+    /// The URL of the SQS queue to poll for bucket notifications.
     pub(super) queue_url: String,
 
-    // restricted to u32 for safe conversion to i64 later
+    /// How long to wait while polling the queue for new messages, in seconds.
+    ///
+    /// Generally should not be changed unless instructed to do so, as if messages are available, they will always be
+    /// consumed, regardless of the value of `poll_secs`.
+    // NOTE: We restrict this to u32 for safe conversion to i64 later.
     #[serde(default = "default_poll_secs")]
     #[derivative(Default(value = "default_poll_secs()"))]
     pub(super) poll_secs: u32,
 
-    // restricted to u32 for safe conversion to i64 later
+    /// The visibility timeout to use for messages, in secords.
+    ///
+    /// This controls how long a message is left unavailable after Vector receives it. If Vector receives a message, and
+    /// takes longer than `visibility_timeout_secs` to process and delete the message from the queue, it will be made reavailable for another consumer.
+    ///
+    /// This can happen if, for example, if Vector crashes between consuming a message and deleting it.
+    // NOTE: We restrict this to u32 for safe conversion to i64 later.
     #[serde(default = "default_visibility_timeout_secs")]
     #[derivative(Default(value = "default_visibility_timeout_secs()"))]
     pub(super) visibility_timeout_secs: u32,
 
+    /// Whether to delete the message once Vector processes it.
+    ///
+    /// It can be useful to set this to `false` to debug or during initial Vector setup.
     #[serde(default = "default_true")]
     #[derivative(Default(value = "default_true()"))]
     pub(super) delete_message: bool,
 
-    // number of tasks spawned for running the SQS/S3 receive loop
+    /// Number of concurrent tasks to create for polling the queue for messages.
+    ///
+    /// Defaults to the number of available CPUs on the system.
+    ///
+    /// Should not typically need to be changed, but it can sometimes be beneficial to raise this value when there is a
+    /// high rate of messages being pushed into the queue and the objects being fetched are small. In these cases,
+    /// Vector may not fully utilize system resources without fetching more messages per second, as the SQS message
+    /// consumption rate affects the S3 object retrieval rate.
     #[serde(default = "default_client_concurrency")]
     #[derivative(Default(value = "default_client_concurrency()"))]
     pub(super) client_concurrency: u32,
 
+    #[configurable(derived)]
     #[serde(default)]
     #[derivative(Default)]
     pub(super) tls_options: Option<TlsConfig>,
@@ -82,7 +113,7 @@ const fn default_true() -> bool {
 }
 
 fn default_client_concurrency() -> u32 {
-    cmp::max(1, num_cpus::get() as u32)
+    crate::num_threads() as u32
 }
 
 #[derive(Debug, Snafu)]
@@ -227,6 +258,7 @@ pub struct IngestorProcess {
     out: SourceSender,
     shutdown: ShutdownSignal,
     acknowledgements: bool,
+    bytes_received: Registered<BytesReceived>,
 }
 
 impl IngestorProcess {
@@ -241,6 +273,7 @@ impl IngestorProcess {
             out,
             shutdown,
             acknowledgements,
+            bytes_received: register!(BytesReceived::from(Protocol::HTTP)),
         }
     }
 
@@ -366,7 +399,7 @@ impl IngestorProcess {
         s3_event: S3EventRecord,
     ) -> Result<(), ProcessingError> {
         let event_version: semver::Version = s3_event.event_version.clone().into();
-        if !SUPPORTED_S3S_EVENT_VERSION.matches(&event_version) {
+        if !SUPPORTED_S3_EVENT_VERSION.matches(&event_version) {
             return Err(ProcessingError::UnsupportedS3EventVersion {
                 version: event_version.clone(),
             });
@@ -436,14 +469,12 @@ impl IngestorProcess {
         // the offset of the object that has been read, but this would only be relevant in
         // the case that the same vector instance processes the same message.
         let mut read_error = None;
+        let bytes_received = self.bytes_received.clone();
         let lines: Box<dyn Stream<Item = Bytes> + Send + Unpin> = Box::new(
             FramedRead::new(object_reader, CharacterDelimitedDecoder::new(b'\n'))
                 .map(|res| {
                     res.map(|bytes| {
-                        emit!(BytesReceived {
-                            byte_size: bytes.len(),
-                            protocol: "http",
-                        });
+                        bytes_received.emit(ByteSize(bytes.len()));
                         bytes
                     })
                     .map_err(|err| {
@@ -471,11 +502,11 @@ impl IngestorProcess {
         let aws_region = Bytes::from(s3_event.aws_region.as_str().as_bytes().to_vec());
 
         let mut stream = lines.filter_map(move |line| {
-            let mut log = LogEvent::from(line).with_batch_notifier_option(&batch);
+            let mut log = LogEvent::from_bytes_legacy(&line).with_batch_notifier_option(&batch);
 
-            log.insert(path!("bucket"), bucket_name.clone());
-            log.insert(path!("object"), object_key.clone());
-            log.insert(path!("region"), aws_region.clone());
+            log.insert(event_path!("bucket"), bucket_name.clone());
+            log.insert(event_path!("object"), object_key.clone());
+            log.insert(event_path!("region"), aws_region.clone());
             log.insert(log_schema().source_type_key(), Bytes::from("aws_s3"));
             log.insert(log_schema().timestamp_key(), timestamp);
 
@@ -485,7 +516,7 @@ impl IngestorProcess {
                 }
             }
 
-            emit!(OldEventsReceived {
+            emit!(EventsReceived {
                 count: 1,
                 byte_size: log.size_of()
             });
@@ -496,10 +527,8 @@ impl IngestorProcess {
         let send_error = match self.out.send_event_stream(&mut stream).await {
             Ok(_) => None,
             Err(error) => {
-                // count is set to 0 to have no discarded events considering
-                // the events are not yet acknowledged and will be retried in
-                // case of error
-                emit!(StreamClosedError { error, count: 0 });
+                let (count, _) = stream.size_hint();
+                emit!(StreamClosedError { error, count });
                 Some(crate::source_sender::ClosedError)
             }
         };
@@ -527,10 +556,7 @@ impl IngestorProcess {
                     BatchStatus::Delivered => Ok(()),
                     BatchStatus::Errored => Err(ProcessingError::ErrorAcknowledgement),
                     BatchStatus::Rejected => {
-                        error!(
-                            message = "Sink reported events were rejected.",
-                            internal_log_rate_secs = 5,
-                        );
+                        // Sinks are responsible for emitting ComponentEventsDropped.
                         // Failed events cannot be retried, so continue to delete the SQS source message.
                         Ok(())
                     }
@@ -693,7 +719,7 @@ pub struct S3Bucket {
     pub name: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct S3Object {
     // S3ObjectKeys are URL encoded

@@ -45,19 +45,20 @@ impl Function for MatchArray {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let pattern = arguments.required("pattern");
         let all = arguments.optional("all");
 
-        Ok(Box::new(MatchArrayFn {
+        Ok(MatchArrayFn {
             value,
             pattern,
             all,
-        }))
+        }
+        .as_expr())
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -79,14 +80,6 @@ impl Function for MatchArray {
             },
         ]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let pattern = args.required("pattern");
-        let all = args.optional("all");
-
-        match_array(value, pattern, all)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -96,7 +89,7 @@ pub(crate) struct MatchArrayFn {
     all: Option<Box<dyn Expression>>,
 }
 
-impl Expression for MatchArrayFn {
+impl FunctionExpression for MatchArrayFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let list = self.value.resolve(ctx)?;
         let pattern = self.pattern.resolve(ctx)?;
@@ -109,7 +102,7 @@ impl Expression for MatchArrayFn {
         match_array(list, pattern, all)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::boolean().infallible()
     }
 }

@@ -8,11 +8,11 @@ use vector_core::{
 
 use super::TemplateRenderingError;
 use crate::{
-    codecs::Encoder,
+    codecs::{Encoder, Transformer},
     config::LogSchema,
     event::{Event, Value},
-    internal_events::{AwsCloudwatchLogsEncoderError, AwsCloudwatchLogsMessageSizeError},
-    sinks::{aws_cloudwatch_logs::CloudwatchKey, util::encoding::Transformer},
+    internal_events::AwsCloudwatchLogsMessageSizeError,
+    sinks::aws_cloudwatch_logs::CloudwatchKey,
     template::Template,
 };
 
@@ -80,8 +80,8 @@ impl CloudwatchRequestBuilder {
         let event_byte_size = event.size_of();
         self.transformer.transform(&mut event);
         let mut message_bytes = BytesMut::new();
-        if let Err(error) = self.encoder.encode(event, &mut message_bytes) {
-            emit!(AwsCloudwatchLogsEncoderError { error });
+        if self.encoder.encode(event, &mut message_bytes).is_err() {
+            // The encoder handles internal event emission for Error and EventsDropped.
             return None;
         }
         let message = String::from_utf8_lossy(&message_bytes).to_string();
@@ -119,6 +119,8 @@ impl ByteSizeOf for CloudwatchRequest {
 
 #[cfg(test)]
 mod tests {
+    use vector_core::event::LogEvent;
+
     use super::*;
     use crate::config::log_schema;
 
@@ -133,12 +135,10 @@ mod tests {
         };
         let timestamp = Utc::now();
         let message = "event message";
-        let mut event = Event::from(message);
-        event
-            .as_mut_log()
-            .insert(log_schema().timestamp_key(), timestamp);
+        let mut event = LogEvent::from(message);
+        event.insert(log_schema().timestamp_key(), timestamp);
 
-        let request = request_builder.build(event).unwrap();
+        let request = request_builder.build(event.into()).unwrap();
         assert_eq!(request.timestamp, timestamp.timestamp_millis());
         assert_eq!(&request.message, message);
     }

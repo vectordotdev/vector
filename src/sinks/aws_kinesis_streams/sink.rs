@@ -4,13 +4,11 @@ use async_trait::async_trait;
 use futures::{future, stream::BoxStream, StreamExt};
 use rand::random;
 use tower::Service;
-use vector_core::{
-    buffers::Acker,
-    stream::{BatcherSettings, DriverResponse},
-};
+use vector_core::stream::{BatcherSettings, DriverResponse};
 
 use crate::{
     event::{Event, LogEvent},
+    internal_events::SinkRequestBuildError,
     sinks::{
         aws_kinesis_streams::request_builder::{KinesisRequest, KinesisRequestBuilder},
         util::{processed_event::ProcessedEvent, SinkBuilderExt, StreamSink},
@@ -25,7 +23,6 @@ pub struct KinesisMetadata {
 
 pub struct KinesisSink<S> {
     pub batch_settings: BatcherSettings,
-    pub acker: Acker,
     pub service: S,
     pub request_builder: KinesisRequestBuilder,
     pub partition_key_field: Option<String>,
@@ -51,15 +48,15 @@ where
             .request_builder(request_builder_concurrency_limit, self.request_builder)
             .filter_map(|request| async move {
                 match request {
-                    Err(e) => {
-                        error!("Failed to build Kinesis Stream request: {:?}.", e);
+                    Err(error) => {
+                        emit!(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),
                 }
             })
             .batched(self.batch_settings.into_byte_size_config())
-            .into_driver(self.service, self.acker);
+            .into_driver(self.service);
 
         sink.run().await
     }
@@ -89,7 +86,7 @@ pub fn process_log(
             warn!(
                 message = "Partition key does not exist; dropping event.",
                 %partition_key_field,
-                internal_log_rate_secs = 30,
+                internal_log_rate_limit = true,
             );
             return None;
         }

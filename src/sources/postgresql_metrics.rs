@@ -1,5 +1,6 @@
 use std::{
     collections::{BTreeMap, HashSet},
+    fmt::Write as _,
     iter,
     path::PathBuf,
     time::Instant,
@@ -15,7 +16,6 @@ use openssl::{
     ssl::{SslConnector, SslMethod},
 };
 use postgres_openssl::MakeTlsConnector;
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::time;
 use tokio_postgres::{
@@ -24,10 +24,12 @@ use tokio_postgres::{
     Client, Config, Error as PgError, NoTls, Row,
 };
 use tokio_stream::wrappers::IntervalStream;
+use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    config::{DataType, Output, SourceConfig, SourceContext, SourceDescription},
+    config::{DataType, Output, SourceConfig, SourceContext},
     event::metric::{Metric, MetricKind, MetricValue},
     internal_events::{
         CollectionCompleted, EndpointBytesReceived, EventsReceived, PostgresqlMetricsCollectError,
@@ -94,20 +96,56 @@ enum CollectError {
     QueryError { source: PgError },
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+/// Configuration of TLS when connecting to PostgreSQL.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 struct PostgresqlMetricsTlsConfig {
+    /// Absolute path to an additional CA certificate file.
+    ///
+    /// The certficate must be in the DER or PEM (X.509) format.
     ca_file: PathBuf,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+/// Configuration for the `postgresql_metrics` source.
+#[configurable_component(source("postgresql_metrics"))]
+#[derive(Clone, Debug)]
 #[serde(default, deny_unknown_fields)]
-struct PostgresqlMetricsConfig {
+pub struct PostgresqlMetricsConfig {
+    /// A list of PostgreSQL instances to scrape.
+    ///
+    /// Each endpoint must be in the [Connection URI
+    /// format](https://www.postgresql.org/docs/current/libpq-connect.html#id-1.7.3.8.3.6).
     endpoints: Vec<String>,
+
+    /// A list of databases to match (by using [POSIX Regular
+    /// Expressions](https://www.postgresql.org/docs/current/functions-matching.html#FUNCTIONS-POSIX-REGEXP)) against
+    /// the `datname` column for which you want to collect metrics from.
+    ///
+    /// If not set, metrics are collected from all databases. Specifying `""` will include metrics where `datname` is
+    /// `NULL`.
+    ///
+    /// This can be used in conjunction with `exclude_databases`.
     include_databases: Option<Vec<String>>,
+
+    /// A list of databases to match (by using [POSIX Regular
+    /// Expressions](https://www.postgresql.org/docs/current/functions-matching.html#FUNCTIONS-POSIX-REGEXP)) against
+    /// the `datname` column for which you don’t want to collect metrics from.
+    ///
+    /// Specifying `""` will include metrics where `datname` is `NULL`.
+    ///
+    /// This can be used in conjunction with `include_databases`.
     exclude_databases: Option<Vec<String>>,
+
+    /// The interval between scrapes, in seconds.
     scrape_interval_secs: u64,
+
+    /// Overrides the default namespace for the metrics emitted by the source.
+    ///
+    /// By default, `postgresql` is used.
     namespace: String,
+
+    #[configurable(derived)]
     tls: Option<PostgresqlMetricsTlsConfig>,
 }
 
@@ -124,14 +162,9 @@ impl Default for PostgresqlMetricsConfig {
     }
 }
 
-inventory::submit! {
-    SourceDescription::new::<PostgresqlMetricsConfig>("postgresql_metrics")
-}
-
 impl_generate_config_from_default!(PostgresqlMetricsConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "postgresql_metrics")]
 impl SourceConfig for PostgresqlMetricsConfig {
     async fn build(&self, mut cx: SourceContext) -> crate::Result<super::Source> {
         let datname_filter = DatnameFilter::new(
@@ -174,12 +207,8 @@ impl SourceConfig for PostgresqlMetricsConfig {
         }))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Metric)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "postgresql_metrics"
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -367,7 +396,7 @@ impl DatnameFilter {
                 if i > 0 {
                     query.push_str(" OR");
                 }
-                query.push_str(&format!(" datname ~ ${}", params.len()));
+                write!(query, " datname ~ ${}", params.len()).expect("write to String never fails");
             }
             query.push(')');
         }
@@ -383,7 +412,7 @@ impl DatnameFilter {
                 if i > 0 {
                     query.push_str(" OR");
                 }
-                query.push_str(&format!(" datname ~ ${}", params.len()));
+                write!(query, " datname ~ ${}", params.len()).expect("write to String never fails");
             }
             query.push(')');
         }

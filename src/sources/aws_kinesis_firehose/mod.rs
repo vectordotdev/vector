@@ -2,15 +2,16 @@ use std::{fmt, net::SocketAddr};
 
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use futures::FutureExt;
-use serde::{Deserialize, Serialize};
 use tracing::Span;
+use vector_common::sensitive_string::SensitiveString;
+use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 use warp::Filter;
 
 use crate::{
     codecs::DecodingConfig,
     config::{
         AcknowledgementsConfig, GenerateConfig, Output, Resource, SourceConfig, SourceContext,
-        SourceDescription,
     },
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
@@ -21,27 +22,65 @@ mod filters;
 mod handlers;
 mod models;
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the `aws_kinesis_firehose` source.
+#[configurable_component(source("aws_kinesis_firehose"))]
+#[derive(Clone, Debug)]
 pub struct AwsKinesisFirehoseConfig {
+    /// The address to listen for connections on.
     address: SocketAddr,
-    access_key: Option<String>,
-    tls: Option<TlsEnableableConfig>,
+
+    /// An optional access key to authenticate requests against.
+    ///
+    /// AWS Kinesis Firehose can be configured to pass along a user-configurable access key with each request. If
+    /// configured, `access_key` should be set to the same value. Otherwise, all requests will be allowed.
+    access_key: Option<SensitiveString>,
+
+    /// The compression scheme to use for decompressing records within the Firehose message.
+    ///
+    /// Some services, like AWS CloudWatch Logs, will [compress the events with
+    /// gzip](\(urls.aws_cloudwatch_logs_firehose)), before sending them AWS Kinesis Firehose. This option can be used
+    /// to automatically decompress them before forwarding them to the next component.
+    ///
+    /// Note that this is different from [Content encoding option](\(urls.aws_kinesis_firehose_http_protocol)) of the
+    /// Firehose HTTP endpoint destination. That option controls the content encoding of the entire HTTP request.
     record_compression: Option<Compression>,
+
+    #[configurable(derived)]
+    tls: Option<TlsEnableableConfig>,
+
+    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     framing: FramingConfig,
+
+    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
+
+    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
 }
 
-#[derive(Derivative, Copy, Clone, Debug, Deserialize, Serialize, PartialEq)]
+/// Compression scheme for records in a Firehose message.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 #[derivative(Default)]
 pub enum Compression {
+    /// Automatically attempt to determine the compression scheme.
+    ///
+    /// Vector will try to determine the compression scheme of the object by looking at its file signature, also known
+    /// as [magic bytes](\(urls.magic_bytes)).
+    ///
+    /// Given that determining the encoding using magic bytes is not a perfect check, if the record fails to decompress
+    /// with the discovered format, the record will be forwarded as-is. Thus, if you know the records will always be
+    /// gzip encoded (for example if they are coming from AWS CloudWatch Logs) then you should prefer to set `gzip` here
+    /// to have Vector reject any records that are not-gziped.
     #[derivative(Default)]
     Auto,
+    /// Uncompressed.
     None,
+    /// GZIP.
     Gzip,
 }
 
@@ -56,14 +95,18 @@ impl fmt::Display for Compression {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "aws_kinesis_firehose")]
 impl SourceConfig for AwsKinesisFirehoseConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
+        let decoder = DecodingConfig::new(
+            self.framing.clone(),
+            self.decoding.clone(),
+            LogNamespace::Legacy,
+        )
+        .build();
         let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
 
         let svc = filters::firehose(
-            self.access_key.clone(),
+            self.access_key.as_ref().map(|k| k.inner().to_owned()),
             self.record_compression.unwrap_or_default(),
             decoder,
             acknowledgements,
@@ -86,12 +129,8 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
         }))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(self.decoding.output_type())]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "aws_kinesis_firehose"
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -101,10 +140,6 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
     fn can_acknowledge(&self) -> bool {
         true
     }
-}
-
-inventory::submit! {
-    SourceDescription::new::<AwsKinesisFirehoseConfig>("aws_kinesis_firehose")
 }
 
 impl GenerateConfig for AwsKinesisFirehoseConfig {
@@ -182,10 +217,10 @@ mod tests {
     }
 
     async fn source(
-        access_key: Option<String>,
+        access_key: Option<SensitiveString>,
         record_compression: Option<Compression>,
         delivered: bool,
-    ) -> (impl Stream<Item = Event>, SocketAddr) {
+    ) -> (impl Stream<Item = Event> + Unpin, SocketAddr) {
         use EventStatus::*;
         let status = if delivered { Delivered } else { Rejected };
         let (sender, recv) = SourceSender::new_test_finalize(status);
@@ -439,7 +474,7 @@ mod tests {
 
     #[tokio::test]
     async fn aws_kinesis_firehose_rejects_bad_access_key() {
-        let (_rx, addr) = source(Some("an access key".to_string()), None, true).await;
+        let (_rx, addr) = source(Some("an access key".to_string().into()), None, true).await;
 
         let res = send(
             addr,

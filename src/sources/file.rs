@@ -8,21 +8,21 @@ use file_source::{
 };
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt};
 use regex::bytes::Regex;
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::{sync::oneshot, task::spawn_blocking};
 use tracing::{Instrument, Span};
+use vector_common::finalizer::OrderedFinalizer;
+use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 
-use super::util::{finalizer::OrderedFinalizer, EncodingConfig, MultilineConfig};
+use super::util::{EncodingConfig, MultilineConfig};
 use crate::{
-    config::{
-        log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext,
-        SourceDescription,
-    },
+    config::{log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext},
     encoding_transcode::{Decoder, Encoder},
     event::{BatchNotifier, BatchStatus, LogEvent},
     internal_events::{
         FileBytesReceived, FileEventsReceived, FileOpen, FileSourceInternalEventsEmitter,
+        StreamClosedError,
     },
     line_agg::{self, LineAgg},
     serde::bool_or_struct,
@@ -59,60 +59,170 @@ enum BuildError {
     },
 }
 
-#[derive(Deserialize, Serialize, Debug, PartialEq)]
+/// Configuration for the `file` source.
+#[configurable_component(source("file"))]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[serde(deny_unknown_fields, default)]
 pub struct FileConfig {
+    /// Array of file patterns to include. [Globbing](https://vector.dev/docs/reference/configuration/sources/file/#globbing) is supported.
     pub include: Vec<PathBuf>,
+
+    /// Array of file patterns to exclude. [Globbing](https://vector.dev/docs/reference/configuration/sources/file/#globbing) is supported.
+    ///
+    /// Takes precedence over the `include` option.
     pub exclude: Vec<PathBuf>,
+
+    /// Overrides the name of the log field used to add the file path to each event.
+    ///
+    /// The value will be the full path to the file where the event was read message.
+    ///
+    /// By default, `file` is used.
     pub file_key: Option<String>,
+
+    /// Whether or not to start reading from the beginning of a new file.
+    ///
+    /// DEPRECATED: This is a deprecated option -- replaced by `ignore_checkpoints`/`read_from` -- and should be removed.
+    #[configurable(deprecated)]
     pub start_at_beginning: Option<bool>,
+
+    /// Whether or not to ignore existing checkpoints when determining where to start reading a file.
+    ///
+    /// Checkpoints are still written normally.
     pub ignore_checkpoints: Option<bool>,
+
+    #[configurable(derived)]
     pub read_from: Option<ReadFromConfig>,
-    // Deprecated name
+
+    /// Ignore files with a data modification date older than the specified number of seconds.
     #[serde(alias = "ignore_older")]
     pub ignore_older_secs: Option<u64>,
+
+    /// The maximum number of bytes a line can contain before being discarded.
+    ///
+    /// This protects against malformed lines or tailing incorrect files.
     #[serde(default = "default_max_line_bytes")]
     pub max_line_bytes: usize,
+
+    /// Overrides the name of the log field used to add the current hostname to each event.
+    ///
+    /// The value will be the current hostname for wherever Vector is running.
+    ///
+    /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
+    ///
+    /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     pub host_key: Option<String>,
+
+    /// The directory used to persist file checkpoint positions.
+    ///
+    /// By default, the global `data_dir` option is used. Please make sure the user Vector is running as has write permissions to this directory.
     pub data_dir: Option<PathBuf>,
+
+    /// Enables adding the file offset to each event and sets the name of the log field used.
+    ///
+    /// The value will be the byte offset of the start of the line within the file.
+    ///
+    /// Off by default, the offset is only added to the event if this is set.
+    pub offset_key: Option<String>,
+
+    /// Delay between file discovery calls, in milliseconds.
+    ///
+    /// This controls the interval at which Vector searches for files. Higher value result in greater chances of some short living files being missed between searches, but lower value increases the performance impact of file discovery.
     #[serde(alias = "glob_minimum_cooldown")]
     pub glob_minimum_cooldown_ms: u64,
-    // Deprecated name
+
+    #[configurable(derived)]
     #[serde(alias = "fingerprinting")]
     fingerprint: FingerprintConfig,
+
+    /// Ignore missing files when fingerprinting.
+    ///
+    /// This may be useful when used with source directories containing dangling symlinks.
     pub ignore_not_found: bool,
+
+    /// String value used to identify the start of a multi-line message.
+    ///
+    /// DEPRECATED: This is a deprecated option -- replaced by `multiline` -- and should be removed.
+    #[configurable(deprecated)]
     pub message_start_indicator: Option<String>,
-    pub multi_line_timeout: u64, // millis
+
+    /// How long to wait for more data when aggregating a multi-line message, in milliseconds.
+    ///
+    /// DEPRECATED: This is a deprecated option -- replaced by `multiline` -- and should be removed.
+    #[configurable(deprecated)]
+    pub multi_line_timeout: u64,
+
+    /// Multiline aggregation configuration.
+    ///
+    /// If not specified, multiline aggregation is disabled.
     pub multiline: Option<MultilineConfig>,
+
+    /// An approximate limit on the amount of data read from a single file at a given time.
     pub max_read_bytes: usize,
+
+    /// Instead of balancing read capacity fairly across all watched files, prioritize draining the oldest files before moving on to read data from younger files.
     pub oldest_first: bool,
+
+    /// Timeout from reaching `EOF` after which file will be removed from filesystem, unless new data is written in the meantime.
+    ///
+    /// If not specified, files will not be removed.
     #[serde(alias = "remove_after")]
     pub remove_after_secs: Option<u64>,
+
+    /// String sequence used to separate one file line from another.
     pub line_delimiter: String,
+
+    #[configurable(derived)]
     pub encoding: Option<EncodingConfig>,
+
+    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
+/// Configuration for how files should be identified.
+///
+/// This is important for `checkpointing` when file rotation is used.
+#[configurable_component]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[serde(tag = "strategy", rename_all = "snake_case")]
 pub enum FingerprintConfig {
+    /// Read lines from the beginning of the file and compute a checksum over them.
     Checksum {
-        // Deprecated name
+        /// Maximum number of bytes to use, from the lines that are read, for generating the checksum.
+        ///
+        /// TODO: Should we properly expose this in the documentation? There could definitely be value in allowing more
+        /// bytes to be used for the checksum generation, but we should commit to exposing it rather than hiding it.
         #[serde(alias = "fingerprint_bytes")]
         bytes: Option<usize>,
+
+        /// The number of bytes to skip ahead (or ignore) when reading the data used for generating the checksum.
+        ///
+        /// This can be helpful if all files share a common header that should be skipped.
         ignored_header_bytes: usize,
+
+        /// The number of lines to read for generating the checksum.
+        ///
+        /// If your files share a common header that is not always a fixed size,
+        ///
+        /// If the file has less than this amount of lines, it won’t be read at all.
         #[serde(default = "default_lines")]
         lines: usize,
     },
+
+    /// Use the [device and inode](https://en.wikipedia.org/wiki/Inode) as the identifier.
     #[serde(rename = "device_and_inode")]
     DevInode,
 }
 
-#[derive(Serialize, Deserialize, Copy, Clone, Debug, PartialEq)]
+/// File position to use when reading a new file.
+#[configurable_component]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ReadFromConfig {
+    /// Read from the beginning of the file.
     Beginning,
+
+    /// Start reading from the current end of the file.
     End,
 }
 
@@ -183,6 +293,7 @@ impl Default for FileConfig {
             },
             ignore_not_found: false,
             host_key: None,
+            offset_key: None,
             data_dir: None,
             glob_minimum_cooldown_ms: 1000, // millis
             message_start_indicator: None,
@@ -198,14 +309,9 @@ impl Default for FileConfig {
     }
 }
 
-inventory::submit! {
-    SourceDescription::new::<FileConfig>("file")
-}
-
 impl_generate_config_from_default!(FileConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "file")]
 impl SourceConfig for FileConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         // add the source name as a subdir, so that multiple sources can
@@ -241,12 +347,8 @@ impl SourceConfig for FileConfig {
         ))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "file"
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -310,12 +412,15 @@ pub fn file_source(
         handle: tokio::runtime::Handle::current(),
     };
 
-    let file_key = config.file_key.clone();
-    let host_key = config
-        .host_key
-        .clone()
-        .unwrap_or_else(|| log_schema().host_key().to_string());
-    let hostname = crate::get_hostname().ok();
+    let event_metadata = EventMetadata {
+        host_key: config
+            .host_key
+            .clone()
+            .unwrap_or_else(|| log_schema().host_key().to_string()),
+        hostname: crate::get_hostname().ok(),
+        file_key: config.file_key.clone(),
+        offset_key: config.offset_key.clone(),
+    };
 
     let include = config.include.clone();
     let exclude = config.exclude.clone();
@@ -397,24 +502,40 @@ pub fn file_source(
         let span2 = span.clone();
         let mut messages = messages.map(move |line| {
             let _enter = span2.enter();
-            let mut event = create_event(line.text, line.filename, &host_key, &hostname, &file_key);
+            let mut event = create_event(
+                line.text,
+                line.start_offset,
+                &line.filename,
+                &event_metadata,
+            );
+
             if let Some(finalizer) = &finalizer {
                 let (batch, receiver) = BatchNotifier::new_with_receiver();
                 event = event.with_batch_notifier(&batch);
                 let entry = FinalizerEntry {
                     file_id: line.file_id,
-                    offset: line.offset,
+                    offset: line.end_offset,
                 };
                 finalizer.add(entry, receiver);
             } else {
-                checkpoints.update(line.file_id, line.offset);
+                checkpoints.update(line.file_id, line.end_offset);
             }
             event
         });
         tokio::spawn(async move {
-            out.send_event_stream(&mut messages)
+            match out
+                .send_event_stream(&mut messages)
                 .instrument(span.or_current())
                 .await
+            {
+                Ok(()) => {
+                    debug!("Finished sending.");
+                }
+                Err(error) => {
+                    let (count, _) = messages.size_hint();
+                    emit!(StreamClosedError { error, count });
+                }
+            }
         });
 
         let span = info_span!("file_server");
@@ -462,42 +583,56 @@ fn wrap_with_line_agg(
     let logic = line_agg::Logic::new(config);
     Box::new(
         LineAgg::new(
-            rx.map(|line| (line.filename, line.text, (line.file_id, line.offset))),
+            rx.map(|line| {
+                (
+                    line.filename,
+                    line.text,
+                    (line.file_id, line.start_offset, line.end_offset),
+                )
+            }),
             logic,
         )
-        .map(|(filename, text, (file_id, offset))| Line {
-            text,
-            filename,
-            file_id,
-            offset,
-        }),
+        .map(
+            |(filename, text, (file_id, start_offset, end_offset))| Line {
+                text,
+                filename,
+                file_id,
+                start_offset,
+                end_offset,
+            },
+        ),
     )
 }
 
-fn create_event(
-    line: Bytes,
-    file: String,
-    host_key: &str,
-    hostname: &Option<String>,
-    file_key: &Option<String>,
-) -> LogEvent {
+struct EventMetadata {
+    host_key: String,
+    hostname: Option<String>,
+    file_key: Option<String>,
+    offset_key: Option<String>,
+}
+
+fn create_event(line: Bytes, offset: u64, file: &str, meta: &EventMetadata) -> LogEvent {
     emit!(FileEventsReceived {
         count: 1,
-        file: &file,
+        file,
         byte_size: line.len(),
     });
 
-    let mut event = LogEvent::from(line);
+    let mut event = LogEvent::from_bytes_legacy(&line);
 
     // Add source type
     event.insert(log_schema().source_type_key(), Bytes::from("file"));
 
-    if let Some(file_key) = &file_key {
+    if let Some(offset_key) = &meta.offset_key {
+        event.insert(offset_key.as_str(), offset);
+    }
+
+    if let Some(file_key) = &meta.file_key {
         event.insert(file_key.as_str(), file);
     }
 
-    if let Some(hostname) = &hostname {
-        event.insert(host_key, hostname.clone());
+    if let Some(hostname) = &meta.hostname {
+        event.insert(meta.host_key.as_str(), hostname.clone());
     }
 
     event
@@ -641,15 +776,25 @@ mod tests {
     #[test]
     fn file_create_event() {
         let line = Bytes::from("hello world");
-        let file = "some_file.rs".to_string();
+        let file = "some_file.rs";
+
         let host_key = "host".to_string();
         let hostname = Some("Some.Machine".to_string());
         let file_key = Some("file".to_string());
+        let offset_key = Some("offset".to_string());
+        let offset: u64 = 0;
 
-        let log = create_event(line, file, &host_key, &hostname, &file_key);
+        let meta = EventMetadata {
+            host_key,
+            hostname,
+            file_key,
+            offset_key,
+        };
+        let log = create_event(line, offset, file, &meta);
 
         assert_eq!(log["file"], "some_file.rs".into());
         assert_eq!(log["host"], "Some.Machine".into());
+        assert_eq!(log["offset"], 0.into());
         assert_eq!(log[log_schema().message_key()], "hello world".into());
         assert_eq!(log[log_schema().source_type_key()], "file".into());
     }
@@ -908,16 +1053,16 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn file_file_key_acknowledged() {
-        file_file_key(Acks).await
+    async fn file_key_acknowledged() {
+        file_key(Acks).await
     }
 
     #[tokio::test]
-    async fn file_file_key_nonacknowledged() {
-        file_file_key(NoAcks).await
+    async fn file_key_nonacknowledged() {
+        file_key(NoAcks).await
     }
 
-    async fn file_file_key(acks: AckingMode) {
+    async fn file_key(acks: AckingMode) {
         // Default
         {
             let dir = tempdir().unwrap();

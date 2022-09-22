@@ -17,9 +17,7 @@ use nom::{
 use once_cell::sync::Lazy;
 use ordered_float::NotNan;
 use regex::Regex;
-use tracing::warn;
 use value::Value;
-use vrl_compiler::Target;
 
 use crate::{
     ast::{Function, FunctionArgument},
@@ -50,7 +48,7 @@ pub fn filter_from_function(f: &Function) -> Result<GrokFilter, GrokStaticError>
                 FunctionArgument::Arg(Value::Bytes(ref bytes)) => {
                     let mut re_str = String::new();
                     re_str.push_str(r"^[\w.\-_@");
-                    re_str.push_str(&String::from_utf8_lossy(bytes).to_string());
+                    re_str.push_str(&String::from_utf8_lossy(bytes));
                     re_str.push_str("]+");
                     Regex::new(re_str.as_str())
                         .map_err(|_e| GrokStaticError::InvalidFunctionArguments(f.name.clone()))?
@@ -146,11 +144,9 @@ pub fn apply_filter(value: &Value, filter: &KeyValueFilter) -> Result<Value, Gro
                     || matches!(&v, Value::Bytes(b) if b.is_empty())
                     || k.trim().is_empty())
                 {
-
                     let lookup: LookupBuf = Lookup::from(&k).into();
-                    result.target_insert(&lookup, v).unwrap_or_else(
-                        |error| warn!(message = "Error updating field value", field = %lookup, %error)
-                    );
+
+                    result.insert_by_path(&lookup, v);
                 }
             });
             Ok(result)

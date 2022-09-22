@@ -1,12 +1,13 @@
 use ::value::Value;
-use aes::cipher::block_padding::{AnsiX923, Iso10126, Iso7816, Pkcs7};
-use aes::cipher::generic_array::GenericArray;
-use aes::cipher::KeyIvInit;
-use aes::cipher::StreamCipher;
-use aes::cipher::{AsyncStreamCipher, BlockEncryptMut};
+use aes::cipher::{
+    block_padding::{AnsiX923, Iso10126, Iso7816, Pkcs7},
+    generic_array::GenericArray,
+    AsyncStreamCipher, BlockEncryptMut, KeyIvInit, StreamCipher,
+};
 use cfb_mode::Encryptor as Cfb;
 use ctr::Ctr64LE;
 use ofb::Ofb;
+use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
 
 type Aes128Cbc = cbc::Encryptor<aes::Aes128>;
@@ -185,9 +186,9 @@ impl Function for Encrypt {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let plaintext = arguments.required("plaintext");
         let algorithm = arguments.required("algorithm");
@@ -205,20 +206,13 @@ impl Function for Encrypt {
             }
         }
 
-        Ok(Box::new(EncryptFn {
+        Ok(EncryptFn {
             plaintext,
             algorithm,
             key,
             iv,
-        }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let plaintext = args.required("plaintext");
-        let algorithm = args.required("algorithm");
-        let key = args.required("key");
-        let iv = args.required("iv");
-        encrypt(plaintext, algorithm, key, iv)
+        }
+        .as_expr())
     }
 }
 
@@ -230,7 +224,7 @@ struct EncryptFn {
     iv: Box<dyn Expression>,
 }
 
-impl Expression for EncryptFn {
+impl FunctionExpression for EncryptFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let plaintext = self.plaintext.resolve(ctx)?;
         let algorithm = self.algorithm.resolve(ctx)?;
@@ -239,7 +233,7 @@ impl Expression for EncryptFn {
         encrypt(plaintext, algorithm, key, iv)
     }
 
-    fn type_def(&self, _state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _state: &state::TypeState) -> TypeDef {
         TypeDef::bytes().fallible()
     }
 }

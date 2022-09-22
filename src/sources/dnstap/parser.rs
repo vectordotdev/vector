@@ -17,9 +17,11 @@ use trust_dns_proto::{
 
 use crate::{
     event::{LogEvent, Value},
-    internal_events::DnstapParseError,
+    internal_events::DnstapParseWarning,
     Error, Result,
 };
+
+#[allow(warnings)]
 mod dnstap_proto {
     include!(concat!(env!("OUT_DIR"), "/dnstap.rs"));
 }
@@ -28,7 +30,8 @@ use dnstap_proto::{
     message::Type as DnstapMessageType, Dnstap, Message as DnstapMessage, SocketFamily,
     SocketProtocol,
 };
-use lookup::lookup_v2::OwnedPath;
+use lookup::lookup_v2::OwnedValuePath;
+use lookup::PathPrefix;
 
 use super::{
     dns_message::{
@@ -76,7 +79,7 @@ static DNSTAP_MESSAGE_RESPONSE_TYPE_IDS: Lazy<HashSet<i32>> = Lazy::new(|| {
 
 pub struct DnstapParser<'a> {
     event_schema: &'a DnstapEventSchema,
-    parent_key_path: OwnedPath,
+    parent_key_path: OwnedValuePath,
     log_event: &'a mut LogEvent,
 }
 
@@ -103,7 +106,8 @@ impl<'a> DnstapParser<'a> {
     {
         let mut node_path = self.parent_key_path.clone();
         node_path.push_field(key);
-        self.log_event.insert(&node_path, value)
+        self.log_event
+            .insert((PathPrefix::Event, &node_path), value)
     }
 
     pub fn parse_dnstap_data(&mut self, frame: Bytes) -> Result<()> {
@@ -149,9 +153,7 @@ impl<'a> DnstapParser<'a> {
             if dnstap_data_type == "Message" {
                 if let Some(message) = proto_msg.message {
                     if let Err(err) = self.parse_dnstap_message(message) {
-                        emit!(DnstapParseError {
-                            error: err.to_string().as_str()
-                        });
+                        emit!(DnstapParseWarning { error: &err });
                         need_raw_data = true;
                         self.insert(
                             self.event_schema.dnstap_root_data_schema().error(),
@@ -161,8 +163,8 @@ impl<'a> DnstapParser<'a> {
                 }
             }
         } else {
-            emit!(DnstapParseError {
-                error: format!("Unknown dnstap data type: {}", dnstap_data_type_id).as_str()
+            emit!(DnstapParseWarning {
+                error: format!("Unknown dnstap data type: {}", dnstap_data_type_id)
             });
             need_raw_data = true;
         }
@@ -623,7 +625,7 @@ impl<'a> DnstapParser<'a> {
         self.parent_key_path.push_field(key_path);
 
         for (i, query) in questions.iter().enumerate() {
-            self.parent_key_path.push_index(i);
+            self.parent_key_path.push_index(i as isize);
             self.log_dns_query_question(query);
             self.parent_key_path.segments.pop();
         }
@@ -828,7 +830,7 @@ impl<'a> DnstapParser<'a> {
         self.parent_key_path.push_field(key_path);
 
         options.iter().enumerate().for_each(|(i, opt)| {
-            self.parent_key_path.push_index(i);
+            self.parent_key_path.push_index(i as isize);
             self.log_edns_opt(opt);
             self.parent_key_path.segments.pop();
         });
@@ -855,7 +857,7 @@ impl<'a> DnstapParser<'a> {
         self.parent_key_path.push_field(key_path);
 
         for (i, record) in records.iter().enumerate() {
-            self.parent_key_path.push_index(i);
+            self.parent_key_path.push_index(i as isize);
             self.log_dns_record(record);
             self.parent_key_path.segments.pop();
         }
@@ -916,6 +918,14 @@ fn to_socket_protocol_name(socket_protocol: i32) -> Result<&'static str> {
         Ok("UDP")
     } else if socket_protocol == SocketProtocol::Tcp as i32 {
         Ok("TCP")
+    } else if socket_protocol == SocketProtocol::Dot as i32 {
+        Ok("DOT")
+    } else if socket_protocol == SocketProtocol::Doh as i32 {
+        Ok("DOH")
+    } else if socket_protocol == SocketProtocol::DnsCryptUdp as i32 {
+        Ok("DNSCryptUDP")
+    } else if socket_protocol == SocketProtocol::DnsCryptTcp as i32 {
+        Ok("DNSCryptTCP")
     } else {
         Err(Error::from(format!(
             "Unknown socket protocol: {}",
@@ -954,14 +964,13 @@ fn to_dnstap_message_type(type_id: i32) -> String {
 #[cfg(test)]
 mod tests {
     use super::{super::schema::DnstapEventSchema, *};
-    use crate::event::{Event, Value};
+    use crate::event::Value;
 
     #[test]
     fn test_parse_dnstap_data_with_query_message() {
-        let mut event = Event::new_empty_log();
-        let log_event = event.as_mut_log();
+        let mut log_event = LogEvent::default();
         let schema = DnstapEventSchema::new();
-        let mut parser = DnstapParser::new(&schema, log_event);
+        let mut parser = DnstapParser::new(&schema, &mut log_event);
         let raw_dnstap_data = "ChVqYW1lcy1WaXJ0dWFsLU1hY2hpbmUSC0JJTkQgOS4xNi4zcnoIAxACGAEiEAAAAAAAAA\
         AAAAAAAAAAAAAqECABBQJwlAAAAAAAAAAAADAw8+0CODVA7+zq9wVNMU3WNlI2kwIAAAABAAAAAAABCWZhY2Vib29rMQNjb\
         20AAAEAAQAAKQIAAACAAAAMAAoACOxjCAG9zVgzWgUDY29tAHgB";
@@ -1009,10 +1018,9 @@ mod tests {
 
     #[test]
     fn test_parse_dnstap_data_with_update_message() {
-        let mut event = Event::new_empty_log();
-        let log_event = event.as_mut_log();
+        let mut log_event = LogEvent::default();
         let schema = DnstapEventSchema::new();
-        let mut parser = DnstapParser::new(&schema, log_event);
+        let mut parser = DnstapParser::new(&schema, &mut log_event);
         let raw_dnstap_data = "ChVqYW1lcy1WaXJ0dWFsLU1hY2hpbmUSC0JJTkQgOS4xNi4zcmsIDhABGAEiBH8AAA\
         EqBH8AAAEwrG44AEC+iu73BU14gfofUh1wi6gAAAEAAAAAAAAHZXhhbXBsZQNjb20AAAYAAWC+iu73BW0agDwvch1wi6gAA\
         AEAAAAAAAAHZXhhbXBsZQNjb20AAAYAAXgB";
@@ -1062,10 +1070,9 @@ mod tests {
 
     #[test]
     fn test_parse_dnstap_data_with_invalid_data() {
-        let mut event = Event::new_empty_log();
-        let log_event = event.as_mut_log();
+        let mut log_event = LogEvent::default();
         let schema = DnstapEventSchema::new();
-        let mut parser = DnstapParser::new(&schema, log_event);
+        let mut parser = DnstapParser::new(&schema, &mut log_event);
         let e = parser
             .parse_dnstap_data(Bytes::from(vec![1, 2, 3]))
             .expect_err("Expected TrustDnsError.");
@@ -1083,6 +1090,10 @@ mod tests {
     fn test_get_socket_protocol_name() {
         assert_eq!("UDP", to_socket_protocol_name(1).unwrap());
         assert_eq!("TCP", to_socket_protocol_name(2).unwrap());
-        assert!(to_socket_protocol_name(3).is_err());
+        assert_eq!("DOT", to_socket_protocol_name(3).unwrap());
+        assert_eq!("DOH", to_socket_protocol_name(4).unwrap());
+        assert_eq!("DNSCryptUDP", to_socket_protocol_name(5).unwrap());
+        assert_eq!("DNSCryptTCP", to_socket_protocol_name(6).unwrap());
+        assert!(to_socket_protocol_name(7).is_err());
     }
 }

@@ -90,26 +90,15 @@ impl Function for Slice {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let start = arguments.required("start");
         let end = arguments.optional("end");
 
-        Ok(Box::new(SliceFn { value, start, end }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let start = args.required("start").try_integer()?;
-        let end = args
-            .optional("end")
-            .map(|value| value.try_integer())
-            .transpose()?;
-
-        slice(start, end, value)
+        Ok(SliceFn { value, start, end }.as_expr())
     }
 }
 
@@ -120,7 +109,7 @@ struct SliceFn {
     end: Option<Box<dyn Expression>>,
 }
 
-impl Expression for SliceFn {
+impl FunctionExpression for SliceFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let start = self.start.resolve(ctx)?.try_integer()?;
         let end = match &self.end {
@@ -132,13 +121,13 @@ impl Expression for SliceFn {
         slice(start, end, value)
     }
 
-    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
-        let td = TypeDef::from(Kind::empty()).fallible();
+    fn type_def(&self, state: &state::TypeState) -> TypeDef {
+        let td = TypeDef::from(Kind::never()).fallible();
 
         match self.value.type_def(state) {
-            v if v.is_bytes() => td.merge_deep(v),
-            v if v.is_array() => td.merge_deep(v).collect_subtypes(),
-            _ => td.add_bytes().add_array(Collection::any()),
+            v if v.is_bytes() => td.union(v),
+            v if v.is_array() => td.union(v).collect_subtypes(),
+            _ => td.or_bytes().or_array(Collection::any()),
         }
     }
 }

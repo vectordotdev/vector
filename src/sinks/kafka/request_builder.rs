@@ -4,13 +4,10 @@ use tokio_util::codec::Encoder as _;
 use vector_core::{config::LogSchema, ByteSizeOf};
 
 use crate::{
-    codecs::Encoder,
+    codecs::{Encoder, Transformer},
     event::{Event, Finalizable, Value},
-    internal_events::KafkaHeaderExtractionError,
-    sinks::{
-        kafka::service::{KafkaRequest, KafkaRequestMetadata},
-        util::encoding::Transformer,
-    },
+    internal_events::{KafkaHeaderExtractionError, TemplateRenderingError},
+    sinks::kafka::service::{KafkaRequest, KafkaRequestMetadata},
     template::Template,
 };
 
@@ -25,7 +22,18 @@ pub struct KafkaRequestBuilder {
 
 impl KafkaRequestBuilder {
     pub fn build_request(&mut self, mut event: Event) -> Option<KafkaRequest> {
-        let topic = self.topic_template.render_string(&event).ok()?;
+        let topic = self
+            .topic_template
+            .render_string(&event)
+            .map_err(|error| {
+                emit!(TemplateRenderingError {
+                    field: None,
+                    drop_event: true,
+                    error,
+                });
+            })
+            .ok()?;
+
         let metadata = KafkaRequestMetadata {
             finalizers: event.take_finalizers(),
             key: get_key(&event, &self.key_field),
@@ -109,6 +117,7 @@ mod tests {
     use rdkafka::message::Headers;
 
     use super::*;
+    use crate::event::LogEvent;
 
     #[test]
     fn kafka_get_headers() {
@@ -117,7 +126,7 @@ mod tests {
         header_values.insert("a-key".to_string(), Value::Bytes(Bytes::from("a-value")));
         header_values.insert("b-key".to_string(), Value::Bytes(Bytes::from("b-value")));
 
-        let mut event = Event::from("hello");
+        let mut event = Event::Log(LogEvent::from("hello"));
         event.as_mut_log().insert(headers_key, header_values);
 
         let headers = get_headers(&event, &Some(headers_key.to_string())).unwrap();

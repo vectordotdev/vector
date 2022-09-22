@@ -4,41 +4,54 @@ use std::net::SocketAddr;
 use bytes::{Buf, Bytes, BytesMut};
 use codecs::StreamDecodingError;
 use flate2::read::MultiGzDecoder;
-use lookup::path;
+use lookup::event_path;
 use rmp_serde::{decode, Deserializer};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use smallvec::{smallvec, SmallVec};
 use tokio_util::codec::Decoder;
+use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 
 use super::util::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
-        SourceConfig, SourceContext, SourceDescription,
+        SourceConfig, SourceContext,
     },
     event::{Event, LogEvent},
     internal_events::{FluentMessageDecodeError, FluentMessageReceived},
     serde::bool_or_struct,
     tcp::TcpKeepaliveConfig,
-    tls::{MaybeTlsSettings, TlsEnableableConfig},
+    tls::{MaybeTlsSettings, TlsSourceConfig},
 };
 
 mod message;
 use self::message::{FluentEntry, FluentMessage, FluentRecord, FluentTag, FluentTimestamp};
 
-#[derive(Deserialize, Serialize, Debug)]
+/// Configuration for the `fluent` source.
+#[configurable_component(source("fluent"))]
+#[derive(Clone, Debug)]
 pub struct FluentConfig {
+    /// The address to listen for connections on.
     address: SocketListenAddr,
-    tls: Option<TlsEnableableConfig>,
+
+    /// The maximum number of TCP connections that will be allowed at any given time.
+    connection_limit: Option<u32>,
+
+    #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
+
+    /// The size, in bytes, of the receive buffer used for each connection.
+    ///
+    /// This should not typically needed to be changed.
     receive_buffer_bytes: Option<usize>,
+
+    #[configurable(derived)]
+    tls: Option<TlsSourceConfig>,
+
+    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
-    connection_limit: Option<u32>,
-}
-
-inventory::submit! {
-    SourceDescription::new::<FluentConfig>("fluent")
 }
 
 impl GenerateConfig for FluentConfig {
@@ -56,17 +69,22 @@ impl GenerateConfig for FluentConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "fluent")]
 impl SourceConfig for FluentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let source = FluentSource {};
         let shutdown_secs = 30;
-        let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
+        let tls_config = self.tls.as_ref().map(|tls| tls.tls_config.clone());
+        let tls_client_metadata_key = self
+            .tls
+            .as_ref()
+            .and_then(|tls| tls.client_metadata_key.clone());
+        let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
         source.run(
             self.address,
             self.keepalive,
             shutdown_secs,
             tls,
+            tls_client_metadata_key,
             self.receive_buffer_bytes,
             cx,
             self.acknowledgements,
@@ -74,12 +92,8 @@ impl SourceConfig for FluentConfig {
         )
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "fluent"
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -443,7 +457,7 @@ impl From<FluentEvent> for LogEvent {
         log.insert(log_schema().timestamp_key(), timestamp);
         log.insert("tag", tag);
         for (key, value) in record.into_iter() {
-            log.insert(path!(&key), value);
+            log.insert(event_path!(&key), value);
         }
         log
     }
@@ -454,6 +468,7 @@ mod tests {
     use bytes::BytesMut;
     use chrono::{DateTime, Utc};
     use rmp_serde::Serializer;
+    use serde::Serialize;
     use std::collections::BTreeMap;
     use tokio::{
         io::{AsyncReadExt, AsyncWriteExt},
@@ -493,7 +508,7 @@ mod tests {
             101, 115, 115, 97, 103, 101, 163, 98, 97, 114,
         ];
 
-        let expected = Event::from(BTreeMap::from([
+        let expected = Event::Log(LogEvent::from(BTreeMap::from([
             (String::from("message"), Value::from("bar")),
             (String::from("tag"), Value::from("tag.name")),
             (
@@ -504,7 +519,7 @@ mod tests {
                         .into(),
                 ),
             ),
-        ]));
+        ])));
         let got = decode_all(message.clone()).unwrap();
         assert_event_data_eq!(got.0[0], expected);
         assert_eq!(got.1, message.len());
@@ -523,7 +538,7 @@ mod tests {
             101, 115, 115, 97, 103, 101, 163, 98, 97, 114, 129, 164, 115, 105, 122, 101, 1,
         ];
 
-        let expected = Event::from(BTreeMap::from([
+        let expected = Event::Log(LogEvent::from(BTreeMap::from([
             (String::from("message"), Value::from("bar")),
             (String::from("tag"), Value::from("tag.name")),
             (
@@ -534,7 +549,7 @@ mod tests {
                         .into(),
                 ),
             ),
-        ]));
+        ])));
         let got = decode_all(message.clone()).unwrap();
         assert_eq!(got.1, message.len());
         assert_event_data_eq!(got.0[0], expected);
@@ -558,7 +573,7 @@ mod tests {
         ];
 
         let expected = vec![
-            Event::from(BTreeMap::from([
+            Event::Log(LogEvent::from(BTreeMap::from([
                 (String::from("message"), Value::from("foo")),
                 (String::from("tag"), Value::from("tag.name")),
                 (
@@ -569,8 +584,8 @@ mod tests {
                             .into(),
                     ),
                 ),
-            ])),
-            Event::from(BTreeMap::from([
+            ]))),
+            Event::Log(LogEvent::from(BTreeMap::from([
                 (String::from("message"), Value::from("bar")),
                 (String::from("tag"), Value::from("tag.name")),
                 (
@@ -581,8 +596,8 @@ mod tests {
                             .into(),
                     ),
                 ),
-            ])),
-            Event::from(BTreeMap::from([
+            ]))),
+            Event::Log(LogEvent::from(BTreeMap::from([
                 (String::from("message"), Value::from("baz")),
                 (String::from("tag"), Value::from("tag.name")),
                 (
@@ -593,7 +608,7 @@ mod tests {
                             .into(),
                     ),
                 ),
-            ])),
+            ]))),
         ];
 
         let got = decode_all(message.clone()).unwrap();
@@ -624,7 +639,7 @@ mod tests {
         ];
 
         let expected = vec![
-            Event::from(BTreeMap::from([
+            Event::Log(LogEvent::from(BTreeMap::from([
                 (String::from("message"), Value::from("foo")),
                 (String::from("tag"), Value::from("tag.name")),
                 (
@@ -635,8 +650,8 @@ mod tests {
                             .into(),
                     ),
                 ),
-            ])),
-            Event::from(BTreeMap::from([
+            ]))),
+            Event::Log(LogEvent::from(BTreeMap::from([
                 (String::from("message"), Value::from("bar")),
                 (String::from("tag"), Value::from("tag.name")),
                 (
@@ -647,8 +662,8 @@ mod tests {
                             .into(),
                     ),
                 ),
-            ])),
-            Event::from(BTreeMap::from([
+            ]))),
+            Event::Log(LogEvent::from(BTreeMap::from([
                 (String::from("message"), Value::from("baz")),
                 (String::from("tag"), Value::from("tag.name")),
                 (
@@ -659,7 +674,7 @@ mod tests {
                             .into(),
                     ),
                 ),
-            ])),
+            ]))),
         ];
 
         let got = decode_all(message.clone()).unwrap();
@@ -691,7 +706,7 @@ mod tests {
         ];
 
         let expected = vec![
-            Event::from(BTreeMap::from([
+            Event::Log(LogEvent::from(BTreeMap::from([
                 (String::from("message"), Value::from("foo")),
                 (String::from("tag"), Value::from("tag.name")),
                 (
@@ -702,8 +717,8 @@ mod tests {
                             .into(),
                     ),
                 ),
-            ])),
-            Event::from(BTreeMap::from([
+            ]))),
+            Event::Log(LogEvent::from(BTreeMap::from([
                 (String::from("message"), Value::from("bar")),
                 (String::from("tag"), Value::from("tag.name")),
                 (
@@ -714,8 +729,8 @@ mod tests {
                             .into(),
                     ),
                 ),
-            ])),
-            Event::from(BTreeMap::from([
+            ]))),
+            Event::Log(LogEvent::from(BTreeMap::from([
                 (String::from("message"), Value::from("baz")),
                 (String::from("tag"), Value::from("tag.name")),
                 (
@@ -726,7 +741,7 @@ mod tests {
                             .into(),
                     ),
                 ),
-            ])),
+            ]))),
         ];
 
         let got = decode_all(message.clone()).unwrap();
@@ -759,7 +774,7 @@ mod tests {
         ];
 
         let expected = vec![
-            Event::from(BTreeMap::from([
+            Event::Log(LogEvent::from(BTreeMap::from([
                 (String::from("message"), Value::from("foo")),
                 (String::from("tag"), Value::from("tag.name")),
                 (
@@ -770,8 +785,8 @@ mod tests {
                             .into(),
                     ),
                 ),
-            ])),
-            Event::from(BTreeMap::from([
+            ]))),
+            Event::Log(LogEvent::from(BTreeMap::from([
                 (String::from("message"), Value::from("bar")),
                 (String::from("tag"), Value::from("tag.name")),
                 (
@@ -782,8 +797,8 @@ mod tests {
                             .into(),
                     ),
                 ),
-            ])),
-            Event::from(BTreeMap::from([
+            ]))),
+            Event::Log(LogEvent::from(BTreeMap::from([
                 (String::from("message"), Value::from("baz")),
                 (String::from("tag"), Value::from("tag.name")),
                 (
@@ -794,7 +809,7 @@ mod tests {
                             .into(),
                     ),
                 ),
-            ])),
+            ]))),
         ];
 
         let got = decode_all(message.clone()).unwrap();
@@ -1001,8 +1016,8 @@ mod integration_tests {
                         .await
                         .unwrap();
                     sleep(Duration::from_secs(2)).await;
-                    let result = collect_ready(out).await;
-                    result
+
+                    collect_ready(out).await
                 })
                 .await;
 
@@ -1095,7 +1110,7 @@ mod integration_tests {
         .await;
     }
 
-    async fn source(status: EventStatus) -> (impl Stream<Item = Event>, SocketAddr) {
+    async fn source(status: EventStatus) -> (impl Stream<Item = Event> + Unpin, SocketAddr) {
         let (sender, recv) = SourceSender::new_test_finalize(status);
         let address = next_addr_for_ip(std::net::IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED));
         tokio::spawn(async move {

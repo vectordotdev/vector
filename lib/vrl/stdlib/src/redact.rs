@@ -60,9 +60,9 @@ impl Function for Redact {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
@@ -91,61 +91,12 @@ impl Function for Redact {
 
         let redactor = Redactor::Full;
 
-        Ok(Box::new(RedactFn {
+        Ok(RedactFn {
             value,
             filters,
             redactor,
-        }))
-    }
-
-    fn compile_argument(
-        &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        match (name, expr) {
-            ("filters", Some(expr)) => {
-                let filters = expr.as_value().ok_or_else(|| {
-                    vrl::function::Error::ExpectedStaticExpression {
-                        keyword: "filters",
-                        expr: expr.clone(),
-                    }
-                })?;
-                let filters = filters
-                    .try_array()
-                    .map_err(|_| vrl::function::Error::ExpectedStaticExpression {
-                        keyword: "filters",
-                        expr: expr.clone(),
-                    })?
-                    .into_iter()
-                    .map(|value| {
-                        value.clone().try_into().map_err(|error| {
-                            vrl::function::Error::InvalidArgument {
-                                keyword: "filters",
-                                value,
-                                error,
-                            }
-                        })
-                    })
-                    .collect::<std::result::Result<Vec<Filter>, vrl::function::Error>>()?;
-
-                Ok(Some(Box::new(filters) as _))
-            }
-            _ => Ok(None),
         }
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let redactor = Redactor::Full;
-        let filters = args
-            .required_any("filters")
-            .downcast_ref::<Vec<Filter>>()
-            .unwrap();
-
-        Ok(redact(value, filters, &redactor))
+        .as_expr())
     }
 }
 
@@ -185,7 +136,7 @@ fn redact(value: Value, filters: &[Filter], redactor: &Redactor) -> Value {
     }
 }
 
-impl Expression for RedactFn {
+impl FunctionExpression for RedactFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let filters = &self.filters;
@@ -194,7 +145,7 @@ impl Expression for RedactFn {
         Ok(redact(value, filters, redactor))
     }
 
-    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &state::TypeState) -> TypeDef {
         self.value.type_def(state).infallible()
     }
 }
@@ -294,7 +245,7 @@ enum Redactor {
 
 impl Redactor {
     fn pattern(&self) -> &str {
-        use Redactor::*;
+        use Redactor::Full;
 
         match self {
             Full => "[REDACTED]",
@@ -312,7 +263,7 @@ impl FromStr for Redactor {
     type Err = &'static str;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        use Redactor::*;
+        use Redactor::Full;
 
         match s {
             "full" => Ok(Full),

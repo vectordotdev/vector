@@ -1,52 +1,50 @@
-use lookup::LookupBuf;
+use lookup::OwnedTargetPath;
 
+use crate::state::TypeState;
 use crate::{
     expression::{Block, Resolved},
-    state::{ExternalEnv, LocalEnv},
     Context, Expression,
 };
 
 #[derive(Debug, Clone)]
 pub struct Program {
+    /// The initial state that the program was compiled with.
+    pub(crate) initial_state: TypeState,
     pub(crate) expressions: Block,
     pub(crate) info: ProgramInfo,
 }
 
 impl Program {
-    /// Get a reference to the final local environment of the compiler that
-    /// compiled the current program.
-    ///
-    /// Can be used to instantiate a new program with the same local state as
-    /// the previous program.
-    ///
-    /// Specifically, this is used by the VRL REPL to incrementally compile
-    /// a program as each line is compiled.
-    pub fn local_env(&self) -> &LocalEnv {
-        &self.expressions.local_env
+    /// Retrieves the state of the type system before the program runs.
+    #[must_use]
+    pub fn initial_type_state(&self) -> TypeState {
+        self.initial_state.clone()
+    }
+
+    /// Retrieves the state of the type system after the program runs.
+    #[must_use]
+    pub fn final_type_state(&self) -> TypeState {
+        self.expressions.type_info(&self.initial_state).state
     }
 
     /// Get detailed information about the program, as collected by the VRL
     /// compiler.
+    #[must_use]
     pub fn info(&self) -> &ProgramInfo {
         &self.info
     }
 
     /// Resolve the program to its final [`Value`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the program resulted in a runtime error.
     pub fn resolve(&self, ctx: &mut Context) -> Resolved {
         self.expressions.resolve(ctx)
     }
-
-    /// Compile the program down to the [`Vm`] runtime.
-    pub fn compile_to_vm(
-        &self,
-        vm: &mut crate::vm::Vm,
-        state: (&mut LocalEnv, &mut ExternalEnv),
-    ) -> Result<(), String> {
-        self.expressions.compile_to_vm(vm, state)
-    }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProgramInfo {
     /// Returns whether the compiled program can fail at runtime.
     ///
@@ -61,9 +59,9 @@ pub struct ProgramInfo {
     pub abortable: bool,
 
     /// A list of possible queries made to the external [`Target`] at runtime.
-    pub target_queries: Vec<LookupBuf>,
+    pub target_queries: Vec<OwnedTargetPath>,
 
     /// A list of possible assignments made to the external [`Target`] at
     /// runtime.
-    pub target_assignments: Vec<LookupBuf>,
+    pub target_assignments: Vec<OwnedTargetPath>,
 }

@@ -92,7 +92,7 @@ where
     let (trigger, tripwire) = Tripwire::new();
     let server = Server::bind(&addr)
         .serve(service)
-        .with_graceful_shutdown(tripwire.then(crate::stream::tripwire_handler))
+        .with_graceful_shutdown(tripwire.then(crate::shutdown::tripwire_handler))
         .map_err(|error| panic!("Server error: {}", error));
 
     (rx, trigger, server)

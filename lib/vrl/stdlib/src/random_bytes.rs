@@ -41,9 +41,9 @@ impl Function for RandomBytes {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let length = arguments.required("length");
 
@@ -58,12 +58,7 @@ impl Function for RandomBytes {
             })?;
         }
 
-        Ok(Box::new(RandomBytesFn { length }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let length = args.required("length");
-        random_bytes(length)
+        Ok(RandomBytesFn { length }.as_expr())
     }
 }
 
@@ -83,13 +78,13 @@ struct RandomBytesFn {
     length: Box<dyn Expression>,
 }
 
-impl Expression for RandomBytesFn {
+impl FunctionExpression for RandomBytesFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let length = self.length.resolve(ctx)?;
         random_bytes(length)
     }
 
-    fn type_def(&self, _state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _state: &state::TypeState) -> TypeDef {
         match self.length.as_value() {
             None => TypeDef::bytes().fallible(),
             Some(value) => {

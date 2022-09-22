@@ -38,17 +38,13 @@ impl Function for IsInteger {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(IsIntegerFn { value }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        Ok(value!(args.required("value").is_integer()))
+        Ok(IsIntegerFn { value }.as_expr())
     }
 }
 
@@ -57,12 +53,12 @@ struct IsIntegerFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for IsIntegerFn {
+impl FunctionExpression for IsIntegerFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         self.value.resolve(ctx).map(|v| value!(v.is_integer()))
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::boolean().infallible()
     }
 }

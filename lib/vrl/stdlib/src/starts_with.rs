@@ -118,49 +118,20 @@ impl Function for StartsWith {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let substring = arguments.required("substring");
         let case_sensitive = arguments.optional("case_sensitive").unwrap_or(expr!(true));
 
-        Ok(Box::new(StartsWithFn {
+        Ok(StartsWithFn {
             value,
             substring,
             case_sensitive,
-        }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Resolved {
-        let value = arguments.required("value");
-        let substring = arguments.required("substring");
-        let case_sensitive = arguments
-            .optional("case_sensitive")
-            .map(|arg| arg.try_boolean())
-            .transpose()?
-            .unwrap_or(true);
-        let substring = {
-            let value = substring;
-            let string = value.try_bytes_utf8_lossy()?;
-
-            match case_sensitive {
-                true => string.into_owned(),
-                false => string.to_lowercase(),
-            }
-        };
-
-        let value = {
-            let string = value.try_bytes_utf8_lossy()?;
-
-            match case_sensitive {
-                true => string.into_owned(),
-                false => string.to_lowercase(),
-            }
-        };
-
-        Ok(value.starts_with(&substring).into())
+        }
+        .as_expr())
     }
 }
 
@@ -171,7 +142,7 @@ struct StartsWithFn {
     case_sensitive: Box<dyn Expression>,
 }
 
-impl Expression for StartsWithFn {
+impl FunctionExpression for StartsWithFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let case_sensitive = if self.case_sensitive.resolve(ctx)?.try_boolean()? {
             Case::Sensitive
@@ -188,7 +159,7 @@ impl Expression for StartsWithFn {
         Ok(starts_with(&value, &substring, case_sensitive).into())
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::boolean().infallible()
     }
 }

@@ -8,20 +8,18 @@ use chrono::Utc;
 use futures::{stream, FutureExt, StreamExt, TryFutureExt};
 use http::uri::Scheme;
 use hyper::{Body, Request};
-use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use tokio_stream::wrappers::IntervalStream;
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    config::{
-        self, GenerateConfig, Output, ProxyConfig, SourceConfig, SourceContext, SourceDescription,
-    },
+    config::{self, GenerateConfig, Output, ProxyConfig, SourceConfig, SourceContext},
     event::metric::{Metric, MetricKind, MetricValue},
     http::HttpClient,
     internal_events::{
         ApacheMetricsEventsReceived, ApacheMetricsHttpError, ApacheMetricsParseError,
-        ApacheMetricsResponseError, EndpointBytesReceived, RequestCompleted,
+        ApacheMetricsResponseError, EndpointBytesReceived, RequestCompleted, StreamClosedError,
     },
     shutdown::ShutdownSignal,
     SourceSender,
@@ -30,12 +28,22 @@ use crate::{
 mod parser;
 
 pub use parser::ParseError;
+use vector_core::config::LogNamespace;
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
-struct ApacheMetricsConfig {
+/// Configuration for the `apache_metrics` source.
+#[configurable_component(source("apache_metrics"))]
+#[derive(Clone, Debug)]
+pub struct ApacheMetricsConfig {
+    /// The list of `mod_status` endpoints to scrape metrics from.
     endpoints: Vec<String>,
+
+    /// The interval between scrapes, in seconds.
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
+
+    /// The namespace of the metric.
+    ///
+    /// Disabled if empty.
     #[serde(default = "default_namespace")]
     namespace: String,
 }
@@ -46,10 +54,6 @@ pub const fn default_scrape_interval_secs() -> u64 {
 
 pub fn default_namespace() -> String {
     "apache".to_string()
-}
-
-inventory::submit! {
-    SourceDescription::new::<ApacheMetricsConfig>("apache_metrics")
 }
 
 impl GenerateConfig for ApacheMetricsConfig {
@@ -64,7 +68,6 @@ impl GenerateConfig for ApacheMetricsConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "apache_metrics")]
 impl SourceConfig for ApacheMetricsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let urls = self
@@ -86,12 +89,8 @@ impl SourceConfig for ApacheMetricsConfig {
         ))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(config::DataType::Metric)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "apache_metrics"
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -265,11 +264,12 @@ fn apache_metrics(
 
         match out.send_event_stream(&mut stream).await {
             Ok(()) => {
-                info!("Finished sending.");
+                debug!("Finished sending.");
                 Ok(())
             }
             Err(error) => {
-                error!(message = "Error sending metric.", %error);
+                let (count, _) = stream.size_hint();
+                emit!(StreamClosedError { error, count });
                 Err(())
             }
         }

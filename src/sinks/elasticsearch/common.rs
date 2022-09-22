@@ -1,26 +1,21 @@
 use std::collections::HashMap;
-use std::time::SystemTime;
 
-use aws_sigv4::http_request::{SignableRequest, SigningSettings};
-use aws_sigv4::SigningParams;
-use aws_types::credentials::{ProvideCredentials, SharedCredentialsProvider};
+use aws_types::credentials::SharedCredentialsProvider;
 use aws_types::region::Region;
 use bytes::Bytes;
 use http::{StatusCode, Uri};
 use snafu::ResultExt;
 
-use super::{InvalidHostSnafu, Request};
+use super::{
+    request_builder::ElasticsearchRequestBuilder, ElasticsearchEncoder, InvalidHostSnafu, Request,
+};
 use crate::{
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         elasticsearch::{
-            encoder::ElasticsearchEncoder, ElasticsearchAuth, ElasticsearchCommonMode,
-            ElasticsearchConfig, ParseError,
+            ElasticsearchAuth, ElasticsearchCommonMode, ElasticsearchConfig, ParseError,
         },
-        util::{
-            encoding::EncodingConfigFixed, http::RequestConfig, Compression, TowerRequestConfig,
-            UriSerde,
-        },
+        util::{http::RequestConfig, TowerRequestConfig, UriSerde},
         HealthcheckError,
     },
     tls::TlsSettings,
@@ -33,12 +28,9 @@ pub struct ElasticsearchCommon {
     pub bulk_uri: Uri,
     pub http_auth: Option<Auth>,
     pub aws_auth: Option<SharedCredentialsProvider>,
-    pub encoding: EncodingConfigFixed<ElasticsearchEncoder>,
     pub mode: ElasticsearchCommonMode,
-    pub doc_type: String,
-    pub suppress_type_name: bool,
+    pub request_builder: ElasticsearchRequestBuilder,
     pub tls_settings: TlsSettings,
-    pub compression: Compression,
     pub region: Option<Region>,
     pub request: RequestConfig,
     pub query_params: HashMap<String, String>,
@@ -84,10 +76,17 @@ impl ElasticsearchCommon {
             }
         };
 
-        let compression = config.compression;
         let mode = config.common_mode()?;
 
         let doc_type = config.doc_type.clone().unwrap_or_else(|| "_doc".into());
+        let request_builder = ElasticsearchRequestBuilder {
+            compression: config.compression,
+            encoder: ElasticsearchEncoder {
+                transformer: config.encoding.clone(),
+                doc_type,
+                suppress_type_name: config.suppress_type_name,
+            },
+        };
 
         let tower_request = config
             .request
@@ -127,12 +126,9 @@ impl ElasticsearchCommon {
             http_auth,
             base_url,
             bulk_uri,
-            compression,
             aws_auth,
-            doc_type,
-            suppress_type_name: config.suppress_type_name,
-            encoding: config.encoding,
             mode,
+            request_builder,
             query_params,
             request,
             region,
@@ -147,6 +143,11 @@ impl ElasticsearchCommon {
         if let Some(authorization) = &self.http_auth {
             builder = authorization.apply_builder(builder);
         }
+
+        for (header, value) in &self.request.headers {
+            builder = builder.header(&header[..], &value[..]);
+        }
+
         let mut request = builder.body(Bytes::new())?;
 
         if let Some(credentials_provider) = &self.aws_auth {
@@ -166,22 +167,5 @@ pub async fn sign_request(
     credentials_provider: &SharedCredentialsProvider,
     region: &Option<Region>,
 ) -> crate::Result<()> {
-    let signable_request = SignableRequest::from(&*request);
-    let credentials = credentials_provider.provide_credentials().await?;
-    let mut signing_params_builder = SigningParams::builder()
-        .access_key(credentials.access_key_id())
-        .secret_key(credentials.secret_access_key())
-        .region(region.as_ref().map(|r| r.as_ref()).unwrap_or(""))
-        .service_name("es")
-        .time(SystemTime::now())
-        .settings(SigningSettings::default());
-
-    signing_params_builder.set_security_token(credentials.session_token());
-
-    let (signing_instructions, _signature) =
-        aws_sigv4::http_request::sign(signable_request, &signing_params_builder.build()?)?
-            .into_parts();
-    signing_instructions.apply_to_request(request);
-
-    Ok(())
+    crate::aws::sign_request("es", request, credentials_provider, region).await
 }

@@ -3,7 +3,6 @@ use std::{fmt, future::Future, hash::Hash, num::NonZeroUsize, pin::Pin, sync::Ar
 use futures_util::{stream::Map, Stream, StreamExt};
 use tower::Service;
 use vector_core::{
-    buffers::{Ackable, Acker},
     event::{Finalizable, Metric},
     partition::Partitioner,
     stream::{
@@ -122,7 +121,7 @@ pub trait SinkBuilderExt: Stream {
     ///
     /// As an example, the normal `request_builder` doesn't allow for a batch of input events to be
     /// split up: all events must be split at the beginning, encoded separately (and all together),
-    /// and the nreassembled into the request.  If the encoding of these events caused a payload to
+    /// and then reassembled into the request.  If the encoding of these events caused a payload to
     /// be generated that was, say, too large, you would have to back out the operation entirely by
     /// failing the batch.
     ///
@@ -191,18 +190,15 @@ pub trait SinkBuilderExt: Stream {
     /// This is typically a terminal step in building a sink, bridging the gap from the processing
     /// that must be performed by Vector (in the stream) to the underlying sink itself (the
     /// service).
-    ///
-    /// As it is intended to be a terminal step, we require an [`Acker`] in order to be able to
-    /// provide acking based on the responses from the underlying service.
-    fn into_driver<Svc>(self, service: Svc, acker: Acker) -> Driver<Self, Svc>
+    fn into_driver<Svc>(self, service: Svc) -> Driver<Self, Svc>
     where
         Self: Sized,
-        Self::Item: Ackable + Finalizable,
+        Self::Item: Finalizable,
         Svc: Service<Self::Item>,
         Svc::Error: fmt::Debug + 'static,
         Svc::Future: Send + 'static,
         Svc::Response: DriverResponse,
     {
-        Driver::new(self, service, acker)
+        Driver::new(self, service)
     }
 }

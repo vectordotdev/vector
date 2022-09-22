@@ -13,26 +13,23 @@ fn is_json(value: Value) -> Resolved {
 fn is_json_with_variant(value: Value, variant: &Bytes) -> Resolved {
     let bytes = value.try_bytes()?;
 
-    match serde_json::from_slice::<'_, serde::de::IgnoredAny>(&bytes) {
-        Err(_) => Ok(value!(false)),
-        Ok(_) => {
-            for c in bytes {
-                return match c {
-                    // Search for the first non whitespace char
-                    b' ' | b'\n' | b'\t' | b'\r' => continue,
-                    b'{' => Ok(value!(variant.as_ref() == b"object")),
-                    b'[' => Ok(value!(variant.as_ref() == b"array")),
-                    b't' | b'f' => Ok(value!(variant.as_ref() == b"bool")),
-                    b'-' | b'0'..=b'9' => Ok(value!(variant.as_ref() == b"number")),
-                    b'"' => Ok(value!(variant.as_ref() == b"string")),
-                    b'n' => Ok(value!(variant.as_ref() == b"null")),
-                    _ => Ok(value!(false)),
-                };
-            }
-            // Empty input value cannot be any type, not a specific variant
-            Ok(value!(false))
+    if serde_json::from_slice::<'_, serde::de::IgnoredAny>(&bytes).is_ok() {
+        for c in bytes {
+            return match c {
+                // Search for the first non whitespace char
+                b' ' | b'\n' | b'\t' | b'\r' => continue,
+                b'{' => Ok(value!(variant.as_ref() == b"object")),
+                b'[' => Ok(value!(variant.as_ref() == b"array")),
+                b't' | b'f' => Ok(value!(variant.as_ref() == b"bool")),
+                b'-' | b'0'..=b'9' => Ok(value!(variant.as_ref() == b"number")),
+                b'"' => Ok(value!(variant.as_ref() == b"string")),
+                b'n' => Ok(value!(variant.as_ref() == b"null")),
+                _ => break,
+            };
         }
     }
+
+    Ok(value!(false))
 }
 
 fn variants() -> Vec<Value> {
@@ -96,9 +93,9 @@ impl Function for IsJson {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let variant = arguments.optional_enum("variant", &variants())?;
@@ -108,42 +105,9 @@ impl Function for IsJson {
                 let variant = raw_variant
                     .try_bytes()
                     .map_err(|e| Box::new(e) as Box<dyn DiagnosticMessage>)?;
-                Ok(Box::new(IsJsonVariantsFn { value, variant }))
+                Ok(IsJsonVariantsFn { value, variant }.as_expr())
             }
-            None => Ok(Box::new(IsJsonFn { value })),
-        }
-    }
-
-    fn compile_argument(
-        &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        match (name, expr) {
-            ("variant", Some(expr)) => {
-                let variant = expr
-                    .as_enum("variant", variants())?
-                    .try_bytes()
-                    .map_err(|e| Box::new(e) as Box<dyn DiagnosticMessage>)?;
-
-                Ok(Some(Box::new(variant) as _))
-            }
-            _ => Ok(None),
-        }
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let variant = args.optional_any("variant");
-
-        match variant {
-            Some(variant) => {
-                let variant = variant.downcast_ref::<Bytes>().unwrap();
-                is_json_with_variant(value, variant)
-            }
-            None => is_json(value),
+            None => Ok(IsJsonFn { value }.as_expr()),
         }
     }
 }
@@ -153,13 +117,13 @@ struct IsJsonFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for IsJsonFn {
+impl FunctionExpression for IsJsonFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         is_json(value)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::boolean().infallible()
     }
 }
@@ -170,7 +134,7 @@ struct IsJsonVariantsFn {
     variant: Bytes,
 }
 
-impl Expression for IsJsonVariantsFn {
+impl FunctionExpression for IsJsonVariantsFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let variant = &self.variant;
@@ -178,7 +142,7 @@ impl Expression for IsJsonVariantsFn {
         is_json_with_variant(value, variant)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::boolean().infallible()
     }
 }

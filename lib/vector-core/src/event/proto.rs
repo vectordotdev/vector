@@ -6,7 +6,13 @@ use crate::{
     metrics::AgentDDSketch,
 };
 
-include!(concat!(env!("OUT_DIR"), "/event.rs"));
+#[allow(warnings)] // Ignore some clippy warnings
+#[allow(clippy::all)]
+mod proto_event {
+    include!(concat!(env!("OUT_DIR"), "/event.rs"));
+}
+pub use proto_event::*;
+
 pub use event_wrapper::Event;
 pub use metric::Value as MetricValue;
 
@@ -86,7 +92,7 @@ impl From<Trace> for Event {
 
 impl From<Log> for event::LogEvent {
     fn from(log: Log) -> Self {
-        if let Some(value) = log.value {
+        let mut event_log = if let Some(value) = log.value {
             Self::from(decode_value(value).unwrap_or(::value::Value::Null))
         } else {
             // This is for backwards compatibility. Only `value` should be set
@@ -97,7 +103,14 @@ impl From<Log> for event::LogEvent {
                 .collect::<BTreeMap<_, _>>();
 
             Self::from(fields)
+        };
+
+        if let Some(metadata_value) = log.metadata {
+            if let Some(decoded_value) = decode_value(metadata_value) {
+                *event_log.metadata_mut().value_mut() = decoded_value;
+            }
         }
+        event_log
     }
 }
 
@@ -109,7 +122,14 @@ impl From<Trace> for event::TraceEvent {
             .filter_map(|(k, v)| decode_value(v).map(|value| (k, value)))
             .collect::<BTreeMap<_, _>>();
 
-        Self::from(event::LogEvent::from(fields))
+        let mut log = event::LogEvent::from(fields);
+        if let Some(metadata_value) = trace.metadata {
+            if let Some(decoded_value) = decode_value(metadata_value) {
+                *log.metadata_mut().value_mut() = decoded_value;
+            }
+        }
+
+        Self::from(log)
     }
 }
 
@@ -155,21 +175,34 @@ impl From<Metric> for event::Metric {
                 samples: dist.samples.into_iter().map(Into::into).collect(),
             },
             MetricValue::AggregatedHistogram1(hist) => event::MetricValue::AggregatedHistogram {
-                buckets: event::metric::zip_buckets(hist.buckets, hist.counts),
-                count: hist.count,
+                buckets: event::metric::zip_buckets(
+                    hist.buckets,
+                    hist.counts.iter().map(|h| u64::from(*h)),
+                ),
+                count: u64::from(hist.count),
                 sum: hist.sum,
             },
             MetricValue::AggregatedHistogram2(hist) => event::MetricValue::AggregatedHistogram {
+                buckets: hist.buckets.into_iter().map(Into::into).collect(),
+                count: u64::from(hist.count),
+                sum: hist.sum,
+            },
+            MetricValue::AggregatedHistogram3(hist) => event::MetricValue::AggregatedHistogram {
                 buckets: hist.buckets.into_iter().map(Into::into).collect(),
                 count: hist.count,
                 sum: hist.sum,
             },
             MetricValue::AggregatedSummary1(summary) => event::MetricValue::AggregatedSummary {
                 quantiles: event::metric::zip_quantiles(summary.quantiles, summary.values),
-                count: summary.count,
+                count: u64::from(summary.count),
                 sum: summary.sum,
             },
             MetricValue::AggregatedSummary2(summary) => event::MetricValue::AggregatedSummary {
+                quantiles: summary.quantiles.into_iter().map(Into::into).collect(),
+                count: u64::from(summary.count),
+                sum: summary.sum,
+            },
+            MetricValue::AggregatedSummary3(summary) => event::MetricValue::AggregatedSummary {
                 quantiles: summary.quantiles.into_iter().map(Into::into).collect(),
                 count: summary.count,
                 sum: summary.sum,
@@ -181,10 +214,18 @@ impl From<Metric> for event::Metric {
             },
         };
 
-        Self::new(name, kind, value)
+        let mut metadata = event::EventMetadata::default();
+        if let Some(metadata_value) = metric.metadata {
+            if let Some(decoded_value) = decode_value(metadata_value) {
+                *metadata.value_mut() = decoded_value;
+            }
+        }
+
+        Self::new_with_metadata(name, kind, value, metadata)
             .with_namespace(namespace)
             .with_tags(tags)
             .with_timestamp(timestamp)
+            .with_interval_ms(std::num::NonZeroU32::new(metric.interval_ms))
     }
 }
 
@@ -232,6 +273,7 @@ impl From<event::LogEvent> for WithMetadata<Log> {
                     .map(|(k, v)| (k, encode_value(v)))
                     .collect::<BTreeMap<_, _>>(),
                 value: None,
+                metadata: Some(encode_value(metadata.value().clone())),
             }
         } else {
             let mut dummy = BTreeMap::new();
@@ -241,6 +283,7 @@ impl From<event::LogEvent> for WithMetadata<Log> {
             Log {
                 fields: dummy,
                 value: Some(encode_value(value)),
+                metadata: Some(encode_value(metadata.value().clone())),
             }
         };
 
@@ -256,7 +299,10 @@ impl From<event::TraceEvent> for WithMetadata<Trace> {
             .map(|(k, v)| (k, encode_value(v)))
             .collect::<BTreeMap<_, _>>();
 
-        let data = Trace { fields };
+        let data = Trace {
+            fields,
+            metadata: Some(encode_value(metadata.value().clone())),
+        };
         Self { data, metadata }
     }
 }
@@ -273,10 +319,12 @@ impl From<event::Metric> for WithMetadata<Metric> {
         let name = series.name.name;
         let namespace = series.name.namespace.unwrap_or_default();
 
-        let timestamp = data.timestamp.map(|ts| prost_types::Timestamp {
+        let timestamp = data.time.timestamp.map(|ts| prost_types::Timestamp {
             seconds: ts.timestamp(),
             nanos: ts.timestamp_subsec_nanos() as i32,
         });
+
+        let interval_ms = data.time.interval_ms.map_or(0, std::num::NonZeroU32::get);
 
         let tags = series.tags.unwrap_or_default();
 
@@ -306,7 +354,7 @@ impl From<event::Metric> for WithMetadata<Metric> {
                 buckets,
                 count,
                 sum,
-            } => MetricValue::AggregatedHistogram2(AggregatedHistogram2 {
+            } => MetricValue::AggregatedHistogram3(AggregatedHistogram3 {
                 buckets: buckets.into_iter().map(Into::into).collect(),
                 count,
                 sum,
@@ -315,7 +363,7 @@ impl From<event::Metric> for WithMetadata<Metric> {
                 quantiles,
                 count,
                 sum,
-            } => MetricValue::AggregatedSummary2(AggregatedSummary2 {
+            } => MetricValue::AggregatedSummary3(AggregatedSummary3 {
                 quantiles: quantiles.into_iter().map(Into::into).collect(),
                 count,
                 sum,
@@ -348,7 +396,9 @@ impl From<event::Metric> for WithMetadata<Metric> {
             timestamp,
             tags,
             kind,
+            interval_ms,
             value: Some(metric),
+            metadata: Some(encode_value(metadata.value().clone())),
         };
         Self { data, metadata }
     }

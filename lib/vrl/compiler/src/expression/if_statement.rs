@@ -2,33 +2,18 @@ use std::fmt;
 
 use value::Value;
 
+use crate::state::{TypeInfo, TypeState};
 use crate::{
-    expression::{Block, Expr, Noop, Predicate, Resolved},
-    state::{ExternalEnv, LocalEnv},
+    expression::{Block, Predicate, Resolved},
     value::VrlValueConvert,
-    vm::OpCode,
-    Context, Expression, TypeDef,
+    Context, Expression,
 };
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct IfStatement {
     pub predicate: Predicate,
-    pub consequent: Block,
-    pub alternative: Option<Block>,
-}
-
-impl IfStatement {
-    pub(crate) fn noop() -> Self {
-        let predicate = Predicate::new_unchecked(vec![]);
-
-        let consequent = Block::new(vec![Expr::Noop(Noop)], LocalEnv::default());
-
-        Self {
-            predicate,
-            consequent,
-            alternative: None,
-        }
-    }
+    pub if_block: Block,
+    pub else_block: Option<Block>,
 }
 
 impl Expression for IfStatement {
@@ -36,64 +21,39 @@ impl Expression for IfStatement {
         let predicate = self.predicate.resolve(ctx)?.try_boolean()?;
 
         match predicate {
-            true => self.consequent.resolve(ctx),
+            true => self.if_block.resolve(ctx),
             false => self
-                .alternative
+                .else_block
                 .as_ref()
-                .map(|block| block.resolve(ctx))
-                .unwrap_or(Ok(Value::Null)),
+                .map_or(Ok(Value::Null), |block| block.resolve(ctx)),
         }
     }
 
-    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
-        let type_def = self.consequent.type_def(state);
+    fn type_info(&self, state: &TypeState) -> TypeInfo {
+        let mut state = state.clone();
+        self.predicate.apply_type_info(&mut state);
 
-        match &self.alternative {
-            None => type_def,
-            Some(alternative) => type_def.merge_deep(alternative.type_def(state)),
-        }
-    }
+        let if_info = self.if_block.type_info(&state);
 
-    fn compile_to_vm(
-        &self,
-        vm: &mut crate::vm::Vm,
-        state: (&mut LocalEnv, &mut ExternalEnv),
-    ) -> Result<(), String> {
-        let (local, external) = state;
+        if let Some(else_block) = &self.else_block {
+            let else_info = else_block.type_info(&state);
 
-        // Write the predicate which will leave the result on the stack.
-        self.predicate.compile_to_vm(vm, (local, external))?;
+            // final state will be from either the "if" or "else" block, but not the original
+            let final_state = if_info.state.merge(else_info.state);
 
-        // If the value is false, we want to jump to the alternative block.
-        // We need to store this jump as it will need updating when we know where
-        // the alternative block actually starts.
-        let else_jump = vm.emit_jump(OpCode::JumpIfFalse);
-        vm.write_opcode(OpCode::Pop);
+            // result is from either "if" or the "else" block
+            let result = if_info.result.union(else_info.result);
 
-        // Write the consequent block.
-        self.consequent.compile_to_vm(vm, (local, external))?;
-
-        // After the consequent block we want to jump over the alternative.
-        let continue_jump = vm.emit_jump(OpCode::Jump);
-
-        // Update the initial if jump to jump to the current position.
-        vm.patch_jump(else_jump);
-        vm.write_opcode(OpCode::Pop);
-
-        if let Some(alternative) = &self.alternative {
-            // Write the alternative block.
-            alternative.compile_to_vm(vm, (local, external))?;
+            TypeInfo::new(final_state, result)
         } else {
-            // No alternative resolves to Null.
-            let null = vm.add_constant(Value::Null);
-            vm.write_opcode(OpCode::Constant);
-            vm.write_primitive(null);
+            // state changes from the "if block" are optional, so merge it with the original
+            let final_state = if_info.state.merge(state);
+
+            // if the predicate is false, "null" is returned.
+            let result = if_info.result.or_null();
+
+            TypeInfo::new(final_state, result)
         }
-
-        // Update the continue jump to jump to the current position after the else block.
-        vm.patch_jump(continue_jump);
-
-        Ok(())
     }
 }
 
@@ -102,9 +62,9 @@ impl fmt::Display for IfStatement {
         f.write_str("if ")?;
         self.predicate.fmt(f)?;
         f.write_str(" ")?;
-        self.consequent.fmt(f)?;
+        self.if_block.fmt(f)?;
 
-        if let Some(alt) = &self.alternative {
+        if let Some(alt) = &self.else_block {
             f.write_str(" else")?;
             alt.fmt(f)?;
         }

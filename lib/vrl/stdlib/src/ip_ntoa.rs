@@ -38,18 +38,13 @@ impl Function for IpNtoa {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(IpNtoaFn { value }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        ip_ntoa(value)
+        Ok(IpNtoaFn { value }.as_expr())
     }
 }
 
@@ -58,13 +53,13 @@ struct IpNtoaFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for IpNtoaFn {
+impl FunctionExpression for IpNtoaFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         ip_ntoa(value)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::bytes().fallible()
     }
 }
@@ -77,13 +72,13 @@ mod tests {
         ip_ntoa => IpNtoa;
 
         invalid {
-            args: func_args![value: u32::MAX as i64 + 1],
+            args: func_args![value: i64::from(u32::MAX) + 1],
             want: Err("cannot convert to bytes: integer does not fit in u32"),
             tdef: TypeDef::bytes().fallible(),
         }
 
         valid {
-            args: func_args![value: 16909060],
+            args: func_args![value: 16_909_060],
             want: Ok(value!("1.2.3.4")),
             tdef: TypeDef::bytes().fallible(),
         }

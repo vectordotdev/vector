@@ -7,7 +7,6 @@ use futures_util::{
 };
 use tower::Service;
 use vector_core::{
-    buffers::Acker,
     config::log_schema,
     event::Event,
     partition::Partitioner,
@@ -17,25 +16,23 @@ use vector_core::{
 
 use super::service::TraceApiRequest;
 use crate::{
-    config::SinkContext,
     internal_events::DatadogTracesEncodingError,
-    sinks::{
-        datadog::traces::{
-            config::DatadogTracesEndpoint, request_builder::DatadogTracesRequestBuilder,
-        },
-        util::SinkBuilderExt,
-    },
+    sinks::{datadog::traces::request_builder::DatadogTracesRequestBuilder, util::SinkBuilderExt},
 };
 #[derive(Default)]
 struct EventPartitioner;
 
+// Use all fields from the top level protobuf contruct associated with the API key
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub(crate) struct PartitionKey {
     pub(crate) api_key: Option<Arc<str>>,
     pub(crate) env: Option<String>,
     pub(crate) hostname: Option<String>,
-    pub(crate) lang: Option<String>,
-    pub(crate) endpoint: DatadogTracesEndpoint,
+    pub(crate) agent_version: Option<String>,
+    // Those two last fields are configuration value and not a per-trace/span information, they come from the Datadog
+    // trace-agent config directly: https://github.com/DataDog/datadog-agent/blob/0f73a78/pkg/trace/config/config.go#L293-L294
+    pub(crate) target_tps: Option<i64>,
+    pub(crate) error_tps: Option<i64>,
 }
 
 impl Partitioner for EventPartitioner {
@@ -43,32 +40,27 @@ impl Partitioner for EventPartitioner {
     type Key = PartitionKey;
 
     fn partition(&self, item: &Self::Item) -> Self::Key {
-        let (endpoint, env, hostname, lang) = match item {
-            Event::Metric(_) => (DatadogTracesEndpoint::APMStats, None, None, None),
+        match item {
+            Event::Metric(_) => {
+                panic!("unexpected metric");
+            }
             Event::Log(_) => {
                 panic!("unexpected log");
             }
-            Event::Trace(t) => (
-                DatadogTracesEndpoint::Traces,
-                t.get("env").map(|s| s.to_string_lossy()),
-                t.get(log_schema().host_key()).map(|s| s.to_string_lossy()),
-                t.get("language").map(|s| s.to_string_lossy()),
-            ),
-        };
-
-        PartitionKey {
-            api_key: item.metadata().datadog_api_key().clone(),
-            env,
-            hostname,
-            lang,
-            endpoint,
+            Event::Trace(t) => PartitionKey {
+                api_key: item.metadata().datadog_api_key(),
+                env: t.get("env").map(|s| s.to_string_lossy()),
+                hostname: t.get(log_schema().host_key()).map(|s| s.to_string_lossy()),
+                agent_version: t.get("agent_version").map(|s| s.to_string_lossy()),
+                target_tps: t.get("target_tps").and_then(|tps| tps.as_integer()),
+                error_tps: t.get("error_tps").and_then(|tps| tps.as_integer()),
+            },
         }
     }
 }
 
 pub struct TracesSink<S> {
     service: S,
-    acker: Acker,
     request_builder: DatadogTracesRequestBuilder,
     batch_settings: BatcherSettings,
 }
@@ -80,15 +72,13 @@ where
     S::Future: Send + 'static,
     S::Response: DriverResponse,
 {
-    pub fn new(
-        cx: SinkContext,
+    pub const fn new(
         service: S,
         request_builder: DatadogTracesRequestBuilder,
         batch_settings: BatcherSettings,
     ) -> Self {
         TracesSink {
             service,
-            acker: cx.acker(),
             request_builder,
             batch_settings,
         }
@@ -102,18 +92,18 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {
-                        let (message, reason, dropped_events) = e.into_parts();
+                        let (error_message, error_reason, dropped_events) = e.into_parts();
                         emit!(DatadogTracesEncodingError {
-                            message,
+                            error_message,
+                            error_reason,
                             dropped_events,
-                            reason,
                         });
                         None
                     }
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(self.service, self.acker);
+            .into_driver(self.service);
 
         sink.run().await
     }

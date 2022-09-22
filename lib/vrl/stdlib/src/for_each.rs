@@ -9,7 +9,7 @@ where
         match item {
             IterItem::KeyValue(key, value) => runner.run_key_value(ctx, key, value)?,
             IterItem::IndexValue(index, value) => runner.run_index_value(ctx, index, value)?,
-            _ => {}
+            IterItem::Value(_) => continue,
         };
     }
 
@@ -49,14 +49,14 @@ impl Function for ForEach {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let closure = arguments.required_closure()?;
 
-        Ok(Box::new(ForEachFn { value, closure }))
+        Ok(ForEachFn { value, closure }.as_expr())
     }
 
     fn closure(&self) -> Option<closure::Definition> {
@@ -84,14 +84,6 @@ impl Function for ForEach {
             is_iterator: true,
         })
     }
-
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
-        let value = args.required("value");
-        let VmFunctionClosure { variables, vm } = args.closure();
-        let runner = closure::Runner::new(variables, |ctx| vm.interpret(ctx));
-
-        for_each(value, ctx, runner)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -100,18 +92,20 @@ struct ForEachFn {
     closure: FunctionClosure,
 }
 
-impl Expression for ForEachFn {
+impl FunctionExpression for ForEachFn {
     fn resolve(&self, ctx: &mut Context) -> Result<Value> {
         let value = self.value.resolve(ctx)?;
-        let FunctionClosure { variables, block } = &self.closure;
+        let FunctionClosure {
+            variables,
+            block,
+            block_type_def: _,
+        } = &self.closure;
         let runner = closure::Runner::new(variables, |ctx| block.resolve(ctx));
 
         for_each(value, ctx, runner)
     }
 
-    fn type_def(&self, ctx: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
-        let fallible = self.closure.block.type_def(ctx).is_fallible();
-
-        TypeDef::null().with_fallibility(fallible)
+    fn type_def(&self, _ctx: &state::TypeState) -> TypeDef {
+        TypeDef::null()
     }
 }

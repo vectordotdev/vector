@@ -3,8 +3,8 @@ use vrl::prelude::*;
 
 use crate::util;
 
-fn is_nullish(value: Value) -> Resolved {
-    Ok(util::is_nullish(&value).into())
+fn is_nullish(value: Value) -> bool {
+    util::is_nullish(&value)
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -33,17 +33,12 @@ impl Function for IsNullish {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
-        Ok(Box::new(IsNullishFn { value }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        is_nullish(value)
+        Ok(IsNullishFn { value }.as_expr())
     }
 }
 
@@ -52,13 +47,13 @@ struct IsNullishFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for IsNullishFn {
+impl FunctionExpression for IsNullishFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        is_nullish(value)
+        Ok(is_nullish(value).into())
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::boolean().infallible()
     }
 }

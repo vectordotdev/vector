@@ -22,7 +22,7 @@ fn parse_query_string(bytes: Value) -> Resolved {
                         v.push(value.into());
                     }
                     v => {
-                        *v = Value::Array(vec![v.to_owned(), value.into()]);
+                        *v = Value::Array(vec![v.clone(), value.into()]);
                     }
                 };
             })
@@ -54,12 +54,12 @@ impl Function for ParseQueryString {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
-        Ok(Box::new(ParseQueryStringFn { value }))
+        Ok(ParseQueryStringFn { value }.as_expr())
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -69,11 +69,6 @@ impl Function for ParseQueryString {
             required: true,
         }]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        parse_query_string(value)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -81,13 +76,13 @@ struct ParseQueryStringFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ParseQueryStringFn {
+impl FunctionExpression for ParseQueryStringFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?;
         parse_query_string(bytes)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::object(inner_kind())
     }
 }

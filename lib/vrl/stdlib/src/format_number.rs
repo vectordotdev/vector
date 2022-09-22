@@ -116,21 +116,22 @@ impl Function for FormatNumber {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let scale = arguments.optional("scale");
         let decimal_separator = arguments.optional("decimal_separator");
         let grouping_separator = arguments.optional("grouping_separator");
 
-        Ok(Box::new(FormatNumberFn {
+        Ok(FormatNumberFn {
             value,
             scale,
             decimal_separator,
             grouping_separator,
-        }))
+        }
+        .as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -139,15 +140,6 @@ impl Function for FormatNumber {
             source: r#"format_number(4672.4, decimal_separator: ",", grouping_separator: "_")"#,
             result: Ok("4_672,4"),
         }]
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let scale = args.optional("scale");
-        let decimal_separator = args.optional("decimal_separator");
-        let grouping_separator = args.optional("grouping_separator");
-
-        format_number(value, scale, grouping_separator, decimal_separator)
     }
 }
 
@@ -159,7 +151,7 @@ struct FormatNumberFn {
     grouping_separator: Option<Box<dyn Expression>>,
 }
 
-impl Expression for FormatNumberFn {
+impl FunctionExpression for FormatNumberFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let scale = self
@@ -181,7 +173,7 @@ impl Expression for FormatNumberFn {
         format_number(value, scale, grouping_separator, decimal_separator)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::bytes().infallible()
     }
 }
@@ -225,7 +217,7 @@ mod tests {
         }
 
         big_number {
-            args: func_args![value: 11222333444.56789,
+            args: func_args![value: 11_222_333_444.567_89,
                              scale: 3,
                              decimal_separator: ",",
                              grouping_separator: "."],

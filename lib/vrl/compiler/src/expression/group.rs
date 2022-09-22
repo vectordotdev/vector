@@ -1,9 +1,9 @@
 use std::fmt;
 
+use crate::state::{TypeInfo, TypeState};
 use crate::{
     expression::{Expr, Resolved},
-    state::{ExternalEnv, LocalEnv},
-    Context, Expression, TypeDef,
+    Context, Expression,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -24,16 +24,8 @@ impl Expression for Group {
         self.inner.resolve(ctx)
     }
 
-    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
-        self.inner.type_def(state)
-    }
-
-    fn compile_to_vm(
-        &self,
-        vm: &mut crate::vm::Vm,
-        state: (&mut LocalEnv, &mut ExternalEnv),
-    ) -> Result<(), String> {
-        self.inner.compile_to_vm(vm, state)
+    fn type_info(&self, state: &TypeState) -> TypeInfo {
+        self.inner.type_info(state)
     }
 }
 
