@@ -14,3 +14,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && rm -rf /var/lib/apt/lists/*
 
 RUN rustup run "${RUST_VERSION}" cargo install cargo-nextest --version 0.9.25 --locked
+
+COPY scripts/environment/install-protoc.sh /
+RUN bash /install-protoc.sh

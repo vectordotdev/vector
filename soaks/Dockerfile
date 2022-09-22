@@ -4,6 +4,7 @@
 FROM ghcr.io/vectordotdev/vector/soak-builder@sha256:4c51db5b5f8b65f2afbc159395f185f4cfc5a84e5b9bdb88e4c2b7ae229ee817 as builder
 WORKDIR /vector
 COPY . .
+RUN bash scripts/environment/install-protoc.sh
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/vector/target \
