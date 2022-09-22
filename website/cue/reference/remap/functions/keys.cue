@@ -29,7 +29,7 @@ remap: functions: keys: {
 				"key2": "val2"
 			}
 			source: #"""
-				values({"key1": "val1", "key2": "val2"})
+				keys({"key1": "val1", "key2": "val2"})
 				"""#
 			return: ["key1", "key2"]
 		},

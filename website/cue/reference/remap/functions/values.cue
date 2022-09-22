@@ -25,8 +25,8 @@ remap: functions: values: {
 		{
 			title: "Get values from key value object"
 			input: log: {
-				"key3": "val3"
-				"key4": "val4"
+				"key1": "val1"
+				"key2": "val2"
 			}
 			source: #"""
 				values({"key1": "val1", "key2": "val2"})
