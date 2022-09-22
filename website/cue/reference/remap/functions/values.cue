@@ -29,9 +29,9 @@ remap: functions: values: {
 				"key4": "val4"
 			}
 			source: #"""
-				values(.)
+				values({"key1": "val1", "key2": "val2"})
 				"""#
-			return: ["val3", "val4"]
+			return: ["val1", "val2"]
 		},
 	]
 }
