@@ -33,7 +33,7 @@ use crate::{
         DockerLogsCommunicationError, DockerLogsContainerEventReceived,
         DockerLogsContainerMetadataFetchError, DockerLogsContainerUnwatch,
         DockerLogsContainerWatch, DockerLogsEventsReceived,
-        DockerLogsLoggingDriverUnsupportedError, DockerLogsReceivedOldLogError,
+        DockerLogsLoggingDriverUnsupportedError, DockerLogsReceivedOutOfOrderError,
         DockerLogsTimestampParseError, StreamClosedError,
     },
     line_agg::{self, LineAgg},
@@ -867,7 +867,7 @@ impl ContainerLogInfo {
                     }
                     // Received log is older than the previously received entry.
                     _ => {
-                        emit!(DockerLogsReceivedOldLogError {
+                        emit!(DockerLogsReceivedOutOfOrderError {
                             container_id: self.id.as_str(),
                             timestamp_str,
                         });

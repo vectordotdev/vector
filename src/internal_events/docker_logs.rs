@@ -189,12 +189,12 @@ impl InternalEvent for DockerLogsLoggingDriverUnsupportedError<'_> {
 }
 
 #[derive(Debug)]
-pub struct DockerLogsReceivedOldLogError<'a> {
+pub struct DockerLogsReceivedOutOfOrderError<'a> {
     pub timestamp_str: &'a str,
     pub container_id: &'a str,
 }
 
-impl InternalEvent for DockerLogsReceivedOldLogError<'_> {
+impl InternalEvent for DockerLogsReceivedOutOfOrderError<'_> {
     fn emit(self) {
         error!(
             message = "Received out of order log message.",
