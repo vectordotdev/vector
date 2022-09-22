@@ -4,16 +4,12 @@ use std::{
     task::{Context, Poll},
 };
 
-use azure_core::HttpError;
 use azure_storage_blobs::prelude::*;
-use futures::{future::BoxFuture, TryFutureExt};
+use futures::future::BoxFuture;
 use tower::Service;
 use tracing::Instrument;
 
-use crate::{
-    internal_events::azure_blob::{AzureBlobHttpError, AzureBlobResponseError},
-    sinks::azure_common::config::{AzureBlobRequest, AzureBlobResponse},
-};
+use crate::sinks::azure_common::config::{AzureBlobRequest, AzureBlobResponse};
 
 #[derive(Clone)]
 pub(crate) struct AzureBlobService {
@@ -53,16 +49,6 @@ impl Service<AzureBlobRequest> for AzureBlobService {
 
             let result = blob
                 .execute()
-                .inspect_err(|reason| {
-                    match reason.downcast_ref::<HttpError>() {
-                        Some(HttpError::StatusCode { status, .. }) => {
-                            emit!(AzureBlobResponseError::from(*status))
-                        }
-                        _ => emit!(AzureBlobHttpError {
-                            error: reason.to_string()
-                        }),
-                    };
-                })
                 .instrument(info_span!("request").or_current())
                 .await;
 
