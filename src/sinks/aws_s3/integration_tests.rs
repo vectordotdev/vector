@@ -27,6 +27,7 @@ use vector_core::{
 };
 
 use super::S3SinkConfig;
+use crate::test_util::components::{run_and_assert_sink_error, COMPONENT_ERROR_TAGS};
 use crate::{
     aws::{create_client, AwsAuthentication, RegionOrEndpoint},
     common::s3::S3ClientBuilder,
@@ -285,7 +286,7 @@ async fn acknowledges_failures() {
     let sink = config.build_processor(service).unwrap();
 
     let (_lines, events, receiver) = make_events_batch(1, 1);
-    sink.run(events).await.unwrap();
+    run_and_assert_sink_error(sink, events, &COMPONENT_ERROR_TAGS).await;
     assert_eq!(receiver.await, BatchStatus::Rejected);
 
     let objects = list_objects(&bucket, prefix.unwrap()).await;
