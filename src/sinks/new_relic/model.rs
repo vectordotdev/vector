@@ -5,7 +5,7 @@ use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};
 
 use super::NewRelicSinkError;
-use crate::event::{Event, MetricValue, Value};
+use crate::event::{Event, MetricValue, Value, MetricKind};
 
 #[derive(Debug)]
 pub enum NewRelicApiModel {
@@ -21,33 +21,9 @@ type DataStore = HashMap<String, Vec<KeyValData>>;
 pub struct MetricsApiModel(pub Vec<DataStore>);
 
 impl MetricsApiModel {
-    pub fn new(metric_array: Vec<(Value, Value, Value, Option<Value>)>) -> Self {
-        let mut metric_data_array = vec![];
-        for (m_name, m_value, m_timestamp, m_attributes) in metric_array {
-            let mut metric_data = KeyValData::new();
-            metric_data.insert("name".to_owned(), m_name);
-            metric_data.insert("value".to_owned(), m_value);
-            if let Some(attr) = m_attributes {
-                metric_data.insert("attributes".to_owned(), attr);
-            }
-            match m_timestamp {
-                Value::Timestamp(ts) => {
-                    metric_data.insert("timestamp".to_owned(), Value::from(ts.timestamp()));
-                }
-                Value::Integer(i) => {
-                    metric_data.insert("timestamp".to_owned(), Value::from(i));
-                }
-                _ => {
-                    metric_data.insert(
-                        "timestamp".to_owned(),
-                        Value::from(DateTime::<Utc>::from(SystemTime::now()).timestamp()),
-                    );
-                }
-            }
-            metric_data_array.push(metric_data);
-        }
+    pub fn new(metric_array: Vec<KeyValData>) -> Self {
         let mut metric_store = DataStore::new();
-        metric_store.insert("metrics".to_owned(), metric_data_array);
+        metric_store.insert("metrics".to_owned(), metric_array);
         Self(vec![metric_store])
     }
 }
@@ -73,28 +49,51 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
                     None
                 };
 
-                match data.value {
-                    MetricValue::Gauge { value } | MetricValue::Counter { value } => {
-                        metric_array.push((
-                            Value::from(series.name.name),
-                            Value::from(
-                                NotNan::new(value).map_err(|_| {
-                                    NewRelicSinkError::new("NaN value not supported")
-                                })?,
-                            ),
-                            Value::from(data.time.timestamp),
-                            attr,
-                        ));
-                    },
-                    _ => {
-                        // Unrecognized metric type
+                let mut metric_data = KeyValData::new();
+
+                if let MetricValue::Gauge { value } | MetricValue::Counter { value } = data.value {
+                    metric_data.insert("name".to_owned(), Value::from(series.name.name));
+                    metric_data.insert("value".to_owned(), Value::from(
+                        NotNan::new(value).map_err(|_| {
+                            NewRelicSinkError::new("NaN value not supported")
+                        })?,
+                    ));
+                    metric_data.insert("timestamp".to_owned(),
+                        if let Some(ts) = data.time.timestamp {
+                            Value::from(ts.timestamp())
+                        }
+                        else {
+                            Value::from(DateTime::<Utc>::from(SystemTime::now()).timestamp())
+                        }
+                    );
+                    if let Some(attr) = attr {
+                        metric_data.insert("atttributes".to_owned(), attr);
                     }
                 }
+
+                match (data.value, data.kind) {
+                    (MetricValue::Counter { .. }, MetricKind::Incremental) => {
+                        if let Some(interval_ms) = data.time.interval_ms {
+                            metric_data.insert("interval.ms".to_owned(), Value::from(interval_ms.get() as i64));
+                        }
+                        else {
+                            // Incremental counter without an interval is worthless, skip this metric
+                            continue;
+                        }
+                        metric_data.insert("type".to_owned(), Value::from("count"));
+                    },
+                    (MetricValue::Gauge { .. } | MetricValue::Counter { .. }, MetricKind::Absolute) => {
+                        metric_data.insert("type".to_owned(), Value::from("gauge"));
+                    },
+                    _ => {}
+                }
+
+                metric_array.push(metric_data);
             }
         }
 
         if !metric_array.is_empty() {
-            Ok(MetricsApiModel::new(metric_array))
+            Ok(Self::new(metric_array))
         } else {
             Err(NewRelicSinkError::new("No valid metrics to generate"))
         }
