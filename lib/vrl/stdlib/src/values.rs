@@ -67,8 +67,13 @@ impl FunctionExpression for ValuesFn {
 
     fn type_def(&self, state: &state::TypeState) -> TypeDef {
         // get all the kinds, iterate over it and union all the unknown kinds with reduced_kind()
-        let merged_kind = self.value.type_def(state).kind().as_object().unwrap().reduced_kind();
+        let merged_kind = self
+            .value
+            .type_def(state)
+            .kind()
+            .as_object()
+            .unwrap()
+            .reduced_kind();
         TypeDef::array(Collection::empty().with_unknown(merged_kind)).infallible()
-
     }
 }
