@@ -2,7 +2,6 @@ package metadata
 
 components: sources: http_scrape: {
 	title: "HTTP Scrape"
-	alias: "http_scrape"
 
 	classes: {
 		commonly_used: false
