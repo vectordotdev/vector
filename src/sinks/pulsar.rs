@@ -4,6 +4,13 @@ use std::{
     task::{Context, Poll},
 };
 
+use crate::{
+    codecs::{Encoder, EncodingConfig, Transformer},
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
+    event::{Event, EventFinalizers, EventStatus, Finalizable},
+    internal_events::PulsarSendingError,
+    sinks::util::metadata::RequestMetadata,
+};
 use bytes::BytesMut;
 use codecs::{encoding::SerializerConfig, TextSerializerConfig};
 use futures::{future::BoxFuture, ready, stream::FuturesUnordered, FutureExt, Sink, Stream};
@@ -20,13 +27,6 @@ use vector_common::internal_event::{
 };
 use vector_config::configurable_component;
 use vector_core::config::log_schema;
-use crate::{
-    codecs::{Encoder, EncodingConfig, Transformer},
-    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
-    event::{Event, EventFinalizers, EventStatus, Finalizable},
-    internal_events::PulsarSendingError,
-    sinks::util::metadata::RequestMetadata,
-};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -168,7 +168,12 @@ impl SinkConfig for PulsarSinkConfig {
         let serializer = self.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
 
-        let sink = PulsarSink::new(producer, transformer, encoder, self.partition_key_field.clone())?;
+        let sink = PulsarSink::new(
+            producer,
+            transformer,
+            encoder,
+            self.partition_key_field.clone(),
+        )?;
 
         let producer = self
             .create_pulsar_producer()
@@ -246,7 +251,7 @@ impl PulsarSink {
         producer: PulsarProducer,
         transformer: Transformer,
         encoder: Encoder<()>,
-        partition_key_field: Option<String>
+        partition_key_field: Option<String>,
     ) -> crate::Result<Self> {
         Ok(Self {
             transformer,
@@ -291,17 +296,16 @@ impl Sink<Event> for PulsarSink {
         );
 
         let key_value: Option<String> = match (event.maybe_as_log(), &self.partition_key_field) {
-            (Some(log), Some(field)) => log.get(field.as_str())
-                .map(|x| x.to_string()),
+            (Some(log), Some(field)) => log.get(field.as_str()).map(|x| x.to_string()),
             _ => None,
         };
 
-        let event_time: Option<u64> = event.maybe_as_log()
+        let event_time: Option<u64> = event
+            .maybe_as_log()
             .and_then(|log| log.get(log_schema().timestamp_key()))
             .and_then(|value| value.as_timestamp())
             .map(|ts| ts.timestamp_millis())
             .map(|i| i as u64);
-
 
         let metadata_builder = RequestMetadata::builder(&event);
         self.transformer.transform(&mut event);
@@ -454,7 +458,8 @@ mod integration_tests {
         let encoder = Encoder::<()>::new(serializer);
 
         assert_sink_compliance(&SINK_TAGS, async move {
-            let sink = PulsarSink::new(producer, transformer, encoder, cnf.partition_key_field).unwrap();
+            let sink =
+                PulsarSink::new(producer, transformer, encoder, cnf.partition_key_field).unwrap();
             VectorSink::from_event_sink(sink).run(events).await
         })
         .await
@@ -467,7 +472,10 @@ mod integration_tests {
             };
             consumer.ack(&msg).await.unwrap();
             assert_eq!(String::from_utf8_lossy(&msg.payload.data), line);
-            assert_eq!(msg.key(), Some(String::from_utf8_lossy(&msg.payload.data).to_string()));
+            assert_eq!(
+                msg.key(),
+                Some(String::from_utf8_lossy(&msg.payload.data).to_string())
+            );
             assert_ne!(msg.metadata().event_time.is_some(), false);
         }
     }

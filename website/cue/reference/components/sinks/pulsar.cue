@@ -136,9 +136,11 @@ components: sinks: pulsar: {
 			}
 		}
 		partition_key_field: {
+			common:      false
 			description: "Log field name to use as Pulsar message key."
 			required:    false
 			type: string: {
+				default: null
 				examples: ["message", "my_field"]
 			}
 		}
