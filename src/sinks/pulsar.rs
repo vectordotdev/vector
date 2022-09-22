@@ -60,7 +60,7 @@ pub struct PulsarSinkConfig {
     pub acknowledgements: AcknowledgementsConfig,
 
     /// Log field to use as Pulsar message key
-    key_field: Option<String>,
+    partition_key_field: Option<String>,
 }
 
 /// Authentication configuration.
@@ -124,7 +124,7 @@ enum PulsarSinkState {
 struct PulsarSink {
     transformer: Transformer,
     encoder: Encoder<()>,
-    key_field: Option<String>,
+    partition_key_field: Option<String>,
     state: PulsarSinkState,
     in_flight: FuturesUnordered<
         BoxFuture<
@@ -144,7 +144,7 @@ impl GenerateConfig for PulsarSinkConfig {
         toml::Value::try_from(Self {
             endpoint: "pulsar://127.0.0.1:6650".to_string(),
             topic: "topic-1234".to_string(),
-            key_field: Some("message".to_string()),
+            partition_key_field: Some("message".to_string()),
             encoding: TextSerializerConfig::new().into(),
             auth: None,
             acknowledgements: Default::default(),
@@ -168,7 +168,7 @@ impl SinkConfig for PulsarSinkConfig {
         let serializer = self.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
 
-        let sink = PulsarSink::new(producer, transformer, encoder, self.key_field.clone())?;
+        let sink = PulsarSink::new(producer, transformer, encoder, self.partition_key_field.clone())?;
 
         let producer = self
             .create_pulsar_producer()
@@ -246,7 +246,7 @@ impl PulsarSink {
         producer: PulsarProducer,
         transformer: Transformer,
         encoder: Encoder<()>,
-        key_field: Option<String>
+        partition_key_field: Option<String>
     ) -> crate::Result<Self> {
         Ok(Self {
             transformer,
@@ -254,7 +254,7 @@ impl PulsarSink {
             state: PulsarSinkState::Ready(Box::new(producer)),
             in_flight: FuturesUnordered::new(),
             bytes_sent: register!(BytesSent::from(Protocol::TCP)),
-            key_field,
+            partition_key_field: partition_key_field,
         })
     }
 
@@ -290,7 +290,7 @@ impl Sink<Event> for PulsarSink {
             "Expected `poll_ready` to be called first."
         );
 
-        let key_value: Option<String> = match (event.maybe_as_log(), &self.key_field) {
+        let key_value: Option<String> = match (event.maybe_as_log(), &self.partition_key_field) {
             (Some(log), Some(field)) => log.get(field.as_str())
                 .map(|x| x.to_string()),
             _ => None,
@@ -427,7 +427,7 @@ mod integration_tests {
             encoding: TextSerializerConfig::new().into(),
             auth: None,
             acknowledgements: Default::default(),
-            key_field: Some("message".to_string()),
+            partition_key_field: Some("message".to_string()),
         };
 
         let pulsar = Pulsar::<TokioExecutor>::builder(&cnf.endpoint, TokioExecutor)
@@ -454,7 +454,7 @@ mod integration_tests {
         let encoder = Encoder::<()>::new(serializer);
 
         assert_sink_compliance(&SINK_TAGS, async move {
-            let sink = PulsarSink::new(producer, transformer, encoder, cnf.key_field).unwrap();
+            let sink = PulsarSink::new(producer, transformer, encoder, cnf.partition_key_field).unwrap();
             VectorSink::from_event_sink(sink).run(events).await
         })
         .await

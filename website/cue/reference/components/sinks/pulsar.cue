@@ -135,6 +135,13 @@ components: sinks: pulsar: {
 				examples: ["topic-1234"]
 			}
 		}
+		partition_key_field: {
+			description: "Log field name to use as Pulsar message key."
+			required:    false
+			type: string: {
+				examples: ["message", "my_field"]
+			}
+		}
 	}
 
 	input: {
