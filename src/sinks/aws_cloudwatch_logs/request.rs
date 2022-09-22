@@ -148,12 +148,10 @@ impl Future for CloudwatchFuture {
                         Ok(_) => {}
                         Err(err) => {
                             let resource_already_exists = match &err {
-                                SdkError::ServiceError { err, raw: _ } => match err.kind {
-                                    CreateLogGroupErrorKind::ResourceAlreadyExistsException(_) => {
-                                        true
-                                    }
-                                    _ => false,
-                                },
+                                SdkError::ServiceError { err, raw: _ } => matches!(
+                                    err.kind,
+                                    CreateLogGroupErrorKind::ResourceAlreadyExistsException(_)
+                                ),
                                 _ => false,
                             };
                             if !resource_already_exists {
@@ -175,12 +173,10 @@ impl Future for CloudwatchFuture {
                         Ok(_) => {}
                         Err(err) => {
                             let resource_already_exists = match &err {
-                                SdkError::ServiceError { err, raw: _ } => match err.kind {
-                                    CreateLogStreamErrorKind::ResourceAlreadyExistsException(_) => {
-                                        true
-                                    }
-                                    _ => false,
-                                },
+                                SdkError::ServiceError { err, raw: _ } => matches!(
+                                    err.kind,
+                                    CreateLogStreamErrorKind::ResourceAlreadyExistsException(_)
+                                ),
                                 _ => false,
                             };
                             if !resource_already_exists {
