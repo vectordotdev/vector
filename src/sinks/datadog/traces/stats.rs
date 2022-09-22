@@ -248,6 +248,11 @@ impl Bucket {
     /// Update a bucket with a new span. Computed statistics include the number of hits and the actual distribution of
     /// execution time, with isolated measurements for spans flagged as errored and spans without error.
     fn update(span: &BTreeMap<String, Value>, weight: f64, is_top: bool, gs: &mut GroupedStats) {
+        //if span.contains_key("name") {
+        //    info!("update span_name: {}", span.get("name").unwrap());
+        //} else {
+        //    info!("update span_name: is_unknown");
+        //}
         is_top.then(|| {
             gs.top_level_hits += weight;
         });
@@ -293,6 +298,14 @@ impl Aggregator {
             _ => vec![],
         };
 
+        // spans.iter().for_each(|span| {
+        //     if span.contains_key("name") {
+        //         info!("1 handle_trace span_name: {}", span.get("name").unwrap());
+        //     } else {
+        //         info!("1 handle_trace span_name: is_unknown");
+        //     }
+        // });
+
         let weight = extract_weight_from_root_span(&spans);
         let payload_aggkey = PayloadAggregationKey {
             env: partition_key.env.clone().unwrap_or_default(),
@@ -311,11 +324,15 @@ impl Aggregator {
             .map(|v| v.to_string_lossy().starts_with(TAG_SYNTHETICS))
             .unwrap_or(false);
         spans.iter().for_each(|span| {
-            let is_top = metric_flag(span, TOP_LEVEL_KEY);
+            let is_top = has_top_level(span, TOP_LEVEL_KEY);
+            // if is_top {
+            //     info!("is_top_true");
+            // }
             if !(is_top
-                || metric_flag(span, MEASURED_KEY)
-                || metric_flag(span, PARTIAL_VERSION_KEY))
+                || is_measured(span, MEASURED_KEY)
+                || is_partial_snapshot(span, PARTIAL_VERSION_KEY))
             {
+                // info!("skipping_span : {}\n{:?}", span.get("name").unwrap(), span);
                 return;
             }
             self.handle_span(span, weight, is_top, synthetics, payload_aggkey.clone());
@@ -333,6 +350,12 @@ impl Aggregator {
         synthetics: bool,
         payload_aggkey: PayloadAggregationKey,
     ) {
+        //if span.contains_key("name") {
+        //    info!("2 handle_span span_name: {}", span.get("name").unwrap());
+        //} else {
+        //    info!("2 handle_span span_name: is_unknown");
+        //}
+
         let aggkey = AggregationKey::new_aggregation_from_span(span, payload_aggkey, synthetics);
         let start = match span.get("start") {
             Some(Value::Timestamp(val)) => val.timestamp_nanos(),
@@ -400,22 +423,47 @@ impl Aggregator {
     }
 }
 
-fn metric_flag(span: &BTreeMap<String, Value>, key: &str) -> bool {
+fn get_metric_value_float(span: &BTreeMap<String, Value>, key: &str) -> Option<f64> {
     span.get("metrics")
         .and_then(|m| m.as_object())
         .map(|m| match m.get(key) {
-            Some(Value::Float(f)) => f.into_inner().signum() == 1.0,
-            _ => false,
+            Some(Value::Float(f)) => Some(f.into_inner()),
+            //Some(Value::Float(f)) => f.into_inner().signum() == 1.0,
+            _ => None,
         })
-        .unwrap_or(false)
+        .unwrap_or(None)
+}
+
+fn metric_is_1f(span: &BTreeMap<String, Value>, key: &str) -> bool {
+    match get_metric_value_float(span, key) {
+        Some(f) => f.signum() == 1.0,
+        None => false,
+    }
+}
+
+fn has_top_level(span: &BTreeMap<String, Value>, key: &str) -> bool {
+    metric_is_1f(span, key)
+}
+
+fn is_measured(span: &BTreeMap<String, Value>, key: &str) -> bool {
+    metric_is_1f(span, key)
+}
+
+fn is_partial_snapshot(span: &BTreeMap<String, Value>, key: &str) -> bool {
+    match get_metric_value_float(span, key) {
+        Some(f) => f >= 0.0,
+        None => false,
+    }
 }
 
 /// This extract the relative weight sfrom the top level span (i.e. the span that does not have
-/// a parent). The weigth calculation is borrowed from https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/stats/weight.go#L17-L26.
+/// a parent). The weight calculation is borrowed from https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/stats/weight.go#L17-L26.
 fn extract_weight_from_root_span(spans: &[&BTreeMap<String, Value>]) -> f64 {
     if spans.is_empty() {
         return 1.0;
     }
+    //let mut parent_id_to_child_weight = BTreeMap::<u64, f64>::new();
+    //let mut span_ids = Vec::<u64>::new();
     let mut parent_id_to_child_weight = BTreeMap::<i64, f64>::new();
     let mut span_ids = Vec::<i64>::new();
     for s in spans.iter() {
@@ -427,6 +475,14 @@ fn extract_weight_from_root_span(spans: &[&BTreeMap<String, Value>]) -> f64 {
             Some(Value::Integer(val)) => *val,
             _ => 0,
         };
+        //let parent_id: u64 = match s.get("parent_id") {
+        //    Some(Value::Float(val)) => (*val).trunc() as u64,
+        //    _ => 0,
+        //};
+        //let span_id: u64 = match s.get("span_id") {
+        //    Some(Value::Float(val)) => (*val).trunc() as u64,
+        //    _ => 0,
+        //};
         let sample_rate = s
             .get("metrics")
             .and_then(|m| m.as_object())
@@ -452,16 +508,23 @@ fn extract_weight_from_root_span(spans: &[&BTreeMap<String, Value>]) -> f64 {
     span_ids.iter().for_each(|id| {
         parent_id_to_child_weight.remove(id);
     });
-    // There should be only one value remaining, the weigth from the root span
+    // There should be only one value remaining, the weight from the root span
     if parent_id_to_child_weight.len() != 1 {
-        debug!("Didn't reliably find the root span.");
+        // TODO- we are hitting this
+        error!(
+            "Didn't reliably find the root span. len: {}",
+            parent_id_to_child_weight.len()
+        );
+        //for (k, v) in &parent_id_to_child_weight {
+        //    error!("parent_id = {}, sample_rate = {}", k, v);
+        //}
     }
 
     *parent_id_to_child_weight
         .values()
         .next()
         .unwrap_or_else(|| {
-            debug!("Root span was not found.");
+            error!("Root span was not found.");
             &1.0
         })
 }

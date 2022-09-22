@@ -214,7 +214,8 @@ fn handle_dd_trace_payload_v0(
         .into_iter()
         .map(|dd_trace| {
             let mut trace_event = TraceEvent::default();
-            trace_event.insert("trace_id", dd_trace.trace_id as i64);
+            trace_event.insert("trace_id", dd_trace.trace_id as f64);
+            //trace_event.insert("trace_id", dd_trace.trace_id as i64);
             trace_event.insert("start_time", Utc.timestamp_nanos(dd_trace.start_time));
             trace_event.insert("end_time", Utc.timestamp_nanos(dd_trace.end_time));
             trace_event.insert(
@@ -270,9 +271,12 @@ fn convert_span(dd_span: ddtrace_proto::Span) -> BTreeMap<String, Value> {
     span.insert("service".into(), Value::from(dd_span.service));
     span.insert("name".into(), Value::from(dd_span.name));
     span.insert("resource".into(), Value::from(dd_span.resource));
-    span.insert("trace_id".into(), Value::from(dd_span.trace_id as i64));
-    span.insert("span_id".into(), Value::from(dd_span.span_id as i64));
-    span.insert("parent_id".into(), Value::from(dd_span.parent_id as i64));
+    span.insert("trace_id".into(), Value::from(dd_span.trace_id as f64));
+    span.insert("span_id".into(), Value::from(dd_span.span_id as f64));
+    span.insert("parent_id".into(), Value::from(dd_span.parent_id as f64));
+    //span.insert("trace_id".into(), Value::from(dd_span.trace_id as i64));
+    //span.insert("span_id".into(), Value::from(dd_span.span_id as i64));
+    //span.insert("parent_id".into(), Value::from(dd_span.parent_id as i64));
     span.insert(
         "start".into(),
         Value::from(Utc.timestamp_nanos(dd_span.start)),
