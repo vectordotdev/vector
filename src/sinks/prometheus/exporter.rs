@@ -8,6 +8,7 @@ use std::{
 };
 
 use async_trait::async_trait;
+use base64;
 use futures::{future, stream::BoxStream, FutureExt, StreamExt};
 use hyper::{
     header::HeaderValue,
@@ -48,7 +49,6 @@ use crate::{
 };
 
 const MIN_FLUSH_PERIOD_SECS: u64 = 1;
-const SUPPORTED_AUTHENTICATION_SCHEMAS: HeaderValue = HeaderValue::from_static("Basic, Bearer");
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -384,7 +384,7 @@ fn handle(
         *response.status_mut() = StatusCode::UNAUTHORIZED;
         response.headers_mut().insert(
             http::header::WWW_AUTHENTICATE,
-            SUPPORTED_AUTHENTICATION_SCHEMAS,
+            HeaderValue::from_static("Basic, Bearer"),
         );
         return response;
     }
