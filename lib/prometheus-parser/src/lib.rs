@@ -619,23 +619,50 @@ mod test {
     fn test_f64_to_u32() {
         let value = -1.0;
         let error = try_f64_to_u32(value).unwrap_err();
-        assert_eq!(error, ParserError::ValueOutOfRange { value });
+        assert_eq!(
+            error,
+            ParserError::ValueOutOfRange {
+                value,
+                max: u32::MAX.into()
+            }
+        );
 
         let value = u32::MAX as f64 + 1.0;
         let error = try_f64_to_u32(value).unwrap_err();
-        assert_eq!(error, ParserError::ValueOutOfRange { value });
+        assert_eq!(
+            error,
+            ParserError::ValueOutOfRange {
+                value,
+                max: u32::MAX.into()
+            }
+        );
 
         let value = f64::NAN;
         let error = try_f64_to_u32(value).unwrap_err();
-        assert!(matches!(error, ParserError::ValueOutOfRange { value } if value.is_nan()));
+        assert!(matches!(error, ParserError::ValueOutOfRange {
+                value,
+                max: _,
+            } if value.is_nan()));
 
         let value = f64::INFINITY;
         let error = try_f64_to_u32(value).unwrap_err();
-        assert_eq!(error, ParserError::ValueOutOfRange { value });
+        assert_eq!(
+            error,
+            ParserError::ValueOutOfRange {
+                value,
+                max: u32::MAX.into()
+            }
+        );
 
         let value = f64::NEG_INFINITY;
         let error = try_f64_to_u32(value).unwrap_err();
-        assert_eq!(error, ParserError::ValueOutOfRange { value });
+        assert_eq!(
+            error,
+            ParserError::ValueOutOfRange {
+                value,
+                max: u32::MAX.into()
+            }
+        );
 
         assert_eq!(try_f64_to_u32(0.0).unwrap(), 0);
         assert_eq!(try_f64_to_u32(u32::MAX as f64).unwrap(), u32::MAX);
@@ -645,19 +672,39 @@ mod test {
     fn test_f64_to_u64() {
         let value = -1.0;
         let error = try_f64_to_u64(value).unwrap_err();
-        assert_eq!(error, ParserError::ValueOutOfRange { value });
+        assert_eq!(
+            error,
+            ParserError::ValueOutOfRange {
+                value,
+                max: u64::MAX
+            }
+        );
 
         let value = f64::NAN;
         let error = try_f64_to_u64(value).unwrap_err();
-        assert!(matches!(error, ParserError::ValueOutOfRange { value } if value.is_nan()));
+        assert!(
+            matches!(error, ParserError::ValueOutOfRange { value, max: u64::MAX} if value.is_nan())
+        );
 
         let value = f64::INFINITY;
         let error = try_f64_to_u64(value).unwrap_err();
-        assert_eq!(error, ParserError::ValueOutOfRange { value });
+        assert_eq!(
+            error,
+            ParserError::ValueOutOfRange {
+                value,
+                max: u64::MAX
+            }
+        );
 
         let value = f64::NEG_INFINITY;
         let error = try_f64_to_u64(value).unwrap_err();
-        assert_eq!(error, ParserError::ValueOutOfRange { value });
+        assert_eq!(
+            error,
+            ParserError::ValueOutOfRange {
+                value,
+                max: u64::MAX
+            }
+        );
 
         assert_eq!(try_f64_to_u64(0.0).unwrap(), 0);
         assert_eq!(try_f64_to_u64(u64::MAX as f64).unwrap(), u64::MAX);
