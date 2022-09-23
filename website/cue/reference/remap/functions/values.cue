@@ -9,7 +9,7 @@ remap: functions: values: {
 	arguments: [
 		{
 			name:        "value"
-			description: "The key, value object to extract values from."
+			description: "The object to extract values from."
 			required:    true
 			type: ["object"]
 		},
