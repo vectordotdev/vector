@@ -102,7 +102,7 @@ pub struct TlsConfig {
     /// Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
     pub verify_hostname: Option<bool>,
 
-    /// Sets the list of supported ALPN protolols.
+    /// Sets the list of supported ALPN protocols.
     ///
     /// Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
     /// they are defined.

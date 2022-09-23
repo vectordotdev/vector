@@ -120,7 +120,7 @@ impl PortForwarder {
     /// Wait for the `kubectl port-forward` process to exit and return the exit
     /// code.
     pub async fn wait(&mut self) -> std::io::Result<ExitStatus> {
-        (&mut self.child).wait().await
+        self.child.wait().await
     }
 
     /// Send a termination signal to the `kubectl port-forward` process.

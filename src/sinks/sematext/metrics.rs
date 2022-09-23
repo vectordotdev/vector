@@ -6,6 +6,7 @@ use http::{StatusCode, Uri};
 use hyper::{Body, Request};
 use indoc::indoc;
 use tower::Service;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
@@ -62,7 +63,7 @@ pub struct SematextMetricsConfig {
     pub endpoint: Option<String>,
 
     /// The token that will be used to write to Sematext.
-    pub token: String,
+    pub token: SensitiveString,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -207,7 +208,11 @@ impl Service<Vec<Metric>> for SematextMetricsService {
     }
 
     fn call(&mut self, items: Vec<Metric>) -> Self::Future {
-        let input = encode_events(&self.config.token, &self.config.default_namespace, items);
+        let input = encode_events(
+            self.config.token.inner(),
+            &self.config.default_namespace,
+            items,
+        );
         let body = input.item;
 
         self.inner.call(body)
