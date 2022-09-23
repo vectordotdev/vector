@@ -28,10 +28,12 @@ impl Service<AzureBlobRequest> for AzureBlobService {
     type Future = BoxFuture<'static, StdResult<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<StdResult<(), Self::Error>> {
+        // Emission of Error internal event is handled upstream by the caller
         Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, request: AzureBlobRequest) -> Self::Future {
+        // Emission of Error internal event is handled upstream by the caller
         let this = self.clone();
 
         Box::pin(async move {
