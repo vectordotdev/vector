@@ -1,7 +1,7 @@
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
-use super::prelude::{error_stage, error_type};
+use vector_common::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct UdpSocketConnectionEstablished;
@@ -74,7 +74,7 @@ impl InternalEvent for UdpSendIncompleteError {
             data_size = self.data_size,
             sent = self.sent,
             dropped = self.data_size - self.sent,
-            internal_log_rate_secs = 30,
+            internal_log_rate_limit = true,
             error_type = error_type::WRITER_FAILED,
             stage = error_stage::PROCESSING,
         );

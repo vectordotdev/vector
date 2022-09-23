@@ -83,11 +83,11 @@ pub async fn start_validated(
         config.global.expire_metrics,
         config.global.expire_metrics_secs,
     ) {
-        (e @ Some(_), None) => {
+        (Some(e), None) => {
             warn!(
                 "DEPRECATED: `expire_metrics` setting is deprecated and will be removed in a future version. Use `expire_metrics_secs` instead."
             );
-            e
+            Some(e.as_secs_f64())
         }
         (Some(_), Some(_)) => {
             error!("Cannot set both `expire_metrics` and `expire_metrics_secs`.");

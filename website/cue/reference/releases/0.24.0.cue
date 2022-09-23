@@ -17,6 +17,16 @@ releases: "0.24.0": {
 	]
 
 	known_issues: [
+		"""
+			The new `host_metrics` metrics for physical and logical CPU counts were incorrectly
+			implemented as new modes for the `cpu_seconds_total` when they were meant to be new gauges.
+			Fixed in 0.24.1.
+			""",
+		"""
+			`vector top` and some sinks like `file` incorrectly report metrics from the
+			`internal_metrics` source as they show the incremental metrics rather than absolute.
+			Fixed in 0.24.1.
+			""",
 	]
 
 	description: """
@@ -33,6 +43,10 @@ releases: "0.24.0": {
 		- A new `opentelemetry` source to receive input from OpenTelemetry collectors and SDKs. Only
 		  logs are supported in this release, but support for metrics and traces are in-flight.
 		  An `opentelemetry` sink will follow.
+		- Support for expiring high cardinality internal metrics through the global `expire_metrics`
+		  (will be replaced by `expire_metrics_secs` in 0.24.1). This can alleviate issues with
+		  Vector using increased memory over time. For now it is opt-in, but we may make this the
+		  default in the future.
 
 		Note that this release has a backwards incompatible data model change that users of the
 		`vector` sink and disk buffers should be aware of while upgrading. See the [note in the

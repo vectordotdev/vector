@@ -1,7 +1,8 @@
 use metrics::counter;
+use vector_common::internal_event::{error_stage, error_type};
 use vector_core::internal_event::InternalEvent;
 
-use super::prelude::{error_stage, error_type, http_error_code};
+use super::prelude::http_error_code;
 
 #[derive(Debug)]
 pub struct HttpScrapeEventsReceived {
@@ -48,7 +49,7 @@ impl InternalEvent for HttpScrapeHttpResponseError {
             stage = error_stage::RECEIVING,
             error_type = error_type::REQUEST_FAILED,
             error_code = %http_error_code(self.code.as_u16()),
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -76,7 +77,7 @@ impl InternalEvent for HttpScrapeHttpError {
             error = ?self.error,
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::RECEIVING,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,

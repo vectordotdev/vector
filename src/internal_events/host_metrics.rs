@@ -1,7 +1,7 @@
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
-use super::prelude::{error_stage, error_type};
+use vector_common::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct HostMetricsScrapeError {
@@ -14,7 +14,7 @@ impl InternalEvent for HostMetricsScrapeError {
             message = self.message,
             error_type = error_type::READER_FAILED,
             stage = error_stage::RECEIVING,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
 
         counter!(
@@ -38,7 +38,7 @@ impl<E: std::fmt::Display> InternalEvent for HostMetricsScrapeDetailError<E> {
             error = %self.error,
             error_type = error_type::READER_FAILED,
             stage = error_stage::RECEIVING,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
 
         counter!(
@@ -64,7 +64,7 @@ impl InternalEvent for HostMetricsScrapeFilesystemError {
             error = %self.error,
             error_type = error_type::READER_FAILED,
             stage = error_stage::RECEIVING,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
 
         counter!(

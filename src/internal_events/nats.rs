@@ -5,9 +5,10 @@ use crate::{
     internal_events::{ComponentEventsDropped, UNINTENTIONAL},
 };
 use metrics::counter;
+use vector_common::internal_event::{error_stage, error_type};
 use vector_core::internal_event::InternalEvent;
 
-use super::prelude::{error_stage, error_type, io_error_code};
+use super::prelude::io_error_code;
 
 #[derive(Debug)]
 pub struct NatsEventSendError {
@@ -23,7 +24,7 @@ impl InternalEvent for NatsEventSendError {
             error_type = error_type::WRITER_FAILED,
             error_code = io_error_code(&self.error),
             stage = error_stage::SENDING,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,

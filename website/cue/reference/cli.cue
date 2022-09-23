@@ -162,6 +162,13 @@ cli: {
 			type:        "integer"
 			env_var:     "VECTOR_THREADS"
 		}
+		"internal-log-rate-limit": {
+			_short:      "i"
+			description: env_vars.VECTOR_INTERNAL_LOG_RATE_LIMIT.description
+			default:     env_vars.VECTOR_INTERNAL_LOG_RATE_LIMIT.type.uint.default
+			type:        "integer"
+			env_var:     "VECTOR_INTERNAL_LOG_RATE_LIMIT"
+		}
 	}
 
 	options: _core_options
@@ -588,6 +595,13 @@ cli: {
 		VECTOR_WATCH_CONFIG: {
 			description: "Watch for changes in the configuration file and reload accordingly"
 			type: bool: default: false
+		}
+		VECTOR_INTERNAL_LOG_RATE_LIMIT: {
+			description: "Set the internal log rate limit. This limits Vector from emitting identical logs more than once over the given number of seconds."
+			type: uint: {
+				default: 10
+				unit:    null
+			}
 		}
 	}
 

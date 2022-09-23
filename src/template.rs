@@ -181,7 +181,7 @@ impl Template {
     }
 }
 
-fn render_fields<'a>(src: &str, event: EventRef<'a>) -> Result<String, TemplateRenderingError> {
+fn render_fields(src: &str, event: EventRef<'_>) -> Result<String, TemplateRenderingError> {
     let mut missing_keys = Vec::new();
     let out = RE
         .replace_all(src, |caps: &Captures<'_>| {

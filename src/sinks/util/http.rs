@@ -31,6 +31,7 @@ use crate::{
 };
 
 pub trait HttpEventEncoder<Output> {
+    // The encoder handles internal event emission for Error and EventsDropped.
     fn encode_event(&mut self, event: Event) -> Option<Output>;
 }
 

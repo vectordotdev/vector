@@ -4,6 +4,8 @@ use snafu::Snafu;
 
 pub mod util;
 
+#[cfg(feature = "sinks-amqp")]
+pub mod amqp;
 #[cfg(feature = "sinks-apex")]
 pub mod apex;
 #[cfg(feature = "sinks-aws_cloudwatch_logs")]
@@ -97,7 +99,8 @@ use vector_config::{configurable_component, NamedComponent};
 pub use vector_core::{config::Input, sink::VectorSink};
 
 use crate::config::{
-    unit_test::UnitTestSinkConfig, AcknowledgementsConfig, Resource, SinkConfig, SinkContext,
+    unit_test::{UnitTestSinkConfig, UnitTestStreamSinkConfig},
+    AcknowledgementsConfig, Resource, SinkConfig, SinkContext,
 };
 
 pub type Healthcheck = BoxFuture<'static, crate::Result<()>>;
@@ -129,6 +132,10 @@ pub enum HealthcheckError {
 #[serde(tag = "type", rename_all = "snake_case")]
 #[enum_dispatch(SinkConfig)]
 pub enum Sinks {
+    /// AMQP.
+    #[cfg(feature = "sinks-amqp")]
+    Amqp(#[configurable(derived)] amqp::AmqpSinkConfig),
+
     /// Apex Logs.
     #[cfg(feature = "sinks-apex")]
     Apex(#[configurable(derived)] apex::ApexSinkConfig),
@@ -346,6 +353,9 @@ pub enum Sinks {
     /// Unit test.
     UnitTest(#[configurable(derived)] UnitTestSinkConfig),
 
+    /// Unit test stream.
+    UnitTestStream(#[configurable(derived)] UnitTestStreamSinkConfig),
+
     /// Vector.
     #[cfg(feature = "sinks-vector")]
     Vector(#[configurable(derived)] vector::VectorConfig),
@@ -360,6 +370,8 @@ impl NamedComponent for Sinks {
 
     fn get_component_name(&self) -> &'static str {
         match self {
+            #[cfg(feature = "sinks-amqp")]
+            Self::Amqp(config) => config.get_component_name(),
             #[cfg(feature = "sinks-apex")]
             Self::Apex(config) => config.get_component_name(),
             #[cfg(feature = "sinks-aws_cloudwatch_logs")]
@@ -465,6 +477,7 @@ impl NamedComponent for Sinks {
             #[cfg(test)]
             Self::TestPanic(config) => config.get_component_name(),
             Self::UnitTest(config) => config.get_component_name(),
+            Self::UnitTestStream(config) => config.get_component_name(),
             #[cfg(feature = "sinks-vector")]
             Self::Vector(config) => config.get_component_name(),
             #[cfg(feature = "sinks-websocket")]

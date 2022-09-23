@@ -1,6 +1,8 @@
 use enum_dispatch::enum_dispatch;
 use snafu::Snafu;
 
+#[cfg(feature = "sources-amqp")]
+pub mod amqp;
 #[cfg(feature = "sources-apache_metrics")]
 pub mod apache_metrics;
 #[cfg(feature = "sources-aws_ecs_metrics")]
@@ -85,7 +87,10 @@ use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::{LogNamespace, Output};
 pub use vector_core::source::Source;
 
-use crate::config::{unit_test::UnitTestSourceConfig, Resource, SourceConfig, SourceContext};
+use crate::config::{
+    unit_test::{UnitTestSourceConfig, UnitTestStreamSourceConfig},
+    Resource, SourceConfig, SourceContext,
+};
 
 /// Common build errors
 #[derive(Debug, Snafu)]
@@ -101,6 +106,10 @@ enum BuildError {
 #[serde(tag = "type", rename_all = "snake_case")]
 #[enum_dispatch(SourceConfig)]
 pub enum Sources {
+    /// AMQP.
+    #[cfg(feature = "sources-amqp")]
+    Amqp(#[configurable(derived)] amqp::AmqpSourceConfig),
+
     /// Apache HTTP Server (HTTPD) Metrics.
     #[cfg(feature = "sources-apache_metrics")]
     ApacheMetrics(#[configurable(derived)] apache_metrics::ApacheMetricsConfig),
@@ -280,6 +289,9 @@ pub enum Sources {
     /// Unit test.
     UnitTest(#[configurable(derived)] UnitTestSourceConfig),
 
+    /// Unit test stream.
+    UnitTestStream(#[configurable(derived)] UnitTestStreamSourceConfig),
+
     /// Vector.
     #[cfg(feature = "sources-vector")]
     Vector(#[configurable(derived)] vector::VectorConfig),
@@ -291,6 +303,8 @@ impl NamedComponent for Sources {
 
     fn get_component_name(&self) -> &'static str {
         match self {
+            #[cfg(feature = "sources-amqp")]
+            Self::Amqp(config) => config.get_component_name(),
             #[cfg(feature = "sources-apache_metrics")]
             Self::ApacheMetrics(config) => config.get_component_name(),
             #[cfg(feature = "sources-aws_ecs_metrics")]
@@ -378,6 +392,7 @@ impl NamedComponent for Sources {
             #[cfg(feature = "sources-syslog")]
             Self::Syslog(config) => config.get_component_name(),
             Self::UnitTest(config) => config.get_component_name(),
+            Self::UnitTestStream(config) => config.get_component_name(),
             #[cfg(feature = "sources-vector")]
             Self::Vector(config) => config.get_component_name(),
         }

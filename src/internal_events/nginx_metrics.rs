@@ -1,8 +1,8 @@
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
-use super::prelude::{error_stage, error_type};
 use crate::sources::nginx_metrics::parser::ParseError;
+use vector_common::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct NginxMetricsEventsReceived<'a> {
@@ -48,7 +48,7 @@ impl<'a> InternalEvent for NginxMetricsRequestError<'a> {
             error = %self.error,
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::RECEIVING,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -74,7 +74,7 @@ impl<'a> InternalEvent for NginxMetricsStubStatusParseError<'a> {
             error = %self.error,
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,

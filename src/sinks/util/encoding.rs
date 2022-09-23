@@ -4,7 +4,7 @@ use bytes::BytesMut;
 use codecs::encoding::Framer;
 use tokio_util::codec::Encoder as _;
 
-use crate::{codecs::Transformer, event::Event};
+use crate::{codecs::Transformer, event::Event, internal_events::EncoderWriteError};
 
 pub trait Encoder<T> {
     /// Encodes the input into the provided writer.
@@ -23,8 +23,9 @@ impl Encoder<Vec<Event>> for (Transformer, crate::codecs::Encoder<Framer>) {
     ) -> io::Result<usize> {
         let mut encoder = self.1.clone();
         let mut bytes_written = 0;
+        let mut n_events_pending = events.len();
         let batch_prefix = encoder.batch_prefix();
-        writer.write_all(batch_prefix)?;
+        write_all(writer, n_events_pending, batch_prefix)?;
         bytes_written += batch_prefix.len();
         if let Some(last) = events.pop() {
             for mut event in events {
@@ -33,8 +34,9 @@ impl Encoder<Vec<Event>> for (Transformer, crate::codecs::Encoder<Framer>) {
                 encoder
                     .encode(event, &mut bytes)
                     .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
-                writer.write_all(&bytes)?;
+                write_all(writer, n_events_pending, &bytes)?;
                 bytes_written += bytes.len();
+                n_events_pending -= 1;
             }
             let mut event = last;
             self.0.transform(&mut event);
@@ -42,11 +44,13 @@ impl Encoder<Vec<Event>> for (Transformer, crate::codecs::Encoder<Framer>) {
             encoder
                 .serialize(event, &mut bytes)
                 .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
-            writer.write_all(&bytes)?;
+            write_all(writer, n_events_pending, &bytes)?;
             bytes_written += bytes.len();
+            n_events_pending -= 1;
         }
         let batch_suffix = encoder.batch_suffix();
-        writer.write_all(batch_suffix)?;
+        assert!(n_events_pending == 0);
+        write_all(writer, 0, batch_suffix)?;
         bytes_written += batch_suffix.len();
 
         Ok(bytes_written)
@@ -61,9 +65,31 @@ impl Encoder<Event> for (Transformer, crate::codecs::Encoder<()>) {
         encoder
             .serialize(event, &mut bytes)
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
-        writer.write_all(&bytes)?;
+        write_all(writer, 1, &bytes)?;
         Ok(bytes.len())
     }
+}
+
+/// Write the buffer to the writer. If the operation fails, emit an internal event which complies with the
+/// instrumentation spec- as this necessitates both an Error and EventsDropped event.
+///
+/// # Arguments
+///
+/// * `writer`           - The object implementing io::Write to write data to.
+/// * `n_events_pending` - The number of events that are dropped if this write fails.
+/// * `buf`              - The buffer to write.
+pub(crate) fn write_all(
+    writer: &mut dyn io::Write,
+    n_events_pending: usize,
+    buf: &[u8],
+) -> io::Result<()> {
+    writer.write_all(buf).map_err(|error| {
+        emit!(EncoderWriteError {
+            error: &error,
+            count: n_events_pending as u64,
+        });
+        error
+    })
 }
 
 pub fn as_tracked_write<F, I, E>(inner: &mut dyn io::Write, input: I, f: F) -> io::Result<usize>

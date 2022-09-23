@@ -72,7 +72,7 @@ pub(crate) fn decode_log_body(
         // The datadog agent may send an empty payload as a keep alive
         debug!(
             message = "Empty payload ignored.",
-            internal_log_rate_secs = 30
+            internal_log_rate_limit = true
         );
         return Ok(Vec::new());
     }

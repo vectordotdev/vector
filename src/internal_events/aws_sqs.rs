@@ -4,7 +4,7 @@ pub use s3::*;
 use vector_core::internal_event::InternalEvent;
 
 #[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs"))]
-use crate::internal_events::prelude::{error_stage, error_type};
+use vector_common::internal_event::{error_stage, error_type};
 
 #[cfg(feature = "sources-aws_s3")]
 mod s3 {
@@ -30,7 +30,7 @@ mod s3 {
                 error_code = "failed_processing_sqs_message",
                 error_type = error_type::PARSER_FAILED,
                 stage = error_stage::PROCESSING,
-                internal_log_rate_secs = 10,
+                internal_log_rate_limit = true,
             );
             counter!(
                 "component_errors_total", 1,
@@ -78,7 +78,7 @@ mod s3 {
                 error_code = "failed_deleting_some_sqs_messages",
                 error_type = error_type::ACKNOWLEDGMENT_FAILED,
                 stage = error_stage::PROCESSING,
-                internal_log_rate_secs = 10,
+                internal_log_rate_limit = true,
             );
             counter!(
                 "component_errors_total", 1,
@@ -109,7 +109,7 @@ mod s3 {
                 error_code = "failed_deleting_all_sqs_messages",
                 error_type = error_type::ACKNOWLEDGMENT_FAILED,
                 stage = error_stage::PROCESSING,
-                internal_log_rate_secs = 10,
+                internal_log_rate_limit = true,
             );
             counter!(
                 "component_errors_total", 1,
@@ -137,7 +137,7 @@ impl<'a, E: std::fmt::Display> InternalEvent for SqsMessageReceiveError<'a, E> {
             error_code = "failed_fetching_sqs_events",
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::RECEIVING,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -191,7 +191,7 @@ impl<'a, E: std::fmt::Display> InternalEvent for SqsMessageDeleteError<'a, E> {
             error = %self.error,
             error_type = error_type::WRITER_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,

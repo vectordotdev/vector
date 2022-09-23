@@ -149,6 +149,15 @@ pub struct RootOpts {
     /// Watch for changes in configuration file, and reload accordingly.
     #[clap(short, long, env = "VECTOR_WATCH_CONFIG")]
     pub watch_config: bool,
+
+    /// Set the internal log rate limit
+    #[clap(
+        short,
+        long,
+        env = "VECTOR_INTERNAL_LOG_RATE_LIMIT",
+        default_value = "10"
+    )]
+    pub internal_log_rate_limit: u64,
 }
 
 impl RootOpts {

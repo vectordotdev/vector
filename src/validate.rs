@@ -141,6 +141,14 @@ pub fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
         .map_err(&mut report_error)
         .ok()?;
 
+    // Check secrets in configuration
+    #[cfg(feature = "enterprise")]
+    {
+        config::loading::schema::check_sensitive_fields_from_paths(&paths, &builder)
+            .map_err(&mut report_error)
+            .ok()?;
+    }
+
     // Build
     let (config, build_warnings) = builder
         .build_with_warnings()

@@ -27,14 +27,11 @@ use codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     StreamDecodingError,
 };
-use vector_config::configurable_component;
+use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
     config::{log_schema, LogNamespace, Output},
     event::Event,
 };
-
-/// The name of this source
-pub(crate) const NAME: &str = "http_scrape";
 
 /// Configuration for the `http_scrape` source.
 #[configurable_component(source("http_scrape"))]
@@ -199,7 +196,7 @@ impl HttpScrapeContext {
                         log,
                         log_schema().source_type_key(),
                         "source_type",
-                        NAME,
+                        HttpScrapeConfig::NAME,
                     );
                     self.log_namespace.insert_vector_metadata(
                         log,
@@ -209,10 +206,16 @@ impl HttpScrapeContext {
                     );
                 }
                 Event::Metric(ref mut metric) => {
-                    metric.insert_tag(log_schema().source_type_key().to_string(), NAME.to_string());
+                    metric.insert_tag(
+                        log_schema().source_type_key().to_string(),
+                        HttpScrapeConfig::NAME.to_string(),
+                    );
                 }
                 Event::Trace(ref mut trace) => {
-                    trace.insert(log_schema().source_type_key(), Bytes::from(NAME));
+                    trace.insert(
+                        log_schema().source_type_key(),
+                        Bytes::from(HttpScrapeConfig::NAME),
+                    );
                 }
             }
         }
