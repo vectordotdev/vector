@@ -18,7 +18,7 @@ remap: functions: values: {
 	return: {
 		types: ["array"]
 		rules: [
-			#"Returns an array for all the values."#,
+			#"Returns an array of all the values."#,
 		]
 	}
 	examples: [
