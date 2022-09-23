@@ -44,6 +44,7 @@ impl Function for Values {
             },
         ]
     }
+
     fn compile(
         &self,
         _state: &TypeState,
