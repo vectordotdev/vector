@@ -1,4 +1,4 @@
 FROM ghcr.io/cross-rs/x86_64-unknown-linux-gnu:0.2.4
 
-COPY scripts/cross/bootstrap-ubuntu.sh scripts/environment/install-protoc.sh .
-RUN ./bootstrap-ubuntu.sh && bash install-protoc.sh
+COPY scripts/cross/bootstrap-ubuntu.sh scripts/environment/install-protoc.sh /
+RUN /bootstrap-ubuntu.sh && bash /install-protoc.sh
