@@ -333,6 +333,8 @@ Find.find('.') do |path|
 
     # Check log message texts for correct formatting.
     if path.start_with? 'src/'
+      reports = []
+
       # Try to find all general usage of the various `tracing` macros.
       text.scan(/(
         (trace|debug|info|warn|error)!\( # Log type.
@@ -340,7 +342,7 @@ Find.find('.') do |path|
         \)(?:;|\n\s*}) # Handles usages that lack a trailing semicolon.
         )/mx) \
       do |full, type, params|
-        # Extract each parameter to the macros, whichn involves handling structured fields and
+        # Extract each parameter to the macros, which involves handling structured fields and
         # string literals. We parse them further below so that we can iterate through them to try
         # and determine what the actual log message is, depending on if it's set by using the
         # `message` field, or implicitly with a string literal.
@@ -348,7 +350,9 @@ Find.find('.') do |path|
         # We also have some special handling in there for `tracing`-specific "target" and "parent"
         # settings which influence how the event is handled when being processed by a subscriber,
         # which we don't care about _here_ but need to account for in our pattern to parse things.
-        params = params.scan(/(".*?"|(?:target|parent):\s*[^,]+|(\w+\s*=\s*(?:".*?"|[%?]?[^,]+))|[%?][^,]+)/) \
+        
+        #params = params.scan(/(".*?"|(?:target|parent):\s*[^,]+|(\w+\s*=\s*(?:".*?"|[%?]?[^,]+))|[%?][^,]+)/) \
+        params = params.scan(/("(?:[^"\\]++|\\.)*+"|(?:target|parent):\s*[^,]+|(\w+\s*=\s*(?:"(?:[^"\\]++|\\.)*+"|[%?]?[^,]+))|[%?][^,]+)/) \
           .map do |param|
             if /^\".*\"$/.match?(param[0].strip)
               { "type" => "litstr", "value" => param[0] }
@@ -377,15 +381,18 @@ Find.find('.') do |path|
         is_capitalized = !has_message || (message[0] == "{" || message.match(/^[[:upper:]]/))
         has_trailing_period = !has_message || (message[-1, 1] == "}" || message.match(/\.$/))
 
-        reports = []
-        reports.append('Message must start with a capital.') unless is_capitalized
-        reports.append('Message must end with a period.') unless has_trailing_period
-        unless reports.empty?
+        match_reports = []
+        match_reports.append('Message must start with a capital.') unless is_capitalized
+        match_reports.append('Message must end with a period.') unless has_trailing_period
+        unless match_reports.empty?
           line_no = find_line_number(text, full)
-          puts "Error(s) in file #{path}"
-          reports.each { |report| puts "  #{report} (`#{type}` call on line #{line_no})" }
-          error_count += 1
+          match_reports.each { |report| reports.push("    #{report} (`#{type}` call on #{path}:#{line_no})") }
         end
+      end
+
+      unless reports.empty?
+        reports.each { |report| puts report }
+        error_count += reports.length
       end
     end
 
