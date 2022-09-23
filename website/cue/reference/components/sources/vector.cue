@@ -63,15 +63,6 @@ components: sources: vector: {
 				examples: ["0.0.0.0:\(_port)"]
 			}
 		}
-		shutdown_timeout_secs: {
-			common:      false
-			description: "The timeout before a connection is forcefully closed during shutdown."
-			required:    false
-			type: uint: {
-				default: 30
-				unit:    "seconds"
-			}
-		}
 		version: {
 			description: "Source API version. Specifying this version ensures that Vector does not silently break backward compatibility."
 			common:      true
