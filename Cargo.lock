@@ -884,7 +884,7 @@ dependencies = [
  "md-5",
  "pin-project-lite",
  "sha1",
- "sha2 0.10.5",
+ "sha2 0.10.6",
  "tracing 0.1.34",
 ]
 
@@ -1127,7 +1127,7 @@ dependencies = [
  "serde-xml-rs",
  "serde_derive",
  "serde_json",
- "sha2 0.10.5",
+ "sha2 0.10.6",
  "thiserror",
  "url",
  "uuid 1.1.2",
@@ -2310,9 +2310,9 @@ dependencies = [
 
 [[package]]
 name = "digest"
-version = "0.10.3"
+version = "0.10.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2fb860ca6fafa5552fb6d0e816a69c8e49f0908bf524e30a90d97c85892d506"
+checksum = "adfbc57365a37acbd2ebf2b64d7e69bb766e2fea813521ed536f5d0520dcf86c"
 dependencies = [
  "block-buffer 0.10.2",
  "crypto-common",
@@ -3365,7 +3365,7 @@ version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c49c37c09c17a53d937dfbb742eb3a961d65a994e6bcdcf37e7399d0cc8ab5e"
 dependencies = [
- "digest 0.10.3",
+ "digest 0.10.5",
 ]
 
 [[package]]
@@ -4358,7 +4358,7 @@ version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "66b48670c893079d3c2ed79114e3644b7004df1c361a4e0ad52e2e6940d07c3d"
 dependencies = [
- "digest 0.10.3",
+ "digest 0.10.5",
 ]
 
 [[package]]
@@ -4599,7 +4599,7 @@ dependencies = [
  "serde_bytes",
  "serde_with 1.14.0",
  "sha-1 0.10.0",
- "sha2 0.10.5",
+ "sha2 0.10.6",
  "socket2",
  "stringprep",
  "strsim 0.10.0",
@@ -5395,7 +5395,7 @@ version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "271779f35b581956db91a3e55737327a03aa051e90b1c47aeb189508533adfd7"
 dependencies = [
- "digest 0.10.3",
+ "digest 0.10.5",
 ]
 
 [[package]]
@@ -5685,7 +5685,7 @@ dependencies = [
  "md-5",
  "memchr",
  "rand 0.8.5",
- "sha2 0.10.5",
+ "sha2 0.10.6",
  "stringprep",
 ]
 
@@ -7139,7 +7139,7 @@ checksum = "028f48d513f9678cda28f6e4064755b3fbb2af6acd672f2c209b62323f7aea0f"
 dependencies = [
  "cfg-if 1.0.0",
  "cpufeatures",
- "digest 0.10.3",
+ "digest 0.10.5",
 ]
 
 [[package]]
@@ -7150,7 +7150,7 @@ checksum = "c77f4e7f65455545c2153c1253d25056825e77ee2533f0e41deb65a93a34852f"
 dependencies = [
  "cfg-if 1.0.0",
  "cpufeatures",
- "digest 0.10.3",
+ "digest 0.10.5",
 ]
 
 [[package]]
@@ -7168,13 +7168,13 @@ dependencies = [
 
 [[package]]
 name = "sha2"
-version = "0.10.5"
+version = "0.10.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf9db03534dff993187064c4e0c05a5708d2a9728ace9a8959b77bedf415dac5"
+checksum = "82e6b795fe2e3b1e845bafcb27aa35405c4d47cdfc92af5fc8d3002f76cebdc0"
 dependencies = [
  "cfg-if 1.0.0",
  "cpufeatures",
- "digest 0.10.3",
+ "digest 0.10.5",
 ]
 
 [[package]]
@@ -7183,7 +7183,7 @@ version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "881bf8156c87b6301fc5ca6b27f11eeb2761224c7081e69b409d5a1951a70c86"
 dependencies = [
- "digest 0.10.3",
+ "digest 0.10.5",
  "keccak",
 ]
 
@@ -8852,7 +8852,7 @@ dependencies = [
  "serde_json",
  "serde_with 2.0.0",
  "serde_yaml 0.9.12",
- "sha2 0.10.5",
+ "sha2 0.10.6",
  "smallvec",
  "smpl_jwt",
  "snafu",
@@ -9282,7 +9282,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha-1 0.10.0",
- "sha2 0.10.5",
+ "sha2 0.10.6",
  "sha3",
  "strip-ansi-escapes",
  "syslog_loose",
