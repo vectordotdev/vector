@@ -22,6 +22,7 @@ use pulsar::{
 };
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
+use value::Value;
 use vector_common::{
     internal_event::{
         ByteSize, BytesSent, EventsSent, InternalEventHandle as _, Protocol, Registered,
@@ -299,7 +300,10 @@ impl Sink<Event> for PulsarSink {
         );
 
         let key_value: Option<String> = match (event.maybe_as_log(), &self.partition_key_field) {
-            (Some(log), Some(field)) => log.get(field.as_str()).map(|x| x.to_string()),
+            (Some(log), Some(field)) => log.get(field.as_str()).map(|x| match x {
+                Value::Bytes(x) => String::from_utf8_lossy(x).to_string(),
+                x => x.to_string(),
+            }),
             _ => None,
         };
 
