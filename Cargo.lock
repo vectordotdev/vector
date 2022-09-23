@@ -862,8 +862,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8d33790cecae42b999d197074c8a19e9b96b9e346284a6f93989e7489c9fa0f5"
 dependencies = [
  "aws-smithy-http 0.49.0",
+ "form_urlencoded",
  "hex",
+ "http",
  "once_cell",
+ "percent-encoding",
  "regex",
  "ring",
  "time",
