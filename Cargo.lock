@@ -7034,9 +7034,9 @@ dependencies = [
 
 [[package]]
 name = "serde_yaml"
-version = "0.9.12"
+version = "0.9.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a2aed7a697360aae71c545044813761b33c131ba40cbbf721f87bfd86dd07a0"
+checksum = "8613d593412a0deb7bbd8de9d908efff5a0cb9ccd8f62c641e7b2ed2f57291d1"
 dependencies = [
  "indexmap",
  "itoa 1.0.1",
@@ -8746,7 +8746,7 @@ dependencies = [
  "serde_bytes",
  "serde_json",
  "serde_with 2.0.0",
- "serde_yaml 0.9.12",
+ "serde_yaml 0.9.13",
  "sha2 0.10.6",
  "smallvec",
  "smpl_jwt",
@@ -8851,7 +8851,7 @@ dependencies = [
  "rand 0.8.5",
  "rkyv",
  "serde",
- "serde_yaml 0.9.12",
+ "serde_yaml 0.9.13",
  "snafu",
  "temp-dir",
  "tokio",
