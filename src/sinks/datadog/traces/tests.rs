@@ -320,8 +320,6 @@ async fn multiple_traces() {
 }
 
 fn json_data_to_btreemap(data: &str) -> BTreeMap<String, Value> {
-    //let map: BTreeMap<String, Value> = serde_json::from_str(&data).unwrap();
-    //map
     serde_json::from_str(&data).unwrap()
 }
 
@@ -338,7 +336,6 @@ fn events_from_sample_data(sample_data_dir: &str) -> Vec<Event> {
     for file in fs::read_dir(sample_data_dir).unwrap() {
         let t = file.unwrap().path();
         let path = t.to_str().unwrap();
-        //println!("converting {}", &path);
 
         let mut count = 0;
         if let Ok(lines) = read_lines(path) {
@@ -352,6 +349,7 @@ fn events_from_sample_data(sample_data_dir: &str) -> Vec<Event> {
             }
         }
         println!("processed {}", count);
+        println!();
     }
 
     events
@@ -361,12 +359,10 @@ fn events_from_sample_data(sample_data_dir: &str) -> Vec<Event> {
 async fn thorough_stats() {
     trace_init();
 
-    let sample_data_dir = "/home/neuro/workspace/issues/incorrect_apm_stats/json_files";
+    let sample_data_dir = "/home/kyle.criddle/workspace/issues/incorrect_apm_stats/json_files";
     let events = events_from_sample_data(&sample_data_dir);
 
     let mut rx = start_test(BatchStatus::Delivered, StatusCode::OK, events).await;
-
-    //let mut output = rx.take(2).collect::<Vec<_>>().await;
 
     let mut items = Vec::new();
     while let Some(item) = rx.next().await {
@@ -376,7 +372,8 @@ async fn thorough_stats() {
     let mut num_spans = 0;
     let mut num_chunks = 0;
 
-    let mut stats_map = HashMap::new();
+    let mut hits_map = HashMap::new();
+    let mut top_hits_map = HashMap::new();
 
     for item in items {
         let (parts, body) = item;
@@ -405,11 +402,18 @@ async fn thorough_stats() {
                 for csb in csp.stats {
                     for cgs in csb.stats {
                         let hits = cgs.hits;
+                        let top_hits = cgs.top_level_hits;
+                        let name = cgs.name.clone();
                         // println!("{:?}", cgs);
-                        stats_map
-                            .entry(cgs.name)
+                        hits_map
+                            .entry(name.clone())
                             .and_modify(|hits_counter| *hits_counter += hits)
                             .or_insert(hits);
+
+                        top_hits_map
+                            .entry(name)
+                            .and_modify(|hits_counter| *hits_counter += top_hits)
+                            .or_insert(top_hits);
                     }
                 }
             }
@@ -417,15 +421,33 @@ async fn thorough_stats() {
             panic!("unidentified flying content type!");
         }
     }
+    println!();
+    println!("hit totals:");
+    println!();
 
     let mut sum = 0;
-    for (k, v) in stats_map {
+    for (k, v) in hits_map {
         println!("{} : {}", k, v);
         sum += v;
     }
+    println!();
 
     println!("sum: {}", sum);
+    println!();
 
     println!("actual spans: {}", num_spans);
     println!("actual chunks: {}", num_chunks);
+
+    println!();
+    println!("top level hit totals:");
+    println!();
+
+    sum = 0;
+    for (k, v) in top_hits_map {
+        println!("{} : {}", k, v);
+        sum += v;
+    }
+    println!();
+    println!("sum: {}", sum);
+    println!();
 }

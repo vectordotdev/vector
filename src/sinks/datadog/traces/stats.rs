@@ -323,20 +323,32 @@ impl Aggregator {
             .get("origin")
             .map(|v| v.to_string_lossy().starts_with(TAG_SYNTHETICS))
             .unwrap_or(false);
-        spans.iter().for_each(|span| {
+
+        for span in spans {
             let is_top = has_top_level(span, TOP_LEVEL_KEY);
-            // if is_top {
-            //     info!("is_top_true");
-            // }
             if !(is_top
                 || is_measured(span, MEASURED_KEY)
                 || is_partial_snapshot(span, PARTIAL_VERSION_KEY))
             {
-                // info!("skipping_span : {}\n{:?}", span.get("name").unwrap(), span);
-                return;
+                println!("skipping_span : {}\n{:?}", span.get("name").unwrap(), span);
+                continue;
             }
             self.handle_span(span, weight, is_top, synthetics, payload_aggkey.clone());
-        });
+        }
+        //spans.iter().for_each(|span| {
+        //    let is_top = has_top_level(span, TOP_LEVEL_KEY);
+        //    // if is_top {
+        //    //     info!("is_top_true");
+        //    // }
+        //    if !(is_top
+        //        || is_measured(span, MEASURED_KEY)
+        //        || is_partial_snapshot(span, PARTIAL_VERSION_KEY))
+        //    {
+        //        // info!("skipping_span : {}\n{:?}", span.get("name").unwrap(), span);
+        //        return;
+        //    }
+        //    self.handle_span(span, weight, is_top, synthetics, payload_aggkey.clone());
+        //});
     }
 
     /// This implementation uses https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/stats/statsraw.go#L147-L182
@@ -469,10 +481,12 @@ fn extract_weight_from_root_span(spans: &[&BTreeMap<String, Value>]) -> f64 {
     for s in spans.iter() {
         let parent_id = match s.get("parent_id") {
             Some(Value::Integer(val)) => *val,
+            // panic other cases
             _ => 0,
         };
         let span_id = match s.get("span_id") {
             Some(Value::Integer(val)) => *val,
+            // panic other cases
             _ => 0,
         };
         //let parent_id: u64 = match s.get("parent_id") {
@@ -483,7 +497,7 @@ fn extract_weight_from_root_span(spans: &[&BTreeMap<String, Value>]) -> f64 {
         //    Some(Value::Float(val)) => (*val).trunc() as u64,
         //    _ => 0,
         //};
-        let sample_rate = s
+        let weight = s
             .get("metrics")
             .and_then(|m| m.as_object())
             .map(|m| match m.get(SAMPLING_RATE_KEY) {
@@ -498,26 +512,46 @@ fn extract_weight_from_root_span(spans: &[&BTreeMap<String, Value>]) -> f64 {
                 _ => 1.0,
             })
             .unwrap_or(1.0);
+
+        // root ?
         if parent_id == 0 {
-            return sample_rate;
+            // TODO is the early return a problem?
+            //continue;
+            return weight;
         }
+
         span_ids.push(span_id);
-        parent_id_to_child_weight.insert(parent_id, sample_rate);
+
+        // TODO shouldn't we be summing the weight for that parent_id ?
+        // what is the
+
+        // parent_id_to_child_weight.insert(parent_id, weight);
+
+        // parent_id_to_child_weight.insert(parent_id, sample_rate);
+        parent_id_to_child_weight
+            .entry(parent_id)
+            .and_modify(|rate| *rate += weight)
+            .or_insert(weight);
+
+        //assert!(parent_id_to_child_weight
+        //    .insert(parent_id, sample_rate)
+        //    .is_none());
     }
+
     // We remove all span that do have a parent
     span_ids.iter().for_each(|id| {
         parent_id_to_child_weight.remove(id);
     });
     // There should be only one value remaining, the weight from the root span
     if parent_id_to_child_weight.len() != 1 {
-        // TODO- we are hitting this
-        error!(
+        // TODO is it a problem- we are hitting this
+        println!(
             "Didn't reliably find the root span. len: {}",
             parent_id_to_child_weight.len()
         );
-        //for (k, v) in &parent_id_to_child_weight {
-        //    error!("parent_id = {}, sample_rate = {}", k, v);
-        //}
+        for (k, v) in &parent_id_to_child_weight {
+            println!("parent_id = {}, sample_rate = {}", k, v);
+        }
     }
 
     *parent_id_to_child_weight
