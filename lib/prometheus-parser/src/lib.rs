@@ -53,8 +53,8 @@ pub enum ParserError {
         error: ErrorKind,
     },
 
-    #[snafu(display("expected value in range [0, {}], found: {}", u32::MAX, value))]
-    ValueOutOfRange { value: f64 },
+    #[snafu(display("expected value in range [0, {}], found: {}", max, value))]
+    ValueOutOfRange { value: f64, max: u64 },
 
     #[snafu(display("multiple metric kinds given for metric name `{}`", name))]
     MultipleMetricKinds { name: String },
@@ -242,7 +242,10 @@ fn try_f64_to_u32(f: f64) -> Result<u32, ParserError> {
     if 0.0 <= f && f <= u32::MAX as f64 {
         Ok(f as u32)
     } else {
-        Err(ParserError::ValueOutOfRange { value: f })
+        Err(ParserError::ValueOutOfRange {
+            value: f,
+            max: u32::MAX.into(),
+        })
     }
 }
 
@@ -250,7 +253,10 @@ fn try_f64_to_u64(f: f64) -> Result<u64, ParserError> {
     if 0.0 <= f && f <= u64::MAX as f64 {
         Ok(f as u64)
     } else {
-        Err(ParserError::ValueOutOfRange { value: f })
+        Err(ParserError::ValueOutOfRange {
+            value: f,
+            max: u64::MAX,
+        })
     }
 }
 
