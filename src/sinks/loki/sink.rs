@@ -452,6 +452,7 @@ impl LokiSink {
                     None
                 }
             })
+            .map(|(key, records)| (key, LokiRecords(records)))
             .request_builder(Some(request_builder_concurrency), self.request_builder)
             .filter_map(|request| async move {
                 match request {
