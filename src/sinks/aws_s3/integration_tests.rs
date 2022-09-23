@@ -33,7 +33,7 @@ use crate::{
     common::s3::S3ClientBuilder,
     config::SinkContext,
     sinks::{
-        s3_common::config::S3Options,
+        s3_common::config::{S3Options, S3ServerSideEncryption},
         util::{BatchConfig, Compression, TowerRequestConfig},
     },
     test_util::{
@@ -105,6 +105,43 @@ async fn s3_insert_message_into_with_folder_key_prefix() {
     let key_parts = key.split('/').collect::<Vec<_>>();
     assert!(key_parts.len() == 2);
     assert!(*key_parts.first().unwrap() == "test-prefix");
+    assert!(key.ends_with(".log"));
+
+    let obj = get_object(&bucket, key).await;
+    assert_eq!(obj.content_encoding, Some("identity".to_string()));
+
+    let response_lines = get_lines(obj).await;
+    assert_eq!(lines, response_lines);
+}
+
+#[tokio::test]
+async fn s3_insert_message_into_with_ssekms_key_id() {
+    let cx = SinkContext::new_test();
+
+    let bucket = uuid::Uuid::new_v4().to_string();
+
+    create_bucket(&bucket, false).await;
+
+    let mut config = config(&bucket, 1000000);
+    config.key_prefix = Some("test-prefix".to_string());
+    let prefix = config.key_prefix.clone();
+    config.options.server_side_encryption = Some(S3ServerSideEncryption::AwsKms);
+    config.options.ssekms_key_id = Some("alias/aws/s3".to_string());
+
+    let service = config.create_service(&cx.globals.proxy).await.unwrap();
+    let sink = config.build_processor(service).unwrap();
+
+    let (lines, events, receiver) = make_events_batch(100, 10);
+    run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
+    assert_eq!(receiver.await, BatchStatus::Delivered);
+
+    let keys = get_keys(&bucket, prefix.unwrap()).await;
+    assert_eq!(keys.len(), 1);
+
+    let key = keys[0].clone();
+    let key_parts = key.split('/');
+    assert!(key_parts.count() == 1);
+    assert!(key.starts_with("test-prefix"));
     assert!(key.ends_with(".log"));
 
     let obj = get_object(&bucket, key).await;
