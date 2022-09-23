@@ -44,6 +44,7 @@ impl Function for Keys {
             },
         ]
     }
+
     fn compile(
         &self,
         _state: &TypeState,
