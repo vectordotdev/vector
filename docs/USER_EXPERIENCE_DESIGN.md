@@ -6,7 +6,7 @@ inherent large surface area, requiring a large team. As a result, definitions
 of good user experience differ, contributors have varying levels of expertise
 in this area, and coordination suffers. To solve this, we must align behind a
 set of [principles](#principles), [guidelines](#guidelines), and
-[processes](#processes) that unify us towards a shared vision of good user
+[processes](#guidelines) that unify us towards a shared vision of good user
 experience -- the purpose of this document.
 
 <!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
@@ -50,7 +50,7 @@ use cases, especially if a large, valuable user is inquiring about them, but we
 should refrain from doing so. Trying to be everything to everyone means we'll
 never be great at anything. Disparate use cases often have competing concerns
 that, when combined, result in a lukewarm user experience. Vector is an
-_observability data pipeline_ and we strive to be the best in this domain.
+_observability data pipeline_, and we strive to be the best in this domain.
 
 Examples:
 
@@ -204,7 +204,7 @@ Examples:
 - A `remap` transform as opposed to multiple `parse_json`, `parse_syslog`, etc
   transforms.
 - A `filter` transform as opposed to a `filter_regex`, `filter_datadog_search`,
-  etc transforms.
+  etc. transforms.
 
 ### Upfront configuration
 

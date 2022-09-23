@@ -182,7 +182,7 @@ async fn demo_logs_source(
     mut out: SourceSender,
     log_namespace: LogNamespace,
 ) -> Result<(), ()> {
-    let maybe_interval: Option<f64> = (interval != 0.0).then(|| interval);
+    let maybe_interval: Option<f64> = (interval != 0.0).then_some(interval);
 
     let mut interval = maybe_interval.map(|i| time::interval(Duration::from_secs_f64(i)));
 
@@ -292,7 +292,13 @@ mod tests {
     use futures::{poll, Stream, StreamExt};
 
     use super::*;
-    use crate::{config::log_schema, event::Event, shutdown::ShutdownSignal, SourceSender};
+    use crate::{
+        config::log_schema,
+        event::Event,
+        shutdown::ShutdownSignal,
+        test_util::components::{assert_source_compliance, SOURCE_TAGS},
+        SourceSender,
+    };
 
     #[test]
     fn generate_config() {
@@ -308,17 +314,21 @@ mod tests {
             LogNamespace::Legacy,
         )
         .build();
-        demo_logs_source(
-            config.interval,
-            config.count,
-            config.format,
-            decoder,
-            ShutdownSignal::noop(),
-            tx,
-            LogNamespace::Legacy,
-        )
-        .await
-        .unwrap();
+
+        assert_source_compliance(&SOURCE_TAGS, async {
+            demo_logs_source(
+                config.interval,
+                config.count,
+                config.format,
+                decoder,
+                ShutdownSignal::noop(),
+                tx,
+                LogNamespace::Legacy,
+            )
+            .await
+            .unwrap();
+        })
+        .await;
         rx
     }
 

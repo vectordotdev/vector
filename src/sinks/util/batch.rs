@@ -105,7 +105,10 @@ pub struct BatchConfig<D: SinkBatchSettings + Clone, S = Unmerged>
 where
     S: Clone,
 {
-    /// The maximum size of a batch, in bytes, before it is flushed.
+    /// The maximum size of a batch that will be processed by a sink.
+    ///
+    /// This is based on the uncompressed size of the batched events, before they are
+    /// serialized / compressed.
     pub max_bytes: Option<usize>,
 
     /// The maximum size of a batch, in events, before it is flushed.

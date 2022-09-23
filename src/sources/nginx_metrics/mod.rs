@@ -321,7 +321,7 @@ mod integration_tests {
             url,
             Some(Auth::Basic {
                 user: "vector".to_owned(),
-                password: "vector".to_owned(),
+                password: "vector".to_owned().into(),
             }),
             ProxyConfig::default(),
         )

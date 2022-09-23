@@ -613,7 +613,7 @@ _values: {
 	unit: #Unit | null
 }
 
-#Unit: "bytes" | "events" | "milliseconds" | "requests" | "seconds" | "lines" | "concurrency"
+#Unit: "bytes" | "events" | "milliseconds" | "nanoseconds" | "requests" | "seconds" | "lines" | "concurrency"
 
 administration: _
 components:     _

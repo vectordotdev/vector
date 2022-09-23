@@ -68,6 +68,7 @@ criterion_group!(
               is_string,
               is_timestamp,
               join,
+              keys,
               length,
               log,
               r#match,
@@ -142,6 +143,7 @@ criterion_group!(
               // TODO: value is dynamic so we cannot assert equality
               //uuidv4,
               upcase,
+              values,
 );
 criterion_main!(benches);
 
@@ -933,6 +935,15 @@ bench_function! {
     literal {
         args: func_args![value: value!(["hello", "world"]), separator: " "],
         want: Ok("hello world"),
+    }
+}
+
+bench_function! {
+    keys => vrl_stdlib::Keys;
+
+    literal {
+        args: func_args![value: value!({"key1": "val1", "key2": "val2"})],
+        want: Ok(value!(["key1", "key2"])),
     }
 }
 
@@ -2508,5 +2519,14 @@ bench_function! {
     literal {
         args: func_args![value: "foo"],
         want: Ok("FOO")
+    }
+}
+
+bench_function! {
+    values => vrl_stdlib::Values;
+
+    literal {
+        args: func_args![value: value!({"key1": "val1", "key2": "val2"})],
+        want: Ok(value!(["val1", "val2"])),
     }
 }

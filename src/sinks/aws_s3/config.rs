@@ -1,12 +1,15 @@
 use std::convert::TryInto;
 
 use aws_sdk_s3::Client as S3Client;
-use codecs::encoding::{Framer, FramingConfig};
-use codecs::TextSerializerConfig;
+use codecs::{
+    encoding::{Framer, FramingConfig},
+    TextSerializerConfig,
+};
 use tower::ServiceBuilder;
 use vector_config::configurable_component;
 use vector_core::sink::VectorSink;
 
+use super::sink::S3RequestOptions;
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},
     codecs::{Encoder, EncodingConfigWithFraming, SinkType},
@@ -15,7 +18,6 @@ use crate::{
         SinkContext,
     },
     sinks::{
-        aws_s3::sink::S3RequestOptions,
         s3_common::{
             self,
             config::{S3Options, S3RetryLogic},

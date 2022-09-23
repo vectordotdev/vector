@@ -2,6 +2,8 @@ pub mod prelude;
 
 mod adaptive_concurrency;
 mod aggregate;
+#[cfg(any(feature = "sources-amqp", feature = "sinks-amqp"))]
+mod amqp;
 #[cfg(feature = "sources-apache_metrics")]
 mod apache_metrics;
 #[cfg(feature = "api")]
@@ -18,8 +20,6 @@ mod aws_ecs_metrics;
 mod aws_kinesis_firehose;
 #[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs",))]
 mod aws_sqs;
-#[cfg(any(feature = "sinks-azure_blob", feature = "sinks-datadog_archives"))]
-pub(crate) mod azure_blob;
 mod batch;
 mod codecs;
 mod common;
@@ -57,6 +57,8 @@ mod http;
 pub mod http_client;
 #[cfg(feature = "sources-utils-http-scrape")]
 mod http_scrape;
+#[cfg(feature = "sinks-influxdb")]
+mod influxdb;
 #[cfg(feature = "sources-internal_logs")]
 mod internal_logs;
 #[cfg(feature = "sources-internal_metrics")]
@@ -90,7 +92,7 @@ mod process;
 mod prometheus;
 #[cfg(feature = "sinks-pulsar")]
 mod pulsar;
-#[cfg(any(feature = "sources-redis", feature = "sinks-redis"))]
+#[cfg(feature = "sources-redis")]
 mod redis;
 #[cfg(feature = "transforms-reduce")]
 mod reduce;
@@ -115,7 +117,6 @@ mod template;
 mod throttle;
 mod udp;
 mod unix;
-mod vector;
 #[cfg(feature = "sinks-websocket")]
 mod websocket;
 
@@ -132,6 +133,8 @@ pub(crate) use mongodb_metrics::*;
 
 #[cfg(feature = "transforms-aggregate")]
 pub(crate) use self::aggregate::*;
+#[cfg(any(feature = "sources-amqp", feature = "sinks-amqp"))]
+pub(crate) use self::amqp::*;
 #[cfg(feature = "sources-apache_metrics")]
 pub(crate) use self::apache_metrics::*;
 #[cfg(feature = "api")]
@@ -192,6 +195,8 @@ pub(crate) use self::host_metrics::*;
 pub(crate) use self::http::*;
 #[cfg(feature = "sources-utils-http-scrape")]
 pub(crate) use self::http_scrape::*;
+#[cfg(feature = "sinks-influxdb")]
+pub(crate) use self::influxdb::*;
 #[cfg(feature = "sources-internal_logs")]
 pub(crate) use self::internal_logs::*;
 #[cfg(feature = "sources-internal_metrics")]
@@ -222,7 +227,7 @@ pub(crate) use self::postgresql_metrics::*;
 pub(crate) use self::prometheus::*;
 #[cfg(feature = "sinks-pulsar")]
 pub(crate) use self::pulsar::*;
-#[cfg(any(feature = "sources-redis", feature = "sinks-redis"))]
+#[cfg(feature = "sources-redis")]
 pub(crate) use self::redis::*;
 #[cfg(feature = "transforms-reduce")]
 pub(crate) use self::reduce::*;
@@ -257,8 +262,6 @@ pub(crate) use self::throttle::*;
     unix
 ))]
 pub(crate) use self::unix::*;
-#[cfg(feature = "sources-vector")]
-pub(crate) use self::vector::*;
 #[cfg(feature = "sinks-websocket")]
 pub(crate) use self::websocket::*;
 #[cfg(windows)]

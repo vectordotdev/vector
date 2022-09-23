@@ -1,5 +1,3 @@
-use crate::config::SinkDescription;
-
 mod config;
 mod encoding;
 mod healthcheck;
@@ -17,7 +15,3 @@ pub use super::{Healthcheck, VectorSink};
 
 #[cfg(test)]
 pub mod tests;
-
-inventory::submit! {
-    SinkDescription::new::<NewRelicConfig>("new_relic")
-}

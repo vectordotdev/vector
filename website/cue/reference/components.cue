@@ -747,7 +747,7 @@ components: {
 					}
 					alpn_protocols: {
 						common:      false
-						description: "Sets the list of supported ALPN protolols, which are used during negotiation with peer. Prioritized in the order they are defined."
+						description: "Sets the list of supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order they are defined."
 						required:    false
 						type: array: {
 							default: null
