@@ -38,9 +38,9 @@ impl Function for Keys {
                 result: Ok(r#"["key1", "key2"]"#),
             },
             Example {
-                title: "get keys",
-                source: r#"keys({"key3": "val3", "key4": "val4"})"#,
-                result: Ok(r#"["key3", "key4"]"#),
+                title: "get keys from a nested object",
+                source: r#"keys({"key1": "val1", "key2": {"nestedkey1": "val3", "nestedkey2": "val4"}})"#,
+                result: Ok(r#"["key1", "key2"]"#),
             },
         ]
     }

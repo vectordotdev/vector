@@ -38,9 +38,9 @@ impl Function for Values {
                 result: Ok(r#"["val1", "val2"]"#),
             },
             Example {
-                title: "get values",
-                source: r#"values({"key3": "val3", "key4": "val4"})"#,
-                result: Ok(r#"["val3", "val4"]"#),
+                title: "get values from a nested object",
+                source: r#"values({"key1": "val1", "key2": {"nestedkey1": "val3", "nestedkey2": "val4"}})"#,
+                result: Ok(r#"["val1", { "nestedkey1": "val3", "nestedkey2": "val4" }]"#),
             },
         ]
     }
@@ -67,7 +67,7 @@ impl FunctionExpression for ValuesFn {
     }
 
     fn type_def(&self, state: &state::TypeState) -> TypeDef {
-        // get all the kinds, iterate over it and union all the unknown kinds with reduced_kind()
+        // The type of all possible values is merged together to get a more specific value than just `TypeDef::any()`
         let merged_kind = self
             .value
             .type_def(state)
