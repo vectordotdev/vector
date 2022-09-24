@@ -4,7 +4,7 @@ use nom::{
     branch::alt,
     bytes::complete::{escaped_transform, tag, take_till1, take_until},
     character::complete::{char, one_of, satisfy},
-    combinator::{map, opt, value},
+    combinator::{map, opt, peek, value},
     error::{ErrorKind, ParseError, VerboseError},
     multi::{count, many1},
     sequence::{delimited, pair, preceded},
@@ -42,6 +42,13 @@ impl Function for ParseCef {
                 source: r#"parse_cef!("CEF:0|CyberArk|PTA|12.6|1|Suspected credentials theft|8|suser=mike2@prod1.domain.com shost=prod1.domain.com src=1.1.1.1")"#,
                 result: Ok(
                     r#"{"cefVersion":"0","deviceVendor":"CyberArk","deviceProduct":"PTA","deviceVersion":"12.6","deviceEventClassId":"1","name":"Suspected credentials theft","severity":"8","suser":"mike2@prod1.domain.com","shost":"prod1.domain.com","src":"1.1.1.1"}"#,
+                ),
+            },
+            Example {
+                title: "empty value",
+                source: r#"parse_cef!("CEF:0|CyberArk|PTA|12.6|1|Suspected credentials theft||suser=mike2@prod1.domain.com shost= src=1.1.1.1")"#,
+                result: Ok(
+                    r#"{"cefVersion":"0","deviceVendor":"CyberArk","deviceProduct":"PTA","deviceVersion":"12.6","deviceEventClassId":"1","name":"Suspected credentials theft","severity":"","suser":"mike2@prod1.domain.com","shost":"","src":"1.1.1.1"}"#,
                 ),
             },
             Example {
@@ -140,11 +147,14 @@ fn parse_header(input: &str) -> IResult<&str, Vec<String>, VerboseError<&str>> {
 fn parse_header_value(input: &str) -> IResult<&str, String, VerboseError<&str>> {
     preceded(
         opt(char('|')),
-        escaped_transform(
-            take_till1(|c: char| c == '\\' || c == '|'),
-            '\\',
-            satisfy(|c| c == '\\' || c == '|'),
-        ),
+        alt((
+            map(peek(char('|')), |_| "".to_string()),
+            escaped_transform(
+                take_till1(|c: char| c == '\\' || c == '|'),
+                '\\',
+                satisfy(|c| c == '\\' || c == '|'),
+            ),
+        )),
     )(input)
 }
 
@@ -157,15 +167,18 @@ fn parse_key_value(input: &str) -> IResult<&str, (&str, String), VerboseError<&s
 }
 
 fn parse_value(input: &str) -> IResult<&str, String, VerboseError<&str>> {
-    escaped_transform(
-        take_till1_input(|input| alt((tag("\\"), tag("="), parse_key))(input).is_ok()),
-        '\\',
-        alt((
-            value('=', char('=')),
-            value('\\', char('\\')),
-            value('\n', one_of("nr")),
-        )),
-    )(input)
+    alt((
+        map(peek(parse_key), |_| "".to_string()),
+        escaped_transform(
+            take_till1_input(|input| alt((tag("\\"), tag("="), parse_key))(input).is_ok()),
+            '\\',
+            alt((
+                value('=', char('=')),
+                value('\\', char('\\')),
+                value('\n', one_of("nr")),
+            )),
+        ),
+    ))(input)
 }
 
 /// As take take_till1 but can have condition on input instead of Input::Item.
@@ -250,6 +263,25 @@ mod test {
                 ("severity".to_string(), "10".into()),
             ]),
             parse("CEF:1|Security|threatmanager|1.0|100|worm successfully stopped|10|src=10.0.0.1 dst=2.1.2.2 spt=1232")
+                .map(Iterator::collect)
+        );
+    }
+
+    #[test]
+    fn test_parse_empty_value() {
+        assert_eq!(
+            Ok(vec![
+                ("src".to_string(), "".into()),
+                ("dst".to_string(), "2.1.2.2".into()),
+                ("cefVersion".to_string(), "1".into()),
+                ("deviceVendor".to_string(), "Security".into()),
+                ("deviceProduct".to_string(), "threatmanager".into()),
+                ("deviceVersion".to_string(), "".into()),
+                ("deviceEventClassId".to_string(), "100".into()),
+                ("name".to_string(), "worm successfully stopped".into()),
+                ("severity".to_string(), "".into()),
+            ]),
+            parse("CEF:1|Security|threatmanager||100|worm successfully stopped||src= dst=2.1.2.2")
                 .map(Iterator::collect)
         );
     }
@@ -473,6 +505,25 @@ mod test {
                 "proto": "6",
                 "service_id": "https",
                 "src": "192.168.101.100",
+            })),
+            tdef: type_def(),
+        }
+
+        missing_value {
+            args: func_args! [
+                value: r#"CEF:0|CyberArk|PTA|12.6||Suspected credentials theft||suser=mike2@prod1.domain.com shost= src=1.1.1.1"#,
+            ],
+            want: Ok(value!({
+                "cefVersion":"0",
+                "deviceVendor":"CyberArk",
+                "deviceProduct":"PTA",
+                "deviceVersion":"12.6",
+                "deviceEventClassId":"",
+                "name":"Suspected credentials theft",
+                "severity":"",
+                "suser":"mike2@prod1.domain.com",
+                "shost":"",
+                "src":"1.1.1.1"
             })),
             tdef: type_def(),
         }
