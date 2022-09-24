@@ -29,5 +29,3 @@ mod service;
 mod sink;
 
 pub(crate) use config::DatadogLogsConfig;
-
-pub(crate) const NAME: &str = "datadog_logs";

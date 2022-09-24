@@ -228,7 +228,7 @@ cross-image-%:
 	$(CONTAINER_TOOL) build \
 		--tag vector-cross-env:${TRIPLE} \
 		--file scripts/cross/${TRIPLE}.dockerfile \
-		scripts/cross
+		.
 
 # This is basically a shorthand for folks.
 # `cross-anything-triple` will call `cross anything --target triple` with the right features.
@@ -305,7 +305,7 @@ test-docs: ## Run the docs test suite
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --doc --workspace --no-fail-fast --no-default-features --features "${FEATURES}" ${SCOPE}
 
 .PHONY: test-all
-test-all: test test-docs test-behavior test-integration ## Runs all tests: unit, docs, behaviorial, and integration.
+test-all: test test-docs test-behavior test-integration ## Runs all tests: unit, docs, behavioral, and integration.
 
 .PHONY: test-x86_64-unknown-linux-gnu
 test-x86_64-unknown-linux-gnu: cross-test-x86_64-unknown-linux-gnu ## Runs unit tests on the x86_64-unknown-linux-gnu triple
@@ -316,16 +316,16 @@ test-aarch64-unknown-linux-gnu: cross-test-aarch64-unknown-linux-gnu ## Runs uni
 	${EMPTY}
 
 .PHONY: test-behavior-config
-test-behavior-config: ## Runs configuration related behaviorial tests
+test-behavior-config: ## Runs configuration related behavioral tests
 	${MAYBE_ENVIRONMENT_EXEC} cargo build --bin secret-backend-example
 	${MAYBE_ENVIRONMENT_EXEC} cargo run -- test tests/behavior/config/*
 
 .PHONY: test-behavior-%
-test-behavior-%: ## Runs behaviorial test for a given category
+test-behavior-%: ## Runs behavioral test for a given category
 	${MAYBE_ENVIRONMENT_EXEC} cargo run -- test tests/behavior/$*/*
 
 .PHONY: test-behavior
-test-behavior: ## Runs all behaviorial tests
+test-behavior: ## Runs all behavioral tests
 test-behavior: test-behavior-transforms test-behavior-formats test-behavior-config
 
 .PHONY: test-enterprise
@@ -334,8 +334,7 @@ test-enterprise: ## Runs enterprise related behavioral tests
 
 .PHONY: test-integration
 test-integration: ## Runs all integration tests
-test-integration: test-integration-apex test-integration-aws test-integration-axiom test-integration-azure test-integration-clickhouse test-integration-docker-logs test-integration-elasticsearch
-test-integration: test-integration-azure test-integration-clickhouse test-integration-docker-logs test-integration-elasticsearch
+test-integration: test-integration-amqp test-integration-apex test-integration-aws test-integration-axiom test-integration-azure test-integration-clickhouse test-integration-docker-logs test-integration-elasticsearch
 test-integration: test-integration-eventstoredb test-integration-fluent test-integration-gcp test-integration-humio test-integration-http-scrape test-integration-influxdb
 test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb test-integration-nats
 test-integration: test-integration-nginx test-integration-opentelemetry test-integration-postgres test-integration-prometheus test-integration-pulsar
@@ -349,6 +348,10 @@ test-integration-aws-sqs: ## Runs AWS SQS integration tests
 .PHONY: test-integration-aws-cloudwatch-logs
 test-integration-aws-cloudwatch-logs: ## Runs AWS Cloudwatch Logs integration tests
 	FILTER=::aws_cloudwatch_logs make test-integration-aws
+
+.PHONY: test-integration-aws-cloudwatch-metrics
+test-integration-aws-cloudwatch-metrics: ## Runs AWS Cloudwatch Metrics integration tests
+	FILTER=::aws_cloudwatch_metrics make test-integration-aws
 
 .PHONY: test-integration-datadog-agent
 test-integration-datadog-agent: ## Runs Datadog Agent integration tests

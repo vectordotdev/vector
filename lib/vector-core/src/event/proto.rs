@@ -6,8 +6,7 @@ use crate::{
     metrics::AgentDDSketch,
 };
 
-#[allow(warnings)] // Ignore some clippy warnings
-#[allow(clippy::all)]
+#[allow(warnings, clippy::all, clippy::pedantic)]
 mod proto_event {
     include!(concat!(env!("OUT_DIR"), "/event.rs"));
 }

@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use futures_util::FutureExt;
 use tower::ServiceBuilder;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::sink::VectorSink;
 
@@ -40,7 +41,7 @@ pub struct HecMetricsSinkConfig {
     ///
     /// If an event has a token set in its metadata, it will prevail over the one set here.
     #[serde(alias = "token")]
-    pub default_token: String,
+    pub default_token: SensitiveString,
 
     /// The base URL of the Splunk instance.
     pub endpoint: String,
@@ -97,7 +98,7 @@ impl GenerateConfig for HecMetricsSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             default_namespace: None,
-            default_token: "${VECTOR_SPLUNK_HEC_TOKEN}".to_owned(),
+            default_token: "${VECTOR_SPLUNK_HEC_TOKEN}".to_owned().into(),
             endpoint: "http://localhost:8088".to_owned(),
             host_key: host_key(),
             index: None,
@@ -119,7 +120,7 @@ impl SinkConfig for HecMetricsSinkConfig {
         let client = create_client(&self.tls, cx.proxy())?;
         let healthcheck = build_healthcheck(
             self.endpoint.clone(),
-            self.default_token.clone(),
+            self.default_token.inner().to_owned(),
             client.clone(),
         )
         .boxed();
@@ -156,7 +157,7 @@ impl HecMetricsSinkConfig {
         let http_request_builder = Arc::new(HttpRequestBuilder::new(
             self.endpoint.clone(),
             EndpointTarget::default(),
-            self.default_token.clone(),
+            self.default_token.inner().to_owned(),
             self.compression,
         ));
         let http_service = ServiceBuilder::new()

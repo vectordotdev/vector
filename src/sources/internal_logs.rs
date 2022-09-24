@@ -146,7 +146,7 @@ mod tests {
     async fn run_test() {
         let test_id: u8 = rand::random();
         let start = chrono::Utc::now();
-        trace::init(false, false, "debug");
+        trace::init(false, false, "debug", 10);
         trace::reset_early_buffer();
 
         error!(message = "Before source started without span.", %test_id);

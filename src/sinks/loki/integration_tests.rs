@@ -315,7 +315,7 @@ async fn out_of_order_drop() {
         .map(|e| Event::Log(LogEvent::from(e)))
         .collect::<Vec<_>>();
 
-    let base = chrono::Utc::now() - Duration::seconds(20);
+    let base = Utc::now() - Duration::seconds(20);
     for (i, event) in events.iter_mut().enumerate() {
         let log = event.as_mut_log();
         log.insert(
@@ -344,7 +344,7 @@ async fn out_of_order_accept() {
         .map(|e| Event::Log(LogEvent::from(e)))
         .collect::<Vec<_>>();
 
-    let base = chrono::Utc::now() - Duration::seconds(20);
+    let base = Utc::now() - Duration::seconds(20);
     for (i, event) in events.iter_mut().enumerate() {
         let log = event.as_mut_log();
         log.insert(
@@ -375,7 +375,7 @@ async fn out_of_order_rewrite() {
         .map(|e| Event::Log(LogEvent::from(e)))
         .collect::<Vec<_>>();
 
-    let base = chrono::Utc::now() - Duration::seconds(20);
+    let base = Utc::now() - Duration::seconds(20);
     for (i, event) in events.iter_mut().enumerate() {
         let log = event.as_mut_log();
         log.insert(
@@ -415,7 +415,7 @@ async fn out_of_order_per_partition() {
         .map(|e| Event::Log(LogEvent::from(e)))
         .collect::<Vec<_>>();
 
-    let base = chrono::Utc::now() - Duration::seconds(30);
+    let base = Utc::now() - Duration::seconds(30);
     for (i, event) in events.iter_mut().enumerate() {
         let log = event.as_mut_log();
         log.insert(

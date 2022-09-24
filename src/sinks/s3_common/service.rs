@@ -1,8 +1,10 @@
 use std::task::{Context, Poll};
 
-use aws_sdk_s3::error::PutObjectError;
-use aws_sdk_s3::types::{ByteStream, SdkError};
-use aws_sdk_s3::Client as S3Client;
+use aws_sdk_s3::{
+    error::PutObjectError,
+    types::{ByteStream, SdkError},
+    Client as S3Client,
+};
 use bytes::Bytes;
 use futures::future::BoxFuture;
 use md5::Digest;
@@ -86,10 +88,14 @@ impl Service<S3Request> for S3Service {
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
+        // Emission of Error internal event is handled upstream by the caller
+
         Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, request: S3Request) -> Self::Future {
+        // Emission of Error internal event is handled upstream by the caller
+
         let options = request.options;
 
         let content_encoding = request.content_encoding;

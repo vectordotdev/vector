@@ -163,10 +163,18 @@ fn main() {
     let debug = tracker
         .get_env_var("DEBUG")
         .expect("Cargo-provided environment variables should always exist!");
+    let rust_version = tracker
+        .get_env_var("CARGO_PKG_RUST_VERSION")
+        .expect("Cargo-provided environment variables should always exist!");
     let build_desc = tracker.get_env_var("VECTOR_BUILD_DESC");
 
     // Gather up the constants and write them out to our build constants file.
     let mut constants = BuildConstants::new();
+    constants.add_required_constant(
+        "RUST_VERSION",
+        "The rust version from the package manifest.",
+        rust_version,
+    );
     constants.add_required_constant("PKG_NAME", "The full name of this package.", pkg_name);
     constants.add_required_constant(
         "PKG_VERSION",

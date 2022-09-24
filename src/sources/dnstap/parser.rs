@@ -17,11 +17,11 @@ use trust_dns_proto::{
 
 use crate::{
     event::{LogEvent, Value},
-    internal_events::DnstapParseError,
+    internal_events::DnstapParseWarning,
     Error, Result,
 };
 
-#[allow(warnings)]
+#[allow(warnings, clippy::all, clippy::pedantic, clippy::nursery)]
 mod dnstap_proto {
     include!(concat!(env!("OUT_DIR"), "/dnstap.rs"));
 }
@@ -153,9 +153,7 @@ impl<'a> DnstapParser<'a> {
             if dnstap_data_type == "Message" {
                 if let Some(message) = proto_msg.message {
                     if let Err(err) = self.parse_dnstap_message(message) {
-                        emit!(DnstapParseError {
-                            error: err.to_string().as_str()
-                        });
+                        emit!(DnstapParseWarning { error: &err });
                         need_raw_data = true;
                         self.insert(
                             self.event_schema.dnstap_root_data_schema().error(),
@@ -165,8 +163,8 @@ impl<'a> DnstapParser<'a> {
                 }
             }
         } else {
-            emit!(DnstapParseError {
-                error: format!("Unknown dnstap data type: {}", dnstap_data_type_id).as_str()
+            emit!(DnstapParseWarning {
+                error: format!("Unknown dnstap data type: {}", dnstap_data_type_id)
             });
             need_raw_data = true;
         }

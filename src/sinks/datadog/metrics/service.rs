@@ -167,14 +167,12 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
     type Error = DatadogApiError;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
-    // Emission of Error internal event is handled upstream by the caller
     fn poll_ready(&mut self, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
         self.client
             .poll_ready(cx)
             .map_err(|error| DatadogApiError::HttpError { error })
     }
 
-    // Emission of Error internal event is handled upstream by the caller
     fn call(&mut self, request: DatadogMetricsRequest) -> Self::Future {
         let client = self.client.clone();
         let api_key = self.api_key.clone();

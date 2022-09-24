@@ -243,7 +243,7 @@ _raw network bytes_.
 - Properties
   - `byte_size` - The number of raw network bytes sent after processing.
     - SHOULD be the closest representation possible of raw network bytes based
-      on the sink's capabilities. For example, if the sink uses a HTTP
+      on the sink's capabilities. For example, if the sink uses an HTTP
       client that does not provide access to the total request byte size, then
       the sink should use the byte size of the payload/body.
 - Metrics
@@ -270,7 +270,7 @@ ingress of _raw network bytes_.
   - `byte_size` - The number of raw network bytes received before
     processing (decryption, decompression, filtering, etc.).
     - SHOULD be the closest representation possible of raw network bytes based
-      on the source's capabilities. For example, if the source uses a HTTP
+      on the source's capabilities. For example, if the source uses an HTTP
       client that only provides access to the request body, then the raw
       request body bytes should be used.
 - Metrics

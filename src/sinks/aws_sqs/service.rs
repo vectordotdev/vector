@@ -1,15 +1,12 @@
 use std::task::{Context, Poll};
 
-use aws_sdk_sqs::error::SendMessageError;
-use aws_sdk_sqs::types::SdkError;
-use aws_sdk_sqs::Client as SqsClient;
+use aws_sdk_sqs::{error::SendMessageError, types::SdkError, Client as SqsClient};
 use futures::{future::BoxFuture, TryFutureExt};
 use tower::Service;
 use tracing::Instrument;
-use vector_core::event::EventStatus;
-use vector_core::internal_event::EventsSent;
-use vector_core::stream::DriverResponse;
-use vector_core::ByteSizeOf;
+use vector_core::{
+    event::EventStatus, internal_event::EventsSent, stream::DriverResponse, ByteSizeOf,
+};
 
 use super::request_builder::SendMessageEntry;
 
@@ -30,10 +27,14 @@ impl Service<SendMessageEntry> for SqsService {
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
+        // Emission of Error internal event is handled upstream by the caller
+
         Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, entry: SendMessageEntry) -> Self::Future {
+        // Emission of Error internal event is handled upstream by the caller
+
         let byte_size = entry.size_of();
         let client = self.client.clone();
 

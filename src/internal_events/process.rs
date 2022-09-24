@@ -1,4 +1,5 @@
 use metrics::counter;
+use metrics::gauge;
 use vector_core::internal_event::InternalEvent;
 
 use crate::{built_info, config};
@@ -15,7 +16,16 @@ impl InternalEvent for VectorStarted {
             debug = built_info::DEBUG,
             version = built_info::PKG_VERSION,
             arch = built_info::TARGET_ARCH,
-            build_id = built_info::VECTOR_BUILD_DESC.unwrap_or("none"),
+            revision = built_info::VECTOR_BUILD_DESC.unwrap_or(""),
+        );
+        gauge!(
+            "build_info",
+            1.0,
+            "debug" => built_info::DEBUG,
+            "version" => built_info::PKG_VERSION,
+            "rust_version" => built_info::RUST_VERSION,
+            "arch" => built_info::TARGET_ARCH,
+            "revision" => built_info::VECTOR_BUILD_DESC.unwrap_or("")
         );
         counter!("started_total", 1);
     }

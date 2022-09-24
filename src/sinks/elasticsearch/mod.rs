@@ -20,6 +20,7 @@ pub use config::*;
 pub use encoder::ElasticsearchEncoder;
 use http::{uri::InvalidUri, Request};
 use snafu::Snafu;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
 use crate::aws::AwsAuthentication;
@@ -40,7 +41,7 @@ pub enum ElasticsearchAuth {
         user: String,
 
         /// Basic authentication password.
-        password: String,
+        password: SensitiveString,
     },
 
     /// Amazon OpenSearch Service-specific authentication.
