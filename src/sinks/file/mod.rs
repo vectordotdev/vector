@@ -1,3 +1,4 @@
+use std::str::FromStr;
 use std::time::{Duration, Instant};
 
 use async_compression::tokio::write::{GzipEncoder, ZstdEncoder};
@@ -12,6 +13,7 @@ use futures::{
     stream::{BoxStream, StreamExt},
     FutureExt,
 };
+use strum_macros::EnumString;
 use tokio::{
     fs::{self, File},
     io::AsyncWriteExt,
@@ -52,10 +54,7 @@ pub struct FileSinkConfig {
     pub encoding: EncodingConfigWithFraming,
 
     #[configurable(derived)]
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
+    #[serde(deserialize_with = "vector_core::serde::string_or_struct")]
     pub compression: Compression,
 
     #[configurable(derived)]
@@ -80,37 +79,51 @@ impl GenerateConfig for FileSinkConfig {
     }
 }
 
-/// Compression algorithm.
-// TODO: Why doesn't this already use `crate::sinks::util::Compression`? :thinkies:
+/// Compression settings.
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-#[serde(rename_all = "snake_case", tag = "compression")]
-pub enum Compression {
+pub struct Compression {
+    #[configurable(derived)]
+    mode: CompressionMode,
+
+    /// Precise quality based on the underlying compression algorithms’ qualities.
+    /// The interpretation of this depends on the algorithm chosen and the specific implementation
+    /// backing it. Qualities are implicitly clamped to the algorithm’s maximum.
+    level: Option<u32>,
+}
+
+impl Default for Compression {
+    fn default() -> Self {
+        Self {
+            mode: CompressionMode::None,
+            level: None,
+        }
+    }
+}
+
+/// Compression mode.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, EnumString)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+enum CompressionMode {
     /// Gzip compression.
-    Gzip {
-        /// Precise quality based on the underlying compression algorithms’ qualities.
-        /// The interpretation of this depends on the algorithm chosen and the specific implementation
-        /// backing it. Qualities are implicitly clamped to the algorithm’s maximum.
-        #[serde(flatten)]
-        compression_level: Option<u32>,
-    },
+    Gzip,
 
     /// Zstandard compression.
-    Zstd {
-        /// Precise quality based on the underlying compression algorithms’ qualities.
-        /// The interpretation of this depends on the algorithm chosen and the specific implementation
-        /// backing it. Qualities are implicitly clamped to the algorithm’s maximum.
-        #[serde(flatten)]
-        compression_level: Option<u32>,
-    },
+    Zstd,
 
     /// No compression.
     None,
 }
 
-impl Default for Compression {
-    fn default() -> Self {
-        Compression::None
+impl From<String> for Compression {
+    fn from(mode: String) -> Self {
+        Self {
+            mode: CompressionMode::from_str(&mode)
+                .expect("Cannot parse CompressionMode from string"),
+            level: None,
+        }
     }
 }
 
@@ -122,26 +135,28 @@ enum OutFile {
 
 impl OutFile {
     fn new(file: File, compression: Compression) -> Self {
-        match compression {
-            Compression::None => OutFile::Regular(file),
-            Compression::Gzip { compression_level } => {
-                if let Some(compression_level) = compression_level {
-                    println!("Gzip compression level: {}", compression_level);
-                    OutFile::Gzip(GzipEncoder::with_quality(file, async_compression::Level::Precise(compression_level)))
+        match compression.mode {
+            CompressionMode::None => OutFile::Regular(file),
+            CompressionMode::Gzip => {
+                if let Some(compression_level) = compression.level {
+                    OutFile::Gzip(GzipEncoder::with_quality(
+                        file,
+                        async_compression::Level::Precise(compression_level),
+                    ))
                 } else {
-                    println!("Gzip no compression level");
                     OutFile::Gzip(GzipEncoder::new(file))
                 }
-            },
-            Compression::Zstd { compression_level } => {
-                if let Some(compression_level) = compression_level {
-                    println!("Zstd compression level: {}", compression_level);
-                    OutFile::Zstd(ZstdEncoder::with_quality(file, async_compression::Level::Precise(compression_level)))
+            }
+            CompressionMode::Zstd => {
+                if let Some(compression_level) = compression.level {
+                    OutFile::Zstd(ZstdEncoder::with_quality(
+                        file,
+                        async_compression::Level::Precise(compression_level),
+                    ))
                 } else {
-                    println!("Zstd no compression level");
                     OutFile::Zstd(ZstdEncoder::new(file))
                 }
-            },
+            }
         }
     }
 

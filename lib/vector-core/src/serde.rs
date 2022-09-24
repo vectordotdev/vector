@@ -54,6 +54,51 @@ where
     deserializer.deserialize_any(BoolOrStruct(PhantomData))
 }
 
+/// Enables deserializing from a value that could be a string or a struct.
+///
+/// Example:
+/// healthcheck: string
+/// healthcheck.enabled: string
+/// Both are accepted.
+///
+/// # Errors
+///
+/// Returns the error from deserializing the underlying struct.
+pub fn string_or_struct<'de, T, D>(deserializer: D) -> Result<T, D::Error>
+where
+    T: Deserialize<'de> + From<String>,
+    D: Deserializer<'de>,
+{
+    struct StringOrStruct<T>(PhantomData<fn() -> T>);
+
+    impl<'de, T> de::Visitor<'de> for StringOrStruct<T>
+    where
+        T: Deserialize<'de> + From<String>,
+    {
+        type Value = T;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("string or map")
+        }
+
+        fn visit_string<E>(self, value: String) -> Result<T, E>
+        where
+            E: de::Error,
+        {
+            Ok(value.into())
+        }
+
+        fn visit_map<M>(self, map: M) -> Result<T, M::Error>
+        where
+            M: de::MapAccess<'de>,
+        {
+            Deserialize::deserialize(de::value::MapAccessDeserializer::new(map))
+        }
+    }
+
+    deserializer.deserialize_any(StringOrStruct(PhantomData))
+}
+
 /// Handling of ASCII characters in `u8` fields via `serde`s `with` attribute.
 ///
 /// ```rust
