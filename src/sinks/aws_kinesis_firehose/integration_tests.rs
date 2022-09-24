@@ -8,16 +8,12 @@ use futures::TryFutureExt;
 use serde_json::{json, Value};
 use tokio::time::{sleep, Duration};
 
-use super::*;
-use crate::aws::create_client;
-use crate::config::ProxyConfig;
-use crate::sinks::aws_kinesis_firehose::config::KinesisFirehoseClientBuilder;
-use crate::sinks::elasticsearch::BulkConfig;
+use super::{config::KinesisFirehoseClientBuilder, *};
 use crate::{
-    aws::{AwsAuthentication, RegionOrEndpoint},
-    config::{SinkConfig, SinkContext},
+    aws::{create_client, AwsAuthentication, RegionOrEndpoint},
+    config::{ProxyConfig, SinkConfig, SinkContext},
     sinks::{
-        elasticsearch::{ElasticsearchAuth, ElasticsearchCommon, ElasticsearchConfig},
+        elasticsearch::{BulkConfig, ElasticsearchAuth, ElasticsearchCommon, ElasticsearchConfig},
         util::{BatchConfig, Compression, TowerRequestConfig},
     },
     test_util::{

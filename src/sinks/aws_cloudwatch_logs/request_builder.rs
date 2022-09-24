@@ -11,7 +11,7 @@ use crate::{
     codecs::{Encoder, Transformer},
     config::LogSchema,
     event::{Event, Value},
-    internal_events::{AwsCloudwatchLogsEncoderError, AwsCloudwatchLogsMessageSizeError},
+    internal_events::AwsCloudwatchLogsMessageSizeError,
     sinks::aws_cloudwatch_logs::CloudwatchKey,
     template::Template,
 };
@@ -80,8 +80,8 @@ impl CloudwatchRequestBuilder {
         let event_byte_size = event.size_of();
         self.transformer.transform(&mut event);
         let mut message_bytes = BytesMut::new();
-        if let Err(error) = self.encoder.encode(event, &mut message_bytes) {
-            emit!(AwsCloudwatchLogsEncoderError { error });
+        if self.encoder.encode(event, &mut message_bytes).is_err() {
+            // The encoder handles internal event emission for Error and EventsDropped.
             return None;
         }
         let message = String::from_utf8_lossy(&message_bytes).to_string();

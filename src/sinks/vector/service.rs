@@ -73,7 +73,7 @@ impl VectorService {
         });
 
         if compression {
-            proto_client = proto_client.send_gzip();
+            proto_client = proto_client.send_compressed(tonic::codec::CompressionEncoding::Gzip);
         }
         Self {
             client: proto_client,

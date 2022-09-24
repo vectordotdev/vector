@@ -41,7 +41,7 @@ impl HostMetrics {
                             .filesystem
                             .mountpoints
                             .contains_path(Some(partition.mount_point()))
-                            .then(|| partition)
+                            .then_some(partition)
                     })
                     .filter_map(|partition| async { partition })
                     // Filter on configured devices
@@ -50,7 +50,7 @@ impl HostMetrics {
                             .filesystem
                             .devices
                             .contains_path(partition.device().map(|d| d.as_ref()))
-                            .then(|| partition)
+                            .then_some(partition)
                     })
                     .filter_map(|partition| async { partition })
                     // Filter on configured filesystems
@@ -59,7 +59,7 @@ impl HostMetrics {
                             .filesystem
                             .filesystems
                             .contains_str(Some(partition.file_system().as_str()))
-                            .then(|| partition)
+                            .then_some(partition)
                     })
                     .filter_map(|partition| async { partition })
                     // Load usage from the partition mount point
