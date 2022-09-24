@@ -150,7 +150,7 @@ impl HttpSink for ClickhouseConfig {
         };
 
         let uri = set_uri_query(
-            &self.endpoint.uri,
+            &self.endpoint.with_default_parts().uri,
             database,
             &self.table,
             self.skip_unknown_fields,
@@ -175,7 +175,7 @@ impl HttpSink for ClickhouseConfig {
 
 async fn healthcheck(client: HttpClient, config: ClickhouseConfig) -> crate::Result<()> {
     // TODO: check if table exists?
-    let uri = format!("{}/?query=SELECT%201", config.endpoint);
+    let uri = format!("{}/?query=SELECT%201", config.endpoint.with_default_parts());
     let mut request = Request::get(uri).body(Body::empty()).unwrap();
 
     if let Some(auth) = &config.auth {
