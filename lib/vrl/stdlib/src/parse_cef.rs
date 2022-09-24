@@ -39,7 +39,7 @@ impl Function for ParseCef {
             },
             Example {
                 title: "header and extension",
-                source: r#"parse_cef!("CEF:0|CyberArk|PTA|12.6|1|Suspected credentials theft|8|suser=mike2@prod1.domain.com shost=prod1.domain.com src=1.1.1.1")"#,
+                source: r#"parse_cef!("CEF:0|CyberArk|PTA|12.6|1|\"Suspected credentials theft\"|8|suser=mike2@prod1.domain.com shost=prod1.domain.com src=1.1.1.1")"#,
                 result: Ok(
                     r#"{"cefVersion":"0","deviceVendor":"CyberArk","deviceProduct":"PTA","deviceVersion":"12.6","deviceEventClassId":"1","name":"Suspected credentials theft","severity":"8","suser":"mike2@prod1.domain.com","shost":"prod1.domain.com","src":"1.1.1.1"}"#,
                 ),
@@ -129,6 +129,13 @@ fn parse(input: &str) -> Result<impl Iterator<Item = (String, Value)> + '_> {
         let result = extension
             .into_iter()
             .chain(headers)
+            .map(|(key, mut value)| {
+                // Strip quotes from value
+                if value.starts_with('"') && value.ends_with('"') {
+                    value = value[1..value.len() - 1].to_string();
+                }
+                (key, value)
+            })
             .map(|(key, value)| (key.to_string(), value.into()));
 
         Ok(result)
@@ -282,6 +289,26 @@ mod test {
                 ("severity".to_string(), "".into()),
             ]),
             parse("CEF:1|Security|threatmanager||100|worm successfully stopped||src= dst=2.1.2.2")
+                .map(Iterator::collect)
+        );
+    }
+
+    #[test]
+    fn test_strip_quotes() {
+        assert_eq!(
+            Ok(vec![
+                ("src".to_string(), "10.0.0.1".into()),
+                ("dst".to_string(), "2.1.2.2".into()),
+                ("spt".to_string(),"1232".into()),
+                ("cefVersion".to_string(), "1".into()),
+                ("deviceVendor".to_string(), "Security".into()),
+                ("deviceProduct".to_string(), "threatmanager".into()),
+                ("deviceVersion".to_string(), "1.0".into()),
+                ("deviceEventClassId".to_string(), "100".into()),
+                ("name".to_string(), "worm successfully stopped".into()),
+                ("severity".to_string(), "10".into()),
+            ]),
+            parse(r#"CEF:1|"Security"|threatmanager|1.0|100|"worm successfully stopped"|10|src="10.0.0.1" dst=2.1.2.2 spt="1232""#)
                 .map(Iterator::collect)
         );
     }
