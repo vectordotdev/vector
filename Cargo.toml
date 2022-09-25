@@ -261,8 +261,8 @@ indexmap = { version = "~1.9.1", default-features = false, features = ["serde"] 
 infer = { version = "0.9.0", default-features = false, optional = true}
 indoc = { version = "1.0.7", default-features = false }
 inventory = { version = "0.3.1", default-features = false }
-k8s-openapi = { version = "0.15.0", default-features = false, features = ["api", "v1_19"], optional = true }
-kube = { version = "0.73.1", default-features = false, features = ["client", "native-tls", "runtime"], optional = true }
+k8s-openapi = { version = "0.16.0", default-features = false, features = ["api", "v1_19"], optional = true }
+kube = { version = "0.75.0", default-features = false, features = ["client", "native-tls", "runtime"], optional = true }
 listenfd = { version = "1.0.0", default-features = false, optional = true }
 logfmt = { version = "0.0.2", default-features = false, optional = true }
 lru = { version = "0.8.0", default-features = false, optional = true }
