@@ -255,7 +255,7 @@ components: sinks: elasticsearch: {
 		endpoint: {
 			description: "The Elasticsearch endpoint to send logs to. This should be the full URL as shown in the example."
 			warnings: ["This option has been deprecated, the `endpoints` option should be used instead."]
-			required:    true
+			required: true
 			type: string: {
 				examples: ["http://10.24.32.122:9000", "https://example.com", "https://user:password@example.com"]
 			}
