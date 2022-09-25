@@ -149,7 +149,7 @@ impl SourceConfig for VectorConfig {
             pipeline: cx.out,
             acknowledgements,
         })
-        .accept_gzip();
+        .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
 
         let source =
             run_grpc_server(self.address, tls_settings, service, cx.shutdown).map_err(|error| {
