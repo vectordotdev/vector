@@ -42,7 +42,7 @@ impl CompressionConfigAdapter {
     pub const fn content_encoding(self) -> Option<&'static str> {
         match self {
             CompressionConfigAdapter::Original(compression) => compression.content_encoding(),
-            CompressionConfigAdapter::Extended(_) => None,
+            CompressionConfigAdapter::Extended(_) => Some("snappy"),
         }
     }
 }
