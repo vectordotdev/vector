@@ -1631,9 +1631,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "3.2.21"
+version = "3.2.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ed5341b2301a26ab80be5cbdced622e80ed808483c52e45e3310a877d3b37d7"
+checksum = "86447ad904c7fb335a790c9d7fe3d0d971dc523b8ccd1561a520de9a85302750"
 dependencies = [
  "atty",
  "bitflags",
@@ -1643,7 +1643,7 @@ dependencies = [
  "once_cell",
  "strsim 0.10.0",
  "termcolor",
- "textwrap 0.15.0",
+ "textwrap 0.15.1",
 ]
 
 [[package]]
@@ -1906,7 +1906,7 @@ dependencies = [
  "atty",
  "cast",
  "ciborium",
- "clap 3.2.21",
+ "clap 3.2.22",
  "criterion-plot",
  "futures 0.3.24",
  "itertools 0.10.4",
@@ -7629,9 +7629,9 @@ dependencies = [
 
 [[package]]
 name = "textwrap"
-version = "0.15.0"
+version = "0.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1141d4d61095b28419e22cb0bbf02755f5e54e0526f97f1e3d1d160e60885fb"
+checksum = "949517c0cf1bf4ee812e2e07e08ab448e3ae0d23472aee8a06c985f0c8815b16"
 
 [[package]]
 name = "thiserror"
@@ -8721,7 +8721,7 @@ dependencies = [
  "bytesize",
  "chrono",
  "cidr-utils",
- "clap 3.2.21",
+ "clap 3.2.22",
  "codecs",
  "colored",
  "console-subscriber",
@@ -8901,7 +8901,7 @@ dependencies = [
  "async-trait",
  "bytecheck",
  "bytes 1.2.1",
- "clap 3.2.21",
+ "clap 3.2.22",
  "crc32fast",
  "criterion",
  "crossbeam-queue",
@@ -9136,7 +9136,7 @@ dependencies = [
 name = "vrl-cli"
 version = "0.1.0"
 dependencies = [
- "clap 3.2.21",
+ "clap 3.2.22",
  "exitcode",
  "indoc",
  "lookup",
@@ -9274,7 +9274,7 @@ dependencies = [
  "ansi_term",
  "chrono",
  "chrono-tz",
- "clap 3.2.21",
+ "clap 3.2.22",
  "enrichment",
  "glob",
  "lookup",
