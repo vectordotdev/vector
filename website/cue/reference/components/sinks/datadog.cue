@@ -32,7 +32,7 @@ components: sinks: _datadog: {
 			required:      false
 			type: string: {
 				default: null
-				examples: ["127.0.0.1:8080", "example.com:12345"]
+				examples: ["http://127.0.0.1:8080", "http://example.com:12345"]
 			}
 		}
 		region: {

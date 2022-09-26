@@ -4,7 +4,7 @@ weight: 5
 tags: ["validate", "configuration"]
 ---
 
-Vector provides a subcommand, [`validate`][validate], that checks the validity of your Vector configuration and exist.
+Vector provides a subcommand, [`validate`][validate], that checks the validity of your Vector configuration and exits.
 Here's an example:
 
 ```bash

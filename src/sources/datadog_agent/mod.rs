@@ -7,7 +7,7 @@ pub mod logs;
 pub mod metrics;
 pub mod traces;
 
-#[allow(warnings)]
+#[allow(warnings, clippy::pedantic, clippy::nursery)]
 pub(crate) mod ddmetric_proto {
     include!(concat!(env!("OUT_DIR"), "/datadog.agentpayload.rs"));
 }

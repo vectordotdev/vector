@@ -823,13 +823,16 @@ fn parse_dns_update_message_header(dns_message: &TrustDnsMessage) -> UpdateHeade
 }
 
 fn parse_edns(dns_message: &TrustDnsMessage) -> Option<OptPseudoSection> {
-    dns_message.edns().map(|edns| OptPseudoSection {
-        extended_rcode: edns.rcode_high(),
-        version: edns.version(),
-        dnssec_ok: edns.dnssec_ok(),
-        udp_max_payload_size: edns.max_payload(),
-        options: parse_edns_options(edns),
-    })
+    dns_message
+        .extensions()
+        .as_ref()
+        .map(|edns| OptPseudoSection {
+            extended_rcode: edns.rcode_high(),
+            version: edns.version(),
+            dnssec_ok: edns.dnssec_ok(),
+            udp_max_payload_size: edns.max_payload(),
+            options: parse_edns_options(edns),
+        })
 }
 
 fn parse_edns_options(edns: &Edns) -> Vec<EdnsOptionEntry> {
