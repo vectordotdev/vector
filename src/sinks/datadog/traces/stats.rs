@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, fs, io::Write};
 
 use chrono::Utc;
 use prost::Message;
@@ -248,11 +248,29 @@ impl Bucket {
     /// Update a bucket with a new span. Computed statistics include the number of hits and the actual distribution of
     /// execution time, with isolated measurements for spans flagged as errored and spans without error.
     fn update(span: &BTreeMap<String, Value>, weight: f64, is_top: bool, gs: &mut GroupedStats) {
-        //if span.contains_key("name") {
-        //    info!("update span_name: {}", span.get("name").unwrap());
-        //} else {
-        //    info!("update span_name: is_unknown");
-        //}
+        let name = match span.get("name") {
+            Some(Value::Bytes(val)) => String::from_utf8_lossy(val).to_string(), //(*val),
+            _ => "".to_owned(),
+        };
+        //let resource = match span.get("resource") {
+        //    Some(Value::Bytes(val)) => String::from_utf8_lossy(val).to_string(), //(*val),
+        //    _ => "".to_owned(),
+        //};
+        //let span_id = match span.get("span_id") {
+        //    Some(Value::Integer(val)) => (*val) as u64,
+        //    _ => 0,
+        //};
+
+        if name == "dynamodb.command" {
+            //&& resource == "dynamodb.query" {
+            let mut file = fs::OpenOptions::new()
+                .write(true)
+                .append(true)
+                .open("vector-dynamodb-spans.txt")
+                .unwrap();
+            file.write_all(format!("{:?}\n", span).as_bytes())
+                .expect("write failed");
+        }
         is_top.then(|| {
             gs.top_level_hits += weight;
         });
@@ -281,12 +299,14 @@ struct Aggregator {
     // The key represent the timestamp (in nanoseconds) of the begining of the time window (that last 10 seconds) on
     // which the associated bucket will calculate statistics.
     buckets: BTreeMap<u64, Bucket>,
+    skipped_spans: u64,
 }
 
 impl Aggregator {
     fn new() -> Self {
         Self {
             buckets: BTreeMap::new(),
+            skipped_spans: 0,
         }
     }
 
@@ -330,11 +350,19 @@ impl Aggregator {
                 || is_measured(span, MEASURED_KEY)
                 || is_partial_snapshot(span, PARTIAL_VERSION_KEY))
             {
-                println!("skipping_span : {}\n{:?}", span.get("name").unwrap(), span);
+                let name = match span.get("name") {
+                    Some(Value::Bytes(val)) => String::from_utf8_lossy(val).to_string(), //(*val),
+                    _ => "".to_owned(),
+                };
+                if name == "dynamodb.command" {
+                    println!("skipping_span : {}\n{:?}", span.get("name").unwrap(), span);
+                }
+                self.skipped_spans += 1;
                 continue;
             }
             self.handle_span(span, weight, is_top, synthetics, payload_aggkey.clone());
         }
+        //println!("total skipped spans: {}", self.skipped_spans);
         //spans.iter().for_each(|span| {
         //    let is_top = has_top_level(span, TOP_LEVEL_KEY);
         //    // if is_top {
@@ -440,7 +468,6 @@ fn get_metric_value_float(span: &BTreeMap<String, Value>, key: &str) -> Option<f
         .and_then(|m| m.as_object())
         .map(|m| match m.get(key) {
             Some(Value::Float(f)) => Some(f.into_inner()),
-            //Some(Value::Float(f)) => f.into_inner().signum() == 1.0,
             _ => None,
         })
         .unwrap_or(None)
@@ -513,10 +540,8 @@ fn extract_weight_from_root_span(spans: &[&BTreeMap<String, Value>]) -> f64 {
             })
             .unwrap_or(1.0);
 
-        // root ?
+        // found root
         if parent_id == 0 {
-            // TODO is the early return a problem?
-            //continue;
             return weight;
         }
 
@@ -525,13 +550,12 @@ fn extract_weight_from_root_span(spans: &[&BTreeMap<String, Value>]) -> f64 {
         // TODO shouldn't we be summing the weight for that parent_id ?
         // what is the
 
-        // parent_id_to_child_weight.insert(parent_id, weight);
+        parent_id_to_child_weight.insert(parent_id, weight);
 
-        // parent_id_to_child_weight.insert(parent_id, sample_rate);
-        parent_id_to_child_weight
-            .entry(parent_id)
-            .and_modify(|rate| *rate += weight)
-            .or_insert(weight);
+        //parent_id_to_child_weight
+        //    .entry(parent_id)
+        //    .and_modify(|rate| *rate += weight)
+        //    .or_insert(weight);
 
         //assert!(parent_id_to_child_weight
         //    .insert(parent_id, sample_rate)
