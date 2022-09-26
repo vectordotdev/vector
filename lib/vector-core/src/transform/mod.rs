@@ -276,6 +276,7 @@ impl TransformOutputs {
                 output: Some(DEFAULT_OUTPUT),
             });
         }
+
         for (key, buf) in &mut buf.named_buffers {
             let count = buf.len();
             let byte_size = buf.size_of();
@@ -287,6 +288,7 @@ impl TransformOutputs {
                 output: Some(key.as_ref()),
             });
         }
+
         Ok(())
     }
 }
@@ -470,6 +472,7 @@ impl OutputBuffer {
         for array in std::mem::take(&mut self.0) {
             output.send(array).await?;
         }
+
         Ok(())
     }
 

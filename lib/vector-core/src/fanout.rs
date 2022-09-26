@@ -138,7 +138,7 @@ impl Fanout {
     /// # Panics
     ///
     /// This method can panic if the fanout receives a control message that violates some invariant
-    /// about its current state (e.g. remove a non-existent sink, etc). This would imply a bug in
+    /// about its current state (e.g. remove a non-existent sink, etc.). This would imply a bug in
     /// Vector's config reloading logic.
     ///
     /// # Errors
