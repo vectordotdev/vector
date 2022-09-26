@@ -232,7 +232,7 @@ bloom = { version = "0.3.2", default-features = false, optional = true }
 bollard = { version = "0.13.0", default-features = false, features = ["ssl", "chrono"] }
 bytes = { version = "1.2.1", default-features = false, features = ["serde"] }
 bytesize = { version = "1.1.0", default-features = false }
-chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
+chrono = { version = "0.4.22", default-features = false, features = ["serde"] }
 cidr-utils = { version = "0.5.7", default-features = false }
 clap = { version = "3.2.22", default-features = false, features = ["derive", "env", "std"] }
 colored = { version = "2.0.0", default-features = false }
@@ -357,7 +357,7 @@ zstd = { version = "0.10.2", default-features = false }
 leveldb-sys = { git = "https://github.com/vectordotdev/leveldb-sys.git", branch = "leveldb_mmap_limit" }
 # Removes dependency on `time` v0.1
 # https://github.com/chronotope/chrono/pull/578
-chrono = { git = "https://github.com/vectordotdev/chrono.git", branch = "no-default-time" }
+chrono = { git = "https://github.com/vectordotdev/chrono.git", branch = "no-default-time-v0.4.22" }
 # Adds `Status::is_reset` test, remove after the next version is released.
 h2 = { git = "https://github.com/hyperium/h2.git", rev = "f6aa3be6719270cd7b4094ee1940751b5f4ec88e" }
 # Enables OpenSSL ENGINE support during cross compilation to musl
