@@ -1728,6 +1728,7 @@ dependencies = [
  "value",
  "vector-common",
  "vector-config",
+ "vector-config-common",
  "vector-config-macros",
  "vector-core",
 ]
@@ -9112,6 +9113,7 @@ dependencies = [
  "vector-buffers",
  "vector-common",
  "vector-config",
+ "vector-config-common",
  "vector-config-macros",
  "vrl",
 ]
@@ -9199,6 +9201,7 @@ dependencies = [
  "value",
  "vector-common",
  "vector-config",
+ "vector-config-common",
  "vector-config-macros",
  "vrl-core",
  "vrl-diagnostic",

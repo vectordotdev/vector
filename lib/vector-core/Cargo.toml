@@ -62,6 +62,7 @@ value = { path = "../value", default-features = false, features = ["lua", "toml"
 vector-buffers = { path = "../vector-buffers", default-features = false }
 vector-common = { path = "../vector-common" }
 vector-config = { path = "../vector-config" }
+vector-config-common = { path = "../vector-config-common" }
 vector-config-macros = { path = "../vector-config-macros" }
 # Rename to "vrl" once we use a release with stable `-Z namespaced-features`:
 # https://doc.rust-lang.org/cargo/reference/unstable.html#namespaced-features
