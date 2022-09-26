@@ -7,7 +7,7 @@ publish = false
 
 [dependencies]
 itertools = { version = "0.10.4", default-features = false }
-once_cell = { version = "1.14", default-features = false, features = ["std"] }
+once_cell = { version = "1.15", default-features = false, features = ["std"] }
 pest = { version = "2.3.1", default-features = false, features = ["std"] }
 pest_derive = { version = "2.3.1", default-features = false, features = ["std"] }
 regex = { version = "1", default-features = false, features = ["std"] }
