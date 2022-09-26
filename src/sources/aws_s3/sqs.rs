@@ -379,12 +379,21 @@ impl IngestorProcess {
     }
 
     async fn handle_sqs_message(&mut self, message: Message) -> Result<(), ProcessingError> {
-        let s3_event: S3Event = serde_json::from_str(message.body.unwrap_or_default().as_ref())
+        let s3_event: Event = serde_json::from_str(message.body.unwrap_or_default().as_ref())
             .context(InvalidSqsMessageSnafu {
-                message_id: message.message_id.unwrap_or_else(|| "<empty>".to_owned()),
+                message_id: message
+                    .message_id
+                    .clone()
+                    .unwrap_or_else(|| "<empty>".to_owned()),
             })?;
 
-        self.handle_s3_event(s3_event).await
+        match s3_event {
+            Event::TestEvent(_s3_test_event) => {
+                debug!(?message.message_id, message = "Found S3 Test Event.");
+                Ok(())
+            }
+            Event::Event(s3_event) => self.handle_s3_event(s3_event).await,
+        }
     }
 
     async fn handle_s3_event(&mut self, s3_event: S3Event) -> Result<(), ProcessingError> {
@@ -590,6 +599,21 @@ impl IngestorProcess {
             .send()
             .await
     }
+}
+
+// https://docs.aws.amazon.com/AmazonS3/latest/userguide/how-to-enable-disable-notification-intro.html
+#[derive(Clone, Debug, Deserialize)]
+enum Event {
+    TestEvent(S3TestEvent),
+    Event(S3Event),
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct S3TestEvent {
+    pub service: String,
+    pub event_name: S3EventName,
+    pub bucket: String,
 }
 
 // https://docs.aws.amazon.com/AmazonS3/latest/dev/notification-content-structure.html
