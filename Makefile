@@ -228,7 +228,7 @@ cross-image-%:
 	$(CONTAINER_TOOL) build \
 		--tag vector-cross-env:${TRIPLE} \
 		--file scripts/cross/${TRIPLE}.dockerfile \
-		scripts/cross
+		.
 
 # This is basically a shorthand for folks.
 # `cross-anything-triple` will call `cross anything --target triple` with the right features.

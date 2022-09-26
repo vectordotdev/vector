@@ -17,6 +17,9 @@ pub trait DriverResponse {
     fn event_status(&self) -> EventStatus;
     fn events_sent(&self) -> EventsSent;
 
+    /// Return a tuple containing the number of bytes that were sent in the
+    /// request that returned this response together with the protocol the
+    /// bytes were sent over.
     // TODO, remove the default implementation once all sinks have
     // implemented this function.
     fn bytes_sent(&self) -> Option<(usize, &str)> {

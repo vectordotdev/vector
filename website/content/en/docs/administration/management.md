@@ -214,13 +214,9 @@ kubectl rollout restart --namespace vector statefulset/vector-aggregator
 
 As you can see above, many administrative interfaces for Vector enable you to trigger a restart of a Vector instance while it's running. There are a few things that you should know about reloading.
 
-### Automatic reloading on config change
+### Automatic reloading on configuration change
 
 You can make Vector automatically reload itself when its [configuration file][configuration] changes by setting the `--watch-config` or `-w` [flag][watch_config] when you first start your Vector instance.
-
-### Automatic reload on configuration change
-
-Vector provides an option
 
 ## How it works
 

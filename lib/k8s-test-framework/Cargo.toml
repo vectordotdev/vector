@@ -8,7 +8,7 @@ publish = false
 license = "MPL-2.0"
 
 [dependencies]
-k8s-openapi = { version = "0.15.0", default-features = false, features = ["v1_19"] }
+k8s-openapi = { version = "0.16.0", default-features = false, features = ["v1_19"] }
 serde_json = "1"
 tempfile = "3"
 tokio = { version = "1.20.1", features = ["full"] }
