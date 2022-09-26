@@ -82,7 +82,7 @@ pub struct ConfigBuilder {
 #[cfg(feature = "enterprise")]
 #[derive(::serde::Serialize)]
 struct ConfigBuilderHash<'a> {
-    version: &'static str,
+    version: String,
     #[cfg(feature = "api")]
     api: &'a api::Options,
     schema: &'a schema::Options,
@@ -161,7 +161,7 @@ fn sort_json_value(value: &mut Value) {
 impl<'a> From<&'a ConfigBuilder> for ConfigBuilderHash<'a> {
     fn from(value: &'a ConfigBuilder) -> Self {
         ConfigBuilderHash {
-            version: env!("CARGO_PKG_VERSION"),
+            version: crate::get_version(),
             #[cfg(feature = "api")]
             api: &value.api,
             schema: &value.schema,
