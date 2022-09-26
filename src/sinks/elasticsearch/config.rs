@@ -44,7 +44,6 @@ pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ElasticsearchConfig {
-    /// DEPRECATED
     /// The Elasticsearch endpoint to send logs to.
     ///
     /// This should be the full URL as shown in the example.
