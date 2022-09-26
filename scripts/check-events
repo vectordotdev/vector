@@ -350,8 +350,6 @@ Find.find('.') do |path|
         # We also have some special handling in there for `tracing`-specific "target" and "parent"
         # settings which influence how the event is handled when being processed by a subscriber,
         # which we don't care about _here_ but need to account for in our pattern to parse things.
-        
-        #params = params.scan(/(".*?"|(?:target|parent):\s*[^,]+|(\w+\s*=\s*(?:".*?"|[%?]?[^,]+))|[%?][^,]+)/) \
         params = params.scan(/("(?:[^"\\]++|\\.)*+"|(?:target|parent):\s*[^,]+|(\w+\s*=\s*(?:"(?:[^"\\]++|\\.)*+"|[%?]?[^,]+))|[%?][^,]+)/) \
           .map do |param|
             if /^\".*\"$/.match?(param[0].strip)
