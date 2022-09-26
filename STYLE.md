@@ -7,7 +7,7 @@ formatting, acceptable (or unacceptable) crates, data structures, or algorithms,
 In essence, we hope to turn pull request review comments like "why did you do it this way?" or "I
 think you could try doing it this way" into "we always do X this way: <link to style guide>".
 
-# Formatting
+## Formatting
 
 At a high-level, code formatting is straightforward: we use the native `rustfmt` exclusively, and
 comprehensively.  All Rust source code within the repository should be formatted using `rustfmt`.
@@ -24,11 +24,11 @@ As an additional note, `rustfmt` sometimes can fail to format code within macros
 to see such code that doesn't look like it's formatted correctly, you may need to manually tweak it
 if `rustfmt` cannot be persuaded to format it correctly for you. :)
 
-# Code Organization
+## Code Organization
 
 Code is primarily split into two main directories: `lib/` and `src/`.
 
-## `lib/`: shared libraries, etc
+### `lib/`: shared libraries, etc
 
 We use `lib` almost entirely for shared libraries and for isolating specific pieces of code. As
 Vector itself involves a large number of dependencies, it can be beneficial to move code into
@@ -37,7 +37,7 @@ amount of code that must be processed by helper tools like `cargo check` and `ru
 normal development, which in turn speeds up the feedback loop between writing code and getting
 informed about errors, warnings, and so on.
 
-## `src/`: main binary and all related functionality
+### `src/`: main binary and all related functionality
 
 The bulk of functional code resides in the `src/` directory/crate.  When we refer to functional
 code, we're talking about code that powers user-visible aspects of Vector, such as the sources,
@@ -45,19 +45,19 @@ transforms, and sinks themselves. There is also, of course, the requisite glue c
 command-line arguments, reading the configuration, constructing and configuring components, and
 wiring them together.
 
-# Internal telemetry: logging, metrics, traces
+## Internal telemetry: logging, metrics, traces
 
 As a tool for ingesting, transforming, enriching, and shipping observability data, Vector has a
 significant amount of its own internal telemetry. This telemetry is primarily logging and metrics,
 but also includes some amount of tracing.
 
-## Logging
+### Logging
 
 For logging, we use **[`tracing`](https://docs.rs/tracing/latest/tracing)**, which doubles as both a
 way to emit logs but also a way to use distributed tracing techniques to add nested and contextual
 metadata by utilizing [spans](https://docs.rs/tracing/latest/tracing/#spans).
 
-### Basic Usage
+#### Basic Usage
 
 For logging, we use `tracing`'s event macros which should look very similar to almost all other
 logging libraries, with names that emulate the logging level being used i.e. `info!("A wild log has
@@ -81,7 +81,7 @@ error!(client_addr = %conn.get_ref().peer_addr, "Client actor received malformed
 While this does not cover all the permutations of what the macros in `tracing` support, these
 examples represent the preferred style of using the macros.
 
-### Passing in the event message
+#### Passing in the event message
 
 The `tracing` event macros support passing the event message itself in a few ways, but we prefer the
 **fields/message/message arguments** order:
@@ -99,7 +99,7 @@ debug!(message = "Client entered authentication phase.", %client_id);
 debug!(%client_id, "Client entered authentication phase.");
 ```
 
-### Writing a good log message
+#### Writing a good log message
 
 In general, there are both a few rules and a few suggestions to follow when it comes to writing a
 (good) log message:
@@ -115,7 +115,7 @@ In general, there are both a few rules and a few suggestions to follow when it c
 - If it's longer than one or two sentences, it's probably better suited as a single sentence briefly
   explaining the event, with a link to external documentation that explains further.
 
-### Choosing the right log level
+#### Choosing the right log level
 
 Similarly, choosing the right level can be important, both from the perspective of making it easy
 for users to grok what they should pay attention to, but also to avoid the performance overhead of
@@ -148,12 +148,12 @@ excess logging (even if we filter it out and it never makes it to the console).
   intervene and recover from. These should be rare so that they maintain a high signal-to-noise
   ratio in the observability tooling that operators themselves are using.
 
-## Metrics
+### Metrics
 
 For metrics, we use **[`metrics`](https://docs.rs/metrics/latest/metrics/)**, which like `tracing`,
 provides macros for emitting counters, gauges, and histograms.
 
-### Basic Usage
+#### Basic Usage
 
 There are three basic metric types: counters, gauges, and histograms. **Counters** are meant for
 counting things, such as the total number of requests processed, where the count only grows over
@@ -186,7 +186,7 @@ histogram!("request_duration_ns", delta);
 histogram!("request_duration_ns", 742_130, "endpoint" => "frontend");
 ```
 
-### Avoiding pitfalls with gauges
+#### Avoiding pitfalls with gauges
 
 Many values can appear, at first, to be best tracked as a gauge: current connection count, in-flight
 request count, and so on. However, in some cases, the value being measured may change too frequently
@@ -207,7 +207,7 @@ they were both zero, and then queried them both a second later, and saw that bot
 would know that the queue size was _currently_ zero but we'd also know that we just processed
 100,000 items in the past second.
 
-### Best Practices
+#### Best Practices
 
 - **Do** attempt to limit the cardinality, or number of unique values, of label values. If the
   number of unique values for a label grows over time, this can represent a large amount of consumed
@@ -226,9 +226,9 @@ would know that the queue size was _currently_ zero but we'd also know that we j
   the value of all samples the histogram has recorded. This means you can potentially get three
   metrics for the cost of emitting one.
 
-# Dependencies
+## Dependencies
 
-## Error handling
+### Error handling
 
 For error handling, there are two parts: _creating errors_ and _working with errors_.
 
@@ -248,9 +248,9 @@ back up the call stack. This does not prevent, and indeed, should not discourage
 using `snafu` to create rich error types that provide additional context, whether through
 descriptive error messages, source errors, or backtraces.
 
-## Concurrency and synchronization
+### Concurrency and synchronization
 
-### Atomics
+#### Atomics
 
 In general, we strive to use the atomic types in the [standard
 library](https://doc.rust-lang.org/stable/std/sync/atomic/index.html) when possible, as they are the
@@ -263,7 +263,7 @@ handle it in a transparent way. It uses a fixed acquire/release ordering that ge
 expected behavior when using atomics, but may not be suitable for usages which require stronger
 ordering.
 
-### Global state
+#### Global state
 
 When there is a need or desire to share global state, there are a few options depending on the
 required constraints.
@@ -284,7 +284,7 @@ data to be atomically updated while being shared concurrently. It does this by w
 `Arc<T>` itself. As it cannot be constructed in a const fashion, `arc-swap` pairs well with
 `once_cell` for actually storing it in a global static variable.
 
-### Concurrent data structures
+#### Concurrent data structures
 
 When there is a need for a concurrent and _indexable_ storage, we prefer
 **[`sharded-slab`](https://docs.rs/sharded-slab)**.  This crate provides a means to insert items
