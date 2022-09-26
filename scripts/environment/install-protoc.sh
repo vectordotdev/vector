@@ -7,8 +7,8 @@ set -o errexit -o verbose
 # Basis of script copied from:
 # https://github.com/paxosglobal/asdf-protoc/blob/46c2f9349b8420144b197cfd064a9677d21cfb0c/bin/install
 
-readonly TMP_DIR
-TMP_DIR="$(mktemp -d -t "protoc_XXXX")"
+# shellcheck disable=SC2155
+readonly TMP_DIR="$(mktemp -d -t "protoc_XXXX")"
 trap 'rm -rf "${TMP_DIR?}"' EXIT
 
 get_platform() {
