@@ -1920,7 +1920,7 @@ dependencies = [
  "clap 3.2.22",
  "criterion-plot",
  "futures 0.3.24",
- "itertools 0.10.4",
+ "itertools 0.10.5",
  "lazy_static",
  "num-traits",
  "oorandom",
@@ -1942,7 +1942,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6b50826342786a51a89e2da3a28f1c32b06e387201bc2d19791f622c673706b1"
 dependencies = [
  "cast",
- "itertools 0.10.4",
+ "itertools 0.10.5",
 ]
 
 [[package]]
@@ -2246,7 +2246,7 @@ dependencies = [
 name = "datadog-search-syntax"
 version = "0.1.0"
 dependencies = [
- "itertools 0.10.4",
+ "itertools 0.10.5",
  "once_cell",
  "pest",
  "pest_derive",
@@ -3793,9 +3793,9 @@ dependencies = [
 
 [[package]]
 name = "itertools"
-version = "0.10.4"
+version = "0.10.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d8bf247779e67a9082a4790b45e71ac7cfd1321331a5c856a74a9faebdab78d0"
+checksum = "b0fd2260e829bddf4cb6ea802289de2f86d6a7a690192fbe91b3f46e0f2c8473"
 dependencies = [
  "either",
 ]
@@ -4085,7 +4085,7 @@ dependencies = [
  "bit-set",
  "diff",
  "ena",
- "itertools 0.10.4",
+ "itertools 0.10.5",
  "lalrpop-util",
  "petgraph",
  "pico-args",
@@ -4713,7 +4713,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "af5a8477ac96877b5bd1fd67e0c28736c12943aba24eda92b127e036b0c8f400"
 dependencies = [
  "indexmap",
- "itertools 0.10.4",
+ "itertools 0.10.5",
  "ndarray",
  "noisy_float",
  "num-integer",
@@ -5709,7 +5709,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a5aab5be6e4732b473071984b3164dbbfb7a3674d30ea5ff44410b6bcd960c3c"
 dependencies = [
  "difflib",
- "itertools 0.10.4",
+ "itertools 0.10.5",
  "predicates-core",
 ]
 
@@ -5909,7 +5909,7 @@ dependencies = [
  "cfg-if",
  "cmake",
  "heck 0.4.0",
- "itertools 0.10.4",
+ "itertools 0.10.5",
  "lazy_static",
  "log",
  "multimap",
@@ -5929,7 +5929,7 @@ checksum = "7f835c582e6bd972ba8347313300219fed5bfa52caf175298d860b61ff6069bb"
 dependencies = [
  "bytes 1.2.1",
  "heck 0.4.0",
- "itertools 0.10.4",
+ "itertools 0.10.5",
  "lazy_static",
  "log",
  "multimap",
@@ -5948,7 +5948,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7b670f45da57fb8542ebdbb6105a925fe571b67f9e7ed9f47a06a84e72b4e7cc"
 dependencies = [
  "anyhow",
- "itertools 0.10.4",
+ "itertools 0.10.5",
  "proc-macro2",
  "quote",
  "syn",
@@ -5961,7 +5961,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7345d5f0e08c0536d7ac7229952590239e77abf0a0100a1b1d890add6ea96364"
 dependencies = [
  "anyhow",
- "itertools 0.10.4",
+ "itertools 0.10.5",
  "proc-macro2",
  "quote",
  "syn",
@@ -8786,7 +8786,7 @@ dependencies = [
  "indoc",
  "infer 0.9.0",
  "inventory",
- "itertools 0.10.4",
+ "itertools 0.10.5",
  "jsonschema",
  "k8s-openapi",
  "kube",
