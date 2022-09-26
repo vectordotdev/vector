@@ -8,7 +8,7 @@ use tower::Service;
 use tracing::Instrument;
 use vector_core::{
     event::{EventFinalizers, EventStatus, Finalizable},
-    internal_event::EventsSent,
+    internal_event::CountByteSize,
     stream::DriverResponse,
 };
 
@@ -56,12 +56,11 @@ impl DriverResponse for LokiResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> EventsSent {
-        EventsSent {
-            count: self.metadata.event_count(),
-            byte_size: self.metadata.events_byte_size(),
-            output: None,
-        }
+    fn events_sent(&self) -> CountByteSize {
+        CountByteSize(
+            self.metadata.event_count(),
+            self.metadata.events_byte_size(),
+        )
     }
 
     fn bytes_sent(&self) -> Option<(usize, &str)> {

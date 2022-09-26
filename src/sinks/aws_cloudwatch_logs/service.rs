@@ -22,7 +22,7 @@ use tower::{
     timeout::Timeout,
     Service, ServiceBuilder, ServiceExt,
 };
-use vector_core::{internal_event::EventsSent, stream::DriverResponse};
+use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
 use vrl::prelude::fmt::Debug;
 
 use crate::{
@@ -117,12 +117,8 @@ impl DriverResponse for CloudwatchResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> EventsSent {
-        EventsSent {
-            count: self.events_count,
-            byte_size: self.events_byte_size,
-            output: None,
-        }
+    fn events_sent(&self) -> CountByteSize {
+        CountByteSize(self.events_count, self.events_byte_size)
     }
 }
 

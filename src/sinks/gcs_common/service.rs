@@ -8,7 +8,7 @@ use http::{
 };
 use hyper::Body;
 use tower::Service;
-use vector_core::{internal_event::EventsSent, stream::DriverResponse};
+use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
 
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
@@ -79,12 +79,11 @@ impl DriverResponse for GcsResponse {
         }
     }
 
-    fn events_sent(&self) -> EventsSent {
-        EventsSent {
-            count: self.metadata.event_count(),
-            byte_size: self.metadata.events_byte_size(),
-            output: None,
-        }
+    fn events_sent(&self) -> CountByteSize {
+        CountByteSize(
+            self.metadata.event_count(),
+            self.metadata.events_byte_size(),
+        )
     }
 
     fn bytes_sent(&self) -> Option<(usize, &str)> {
