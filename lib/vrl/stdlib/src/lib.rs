@@ -146,6 +146,8 @@ mod is_string;
 mod is_timestamp;
 #[cfg(feature = "join")]
 mod join;
+#[cfg(feature = "keys")]
+mod keys;
 #[cfg(feature = "length")]
 mod length;
 #[cfg(feature = "log")]
@@ -310,6 +312,8 @@ mod unnest;
 mod upcase;
 #[cfg(feature = "uuid_v4")]
 mod uuid_v4;
+#[cfg(feature = "values")]
+mod values;
 
 // -----------------------------------------------------------------------------
 
@@ -429,6 +433,8 @@ pub use is_string::IsString;
 pub use is_timestamp::IsTimestamp;
 #[cfg(feature = "join")]
 pub use join::Join;
+#[cfg(feature = "keys")]
+pub use keys::Keys;
 #[cfg(feature = "length")]
 pub use length::Length;
 #[cfg(feature = "log")]
@@ -583,6 +589,8 @@ pub use unnest::Unnest;
 pub use upcase::Upcase;
 #[cfg(feature = "uuid_v4")]
 pub use uuid_v4::UuidV4;
+#[cfg(feature = "values")]
+pub use values::Values;
 
 #[cfg(feature = "array")]
 pub use crate::array::Array;
@@ -712,6 +720,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(IsTimestamp),
         #[cfg(feature = "join")]
         Box::new(Join),
+        #[cfg(feature = "keys")]
+        Box::new(Keys),
         #[cfg(feature = "length")]
         Box::new(Length),
         #[cfg(feature = "log")]
@@ -872,5 +882,7 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Upcase),
         #[cfg(feature = "uuid_v4")]
         Box::new(UuidV4),
+        #[cfg(feature = "values")]
+        Box::new(Values),
     ]
 }

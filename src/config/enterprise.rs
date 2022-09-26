@@ -14,6 +14,7 @@ use tokio::{
     time::{sleep, Duration},
 };
 use url::{ParseError, Url};
+use vector_common::sensitive_string::SensitiveString;
 use vector_core::config::proxy::ProxyConfig;
 
 use super::{
@@ -95,16 +96,16 @@ pub struct Options {
     ///
     /// [api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
     #[serde(default)]
-    pub api_key: Option<String>,
+    pub api_key: Option<SensitiveString>,
 
     /// The Datadog application key.
     ///
     /// This is deprecated.
     #[configurable(deprecated)]
-    pub application_key: Option<String>,
+    pub application_key: Option<SensitiveString>,
 
     /// The configuration key for Observability Pipelines.
-    pub configuration_key: String,
+    pub configuration_key: SensitiveString,
 
     /// The amount of time, in seconds, between reporting host metrics to Observability Pipelines.
     #[serde(default = "default_reporting_interval_secs")]
@@ -135,7 +136,7 @@ impl Default for Options {
             endpoint: None,
             api_key: None,
             application_key: None,
-            configuration_key: "".to_owned(),
+            configuration_key: "".to_owned().into(),
             reporting_interval_secs: default_reporting_interval_secs(),
             max_retries: default_max_retries(),
             proxy: ProxyConfig::default(),
@@ -319,7 +320,7 @@ impl TryFrom<&Config> for EnterpriseMetadata {
 
         let api_key = match &opts.api_key {
             // API key provided explicitly.
-            Some(api_key) => api_key.clone(),
+            Some(api_key) => api_key.inner().to_owned(),
             // No API key; attempt to get it from the environment.
             None => match env::var(DATADOG_API_KEY_ENV_VAR_FULL)
                 .or_else(|_| env::var(DATADOG_API_KEY_ENV_VAR_SHORT))
@@ -670,7 +671,7 @@ pub(crate) fn report_configuration(
             opts.endpoint.as_ref(),
             opts.site.as_ref(),
             opts.region,
-            &opts.configuration_key,
+            opts.configuration_key.inner(),
         );
         // Datadog uses a JSON:API, so we'll serialize the config to a JSON
         let payload = PipelinesVersionPayload::new(&table, &fields);

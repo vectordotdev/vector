@@ -110,10 +110,6 @@ pub struct VectorConfig {
     /// It _must_ include a port.
     pub address: SocketAddr,
 
-    /// The timeout, in seconds, before a connection is forcefully closed during shutdown.
-    #[serde(default = "default_shutdown_timeout_secs")]
-    pub shutdown_timeout_secs: u64,
-
     #[configurable(derived)]
     #[serde(default)]
     tls: Option<TlsEnableableConfig>,
@@ -123,16 +119,11 @@ pub struct VectorConfig {
     acknowledgements: AcknowledgementsConfig,
 }
 
-const fn default_shutdown_timeout_secs() -> u64 {
-    30
-}
-
 impl GenerateConfig for VectorConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             version: None,
             address: "0.0.0.0:6000".parse().unwrap(),
-            shutdown_timeout_secs: default_shutdown_timeout_secs(),
             tls: None,
             acknowledgements: Default::default(),
         })
@@ -149,7 +140,7 @@ impl SourceConfig for VectorConfig {
             pipeline: cx.out,
             acknowledgements,
         })
-        .accept_gzip();
+        .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
 
         let source =
             run_grpc_server(self.address, tls_settings, service, cx.shutdown).map_err(|error| {

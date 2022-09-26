@@ -330,6 +330,7 @@ Find.find('.') do |path|
         reports.append('Message must start with a capital.') unless message.match(/^[[:upper:]]/)
         reports.append('Message must end with a period.') unless message.match(/\.$/)
         unless reports.empty?
+          puts "Error(s) in file #{path}"
           reports.each { |report| puts "  #{report}" }
           error_count += 1
         end

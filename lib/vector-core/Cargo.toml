@@ -29,16 +29,17 @@ metrics-tracing-context = { version = "0.12.0", default-features = false }
 metrics-util = { version = "0.14.0", default-features = false, features = ["registry"] }
 mlua = { version = "0.8.3", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 no-proxy = { version  = "0.3.2", default-features = false, features = ["serialize"] }
-once_cell = { version = "1.14", default-features = false }
+once_cell = { version = "1.15", default-features = false }
 openssl = { version = "0.10.41", default-features = false, features = ["vendored"] }
 ordered-float = { version = "3.0.0", default-features = false }
+parking_lot = { version = "0.12.1", default-features = false }
 pin-project = { version = "1.0.12", default-features = false }
 proptest = { version = "1.0", optional = true }
-prost = { version = "0.10.4", default-features = false, features = ["std"] }
-prost-types = { version = "0.10.1", default-features = false }
+prost-types = { version = "0.11.0", default-features = false }
+prost = { version = "0.11.0", default-features = false, features = ["std"] }
 quanta = { version = "0.10.1", default-features = false }
 regex = { version = "1.6.0", default-features = false, features = ["std", "perf"] }
-serde = { version = "1.0.144", default-features = false, features = ["derive", "rc"] }
+serde = { version = "1.0.145", default-features = false, features = ["derive", "rc"] }
 serde_json = { version = "1.0.85", default-features = false }
 serde_with = { version = "2.0.0", default-features = false, features = ["std", "macros"] }
 snafu = { version = "0.7.1", default-features = false }
@@ -48,7 +49,7 @@ tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1", default-features = false, features = ["time"], optional = true }
 tokio-util = { version = "0.7.0", default-features = false, features = ["time"] }
 toml = { version = "0.5.9", default-features = false }
-tonic = { version = "0.7.2", default-features = false, features = ["transport"] }
+tonic = { version = "0.8", default-features = false, features = ["transport"] }
 tower = { version = "0.4", default-features = false, features = ["util"] }
 tracing = { version = "0.1.34", default-features = false }
 tracing-core = { version = "0.1.26", default-features = false }
@@ -73,11 +74,11 @@ security-framework = "2.7.0"
 schannel = "0.1.20"
 
 [build-dependencies]
-prost-build = "0.10.4"
+prost-build = "0.11.1"
 
 [dev-dependencies]
 base64 = "0.13.0"
-criterion = { version = "0.3.6", features = ["html_reports"] }
+criterion = { version = "0.4.0", features = ["html_reports"] }
 env-test-util = "1.0.1"
 quickcheck = "1.0.3"
 proptest = "1.0"

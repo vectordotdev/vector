@@ -3,16 +3,12 @@ use std::{fmt, num::NonZeroUsize};
 use async_trait::async_trait;
 use futures::{stream::BoxStream, StreamExt};
 use tower::Service;
-use vector_config::NamedComponent;
 use vector_core::{
     sink::StreamSink,
     stream::{BatcherSettings, DriverResponse},
 };
 
-use super::{
-    config::KinesisFirehoseSinkConfig,
-    request_builder::{KinesisRequest, KinesisRequestBuilder},
-};
+use super::request_builder::{KinesisRequest, KinesisRequestBuilder};
 use crate::{event::Event, internal_events::SinkRequestBuildError, sinks::util::SinkBuilderExt};
 
 #[derive(Debug, Clone)]
@@ -43,10 +39,7 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError {
-                            name: KinesisFirehoseSinkConfig::NAME,
-                            error,
-                        });
+                        emit!(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),

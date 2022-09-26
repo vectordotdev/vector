@@ -4,7 +4,6 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use futures::stream::{BoxStream, StreamExt};
 use tower::Service;
-use vector_config::NamedComponent;
 use vector_core::{
     event::{EventFinalizers, Finalizable},
     stream::{BatcherSettings, DriverResponse},
@@ -18,7 +17,6 @@ use crate::{
     codecs::Transformer,
     event::Event,
     internal_events::SinkRequestBuildError,
-    sinks::new_relic::NewRelicConfig,
     sinks::util::{
         builder::SinkBuilderExt,
         metadata::{RequestMetadata, RequestMetadataBuilder},
@@ -166,10 +164,7 @@ where
                 |request: Result<NewRelicApiRequest, NewRelicSinkError>| async move {
                     match request {
                         Err(error) => {
-                            emit!(SinkRequestBuildError {
-                                name: NewRelicConfig::NAME,
-                                error
-                            });
+                            emit!(SinkRequestBuildError { error });
                             None
                         }
                         Ok(req) => Some(req),
