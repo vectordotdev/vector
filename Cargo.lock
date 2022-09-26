@@ -1713,7 +1713,7 @@ dependencies = [
  "lookup",
  "memchr",
  "once_cell",
- "ordered-float 3.0.0",
+ "ordered-float 3.1.0",
  "pretty_assertions",
  "prost 0.11.0",
  "regex",
@@ -2230,7 +2230,7 @@ dependencies = [
  "nom",
  "once_cell",
  "onig",
- "ordered-float 3.0.0",
+ "ordered-float 3.1.0",
  "peeking_take_while",
  "regex",
  "serde_json",
@@ -5263,7 +5263,7 @@ dependencies = [
  "bytes 1.2.1",
  "chrono",
  "hex",
- "ordered-float 3.0.0",
+ "ordered-float 3.1.0",
  "prost 0.11.0",
  "prost-build 0.11.1",
  "tonic",
@@ -5292,9 +5292,9 @@ dependencies = [
 
 [[package]]
 name = "ordered-float"
-version = "3.0.0"
+version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "96bcbab4bfea7a59c2c0fe47211a1ac4e3e96bea6eb446d704f310bc5c732ae2"
+checksum = "98ffdb14730ed2ef599c65810c15b000896e21e8776b512de0db0c3d7335cc2a"
 dependencies = [
  "num-traits",
 ]
@@ -5873,7 +5873,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "lookup",
- "ordered-float 3.0.0",
+ "ordered-float 3.1.0",
  "proptest",
  "vrl-diagnostic",
  "vrl-parser",
@@ -8682,7 +8682,7 @@ dependencies = [
  "indoc",
  "lookup",
  "mlua",
- "ordered-float 3.0.0",
+ "ordered-float 3.1.0",
  "quickcheck",
  "regex",
  "serde",
@@ -8814,7 +8814,7 @@ dependencies = [
  "openssl-probe",
  "openssl-src",
  "opentelemetry-proto",
- "ordered-float 3.0.0",
+ "ordered-float 3.1.0",
  "percent-encoding",
  "pin-project",
  "portpicker",
@@ -8976,7 +8976,7 @@ dependencies = [
  "futures 0.3.24",
  "metrics",
  "nom",
- "ordered-float 3.0.0",
+ "ordered-float 3.1.0",
  "pin-project",
  "serde",
  "serde_json",
@@ -9073,7 +9073,7 @@ dependencies = [
  "noisy_float",
  "once_cell",
  "openssl",
- "ordered-float 3.0.0",
+ "ordered-float 3.1.0",
  "parking_lot",
  "pin-project",
  "pretty_assertions",
@@ -9145,7 +9145,7 @@ dependencies = [
  "criterion",
  "indoc",
  "lookup",
- "ordered-float 3.0.0",
+ "ordered-float 3.1.0",
  "serde_json",
  "value",
  "vector-common",
@@ -9191,7 +9191,7 @@ dependencies = [
  "indoc",
  "lalrpop-util",
  "lookup",
- "ordered-float 3.0.0",
+ "ordered-float 3.1.0",
  "paste",
  "regex",
  "serde",
@@ -9230,7 +9230,7 @@ dependencies = [
  "lalrpop",
  "lalrpop-util",
  "lookup",
- "ordered-float 3.0.0",
+ "ordered-float 3.1.0",
  "paste",
  "test-case",
  "thiserror",
