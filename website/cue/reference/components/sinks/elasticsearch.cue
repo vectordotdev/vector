@@ -117,7 +117,7 @@ components: sinks: elasticsearch: {
 				options: {
 					region: {
 						common:      true
-						description: "The [AWS region](\(urls.aws_regions)) of the target service. This defaults to the region named in the endpoints parameter, or the value of the `$AWS_REGION` or `$AWS_DEFAULT_REGION` environment variables if that cannot be determined, or \"us-east-1\"."
+						description: "The [AWS region](\(urls.aws_regions)) for AWS authentication."
 						required:    false
 						type: string: {
 							default: null
