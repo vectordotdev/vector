@@ -55,10 +55,10 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
     }
 
     #[cfg(feature = "enterprise")]
-    let version = Some(builder.sha256_hash());
+    let hash = Some(builder.sha256_hash());
 
     #[cfg(not(feature = "enterprise"))]
-    let version = None;
+    let hash = None;
 
     let ConfigBuilder {
         global,
@@ -123,7 +123,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             schema,
             #[cfg(feature = "enterprise")]
             enterprise,
-            version,
+            hash,
             healthchecks,
             enrichment_tables,
             sources,
