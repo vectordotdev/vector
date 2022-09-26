@@ -308,7 +308,7 @@ $all_events = Hash::new { |hash, key| hash[key] = Event::new(key) }
 error_count = 0
 
 # Scan sources and build internal structures
-Find.find('.') do |path|
+Find.find('./src', './lib') do |path|
   if path.start_with? './'
     path = path[2..]
   end
