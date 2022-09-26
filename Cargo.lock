@@ -3073,10 +3073,11 @@ dependencies = [
 
 [[package]]
 name = "governor"
-version = "0.4.2"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19775995ee20209163239355bc3ad2f33f83da35d9ef72dea26e5af753552c87"
+checksum = "de1b4626e87b9eb1d603ed23067ba1e29ec1d0b35325a2b96c3fe1cf20871f56"
 dependencies = [
+ "cfg-if",
  "dashmap",
  "futures 0.3.24",
  "futures-timer",
