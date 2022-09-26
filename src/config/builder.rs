@@ -451,18 +451,15 @@ mod tests {
     }
 
     #[test]
-    /// If this hash changes, it means either the `ConfigBuilder` has changed what it
-    /// serializes, or the implementation of `serde_json` has changed. If this test fails, we
-    /// should ideally be able to fix so that the original hash passes!
+    /// If this hash changes, it means either the version of Vector has changed (here it's fixed),
+    /// the `ConfigBuilder` has changed what it serializes, or the implementation of `serde_json` has changed.
+    /// If this test fails, we should ideally be able to fix so that the original hash passes!
     fn version_hash_match() {
         let expected_hash = "6c98bea9d9e2f3133e2d39ba04592d17f96340a9bc4c8d697b09f5af388a76bd";
         let builder = ConfigBuilder::default();
         let mut hash_builder = ConfigBuilderHash::from(&builder);
-        hash_builder.version = "1.2.3";
+        hash_builder.version = "1.2.3".into();
         assert_eq!(expected_hash, hash_builder.into_hash());
-        let mut hash_builder = ConfigBuilderHash::from(&builder);
-        hash_builder.version = "1.2.4";
-        assert_ne!(expected_hash, hash_builder.into_hash());
     }
 
     #[test]
