@@ -4,14 +4,13 @@ use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
 use once_cell::sync::Lazy;
-use serde::{Deserialize, Serialize};
 use serde_json::json;
+use vector_common::sensitive_string::SensitiveString;
+use vector_config::configurable_component;
 
 use crate::{
     codecs::Transformer,
-    config::{
-        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
-    },
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::Event,
     http::{Auth, HttpClient},
     sinks::util::{
@@ -26,43 +25,59 @@ static HOST: Lazy<Uri> = Lazy::new(|| Uri::from_static("https://logs.logdna.com"
 
 const PATH: &str = "/logs/ingest";
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub(super) struct LogdnaConfig {
-    api_key: String,
-    // Deprecated name
+/// Configuration for the `logdna` sink.
+#[configurable_component(sink("logdna"))]
+#[derive(Clone, Debug)]
+pub struct LogdnaConfig {
+    /// The Ingestion API key.
+    api_key: SensitiveString,
+
+    /// The endpoint to send logs to.
     #[serde(alias = "host")]
     endpoint: Option<UriSerde>,
 
+    /// The hostname that will be attached to each batch of events.
+    #[configurable(metadata(templateable))]
     hostname: Template,
+
+    /// The MAC address that will be attached to each batch of events.
     mac: Option<String>,
+
+    /// The IP address that will be attached to each batch of events.
     ip: Option<String>,
+
+    /// The tags that will be attached to each batch of events.
+    #[configurable(metadata(templateable))]
     tags: Option<Vec<Template>>,
 
+    #[configurable(derived)]
     #[serde(
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub encoding: Transformer,
 
+    /// The default app that will be set for events that do not contain a `file` or `app` field.
     default_app: Option<String>,
+
+    /// The default environment that will be set for events that do not contain an `env` field.
     default_env: Option<String>,
 
+    #[configurable(derived)]
     #[serde(default)]
     batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 
+    #[configurable(derived)]
     #[serde(default)]
     request: TowerRequestConfig,
 
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     acknowledgements: AcknowledgementsConfig,
-}
-
-inventory::submit! {
-    SinkDescription::new::<LogdnaConfig>("logdna")
 }
 
 impl GenerateConfig for LogdnaConfig {
@@ -76,7 +91,6 @@ impl GenerateConfig for LogdnaConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "logdna")]
 impl SinkConfig for LogdnaConfig {
     async fn build(
         &self,
@@ -104,12 +118,8 @@ impl SinkConfig for LogdnaConfig {
         Input::log()
     }
 
-    fn sink_type(&self) -> &'static str {
-        "logdna"
-    }
-
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
@@ -278,8 +288,8 @@ impl HttpSink for LogdnaConfig {
             .unwrap();
 
         let auth = Auth::Basic {
-            user: self.api_key.clone(),
-            password: "".to_string(),
+            user: self.api_key.inner().to_string(),
+            password: SensitiveString::default(),
         };
 
         auth.apply(&mut request);

@@ -119,7 +119,6 @@ mod tests {
     // Here we test that the deserializations from various formats match
     // the TOML format.
     #[cfg(all(
-        feature = "enrichment-tables-file",
         feature = "sources-socket",
         feature = "transforms-sample",
         feature = "sinks-socket"
@@ -154,12 +153,12 @@ mod tests {
         "#;
 
         let cases = vec![
-            // Valid empty inputs should resolve to default.
+            // Valid empty inputs should resolve to an empty, default value.
             ("", Format::Toml, Ok("")),
             ("{}", Format::Yaml, Ok("")),
             ("{}", Format::Json, Ok("")),
+            ("", Format::Yaml, Ok("")),
             // Invalid "empty" inputs should resolve to an error.
-            ("", Format::Yaml, Err(vec!["EOF while parsing a value"])),
             (
                 "",
                 Format::Json,

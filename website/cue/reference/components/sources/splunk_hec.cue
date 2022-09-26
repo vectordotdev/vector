@@ -149,6 +149,13 @@ components: sources: splunk_hec: {
 				required:    true
 				type: timestamp: {}
 			}
+			source_type: {
+				description: "The name of the source type."
+				required:    true
+				type: string: {
+					examples: ["splunk_hec"]
+				}
+			}
 			timestamp: fields._current_timestamp
 		}
 	}

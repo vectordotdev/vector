@@ -5,7 +5,7 @@ use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
 /// A container that holds secrets accessible from Vector / VRL.
-#[derive(Clone, Default, PartialEq, PartialOrd)]
+#[derive(Clone, Default, PartialEq, Eq, PartialOrd)]
 pub struct Secrets {
     secrets: BTreeMap<String, Arc<str>>,
 }

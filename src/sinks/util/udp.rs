@@ -8,18 +8,20 @@ use std::{
 use async_trait::async_trait;
 use bytes::BytesMut;
 use futures::{future::BoxFuture, ready, stream::BoxStream, FutureExt, StreamExt};
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::{net::UdpSocket, sync::oneshot, time::sleep};
 use tokio_util::codec::Encoder;
-use vector_common::internal_event::BytesSent;
+use vector_common::internal_event::{
+    ByteSize, BytesSent, InternalEventHandle, Protocol, Registered,
+};
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use super::SinkBuildError;
 use crate::{
     codecs::Transformer,
     dns,
-    event::{Event, Finalizable},
+    event::{Event, EventStatus, Finalizable},
     internal_events::{
         SocketEventsSent, SocketMode, UdpSendIncompleteError, UdpSocketConnectionError,
         UdpSocketConnectionEstablished, UdpSocketError,
@@ -47,9 +49,18 @@ pub enum UdpError {
     ServiceChannelRecvError { source: oneshot::error::RecvError },
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+/// A UDP sink.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct UdpSinkConfig {
+    /// The address to connect to.
+    ///
+    /// The address _must_ include a port.
     address: String,
+
+    /// The size, in bytes, of the socket's send buffer.
+    ///
+    /// If set, the value of the setting is passed via the `SO_SNDBUF` option.
     send_buffer_bytes: Option<usize>,
 }
 
@@ -168,13 +179,15 @@ enum UdpServiceState {
 pub struct UdpService {
     connector: UdpConnector,
     state: UdpServiceState,
+    bytes_sent: Registered<BytesSent>,
 }
 
 impl UdpService {
-    const fn new(connector: UdpConnector) -> Self {
+    fn new(connector: UdpConnector) -> Self {
         Self {
             connector,
             state: UdpServiceState::Disconnected,
+            bytes_sent: register!(BytesSent::from(Protocol::UDP)),
         }
     }
 }
@@ -213,6 +226,7 @@ impl tower::Service<BytesMut> for UdpService {
     fn call(&mut self, msg: BytesMut) -> Self::Future {
         let (sender, receiver) = oneshot::channel();
         let byte_size = msg.len();
+        let bytes_sent = self.bytes_sent.clone();
 
         let mut socket =
             match std::mem::replace(&mut self.state, UdpServiceState::Sending(receiver)) {
@@ -231,10 +245,7 @@ impl tower::Service<BytesMut> for UdpService {
                 // emitting the `BytesSent` event, and related metrics... and practically, those sinks don't compress
                 // anyways, so the metrics are correct as-is... they just may not be correct in the future if
                 // compression support was added, etc.
-                emit!(BytesSent {
-                    byte_size,
-                    protocol: "udp",
-                });
+                bytes_sent.emit(ByteSize(byte_size));
             }
 
             result
@@ -249,17 +260,19 @@ where
     connector: UdpConnector,
     transformer: Transformer,
     encoder: E,
+    bytes_sent: Registered<BytesSent>,
 }
 
 impl<E> UdpSink<E>
 where
     E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync,
 {
-    const fn new(connector: UdpConnector, transformer: Transformer, encoder: E) -> Self {
+    fn new(connector: UdpConnector, transformer: Transformer, encoder: E) -> Self {
         Self {
             connector,
             transformer,
             encoder,
+            bytes_sent: register!(BytesSent::from(Protocol::UDP)),
         }
     }
 }
@@ -294,18 +307,15 @@ where
                             byte_size,
                         });
 
-                        emit!(BytesSent {
-                            byte_size: bytes.len(),
-                            protocol: "udp",
-                        });
+                        self.bytes_sent.emit(ByteSize(bytes.len()));
+                        finalizers.update_status(EventStatus::Delivered);
                     }
                     Err(error) => {
                         emit!(UdpSocketError { error });
+                        finalizers.update_status(EventStatus::Errored);
                         break;
                     }
-                };
-
-                drop(finalizers); // Ensure we don't acknowledge until after the send
+                }
             }
         }
 

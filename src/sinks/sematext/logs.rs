@@ -1,14 +1,13 @@
 use async_trait::async_trait;
 use futures::stream::{BoxStream, StreamExt};
 use indoc::indoc;
-use serde::{Deserialize, Serialize};
+use vector_common::sensitive_string::SensitiveString;
+use vector_config::configurable_component;
 
 use super::Region;
 use crate::{
     codecs::Transformer,
-    config::{
-        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
-    },
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::EventArray,
     sinks::{
         elasticsearch::{BulkConfig, ElasticsearchConfig},
@@ -20,36 +19,42 @@ use crate::{
     },
 };
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+/// Configuration for the `sematext_logs` sink.
+#[configurable_component(sink("sematext_logs"))]
+#[derive(Clone, Debug)]
 pub struct SematextLogsConfig {
+    #[configurable(derived)]
     region: Option<Region>,
-    // Deprecated name
+
+    /// The endpoint to send data to.
     #[serde(alias = "host")]
     endpoint: Option<String>,
-    token: String,
 
+    /// The token that will be used to write to Sematext.
+    token: SensitiveString,
+
+    #[configurable(derived)]
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
     )]
     pub encoding: Transformer,
 
+    #[configurable(derived)]
     #[serde(default)]
     request: TowerRequestConfig,
 
+    #[configurable(derived)]
     #[serde(default)]
     batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     acknowledgements: AcknowledgementsConfig,
-}
-
-inventory::submit! {
-    SinkDescription::new::<SematextLogsConfig>("sematext_logs")
 }
 
 impl GenerateConfig for SematextLogsConfig {
@@ -63,7 +68,6 @@ impl GenerateConfig for SematextLogsConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "sematext_logs")]
 impl SinkConfig for SematextLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let endpoint = match (&self.endpoint, &self.region) {
@@ -86,7 +90,7 @@ impl SinkConfig for SematextLogsConfig {
             ),
             bulk: Some(BulkConfig {
                 action: None,
-                index: Some(self.token.clone()),
+                index: Some(self.token.inner().to_owned()),
             }),
             batch: self.batch,
             request: RequestConfig {
@@ -109,12 +113,8 @@ impl SinkConfig for SematextLogsConfig {
         Input::log()
     }
 
-    fn sink_type(&self) -> &'static str {
-        "sematext_logs"
-    }
-
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 

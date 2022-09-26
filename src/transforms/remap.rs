@@ -6,8 +6,8 @@ use std::{
     path::PathBuf,
 };
 
-use lookup::lookup_v2::Path;
-use lookup::path;
+use lookup::lookup_v2::ValuePath;
+use lookup::{metadata_path, path, PathPrefix};
 use snafu::{ResultExt, Snafu};
 use value::Kind;
 use vector_common::TimeZone;
@@ -17,17 +17,16 @@ use vector_core::config::LogNamespace;
 use vector_core::schema::Definition;
 
 use vector_vrl_functions::set_semantic_meaning::MeaningList;
-use vrl::state::LocalEnv;
+use vrl::prelude::state::TypeState;
 use vrl::{
     diagnostic::{Formatter, Note},
     prelude::{DiagnosticMessage, ExpressionError},
-    Program, Runtime, Terminate, VrlRuntime,
+    CompileConfig, Program, Runtime, Terminate, VrlRuntime,
 };
 
 use crate::{
     config::{
         log_schema, ComponentKey, DataType, Input, Output, TransformConfig, TransformContext,
-        TransformDescription,
     },
     event::{Event, TargetEvents, VrlTarget},
     internal_events::{RemapMappingAbort, RemapMappingError},
@@ -39,64 +38,74 @@ use crate::{
 const DROPPED: &str = "dropped";
 
 /// Configuration for the `remap` transform.
-#[configurable_component(transform)]
+#[configurable_component(transform("remap"))]
 #[derive(Clone, Debug, Derivative)]
 #[serde(deny_unknown_fields, default)]
 #[derivative(Default)]
 pub struct RemapConfig {
-    /// The [Vector Remap Language](https://vector.dev/docs/reference/vrl) (VRL) program to execute for each event.
+    /// The [Vector Remap Language][vrl] (VRL) program to execute for each event.
     ///
     /// Required if `file` is missing.
+    ///
+    /// [vrl]: https://vector.dev/docs/reference/vrl
     pub source: Option<String>,
 
-    /// File path to the [Vector Remap Language](https://vector.dev/docs/reference/vrl) (VRL) program to execute for each event.
+    /// File path to the [Vector Remap Language][vrl] (VRL) program to execute for each event.
     ///
     /// If a relative path is provided, its root is the current working directory.
     ///
     /// Required if `source` is missing.
+    ///
+    /// [vrl]: https://vector.dev/docs/reference/vrl
     pub file: Option<PathBuf>,
 
-    /// The name of the timezone to apply to timestamp conversions that do not contain an explicit time zone.
+    /// The name of the timezone to apply to timestamp conversions that do not contain an explicit
+    /// time zone.
     ///
-    /// This overrides the [global `timezone`](https://vector.dev/docs/reference/configuration//global-options#timezone)
-    /// option. The time zone name may be any name in the [TZ
-    /// database](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones), or `local` to indicate system local
-    /// time.
+    /// This overrides the [global `timezone`][global_timezone] option. The time zone name may be
+    /// any name in the [TZ database][tz_database], or `local` to indicate system local time.
+    ///
+    /// [global_timezone]: https://vector.dev/docs/reference/configuration//global-options#timezone
+    /// [tz_database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
     #[serde(default)]
     pub timezone: TimeZone,
 
     /// Drops any event that encounters an error during processing.
     ///
-    /// Normally, if a VRL program encounters an error when processing an event, the original, unmodified event will be
-    /// sent downstream. In some cases, you may not wish to send the event any further, such as if certain
-    /// transformation or enrichment is strictly required. Setting `drop_on_error` to `true` allows you to ensure these
-    /// events do not get processed any further.
+    /// Normally, if a VRL program encounters an error when processing an event, the original,
+    /// unmodified event will be sent downstream. In some cases, you may not wish to send the event
+    /// any further, such as if certain transformation or enrichment is strictly required. Setting
+    /// `drop_on_error` to `true` allows you to ensure these events do not get processed any
+    /// further.
     ///
-    /// Additionally, dropped events can potentially be diverted to a specially named output for further logging and
-    /// analysis by setting `reroute_dropped`.
+    /// Additionally, dropped events can potentially be diverted to a specially named output for
+    /// further logging and analysis by setting `reroute_dropped`.
     pub drop_on_error: bool,
 
     /// Drops any event that is manually aborted during processing.
     ///
-    /// Normally, if a VRL program is manually aborted (via
-    /// [`abort`](https://vector.dev/docs/reference/vrl/expressions/#abort)) when processing an event, the original,
-    /// unmodified event will be sent downstream. In some cases, you may not wish to send the event any further, such as
-    /// if certain transformation or enrichment is strictly required. Setting `drop_on_abort` to `true` allows you to
-    /// ensure these events do not get processed any further.
+    /// Normally, if a VRL program is manually aborted (via [`abort`][vrl_docs_abort]) when
+    /// processing an event, the original, unmodified event will be sent downstream. In some cases,
+    /// you may not wish to send the event any further, such as if certain transformation or
+    /// enrichment is strictly required. Setting `drop_on_abort` to `true` allows you to ensure
+    /// these events do not get processed any further.
     ///
-    /// Additionally, dropped events can potentially be diverted to a specially-named output for further logging and
-    /// analysis by setting `reroute_dropped`.
+    /// Additionally, dropped events can potentially be diverted to a specially-named output for
+    /// further logging and analysis by setting `reroute_dropped`.
+    ///
+    /// [vrl_docs_abort]: https://vector.dev/docs/reference/vrl/expressions/#abort
     #[serde(default = "crate::serde::default_true")]
     pub drop_on_abort: bool,
 
     /// Reroutes dropped events to a named output instead of halting processing on them.
     ///
-    /// When using `drop_on_error` or `drop_on_abort`, events that are "dropped" are processed no further. In some
-    /// cases, it may be desirable to keep the events around for further analysis, debugging, or retrying.
+    /// When using `drop_on_error` or `drop_on_abort`, events that are "dropped" are processed no
+    /// further. In some cases, it may be desirable to keep the events around for further analysis,
+    /// debugging, or retrying.
     ///
-    /// In these cases, `reroute_dropped` can be set to `true` which will forward the original event to a
-    /// specially-named output, `dropped`. The original event will be annotated with additional fields describing why
-    /// the event was dropped.
+    /// In these cases, `reroute_dropped` can be set to `true` which will forward the original event
+    /// to a specially-named output, `dropped`. The original event will be annotated with additional
+    /// fields describing why the event was dropped.
     pub reroute_dropped: bool,
 
     #[configurable(derived)]
@@ -113,7 +122,7 @@ impl RemapConfig {
         vrl::Program,
         String,
         Vec<Box<dyn vrl::Function>>,
-        vrl::state::ExternalEnv,
+        CompileConfig,
     )> {
         let source = match (&self.source, &self.file) {
             (Some(source), None) => source.to_owned(),
@@ -134,39 +143,39 @@ impl RemapConfig {
         functions.append(&mut enrichment::vrl_functions());
         functions.append(&mut vector_vrl_functions::vrl_functions());
 
-        let mut state = vrl::state::ExternalEnv::new_with_kind(
-            merged_schema_definition.event_kind().clone(),
-            merged_schema_definition.metadata_kind().clone(),
-        );
-        state.set_external_context(enrichment_tables);
-        state.set_external_context(MeaningList::default());
+        let state = TypeState {
+            local: Default::default(),
+            external: vrl::state::ExternalEnv::new_with_kind(
+                merged_schema_definition.event_kind().clone(),
+                merged_schema_definition.metadata_kind().clone(),
+            ),
+        };
+        let mut config = CompileConfig::default();
 
-        compile_vrl(&source, &functions, &mut state, LocalEnv::default())
+        config.set_custom(enrichment_tables);
+        config.set_custom(MeaningList::default());
+
+        compile_vrl(&source, &functions, &state, config)
             .map_err(|diagnostics| {
                 Formatter::new(&source, diagnostics)
                     .colored()
                     .to_string()
                     .into()
             })
-            .map(|(program, diagnostics)| {
+            .map(|result| {
                 (
-                    program,
-                    Formatter::new(&source, diagnostics).to_string(),
+                    result.program,
+                    Formatter::new(&source, result.warnings).to_string(),
                     functions,
-                    state,
+                    result.config,
                 )
             })
     }
 }
 
-inventory::submit! {
-    TransformDescription::new::<RemapConfig>("remap")
-}
-
 impl_generate_config_from_default!(RemapConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "remap")]
 impl TransformConfig for RemapConfig {
     async fn build(&self, context: &TransformContext) -> Result<Transform> {
         let (transform, warnings) = match self.runtime {
@@ -200,15 +209,17 @@ impl TransformConfig for RemapConfig {
                 enrichment::TableRegistry::default(),
                 input_definition.clone(),
             )
-            .map(|(_, _, _, state)| {
-                let meaning = state
-                    .get_external_context::<MeaningList>()
+            .map(|(program, _, _, external_context)| {
+                let meaning = external_context
+                    .get_custom::<MeaningList>()
                     .cloned()
                     .expect("context exists")
                     .0;
 
-                let mut new_type_def = Definition::new(
-                    state.target_kind().clone(),
+                let state = program.final_type_state();
+
+                let mut new_type_def = Definition::new_with_default_metadata(
+                    state.external.target_kind().clone(),
                     input_definition.log_namespaces().clone(),
                 );
                 for (id, path) in meaning {
@@ -217,7 +228,7 @@ impl TransformConfig for RemapConfig {
                 new_type_def
             })
             .unwrap_or_else(|_| {
-                Definition::new(
+                Definition::new_with_default_metadata(
                     // The program failed to compile, so it can "never" return a value
                     Kind::never(),
                     input_definition.log_namespaces().clone(),
@@ -226,8 +237,10 @@ impl TransformConfig for RemapConfig {
 
         // When a message is dropped and re-routed, we keep the original event, but also annotate
         // it with additional metadata.
-        let mut dropped_definition =
-            Definition::new(Kind::never(), input_definition.log_namespaces().clone());
+        let mut dropped_definition = Definition::new_with_default_metadata(
+            Kind::never(),
+            input_definition.log_namespaces().clone(),
+        );
 
         if input_definition
             .log_namespaces()
@@ -274,10 +287,6 @@ impl TransformConfig for RemapConfig {
         } else {
             vec![default_output]
         }
-    }
-
-    fn transform_type(&self) -> &'static str {
-        "remap"
     }
 
     fn enable_concurrency(&self) -> bool {
@@ -416,14 +425,18 @@ where
             Event::Log(ref mut log) => match log.namespace() {
                 LogNamespace::Legacy => {
                     log.insert(
-                        log_schema().metadata_key().concat(path!("dropped")),
+                        (
+                            PathPrefix::Event,
+                            log_schema().metadata_key().concat(path!("dropped")),
+                        ),
                         self.dropped_data(reason, error),
                     );
                 }
                 LogNamespace::Vector => {
-                    log.metadata_mut()
-                        .value_mut()
-                        .insert(path!("vector", "dropped"), self.dropped_data(reason, error));
+                    log.insert(
+                        metadata_path!("vector", "dropped"),
+                        self.dropped_data(reason, error),
+                    );
                 }
             },
             Event::Metric(ref mut metric) => {
@@ -1014,11 +1027,11 @@ mod tests {
         let context = TransformContext {
             key: Some(ComponentKey::from("remapper")),
             schema_definitions,
-            merged_schema_definition: schema::Definition::empty_legacy_namespace().with_field(
-                "hello",
-                Kind::bytes(),
-                None,
-            ),
+            merged_schema_definition: schema::Definition::new_with_default_metadata(
+                Kind::any_object(),
+                [LogNamespace::Legacy],
+            )
+            .with_field("hello", Kind::bytes(), None),
             ..Default::default()
         };
         let mut tform = Remap::new_ast(conf, &context).unwrap().0;
@@ -1263,16 +1276,18 @@ mod tests {
             ..Default::default()
         };
 
-        let schema_definition = schema::Definition::empty_legacy_namespace()
-            .with_field("foo", Kind::bytes().or_null(), None)
-            .with_field(
-                "tags",
-                Kind::object(BTreeMap::from([("foo".into(), Kind::bytes())])).or_null(),
-                None,
-            );
+        let schema_definition = schema::Definition::new_with_default_metadata(
+            Kind::any_object(),
+            [LogNamespace::Legacy],
+        )
+        .with_field("foo", Kind::any(), None)
+        .with_field("tags", Kind::any(), None);
 
         assert_eq!(
-            conf.outputs(&schema::Definition::empty_legacy_namespace()),
+            conf.outputs(&schema::Definition::new_with_default_metadata(
+                Kind::any_object(),
+                [LogNamespace::Legacy]
+            )),
             vec![Output::default(DataType::all()).with_schema_definition(schema_definition)]
         );
 

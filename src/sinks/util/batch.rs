@@ -11,7 +11,7 @@ use crate::{event::EventFinalizers, internal_events::LargeEventDroppedError};
 // * Provide sensible sink default 10 MB with 1s timeout. Don't allow chaining builder methods on
 //   that.
 
-#[derive(Debug, Snafu, PartialEq)]
+#[derive(Debug, Snafu, PartialEq, Eq)]
 pub enum BatchError {
     #[snafu(display("This sink does not allow setting `max_bytes`"))]
     BytesNotAllowed,
@@ -85,13 +85,30 @@ pub struct Merged;
 pub struct Unmerged;
 
 /// Event batching behavior.
+// TODO: We should/could probably derive the impl of `Configurable` such that it uses `D` to get the
+// default batch settings, since we'll need an effective way to encode different defaults for the
+// various sinks. Sort of middleground between "define defaults per-field" and "this type has its
+// own default" but I don't think it will end up being too messy.
+//
+// Differently, maybe we just write a custom `Default` implementation for `BatchConfig` such that it
+// extracts the actual default values from `D`? What gets tricky there is there is that users would
+// need to specify `#[serde(default)]` for that default value to get pulled up correctly, whereas
+// the custom `Configurable` implementation does that automatically for us.
+//
+// Thinking even _more_ about it, maybe we could actually just define a per-field default here that
+// derives from the consts in `D`? I think _that_ might work... but we don't pull up per-field
+// defaults to the callsite of whatever is using `BatchConfig`, IIRC, so we wouldn't actually show
+// the default value at the callsite? Hmph.
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct BatchConfig<D: SinkBatchSettings + Clone, S = Unmerged>
 where
     S: Clone,
 {
-    /// The maximum size of a batch, in bytes, before it is flushed.
+    /// The maximum size of a batch that will be processed by a sink.
+    ///
+    /// This is based on the uncompressed size of the batched events, before they are
+    /// serialized / compressed.
     pub max_bytes: Option<usize>,
 
     /// The maximum size of a batch, in events, before it is flushed.

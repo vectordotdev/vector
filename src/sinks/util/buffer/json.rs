@@ -6,6 +6,8 @@ pub type BoxedRawValue = Box<RawValue>;
 
 /// A `batch` implementation for storing an array of json
 /// values.
+///
+/// Note: This has been deprecated, please do not use when creating new Sinks.
 #[derive(Debug)]
 pub struct JsonArrayBuffer {
     buffer: Vec<BoxedRawValue>,

@@ -1,12 +1,12 @@
 use bytes::{BufMut, BytesMut};
-use serde::{Deserialize, Serialize};
 use syslog::{Facility, Formatter3164, LogFormat, Severity};
+use vector_config::configurable_component;
 
 use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig,
-        SinkContext, SinkDescription,
+        SinkContext,
     },
     event::Event,
     internal_events::TemplateRenderingError,
@@ -16,19 +16,37 @@ use crate::{
     tls::TlsEnableableConfig,
 };
 
-#[derive(Deserialize, Serialize, Debug)]
+/// Configuration for the `papertrail` sink.
+#[configurable_component(sink("papertrail"))]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-pub(self) struct PapertrailConfig {
+pub struct PapertrailConfig {
+    /// The endpoint to send logs to.
     endpoint: UriSerde,
-    encoding: EncodingConfig,
-    keepalive: Option<TcpKeepaliveConfig>,
-    tls: Option<TlsEnableableConfig>,
-    send_buffer_bytes: Option<usize>,
-    process: Option<Template>,
-}
 
-inventory::submit! {
-    SinkDescription::new::<PapertrailConfig>("papertrail")
+    #[configurable(derived)]
+    encoding: EncodingConfig,
+
+    #[configurable(derived)]
+    keepalive: Option<TcpKeepaliveConfig>,
+
+    #[configurable(derived)]
+    tls: Option<TlsEnableableConfig>,
+
+    /// Configures the send buffer size using the `SO_SNDBUF` option on the socket.
+    send_buffer_bytes: Option<usize>,
+
+    /// The value to use as the `process` in Papertrail.
+    #[configurable(metadata(templateable))]
+    process: Option<Template>,
+
+    #[configurable(derived)]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 impl GenerateConfig for PapertrailConfig {
@@ -42,7 +60,6 @@ impl GenerateConfig for PapertrailConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "papertrail")]
 impl SinkConfig for PapertrailConfig {
     async fn build(
         &self,
@@ -91,12 +108,8 @@ impl SinkConfig for PapertrailConfig {
         Input::new(self.encoding.config().input_type() & DataType::Log)
     }
 
-    fn sink_type(&self) -> &'static str {
-        "papertrail"
-    }
-
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        None
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 

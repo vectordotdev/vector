@@ -16,6 +16,7 @@ use hyper_proxy::ProxyConnector;
 use snafu::{ResultExt, Snafu};
 use tower::Service;
 use tracing::Instrument;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
 use crate::{
@@ -114,7 +115,7 @@ where
             let response = response_result
                 .map_err(|error| {
                     // Emit the error into the internal events system.
-                    emit!(http_client::GotHttpError {
+                    emit!(http_client::GotHttpWarning {
                         error: &error,
                         roundtrip
                     });
@@ -139,8 +140,15 @@ pub fn build_proxy_connector(
     tls_settings: MaybeTlsSettings,
     proxy_config: &ProxyConfig,
 ) -> Result<ProxyConnector<HttpsConnector<HttpConnector>>, HttpError> {
+    // Create dedicated TLS connector for the proxied connection with user TLS settings.
+    let tls = tls_connector_builder(&tls_settings)
+        .context(BuildTlsConnectorSnafu)?
+        .build();
     let https = build_tls_connector(tls_settings)?;
     let mut proxy = ProxyConnector::new(https).unwrap();
+    // Make proxy connector aware of user TLS settings by setting the TLS connector:
+    // https://github.com/vectordotdev/vector/issues/13683
+    proxy.set_tls(Some(tls));
     proxy_config
         .configure(&mut proxy)
         .context(MakeProxyConnectorSnafu)?;
@@ -236,7 +244,7 @@ pub enum Auth {
         user: String,
 
         /// The password to send.
-        password: String,
+        password: SensitiveString,
     },
 
     /// Bearer authentication.
@@ -244,7 +252,7 @@ pub enum Auth {
     /// A bearer token (OAuth2, JWT, etc) is passed as-is.
     Bearer {
         /// The bearer token to send.
-        token: String,
+        token: SensitiveString,
     },
 }
 
@@ -277,10 +285,10 @@ impl Auth {
     pub fn apply_headers_map(&self, map: &mut HeaderMap) {
         match &self {
             Auth::Basic { user, password } => {
-                let auth = Authorization::basic(user, password);
+                let auth = Authorization::basic(user.as_str(), password.inner());
                 map.typed_insert(auth);
             }
-            Auth::Bearer { token } => match Authorization::bearer(token) {
+            Auth::Bearer { token } => match Authorization::bearer(token.inner()) {
                 Ok(auth) => map.typed_insert(auth),
                 Err(error) => error!(message = "Invalid bearer token.", token = %token, %error),
             },

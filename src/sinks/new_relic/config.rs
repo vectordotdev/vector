@@ -2,8 +2,9 @@ use std::{fmt::Debug, sync::Arc};
 
 use futures::FutureExt;
 use http::Uri;
-use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
+use vector_common::sensitive_string::SensitiveString;
+use vector_config::configurable_component;
 
 use super::{
     healthcheck, NewRelicApiResponse, NewRelicApiService, NewRelicEncoder, NewRelicSink,
@@ -20,22 +21,34 @@ use crate::{
     tls::TlsSettings,
 };
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Copy, Derivative)]
+/// New Relic region.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 #[derivative(Default)]
 pub enum NewRelicRegion {
+    /// US region.
     #[derivative(Default)]
     Us,
+
+    /// EU region.
     Eu,
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Copy, Derivative)]
+/// New Relic API endpoint.
+#[configurable_component]
+#[derive(Clone, Copy, Derivative, Debug, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 #[derivative(Default)]
 pub enum NewRelicApi {
+    /// Events API.
     #[derivative(Default)]
     Events,
+
+    /// Metrics API.
     Metrics,
+
+    /// Logs API.
     Logs,
 }
 
@@ -61,30 +74,50 @@ impl RetryLogic for NewRelicApiRetry {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+/// Configuration for the `new_relic` sink.
+#[configurable_component(sink("new_relic"))]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct NewRelicConfig {
-    pub license_key: String,
-    pub account_id: String,
+    /// A valid New Relic license key.
+    pub license_key: SensitiveString,
+
+    /// The New Relic account ID.
+    pub account_id: SensitiveString,
+
+    #[configurable(derived)]
     pub region: Option<NewRelicRegion>,
+
+    #[configurable(derived)]
     pub api: NewRelicApi,
+
+    #[configurable(derived)]
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
+
+    #[configurable(derived)]
     #[serde(
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub encoding: Transformer,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<NewRelicDefaultBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     acknowledgements: AcknowledgementsConfig,
+
     #[serde(skip)]
     pub override_uri: Option<Uri>,
 }
@@ -102,7 +135,6 @@ impl NewRelicConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "new_relic")]
 impl SinkConfig for NewRelicConfig {
     async fn build(
         &self,
@@ -127,7 +159,6 @@ impl SinkConfig for NewRelicConfig {
 
         let sink = NewRelicSink {
             service,
-
             transformer: self.encoding.clone(),
             encoder: NewRelicEncoder,
             credentials,
@@ -142,12 +173,8 @@ impl SinkConfig for NewRelicConfig {
         Input::new(DataType::Log | DataType::Metric)
     }
 
-    fn sink_type(&self) -> &'static str {
-        "new_relic"
-    }
-
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
@@ -198,8 +225,8 @@ impl NewRelicCredentials {
 impl From<&NewRelicConfig> for NewRelicCredentials {
     fn from(config: &NewRelicConfig) -> Self {
         Self {
-            license_key: config.license_key.clone(),
-            account_id: config.account_id.clone(),
+            license_key: config.license_key.inner().to_string(),
+            account_id: config.account_id.inner().to_string(),
             api: config.api,
             region: config.region.unwrap_or(NewRelicRegion::Us),
             override_uri: config.override_uri.clone(),

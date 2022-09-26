@@ -3,6 +3,7 @@ use std::{fmt, net::SocketAddr};
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use futures::FutureExt;
 use tracing::Span;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 use warp::Filter;
@@ -11,7 +12,6 @@ use crate::{
     codecs::DecodingConfig,
     config::{
         AcknowledgementsConfig, GenerateConfig, Output, Resource, SourceConfig, SourceContext,
-        SourceDescription,
     },
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
@@ -23,7 +23,7 @@ mod handlers;
 mod models;
 
 /// Configuration for the `aws_kinesis_firehose` source.
-#[configurable_component(source)]
+#[configurable_component(source("aws_kinesis_firehose"))]
 #[derive(Clone, Debug)]
 pub struct AwsKinesisFirehoseConfig {
     /// The address to listen for connections on.
@@ -33,7 +33,7 @@ pub struct AwsKinesisFirehoseConfig {
     ///
     /// AWS Kinesis Firehose can be configured to pass along a user-configurable access key with each request. If
     /// configured, `access_key` should be set to the same value. Otherwise, all requests will be allowed.
-    access_key: Option<String>,
+    access_key: Option<SensitiveString>,
 
     /// The compression scheme to use for decompressing records within the Firehose message.
     ///
@@ -63,7 +63,7 @@ pub struct AwsKinesisFirehoseConfig {
 
 /// Compression scheme for records in a Firehose message.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative, PartialEq)]
+#[derive(Clone, Copy, Debug, Derivative, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 #[derivative(Default)]
 pub enum Compression {
@@ -95,7 +95,6 @@ impl fmt::Display for Compression {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "aws_kinesis_firehose")]
 impl SourceConfig for AwsKinesisFirehoseConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let decoder = DecodingConfig::new(
@@ -107,7 +106,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
         let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
 
         let svc = filters::firehose(
-            self.access_key.clone(),
+            self.access_key.as_ref().map(|k| k.inner().to_owned()),
             self.record_compression.unwrap_or_default(),
             decoder,
             acknowledgements,
@@ -134,10 +133,6 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
         vec![Output::default(self.decoding.output_type())]
     }
 
-    fn source_type(&self) -> &'static str {
-        "aws_kinesis_firehose"
-    }
-
     fn resources(&self) -> Vec<Resource> {
         vec![Resource::tcp(self.address)]
     }
@@ -145,10 +140,6 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
     fn can_acknowledge(&self) -> bool {
         true
     }
-}
-
-inventory::submit! {
-    SourceDescription::new::<AwsKinesisFirehoseConfig>("aws_kinesis_firehose")
 }
 
 impl GenerateConfig for AwsKinesisFirehoseConfig {
@@ -226,7 +217,7 @@ mod tests {
     }
 
     async fn source(
-        access_key: Option<String>,
+        access_key: Option<SensitiveString>,
         record_compression: Option<Compression>,
         delivered: bool,
     ) -> (impl Stream<Item = Event> + Unpin, SocketAddr) {
@@ -483,7 +474,7 @@ mod tests {
 
     #[tokio::test]
     async fn aws_kinesis_firehose_rejects_bad_access_key() {
-        let (_rx, addr) = source(Some("an access key".to_string()), None, true).await;
+        let (_rx, addr) = source(Some("an access key".to_string().into()), None, true).await;
 
         let res = send(
             addr,

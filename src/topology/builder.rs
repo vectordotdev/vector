@@ -14,6 +14,7 @@ use tokio::{
     time::{timeout, Duration},
 };
 use tracing::Instrument;
+use vector_config::NamedComponent;
 use vector_core::{
     buffers::{
         topology::{
@@ -35,8 +36,9 @@ use super::{
 };
 use crate::{
     config::{
-        ComponentKey, DataType, Input, Output, OutputId, ProxyConfig, SinkContext, SourceContext,
-        TransformContext, TransformOuter,
+        ComponentKey, DataType, EnrichmentTableConfig, Input, Output, OutputId, ProxyConfig,
+        SinkConfig, SinkContext, SourceConfig, SourceContext, TransformConfig, TransformContext,
+        TransformOuter,
     },
     event::{EventArray, EventContainer},
     internal_events::EventsReceived,
@@ -76,7 +78,7 @@ pub(self) async fn load_enrichment_tables<'a>(
     'tables: for (name, table) in config.enrichment_tables.iter() {
         let table_name = name.to_string();
         if ENRICHMENT_TABLES.needs_reload(&table_name) {
-            let indexes = if !diff.enrichment_tables.contains_new(name) {
+            let indexes = if !diff.enrichment_tables.is_added(name) {
                 // If this is an existing enrichment table, we need to store the indexes to reapply
                 // them again post load.
                 Some(ENRICHMENT_TABLES.index_fields(&table_name))
@@ -156,20 +158,27 @@ pub async fn build_pieces(
     {
         debug!(component = %key, "Building new source.");
 
-        let typetag = source.inner.source_type();
+        let typetag = source.inner.get_component_name();
         let source_outputs = source.inner.outputs(config.schema.log_namespace());
 
         let span = error_span!(
             "source",
             component_kind = "source",
             component_id = %key.id(),
-            component_type = %source.inner.source_type(),
+            component_type = %source.inner.get_component_name(),
             // maintained for compatibility
             component_name = %key.id(),
         );
-        let task_name = format!(">> {} ({}, pump) >>", source.inner.source_type(), key.id());
+        let task_name = format!(
+            ">> {} ({}, pump) >>",
+            source.inner.get_component_name(),
+            key.id()
+        );
 
-        let mut builder = SourceSender::builder().with_buffer(*SOURCE_SENDER_BUFFER_SIZE);
+        let mut builder = {
+            let _span = span.enter();
+            SourceSender::builder().with_buffer(*SOURCE_SENDER_BUFFER_SIZE)
+        };
         let mut pumps = Vec::new();
         let mut controls = HashMap::new();
         let mut schema_definitions = HashMap::with_capacity(source_outputs.len());
@@ -329,10 +338,10 @@ pub async fn build_pieces(
         let healthcheck = sink.healthcheck();
         let enable_healthcheck = healthcheck.enabled && config.healthchecks.enabled;
 
-        let typetag = sink.inner.sink_type();
+        let typetag = sink.inner.get_component_name();
         let input_type = sink.inner.input().data_type();
 
-        if config.schema.enabled {
+        if config.schema.validation {
             // At this point, we've validated that all transforms are valid, including any
             // transform that mutates the schema provided by their sources. We can now validate the
             // schema expectations of each individual sink.
@@ -525,7 +534,7 @@ impl TransformNode {
     ) -> Self {
         Self {
             key,
-            typetag: transform.inner.transform_type(),
+            typetag: transform.inner.get_component_name(),
             inputs: transform.inputs.clone(),
             input_details: transform.inner.input(),
             outputs: transform.inner.outputs(schema_definition),
@@ -694,7 +703,7 @@ impl Runner {
                                 }
                                 outputs_buf
                             }.in_current_span());
-                            in_flight.push(task);
+                            in_flight.push_back(task);
                         }
                         None => {
                             shutting_down = true;

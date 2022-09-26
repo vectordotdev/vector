@@ -8,7 +8,7 @@ use codecs::{
     NewlineDelimitedDecoderConfig,
 };
 use http::StatusCode;
-use lookup::path;
+use lookup::event_path;
 use tokio_util::codec::Decoder as _;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
@@ -18,7 +18,7 @@ use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
-        SourceConfig, SourceContext, SourceDescription,
+        SourceConfig, SourceContext,
     },
     event::{Event, Value},
     serde::{bool_or_struct, default_decoding},
@@ -55,7 +55,7 @@ pub enum HttpMethod {
 }
 
 /// Configuration for the `http` source.
-#[configurable_component(source)]
+#[configurable_component(source("http"))]
 #[derive(Clone, Debug)]
 pub struct SimpleHttpConfig {
     /// The address to listen for connections on.
@@ -118,10 +118,6 @@ pub struct SimpleHttpConfig {
     acknowledgements: AcknowledgementsConfig,
 }
 
-inventory::submit! {
-    SourceDescription::new::<SimpleHttpConfig>("http")
-}
-
 impl GenerateConfig for SimpleHttpConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
@@ -179,10 +175,12 @@ impl HttpSource for SimpleHttpSource {
                 }
                 Ok(None) => break,
                 Err(error) => {
+                    // Error is logged / emitted by `crate::codecs::Decoder`, no further
+                    // handling is needed here
                     return Err(ErrorMessage::new(
                         StatusCode::BAD_REQUEST,
                         format!("Failed decoding body: {}", error),
-                    ))
+                    ));
                 }
             }
         }
@@ -204,7 +202,6 @@ impl HttpSource for SimpleHttpSource {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "http")]
 impl SourceConfig for SimpleHttpConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         if self.encoding.is_some() && (self.framing.is_some() || self.decoding.is_some()) {
@@ -267,10 +264,6 @@ impl SourceConfig for SimpleHttpConfig {
         )]
     }
 
-    fn source_type(&self) -> &'static str {
-        "http"
-    }
-
     fn resources(&self) -> Vec<Resource> {
         vec![Resource::tcp(self.address)]
     }
@@ -294,7 +287,7 @@ fn add_headers(events: &mut [Event], headers_config: &[String], headers: HeaderM
 
         for event in events.iter_mut() {
             event.as_mut_log().try_insert(
-                path!(header_name),
+                event_path!(header_name),
                 Value::from(value.map(Bytes::copy_from_slice)),
             );
         }
@@ -303,7 +296,7 @@ fn add_headers(events: &mut [Event], headers_config: &[String], headers: HeaderM
 
 #[cfg(test)]
 mod tests {
-    use lookup::path;
+    use lookup::event_path;
     use std::str::FromStr;
     use std::{collections::BTreeMap, io::Write, net::SocketAddr};
 
@@ -705,7 +698,10 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log.get(path!("dotted.key")).unwrap(), &Value::from("value"));
+            assert_eq!(
+                log.get(event_path!("dotted.key")).unwrap(),
+                &Value::from("value")
+            );
         }
         {
             let event = events.remove(0);

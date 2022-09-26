@@ -40,6 +40,8 @@ mod assert_eq;
 mod boolean;
 #[cfg(feature = "ceil")]
 mod ceil;
+#[cfg(feature = "chunks")]
+mod chunks;
 #[cfg(feature = "compact")]
 mod compact;
 #[cfg(feature = "contains")]
@@ -124,6 +126,10 @@ mod is_empty;
 mod is_float;
 #[cfg(feature = "is_integer")]
 mod is_integer;
+#[cfg(feature = "is_ipv4")]
+mod is_ipv4;
+#[cfg(feature = "is_ipv6")]
+mod is_ipv6;
 #[cfg(feature = "is_json")]
 mod is_json;
 #[cfg(feature = "is_null")]
@@ -140,6 +146,8 @@ mod is_string;
 mod is_timestamp;
 #[cfg(feature = "join")]
 mod join;
+#[cfg(feature = "keys")]
+mod keys;
 #[cfg(feature = "length")]
 mod length;
 #[cfg(feature = "log")]
@@ -166,6 +174,8 @@ mod match_datadog_query;
 mod md5;
 #[cfg(feature = "merge")]
 mod merge;
+#[cfg(feature = "mod")]
+mod mod_func;
 #[cfg(feature = "now")]
 mod now;
 #[cfg(feature = "object")]
@@ -302,6 +312,8 @@ mod unnest;
 mod upcase;
 #[cfg(feature = "uuid_v4")]
 mod uuid_v4;
+#[cfg(feature = "values")]
+mod values;
 
 // -----------------------------------------------------------------------------
 
@@ -315,6 +327,8 @@ pub use assert_eq::AssertEq;
 pub use boolean::Boolean;
 #[cfg(feature = "ceil")]
 pub use ceil::Ceil;
+#[cfg(feature = "chunks")]
+pub use chunks::Chunks;
 #[cfg(feature = "compact")]
 pub use compact::Compact;
 #[cfg(feature = "contains")]
@@ -399,6 +413,10 @@ pub use is_empty::IsEmpty;
 pub use is_float::IsFloat;
 #[cfg(feature = "is_integer")]
 pub use is_integer::IsInteger;
+#[cfg(feature = "is_ipv4")]
+pub use is_ipv4::IsIpv4;
+#[cfg(feature = "is_ipv6")]
+pub use is_ipv6::IsIpv6;
 #[cfg(feature = "is_json")]
 pub use is_json::IsJson;
 #[cfg(feature = "is_null")]
@@ -415,6 +433,8 @@ pub use is_string::IsString;
 pub use is_timestamp::IsTimestamp;
 #[cfg(feature = "join")]
 pub use join::Join;
+#[cfg(feature = "keys")]
+pub use keys::Keys;
 #[cfg(feature = "length")]
 pub use length::Length;
 #[cfg(feature = "log")]
@@ -431,6 +451,8 @@ pub use match_array::MatchArray;
 pub use match_datadog_query::MatchDatadogQuery;
 #[cfg(feature = "merge")]
 pub use merge::Merge;
+#[cfg(feature = "mod")]
+pub use mod_func::Mod;
 #[cfg(feature = "now")]
 pub use now::Now;
 #[cfg(feature = "object")]
@@ -567,6 +589,8 @@ pub use unnest::Unnest;
 pub use upcase::Upcase;
 #[cfg(feature = "uuid_v4")]
 pub use uuid_v4::UuidV4;
+#[cfg(feature = "values")]
+pub use values::Values;
 
 #[cfg(feature = "array")]
 pub use crate::array::Array;
@@ -590,6 +614,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Boolean),
         #[cfg(feature = "ceil")]
         Box::new(Ceil),
+        #[cfg(feature = "chunks")]
+        Box::new(Chunks),
         #[cfg(feature = "compact")]
         Box::new(Compact),
         #[cfg(feature = "contains")]
@@ -674,6 +700,10 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(IsFloat),
         #[cfg(feature = "is_integer")]
         Box::new(IsInteger),
+        #[cfg(feature = "is_ipv4")]
+        Box::new(IsIpv4),
+        #[cfg(feature = "is_ipv6")]
+        Box::new(IsIpv6),
         #[cfg(feature = "is_json")]
         Box::new(IsJson),
         #[cfg(feature = "is_null")]
@@ -690,6 +720,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(IsTimestamp),
         #[cfg(feature = "join")]
         Box::new(Join),
+        #[cfg(feature = "keys")]
+        Box::new(Keys),
         #[cfg(feature = "length")]
         Box::new(Length),
         #[cfg(feature = "log")]
@@ -710,6 +742,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Md5),
         #[cfg(feature = "merge")]
         Box::new(Merge),
+        #[cfg(feature = "mod")]
+        Box::new(Mod),
         #[cfg(feature = "now")]
         Box::new(Now),
         // We are not sure if this is the way we want to expose this functionality yet
@@ -848,5 +882,7 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Upcase),
         #[cfg(feature = "uuid_v4")]
         Box::new(UuidV4),
+        #[cfg(feature = "values")]
+        Box::new(Values),
     ]
 }

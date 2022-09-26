@@ -1,4 +1,7 @@
-use std::{iter::FromIterator, str::FromStr};
+use std::{
+    collections::{btree_map::Entry, BTreeMap},
+    str::FromStr,
+};
 
 use ::value::Value;
 use nom::{
@@ -32,7 +35,34 @@ pub(crate) fn parse_key_value(
         whitespace,
         standalone_key,
     )?;
-    Ok(Value::from_iter(values))
+
+    // Construct Value::Object by grouping values with the same key into an array.
+    // This logic depends on values not being arrays which is true for this parser.
+    let mut map = BTreeMap::new();
+    for (key, value) in values {
+        match map.entry(key) {
+            Entry::Vacant(entry) => {
+                entry.insert(value);
+            }
+            Entry::Occupied(mut entry) => {
+                if let Value::Boolean(true) = value {
+                    // We are done
+                } else {
+                    let existing = entry.get_mut();
+                    match existing {
+                        // A key without value
+                        Value::Boolean(true) => *existing = value,
+                        Value::Array(array) => array.push(value),
+                        _ => {
+                            let values = vec![std::mem::replace(existing, Value::Null), value];
+                            *existing = Value::Array(values);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(Value::Object(map))
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -97,14 +127,19 @@ impl Function for ParseKeyValue {
                 source: r#"parse_key_value!(s'foo=bar foobar', whitespace: "strict")"#,
                 result: Ok(r#"{"foo": "bar", "foobar": true}"#),
             },
+            Example {
+                title: "duplicate keys",
+                source: r#"parse_key_value!(s'foo=bar foo=nor', whitespace: "strict")"#,
+                result: Ok(r#"{"foo": ["bar", "nor"]}"#),
+            },
         ]
     }
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
@@ -128,39 +163,14 @@ impl Function for ParseKeyValue {
             .optional("accept_standalone_key")
             .unwrap_or_else(|| expr!(true));
 
-        Ok(Box::new(ParseKeyValueFn {
+        Ok(ParseKeyValueFn {
             value,
             key_value_delimiter,
             field_delimiter,
             whitespace,
             standalone_key,
-        }))
-    }
-
-    fn compile_argument(
-        &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        match (name, expr) {
-            ("whitespace", Some(expr)) => match expr.as_value() {
-                None => Ok(None),
-                Some(value) => Ok(Some(
-                    Whitespace::from_str(
-                        &value.try_bytes_utf8_lossy().expect("whitespace not bytes"),
-                    )
-                    .map(|whitespace| Box::new(whitespace) as Box<dyn std::any::Any + Send + Sync>)
-                    .map_err(|_| vrl::function::Error::InvalidEnumVariant {
-                        keyword: "whitespace",
-                        value,
-                        variants: Whitespace::all_value(),
-                    })?,
-                )),
-            },
-            _ => Ok(None),
         }
+        .as_expr())
     }
 }
 
@@ -219,7 +229,7 @@ pub(crate) struct ParseKeyValueFn {
     pub(crate) standalone_key: Box<dyn Expression>,
 }
 
-impl Expression for ParseKeyValueFn {
+impl FunctionExpression for ParseKeyValueFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?;
         let key_value_delimiter = self.key_value_delimiter.resolve(ctx)?;
@@ -236,8 +246,8 @@ impl Expression for ParseKeyValueFn {
         )
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
-        TypeDef::object(Collection::any()).fallible()
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
+        type_def()
     }
 }
 
@@ -445,6 +455,13 @@ fn parse_key<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
             ))(input)
         })
     }
+}
+
+fn type_def() -> TypeDef {
+    TypeDef::object(Collection::from_unknown(
+        Kind::boolean() | Kind::bytes() | Kind::array(Collection::from_unknown(Kind::bytes())),
+    ))
+    .fallible()
 }
 
 #[cfg(test)]
@@ -700,7 +717,7 @@ mod test {
                              bytes: "13",
                              tls_version: "tls1.1",
                              protocol: "http"})),
-            tdef: TypeDef::object(Collection::any()).fallible(),
+            tdef: type_def(),
         }
 
         logfmt {
@@ -712,7 +729,7 @@ mod test {
                              tag: "stopping_fetchers",
                              id: "ConsumerFetcherManager-1382721708341",
                              module: "kafka.consumer.ConsumerFetcherManager"})),
-            tdef: TypeDef::object(Collection::any()).fallible(),
+            tdef: type_def(),
         }
 
         // From https://github.com/vectordotdev/vector/issues/5347
@@ -730,7 +747,7 @@ mod test {
                              PolicyID: "3",
                              Action: "PERMIT",
                              Content: "Session Backout"})),
-            tdef: TypeDef::object(Collection::any()).fallible(),
+            tdef: type_def(),
         }
 
         strict {
@@ -741,7 +758,7 @@ mod test {
             want: Ok(value!({foo: "",
                              bar: "",
                              tar: "data"})),
-            tdef: TypeDef::object(Collection::any()).fallible(),
+            tdef: type_def(),
         }
 
         spaces {
@@ -751,7 +768,7 @@ mod test {
             ],
             want: Ok(value!({"zork one": r#"zoog\"zink\"zork"#,
                              nonk: "nink"})),
-            tdef: TypeDef::object(Collection::any()).fallible(),
+            tdef: type_def(),
         }
 
         delimited {
@@ -762,7 +779,7 @@ mod test {
             ],
             want: Ok(value!({"zork one": r#"zoog\"zink\"zork"#,
                              nonk: "nink"})),
-            tdef: TypeDef::object(Collection::any()).fallible(),
+            tdef: type_def(),
         }
 
         delimited_with_spaces {
@@ -773,7 +790,7 @@ mod test {
             ],
             want: Ok(value!({"zork one": r#"zoog\"zink\"zork"#,
                              nonk: "nink"})),
-            tdef: TypeDef::object(Collection::any()).fallible(),
+            tdef: type_def(),
         }
 
         multiple_chars {
@@ -784,7 +801,7 @@ mod test {
             ],
             want: Ok(value!({"zork one": r#"zoog\"zink\"zork"#,
                              nonk: "nink"})),
-            tdef: TypeDef::object(Collection::any()).fallible(),
+            tdef: type_def(),
         }
 
         error {
@@ -795,7 +812,7 @@ mod test {
                 accept_standalone_key: false,
             ],
             want: Err("0: at line 1, in Tag:\nI am not a valid line.\n                      ^\n\n1: at line 1, in ManyMN:\nI am not a valid line.\n                      ^\n\n"),
-            tdef: TypeDef::object(Collection::any()).fallible(),
+            tdef: type_def(),
         }
 
         // The following case demonstrates a scenario that could potentially be considered an
@@ -810,7 +827,7 @@ mod test {
             ],
             want: Ok(value!({zork: r#"zoog"#,
                              nonk: "nink norgle: noog"})),
-            tdef: TypeDef::object(Collection::any()).fallible(),
+            tdef: type_def(),
         }
 
         // If the value field is delimited and we miss the separator,
@@ -823,7 +840,7 @@ mod test {
             ],
             want: Ok(value!({zork: "zoog",
                              nonk: r#""nink" norgle: noog"#})),
-            tdef: TypeDef::object(Collection::any()).fallible(),
+            tdef: type_def(),
         }
 
         multi_line_with_quotes {
@@ -834,7 +851,7 @@ mod test {
             ],
             want: Ok(value!({"To": "tom",
                              "test": "\"tom\" test"})),
-            tdef: TypeDef::object(Collection::any()).fallible(),
+            tdef: type_def(),
         }
 
         multi_line_with_quotes_spaces {
@@ -845,7 +862,27 @@ mod test {
             ],
             want: Ok(value!({"To": "tom",
                              "test": "tom test"})),
-            tdef: TypeDef::object(Collection::any()).fallible(),
+            tdef: type_def(),
+        }
+
+        duplicate_keys {
+            args: func_args! [
+                value: r#"Cc:"tom" Cc:"bob""#,
+                key_value_delimiter: ":",
+                field_delimiter: " ",
+            ],
+            want: Ok(value!({"Cc": ["tom", "bob"]})),
+            tdef: type_def(),
+        }
+
+        duplicate_keys_no_value {
+            args: func_args! [
+                value: r#"Cc Cc:"bob""#,
+                key_value_delimiter: ":",
+                field_delimiter: " ",
+            ],
+            want: Ok(value!({"Cc": "bob"})),
+            tdef: type_def(),
         }
     ];
 }

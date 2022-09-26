@@ -149,6 +149,15 @@ pub struct RootOpts {
     /// Watch for changes in configuration file, and reload accordingly.
     #[clap(short, long, env = "VECTOR_WATCH_CONFIG")]
     pub watch_config: bool,
+
+    /// Set the internal log rate limit
+    #[clap(
+        short,
+        long,
+        env = "VECTOR_INTERNAL_LOG_RATE_LIMIT",
+        default_value = "10"
+    )]
+    pub internal_log_rate_limit: u64,
 }
 
 impl RootOpts {
@@ -178,6 +187,14 @@ pub enum SubCommand {
 
     /// Generate a Vector configuration containing a list of components.
     Generate(generate::Opts),
+
+    /// Generate the configuration schema for this version of Vector. (experimental)
+    ///
+    /// A JSON Schema document will be written to stdout that represents the valid schema for a
+    /// Vector configuration. This schema is based on the "full" configuration, such that for usages
+    /// where a configuration is split into multiple files, the schema would apply to those files
+    /// only when concatentated together.
+    GenerateSchema,
 
     /// Output a provided Vector configuration file/dir as a single JSON object, useful for checking in to version control.
     #[clap(hide = true)]
@@ -210,14 +227,14 @@ pub enum SubCommand {
     Vrl(vrl_cli::Opts),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Color {
     Auto,
     Always,
     Never,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LogFormat {
     Text,
     Json,

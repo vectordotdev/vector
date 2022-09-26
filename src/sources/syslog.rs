@@ -19,10 +19,7 @@ use crate::codecs::Decoder;
 #[cfg(unix)]
 use crate::sources::util::build_unix_stream_source;
 use crate::{
-    config::{
-        log_schema, DataType, GenerateConfig, Output, Resource, SourceConfig, SourceContext,
-        SourceDescription,
-    },
+    config::{log_schema, DataType, GenerateConfig, Output, Resource, SourceConfig, SourceContext},
     event::Event,
     internal_events::SyslogUdpReadError,
     shutdown::ShutdownSignal,
@@ -33,7 +30,7 @@ use crate::{
 };
 
 /// Configuration for the `syslog` source.
-#[configurable_component(source)]
+#[configurable_component(source("syslog"))]
 #[derive(Clone, Debug)]
 pub struct SyslogConfig {
     #[serde(flatten)]
@@ -50,7 +47,9 @@ pub struct SyslogConfig {
     /// If using TCP or UDP, the value will be the peer host's address, including the port i.e. `1.2.3.4:9000`. If using
     /// UDS, the value will be the socket path itself.
     ///
-    /// By default, the [global `host_key` option](https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key) is used.
+    /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
+    ///
+    /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     host_key: Option<String>,
 }
 
@@ -116,10 +115,6 @@ impl SyslogConfig {
     }
 }
 
-inventory::submit! {
-    SourceDescription::new::<SyslogConfig>("syslog")
-}
-
 impl GenerateConfig for SyslogConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
@@ -138,7 +133,6 @@ impl GenerateConfig for SyslogConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "syslog")]
 impl SourceConfig for SyslogConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let host_key = self
@@ -212,10 +206,6 @@ impl SourceConfig for SyslogConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "syslog"
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -313,7 +303,7 @@ pub fn udp(
 
         match out.send_event_stream(&mut stream).await {
             Ok(()) => {
-                info!("Finished sending.");
+                debug!("Finished sending.");
                 Ok(())
             }
             Err(error) => {
@@ -360,7 +350,7 @@ fn enrich_syslog_event(event: &mut Event, host_key: &str, default_host: Option<B
 
 #[cfg(test)]
 mod test {
-    use lookup::path;
+    use lookup::event_path;
     use std::{
         collections::{BTreeMap, HashMap},
         fmt,
@@ -748,8 +738,8 @@ mod test {
             expected.insert("appname", "liblogging-stdlog");
             expected.insert("origin.software", "rsyslogd");
             expected.insert("origin.swVersion", "8.24.0");
-            expected.insert(path!("origin", "x-pid"), "8979");
-            expected.insert(path!("origin", "x-info"), "http://www.rsyslog.com");
+            expected.insert(event_path!("origin", "x-pid"), "8979");
+            expected.insert(event_path!("origin", "x-info"), "http://www.rsyslog.com");
         }
 
         assert_event_data_eq!(event, expected);
@@ -780,8 +770,8 @@ mod test {
             expected.insert("appname", "liblogging-stdlog");
             expected.insert("origin.software", "rsyslogd");
             expected.insert("origin.swVersion", "8.24.0");
-            expected.insert(path!("origin", "x-pid"), "9043");
-            expected.insert(path!("origin", "x-info"), "http://www.rsyslog.com");
+            expected.insert(event_path!("origin", "x-pid"), "9043");
+            expected.insert(event_path!("origin", "x-info"), "http://www.rsyslog.com");
         }
 
         assert_event_data_eq!(
@@ -1129,7 +1119,7 @@ mod test {
     }
 
     #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
-    #[derive(Copy, Clone, Deserialize, PartialEq, Debug)]
+    #[derive(Copy, Clone, Deserialize, PartialEq, Eq, Debug)]
     pub enum Severity {
         #[serde(rename(deserialize = "emergency"))]
         LOG_EMERG,
@@ -1173,7 +1163,7 @@ mod test {
     }
 
     #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
-    #[derive(Copy, Clone, PartialEq, Deserialize, Debug)]
+    #[derive(Copy, Clone, PartialEq, Eq, Deserialize, Debug)]
     pub enum Facility {
         #[serde(rename(deserialize = "kernel"))]
         LOG_KERN = 0 << 3,

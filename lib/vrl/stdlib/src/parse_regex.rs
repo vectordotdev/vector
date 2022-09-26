@@ -1,6 +1,6 @@
 use ::value::Value;
 use regex::Regex;
-use vrl::{function::Error, prelude::*};
+use vrl::prelude::*;
 
 use crate::util;
 
@@ -44,9 +44,9 @@ impl Function for ParseRegex {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let pattern = arguments.required_regex("pattern")?;
@@ -54,11 +54,12 @@ impl Function for ParseRegex {
             .optional("numeric_groups")
             .unwrap_or_else(|| expr!(false));
 
-        Ok(Box::new(ParseRegexFn {
+        Ok(ParseRegexFn {
             value,
             pattern,
             numeric_groups,
-        }))
+        }
+        .as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -84,32 +85,6 @@ impl Function for ParseRegex {
             },
         ]
     }
-
-    fn compile_argument(
-        &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        match (name, expr) {
-            ("pattern", Some(expr)) => {
-                let regex: regex::Regex = match expr {
-                    expression::Expr::Literal(expression::Literal::Regex(regex)) => {
-                        Ok((**regex).clone())
-                    }
-                    expr => Err(Error::UnexpectedExpression {
-                        keyword: "pattern",
-                        expected: "regex",
-                        expr: expr.clone(),
-                    }),
-                }?;
-
-                Ok(Some(Box::new(regex) as _))
-            }
-            _ => Ok(None),
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -119,7 +94,7 @@ pub(crate) struct ParseRegexFn {
     numeric_groups: Box<dyn Expression>,
 }
 
-impl Expression for ParseRegexFn {
+impl FunctionExpression for ParseRegexFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let numeric_groups = self.numeric_groups.resolve(ctx)?;
@@ -128,7 +103,7 @@ impl Expression for ParseRegexFn {
         parse_regex(value, numeric_groups.try_boolean()?, pattern)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::object(util::regex_kind(&self.pattern)).fallible()
     }
 }

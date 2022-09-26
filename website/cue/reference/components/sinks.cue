@@ -36,7 +36,7 @@ components: sinks: [Name=string]: {
 						options: {
 							max_bytes: {
 								common:      true
-								description: "The maximum size of a batch, in bytes, before it is flushed."
+								description: "The maximum size of a batch that will be processed by a sink. This is based on the uncompressed size of the batched events, before they are serialized / compressed."
 								required:    false
 								type: uint: {
 									default: features.send.batch.max_bytes | *null
@@ -136,6 +136,7 @@ components: sinks: [Name=string]: {
 					description: """
 						The compression strategy used to compress the encoded event data before transmission.
 
+						The default compression level of the chosen algorithm is used.
 						Some cloud storage API clients and browsers will handle decompression transparently,
 						so files may not always appear to be compressed depending how they are accessed.
 						"""
@@ -148,7 +149,7 @@ components: sinks: [Name=string]: {
 									none: "No compression."
 								}
 								if algo == "gzip" {
-									gzip: "[Gzip](\(urls.gzip)) standard DEFLATE compression."
+									gzip: "[Gzip](\(urls.gzip)) standard DEFLATE compression. Compression level is `6` unless otherwise specified."
 								}
 								if algo == "snappy" {
 									snappy: "[Snappy](\(urls.snappy)) compression."
@@ -157,7 +158,7 @@ components: sinks: [Name=string]: {
 									lz4: "[lz4](\(urls.lz4)) compression."
 								}
 								if algo == "zstd" {
-									zstd: "[zstd](\(urls.zstd)) compression."
+									zstd: "[zstd](\(urls.zstd)) compression. Compression level is `3` unless otherwise specified. Dictionaries are not supported."
 								}
 							}
 						}
@@ -192,6 +193,9 @@ components: sinks: [Name=string]: {
 											}
 											if codec == "json" {
 												json: "JSON encoded event."
+											}
+											if codec == "gelf" {
+												gelf: "[GELF](https://docs.graylog.org/docs/gelf) encoded event."
 											}
 											if codec == "avro" {
 												avro: "Avro encoded event with a given schema."
@@ -515,6 +519,7 @@ components: sinks: [Name=string]: {
 					can_verify_certificate: features.send.tls.can_verify_certificate
 					can_verify_hostname:    features.send.tls.can_verify_hostname
 					enabled_default:        features.send.tls.enabled_default
+					enabled_by_scheme:      features.send.tls.enabled_by_scheme
 				}}
 			}
 		}

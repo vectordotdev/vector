@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use ::value::Value;
-use vrl::{function::Error, prelude::*};
+use vrl::prelude::*;
 
 fn to_unix_timestamp(value: Value, unit: Unit) -> Resolved {
     let ts = value.try_timestamp()?;
@@ -58,9 +58,9 @@ impl Function for ToUnixTimestamp {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
@@ -72,34 +72,7 @@ impl Function for ToUnixTimestamp {
             })
             .unwrap_or_default();
 
-        Ok(Box::new(ToUnixTimestampFn { value, unit }))
-    }
-
-    fn compile_argument(
-        &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        match (name, expr) {
-            ("unit", Some(expr)) => match expr.as_value() {
-                None => Ok(None),
-                Some(value) => {
-                    let s = value.try_bytes_utf8_lossy().expect("unit not bytes");
-                    Ok(Some(
-                        Unit::from_str(&s)
-                            .map(|unit| Box::new(unit) as Box<dyn std::any::Any + Send + Sync>)
-                            .map_err(|_| Error::InvalidEnumVariant {
-                                keyword: "unit",
-                                value,
-                                variants: Unit::all_value(),
-                            })?,
-                    ))
-                }
-            },
-            _ => Ok(None),
-        }
+        Ok(ToUnixTimestampFn { value, unit }.as_expr())
     }
 }
 
@@ -158,7 +131,7 @@ struct ToUnixTimestampFn {
     unit: Unit,
 }
 
-impl Expression for ToUnixTimestampFn {
+impl FunctionExpression for ToUnixTimestampFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let unit = self.unit;
@@ -166,7 +139,7 @@ impl Expression for ToUnixTimestampFn {
         to_unix_timestamp(value, unit)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::integer().infallible()
     }
 }

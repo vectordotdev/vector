@@ -3,14 +3,15 @@ use codecs::JsonSerializerConfig;
 use futures::StreamExt;
 use futures_util::stream::BoxStream;
 use indoc::indoc;
-use serde::{Deserialize, Serialize};
+use vector_common::sensitive_string::SensitiveString;
+use vector_config::configurable_component;
 use vector_core::{sink::StreamSink, transform::Transform};
 
 use super::{host_key, logs::HumioLogsConfig};
 use crate::{
     config::{
-        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
-        TransformConfig, TransformContext,
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, TransformConfig,
+        TransformContext,
     },
     event::{Event, EventArray, EventContainer},
     sinks::{
@@ -23,48 +24,93 @@ use crate::{
     transforms::{metric_to_log::MetricToLogConfig, OutputBuffer},
 };
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+/// Configuration for the `humio_metrics` sink.
+//
+// TODO: This sink overlaps almost entirely with the `humio_logs` sink except for the metric-to-log
+// transform that it uses to get metrics into the shape of a log before sending to Humio. However,
+// due to issues with aliased fields and flattened fields [1] in `serde`, we can't embed the
+// `humio_logs` config here.
+//
+// [1]: https://github.com/serde-rs/serde/issues/1504
+#[configurable_component(sink("humio_metrics"))]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-struct HumioMetricsConfig {
+pub struct HumioMetricsConfig {
     #[serde(flatten)]
     transform: MetricToLogConfig,
-    token: String,
-    // Deprecated name
+
+    /// The Humio ingestion token.
+    token: SensitiveString,
+
+    /// The base URL of the Humio instance.
     #[serde(alias = "host")]
-    pub(in crate::sinks::humio) endpoint: Option<String>,
+    pub(super) endpoint: Option<String>,
+
+    /// The source of events sent to this sink.
+    ///
+    /// Typically the filename the metrics originated from. Maps to `@source` in Humio.
+    #[configurable(metadata(templateable))]
     source: Option<Template>,
+
+    /// The type of events sent to this sink. Humio uses this as the name of the parser to use to ingest the data.
+    ///
+    /// If unset, Humio will default it to none.
+    #[configurable(metadata(templateable))]
     event_type: Option<Template>,
+
+    /// Overrides the name of the log field used to grab the hostname to send to Humio.
+    ///
+    /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
+    ///
+    /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     #[serde(default = "host_key")]
     host_key: String,
+
+    /// Event fields to be added to Humio’s extra fields.
+    ///
+    /// Can be used to tag events by specifying fields starting with `#`.
+    ///
+    /// For more information, see [Humio’s Format of Data][humio_data_format].
+    ///
+    /// [humio_data_format]: https://docs.humio.com/integrations/data-shippers/hec/#format-of-data
     #[serde(default)]
     indexed_fields: Vec<String>,
+
+    /// Optional name of the repository to ingest into.
+    ///
+    /// In public-facing APIs, this must (if present) be equal to the repository used to create the ingest token used for authentication.
+    ///
+    /// In private cluster setups, Humio can be configured to allow these to be different.
+    ///
+    /// For more information, see [Humio’s Format of Data][humio_data_format].
+    ///
+    /// [humio_data_format]: https://docs.humio.com/integrations/data-shippers/hec/#format-of-data
+    #[configurable(metadata(templateable))]
     #[serde(default)]
     index: Option<Template>,
+
+    #[configurable(derived)]
     #[serde(default)]
     compression: Compression,
+
+    #[configurable(derived)]
     #[serde(default)]
     request: TowerRequestConfig,
+
+    #[configurable(derived)]
     #[serde(default)]
     batch: BatchConfig<SplunkHecDefaultBatchSettings>,
+
+    #[configurable(derived)]
     tls: Option<TlsConfig>,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     acknowledgements: AcknowledgementsConfig,
-    // The above settings are copied from HumioLogsConfig. In theory we should do below:
-    //
-    // #[serde(flatten)]
-    // sink: HumioLogsConfig,
-    //
-    // However there is an issue in serde (https://github.com/serde-rs/serde/issues/1504) with aliased
-    // fields in flattened structs which interferes with the host field alias.
-    // Until that issue is fixed, we will have to just copy the fields instead.
-}
-
-inventory::submit! {
-    SinkDescription::new::<HumioMetricsConfig>("humio_metrics")
 }
 
 impl GenerateConfig for HumioMetricsConfig {
@@ -78,7 +124,6 @@ impl GenerateConfig for HumioMetricsConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "humio_metrics")]
 impl SinkConfig for HumioMetricsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let transform = self
@@ -120,12 +165,8 @@ impl SinkConfig for HumioMetricsConfig {
         Input::metric()
     }
 
-    fn sink_type(&self) -> &'static str {
-        "humio_metrics"
-    }
-
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 

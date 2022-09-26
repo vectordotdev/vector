@@ -1,9 +1,10 @@
 ///! Contains backwards compatibility with lookup "v1"
-use crate::lookup_v2::{BorrowedSegment, Path};
-use crate::{LookupBuf, SegmentBuf};
+///! This is all temporary and will be deleted when migration to the V2 lookup code is complete.
+use crate::lookup_v2::{BorrowedSegment, OwnedSegment, OwnedValuePath, ValuePath};
+use crate::{FieldBuf, LookupBuf, SegmentBuf};
 use std::borrow::Cow;
 
-impl<'a> Path<'a> for &'a LookupBuf {
+impl<'a> ValuePath<'a> for &'a LookupBuf {
     type Iter = LookupBufPathIter<'a>;
 
     fn segment_iter(&self) -> Self::Iter {
@@ -15,6 +16,52 @@ impl<'a> Path<'a> for &'a LookupBuf {
     }
 }
 
+impl From<LookupBuf> for OwnedValuePath {
+    fn from(lookup: LookupBuf) -> Self {
+        let segments = lookup
+            .segments
+            .into_iter()
+            .map(|segment| match segment {
+                SegmentBuf::Field(field) => OwnedSegment::Field(field.name),
+                SegmentBuf::Index(i) => OwnedSegment::Index(i),
+                SegmentBuf::Coalesce(fields) => {
+                    let fields = fields.into_iter().map(|field| field.name).collect();
+                    OwnedSegment::Coalesce(fields)
+                }
+            })
+            .collect();
+        Self { segments }
+    }
+}
+
+// This should only be used if the `OwnedPath` has already been verified to be valid.
+impl From<OwnedValuePath> for LookupBuf {
+    fn from(path: OwnedValuePath) -> Self {
+        let segments = path
+            .segments
+            .into_iter()
+            .map(|segment| match segment {
+                OwnedSegment::Field(field) => SegmentBuf::Field(FieldBuf::from(field)),
+                OwnedSegment::Index(i) => SegmentBuf::Index(i),
+                OwnedSegment::Coalesce(fields) => {
+                    let fields = fields.into_iter().map(FieldBuf::from).collect();
+                    SegmentBuf::Coalesce(fields)
+                }
+                OwnedSegment::Invalid => {
+                    // eventually "Invalid" will be removed from `OwnedPath`, but until then
+                    // this compatibility layer should only be used where OwnedPath can never be Invalid
+                    // (such as after being converted directly from a LookupBuf)
+                    unreachable!(
+                        "compatibility layer shouldn't be used if OwnedPath can be invalid!"
+                    )
+                }
+            })
+            .collect();
+        LookupBuf::from_segments(segments)
+    }
+}
+
+#[derive(Clone)]
 pub struct LookupBufPathIter<'a> {
     buf: &'a LookupBuf,
     segment_i: usize,
@@ -56,7 +103,7 @@ impl<'a> Iterator for LookupBufPathIter<'a> {
 
 #[cfg(test)]
 mod test {
-    use crate::lookup_v2::Path;
+    use crate::lookup_v2::ValuePath;
     use crate::LookupBuf;
 
     #[test]
@@ -73,7 +120,7 @@ mod test {
 
         for test in tests {
             let lookup_buf = LookupBuf::from_str(test).unwrap();
-            if !Path::eq(&test, &lookup_buf) {
+            if !ValuePath::eq(&test, &lookup_buf) {
                 panic!("Equality failed. Path={:?}", test);
             }
         }

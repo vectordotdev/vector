@@ -1,4 +1,4 @@
-use crate::lookup_v2::{OwnedSegment, Path};
+use crate::lookup_v2::ValuePath;
 use std::borrow::Cow;
 use std::iter::Cloned;
 use std::slice::Iter;
@@ -48,21 +48,7 @@ impl From<isize> for BorrowedSegment<'_> {
     }
 }
 
-impl<'a, 'b: 'a> From<&'b OwnedSegment> for BorrowedSegment<'a> {
-    fn from(segment: &'b OwnedSegment) -> Self {
-        match segment {
-            OwnedSegment::Field(field) => BorrowedSegment::Field(field.as_str().into()),
-            OwnedSegment::Index(value) => BorrowedSegment::Index(*value),
-            OwnedSegment::Invalid => BorrowedSegment::Invalid,
-            OwnedSegment::CoalesceField(field) => {
-                BorrowedSegment::CoalesceField(field.as_str().into())
-            }
-            OwnedSegment::CoalesceEnd(field) => BorrowedSegment::CoalesceEnd(field.as_str().into()),
-        }
-    }
-}
-
-impl<'a, 'b> Path<'a> for &'b Vec<BorrowedSegment<'a>> {
+impl<'a, 'b> ValuePath<'a> for &'b Vec<BorrowedSegment<'a>> {
     type Iter = Cloned<Iter<'b, BorrowedSegment<'a>>>;
 
     fn segment_iter(&self) -> Self::Iter {
@@ -70,7 +56,7 @@ impl<'a, 'b> Path<'a> for &'b Vec<BorrowedSegment<'a>> {
     }
 }
 
-impl<'a, 'b> Path<'a> for &'b [BorrowedSegment<'a>] {
+impl<'a, 'b> ValuePath<'a> for &'b [BorrowedSegment<'a>] {
     type Iter = Cloned<Iter<'b, BorrowedSegment<'a>>>;
 
     fn segment_iter(&self) -> Self::Iter {
@@ -78,7 +64,7 @@ impl<'a, 'b> Path<'a> for &'b [BorrowedSegment<'a>] {
     }
 }
 
-impl<'a, 'b, const A: usize> Path<'a> for &'b [BorrowedSegment<'a>; A] {
+impl<'a, 'b, const A: usize> ValuePath<'a> for &'b [BorrowedSegment<'a>; A] {
     type Iter = Cloned<Iter<'b, BorrowedSegment<'a>>>;
 
     fn segment_iter(&self) -> Self::Iter {

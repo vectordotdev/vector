@@ -1,6 +1,6 @@
 use crate::{gelf_fields::*, VALID_FIELD_REGEX};
 use bytes::{BufMut, BytesMut};
-use lookup::path;
+use lookup::event_path;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tokio_util::codec::Encoder;
@@ -209,7 +209,7 @@ fn to_gelf_event(log: LogEvent) -> vector_core::Result<LogEvent> {
         coerce_field_names_and_values(log).map(|(mut log, missing_prefix)| {
             // rename additional fields that were flagged as missing the underscore prefix
             for field in missing_prefix {
-                log.rename_key(path!(field.as_str()), format!("_{}", &field).as_str());
+                log.rename_key(event_path!(field.as_str()), format!("_{}", &field).as_str());
             }
             log
         })

@@ -16,7 +16,7 @@ components: sinks: prometheus_exporter: {
 	}
 
 	features: {
-		acknowledgements: false
+		acknowledgements: true
 		healthcheck: enabled: false
 		exposes: {
 			tls: {
@@ -66,6 +66,10 @@ components: sinks: prometheus_exporter: {
 				examples: ["0.0.0.0:\(_port)"]
 			}
 		}
+		auth: configuration._http_auth & {_args: {
+			password_example: "${PROMETHEUS_PASSWORD}"
+			username_example: "${PROMETHEUS_USERNAME}"
+		}}
 		buckets: {
 			common:      false
 			description: """
@@ -128,7 +132,7 @@ components: sinks: prometheus_exporter: {
 			common:      false
 			description: "Whether or not to strip metric timestamp in the response."
 			required:    false
-			type: bool: default: true
+			type: bool: default: false
 		}
 	}
 
@@ -368,7 +372,7 @@ components: sinks: prometheus_exporter: {
 		memory_usage: {
 			title: "Memory Usage"
 			body: """
-				Like other Prometheus instances, the `prometheus` sink aggregates
+				Like other Prometheus instances, the `prometheus_exporter` sink aggregates
 				metrics in memory which keeps the memory footprint to a minimum if Prometheus
 				fails to scrape the Vector instance over an extended period of time. The
 				downside is that data will be lost if Vector is restarted. This is by design of

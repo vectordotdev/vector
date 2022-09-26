@@ -5,6 +5,9 @@ RUN apt-get update && \
     libsasl2-dev libstdc++-10-dev libssl-dev libxxhash-dev zlib1g-dev zlib1g && \
 		rm -rf /var/lib/apt/lists/*
 
+COPY scripts/environment/install-protoc.sh .
+RUN bash ./install-protoc.sh
+
 # Build mold, a fast linker
 RUN git clone https://github.com/rui314/mold.git && cd mold && git checkout v1.2.1 && make -j"$(nproc)" && make install
 

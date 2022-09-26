@@ -3,17 +3,14 @@ use futures::{FutureExt, SinkExt};
 use http::{Request, Uri};
 use hyper::Body;
 use indoc::indoc;
-use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
+use vector_config::configurable_component;
 
 use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
-    config::{
-        AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
-        SinkDescription,
-    },
+    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     event::Event,
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope, PUBSUB_URL},
     http::HttpClient,
@@ -46,34 +43,45 @@ impl SinkBatchSettings for PubsubDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 1.0;
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the `gcp_pubsub` sink.
+#[configurable_component(sink("gcp_pubsub"))]
+#[derive(Clone, Debug)]
 pub struct PubsubConfig {
+    /// The project name to which to publish events.
     pub project: String,
+
+    /// The topic within the project to which to publish events.
     pub topic: String,
+
+    /// The endpoint to which to publish events.
     #[serde(default)]
     pub endpoint: Option<String>,
+
     #[serde(default, flatten)]
     pub auth: GcpAuthConfig,
 
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<PubsubDefaultBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    #[configurable(derived)]
     encoding: EncodingConfig,
 
+    #[configurable(derived)]
     #[serde(default)]
     pub tls: Option<TlsConfig>,
 
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     acknowledgements: AcknowledgementsConfig,
-}
-
-inventory::submit! {
-    SinkDescription::new::<PubsubConfig>("gcp_pubsub")
 }
 
 impl GenerateConfig for PubsubConfig {
@@ -88,7 +96,6 @@ impl GenerateConfig for PubsubConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "gcp_pubsub")]
 impl SinkConfig for PubsubConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink = PubsubSink::from_config(self).await?;
@@ -119,12 +126,8 @@ impl SinkConfig for PubsubConfig {
         Input::new(self.encoding.config().input_type() & DataType::Log)
     }
 
-    fn sink_type(&self) -> &'static str {
-        "gcp_pubsub"
-    }
-
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
@@ -250,6 +253,7 @@ mod tests {
 mod integration_tests {
     use codecs::JsonSerializerConfig;
     use reqwest::{Client, Method, Response};
+    use serde::{Deserialize, Serialize};
     use serde_json::{json, Value};
     use vector_core::event::{BatchNotifier, BatchStatus};
 

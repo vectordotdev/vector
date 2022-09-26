@@ -2,8 +2,9 @@ use std::{convert::TryInto, sync::Arc};
 
 use azure_storage_blobs::prelude::*;
 use codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
-use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
+use vector_common::sensitive_string::SensitiveString;
+use vector_config::configurable_component;
 
 use super::request_builder::AzureBlobRequestOptions;
 use crate::{
@@ -22,23 +23,88 @@ use crate::{
     Result,
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the `azure_blob` sink.
+#[configurable_component(sink("azure_blob"))]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct AzureBlobSinkConfig {
-    pub connection_string: Option<String>,
-    pub storage_account: Option<String>,
+    /// The Azure Blob Storage Account connection string.
+    ///
+    /// Authentication with access key is the only supported authentication method.
+    ///
+    /// Either `storage_account`, or this field, must be specified.
+    pub connection_string: Option<SensitiveString>,
+
+    /// The Azure Blob Storage Account name.
+    ///
+    /// Attempts to load credentials for the account in the following ways, in order:
+    ///
+    /// - read from environment variables ([more information][env_cred_docs])
+    /// - looks for a [Managed Identity][managed_ident_docs]
+    /// - uses the `az` CLI tool to get an access token ([more information][az_cli_docs])
+    ///
+    /// Either `connection_string`, or this field, must be specified.
+    ///
+    /// [env_cred_docs]: https://docs.rs/azure_identity/latest/azure_identity/struct.EnvironmentCredential.html
+    /// [managed_ident_docs]: https://docs.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/overview
+    /// [az_cli_docs]: https://docs.microsoft.com/en-us/cli/azure/account?view=azure-cli-latest#az-account-get-access-token
+    pub storage_account: Option<SensitiveString>,
+
+    /// The Azure Blob Storage Account container name.
     pub(super) container_name: String,
+
+    /// A prefix to apply to all blob keys.
+    ///
+    /// Prefixes are useful for partitioning objects, such as by creating an blob key that
+    /// stores blobs under a particular "directory". If using a prefix for this purpose, it must end
+    /// in `/` in order to act as a directory path: Vector will **not** add a trailing `/` automatically.
     pub blob_prefix: Option<String>,
+
+    /// The timestamp format for the time component of the blob key.
+    ///
+    /// By default, blob keys are appended with a timestamp that reflects when the blob are sent to
+    /// Azure Blob Storage, such that the resulting blob key is functionally equivalent to joining
+    /// the blob prefix with the formatted timestamp, such as `date=2022-07-18/1658176486`.
+    ///
+    /// This would represent a `blob_prefix` set to `date=%F/` and the timestamp of Mon Jul 18 2022
+    /// 20:34:44 GMT+0000, with the `filename_time_format` being set to `%s`, which renders
+    /// timestamps in seconds since the Unix epoch.
+    ///
+    /// Supports the common [`strftime`][chrono_strftime_specifiers] specifiers found in most
+    /// languages.
+    ///
+    /// When set to an empty string, no timestamp will be appended to the blob prefix.
+    ///
+    /// [chrono_strftime_specifiers]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
     pub blob_time_format: Option<String>,
+
+    /// Whether or not to append a UUID v4 token to the end of the blob key.
+    ///
+    /// The UUID is appended to the timestamp portion of the object key, such that if the blob key
+    /// being generated was `date=2022-07-18/1658176486`, setting this field to `true` would result
+    /// in an blob key that looked like
+    /// `date=2022-07-18/1658176486-30f6652c-71da-4f9f-800d-a1189c47c547`.
+    ///
+    /// This ensures there are no name collisions, and can be useful in high-volume workloads where
+    /// blob keys must be unique.
     pub blob_append_uuid: Option<bool>,
+
     #[serde(flatten)]
     pub encoding: EncodingConfigWithFraming,
+
+    #[configurable(derived)]
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<BulkSizeBasedDefaultBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -50,8 +116,8 @@ pub struct AzureBlobSinkConfig {
 impl GenerateConfig for AzureBlobSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            connection_string: Some(String::from("DefaultEndpointsProtocol=https;AccountName=some-account-name;AccountKey=some-account-key;")),
-            storage_account: Some(String::from("some-account-name")),
+            connection_string: Some(String::from("DefaultEndpointsProtocol=https;AccountName=some-account-name;AccountKey=some-account-key;").into()),
+            storage_account: Some(String::from("some-account-name").into()),
             container_name: String::from("logs"),
             blob_prefix: Some(String::from("blob")),
             blob_time_format: Some(String::from("%s")),
@@ -67,12 +133,11 @@ impl GenerateConfig for AzureBlobSinkConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "azure_blob")]
 impl SinkConfig for AzureBlobSinkConfig {
     async fn build(&self, _cx: SinkContext) -> Result<(VectorSink, Healthcheck)> {
         let client = azure_common::config::build_client(
-            self.connection_string.clone(),
-            self.storage_account.clone(),
+            self.connection_string.as_ref().map(|v| v.to_string()),
+            self.storage_account.as_ref().map(|v| v.to_string()),
             self.container_name.clone(),
         )?;
 
@@ -88,12 +153,8 @@ impl SinkConfig for AzureBlobSinkConfig {
         Input::new(self.encoding.config().1.input_type() & DataType::Log)
     }
 
-    fn sink_type(&self) -> &'static str {
-        "azure_blob"
-    }
-
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 

@@ -4,7 +4,10 @@ use value::Kind;
 pub(super) use crate::schema::Definition;
 
 use crate::{
-    config::{ComponentKey, Config, Output, OutputId, SinkOuter},
+    config::{
+        ComponentKey, Config, Output, OutputId, SinkConfig, SinkOuter, SourceConfig,
+        TransformConfig,
+    },
     topology,
 };
 
@@ -45,7 +48,7 @@ pub fn merged_definition(
         return definition.clone();
     }
 
-    let mut definition = Definition::new(Kind::never(), []);
+    let mut definition = Definition::new(Kind::never(), Kind::never(), []);
 
     for input in inputs {
         let key = &input.component;
@@ -300,12 +303,7 @@ pub trait ComponentContainer {
 }
 
 fn get_output_for_port(outputs: Vec<Output>, port: &Option<String>) -> Option<Output> {
-    for output in outputs {
-        if &output.port == port {
-            return Some(output);
-        }
-    }
-    None
+    outputs.into_iter().find(|output| &output.port == port)
 }
 
 impl ComponentContainer for Config {

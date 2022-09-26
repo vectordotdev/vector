@@ -2,12 +2,12 @@ use bytes::{BufMut, Bytes, BytesMut};
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
-use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
+use vector_config::configurable_component;
 
 use crate::{
     codecs::Transformer,
-    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     event::Event,
     http::{Auth, HttpClient, HttpError, MaybeAuth},
     sinks::util::{
@@ -19,29 +19,51 @@ use crate::{
     tls::{TlsConfig, TlsSettings},
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+/// Configuration for the `clickhouse` sink.
+#[configurable_component(sink("clickhouse"))]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ClickhouseConfig {
-    // Deprecated name
+    /// The endpoint of the Clickhouse server.
     #[serde(alias = "host")]
     pub endpoint: UriSerde,
+
+    /// The table that data will be inserted into.
     pub table: String,
+
+    /// The database that contains the table that data will be inserted into.
     pub database: Option<String>,
+
+    /// Sets `input_format_skip_unknown_fields`, allowing Clickhouse to discard fields not present in the table schema.
     #[serde(default)]
     pub skip_unknown_fields: bool,
+
+    #[configurable(derived)]
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
+
+    #[configurable(derived)]
     #[serde(
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub encoding: Transformer,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
+
+    #[configurable(derived)]
     pub auth: Option<Auth>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -50,14 +72,9 @@ pub struct ClickhouseConfig {
     acknowledgements: AcknowledgementsConfig,
 }
 
-inventory::submit! {
-    SinkDescription::new::<ClickhouseConfig>("clickhouse")
-}
-
 impl_generate_config_from_default!(ClickhouseConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "clickhouse")]
 impl SinkConfig for ClickhouseConfig {
     async fn build(
         &self,
@@ -92,12 +109,8 @@ impl SinkConfig for ClickhouseConfig {
         Input::log()
     }
 
-    fn sink_type(&self) -> &'static str {
-        "clickhouse"
-    }
-
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
@@ -302,6 +315,7 @@ mod integration_tests {
         future::{ok, ready},
         stream,
     };
+    use serde::Deserialize;
     use serde_json::Value;
     use tokio::time::{timeout, Duration};
     use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};

@@ -1,12 +1,12 @@
 use std::{collections::BTreeMap, convert::TryFrom, num::ParseFloatError};
 
+use chrono::Utc;
 use indexmap::IndexMap;
 use vector_config::configurable_component;
 
 use crate::{
     config::{
         log_schema, DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
-        TransformDescription,
     },
     event::{
         metric::{Metric, MetricKind, MetricValue, StatisticKind},
@@ -14,7 +14,7 @@ use crate::{
     },
     internal_events::{
         LogToMetricFieldNullError, LogToMetricParseFloatError, LogToMetricTemplateParseError,
-        ParserMissingFieldError,
+        ParserMissingFieldError, DROP_EVENT,
     },
     schema,
     template::{Template, TemplateParseError, TemplateRenderingError},
@@ -22,7 +22,7 @@ use crate::{
 };
 
 /// Configuration for the `log_to_metric` transform.
-#[configurable_component(transform)]
+#[configurable_component(transform("log_to_metric"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct LogToMetricConfig {
@@ -179,10 +179,6 @@ pub struct LogToMetric {
     config: LogToMetricConfig,
 }
 
-inventory::submit! {
-    TransformDescription::new::<LogToMetricConfig>("log_to_metric")
-}
-
 impl GenerateConfig for LogToMetricConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
@@ -200,7 +196,6 @@ impl GenerateConfig for LogToMetricConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "log_to_metric")]
 impl TransformConfig for LogToMetricConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(LogToMetric::new(self.clone())))
@@ -216,10 +211,6 @@ impl TransformConfig for LogToMetricConfig {
 
     fn enable_concurrency(&self) -> bool {
         true
-    }
-
-    fn transform_type(&self) -> &'static str {
-        "log_to_metric"
     }
 }
 
@@ -289,7 +280,8 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
     let timestamp = log
         .get(log_schema().timestamp_key())
         .and_then(Value::as_timestamp)
-        .cloned();
+        .cloned()
+        .or_else(|| Some(Utc::now()));
     let metadata = event.metadata().clone();
 
     let field = config.field();
@@ -465,9 +457,11 @@ impl FunctionTransform for LogToMetric {
                 Err(TransformError::FieldNull { field }) => emit!(LogToMetricFieldNullError {
                     field: field.as_ref()
                 }),
-                Err(TransformError::FieldNotFound { field }) => emit!(ParserMissingFieldError {
-                    field: field.as_ref()
-                }),
+                Err(TransformError::FieldNotFound { field }) => {
+                    emit!(ParserMissingFieldError::<DROP_EVENT> {
+                        field: field.as_ref()
+                    })
+                }
                 Err(TransformError::ParseFloatError { field, error }) => {
                     emit!(LogToMetricParseFloatError {
                         field: field.as_ref(),

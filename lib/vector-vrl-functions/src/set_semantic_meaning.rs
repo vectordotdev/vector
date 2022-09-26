@@ -1,14 +1,15 @@
 use std::ops::{Deref, DerefMut};
 
 use ::value::Value;
-use lookup::LookupBuf;
+use lookup::OwnedValuePath;
+use vrl::state::TypeState;
 use vrl::{diagnostic::Label, prelude::*};
 
 #[derive(Debug, Default, Clone)]
-pub struct MeaningList(pub BTreeMap<String, LookupBuf>);
+pub struct MeaningList(pub BTreeMap<String, OwnedValuePath>);
 
 impl Deref for MeaningList {
-    type Target = BTreeMap<String, LookupBuf>;
+    type Target = BTreeMap<String, OwnedValuePath>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -54,9 +55,9 @@ impl Function for SetSemanticMeaning {
 
     fn compile(
         &self,
-        (_, state): (&mut state::LocalEnv, &mut state::ExternalEnv),
+        state: &TypeState,
         ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let span = ctx.span();
         let query = arguments.required_query("target")?;
@@ -94,11 +95,10 @@ impl Function for SetSemanticMeaning {
         let path = query.path().clone();
 
         let exists = state
+            .external
             .target_kind()
-            .find_at_path(&path.to_lookup())
-            .ok()
-            .flatten()
-            .is_some();
+            .at_path(&path)
+            .contains_any_defined();
 
         // Reject assigning meaning to non-existing field.
         if !exists {
@@ -147,19 +147,19 @@ impl Function for SetSemanticMeaning {
             list.insert(meaning, path);
         };
 
-        Ok(Box::new(SetSemanticMeaningFn))
+        Ok(SetSemanticMeaningFn.as_expr())
     }
 }
 
 #[derive(Debug, Clone)]
 struct SetSemanticMeaningFn;
 
-impl Expression for SetSemanticMeaningFn {
+impl FunctionExpression for SetSemanticMeaningFn {
     fn resolve(&self, _ctx: &mut Context) -> Resolved {
         Ok(Value::Null)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &TypeState) -> TypeDef {
         TypeDef::null().infallible()
     }
 }

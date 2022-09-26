@@ -4,15 +4,16 @@ use futures::StreamExt;
 use hyper::{Body, Client, Request};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
+use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    config::{self, GenerateConfig, Output, SourceConfig, SourceContext, SourceDescription},
+    config::{self, GenerateConfig, Output, SourceConfig, SourceContext},
     internal_events::{
         AwsEcsMetricsEventsReceived, AwsEcsMetricsHttpError, AwsEcsMetricsParseError,
-        AwsEcsMetricsResponseError, BytesReceived, RequestCompleted, StreamClosedError,
+        AwsEcsMetricsResponseError, RequestCompleted, StreamClosedError,
     },
     shutdown::ShutdownSignal,
     SourceSender,
@@ -46,7 +47,7 @@ pub enum Version {
 }
 
 /// Configuration for the `aws_ecs_metrics` source.
-#[configurable_component(source)]
+#[configurable_component(source("aws_ecs_metrics"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct AwsEcsMetricsSourceConfig {
@@ -112,10 +113,6 @@ pub fn default_namespace() -> String {
     "awsecs".to_string()
 }
 
-inventory::submit! {
-    SourceDescription::new::<AwsEcsMetricsSourceConfig>("aws_ecs_metrics")
-}
-
 impl AwsEcsMetricsSourceConfig {
     fn stats_endpoint(&self) -> String {
         match self.version {
@@ -138,7 +135,6 @@ impl GenerateConfig for AwsEcsMetricsSourceConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "aws_ecs_metrics")]
 impl SourceConfig for AwsEcsMetricsSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
@@ -156,10 +152,6 @@ impl SourceConfig for AwsEcsMetricsSourceConfig {
         vec![Output::default(config::DataType::Metric)]
     }
 
-    fn source_type(&self) -> &'static str {
-        "aws_ecs_metrics"
-    }
-
     fn can_acknowledge(&self) -> bool {
         false
     }
@@ -174,6 +166,7 @@ async fn aws_ecs_metrics(
 ) -> Result<(), ()> {
     let interval = time::Duration::from_secs(interval);
     let mut interval = IntervalStream::new(time::interval(interval)).take_until(shutdown);
+    let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
     while interval.next().await.is_some() {
         let client = Client::new();
 
@@ -192,10 +185,7 @@ async fn aws_ecs_metrics(
                             end: Instant::now()
                         });
 
-                        emit!(BytesReceived {
-                            byte_size: body.len(),
-                            protocol: "http",
-                        });
+                        bytes_received.emit(ByteSize(body.len()));
 
                         match parser::parse(body.as_ref(), namespace.clone()) {
                             Ok(metrics) => {

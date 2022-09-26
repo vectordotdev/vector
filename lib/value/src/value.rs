@@ -30,7 +30,7 @@ pub use crate::value::regex::ValueRegex;
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, SecondsFormat, Utc};
 pub use iter::IterItem;
-use lookup::lookup_v2::Path;
+use lookup::lookup_v2::ValuePath;
 use ordered_float::NotNan;
 
 /// A boxed `std::error::Error`.
@@ -107,19 +107,19 @@ impl Hash for Value {
     fn hash<H: Hasher>(&self, state: &mut H) {
         core::mem::discriminant(self).hash(state);
         match self {
-            Value::Array(v) => {
+            Self::Array(v) => {
                 v.hash(state);
             }
-            Value::Boolean(v) => {
+            Self::Boolean(v) => {
                 v.hash(state);
             }
-            Value::Bytes(v) => {
+            Self::Bytes(v) => {
                 v.hash(state);
             }
-            Value::Regex(regex) => {
+            Self::Regex(regex) => {
                 regex.as_bytes_slice().hash(state);
             }
-            Value::Float(v) => {
+            Self::Float(v) => {
                 // This hashes floats with the following rules:
                 // * NaNs hash as equal (covered by above discriminant hash)
                 // * Positive and negative infinity has to different values
@@ -133,16 +133,16 @@ impl Hash for Value {
                     v.is_sign_negative().hash(state);
                 } //else covered by discriminant hash
             }
-            Value::Integer(v) => {
+            Self::Integer(v) => {
                 v.hash(state);
             }
-            Value::Object(v) => {
+            Self::Object(v) => {
                 v.hash(state);
             }
             Self::Null => {
                 //covered by discriminant hash
             }
-            Value::Timestamp(v) => {
+            Self::Timestamp(v) => {
                 v.hash(state);
             }
         }
@@ -153,13 +153,13 @@ impl Value {
     /// Returns a string description of the value type
     pub const fn kind_str(&self) -> &str {
         match self {
-            Value::Bytes(_) | Value::Regex(_) => "string",
-            Value::Timestamp(_) => "timestamp",
-            Value::Integer(_) => "integer",
-            Value::Float(_) => "float",
-            Value::Boolean(_) => "boolean",
-            Value::Object(_) => "map",
-            Value::Array(_) => "array",
+            Self::Bytes(_) | Self::Regex(_) => "string",
+            Self::Timestamp(_) => "timestamp",
+            Self::Integer(_) => "integer",
+            Self::Float(_) => "float",
+            Self::Boolean(_) => "boolean",
+            Self::Object(_) => "map",
+            Self::Array(_) => "array",
             Self::Null => "null",
         }
     }
@@ -169,7 +169,7 @@ impl Value {
     /// Will concatenate `Bytes` and overwrite the rest value kinds.
     pub fn merge(&mut self, incoming: Self) {
         match (self, incoming) {
-            (Value::Bytes(self_bytes), Value::Bytes(ref incoming)) => {
+            (Self::Bytes(self_bytes), Self::Bytes(ref incoming)) => {
                 let mut bytes = BytesMut::with_capacity(self_bytes.len() + incoming.len());
                 bytes.extend_from_slice(&self_bytes[..]);
                 bytes.extend_from_slice(&incoming[..]);
@@ -205,15 +205,15 @@ impl Value {
     /// ```
     pub fn is_empty(&self) -> bool {
         match &self {
-            Value::Boolean(_)
-            | Value::Bytes(_)
-            | Value::Regex(_)
-            | Value::Timestamp(_)
-            | Value::Float(_)
-            | Value::Integer(_) => false,
+            Self::Boolean(_)
+            | Self::Bytes(_)
+            | Self::Regex(_)
+            | Self::Timestamp(_)
+            | Self::Float(_)
+            | Self::Integer(_) => false,
             Self::Null => true,
-            Value::Object(v) => v.is_empty(),
-            Value::Array(v) => v.is_empty(),
+            Self::Object(v) => v.is_empty(),
+            Self::Array(v) => v.is_empty(),
         }
     }
 
@@ -221,7 +221,7 @@ impl Value {
     #[allow(clippy::needless_pass_by_value)]
     pub fn insert<'a>(
         &mut self,
-        path: impl Path<'a>,
+        path: impl ValuePath<'a>,
         insert_value: impl Into<Self>,
     ) -> Option<Self> {
         let insert_value = insert_value.into();
@@ -235,25 +235,25 @@ impl Value {
     /// A special case worth mentioning: if there is a nested array and an item is removed
     /// from the middle of this array, then it is just replaced by `Value::Null`.
     #[allow(clippy::needless_pass_by_value)]
-    pub fn remove<'a>(&mut self, path: impl Path<'a>, prune: bool) -> Option<Self> {
+    pub fn remove<'a>(&mut self, path: impl ValuePath<'a>, prune: bool) -> Option<Self> {
         crud::remove(self, &(), path.segment_iter(), prune)
             .map(|(prev_value, _is_empty)| prev_value)
     }
 
     /// Returns a reference to a field value specified by a path iter.
     #[allow(clippy::needless_pass_by_value)]
-    pub fn get<'a>(&self, path: impl Path<'a>) -> Option<&Self> {
+    pub fn get<'a>(&self, path: impl ValuePath<'a>) -> Option<&Self> {
         crud::get(self, path.segment_iter())
     }
 
     /// Get a mutable borrow of the value by path
     #[allow(clippy::needless_pass_by_value)]
-    pub fn get_mut<'a>(&mut self, path: impl Path<'a>) -> Option<&mut Self> {
+    pub fn get_mut<'a>(&mut self, path: impl ValuePath<'a>) -> Option<&mut Self> {
         crud::get_mut(self, path.segment_iter())
     }
 
     /// Determine if the lookup is contained within the value.
-    pub fn contains<'a>(&self, path: impl Path<'a>) -> bool {
+    pub fn contains<'a>(&self, path: impl ValuePath<'a>) -> bool {
         self.get(path).is_some()
     }
 }

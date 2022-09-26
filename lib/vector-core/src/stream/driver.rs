@@ -5,7 +5,7 @@ use futures_util::future::poll_fn;
 use tokio::{pin, select};
 use tower::Service;
 use tracing::Instrument;
-use vector_common::internal_event::BytesSent;
+use vector_common::internal_event::{service, BytesSent};
 
 use super::FuturesUnorderedCount;
 use crate::{
@@ -17,9 +17,12 @@ pub trait DriverResponse {
     fn event_status(&self) -> EventStatus;
     fn events_sent(&self) -> EventsSent;
 
+    /// Return a tuple containing the number of bytes that were sent in the
+    /// request that returned this response together with the protocol the
+    /// bytes were sent over.
     // TODO, remove the default implementation once all sinks have
     // implemented this function.
-    fn bytes_sent(&self) -> Option<BytesSent> {
+    fn bytes_sent(&self) -> Option<(usize, &str)> {
         None
     }
 }
@@ -119,8 +122,8 @@ where
 
                         let svc = match maybe_ready {
                             Poll::Ready(Ok(())) => &mut service,
-                            Poll::Ready(Err(err)) => {
-                                error!(message = "Service return error from `poll_ready()`.", ?err);
+                            Poll::Ready(Err(error)) => {
+                                emit(service::PollReadyError{ error });
                                 return Err(())
                             }
                             Poll::Pending => {
@@ -168,6 +171,7 @@ where
     ) {
         match result {
             Err(error) => {
+                // `Error` and `EventsDropped` internal events are emitted in the sink retry logic.
                 error!(message = "Service call failed.", ?error, request_id);
                 finalizers.update_status(EventStatus::Rejected);
             }
@@ -175,8 +179,11 @@ where
                 trace!(message = "Service call succeeded.", request_id);
                 finalizers.update_status(response.event_status());
                 if response.event_status() == EventStatus::Delivered {
-                    if let Some(bytes_sent) = response.bytes_sent() {
-                        emit(bytes_sent);
+                    if let Some((byte_size, protocol)) = response.bytes_sent() {
+                        emit(BytesSent {
+                            byte_size,
+                            protocol: protocol.to_string().into(),
+                        });
                     }
                     emit(response.events_sent());
                 }

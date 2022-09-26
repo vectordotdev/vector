@@ -1,22 +1,23 @@
 use crate::{
     config::{SourceConfig, SourceContext},
     event::{into_event_stream, Event, EventStatus, LogEvent, Value},
-    opentelemetry::{
-        Common::{any_value, AnyValue, KeyValue},
-        LogService::{logs_service_client::LogsServiceClient, ExportLogsServiceRequest},
-        Logs::{LogRecord, ResourceLogs, ScopeLogs},
-        Resource as OtelResource,
-    },
-    sources::opentelemetry::{OpentelemetryConfig, LOGS},
+    sources::opentelemetry::{GrpcConfig, HttpConfig, OpentelemetryConfig, LOGS},
     test_util::{
         self,
         components::{assert_source_compliance, SOURCE_TAGS},
+        next_addr,
     },
     SourceSender,
 };
 use chrono::{TimeZone, Utc};
 use futures::Stream;
 use futures_util::StreamExt;
+use opentelemetry_proto::proto::{
+    collector::logs::v1::{logs_service_client::LogsServiceClient, ExportLogsServiceRequest},
+    common::v1::{any_value, AnyValue, KeyValue},
+    logs::v1::{LogRecord, ResourceLogs, ScopeLogs},
+    resource::v1::Resource as OtelResource,
+};
 use std::collections::BTreeMap;
 use tonic::Request;
 
@@ -26,21 +27,32 @@ fn generate_config() {
 }
 
 #[tokio::test]
-async fn receive_message() {
+async fn receive_grpc_logs() {
     assert_source_compliance(&SOURCE_TAGS, async {
-        let addr = test_util::next_addr();
-        let config = format!(r#"address = "{}""#, addr);
-        let source: OpentelemetryConfig = toml::from_str(&config).unwrap();
+        let grpc_addr = next_addr();
+        let http_addr = next_addr();
+
+        let source = OpentelemetryConfig {
+            grpc: GrpcConfig {
+                address: grpc_addr,
+                tls: Default::default(),
+            },
+            http: HttpConfig {
+                address: http_addr,
+                tls: Default::default(),
+            },
+            acknowledgements: Default::default(),
+        };
         let (sender, logs_output, _) = new_source(EventStatus::Delivered);
         let server = source
             .build(SourceContext::new_test(sender, None))
             .await
             .unwrap();
         tokio::spawn(server);
-        test_util::wait_for_tcp(addr).await;
+        test_util::wait_for_tcp(grpc_addr).await;
 
         // send request via grpc client
-        let mut client = LogsServiceClient::connect(format!("http://{}", addr))
+        let mut client = LogsServiceClient::connect(format!("http://{}", grpc_addr))
             .await
             .unwrap();
         let req = Request::new(ExportLogsServiceRequest {
@@ -104,6 +116,7 @@ async fn receive_message() {
             ("dropped_attributes_count", 3.into()),
             ("timestamp", Utc.timestamp_nanos(1).into()),
             ("observed_timestamp", Utc.timestamp_nanos(2).into()),
+            ("source_type", "opentelemetry".into()),
         ]);
         let expect_event = Event::from(LogEvent::from(expect_vec));
         assert_eq!(actual_event, expect_event);

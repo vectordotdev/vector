@@ -47,7 +47,7 @@ impl ClientBuilder for CloudwatchLogsClientBuilder {
 }
 
 /// Configuration for the `aws_cloudwatch_logs` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("aws_cloudwatch_logs"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct CloudwatchLogsSinkConfig {
@@ -58,9 +58,9 @@ pub struct CloudwatchLogsSinkConfig {
 
     /// The [stream name][stream_name] of the target CloudWatch Logs stream.
     ///
-    /// Note that there can only be one writer to a log stream at a time. If you have multiple instances of Vector
-    /// writing to the same log group, you must include an identifier in the stream name that is guaranteed to be unique per
-    /// Vector instance.
+    /// Note that there can only be one writer to a log stream at a time. If you have multiple
+    /// instances of Vector writing to the same log group, you must include an identifier in the
+    /// stream name that is guaranteed to be unique per Vector instance.
     ///
     /// For example, you might choose `host`.
     ///
@@ -75,7 +75,8 @@ pub struct CloudwatchLogsSinkConfig {
 
     /// Dynamically create a [log group][log_group] if it does not already exist.
     ///
-    /// This will ignore `create_missing_stream` directly after creating the group and will create the first stream.
+    /// This will ignore `create_missing_stream` directly after creating the group and will create
+    /// the first stream.
     ///
     /// [log_group]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
     pub create_missing_group: Option<bool>,
@@ -103,7 +104,9 @@ pub struct CloudwatchLogsSinkConfig {
     #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
-    /// The ARN of an [IAM role](\(urls.aws_iam_role)) to assume at startup.
+    /// The ARN of an [IAM role][iam_role] to assume at startup.
+    ///
+    /// [iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
     #[configurable(deprecated)]
     pub assume_role: Option<String>,
 
@@ -150,7 +153,6 @@ impl CloudwatchLogsSinkConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "aws_cloudwatch_logs")]
 impl SinkConfig for CloudwatchLogsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let batcher_settings = self.batch.into_batcher_settings()?;
@@ -191,12 +193,8 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
         Input::new(self.encoding.config().input_type() & DataType::Log)
     }
 
-    fn sink_type(&self) -> &'static str {
-        "aws_cloudwatch_logs"
-    }
-
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 

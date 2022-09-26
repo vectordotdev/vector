@@ -190,6 +190,16 @@ components: sources: file: {
 				unit: "bytes"
 			}
 		}
+		offset_key: {
+			category:    "Context"
+			common:      false
+			description: "Enables adding the byte offset within the file of the start of each line to each event and sets the name of the log field used. Off by default, the offset is only added to the event if this is set."
+			required:    false
+			type: string: {
+				default: null
+				examples: ["offset"]
+			}
+		}
 		oldest_first: {
 			category:    "Reading"
 			common:      false
@@ -246,6 +256,13 @@ components: sources: file: {
 					examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
 				}
 			}
+			source_type: {
+				description: "The name of the source type."
+				required:    true
+				type: string: {
+					examples: ["file"]
+				}
+			}
 			timestamp: fields._current_timestamp
 		}
 	}
@@ -261,10 +278,11 @@ components: sources: file: {
 			}
 			input: _line
 			output: log: {
-				file:      _file
-				host:      _values.local_host
-				message:   _line
-				timestamp: _values.current_timestamp
+				file:        _file
+				host:        _values.local_host
+				message:     _line
+				source_type: "file"
+				timestamp:   _values.current_timestamp
 			}
 		},
 	]

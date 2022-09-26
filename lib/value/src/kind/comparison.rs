@@ -13,6 +13,7 @@ impl Kind {
             && self.contains_timestamp()
             && self.contains_regex()
             && self.contains_null()
+            && self.contains_undefined()
             && self.contains_array()
             && self.contains_object()
     }
@@ -27,6 +28,7 @@ impl Kind {
             && !self.contains_timestamp()
             && !self.contains_regex()
             && self.contains_null()
+            && self.contains_undefined()
             && self.contains_array()
             && self.contains_object()
     }
@@ -45,6 +47,7 @@ impl Kind {
             && !self.contains_timestamp()
             && !self.contains_regex()
             && !self.contains_null()
+            && !self.contains_undefined()
     }
 
     /// Returns `true` if the type is `bytes`.
@@ -56,6 +59,7 @@ impl Kind {
             && self.timestamp.is_none()
             && self.regex.is_none()
             && self.null.is_none()
+            && self.undefined.is_none()
             && self.array.is_none()
             && self.object.is_none()
     }
@@ -69,6 +73,7 @@ impl Kind {
             && self.timestamp.is_none()
             && self.regex.is_none()
             && self.null.is_none()
+            && self.undefined.is_none()
             && self.array.is_none()
             && self.object.is_none()
     }
@@ -83,6 +88,7 @@ impl Kind {
             && self.timestamp.is_none()
             && self.regex.is_none()
             && self.null.is_none()
+            && self.undefined.is_none()
             && self.array.is_none()
             && self.object.is_none()
     }
@@ -96,6 +102,7 @@ impl Kind {
             && self.timestamp.is_none()
             && self.regex.is_none()
             && self.null.is_none()
+            && self.undefined.is_none()
             && self.array.is_none()
             && self.object.is_none()
     }
@@ -109,6 +116,7 @@ impl Kind {
             && self.timestamp.is_none()
             && self.regex.is_none()
             && self.null.is_none()
+            && self.undefined.is_none()
             && self.array.is_none()
             && self.object.is_none()
     }
@@ -122,6 +130,7 @@ impl Kind {
             && self.boolean.is_none()
             && self.regex.is_none()
             && self.null.is_none()
+            && self.undefined.is_none()
             && self.array.is_none()
             && self.object.is_none()
     }
@@ -135,6 +144,7 @@ impl Kind {
             && self.boolean.is_none()
             && self.timestamp.is_none()
             && self.null.is_none()
+            && self.undefined.is_none()
             && self.array.is_none()
             && self.object.is_none()
     }
@@ -148,6 +158,21 @@ impl Kind {
             && self.boolean.is_none()
             && self.timestamp.is_none()
             && self.regex.is_none()
+            && self.undefined.is_none()
+            && self.array.is_none()
+            && self.object.is_none()
+    }
+
+    /// Returns `true` if the type is `undefined`.
+    #[must_use]
+    pub const fn is_undefined(&self) -> bool {
+        self.bytes.is_none()
+            && self.integer.is_none()
+            && self.float.is_none()
+            && self.boolean.is_none()
+            && self.timestamp.is_none()
+            && self.regex.is_none()
+            && self.null.is_none()
             && self.array.is_none()
             && self.object.is_none()
     }
@@ -162,6 +187,7 @@ impl Kind {
             && self.timestamp.is_none()
             && self.regex.is_none()
             && self.null.is_none()
+            && self.undefined.is_none()
             && self.object.is_none()
     }
 
@@ -175,10 +201,11 @@ impl Kind {
             && self.timestamp.is_none()
             && self.regex.is_none()
             && self.null.is_none()
+            && self.undefined.is_none()
             && self.array.is_none()
     }
 
-    /// Returns `true` if exactly one type is set (or never).
+    /// Returns `true` if at most one type is set.
     #[must_use]
     #[allow(clippy::many_single_char_names)]
     pub const fn is_exact(&self) -> bool {
@@ -189,6 +216,7 @@ impl Kind {
             || self.is_timestamp()
             || self.is_regex()
             || self.is_null()
+            || self.is_undefined()
             || self.is_array()
             || self.is_object()
             || self.is_never()
@@ -228,6 +256,10 @@ impl Kind {
         };
 
         if let (None, Some(_)) = (self.null, other.null) {
+            return false;
+        };
+
+        if let (None, Some(_)) = (self.undefined, other.undefined) {
             return false;
         };
 
@@ -281,6 +313,10 @@ impl Kind {
         }
 
         if self.contains_null() && other.contains_null() {
+            return true;
+        }
+
+        if self.contains_undefined() && other.contains_undefined() {
             return true;
         }
 
@@ -338,6 +374,18 @@ impl Kind {
     #[must_use]
     pub const fn contains_null(&self) -> bool {
         self.null.is_some() || self.is_never()
+    }
+
+    /// Returns `true` if the type is _at least_ `undefined`.
+    #[must_use]
+    pub const fn contains_undefined(&self) -> bool {
+        self.undefined.is_some() || self.is_never()
+    }
+
+    /// Returns `true` if the type can be _any_ type other than `undefined`
+    #[must_use]
+    pub const fn contains_any_defined(&self) -> bool {
+        !self.is_undefined()
     }
 
     /// Returns `true` if the type is _at least_ `array`.

@@ -1,6 +1,6 @@
 package metadata
 
-components: sinks: chronicle_unstructured: {
+components: sinks: gcp_chronicle_unstructured: {
 	title: "GCP Chronicle Unstructured"
 
 	classes: {
@@ -41,7 +41,8 @@ components: sinks: chronicle_unstructured: {
 				enabled:                true
 				can_verify_certificate: true
 				can_verify_hostname:    true
-				enabled_default:        false
+				enabled_default:        true
+				enabled_by_scheme:      true
 			}
 			to: {
 				service: services.gcp_chronicle

@@ -1,14 +1,16 @@
 use std::path::PathBuf;
 
 use bytes::Bytes;
+use vector_common::internal_event::{
+    ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
+};
 use vector_config::configurable_component;
-use vector_core::ByteSizeOf;
 
 use super::util::framestream::{build_framestream_unix_source, FrameHandler};
 use crate::{
-    config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
+    config::{log_schema, DataType, Output, SourceConfig, SourceContext},
     event::{Event, LogEvent},
-    internal_events::{BytesReceived, DnstapParseError, EventsReceived},
+    internal_events::DnstapParseError,
     Result,
 };
 
@@ -21,7 +23,7 @@ pub use schema::DnstapEventSchema;
 use vector_core::config::LogNamespace;
 
 /// Configuration for the `dnstap` source.
-#[configurable_component(source)]
+#[configurable_component(source("dnstap"))]
 #[derive(Clone, Debug)]
 pub struct DnstapConfig {
     /// Maximum length, in bytes, that a frame can be.
@@ -32,8 +34,9 @@ pub struct DnstapConfig {
     ///
     /// The value will be the socket path itself.
     ///
-    /// By default, the [global `host_key` option](https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key) is
-    /// used.
+    /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
+    ///
+    /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     pub host_key: Option<String>,
 
     /// Absolute path to the socket file to read DNSTAP data from.
@@ -105,14 +108,9 @@ impl Default for DnstapConfig {
     }
 }
 
-inventory::submit! {
-    SourceDescription::new::<DnstapConfig>("dnstap")
-}
-
 impl_generate_config_from_default!(DnstapConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "dnstap")]
 impl SourceConfig for DnstapConfig {
     async fn build(&self, cx: SourceContext) -> Result<super::Source> {
         let frame_handler = DnstapFrameHandler::new(self);
@@ -121,10 +119,6 @@ impl SourceConfig for DnstapConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "dnstap"
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -146,6 +140,7 @@ pub struct DnstapFrameHandler {
     socket_send_buffer_size: Option<usize>,
     host_key: String,
     timestamp_key: String,
+    bytes_received: Registered<BytesReceived>,
 }
 
 impl DnstapFrameHandler {
@@ -175,6 +170,7 @@ impl DnstapFrameHandler {
             socket_send_buffer_size: config.socket_send_buffer_size,
             host_key,
             timestamp_key: timestamp_key.to_string(),
+            bytes_received: register!(BytesReceived::from(Protocol::from("protobuf"))),
         }
     }
 }
@@ -193,10 +189,10 @@ impl FrameHandler for DnstapFrameHandler {
      * Takes a data frame from the unix socket and turns it into a Vector Event.
      **/
     fn handle_event(&self, received_from: Option<Bytes>, frame: Bytes) -> Option<Event> {
-        emit!(BytesReceived {
-            byte_size: frame.len(),
-            protocol: "protobuf",
-        });
+        // SocketEventsReceived is emitted already
+
+        self.bytes_received.emit(ByteSize(frame.len()));
+
         let mut log_event = LogEvent::default();
 
         if let Some(host) = received_from {
@@ -209,30 +205,23 @@ impl FrameHandler for DnstapFrameHandler {
                 base64::encode(&frame),
             );
             let event = Event::from(log_event);
-            emit!(EventsReceived {
-                count: 1,
-                byte_size: event.size_of(),
-            });
             Some(event)
         } else {
             match parse_dnstap_data(&self.schema, &mut log_event, frame) {
                 Err(err) => {
                     emit!(DnstapParseError {
-                        error: format!("Dnstap protobuf decode error {:?}.", err).as_str()
+                        error: format!("Dnstap protobuf decode error {:?}.", err)
                     });
                     None
                 }
                 Ok(_) => {
                     let event = Event::from(log_event);
-                    emit!(EventsReceived {
-                        count: 1,
-                        byte_size: event.size_of(),
-                    });
                     Some(event)
                 }
             }
         }
     }
+
     fn socket_path(&self) -> PathBuf {
         self.socket_path.clone()
     }

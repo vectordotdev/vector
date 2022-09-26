@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use chrono::{DateTime, NaiveDateTime, Utc};
-use lookup::path;
+use lookup::event_path;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use std::collections::HashMap;
@@ -40,20 +40,23 @@ impl GelfDeserializerConfig {
 
     /// The schema produced by the deserializer.
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
-        schema::Definition::new(Kind::object(Collection::empty()), [log_namespace])
-            .with_field(VERSION, Kind::bytes(), None)
-            .with_field(HOST, Kind::bytes(), None)
-            .with_field(SHORT_MESSAGE, Kind::bytes(), None)
-            .optional_field(FULL_MESSAGE, Kind::bytes(), None)
-            .optional_field(TIMESTAMP, Kind::timestamp(), None)
-            .optional_field(LEVEL, Kind::integer(), None)
-            .optional_field(FACILITY, Kind::bytes(), None)
-            .optional_field(LINE, Kind::integer(), None)
-            .optional_field(FILE, Kind::bytes(), None)
-            // Every field with an underscore (_) prefix will be treated as an additional field.
-            // Allowed characters in field names are any word character (letter, number, underscore), dashes and dots.
-            // Libraries SHOULD not allow to send id as additional field ( _id). Graylog server nodes omit this field automatically.
-            .unknown_fields(Kind::bytes().or_integer().or_float())
+        schema::Definition::new_with_default_metadata(
+            Kind::object(Collection::empty()),
+            [log_namespace],
+        )
+        .with_field(VERSION, Kind::bytes(), None)
+        .with_field(HOST, Kind::bytes(), None)
+        .with_field(SHORT_MESSAGE, Kind::bytes(), None)
+        .optional_field(FULL_MESSAGE, Kind::bytes(), None)
+        .optional_field(TIMESTAMP, Kind::timestamp(), None)
+        .optional_field(LEVEL, Kind::integer(), None)
+        .optional_field(FACILITY, Kind::bytes(), None)
+        .optional_field(LINE, Kind::integer(), None)
+        .optional_field(FILE, Kind::bytes(), None)
+        // Every field with an underscore (_) prefix will be treated as an additional field.
+        // Allowed characters in field names are any word character (letter, number, underscore), dashes and dots.
+        // Libraries SHOULD not allow to send id as additional field ( _id). Graylog server nodes omit this field automatically.
+        .unknown_fields(Kind::bytes().or_integer().or_float())
     }
 }
 
@@ -151,7 +154,7 @@ impl GelfDeserializer {
                 // per GELF spec, Additional field values must be either strings or numbers
                 if val.is_string() || val.is_number() {
                     let vector_val: value::Value = val.into();
-                    log.insert(path!(key.as_str()), vector_val);
+                    log.insert(event_path!(key.as_str()), vector_val);
                 } else {
                     let type_ = match val {
                         serde_json::Value::Null => "null",
@@ -206,7 +209,7 @@ mod tests {
     use super::*;
     use bytes::Bytes;
     use chrono::{DateTime, NaiveDateTime, Utc};
-    use lookup::path;
+    use lookup::event_path;
     use pretty_assertions::assert_eq;
     use serde_json::json;
     use smallvec::SmallVec;
@@ -288,13 +291,13 @@ mod tests {
             Some(&Value::Bytes(Bytes::from_static(b"/tmp/bar")))
         );
         assert_eq!(
-            log.get(path!(add_on_int_in)),
+            log.get(event_path!(add_on_int_in)),
             Some(&Value::Float(
                 ordered_float::NotNan::new(2001.1002).unwrap()
             ))
         );
         assert_eq!(
-            log.get(path!(add_on_str_in)),
+            log.get(event_path!(add_on_str_in)),
             Some(&Value::Bytes(Bytes::from_static(b"A Space Odyssey")))
         );
     }

@@ -29,8 +29,9 @@ use crate::{
     config::{AcknowledgementsConfig, Resource, SourceContext},
     event::{BatchNotifier, BatchStatus, Event},
     internal_events::{
-        ConnectionOpen, OpenGauge, SocketEventsReceived, SocketMode, StreamClosedError,
-        TcpBytesReceived, TcpSendAckError, TcpSocketTlsConnectionError,
+        ConnectionOpen, DecoderFramingError, OpenGauge, SocketEventsReceived, SocketMode,
+        StreamClosedError, TcpBytesReceived, TcpSendAckError, TcpSocketReceiveError,
+        TcpSocketTlsConnectionError,
     },
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
@@ -176,10 +177,7 @@ where
                         let socket = match connection {
                             Ok(socket) => socket,
                             Err(error) => {
-                                error!(
-                                    message = "Failed to accept socket.",
-                                    %error
-                                );
+                                emit!(TcpSocketReceiveError { error });
                                 return;
                             }
                         };
@@ -284,7 +282,7 @@ async fn handle_stream<T>(
         .get_ref()
         .ssl_stream()
         .and_then(|stream| stream.ssl().peer_certificate())
-        .map(CertificateMetadata::from_x509);
+        .map(CertificateMetadata::from);
 
     let reader = FramedRead::new(socket, source.decoder());
     let mut reader = ReadyFrames::new(reader);
@@ -368,14 +366,9 @@ async fn handle_stream<T>(
                                     Some(receiver) =>
                                         match receiver.await {
                                             BatchStatus::Delivered => TcpSourceAck::Ack,
-                                            BatchStatus::Errored => {
-                                                warn!(message = "Error delivering events to sink.",
-                                                      internal_log_rate_secs = 5);
-                                                TcpSourceAck::Error
-                                            }
+                                            BatchStatus::Errored => {TcpSourceAck::Error},
                                             BatchStatus::Rejected => {
-                                                warn!(message = "Failed to deliver events to sink.",
-                                                      internal_log_rate_secs = 5);
+                                                // Sinks are responsible for emitting ComponentEventsDropped.
                                                 TcpSourceAck::Reject
                                             }
                                         }
@@ -399,7 +392,7 @@ async fn handle_stream<T>(
                     }
                     Some(Err(error)) => {
                         if !<<T as TcpSource>::Error as StreamDecodingError>::can_continue(&error) {
-                            warn!(message = "Failed to read data from TCP source.", %error);
+                            emit!(DecoderFramingError { error });
                             break;
                         }
                     }
@@ -435,7 +428,7 @@ fn close_socket(socket: &MaybeTlsIncomingStream<TcpStream>) -> bool {
 
 /// A listening address that can be given directly or be managed via `systemd` socket activation.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum SocketListenAddr {
     /// An IPv4/IPv6 address and port.

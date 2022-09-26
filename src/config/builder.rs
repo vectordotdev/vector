@@ -3,53 +3,84 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
 #[cfg(feature = "enterprise")]
 use serde_json::Value;
-use vector_core::{config::GlobalOptions, default_data_dir, transform::TransformConfig};
+use vector_config::configurable_component;
+use vector_core::config::GlobalOptions;
+
+use crate::{
+    enrichment_tables::EnrichmentTables, providers::Providers, secrets::SecretBackends,
+    sinks::Sinks, sources::Sources, transforms::Transforms,
+};
 
 #[cfg(feature = "api")]
 use super::api;
 #[cfg(feature = "enterprise")]
 use super::enterprise;
 use super::{
-    compiler, provider, schema, ComponentKey, Config, EnrichmentTableConfig, EnrichmentTableOuter,
-    HealthcheckOptions, SecretBackend, SinkConfig, SinkOuter, SourceConfig, SourceOuter,
-    TestDefinition, TransformOuter,
+    compiler, schema, ComponentKey, Config, EnrichmentTableOuter, HealthcheckOptions, SinkOuter,
+    SourceOuter, TestDefinition, TransformOuter,
 };
 
-#[derive(Deserialize, Serialize, Debug, Default)]
+/// A complete Vector configuration.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ConfigBuilder {
     #[serde(flatten)]
     pub global: GlobalOptions,
+
     #[cfg(feature = "api")]
+    #[configurable(derived)]
     #[serde(default)]
     pub api: api::Options,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub schema: schema::Options,
+
     #[cfg(feature = "enterprise")]
+    #[configurable(derived)]
     #[serde(default)]
     pub enterprise: Option<enterprise::Options>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub healthchecks: HealthcheckOptions,
+
+    /// All configured enrichment tables.
     #[serde(default)]
     pub enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter>,
+
+    /// All configured sources.
     #[serde(default)]
     pub sources: IndexMap<ComponentKey, SourceOuter>,
+
+    /// All configured sinks.
     #[serde(default)]
     pub sinks: IndexMap<ComponentKey, SinkOuter<String>>,
+
+    /// All configured transforms.
     #[serde(default)]
     pub transforms: IndexMap<ComponentKey, TransformOuter<String>>,
+
+    /// All configured unit tests.
     #[serde(default)]
     pub tests: Vec<TestDefinition<String>>,
-    pub provider: Option<Box<dyn provider::ProviderConfig>>,
+
+    /// Optional configuration provider to use.
+    ///
+    /// Configuration providers allow sourcing configuration information from a source other than
+    /// the typical configuration files that must be passed to Vector.
+    pub provider: Option<Providers>,
+
+    /// All configured secrets backends.
     #[serde(default)]
-    pub secret: IndexMap<ComponentKey, Box<dyn SecretBackend>>,
+    pub secret: IndexMap<ComponentKey, SecretBackends>,
 }
 
 #[cfg(feature = "enterprise")]
-#[derive(Serialize)]
+#[derive(::serde::Serialize)]
 struct ConfigBuilderHash<'a> {
     #[cfg(feature = "api")]
     api: &'a api::Options,
@@ -61,8 +92,8 @@ struct ConfigBuilderHash<'a> {
     sinks: BTreeMap<&'a ComponentKey, &'a SinkOuter<String>>,
     transforms: BTreeMap<&'a ComponentKey, &'a TransformOuter<String>>,
     tests: &'a Vec<TestDefinition<String>>,
-    provider: &'a Option<Box<dyn provider::ProviderConfig>>,
-    secret: BTreeMap<&'a ComponentKey, &'a dyn SecretBackend>,
+    provider: &'a Option<Providers>,
+    secret: BTreeMap<&'a ComponentKey, &'a SecretBackends>,
 }
 
 #[cfg(feature = "enterprise")]
@@ -95,7 +126,7 @@ impl ConfigBuilderHash<'_> {
 #[cfg(feature = "enterprise")]
 fn to_sorted_json_string<T>(value: T) -> String
 where
-    T: Serialize,
+    T: ::serde::Serialize,
 {
     let mut value = serde_json::to_value(value).expect("Should serialize to JSON. Please report.");
     sort_json_value(&mut value);
@@ -140,20 +171,8 @@ impl<'a> From<&'a ConfigBuilder> for ConfigBuilderHash<'a> {
             transforms: value.transforms.iter().collect(),
             tests: &value.tests,
             provider: &value.provider,
-            secret: value.secret.iter().map(|(k, v)| (k, v.as_ref())).collect(),
+            secret: value.secret.iter().collect(),
         }
-    }
-}
-
-impl Clone for ConfigBuilder {
-    fn clone(&self) -> Self {
-        // This is a hack around the issue of cloning
-        // trait objects. So instead to clone the config
-        // we first serialize it into JSON, then back from
-        // JSON. Originally we used TOML here but TOML does not
-        // support serializing `None`.
-        let json = serde_json::to_value(self).unwrap();
-        serde_json::from_value(json).unwrap()
     }
 }
 
@@ -173,7 +192,8 @@ impl From<Config> for ConfigBuilder {
             transforms,
             tests,
             secret,
-            ..
+            version: _,
+            expansions: _,
         } = config;
 
         let transforms = transforms
@@ -222,43 +242,40 @@ impl ConfigBuilder {
         compiler::compile(self)
     }
 
-    pub fn add_enrichment_table<E: EnrichmentTableConfig + 'static, T: Into<String>>(
+    pub fn add_enrichment_table<K: Into<String>, E: Into<EnrichmentTables>>(
         &mut self,
-        name: T,
+        key: K,
         enrichment_table: E,
     ) {
         self.enrichment_tables.insert(
-            ComponentKey::from(name.into()),
-            EnrichmentTableOuter::new(Box::new(enrichment_table)),
+            ComponentKey::from(key.into()),
+            EnrichmentTableOuter::new(enrichment_table),
         );
     }
 
-    pub fn add_source<S: SourceConfig + 'static, T: Into<String>>(&mut self, id: T, source: S) {
+    pub fn add_source<K: Into<String>, S: Into<Sources>>(&mut self, key: K, source: S) {
         self.sources
-            .insert(ComponentKey::from(id.into()), SourceOuter::new(source));
+            .insert(ComponentKey::from(key.into()), SourceOuter::new(source));
     }
 
-    pub fn add_sink<S: SinkConfig + 'static, T: Into<String>>(
-        &mut self,
-        id: T,
-        inputs: &[&str],
-        sink: S,
-    ) {
+    pub fn add_sink<K: Into<String>, S: Into<Sinks>>(&mut self, key: K, inputs: &[&str], sink: S) {
         let inputs = inputs
             .iter()
             .map(|value| value.to_string())
             .collect::<Vec<_>>();
-        let sink = SinkOuter::new(inputs, Box::new(sink));
-        self.add_sink_outer(id, sink);
+        let sink = SinkOuter::new(inputs, sink);
+        self.add_sink_outer(key, sink);
     }
 
-    pub fn add_sink_outer(&mut self, id: impl Into<String>, sink: SinkOuter<String>) {
-        self.sinks.insert(ComponentKey::from(id.into()), sink);
+    pub fn add_sink_outer<K: Into<String>>(&mut self, key: K, sink: SinkOuter<String>) {
+        self.sinks.insert(ComponentKey::from(key.into()), sink);
     }
 
-    pub fn add_transform<T: TransformConfig + 'static, S: Into<String>>(
+    // For some feature sets, no transforms are compiled, which leads to no callers using this
+    // method, and in turn, annoying errors about unused variables.
+    pub fn add_transform<K: Into<String>, T: Into<Transforms>>(
         &mut self,
-        id: S,
+        key: K,
         inputs: &[&str],
         transform: T,
     ) {
@@ -266,13 +283,10 @@ impl ConfigBuilder {
             .iter()
             .map(|value| value.to_string())
             .collect::<Vec<_>>();
-        let transform = TransformOuter {
-            inner: Box::new(transform),
-            inputs,
-        };
+        let transform = TransformOuter::new(inputs, transform);
 
         self.transforms
-            .insert(ComponentKey::from(id.into()), transform);
+            .insert(ComponentKey::from(key.into()), transform);
     }
 
     pub fn set_data_dir(&mut self, path: &Path) {
@@ -286,8 +300,6 @@ impl ConfigBuilder {
         if let Err(error) = self.api.merge(with.api) {
             errors.push(error);
         }
-
-        self.schema = with.schema;
 
         #[cfg(feature = "enterprise")]
         {
@@ -306,47 +318,14 @@ impl ConfigBuilder {
 
         self.provider = with.provider;
 
-        if self.global.proxy.http.is_some() && with.global.proxy.http.is_some() {
-            errors.push("conflicting values for 'proxy.http' found".to_owned());
+        match self.global.merge(with.global) {
+            Err(errs) => errors.extend(errs),
+            Ok(new_global) => self.global = new_global,
         }
 
-        if self.global.proxy.https.is_some() && with.global.proxy.https.is_some() {
-            errors.push("conflicting values for 'proxy.https' found".to_owned());
-        }
-
-        if !self.global.proxy.no_proxy.is_empty() && !with.global.proxy.no_proxy.is_empty() {
-            errors.push("conflicting values for 'proxy.no_proxy' found".to_owned());
-        }
-
-        self.global.proxy = self.global.proxy.merge(&with.global.proxy);
-
-        if self.schema.log_namespace.is_some()
-            && with.schema.log_namespace.is_some()
-            && self.schema.log_namespace != with.schema.log_namespace
-        {
-            errors.push(
-                format!("conflicting values for 'log_namespace' found. Both {:?} and {:?} used in the same component",
-                                self.schema.log_namespace(), with.schema.log_namespace())
-            );
-        }
+        self.schema.append(with.schema, &mut errors);
 
         self.schema.log_namespace = self.schema.log_namespace.or(with.schema.log_namespace);
-
-        if self.global.data_dir.is_none() || self.global.data_dir == default_data_dir() {
-            self.global.data_dir = with.global.data_dir;
-        } else if with.global.data_dir != default_data_dir()
-            && self.global.data_dir != with.global.data_dir
-        {
-            // If two configs both set 'data_dir' and have conflicting values
-            // we consider this an error.
-            errors.push("conflicting values for 'data_dir' found".to_owned());
-        }
-
-        // If the user has multiple config files, we must *merge* log schemas
-        // until we meet a conflict, then we are allowed to error.
-        if let Err(merge_errors) = self.global.log_schema.merge(&with.global.log_schema) {
-            errors.extend(merge_errors);
-        }
 
         self.healthchecks.merge(with.healthchecks);
 
@@ -474,7 +453,7 @@ mod tests {
     /// should ideally be able to fix so that the original hash passes!
     fn version_hash_match() {
         assert_eq!(
-            "53dff3cdc4bcf9ac23a04746b253b2f3ba8b1120e483e13d586b3643a4e066de",
+            "bc0825487e137ee1d1fc76c616795d041c4825b4ca5a7236455ea4515238885c",
             ConfigBuilder::default().sha256_hash()
         );
     }
@@ -503,14 +482,12 @@ mod tests {
 
     #[test]
     fn append_overwrites_enterprise() {
-        let mut base_ent = enterprise::Options::default();
-        base_ent.application_key = "base".to_string();
+        let base_ent = enterprise::Options::default();
         let mut base = ConfigBuilder {
             enterprise: Some(base_ent),
             ..Default::default()
         };
-        let mut other_ent = enterprise::Options::default();
-        other_ent.application_key = "other".to_string();
+        let other_ent = enterprise::Options::default();
         let other = ConfigBuilder {
             enterprise: Some(other_ent),
             ..Default::default()
@@ -528,7 +505,6 @@ mod tests {
             r#"
         [enterprise]
         api_key = "apikey"
-        application_key = "appkey"
         configuration_key = "configkey"
 
         [sources.foo]
@@ -559,7 +535,6 @@ mod tests {
                 r#"
             [enterprise]
             api_key = "apikey"
-            application_key = "appkey"
             configuration_key = "configkey"
 
             [sources.foo]

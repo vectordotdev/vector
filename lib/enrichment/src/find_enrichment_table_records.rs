@@ -2,9 +2,10 @@ use std::collections::BTreeMap;
 
 use ::value::Value;
 use vrl::prelude::*;
+use vrl::state::TypeState;
 
 use crate::{
-    vrl_util::{self, add_index, evaluate_condition, index_from_args},
+    vrl_util::{self, add_index, evaluate_condition},
     Case, Condition, IndexHandle, TableRegistry, TableSearch,
 };
 
@@ -89,9 +90,9 @@ impl Function for FindEnrichmentTableRecords {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &TypeState,
         ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let registry = ctx
             .get_external_context_mut::<TableRegistry>()
@@ -132,48 +133,15 @@ impl Function for FindEnrichmentTableRecords {
                 .map_err(|err| Box::new(err) as Box<_>)?,
         );
 
-        Ok(Box::new(FindEnrichmentTableRecordsFn {
+        Ok(FindEnrichmentTableRecordsFn {
             table,
             condition,
             index,
             select,
             case_sensitive,
             enrichment_tables: registry.as_readonly(),
-        }))
-    }
-
-    fn compile_argument(
-        &self,
-        args: &[(&'static str, Option<FunctionArgument>)],
-        ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        match (name, expr) {
-            ("table", Some(expr)) => {
-                let registry =
-                    ctx.get_external_context_mut::<TableRegistry>()
-                        .ok_or(Box::new(vrl_util::Error::TablesNotLoaded)
-                            as Box<dyn DiagnosticMessage>)?;
-
-                let tables = registry
-                    .table_ids()
-                    .into_iter()
-                    .map(Value::from)
-                    .collect::<Vec<_>>();
-
-                let table = expr
-                    .as_enum("table", tables)?
-                    .try_bytes_utf8_lossy()
-                    .expect("table is not valid utf8")
-                    .into_owned();
-
-                let record = index_from_args(table, registry, args)?;
-
-                Ok(Some(Box::new(record) as _))
-            }
-            _ => Ok(None),
         }
+        .as_expr())
     }
 }
 
@@ -187,7 +155,7 @@ pub struct FindEnrichmentTableRecordsFn {
     enrichment_tables: TableSearch,
 }
 
-impl Expression for FindEnrichmentTableRecordsFn {
+impl FunctionExpression for FindEnrichmentTableRecordsFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let condition = self
             .condition
@@ -219,7 +187,7 @@ impl Expression for FindEnrichmentTableRecordsFn {
         )
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &TypeState) -> TypeDef {
         TypeDef::array(Collection::from_unknown(Kind::object(Collection::any()))).fallible()
     }
 }

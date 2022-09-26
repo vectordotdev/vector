@@ -25,7 +25,7 @@ interpreted as described in [RFC 2119].
 Vector's runtime behavior is expressed through user-defined configuration files
 intended to be written directly by users. Therefore, the quality of Vector's
 configuration largely affects Vector's user experience. This document aims to
-make Vector's configuration as high quality as possible in order to achieve a
+make Vector's configuration as high quality as possible in order to achieve the
 [best in class user experience][user_experience].
 
 ## Scope
@@ -111,5 +111,5 @@ buffer.disk.max_bytes = 1_000_000_000
 
 [component specification]: component.md
 [external tagging]: https://docs.rs/serde_tagged/0.2.0/serde_tagged/ser/external/index.html
-[JSON types]: http://json-schema.org/understanding-json-schema/reference/type.html
+[json types]: http://json-schema.org/understanding-json-schema/reference/type.html
 [user_experience]: ../USER_EXPERIENCE_DESIGN.md

@@ -1,12 +1,17 @@
-use aws_sdk_kinesis::error::{DescribeStreamError, PutRecordsError, PutRecordsErrorKind};
-use aws_sdk_kinesis::types::SdkError;
-use aws_sdk_kinesis::Client as KinesisClient;
+use aws_sdk_kinesis::{
+    error::{DescribeStreamError, PutRecordsError, PutRecordsErrorKind},
+    types::SdkError,
+    Client as KinesisClient,
+};
 use futures::FutureExt;
-use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tower::ServiceBuilder;
+use vector_config::configurable_component;
 
-use super::service::KinesisResponse;
+use super::{
+    request_builder::KinesisRequestBuilder, service::KinesisResponse, service::KinesisService,
+    sink::KinesisSink,
+};
 use crate::{
     aws::{create_client, is_retriable_error, AwsAuthentication, ClientBuilder, RegionOrEndpoint},
     codecs::{Encoder, EncodingConfig},
@@ -15,9 +20,6 @@ use crate::{
         SinkContext,
     },
     sinks::{
-        aws_kinesis_streams::{
-            request_builder::KinesisRequestBuilder, service::KinesisService, sink::KinesisSink,
-        },
         util::{
             retries::RetryLogic, BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings,
             TowerRequestConfig,
@@ -68,23 +70,47 @@ impl SinkBatchSettings for KinesisDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 1.0;
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the `aws_kinesis_streams` sink.
+#[configurable_component(sink("aws_kinesis_streams"))]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct KinesisSinkConfig {
+    /// The [stream name][stream_name] of the target Kinesis Logs stream.
+    ///
+    /// [stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
     pub stream_name: String,
+
+    /// The log field used as the Kinesis record’s partition key value.
+    ///
+    /// If not specified, a unique partition key will be generated for each Kinesis record.
     pub partition_key_field: Option<String>,
+
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
+
+    #[configurable(derived)]
     pub encoding: EncodingConfig,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub compression: Compression,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<KinesisDefaultBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub auth: AwsAuthentication,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -135,7 +161,6 @@ impl KinesisSinkConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "aws_kinesis_streams")]
 impl SinkConfig for KinesisSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.create_client(&cx.proxy).await?;
@@ -177,12 +202,8 @@ impl SinkConfig for KinesisSinkConfig {
         Input::new(self.encoding.config().input_type() & DataType::Log)
     }
 
-    fn sink_type(&self) -> &'static str {
-        "aws_kinesis_streams"
-    }
-
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 

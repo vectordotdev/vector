@@ -58,9 +58,9 @@ impl Function for ParseNginxLog {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let format = arguments
@@ -70,11 +70,12 @@ impl Function for ParseNginxLog {
 
         let timestamp_format = arguments.optional("timestamp_format");
 
-        Ok(Box::new(ParseNginxLogFn {
+        Ok(ParseNginxLogFn {
             value,
             format,
             timestamp_format,
-        }))
+        }
+        .as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -94,25 +95,6 @@ impl Function for ParseNginxLog {
                 ),
             },
         ]
-    }
-
-    fn compile_argument(
-        &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        match (name, expr) {
-            ("format", Some(expr)) => {
-                let format = expr
-                    .as_enum("format", variants())?
-                    .try_bytes()
-                    .expect("format not bytes");
-                Ok(Some(Box::new(format) as _))
-            }
-            _ => Ok(None),
-        }
     }
 }
 
@@ -148,7 +130,7 @@ struct ParseNginxLogFn {
     timestamp_format: Option<Box<dyn Expression>>,
 }
 
-impl Expression for ParseNginxLogFn {
+impl FunctionExpression for ParseNginxLogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?;
         let timestamp_format = self
@@ -161,7 +143,7 @@ impl Expression for ParseNginxLogFn {
         parse_nginx_log(bytes, timestamp_format, format, ctx)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::object(match self.format.as_ref() {
             b"combined" => kind_combined(),
             b"error" => kind_error(),

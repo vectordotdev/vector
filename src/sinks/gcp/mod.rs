@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 pub mod chronicle_unstructured;
 pub mod cloud_storage;
@@ -6,9 +7,24 @@ pub mod pubsub;
 pub mod stackdriver_logs;
 pub mod stackdriver_metrics;
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+/// A monitored resource.
+///
+/// Monitored resources in GCP allow associating logs and metrics specifically with native resources
+/// within Google Cloud Platform. This takes the form of a "type" field which identifies the
+/// resource, and a set of type-specific labels to uniquely identify a resource of that type.
+///
+/// See [Monitored resource types][mon_docs] for more information.
+///
+/// [mon_docs]: https://cloud.google.com/monitoring/api/resources
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
 pub struct GcpTypedResource {
+    /// The monitored resource type.
+    ///
+    /// For example, the type of a Compute Engine VM instance is `gce_instance`.
     pub r#type: String,
+
+    /// Type-specific labels.
     #[serde(flatten)]
     pub labels: std::collections::HashMap<String, String>,
 }

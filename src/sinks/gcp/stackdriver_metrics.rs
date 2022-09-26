@@ -7,10 +7,10 @@ use chrono::{DateTime, Utc};
 use futures::{sink::SinkExt, FutureExt};
 use goauth::scopes::Scope;
 use http::Uri;
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 use crate::{
-    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     event::{Event, Metric, MetricValue},
     gcp::{GcpAuthConfig, GcpAuthenticator},
     http::HttpClient,
@@ -35,19 +35,42 @@ impl SinkBatchSettings for StackdriverMetricsDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 1.0;
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+/// Configuration for the `gcp_stackdriver_metrics` sink.
+#[configurable_component(sink("gcp_stackdriver_metrics"))]
+#[derive(Clone, Debug, Default)]
 pub struct StackdriverConfig {
+    /// The project ID to which to publish metrics.
+    ///
+    /// See the [Google Cloud Platform project management documentation][project_docs] for more details.
+    ///
+    /// [project_docs]: https://cloud.google.com/resource-manager/docs/creating-managing-projects
     pub project_id: String,
+
+    /// The monitored resource to associate the metrics with.
     pub resource: gcp::GcpTypedResource,
+
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
+
+    /// The default namespace to use for metrics that do not have one.
+    ///
+    /// Metrics with the same name can only be differentiated by their namespace, and not all
+    /// metrics have their own namespace.
     #[serde(default = "default_metric_namespace_value")]
     pub default_namespace: String,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<StackdriverMetricsDefaultBatchSettings>,
+
+    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -62,12 +85,7 @@ fn default_metric_namespace_value() -> String {
 
 impl_generate_config_from_default!(StackdriverConfig);
 
-inventory::submit! {
-    SinkDescription::new::<StackdriverConfig>("gcp_stackdriver_metrics")
-}
-
 #[async_trait::async_trait]
-#[typetag::serde(name = "gcp_stackdriver_metrics")]
 impl SinkConfig for StackdriverConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let auth = self.auth.build(Scope::MonitoringWrite).await?;
@@ -107,12 +125,8 @@ impl SinkConfig for StackdriverConfig {
         Input::metric()
     }
 
-    fn sink_type(&self) -> &'static str {
-        "gcp_stackdriver_metrics"
-    }
-
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 

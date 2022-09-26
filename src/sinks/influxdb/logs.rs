@@ -4,16 +4,14 @@ use bytes::{Bytes, BytesMut};
 use futures::SinkExt;
 use http::{Request, Uri};
 use indoc::indoc;
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 use crate::{
     codecs::Transformer,
-    config::{
-        log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
-        SinkDescription,
-    },
+    config::{log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::{Event, Value},
     http::HttpClient,
+    internal_events::InfluxdbEncodingError,
     sinks::{
         influxdb::{
             encode_timestamp, healthcheck, influx_line_protocol, influxdb_settings, Field,
@@ -37,28 +35,54 @@ impl SinkBatchSettings for InfluxDbLogsDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 1.0;
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+/// Configuration for the `influxdb_logs` sink.
+#[configurable_component(sink("influxdb_logs"))]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct InfluxDbLogsConfig {
+    /// The namespace of the measurement name to use.
+    ///
+    /// When specified, the measurement name will be `<namespace>.vector`.
+    ///
+    /// This field is deprecated, and `measurement` should be used instead.
+    #[configurable(deprecated)]
     pub namespace: Option<String>,
+
+    /// The name of the InfluxDB measurement that will be written to.
     pub measurement: Option<String>,
+
+    /// The endpoint to send data to.
     pub endpoint: String,
+
+    /// The list of names of log fields that should be added as tags to each measurement.
     #[serde(default)]
     pub tags: Vec<String>,
+
     #[serde(flatten)]
     pub influxdb1_settings: Option<InfluxDb1Settings>,
+
     #[serde(flatten)]
     pub influxdb2_settings: Option<InfluxDb2Settings>,
+
+    #[configurable(derived)]
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
     )]
     pub encoding: Transformer,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<InfluxDbLogsDefaultBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -77,10 +101,6 @@ struct InfluxDbLogsSink {
     transformer: Transformer,
 }
 
-inventory::submit! {
-    SinkDescription::new::<InfluxDbLogsConfig>("influxdb_logs")
-}
-
 impl GenerateConfig for InfluxDbLogsConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(indoc! {r#"
@@ -96,7 +116,6 @@ impl GenerateConfig for InfluxDbLogsConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "influxdb_logs")]
 impl SinkConfig for InfluxDbLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let measurement = self.get_measurement()?;
@@ -129,7 +148,7 @@ impl SinkConfig for InfluxDbLogsConfig {
 
         let sink = InfluxDbLogsSink {
             uri,
-            token,
+            token: token.inner().to_owned(),
             protocol_version,
             measurement,
             tags,
@@ -152,12 +171,8 @@ impl SinkConfig for InfluxDbLogsConfig {
         Input::log()
     }
 
-    fn sink_type(&self) -> &'static str {
-        "influxdb_logs"
-    }
-
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
@@ -196,7 +211,7 @@ impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
         });
 
         let mut output = BytesMut::new();
-        if let Err(error) = influx_line_protocol(
+        if let Err(error_message) = influx_line_protocol(
             self.protocol_version,
             &self.measurement,
             Some(tags),
@@ -204,7 +219,10 @@ impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
             timestamp,
             &mut output,
         ) {
-            warn!(message = "Failed to encode event; dropping event.", %error, internal_log_rate_secs = 30);
+            emit!(InfluxdbEncodingError {
+                error_message,
+                count: 1
+            });
             return None;
         };
 
@@ -282,7 +300,7 @@ fn to_field(value: &Value) -> Field {
 #[cfg(test)]
 mod tests {
     use chrono::{offset::TimeZone, Utc};
-    use futures::{channel::mpsc, StreamExt};
+    use futures::{channel::mpsc, stream, StreamExt};
     use http::{request::Parts, StatusCode};
     use indoc::indoc;
     use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
@@ -293,7 +311,13 @@ mod tests {
             influxdb::test_util::{assert_fields, split_line_protocol, ts},
             util::test::{build_test_server_status, load_sink},
         },
-        test_util::{components, components::HTTP_SINK_TAGS, next_addr},
+        test_util::{
+            components::{
+                run_and_assert_sink_compliance, run_and_assert_sink_error, COMPONENT_ERROR_TAGS,
+                HTTP_SINK_TAGS,
+            },
+            next_addr,
+        },
     };
 
     type Receiver = mpsc::Receiver<(Parts, bytes::Bytes)>;
@@ -667,10 +691,10 @@ mod tests {
         }
         drop(batch);
 
-        components::init_test();
-        sink.run_events(events).await.unwrap();
         if batch_status == BatchStatus::Delivered {
-            components::SINK_TESTS.assert(&HTTP_SINK_TAGS);
+            run_and_assert_sink_compliance(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
+        } else {
+            run_and_assert_sink_error(sink, stream::iter(events), &COMPONENT_ERROR_TAGS).await;
         }
 
         assert_eq!(receiver.try_recv(), Ok(batch_status));
@@ -768,7 +792,7 @@ mod integration_tests {
             influxdb2_settings: Some(InfluxDb2Settings {
                 org: ORG.to_string(),
                 bucket: BUCKET.to_string(),
-                token: TOKEN.to_string(),
+                token: TOKEN.to_string().into(),
             }),
             encoding: Default::default(),
             batch: Default::default(),

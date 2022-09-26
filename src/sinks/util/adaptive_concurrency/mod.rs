@@ -5,7 +5,9 @@ mod future;
 mod layer;
 mod semaphore;
 mod service;
-mod tests;
+
+#[cfg(test)]
+pub mod tests;
 
 pub(super) const MAX_CONCURRENCY: usize = 200;
 
@@ -65,6 +67,10 @@ impl AdaptiveConcurrencySettings {
             ewma_alpha: 0.4,
             rtt_deviation_scale: 2.5,
         }
+    }
+
+    pub const fn max_concurrency() -> usize {
+        MAX_CONCURRENCY
     }
 }
 

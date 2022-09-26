@@ -226,8 +226,8 @@ async fn insert_events_over_https() {
     run_insert_tests(
         ElasticsearchConfig {
             auth: Some(ElasticsearchAuth::Basic {
-                user: "elastic".into(),
-                password: "vector".into(),
+                user: "elastic".to_string(),
+                password: "vector".to_string().into(),
             }),
             endpoint: https_server(),
             doc_type: Some("log_lines".into()),
