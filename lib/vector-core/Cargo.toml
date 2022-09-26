@@ -41,7 +41,7 @@ quanta = { version = "0.10.1", default-features = false }
 regex = { version = "1.6.0", default-features = false, features = ["std", "perf"] }
 serde = { version = "1.0.145", default-features = false, features = ["derive", "rc"] }
 serde_json = { version = "1.0.85", default-features = false }
-serde_with = { version = "2.0.0", default-features = false, features = ["std", "macros"] }
+serde_with = { version = "2.0.1", default-features = false, features = ["std", "macros"] }
 snafu = { version = "0.7.1", default-features = false }
 socket2 = { version = "0.4.7", default-features = false }
 tokio = { version = "1.20.1", default-features = false, features = ["net"] }
