@@ -5,7 +5,6 @@ use std::{
 
 use futures::{FutureExt, TryFutureExt};
 use snafu::ResultExt;
-use tower::ServiceBuilder;
 use vector_config::configurable_component;
 
 use crate::{
@@ -26,7 +25,7 @@ use crate::{
         },
         util::{
             http::RequestConfig, service::HealthConfig, BatchConfig, Compression,
-            RealtimeSizeBasedDefaultBatchSettings, ServiceBuilderExt, TowerRequestConfig,
+            RealtimeSizeBasedDefaultBatchSettings, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -388,45 +387,31 @@ impl SinkConfig for ElasticsearchConfig {
             .tower
             .unwrap_with(&TowerRequestConfig::default());
 
-        let stream = if commons.len() > 1 {
-            // Distributed services
-            let health_config = self.distribution.clone().unwrap_or_default();
+        let health_config = self.distribution.clone().unwrap_or_default();
 
-            let services = commons
-                .iter()
-                .cloned()
-                .map(|common| {
-                    let endpoint = common.base_url.clone();
+        let services = commons
+            .iter()
+            .cloned()
+            .map(|common| {
+                let endpoint = common.base_url.clone();
 
-                    let http_request_builder = HttpRequestBuilder::new(&common, self);
-                    let service = ElasticsearchService::new(client.clone(), http_request_builder);
+                let http_request_builder = HttpRequestBuilder::new(&common, self);
+                let service = ElasticsearchService::new(client.clone(), http_request_builder);
 
-                    (endpoint, service)
-                })
-                .collect::<Vec<_>>();
+                (endpoint, service)
+            })
+            .collect::<Vec<_>>();
 
-            let service = request_limits.distributed_service(
-                ElasticsearchRetryLogic,
-                services,
-                health_config,
-                ElasticsearchHealthLogic,
-            );
+        let service = request_limits.distributed_service(
+            ElasticsearchRetryLogic,
+            services,
+            health_config,
+            ElasticsearchHealthLogic,
+        );
 
-            let sink = ElasticsearchSink::new(&common, self, service)?;
+        let sink = ElasticsearchSink::new(&common, self, service)?;
 
-            VectorSink::from_event_streamsink(sink)
-        } else {
-            // Single service
-            let service =
-                ElasticsearchService::new(client.clone(), HttpRequestBuilder::new(&common, self));
-
-            let service = ServiceBuilder::new()
-                .settings(request_limits, ElasticsearchRetryLogic)
-                .service(service);
-
-            let sink = ElasticsearchSink::new(&common, self, service)?;
-            VectorSink::from_event_streamsink(sink)
-        };
+        let stream = VectorSink::from_event_streamsink(sink);
 
         let healthcheck = futures::future::select_ok(
             commons
