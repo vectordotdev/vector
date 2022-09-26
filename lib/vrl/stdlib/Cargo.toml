@@ -29,7 +29,7 @@ indexmap = { version = "~1.9.1", default-features = false, optional = true}
 md-5 = { version = "0.10", optional = true }
 nom = { version = "7", optional = true }
 percent-encoding = { version = "2.2", optional = true }
-once_cell = { version = "1.14", optional = true }
+once_cell = { version = "1.15", optional = true }
 rand = { version = "0.8.5", optional = true }
 regex = { version = "1", optional = true }
 rust_decimal = { version = "1", optional = true }
@@ -61,7 +61,7 @@ ofb = { version = "0.6.1", optional = true }
 [dev-dependencies]
 anyhow = "1"
 chrono-tz = "0.6"
-criterion = "0.3"
+criterion = "0.4"
 tracing-test = "0.1"
 value = { path = "../../value", features = ["test"] }
 vrl-core = { path = "../../vrl/core", features = ["test"] }
