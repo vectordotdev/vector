@@ -872,7 +872,7 @@ fn config_to_endpoint(config: &Config) -> String {
         SslMode::Require => params.push(("sslmode", "require".to_string())),
         // non_exhaustive enum
         _ => {
-            warn!(r#"Unknown variant of "SslMode.""#);
+            warn!("Unknown variant of \"SslMode\".");
         }
     };
 
@@ -914,7 +914,7 @@ fn config_to_endpoint(config: &Config) -> String {
         }
         // non_exhaustive enum
         _ => {
-            warn!(r#"Unknown variant of "TargetSessionAttrs.""#);
+            warn!("Unknown variant of \"TargetSessionAttr\".");
         }
     }
 
@@ -925,7 +925,7 @@ fn config_to_endpoint(config: &Config) -> String {
         ChannelBinding::Require => params.push(("channel_binding", "require".to_owned())),
         // non_exhaustive enum
         _ => {
-            warn!(r#"Unknown variant of "ChannelBinding"."#);
+            warn!("Unknown variant of \"ChannelBinding\".");
         }
     }
 

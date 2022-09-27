@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-import sys, tomlkit
+import os, sys, tomlkit, yaml
+from yaml.loader import SafeLoader
 
 try:
   _, filename = sys.argv
@@ -7,8 +8,16 @@ except:
   print("usage: {} CONFIG.toml".format(sys.argv[0]))
   exit(1)
 
-with open(filename, 'rb') as fh:
-  config = tomlkit.load(fh)
+_, ext = os.path.splitext(filename.lower())
+if ext in ['.yaml', '.yml']:
+  with open(filename) as fh:
+    config = yaml.load(fh, Loader=SafeLoader)
+elif ext == '.toml':
+  with open(filename, 'rb') as fh:
+    config = tomlkit.load(fh)
+else:
+  print("{}: Unknown config filename extension.".format(sys.argv[0]))
+  exit(1)
 
 base_features = set()
 

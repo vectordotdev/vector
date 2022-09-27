@@ -8,6 +8,7 @@ use vector_core::stream::{BatcherSettings, DriverResponse};
 
 use crate::{
     event::{Event, LogEvent},
+    internal_events::SinkRequestBuildError,
     sinks::{
         aws_kinesis_streams::request_builder::{KinesisRequest, KinesisRequestBuilder},
         util::{processed_event::ProcessedEvent, SinkBuilderExt, StreamSink},
@@ -47,8 +48,8 @@ where
             .request_builder(request_builder_concurrency_limit, self.request_builder)
             .filter_map(|request| async move {
                 match request {
-                    Err(e) => {
-                        error!("Failed to build Kinesis Stream request: {:?}.", e);
+                    Err(error) => {
+                        emit!(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),

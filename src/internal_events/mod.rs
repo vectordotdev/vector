@@ -20,8 +20,6 @@ mod aws_ecs_metrics;
 mod aws_kinesis_firehose;
 #[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs",))]
 mod aws_sqs;
-#[cfg(any(feature = "sinks-azure_blob", feature = "sinks-datadog_archives"))]
-pub(crate) mod azure_blob;
 mod batch;
 mod codecs;
 mod common;

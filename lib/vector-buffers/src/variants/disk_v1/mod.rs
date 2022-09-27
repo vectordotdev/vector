@@ -498,7 +498,7 @@ pub(self) fn get_sidelined_old_style_buffer_dir_name(base: &str) -> String {
     format!("{}_buffer_old", base)
 }
 
-fn get_new_style_buffer_dir_path(base: &Path, id: &str) -> PathBuf {
+pub(crate) fn get_new_style_buffer_dir_path(base: &Path, id: &str) -> PathBuf {
     let buffer_id = get_new_style_buffer_dir_name(id);
     base.join(buffer_id)
 }

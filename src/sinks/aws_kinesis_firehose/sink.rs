@@ -8,13 +8,8 @@ use vector_core::{
     stream::{BatcherSettings, DriverResponse},
 };
 
-use crate::{
-    event::Event,
-    sinks::{
-        aws_kinesis_firehose::request_builder::{KinesisRequest, KinesisRequestBuilder},
-        util::SinkBuilderExt,
-    },
-};
+use super::request_builder::{KinesisRequest, KinesisRequestBuilder};
+use crate::{event::Event, internal_events::SinkRequestBuildError, sinks::util::SinkBuilderExt};
 
 #[derive(Debug, Clone)]
 struct KinesisFirehoseRetryLogic;
@@ -43,8 +38,8 @@ where
             .request_builder(request_builder_concurrency_limit, self.request_builder)
             .filter_map(|request| async move {
                 match request {
-                    Err(e) => {
-                        error!("Failed to build Kinesis Firehose request: {:?}.", e);
+                    Err(error) => {
+                        emit!(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),

@@ -4,30 +4,21 @@ use std::{
     task::{Context, Poll},
 };
 
-use azure_core::HttpError;
 use azure_storage_blobs::prelude::*;
-use futures::{future::BoxFuture, TryFutureExt};
+use futures::future::BoxFuture;
 use tower::Service;
 use tracing::Instrument;
-use vector_common::internal_event::{
-    ByteSize, BytesSent, InternalEventHandle, Protocol, Registered,
-};
 
-use crate::{
-    internal_events::azure_blob::{AzureBlobHttpError, AzureBlobResponseError},
-    sinks::azure_common::config::{AzureBlobRequest, AzureBlobResponse},
-};
+use crate::sinks::azure_common::config::{AzureBlobRequest, AzureBlobResponse};
 
 #[derive(Clone)]
 pub(crate) struct AzureBlobService {
     client: Arc<ContainerClient>,
-    bytes_sent: Registered<BytesSent>,
 }
 
 impl AzureBlobService {
     pub fn new(client: Arc<ContainerClient>) -> AzureBlobService {
-        let bytes_sent = register!(BytesSent::from(Protocol::HTTPS));
-        AzureBlobService { client, bytes_sent }
+        AzureBlobService { client }
     }
 }
 
@@ -37,10 +28,12 @@ impl Service<AzureBlobRequest> for AzureBlobService {
     type Future = BoxFuture<'static, StdResult<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<StdResult<(), Self::Error>> {
+        // Emission of Error internal event is handled upstream by the caller
         Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, request: AzureBlobRequest) -> Self::Future {
+        // Emission of Error internal event is handled upstream by the caller
         let this = self.clone();
 
         Box::pin(async move {
@@ -58,17 +51,6 @@ impl Service<AzureBlobRequest> for AzureBlobService {
 
             let result = blob
                 .execute()
-                .inspect_err(|reason| {
-                    match reason.downcast_ref::<HttpError>() {
-                        Some(HttpError::StatusCode { status, .. }) => {
-                            emit!(AzureBlobResponseError::from(*status))
-                        }
-                        _ => emit!(AzureBlobHttpError {
-                            error: reason.to_string()
-                        }),
-                    };
-                })
-                .inspect_ok(|_| this.bytes_sent.emit(ByteSize(byte_size)))
                 .instrument(info_span!("request").or_current())
                 .await;
 
@@ -76,6 +58,7 @@ impl Service<AzureBlobRequest> for AzureBlobService {
                 inner,
                 count: request.metadata.count,
                 events_byte_size: request.metadata.byte_size,
+                byte_size,
             })
         })
     }

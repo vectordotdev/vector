@@ -38,7 +38,7 @@ impl HostMetrics {
                             .network
                             .devices
                             .contains_str(Some(counter.interface()))
-                            .then(|| counter)
+                            .then_some(counter)
                     })
                     .filter_map(|counter| async { counter })
                     .collect::<Vec<_>>()
