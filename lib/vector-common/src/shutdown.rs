@@ -15,7 +15,7 @@ use tokio::time::{timeout_at, Instant};
 use crate::{config::ComponentKey, trigger::DisabledTrigger};
 
 pub async fn tripwire_handler(closed: bool) {
-    futures::future::poll_fn(|_| {
+    std::future::poll_fn(|_| {
         if closed {
             Poll::Ready(())
         } else {
