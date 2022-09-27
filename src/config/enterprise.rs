@@ -342,7 +342,7 @@ impl TryFrom<&Config> for EnterpriseMetadata {
         );
 
         // Get the configuration version hash. In DD Pipelines, this is referred to as the 'config hash'.
-        let configuration_version_hash = value.version.clone().expect("Config should be versioned");
+        let configuration_version_hash = value.hash.clone().expect("Config should be versioned");
 
         Ok(Self {
             opts,
