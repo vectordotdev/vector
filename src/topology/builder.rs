@@ -332,7 +332,7 @@ pub async fn build_pieces(
         .sinks()
         .filter(|(key, _)| diff.sinks.contains_new(key))
     {
-        debug!(component = %key, "Building new sink");
+        debug!(component = %key, "Building new sink.");
 
         let sink_inputs = &sink.inputs;
         let healthcheck = sink.healthcheck();
