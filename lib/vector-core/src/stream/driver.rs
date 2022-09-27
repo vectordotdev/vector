@@ -1,7 +1,6 @@
-use std::{collections::VecDeque, fmt, task::Poll};
+use std::{collections::VecDeque, fmt, future::poll_fn, task::Poll};
 
 use futures::{poll, FutureExt, Stream, StreamExt, TryFutureExt};
-use futures_util::future::poll_fn;
 use tokio::{pin, select};
 use tower::Service;
 use tracing::Instrument;
@@ -199,11 +198,11 @@ mod tests {
         future::Future,
         pin::Pin,
         sync::{atomic::AtomicUsize, atomic::Ordering, Arc},
-        task::{Context, Poll},
+        task::{ready, Context, Poll},
         time::Duration,
     };
 
-    use futures_util::{ready, stream};
+    use futures_util::stream;
     use rand::{prelude::StdRng, SeedableRng};
     use rand_distr::{Distribution, Pareto};
     use tokio::{

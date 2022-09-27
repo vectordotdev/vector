@@ -8,13 +8,7 @@ use std::{
 
 use async_trait::async_trait;
 use bytes::BytesMut;
-use futures::{
-    future::{self},
-    pin_mut,
-    sink::SinkExt,
-    stream::BoxStream,
-    Sink, Stream, StreamExt,
-};
+use futures::{pin_mut, sink::SinkExt, stream::BoxStream, Sink, Stream, StreamExt};
 use snafu::{ResultExt, Snafu};
 use tokio::{net::TcpStream, time};
 use tokio_tungstenite::{
@@ -189,7 +183,7 @@ impl PingInterval {
     }
 
     async fn tick(&mut self) -> time::Instant {
-        future::poll_fn(|cx| self.poll_tick(cx)).await
+        std::future::poll_fn(|cx| self.poll_tick(cx)).await
     }
 }
 

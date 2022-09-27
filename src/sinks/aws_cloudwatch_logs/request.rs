@@ -1,7 +1,7 @@
 use std::{
     future::Future,
     pin::Pin,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
 };
 
 use aws_sdk_cloudwatchlogs::error::{
@@ -15,7 +15,7 @@ use aws_sdk_cloudwatchlogs::output::{DescribeLogStreamsOutput, PutLogEventsOutpu
 use aws_sdk_cloudwatchlogs::types::SdkError;
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
 use aws_smithy_http::operation::{Operation, Request};
-use futures::{future::BoxFuture, ready, FutureExt};
+use futures::{future::BoxFuture, FutureExt};
 use indexmap::IndexMap;
 use tokio::sync::oneshot;
 
