@@ -8,7 +8,7 @@ use std::{
 
 use async_trait::async_trait;
 use bytes::BytesMut;
-use futures::{future, pin_mut, sink::SinkExt, stream::BoxStream, Sink, Stream, StreamExt};
+use futures::{pin_mut, sink::SinkExt, stream::BoxStream, Sink, Stream, StreamExt};
 use snafu::{ResultExt, Snafu};
 use tokio::{net::TcpStream, time};
 use tokio_tungstenite::{

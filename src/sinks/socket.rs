@@ -295,7 +295,7 @@ mod test {
             task::Poll,
         };
 
-        use futures::{channel::mpsc, future, FutureExt, SinkExt, StreamExt};
+        use futures::{channel::mpsc, FutureExt, SinkExt, StreamExt};
         use tokio::{
             io::{AsyncRead, AsyncWriteExt, ReadBuf},
             net::TcpStream,
