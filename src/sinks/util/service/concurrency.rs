@@ -8,6 +8,7 @@ use vector_config::{
     schemars::{gen::SchemaGenerator, schema::SchemaObject},
     Configurable, GenerateError, Metadata,
 };
+use vector_config_common::attributes::CustomAttribute;
 
 use serde::{
     de::{self, Unexpected, Visitor},
@@ -138,6 +139,10 @@ impl Configurable for Concurrency {
         none_metadata.set_description(
             "In other words, only one request can be outstanding at any given time.",
         );
+        none_metadata.add_custom_attribute(CustomAttribute::KeyValue {
+            key: "logical_name".to_string(),
+            value: "None".to_string(),
+        });
         apply_metadata(&mut none_schema, none_metadata);
 
         let mut adaptive_schema = generate_const_string_schema("adaptive".to_string());
@@ -146,12 +151,20 @@ impl Configurable for Concurrency {
         );
         adaptive_metadata
             .set_description("[arc]: https://vector.dev/docs/about/under-the-hood/networking/arc/");
+        adaptive_metadata.add_custom_attribute(CustomAttribute::KeyValue {
+            key: "logical_name".to_string(),
+            value: "Adaptive".to_string(),
+        });
         apply_metadata(&mut adaptive_schema, adaptive_metadata);
 
         let mut fixed_schema = generate_number_schema::<usize>();
         let mut fixed_metadata =
             Metadata::<()>::with_description("A fixed amount of concurrency will be allowed.");
         fixed_metadata.set_transparent();
+        fixed_metadata.add_custom_attribute(CustomAttribute::KeyValue {
+            key: "logical_name".to_string(),
+            value: "Fixed".to_string(),
+        });
         apply_metadata(&mut fixed_schema, fixed_metadata);
 
         Ok(generate_one_of_schema(&[

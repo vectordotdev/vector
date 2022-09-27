@@ -4,13 +4,14 @@ use indexmap::IndexMap;
 use serde::{de, ser};
 use vector_config::{
     schema::{
-        generate_const_string_schema, generate_enum_schema,
+        apply_metadata, generate_const_string_schema, generate_enum_schema,
         generate_internal_tagged_variant_schema, generate_one_of_schema, generate_struct_schema,
         get_or_generate_schema,
     },
     schemars::{gen::SchemaGenerator, schema::SchemaObject},
     Configurable, GenerateError, Metadata,
 };
+use vector_config_common::attributes::CustomAttribute;
 
 /// Compression configuration.
 #[derive(Copy, Clone, Debug, Derivative, Eq, PartialEq)]
@@ -208,11 +209,11 @@ impl Configurable for Compression {
     }
 
     fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
-        const ALGORITHM_NAME: &'static str = "algorithm";
-        const LEVEL_NAME: &'static str = "level";
-        const NONE_NAME: &'static str = "none";
-        const GZIP_NAME: &'static str = "gzip";
-        const ZLIB_NAME: &'static str = "zlib";
+        const ALGORITHM_NAME: &str = "algorithm";
+        const LEVEL_NAME: &str = "level";
+        const NONE_NAME: &str = "none";
+        const GZIP_NAME: &str = "gzip";
+        const ZLIB_NAME: &str = "zlib";
 
         // First, we need to be able to handle all of the string-only variants.
         let const_values = [NONE_NAME, GZIP_NAME, ZLIB_NAME]
@@ -227,6 +228,22 @@ impl Configurable for Compression {
         let compression_level_schema =
             get_or_generate_schema::<CompressionLevel>(gen, compression_level_metadata)?;
 
+        let mut required = BTreeSet::new();
+        required.insert(ALGORITHM_NAME.to_string());
+
+        // Build the None schema.
+        let mut none_schema = generate_internal_tagged_variant_schema(
+            ALGORITHM_NAME.to_string(),
+            NONE_NAME.to_string(),
+        );
+        let mut none_metadata = Metadata::<()>::with_description("No compression.");
+        none_metadata.add_custom_attribute(CustomAttribute::KeyValue {
+            key: "logical_name".to_string(),
+            value: "None".to_string(),
+        });
+        apply_metadata(&mut none_schema, none_metadata);
+
+        // Build the Gzip schema.
         let mut gzip_properties = IndexMap::new();
         gzip_properties.insert(
             ALGORITHM_NAME.to_string(),
@@ -234,6 +251,16 @@ impl Configurable for Compression {
         );
         gzip_properties.insert(LEVEL_NAME.to_string(), compression_level_schema.clone());
 
+        let mut gzip_schema = generate_struct_schema(gzip_properties, required.clone(), None);
+        let mut gzip_metadata = Metadata::<()>::with_title("[Gzip][gzip] compression.");
+        gzip_metadata.set_description("[gzip]: https://en.wikipedia.org/wiki/Gzip");
+        gzip_metadata.add_custom_attribute(CustomAttribute::KeyValue {
+            key: "logical_name".to_string(),
+            value: "Gzip".to_string(),
+        });
+        apply_metadata(&mut gzip_schema, gzip_metadata);
+
+        // Build the Zlib schema.
         let mut zlib_properties = IndexMap::new();
         zlib_properties.insert(
             ALGORITHM_NAME.to_string(),
@@ -241,19 +268,22 @@ impl Configurable for Compression {
         );
         zlib_properties.insert(LEVEL_NAME.to_string(), compression_level_schema);
 
-        let mut required = BTreeSet::new();
-        required.insert(ALGORITHM_NAME.to_string());
+        let mut zlib_schema = generate_struct_schema(zlib_properties, required, None);
+        let mut zlib_metadata = Metadata::<()>::with_title("[Zlib]][zlib] compression.");
+        zlib_metadata.set_description("[zlib]: https://en.wikipedia.org/wiki/Zlib");
+        zlib_metadata.add_custom_attribute(CustomAttribute::KeyValue {
+            key: "logical_name".to_string(),
+            value: "Zlib".to_string(),
+        });
+        apply_metadata(&mut zlib_schema, zlib_metadata);
 
         Ok(generate_one_of_schema(&[
             // Handle the condensed string form.
             generate_enum_schema(const_values),
             // Handle the expanded object form.
-            generate_internal_tagged_variant_schema(
-                ALGORITHM_NAME.to_string(),
-                NONE_NAME.to_string(),
-            ),
-            generate_struct_schema(gzip_properties, required.clone(), None),
-            generate_struct_schema(zlib_properties, required, None),
+            none_schema,
+            gzip_schema,
+            zlib_schema,
         ]))
     }
 }
@@ -383,7 +413,7 @@ impl Configurable for CompressionLevel {
             .iter()
             .map(|s| serde_json::Value::from(*s));
 
-        let level_consts = (0u32..=9).map(|n| serde_json::Value::from(n));
+        let level_consts = (0u32..=9).map(serde_json::Value::from);
 
         let valid_values = string_consts.chain(level_consts).collect();
         Ok(generate_enum_schema(valid_values))

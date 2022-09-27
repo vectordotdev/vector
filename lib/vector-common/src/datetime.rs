@@ -11,6 +11,7 @@ use vector_config::{
     schemars::{gen::SchemaGenerator, schema::SchemaObject},
     Configurable, GenerateError, Metadata,
 };
+use vector_config_common::attributes::CustomAttribute;
 
 /// Timezone reference.
 ///
@@ -108,7 +109,11 @@ impl Configurable for TimeZone {
 
     fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
         let mut local_schema = generate_const_string_schema("local".to_string());
-        let local_metadata = Metadata::<()>::with_description("System local timezone.");
+        let mut local_metadata = Metadata::<()>::with_description("System local timezone.");
+        local_metadata.add_custom_attribute(CustomAttribute::KeyValue {
+            key: "logical_name".to_string(),
+            value: "Local".to_string(),
+        });
         apply_metadata(&mut local_schema, local_metadata);
 
         let mut tz_metadata = Metadata::with_title("A named timezone.");
@@ -117,6 +122,10 @@ impl Configurable for TimeZone {
 
 [tzdb]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones"#,
         );
+        tz_metadata.add_custom_attribute(CustomAttribute::KeyValue {
+            key: "logical_name".to_string(),
+            value: "Named".to_string(),
+        });
         let tz_schema = get_or_generate_schema::<Tz>(gen, tz_metadata)?;
 
         Ok(generate_one_of_schema(&[local_schema, tz_schema]))
