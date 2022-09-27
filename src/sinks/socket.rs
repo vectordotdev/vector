@@ -368,7 +368,7 @@ mod test {
 
                     let mut stream: MaybeTlsIncomingStream<TcpStream> = connection.unwrap();
 
-                    future::poll_fn(move |cx| loop {
+                    std::future::poll_fn(move |cx| loop {
                         if let Some(fut) = close_rx.as_mut() {
                             if let Poll::Ready(()) = fut.poll_unpin(cx) {
                                 stream

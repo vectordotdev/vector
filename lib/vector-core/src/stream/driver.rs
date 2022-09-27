@@ -1,7 +1,6 @@
-use std::{collections::VecDeque, fmt, task::Poll};
+use std::{collections::VecDeque, fmt, future::poll_fn, task::Poll};
 
 use futures::{poll, FutureExt, Stream, StreamExt, TryFutureExt};
-use futures_util::future::poll_fn;
 use tokio::{pin, select};
 use tower::Service;
 use tracing::Instrument;
