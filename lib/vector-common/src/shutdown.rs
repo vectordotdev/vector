@@ -5,10 +5,10 @@ use std::{
     future::Future,
     pin::Pin,
     sync::Arc,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
 };
 
-use futures::{future, ready, FutureExt};
+use futures::{future, FutureExt};
 use stream_cancel::{Trigger, Tripwire};
 use tokio::time::{timeout_at, Instant};
 
