@@ -1,16 +1,16 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 
-mod tracing_allocator;
 mod token;
 mod tracer;
 mod tracing;
+mod tracing_allocator;
 
 use self::token::with_suspended_allocation_group;
 
-pub use self::tracing_allocator::GroupedTraceableAllocator;
 pub use self::token::AllocationGroupId;
 pub use self::tracer::Tracer;
 pub use self::tracing::AllocationLayer;
+pub use self::tracing_allocator::GroupedTraceableAllocator;
 
 /// Whether or not allocations and deallocations should be traced.
 static TRACING_ENABLED: AtomicBool = AtomicBool::new(false);
