@@ -248,29 +248,35 @@ impl Bucket {
     /// Update a bucket with a new span. Computed statistics include the number of hits and the actual distribution of
     /// execution time, with isolated measurements for spans flagged as errored and spans without error.
     fn update(span: &BTreeMap<String, Value>, weight: f64, is_top: bool, gs: &mut GroupedStats) {
-        let name = match span.get("name") {
-            Some(Value::Bytes(val)) => String::from_utf8_lossy(val).to_string(), //(*val),
-            _ => "".to_owned(),
-        };
+        //let name = match span.get("name") {
+        //    Some(Value::Bytes(val)) => String::from_utf8_lossy(val).to_string(), //(*val),
+        //    _ => "".to_owned(),
+        //};
         //let resource = match span.get("resource") {
         //    Some(Value::Bytes(val)) => String::from_utf8_lossy(val).to_string(), //(*val),
         //    _ => "".to_owned(),
         //};
-        //let span_id = match span.get("span_id") {
-        //    Some(Value::Integer(val)) => (*val) as u64,
-        //    _ => 0,
-        //};
 
-        if name == "dynamodb.command" {
-            //&& resource == "dynamodb.query" {
-            let mut file = fs::OpenOptions::new()
-                .write(true)
-                .append(true)
-                .open("vector-dynamodb-spans.txt")
-                .unwrap();
-            file.write_all(format!("{:?}\n", span).as_bytes())
-                .expect("write failed");
-        }
+        //if name == "dynamodb.command" {
+        //    let span_id = match span.get("span_id") {
+        //        Some(Value::Integer(val)) => (*val) as u64,
+        //        _ => 0,
+        //    };
+        //    //&& resource == "dynamodb.query" {
+        //    let mut file = fs::OpenOptions::new()
+        //        .write(true)
+        //        .append(true)
+        //        .open("vector-dynamodb-span-ids.txt")
+        //        .unwrap();
+        //    file.write_all(format!("{}\n", span_id).as_bytes())
+        //        .expect("write failed");
+        //}
+        write_span_ids(
+            &span,
+            "vector-dynamodb-span-ids_update.txt",
+            "dynamodb.command",
+            "dynamodb.query",
+        );
         is_top.then(|| {
             gs.top_level_hits += weight;
         });
@@ -300,6 +306,40 @@ struct Aggregator {
     // which the associated bucket will calculate statistics.
     buckets: BTreeMap<u64, Bucket>,
     skipped_spans: u64,
+}
+
+fn write_span_ids(
+    span: &BTreeMap<String, Value>,
+    outfile: &str,
+    span_name: &str,
+    resource_name: &str,
+) {
+    let name = match span.get("name") {
+        Some(Value::Bytes(val)) => String::from_utf8_lossy(val).to_string(), //(*val),
+        _ => "".to_owned(),
+    };
+    let resource = match span.get("resource") {
+        Some(Value::Bytes(val)) => String::from_utf8_lossy(val).to_string(), //(*val),
+        _ => "".to_owned(),
+    };
+
+    if name == span_name && resource == resource_name {
+        //let span_id = match span.get("span_id") {
+        //    Some(Value::Integer(val)) => (*val) as u64,
+        //    _ => 0,
+        //};
+        let hits = match span.get("hits") {
+            Some(Value::Integer(val)) => (*val) as u64,
+            _ => 0,
+        };
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .append(true)
+            .open(outfile)
+            .unwrap();
+        file.write_all(format!("{}-{}\n", resource, hits).as_bytes())
+            .expect("write failed");
+    }
 }
 
 impl Aggregator {
@@ -360,6 +400,12 @@ impl Aggregator {
                 self.skipped_spans += 1;
                 continue;
             }
+            write_span_ids(
+                &span,
+                "vector-dynamodb-span-ids_handle_trace.txt",
+                "dynamodb.command",
+                "dynamodb.query",
+            );
             self.handle_span(span, weight, is_top, synthetics, payload_aggkey.clone());
         }
         //println!("total skipped spans: {}", self.skipped_spans);

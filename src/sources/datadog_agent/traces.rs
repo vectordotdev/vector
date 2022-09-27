@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, sync::Arc};
+use std::{collections::BTreeMap, fs, io::Write, sync::Arc};
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
@@ -178,14 +178,18 @@ fn convert_dd_tracer_payload(payload: ddtrace_proto::TracerPayload) -> Vec<Trace
             let mut trace_tags = convert_tags(trace.tags);
             trace_tags.extend(tags.clone());
             trace_event.insert("tags", Value::from(trace_tags));
-            trace_event.insert(
-                "spans",
-                trace
-                    .spans
-                    .into_iter()
-                    .map(|s| Value::from(convert_span(s)))
-                    .collect::<Vec<Value>>(),
-            );
+
+            let n_spans = trace.spans.len();
+
+            let spans = trace
+                .spans
+                .into_iter()
+                .map(|s| Value::from(convert_span(s)))
+                .collect::<Vec<Value>>();
+
+            assert_eq!(n_spans, spans.len(), "Not all spans converted!");
+
+            trace_event.insert("spans", spans);
             trace_event.insert("container_id", payload.container_id.clone());
             trace_event.insert("language_name", payload.language_name.clone());
             trace_event.insert("language_version", payload.language_version.clone());
@@ -214,8 +218,8 @@ fn handle_dd_trace_payload_v0(
         .into_iter()
         .map(|dd_trace| {
             let mut trace_event = TraceEvent::default();
-            trace_event.insert("trace_id", dd_trace.trace_id as f64);
-            //trace_event.insert("trace_id", dd_trace.trace_id as i64);
+            //trace_event.insert("trace_id", dd_trace.trace_id as f64);
+            trace_event.insert("trace_id", dd_trace.trace_id as i64);
             trace_event.insert("start_time", Utc.timestamp_nanos(dd_trace.start_time));
             trace_event.insert("end_time", Utc.timestamp_nanos(dd_trace.end_time));
             trace_event.insert(
@@ -270,13 +274,14 @@ fn convert_span(dd_span: ddtrace_proto::Span) -> BTreeMap<String, Value> {
     let mut span = BTreeMap::<String, Value>::new();
     span.insert("service".into(), Value::from(dd_span.service));
     span.insert("name".into(), Value::from(dd_span.name));
+
     span.insert("resource".into(), Value::from(dd_span.resource));
-    span.insert("trace_id".into(), Value::from(dd_span.trace_id as f64));
-    span.insert("span_id".into(), Value::from(dd_span.span_id as f64));
-    span.insert("parent_id".into(), Value::from(dd_span.parent_id as f64));
-    //span.insert("trace_id".into(), Value::from(dd_span.trace_id as i64));
-    //span.insert("span_id".into(), Value::from(dd_span.span_id as i64));
-    //span.insert("parent_id".into(), Value::from(dd_span.parent_id as i64));
+    //span.insert("trace_id".into(), Value::from(dd_span.trace_id as f64));
+    //span.insert("span_id".into(), Value::from(dd_span.span_id as f64));
+    //span.insert("parent_id".into(), Value::from(dd_span.parent_id as f64));
+    span.insert("trace_id".into(), Value::from(dd_span.trace_id as i64));
+    span.insert("span_id".into(), Value::from(dd_span.span_id as i64));
+    span.insert("parent_id".into(), Value::from(dd_span.parent_id as i64));
     span.insert(
         "start".into(),
         Value::from(Utc.timestamp_nanos(dd_span.start)),
@@ -312,6 +317,30 @@ fn convert_span(dd_span: ddtrace_proto::Span) -> BTreeMap<String, Value> {
                 .collect::<BTreeMap<String, Value>>(),
         ),
     );
+
+    let name = match span.get("name") {
+        Some(Value::Bytes(val)) => String::from_utf8_lossy(val).to_string(), //(*val),
+        _ => "".to_owned(),
+    };
+    let resource = match span.get("resource") {
+        Some(Value::Bytes(val)) => String::from_utf8_lossy(val).to_string(), //(*val),
+        _ => "".to_owned(),
+    };
+
+    if name == "dynamodb.command" && resource == "dynamodb.query" {
+        let span_id = match span.get("span_id") {
+            Some(Value::Integer(val)) => (*val) as u64,
+            _ => 0,
+        };
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .append(true)
+            .open("vector-dynamodb-span-ids_source_handle_dd_trace.txt")
+            .unwrap();
+        file.write_all(format!("{}\n", span_id).as_bytes())
+            .expect("write failed");
+    }
+
     span
 }
 
