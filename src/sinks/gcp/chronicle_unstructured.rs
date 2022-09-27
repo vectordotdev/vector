@@ -4,7 +4,7 @@
 use bytes::{Bytes, BytesMut};
 use futures_util::{future::BoxFuture, task::Poll};
 use goauth::scopes::Scope;
-use http::{header::HeaderValue, Request, Uri};
+use http::{header::HeaderValue, Request, StatusCode, Uri};
 use hyper::Body;
 use indoc::indoc;
 use serde_json::json;
@@ -23,7 +23,7 @@ use crate::{
     codecs::{self, EncodingConfig},
     config::{log_schema, GenerateConfig, SinkConfig, SinkContext},
     gcp::{GcpAuthConfig, GcpAuthenticator},
-    http::{HttpClient, HttpError},
+    http::HttpClient,
     sinks::{
         gcs_common::{
             config::{healthcheck_response, GcsRetryLogic},
@@ -423,9 +423,17 @@ impl ChronicleService {
     }
 }
 
+#[derive(Debug, Snafu)]
+pub enum ChronicleResponseError {
+    #[snafu(display("Server responded with an error: {}", code))]
+    ServerError { code: StatusCode },
+    #[snafu(display("Failed to make HTTP(S) request: {}", error))]
+    HttpError { error: crate::http::HttpError },
+}
+
 impl Service<ChronicleRequest> for ChronicleService {
     type Response = GcsResponse;
-    type Error = HttpError;
+    type Error = ChronicleResponseError;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, _: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -449,12 +457,22 @@ impl Service<ChronicleRequest> for ChronicleService {
 
         let mut client = self.client.clone();
         Box::pin(async move {
-            let result = client.call(http_request).await;
-            result.map(|inner| GcsResponse {
-                inner,
-                protocol: "http",
-                metadata: request.metadata,
-            })
+            match client.call(http_request).await {
+                Ok(response) => {
+                    let status = response.status();
+
+                    if status.is_success() {
+                        Ok(GcsResponse {
+                            inner: response,
+                            protocol: "http",
+                            metadata: request.metadata,
+                        })
+                    } else {
+                        Err(ChronicleResponseError::ServerError { code: status })
+                    }
+                }
+                Err(error) => Err(ChronicleResponseError::HttpError { error }),
+            }
         })
     }
 }
@@ -467,7 +485,10 @@ mod integration_tests {
 
     use super::*;
     use crate::test_util::{
-        components::{run_and_assert_sink_compliance, SINK_TAGS},
+        components::{
+            run_and_assert_sink_compliance, run_and_assert_sink_error, COMPONENT_ERROR_TAGS,
+            SINK_TAGS,
+        },
         random_events_with_stream, random_string, trace_init,
     };
 
@@ -553,7 +574,7 @@ mod integration_tests {
 
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
         let (_input, events) = random_events_with_stream(100, 100, Some(batch));
-        let _ = sink.run(events).await;
+        run_and_assert_sink_error(sink, events, &COMPONENT_ERROR_TAGS).await;
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
     }
 
