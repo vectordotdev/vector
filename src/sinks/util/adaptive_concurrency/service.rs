@@ -3,10 +3,10 @@ use std::{
     future::Future,
     mem,
     sync::Arc,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
 };
 
-use futures::{future::BoxFuture, ready};
+use futures::future::BoxFuture;
 use tokio::sync::OwnedSemaphorePermit;
 use tower::{load::Load, Service};
 

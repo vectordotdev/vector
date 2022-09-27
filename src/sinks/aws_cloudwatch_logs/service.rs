@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     fmt,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
 };
 
 use aws_sdk_cloudwatchlogs::error::{
@@ -11,7 +11,7 @@ use aws_sdk_cloudwatchlogs::model::InputLogEvent;
 use aws_sdk_cloudwatchlogs::types::SdkError;
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
 use chrono::Duration;
-use futures::{future::BoxFuture, ready, FutureExt};
+use futures::{future::BoxFuture, FutureExt};
 use futures_util::TryFutureExt;
 use indexmap::IndexMap;
 use tokio::sync::oneshot;
