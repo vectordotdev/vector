@@ -236,8 +236,8 @@ chrono = { version = "0.4.22", default-features = false, features = ["serde"] }
 cidr-utils = { version = "0.5.7", default-features = false }
 clap = { version = "3.2.22", default-features = false, features = ["derive", "env", "std"] }
 colored = { version = "2.0.0", default-features = false }
-crossbeam-queue = { version = "0.3.5", default-features = false, features = ["std"], optional = true }
-crossbeam-utils = { version = "0.8.8", default-features = false, features = ["std"] }
+crossbeam-queue = { version = "0.3.6", default-features = false, features = ["std"], optional = true }
+crossbeam-utils = { version = "0.8.11", default-features = false, features = ["std"] }
 csv = { version = "1.1", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
 dirs-next = { version = "2.0.0", default-features = false, optional = true }
@@ -289,7 +289,7 @@ rand_distr = { version = "0.4.3", default-features = false }
 rdkafka = { version = "0.28.0", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
 redis = { version = "0.21.6", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
 regex = { version = "1.6.0", default-features = false, features = ["std", "perf"] }
-slab = { version = "0.4.6", default-features = false, optional = true }
+slab = { version = "0.4.7", default-features = false, optional = true }
 roaring = { version = "0.10.1", default-features = false, optional = true }
 seahash = { version = "4.1.0", default-features = false }
 semver = { version = "1.0.14", default-features = false, features = ["serde", "std"], optional = true }
