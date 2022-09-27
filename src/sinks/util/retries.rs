@@ -170,7 +170,7 @@ impl<L: RetryLogic> Future for RetryPolicyFuture<L> {
     type Output = FixedRetryPolicy<L>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        futures::ready!(self.delay.poll_unpin(cx));
+        std::task::ready!(self.delay.poll_unpin(cx));
         Poll::Ready(self.policy.clone())
     }
 }

@@ -199,11 +199,11 @@ mod tests {
         future::Future,
         pin::Pin,
         sync::{atomic::AtomicUsize, atomic::Ordering, Arc},
-        task::{Context, Poll},
+        task::{ready, Context, Poll},
         time::Duration,
     };
 
-    use futures_util::{ready, stream};
+    use futures_util::stream;
     use rand::{prelude::StdRng, SeedableRng};
     use rand_distr::{Distribution, Pareto};
     use tokio::{

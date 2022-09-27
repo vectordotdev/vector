@@ -5,12 +5,12 @@ use std::{
     marker::PhantomData,
     pin::Pin,
     sync::Arc,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
     time::Duration,
 };
 
 use bytes::{Buf, Bytes};
-use futures::{future::BoxFuture, ready, Sink};
+use futures::{future::BoxFuture, Sink};
 use http::StatusCode;
 use hyper::{body, Body};
 use indexmap::IndexMap;
