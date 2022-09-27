@@ -27,7 +27,7 @@ use super::{
 use crate::{
     event::Event,
     http::{HttpClient, HttpError},
-    internal_events::EndpointBytesSent,
+    internal_events::{EndpointBytesSent, SinkRequestBuildError},
 };
 
 pub trait HttpEventEncoder<Output> {
@@ -382,11 +382,16 @@ where
         let mut http_client = self.inner.clone();
 
         Box::pin(async move {
-            let request = request_builder(body).await?;
+            let request = request_builder(body).await.map_err(|error| {
+                emit!(SinkRequestBuildError { error: &error });
+                error
+            })?;
             let byte_size = request.body().len();
             let request = request.map(Body::from);
             let (protocol, endpoint) = uri::protocol_endpoint(request.uri().clone());
 
+            // Any errors raised in `http_client.call` results in a `GotHttpWarning` event being emmited
+            // in `HttpClient::send`.
             let response = http_client.call(request).await?;
 
             if response.status().is_success() {
