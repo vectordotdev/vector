@@ -33,7 +33,7 @@ impl AllocationGroupId {
 
     /// Gets the integer representation of this group ID.
     #[must_use]
-    pub const fn as_raw(&self) -> usize {
+    pub const fn as_raw(self) -> usize {
         self.0.get()
     }
 

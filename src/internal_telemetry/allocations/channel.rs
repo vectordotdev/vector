@@ -44,7 +44,7 @@ impl<const CHUNK_LEN: usize, T: Copy> Chunk<CHUNK_LEN, T> {
     /// by the producer. If the length caused a slice reference to be created that extended past the number of elements
     /// written, even if it was still in bounds in terms of the chunk size, it would constitute immediate UB, even if
     /// somehow `T` could be represented by the underlying data in the backing allocation.
-    unsafe fn as_bounded_slice(&self, len: usize) -> &[T] {
+    const unsafe fn as_bounded_slice(&self, len: usize) -> &[T] {
         slice::from_raw_parts(self.0.as_ptr() as *const _, len)
     }
 }
