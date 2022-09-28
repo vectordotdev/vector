@@ -306,7 +306,7 @@ trust-dns-proto = { version = "0.22.0", default-features = false, features = ["d
 typetag = { version = "0.2.3", default-features = false }
 url = { version = "2.3.1", default-features = false, features = ["serde"] }
 uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
-warp = { version = "0.3.1", default-features = false }
+warp = { version = "0.3.3", default-features = false }
 
 # depending on fork for bumped nix dependency
 # https://github.com/heim-rs/heim/pull/360
