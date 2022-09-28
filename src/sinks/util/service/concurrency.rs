@@ -136,9 +136,7 @@ impl Configurable for Concurrency {
     fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
         let mut none_schema = generate_const_string_schema("none".to_string());
         let mut none_metadata = Metadata::<()>::with_title("A fixed concurrency of 1.");
-        none_metadata.set_description(
-            "Only one request can be outstanding at any given time.",
-        );
+        none_metadata.set_description("Only one request can be outstanding at any given time.");
         none_metadata.add_custom_attribute(CustomAttribute::KeyValue {
             key: "logical_name".to_string(),
             value: "None".to_string(),
@@ -149,7 +147,7 @@ impl Configurable for Concurrency {
         let mut adaptive_metadata = Metadata::<()>::with_title(
             "Concurrency will be managed by Vector's [Adaptive Request Concurrency][arc] feature.",
         );
-        adaptive_metadatai
+        adaptive_metadata
             .set_description("[arc]: https://vector.dev/docs/about/under-the-hood/networking/arc/");
         adaptive_metadata.add_custom_attribute(CustomAttribute::KeyValue {
             key: "logical_name".to_string(),
