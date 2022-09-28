@@ -1,4 +1,4 @@
-use std::{error, fmt, sync::Arc};
+use std::sync::Arc;
 
 use async_recursion::async_recursion;
 use tokio::sync::Mutex;
@@ -12,39 +12,6 @@ use crate::{
     },
     Bufferable, WhenFull,
 };
-
-/// Error related to sending an item via `BufferSender`.
-///
-/// This error type is meant to opaquely wrap the various error types returned by different buffer
-/// implementations in order to pass along the underlying error message to higher-level callers.
-#[derive(Debug)]
-pub struct SendError {
-    inner: Box<dyn error::Error + Send + Sync>,
-}
-
-impl SendError {
-    fn new(inner: impl error::Error + Send + Sync + 'static) -> Self {
-        Self {
-            inner: Box::new(inner),
-        }
-    }
-}
-
-impl error::Error for SendError {
-    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-        self.inner.source()
-    }
-
-    fn cause(&self) -> Option<&dyn error::Error> {
-        self.source()
-    }
-}
-
-impl fmt::Display for SendError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.inner.fmt(f)
-    }
-}
 
 /// Adapter for papering over various sender backends.
 #[derive(Clone, Debug)]
@@ -81,9 +48,9 @@ impl<T> SenderAdapter<T>
 where
     T: Bufferable,
 {
-    pub(crate) async fn send(&mut self, item: T) -> Result<(), SendError> {
+    pub(crate) async fn send(&mut self, item: T) -> crate::Result<()> {
         match self {
-            Self::InMemory(tx) => tx.send(item).await.map_err(SendError::new),
+            Self::InMemory(tx) => tx.send(item).await.map_err(Into::into),
             Self::DiskV1(writer) => {
                 writer.send(item).await;
                 Ok(())
@@ -91,7 +58,7 @@ where
             Self::DiskV2(writer) => {
                 let mut writer = writer.lock().await;
 
-                if let Err(e) = writer.write_record(item).await {
+                writer.write_record(item).await.map(|_| ()).map_err(|e| {
                     // TODO: Actually handle recoverable errors when we have sink error handling
                     // capabilities i.e. a record that's too big to encode/serialize could
                     // theoretically be passed back and handled somewhere else... we don't have to
@@ -109,15 +76,13 @@ where
                         error!("Disk buffer writer has encountered an unrecoverable error.");
                     }
 
-                    return Err(SendError::new(e));
-                }
-
-                Ok(())
+                    e.into()
+                })
             }
         }
     }
 
-    pub(crate) async fn try_send(&mut self, item: T) -> Result<Option<T>, SendError> {
+    pub(crate) async fn try_send(&mut self, item: T) -> crate::Result<Option<T>> {
         match self {
             Self::InMemory(tx) => tx
                 .try_send(item)
@@ -145,13 +110,13 @@ where
                         error!("Disk buffer writer has encountered an unrecoverable error.");
                     }
 
-                    SendError::new(e)
+                    e.into()
                 })
             }
         }
     }
 
-    pub(crate) async fn flush(&mut self) -> Result<(), SendError> {
+    pub(crate) async fn flush(&mut self) -> crate::Result<()> {
         match self {
             Self::InMemory(_) => Ok(()),
             Self::DiskV1(writer) => {
@@ -164,7 +129,7 @@ where
                     // Errors on the I/O path, which is all that flushing touches, are never recoverable.
                     error!("Disk buffer writer has encountered an unrecoverable error.");
 
-                    SendError::new(e)
+                    e.into()
                 })
             }
         }
@@ -257,7 +222,7 @@ impl<T: Bufferable> BufferSender<T> {
     }
 
     #[async_recursion]
-    pub async fn send(&mut self, item: T) -> Result<(), SendError> {
+    pub async fn send(&mut self, item: T) -> crate::Result<()> {
         let item_sizing = self
             .instrumentation
             .as_ref()
@@ -307,7 +272,7 @@ impl<T: Bufferable> BufferSender<T> {
     }
 
     #[async_recursion]
-    pub async fn flush(&mut self) -> Result<(), SendError> {
+    pub async fn flush(&mut self) -> crate::Result<()> {
         self.base.flush().await?;
         if let Some(overflow) = self.overflow.as_mut() {
             overflow.flush().await?;

@@ -79,7 +79,7 @@ impl GelfDeserializer {
 
     /// Builds a LogEvent from the parsed GelfMessage.
     /// The logic follows strictly the documented GELF standard.
-    fn message_to_event(&self, parsed: &GelfMessage) -> vector_core::Result<Event> {
+    fn message_to_event(&self, parsed: &GelfMessage) -> vector_common::Result<Event> {
         let mut log = LogEvent::from_str_legacy(parsed.short_message.to_string());
 
         // GELF spec defines the version as 1.1 which has not changed since 2013
@@ -193,7 +193,7 @@ impl Deserializer for GelfDeserializer {
         &self,
         bytes: Bytes,
         _log_namespace: LogNamespace,
-    ) -> vector_core::Result<SmallVec<[Event; 1]>> {
+    ) -> vector_common::Result<SmallVec<[Event; 1]>> {
         let line = std::str::from_utf8(&bytes)?;
         let line = line.trim();
 
@@ -218,7 +218,7 @@ mod tests {
 
     fn deserialize_gelf_input(
         input: &serde_json::Value,
-    ) -> vector_core::Result<SmallVec<[Event; 1]>> {
+    ) -> vector_common::Result<SmallVec<[Event; 1]>> {
         let config = GelfDeserializerConfig;
         let deserializer = config.build();
         let buffer = Bytes::from(serde_json::to_vec(&input).unwrap());

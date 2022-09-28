@@ -1,4 +1,4 @@
-use std::{collections::HashMap, error, fmt, task::Poll};
+use std::{collections::HashMap, fmt, task::Poll};
 
 use futures::{Stream, StreamExt};
 use futures_util::{pending, poll};
@@ -148,7 +148,7 @@ impl Fanout {
     pub async fn send_stream(
         &mut self,
         events: impl Stream<Item = EventArray>,
-    ) -> Result<(), Box<dyn error::Error + Send + Sync>> {
+    ) -> crate::Result<()> {
         tokio::pin!(events);
         while let Some(event_array) = events.next().await {
             self.send(event_array).await?;
@@ -171,10 +171,7 @@ impl Fanout {
     ///
     /// If an error occurs while sending events to any of the connected sinks, an error variant will be
     /// returned detailing the cause.
-    pub async fn send(
-        &mut self,
-        events: EventArray,
-    ) -> Result<(), Box<dyn error::Error + Send + Sync>> {
+    pub async fn send(&mut self, events: EventArray) -> crate::Result<()> {
         // First, process any available control messages in a non-blocking fashion.  If any of our
         // senders were replaced, we additionally wait until they're replaced.
         while let Ok(message) = self.control_channel.try_recv() {
@@ -249,10 +246,7 @@ impl Fanout {
 
 struct SendGroup<'a> {
     senders: &'a mut IndexMap<ComponentKey, Option<Sender>>,
-    sends: HashMap<
-        ComponentKey,
-        ReusableBoxFuture<'static, Result<Sender, Box<dyn error::Error + Send + Sync>>>,
-    >,
+    sends: HashMap<ComponentKey, ReusableBoxFuture<'static, crate::Result<Sender>>>,
 }
 
 impl<'a> SendGroup<'a> {
@@ -358,7 +352,7 @@ impl<'a> SendGroup<'a> {
         }
     }
 
-    async fn send(&mut self) -> Result<(), Box<dyn error::Error + Send + Sync>> {
+    async fn send(&mut self) -> crate::Result<()> {
         // Right now, we do a linear scan of all sends, polling each send once in order to avoid
         // waiting forever, such that we can let our control messages get picked up while sends are
         // waiting.
@@ -405,7 +399,7 @@ impl Sender {
         Self { inner, input: None }
     }
 
-    async fn flush(&mut self) -> Result<(), Box<dyn error::Error + Send + Sync>> {
+    async fn flush(&mut self) -> crate::Result<()> {
         if let Some(input) = self.input.take() {
             self.inner.send(input).await?;
             self.inner.flush().await?;

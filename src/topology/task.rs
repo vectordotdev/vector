@@ -1,5 +1,5 @@
 use std::{
-    error, fmt,
+    fmt,
     future::Future,
     pin::Pin,
     task::{Context, Poll},
@@ -32,13 +32,11 @@ pub(crate) enum TaskError {
     #[snafu(display("the task completed with an error"))]
     Opaque,
     #[snafu(display("{}", source))]
-    Wrapped {
-        source: Box<dyn error::Error + Send + Sync + 'static>,
-    },
+    Wrapped { source: crate::Error },
 }
 
 impl TaskError {
-    pub fn wrapped(e: Box<dyn std::error::Error + Send + Sync + 'static>) -> Self {
+    pub fn wrapped(e: crate::Error) -> Self {
         Self::Wrapped { source: e }
     }
 }

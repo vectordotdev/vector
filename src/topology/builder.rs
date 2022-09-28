@@ -233,16 +233,22 @@ pub async fn build_pieces(
                 handles.push(spawn_named(pump, task_name.as_ref()));
             }
 
+            let mut had_pump_error = false;
             while let Some(output) = handles.try_next().await? {
                 if let Err(e) = output {
                     // Immediately send the error to the source's wrapper future, but ignore any
                     // errors during the send, since nested errors wouldn't make any sense here.
                     let _ = pump_error_tx.send(e);
+                    had_pump_error = true;
                     break;
                 }
             }
 
-            debug!("Source pump supervisor task finished normally.");
+            if had_pump_error {
+                debug!("Source pump supervisor task finished with an error.");
+            } else {
+                debug!("Source pump supervisor task finished normally.");
+            }
             Ok(TaskOutput::Source)
         };
         let pump = Task::new(key.clone(), typetag, pump);
