@@ -42,13 +42,13 @@ sinks. The main reason for this is that, in practice, sinks represent the primar
 backpressure in a topology: talking to services over the network, where latency may be introduced,
 or outages may temporarily occur.
 
-By default, sinks use an in-memory buffer like all other components do, but the default buffer size is a
-little bigger, around 500 events. This buffer is bigger because, again, sinks are typically the
-primary source of backpressure and so we want to provide more cushion.
+By default, sinks use an in-memory buffer like all other components do, but the default buffer size
+is slightly increased, at 500 events. We've increased the buffer capacity for sinks specifically as,
+again, they are typically the primary source of backpressure in any given Vector topology.
 
-Beyond the default size being larger, you can also fully control the buffer configuration as well.
-Vector exposes two main knobs for controlling buffering behavior: the type of buffer to use, and the
-action to take when the buffer is full.
+Beyond the default buffer capacity being larger, you can also fully control the buffer configuration
+as well.  Vector exposes two main settings for controlling buffering: the type of buffer to use, and
+the action to take when the buffer is full.
 
 ## Buffer types
 
@@ -76,9 +76,9 @@ reattempting to process the events, push-based sources may not be able to retran
 ### Disk buffers
 
 When the durability of data is more important than the overall performance of Vector, disk buffers
-can be used to persist buffered events between stopping and starting Vector, including when
-Vector crashes. Disk buffers allow Vector to essentially pick up from where it left off when it
-starts back up again.
+can be used to persist buffered events while stopping and starting Vector, including if Vector
+crashes. Disk buffers allow Vector to essentially pick up from where it left off when it starts back
+up again.
 
 Disk buffers function like a write-ahead log, where every event is first sent through the buffer,
 and written to the data files, before it is read back out. This may sound slow, but in practice,
@@ -126,15 +126,17 @@ it detects your disk buffers could grow to a size bigger than the storage volume
 be able to detect that issue with exotic/unique storage configurations, and it also cannot detect if
 other processes are writing files that are consuming free space.
 
-## Buffer behavior
+## "When full" behavior
 
 As important as choosing which buffer type to use, choosing what to do when a buffer is full can
-ultimately have a major impact on how Vector performs, and will often need to be matched to the
-topology and the goals of using Vector.
+have a major impact on how Vector as a system performs, and this behavior often need to be matched
+to the configuration and workload itself.
 
-You'll recognize this as the `buffer.when_full` configuration option.
+{{< info >}}
+This behavior is configured with the `buffer.when_full` setting.
+{{< /info >}}
 
-### Blocking
+### Blocking (`block`)
 
 When configured to block, Vector will wait indefinitely to write to a buffer that is currently full.
 This is the default "when full" behavior.
@@ -148,39 +150,71 @@ Blocking may not be acceptable, however, if you're accepting data from clients a
 have them also blocked on waiting for a response that the data was accepted by Vector. We'll cover
 some common buffering scenarios (and configuration) further down.
 
-### Drop newest
+### Drop the event (`drop_newest`)
 
-When configured to drop newest, Vector will simply drop an event if the buffer is currently full.
+When configured to "drop newest", Vector will simply drop an event if the buffer is currently full.
 
 This behavior can be useful when the data itself is idempotent (the same value is being sent
 continually) or is generally not high-value, such as trace/debug logging. It allows Vector to
 effectively shed load, by lowering the number of events in-flight for a topology, while
 simultaneously avoiding the blocking of upstream components.
 
-### Overflow (beta)
+{{< warning >}}
+This mode can sometimes drop more events than expected.
 
-**Overflow buffers are a beta feature. Use with caution.**
+As events typically arrive to Vector in batches, and are shipped between components as batches, it is possible
+to quickly fill up an in-memory buffer and drop the remaining events, leading to a large percentage
+of events being dropped.
 
-Instead of blocking and causing backpressure, or losing events by dropping them, what if we could
-combine the best parts of both in-memory buffers and disk buffers together? This is what overflow buffers
-provide.
+If your events arrive in bursts, or periodically, and are not a steady stream, then using
+`drop_newest` with in-memory buffers is **not recommended.**
+{{< /warning >}}
 
-We're using the term "overflow buffers" because while this is technically a "when full" behavior, it
-involves the configuration of multiple buffers. Essentially, a buffer can be configured to overflow
-to another buffer instead of blocking or dropping.
+### Overflow to another buffer (`overflow`)
 
-This allows users to build more resource-efficient buffering topologies, such as using a fast,
-in-memory channel of limited size (to put an upper bound on potential data loss) while overflow to a
-disk buffer. Instead of being limited by the in-memory buffer, disk buffers could offer far more
-buffering capacity in the case of extended slowdowns/outages. Additionally, it means that when load
-is normal, events don't have to be written to the disk buffer: they can simply be sent through the
-in-memory buffer. This reduces disk usage and generally increases performance, while still providing
-the _ability_ to buffer to disk during overload scenarios.
+{{< warning >}}
+Overflow buffers are not yet suitable for production workloads and may contain bugs that ultimately lead to data
+loss.
+{{< /warning >}}
 
-However, the overflow behavior cannot be used on the last buffer in the buffer topology: you
-inevitably have to either block or drop the event if there's no more capacity. There's a few other
-constraints around how overflow buffer topologies that we don't cover here, but Vector will make
-sure to warn you about if it detects an invalid configuration on startup.
+Using the overflow behavior, operators can configure a **buffer topology**. This consists or two or
+more buffers, arranged sequentially, where one buffer can overflow to the next one in the topology,
+and so on, until either the last buffer is reached (which must either block or drop the event) or a
+buffer is found with available capacity.
+
+Instead of being forced to use only an in-memory buffer, which is limited by available memory, or
+being forced to use only a disk buffer, which decreases throughput even if the sink is not
+experiencing an issue, we can use the overflow mode to preferentially buffer events by first trying
+to use an in-memory buffer, and only falling back to a disk buffer is necessary.
+
+Here's a snippet of what it looks like to configure a buffer topology to use the overflow behavior:
+
+
+```yaml title="vector.yaml"
+sinks:
+  overflow_test:
+    type: blackhole
+    buffer:
+    - type: memory
+      max_events: 1000
+      when_full: overflow
+    - type: disk
+      max_size: 1073741824 # 1GiB.
+      when_full: drop_newest
+```
+
+In this example, we have an in-memory channel with a maximum capacity of 1000 events overflowing to
+a disk buffer that can grow up to 1GiB in size, after which point it will drop new events until free
+space becomes available in the buffer.
+
+An important thing to note is that if space becomes available in the in-memory buffer, new events
+that Vector tries to buffer will go to in-memory buffer, even if there are still events in the disk
+buffer. Additionally, those new events in the in-memory buffer may be returned _before_ older events
+stored in the disk buffer. There are **no event ordering gaurantees** when using the overflow behavior for
+a buffer topology.
+
+Additionally, the last buffer in a buffer topology cannot be set to the overflow mode. Naturally,
+unless there is another buffer to overflow to, you must either block or drop an event when full.
 
 ## Recommended buffering configurations
 
@@ -194,12 +228,10 @@ storage systems.
 
 **Performance is the most important factor.**
 
-You should use in-memory buffers, which are the default. Using `buffer.when_full = "drop_newest"`
-would provide the highest performance, but it can sometimes drop more events than you may expect it
-to: events are generally received in chunks, not as a steady stream, which can quickly exceed
-`buffer.max_size`.
+You should use in-memory buffers. As noted above, the "drop newest" mode will provide the highest
+possible performance, but more events may be dropped than expected.
 
-Generally, increasing `buffer.max_size` and leaving the default blocking behavior is sufficient to
+Generally, increasing `max_events` and leaving the default blocking behavior is sufficient to
 handle higher event processing rates.
 
 **Durability is the most important factor.**
