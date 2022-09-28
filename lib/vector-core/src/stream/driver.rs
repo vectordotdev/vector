@@ -1,11 +1,10 @@
-use std::{collections::VecDeque, fmt, task::Poll};
+use std::{collections::VecDeque, fmt, future::poll_fn, task::Poll};
 
 use futures::{poll, FutureExt, Stream, StreamExt, TryFutureExt};
-use futures_util::future::poll_fn;
 use tokio::{pin, select};
 use tower::Service;
 use tracing::Instrument;
-use vector_common::internal_event::{service, BytesSent};
+use vector_common::internal_event::{service, BytesSent, CountByteSize};
 
 use super::FuturesUnorderedCount;
 use crate::{
@@ -15,7 +14,7 @@ use crate::{
 
 pub trait DriverResponse {
     fn event_status(&self) -> EventStatus;
-    fn events_sent(&self) -> EventsSent;
+    fn events_sent(&self) -> CountByteSize;
 
     /// Return a tuple containing the number of bytes that were sent in the
     /// request that returned this response together with the protocol the
@@ -185,7 +184,12 @@ where
                             protocol: protocol.to_string().into(),
                         });
                     }
-                    emit(response.events_sent());
+                    let cbs = response.events_sent();
+                    emit(EventsSent {
+                        count: cbs.0,
+                        byte_size: cbs.1,
+                        output: None,
+                    });
                 }
             }
         };
@@ -199,11 +203,11 @@ mod tests {
         future::Future,
         pin::Pin,
         sync::{atomic::AtomicUsize, atomic::Ordering, Arc},
-        task::{Context, Poll},
+        task::{ready, Context, Poll},
         time::Duration,
     };
 
-    use futures_util::{ready, stream};
+    use futures_util::stream;
     use rand::{prelude::StdRng, SeedableRng};
     use rand_distr::{Distribution, Pareto};
     use tokio::{
@@ -215,7 +219,7 @@ mod tests {
     use vector_common::finalization::{
         BatchNotifier, EventFinalizer, EventFinalizers, EventStatus, Finalizable,
     };
-    use vector_common::internal_event::EventsSent;
+    use vector_common::internal_event::CountByteSize;
 
     use super::{Driver, DriverResponse};
 
@@ -249,12 +253,8 @@ mod tests {
             EventStatus::Delivered
         }
 
-        fn events_sent(&self) -> EventsSent {
-            EventsSent {
-                count: 1,
-                byte_size: 1,
-                output: None,
-            }
+        fn events_sent(&self) -> CountByteSize {
+            CountByteSize(1, 1)
         }
     }
 
