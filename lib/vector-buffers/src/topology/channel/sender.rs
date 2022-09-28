@@ -59,22 +59,12 @@ where
                 let mut writer = writer.lock().await;
 
                 writer.write_record(item).await.map(|_| ()).map_err(|e| {
-                    // TODO: Actually handle recoverable errors when we have sink error handling
-                    // capabilities i.e. a record that's too big to encode/serialize could
-                    // theoretically be passed back and handled somewhere else... we don't have to
-                    // drop it.
-
-                    // We want to get right to the meat of things by emitting an error message here,
-                    // because otherwise the bubbled-up error will be a bit plain without more
-                    // context.
-                    //
-                    // TODO: Should we actually take the Go-style approach and just build new errors
-                    // that are chained together e.g. `disk buffer error: i/o error: no space left
-                    // on device`. That one would be more useful when emitted by the component
-                    // task's error handling code... but it's also not our typical pattern.
-                    if !e.is_recoverable() {
-                        error!("Disk buffer writer has encountered an unrecoverable error.");
-                    }
+                    // TODO: Could some errors be handled and not be unrecoverable? Right now,
+                    // encoding should theoretically be recoverable -- encoded value was too big, or
+                    // error during encoding -- but the traits don't allow for recovering the
+                    // original event value because we have to consume it to do the encoding... but
+                    // that might not always be the case.
+                    error!("Disk buffer writer has encountered an unrecoverable error.");
 
                     e.into()
                 })
@@ -93,22 +83,12 @@ where
                 let mut writer = writer.lock().await;
 
                 writer.try_write_record(item).await.map_err(|e| {
-                    // TODO: Actually handle recoverable errors when we have sink error handling
-                    // capabilities i.e. a record that's too big to encode/serialize could
-                    // theoretically be passed back and handled somewhere else... we don't have to
-                    // drop it.
-
-                    // We want to get right to the meat of things by emitting an error message here,
-                    // because otherwise the bubbled-up error will be a bit plain without more
-                    // context.
-                    //
-                    // TODO: Should we actually take the Go-style approach and just build new errors
-                    // that are chained together e.g. `disk buffer error: i/o error: no space left
-                    // on device`. That one would be more useful when emitted by the component
-                    // task's error handling code... but it's also not our typical pattern.
-                    if !e.is_recoverable() {
-                        error!("Disk buffer writer has encountered an unrecoverable error.");
-                    }
+                    // TODO: Could some errors be handled and not be unrecoverable? Right now,
+                    // encoding should theoretically be recoverable -- encoded value was too big, or
+                    // error during encoding -- but the traits don't allow for recovering the
+                    // original event value because we have to consume it to do the encoding... but
+                    // that might not always be the case.
+                    error!("Disk buffer writer has encountered an unrecoverable error.");
 
                     e.into()
                 })
