@@ -1344,7 +1344,7 @@ dependencies = [
  "serde_urlencoded",
  "thiserror",
  "tokio",
- "tokio-util 0.7.1",
+ "tokio-util",
  "url",
  "webpki 0.22.0",
  "webpki-roots",
@@ -1724,7 +1724,7 @@ dependencies = [
  "snafu",
  "syslog_loose",
  "tokio",
- "tokio-util 0.7.1",
+ "tokio-util",
  "tracing 0.1.34",
  "value",
  "vector-common",
@@ -1779,7 +1779,7 @@ dependencies = [
  "memchr",
  "pin-project-lite",
  "tokio",
- "tokio-util 0.7.1",
+ "tokio-util",
 ]
 
 [[package]]
@@ -3171,7 +3171,7 @@ dependencies = [
  "indexmap",
  "slab",
  "tokio",
- "tokio-util 0.7.1",
+ "tokio-util",
  "tracing 0.1.34",
 ]
 
@@ -4030,7 +4030,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-native-tls",
- "tokio-util 0.7.1",
+ "tokio-util",
  "tower",
  "tower-http",
  "tracing 0.1.34",
@@ -4073,7 +4073,7 @@ dependencies = [
  "smallvec",
  "thiserror",
  "tokio",
- "tokio-util 0.7.1",
+ "tokio-util",
  "tracing 0.1.34",
 ]
 
@@ -4591,7 +4591,7 @@ dependencies = [
  "serde",
  "serde_bytes",
  "serde_with 1.14.0",
- "sha-1 0.10.0",
+ "sha-1",
  "sha2 0.10.6",
  "socket2",
  "stringprep",
@@ -4600,7 +4600,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-rustls 0.23.3",
- "tokio-util 0.7.1",
+ "tokio-util",
  "trust-dns-proto 0.21.2",
  "trust-dns-resolver",
  "typed-builder 0.10.0",
@@ -6029,7 +6029,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "tokio-native-tls",
- "tokio-util 0.7.1",
+ "tokio-util",
  "url",
  "uuid 1.1.2",
 ]
@@ -6293,7 +6293,7 @@ dependencies = [
  "ryu",
  "tokio",
  "tokio-native-tls",
- "tokio-util 0.7.1",
+ "tokio-util",
  "url",
 ]
 
@@ -6411,7 +6411,7 @@ dependencies = [
  "tokio",
  "tokio-native-tls",
  "tokio-rustls 0.23.3",
- "tokio-util 0.7.1",
+ "tokio-util",
  "tower-service",
  "url",
  "wasm-bindgen",
@@ -7108,19 +7108,6 @@ dependencies = [
  "ryu",
  "serde",
  "unsafe-libyaml",
-]
-
-[[package]]
-name = "sha-1"
-version = "0.9.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "99cd6713db3cf16b6c84e06321e049a9b9f699826e16096d23bbcc44d15d51a6"
-dependencies = [
- "block-buffer 0.9.0",
- "cfg-if",
- "cpufeatures",
- "digest 0.9.0",
- "opaque-debug",
 ]
 
 [[package]]
@@ -7849,7 +7836,7 @@ dependencies = [
  "postgres-types",
  "socket2",
  "tokio",
- "tokio-util 0.7.1",
+ "tokio-util",
 ]
 
 [[package]]
@@ -7883,7 +7870,7 @@ dependencies = [
  "futures-core",
  "pin-project-lite",
  "tokio",
- "tokio-util 0.7.1",
+ "tokio-util",
 ]
 
 [[package]]
@@ -7901,19 +7888,6 @@ dependencies = [
 
 [[package]]
 name = "tokio-tungstenite"
-version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "511de3f85caf1c98983545490c3d09685fa8eb634e57eec22bb4db271f46cbd8"
-dependencies = [
- "futures-util",
- "log",
- "pin-project",
- "tokio",
- "tungstenite 0.14.0",
-]
-
-[[package]]
-name = "tokio-tungstenite"
 version = "0.17.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f714dd15bead90401d77e04243611caec13726c2408afd5b31901dfcdcb3b181"
@@ -7922,21 +7896,7 @@ dependencies = [
  "log",
  "rustls 0.20.4",
  "tokio",
- "tungstenite 0.17.3",
-]
-
-[[package]]
-name = "tokio-util"
-version = "0.6.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e99e1983e5d376cd8eb4b66604d2e99e79f5bd988c3055891dcd8c9e2604cc0"
-dependencies = [
- "bytes 1.2.1",
- "futures-core",
- "futures-sink",
- "log",
- "pin-project-lite",
- "tokio",
+ "tungstenite",
 ]
 
 [[package]]
@@ -7990,7 +7950,7 @@ dependencies = [
  "tokio",
  "tokio-rustls 0.23.3",
  "tokio-stream",
- "tokio-util 0.7.1",
+ "tokio-util",
  "tower",
  "tower-layer",
  "tower-service",
@@ -8025,7 +7985,7 @@ dependencies = [
  "rand 0.8.5",
  "slab",
  "tokio",
- "tokio-util 0.7.1",
+ "tokio-util",
  "tower-layer",
  "tower-service",
  "tracing 0.1.34",
@@ -8395,25 +8355,6 @@ dependencies = [
 
 [[package]]
 name = "tungstenite"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a0b2d8558abd2e276b0a8df5c05a2ec762609344191e5fd23e292c910e9165b5"
-dependencies = [
- "base64",
- "byteorder",
- "bytes 1.2.1",
- "http",
- "httparse",
- "log",
- "rand 0.8.5",
- "sha-1 0.9.8",
- "thiserror",
- "url",
- "utf-8",
-]
-
-[[package]]
-name = "tungstenite"
 version = "0.17.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e27992fd6a8c29ee7eef28fc78349aa244134e10ad447ce3b9f0ac0ed0fa4ce0"
@@ -8425,7 +8366,7 @@ dependencies = [
  "httparse",
  "log",
  "rand 0.8.5",
- "sha-1 0.10.0",
+ "sha-1",
  "thiserror",
  "url",
  "utf-8",
@@ -8853,8 +8794,8 @@ dependencies = [
  "tokio-postgres",
  "tokio-stream",
  "tokio-test",
- "tokio-tungstenite 0.17.2",
- "tokio-util 0.7.1",
+ "tokio-tungstenite",
+ "tokio-util",
  "toml",
  "tonic",
  "tonic-build",
@@ -8904,7 +8845,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "tokio-stream",
- "tokio-tungstenite 0.17.2",
+ "tokio-tungstenite",
  "url",
  "uuid 1.1.2",
 ]
@@ -8946,7 +8887,7 @@ dependencies = [
  "temp-dir",
  "tokio",
  "tokio-test",
- "tokio-util 0.7.1",
+ "tokio-util",
  "tracing 0.1.34",
  "tracing-fluent-assertions",
  "tracing-subscriber 0.3.15",
@@ -9090,7 +9031,7 @@ dependencies = [
  "tokio-openssl",
  "tokio-stream",
  "tokio-test",
- "tokio-util 0.7.1",
+ "tokio-util",
  "toml",
  "tonic",
  "tower",
@@ -9268,7 +9209,7 @@ dependencies = [
  "rust_decimal",
  "serde",
  "serde_json",
- "sha-1 0.10.0",
+ "sha-1",
  "sha2 0.10.6",
  "sha3",
  "strip-ansi-escapes",
@@ -9369,9 +9310,9 @@ dependencies = [
 
 [[package]]
 name = "warp"
-version = "0.3.2"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3cef4e1e9114a4b7f1ac799f16ce71c14de5778500c5450ec6b7b920c55b587e"
+checksum = "ed7b8be92646fc3d18b06147664ebc5f48d222686cb11a8755e561a735aacc6d"
 dependencies = [
  "bytes 1.2.1",
  "futures-channel",
@@ -9384,14 +9325,15 @@ dependencies = [
  "mime_guess",
  "percent-encoding",
  "pin-project",
+ "rustls-pemfile 0.2.1",
  "scoped-tls",
  "serde",
  "serde_json",
  "serde_urlencoded",
  "tokio",
  "tokio-stream",
- "tokio-tungstenite 0.15.0",
- "tokio-util 0.6.9",
+ "tokio-tungstenite",
+ "tokio-util",
  "tower-service",
  "tracing 0.1.34",
 ]
