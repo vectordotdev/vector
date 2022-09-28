@@ -13,16 +13,24 @@ While operators typically strive to ensure their Vector deployments are appropri
 expected load, sometimes problems can occur. Maybe an application starts generating more logs than
 normal, or the downstream service where you're sending data starts to respond slower than normal.
 
-Part of Vector's design is to propagate _backpressure_, where when a component is processing slowly,
-the components that come before are notified of this slowdown and can potentially reduce their rate
-of consumption, or temporarily turn away requests, in order to alleviate pressure on the component
-(which may be isolated to Vector, or a downstream service) and hopefully allow processing to return
-to normal.
+Part of Vector's topology design involves propagating _backpressure_, which is a signal that events cannot be
+processed as quickly as they are being received. When one component tries to send more events to a
+component than that component can currently handle, the sending component is informed of this
+indirectly. Backpressure can travel all the way from a sink, up through transforms, back to a
+source, and ultimately, even to clients such as applications sending logs over HTTP.
 
-In these cases, though, we don't always want to immediately propagate backpressure, as this could
+Backpressure is a means of allowing a system to expose whether or not it can handle more work or if
+it is too busy to do so. We rely on backpressure to be able to slow down the consumption or
+acceptance of events, such as when pulling them from a source like Kafka, or accepting them over a
+socket like HTTP.
+
+In some cases, though, we don't always want to immediately propagate backpressure, as this could
 lead to constantly slowing down upstream components and callers, potentially causing issues outside
-of Vector. Vector is intended to be stable and resilient to temporary overload or outages, and this
-is where buffering comes in.
+of Vector. We want to avoid entirely slowing things down when a component just crosses over the
+threshold of being fully saturated, as well being able to handle temporary slowdowns and outages in external
+services that sinks send data to.
+
+Buffering is the approach that Vector takes to solve these problems.
 
 ## Buffering between components
 
@@ -138,10 +146,6 @@ As important as choosing which buffer type to use, choosing what to do when a bu
 have a major impact on how Vector as a system performs, and this behavior often need to be matched
 to the configuration and workload itself.
 
-{{< info >}}
-This behavior is configured with the `buffer.when_full` setting.
-{{< /info >}}
-
 ### Blocking (`block`)
 
 When configured to block, Vector will wait indefinitely to write to a buffer that is currently full.
@@ -160,9 +164,10 @@ some common buffering scenarios (and configuration) further down.
 
 {{< warning >}}
 Using `drop_newest` with in-memory buffers is **not recommended** for bursty workloads, where events
-arrive in large, periodic batches. Doing so will typically result in the buffer being immediately
-filled and the remaining events being dropped, even when Vector appears to have available processing
-capacity.
+arrive in large, periodic batches.
+
+Doing so will typically result in the buffer being immediately filled and the remaining events being
+dropped, even when Vector appears to have available processing capacity.
 {{< /warning >}}
 
 When configured to "drop newest", Vector will simply drop an event if the buffer is currently full.
@@ -175,8 +180,8 @@ simultaneously avoiding the blocking of upstream components.
 ### Overflow to another buffer (`overflow`)
 
 {{< danger >}}
-Overflow buffers are not yet suitable for production workloads and may contain bugs that ultimately lead to data
-loss.
+Overflow buffers are **not yet suitable** for production workloads and may contain bugs that ultimately lead to **data
+loss.**
 {{< /danger >}}
 
 Using the overflow behavior, operators can configure a **buffer topology**. This consists or two or

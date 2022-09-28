@@ -72,7 +72,7 @@ components: sinks: [Name=string]: {
 			description: """
 				Configures the sink specific buffer behavior.
 
-				More information about the individual buffer types, and buffer behavior, can be found in the [Buffering Model][\(urls.vector_buffering_model)] section. 
+				More information about the individual buffer types, and buffer behavior, can be found in the [Buffering Model][\(urls.vector_buffering_model)] section.
 				"""
 			required:    false
 			type: object: {
@@ -108,7 +108,7 @@ components: sinks: [Name=string]: {
 							enum: {
 								memory: """
 									Events are buffered in memory.
-									
+
 									This is more performant, but less durable. Data will be lost if Vector is restarted forcefully or crashes.
 									"""
 								disk: """
@@ -130,12 +130,12 @@ components: sinks: [Name=string]: {
 							enum: {
 								block: """
 									Waits for capacity in the buffer.
-									
+
 									This will cause backpressure to propagate to upstream components, which can cause data to pile up on the edge.
 									"""
 								drop_newest: """
 									Drops the event without waiting for capacity in the buffer.
-									
+
 									The data is lost. This should only be used when performance is the highest priority.
 									"""
 							}
