@@ -63,10 +63,4 @@ pub fn default_data_dir() -> Option<PathBuf> {
     Some(PathBuf::from("/var/lib/vector/"))
 }
 
-/// Vector's basic error type, dynamically dispatched and safe to send across
-/// threads.
-pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
-
-/// Vector's basic result type, defined in terms of [`Error`] and generic over
-/// `T`.
-pub type Result<T> = std::result::Result<T, Error>;
+pub(crate) use vector_common::{Error, Result};
