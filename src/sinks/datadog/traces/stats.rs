@@ -18,7 +18,7 @@ const TAG_STATUS_CODE: &str = "http.status_code";
 const TAG_SYNTHETICS: &str = "synthetics";
 const TOP_LEVEL_KEY: &str = "_top_level";
 
-#[derive(PartialEq, Eq, PartialOrd, Ord)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug)]
 struct AggregationKey {
     payload_key: PayloadAggregationKey,
     bucket_key: BucketAggregationKey,
@@ -62,7 +62,7 @@ impl AggregationKey {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 struct PayloadAggregationKey {
     env: String,
     hostname: String,
@@ -86,7 +86,7 @@ impl PayloadAggregationKey {
     }
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug)]
 struct BucketAggregationKey {
     service: String,
     name: String,
@@ -235,9 +235,23 @@ impl Bucket {
         is_top: bool,
         aggkey: AggregationKey,
     ) {
+        let name = match span.get("name") {
+            Some(Value::Bytes(val)) => String::from_utf8_lossy(val).to_string(), //(*val),
+            _ => "".to_owned(),
+        };
         match self.data.get_mut(&aggkey) {
-            Some(gs) => Bucket::update(span, weight, is_top, gs),
+            Some(gs) => {
+                if name == "elasticsearch.query" {
+                    println!("found matching bucket for span: {:?}", span);
+                    println!("aggkey: {:?}", aggkey);
+                }
+                Bucket::update(span, weight, is_top, gs);
+            }
             None => {
+                if name == "elasticsearch.query" {
+                    println!("no matching bucket for span: {:?}", span);
+                    println!("aggkey: {:?}", aggkey);
+                }
                 let mut gs = GroupedStats::new();
                 Bucket::update(span, weight, is_top, &mut gs);
                 self.data.insert(aggkey, gs);
@@ -301,7 +315,7 @@ impl Bucket {
     }
 }
 
-struct Aggregator {
+pub(crate) struct Aggregator {
     // The key represent the timestamp (in nanoseconds) of the begining of the time window (that last 10 seconds) on
     // which the associated bucket will calculate statistics.
     buckets: BTreeMap<u64, Bucket>,
@@ -343,7 +357,7 @@ fn write_span_ids(
 }
 
 impl Aggregator {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             buckets: BTreeMap::new(),
             skipped_spans: 0,
@@ -436,12 +450,6 @@ impl Aggregator {
         synthetics: bool,
         payload_aggkey: PayloadAggregationKey,
     ) {
-        //if span.contains_key("name") {
-        //    info!("2 handle_span span_name: {}", span.get("name").unwrap());
-        //} else {
-        //    info!("2 handle_span span_name: is_unknown");
-        //}
-
         let aggkey = AggregationKey::new_aggregation_from_span(span, payload_aggkey, synthetics);
         let start = match span.get("start") {
             Some(Value::Timestamp(val)) => val.timestamp_nanos(),
@@ -449,6 +457,7 @@ impl Aggregator {
         };
         // 10 seconds bucket
         let btime = (start - (start % 10_000_000_000)) as u64;
+
         match self.buckets.get_mut(&btime) {
             Some(b) => {
                 b.add(span, weight, is_top, aggkey);
@@ -633,8 +642,17 @@ fn extract_weight_from_root_span(spans: &[&BTreeMap<String, Value>]) -> f64 {
         })
 }
 
-pub(crate) fn compute_apm_stats(key: &PartitionKey, traces: &[TraceEvent]) -> StatsPayload {
-    let mut aggregator = Aggregator::new();
+pub(crate) fn compute_apm_stats(
+    key: &PartitionKey,
+    aggregator: &mut Aggregator,
+    traces: &[TraceEvent],
+) -> StatsPayload {
+    // TODO when to remove entries from the aggregator's buckets?
+    // We don't want to keep them forever.
+    //
+    // Seems need to implement the logic backing this comment ? :
+    // https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/stats/concentrator.go#L38-L41
+    //
     traces.iter().for_each(|t| aggregator.handle_trace(key, t));
     StatsPayload {
         agent_hostname: key.hostname.clone().unwrap_or_default(),

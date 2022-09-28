@@ -1,4 +1,8 @@
-use std::{collections::BTreeMap, io::Write, sync::Arc};
+use std::{
+    collections::BTreeMap,
+    io::Write,
+    sync::{Arc, Mutex},
+};
 
 use bytes::Bytes;
 use prost::Message;
@@ -53,6 +57,7 @@ pub struct DatadogTracesRequestBuilder {
     endpoint_configuration: DatadogTracesEndpointConfiguration,
     compression: Compression,
     trace_encoder: DatadogTracesEncoder,
+    stats_aggregator: Arc<Mutex<stats::Aggregator>>,
 }
 
 impl DatadogTracesRequestBuilder {
@@ -67,6 +72,7 @@ impl DatadogTracesRequestBuilder {
             endpoint_configuration,
             compression,
             trace_encoder: DatadogTracesEncoder { max_size },
+            stats_aggregator: Arc::new(Mutex::new(stats::Aggregator::new())),
         })
     }
 }
@@ -103,6 +109,7 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
             &traces_event,
             self.compression,
             &self.api_key,
+            &self.stats_aggregator,
         ));
 
         self.trace_encoder
@@ -410,8 +417,12 @@ fn build_apm_stats_request(
     events: &[TraceEvent],
     compression: Compression,
     default_api_key: &Arc<str>,
+    aggregator: &Arc<Mutex<stats::Aggregator>>,
 ) -> Result<(RequestMetadata, Bytes), RequestBuilderError> {
-    let payload = stats::compute_apm_stats(key, events);
+    let aggregator_ = Arc::clone(aggregator);
+    let mut aggregator = aggregator_.lock().unwrap();
+    let payload = stats::compute_apm_stats(key, &mut aggregator, events);
+
     let encoded_payload =
         rmp_serde::to_vec_named(&payload).map_err(|e| RequestBuilderError::FailedToEncode {
             message: "APM stats encoding failed.",
