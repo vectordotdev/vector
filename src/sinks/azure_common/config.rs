@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use azure_core::{error::HttpError, RetryOptions};
 use azure_identity::{AutoRefreshingTokenCredential, DefaultAzureCredential};
-use azure_storage::{prelude::*, ConnectionString};
+use azure_storage::{prelude::*, CloudLocation, ConnectionString};
 use azure_storage_blobs::{blob::operations::PutBlockBlobResponse, prelude::*};
 use bytes::Bytes;
 use futures::FutureExt;
@@ -118,14 +118,20 @@ pub fn build_client(
     match (connection_string, storage_account) {
         (Some(connection_string_p), None) => {
             let connection_string = ConnectionString::new(&connection_string_p)?;
-            client = ClientBuilder::new(
+            let mut builder = ClientBuilder::new(
                 connection_string
                     .account_name
                     .ok_or("Account name missing in connection string")?,
                 connection_string.storage_credentials()?,
             )
-            .retry(RetryOptions::none())
-            .container_client(container_name);
+            .retry(RetryOptions::none());
+            if let Some(uri) = connection_string.blob_endpoint {
+                builder = builder.cloud_location(CloudLocation::Custom {
+                    uri: uri.to_string(),
+                    credentials: connection_string.storage_credentials()?,
+                });
+            }
+            client = builder.container_client(container_name);
         }
         (None, Some(storage_account_p)) => {
             let creds = std::sync::Arc::new(DefaultAzureCredential::default());
