@@ -98,7 +98,7 @@ where
 }
 
 /// Any `None` values returned from this function will already result in a `TemplateRenderingError`
-/// being emitted, so no further `discarded_event` need emitting.
+/// being emitted, so no further `discarded_event` needs emitting.
 pub(super) fn process_log(
     mut log: LogEvent,
     mode: &ElasticsearchCommonMode,
