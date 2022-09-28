@@ -131,7 +131,7 @@ fn parse(input: &str) -> Result<impl Iterator<Item = (String, Value)> + '_> {
             .chain(headers)
             .map(|(key, mut value)| {
                 // Strip quotes from value
-                if value.starts_with('"') && value.ends_with('"') {
+                if value.starts_with('"') && value.ends_with('"') && value.len() >= 2 {
                     value = value[1..value.len() - 1].to_string();
                 }
                 (key, value)
