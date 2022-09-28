@@ -107,8 +107,10 @@ detected, to give as accurate of a view into the number of events that were lost
 
 #### Operator requirements
 
+{{< warning >}}
 Disk buffers have some unique monitoring requirements compared to in-memory buffers, specifically
 around free storage space.
+{{< /warning >}}
 
 In order to provide the durability guarantees that an event written to a disk buffer is safely on
 disk, many common error handling techniques cannot be used, such as retrying failed operations and
@@ -124,11 +126,13 @@ it detects your disk buffers could grow to a size bigger than the storage volume
 be able to detect that issue with exotic/unique storage configurations, and it also cannot detect if
 other processes are writing files that are consuming free space.
 
-## "When full" actions
+## Buffer behavior
 
 As important as choosing which buffer type to use, choosing what to do when a buffer is full can
 ultimately have a major impact on how Vector performs, and will often need to be matched to the
 topology and the goals of using Vector.
+
+You'll recognize this as the `buffer.when_full` configuration option.
 
 ### Blocking
 
@@ -183,12 +187,12 @@ sure to warn you about if it detects an invalid configuration on startup.
 Below are a few common scenarios that Vector users often deal with and the recommended buffering
 configurations to use.
 
-#### I can't provide any storage to Vector.
+**I can't provide any storage to Vector.**
 
 You'll have to use in-memory buffers then. Vector does not support buffering events to external
 storage systems.
 
-#### Performance is the most important factor.
+**Performance is the most important factor.**
 
 You should use in-memory buffers, which are the default. Using `buffer.when_full = "drop_newest"`
 would provide the highest performance, but it can sometimes drop more events than you may expect it
@@ -198,7 +202,7 @@ to: events are generally received in chunks, not as a steady stream, which can q
 Generally, increasing `buffer.max_size` and leaving the default blocking behavior is sufficient to
 handle higher event processing rates.
 
-#### Durability is the most important factor.
+**Durability is the most important factor.**
 
 You should use disk buffers.
 
