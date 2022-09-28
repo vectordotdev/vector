@@ -108,23 +108,29 @@ detected, to give as accurate of a view into the number of events that were lost
 #### Operator requirements
 
 {{< warning >}}
-Disk buffers have some unique monitoring requirements compared to in-memory buffers, specifically
-around free storage space.
+Disk buffers have some unique monitoring requirements compared to in-memory buffers,
+specifically around free storage space.
 {{< /warning >}}
 
-In order to provide the durability guarantees that an event written to a disk buffer is safely on
-disk, many common error handling techniques cannot be used, such as retrying failed operations and
-so on. This means that Vector will **forcefully panic** and exit the process when an I/O error
-occurs during flushing to disk.
+I/O errors are notoriously hard to recover from, as it can be difficult to know what data made it to
+disk or not. In order to provide the durability guarantees that an event written to a disk buffer is
+safely on disk, Vector will **forcefully stop itself** when an I/O error occurs during flushing to
+disk. An error message will be emitted before exiting that explains the underlying cause of the
+error, such as "no storage space". Depending on the error, Vector can typically be safely restarted
+and it will attempt to recover whatever events are in the disk buffer that are not corrupted, but we
+cannot run that logic without reloading the buffers entirely, hence the forced process exit.
 
 As an operator, the main resource you'll need to monitor is _free storage space_. If Vector cannot
-write to a disk buffer because of a lack of free space, it will panic, as we can no longer be sure
+write to a disk buffer because of a lack of free space, it must exit, as we can no longer be sure
 what data has been written to disk or not. You **must** ensure that the data directory configured
 for Vector ([`global.data_dir`][global_data_dir]) is on a storage volume with enough free space
-based on the total maximum size of all configured disk buffers. While Vector will exit at startup if
-it detects your disk buffers could grow to a size bigger than the storage volume itself, it may not
-be able to detect that issue with exotic/unique storage configurations, and it also cannot detect if
-other processes are writing files that are consuming free space.
+based on the total maximum size of all configured disk buffers. You must also ensure that other
+processes are not consuming that free space.
+
+While Vector will exit at startup if it detects your disk buffers could grow to a size bigger than
+the storage volume itself, it may not be able to detect that issue with exotic/unique storage
+configurations, and it also cannot detect if other processes are writing files that are consuming
+free space and stop itself from trying to continue to write to disk.
 
 ## "When full" behavior
 
