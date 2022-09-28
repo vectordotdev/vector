@@ -27,11 +27,11 @@ components: sinks: vector: {
 				max_bytes:    10_000_000
 				timeout_secs: 1.0
 			}
-			compression: enabled:       false
-			encoding: enabled:          false
+			compression: enabled: false
+			encoding: enabled:    false
 			request: {
-				enabled:       true
-				headers:       false
+				enabled: true
+				headers: false
 			}
 
 			tls: {
