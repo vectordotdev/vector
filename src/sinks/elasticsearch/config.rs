@@ -46,6 +46,7 @@ pub struct ElasticsearchConfig {
     /// The Elasticsearch endpoint to send logs to.
     ///
     /// This should be the full URL as shown in the example.
+    #[configurable(deprecated)]
     pub endpoint: Option<String>,
 
     /// The Elasticsearch endpoints to send logs to.
