@@ -123,9 +123,9 @@ cannot run that logic without reloading the buffers entirely, hence the forced p
 As an operator, the main resource you'll need to monitor is _free storage space_. If Vector cannot
 write to a disk buffer because of a lack of free space, it must exit, as we can no longer be sure
 what data has been written to disk or not. You **must** ensure that the data directory configured
-for Vector ([`global.data_dir`][global_data_dir]) is on a storage volume with enough free space
-based on the total maximum size of all configured disk buffers. You must also ensure that other
-processes are not consuming that free space.
+for Vector (located within the global [`data_dir`][global_data_dir]) is on a storage volume with
+enough free space based on the total maximum size of all configured disk buffers. You must also
+ensure that other processes are not consuming that free space.
 
 While Vector will exit at startup if it detects your disk buffers could grow to a size bigger than
 the storage volume itself, it may not be able to detect that issue with exotic/unique storage
@@ -158,6 +158,13 @@ some common buffering scenarios (and configuration) further down.
 
 ### Drop the event (`drop_newest`)
 
+{{< warning >}}
+Using `drop_newest` with in-memory buffers is **not recommended** for bursty workloads, where events
+arrive in large, periodic batches. Doing so will typically result in the buffer being immediately
+filled and the remaining events being dropped, even when Vector appears to have available processing
+capacity.
+{{< /warning >}}
+
 When configured to "drop newest", Vector will simply drop an event if the buffer is currently full.
 
 This behavior can be useful when the data itself is idempotent (the same value is being sent
@@ -165,23 +172,12 @@ continually) or is generally not high-value, such as trace/debug logging. It all
 effectively shed load, by lowering the number of events in-flight for a topology, while
 simultaneously avoiding the blocking of upstream components.
 
-{{< warning >}}
-This mode can sometimes drop more events than expected.
-
-As events typically arrive to Vector in batches, and are shipped between components as batches, it is possible
-to quickly fill up an in-memory buffer and drop the remaining events, leading to a large percentage
-of events being dropped.
-
-If your events arrive in bursts, or periodically, and are not a steady stream, then using
-`drop_newest` with in-memory buffers is **not recommended.**
-{{< /warning >}}
-
 ### Overflow to another buffer (`overflow`)
 
-{{< warning >}}
+{{< danger >}}
 Overflow buffers are not yet suitable for production workloads and may contain bugs that ultimately lead to data
 loss.
-{{< /warning >}}
+{{< /danger >}}
 
 Using the overflow behavior, operators can configure a **buffer topology**. This consists or two or
 more buffers, arranged sequentially, where one buffer can overflow to the next one in the topology,
