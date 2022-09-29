@@ -419,8 +419,8 @@ fn build_apm_stats_request(
     default_api_key: &Arc<str>,
     aggregator: &Arc<Mutex<stats::Aggregator>>,
 ) -> Result<(RequestMetadata, Bytes), RequestBuilderError> {
-    let aggregator_ = Arc::clone(aggregator);
-    let mut aggregator = aggregator_.lock().unwrap();
+    let aggregator = Arc::clone(aggregator);
+    let mut aggregator = aggregator.lock().unwrap();
     let payload = stats::compute_apm_stats(key, &mut aggregator, events);
 
     let encoded_payload =

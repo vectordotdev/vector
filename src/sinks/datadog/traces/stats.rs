@@ -430,7 +430,7 @@ impl Aggregator {
     }
 }
 
-/// Assumes that all metrics are all encoded as float values.
+/// Assumes that all metrics are all encoded as Value::Float.
 /// Return the f64 of the specified key or None of key not present.
 fn get_metric_value_float(span: &BTreeMap<String, Value>, key: &str) -> Option<f64> {
     span.get("metrics")
@@ -443,7 +443,7 @@ fn get_metric_value_float(span: &BTreeMap<String, Value>, key: &str) -> Option<f
         .unwrap_or(None)
 }
 
-/// Retruns true of the value of this metric is equal to 1.0
+/// Retruns true if the value of this metric is equal to 1.0
 fn metric_value_is_1(span: &BTreeMap<String, Value>, key: &str) -> bool {
     match get_metric_value_float(span, key) {
         Some(f) => f == 1.0,
@@ -466,7 +466,7 @@ fn is_measured(span: &BTreeMap<String, Value>, key: &str) -> bool {
 }
 
 /// Returns true if the span is a partial snapshot.
-/// This type of spans are partial images of long-running spans.
+/// These types of spans are partial images of long-running spans.
 /// When incomplete, a partial snapshot has a metric _dd.partial_version which is a positive integer.
 /// The metric usually increases each time a new version of the same span is sent by the tracer
 ///
@@ -478,7 +478,7 @@ fn is_partial_snapshot(span: &BTreeMap<String, Value>, key: &str) -> bool {
     }
 }
 
-/// This extract the relative weights from the top level span (i.e. the span that does not have
+/// This extracts the relative weights from the top level span (i.e. the span that does not have
 /// a parent). The weight calculation is borrowed from
 /// https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/stats/weight.go#L17-L26.
 fn extract_weight_from_root_span(spans: &[&BTreeMap<String, Value>]) -> f64 {
@@ -533,8 +533,6 @@ fn extract_weight_from_root_span(spans: &[&BTreeMap<String, Value>]) -> f64 {
         parent_id_to_child_weight.insert(parent_id, weight);
     }
 
-    let trace_id = trace_id.unwrap_or_else(|| panic!("trace_id should exist in the span"));
-
     // We remove all span that do have a parent
     span_ids.iter().for_each(|id| {
         parent_id_to_child_weight.remove(id);
@@ -542,6 +540,7 @@ fn extract_weight_from_root_span(spans: &[&BTreeMap<String, Value>]) -> f64 {
 
     // There should be only one value remaining, the weight from the root span
     if parent_id_to_child_weight.len() != 1 {
+        let trace_id = trace_id.unwrap_or_else(|| panic!("trace_id should exist in the span"));
         emit!(DatadogTracesStatsError {
             error_message: "Didn't reliably find the root span for weight calculation.",
             trace_id,
@@ -552,6 +551,7 @@ fn extract_weight_from_root_span(spans: &[&BTreeMap<String, Value>]) -> f64 {
         .values()
         .next()
         .unwrap_or_else(|| {
+            let trace_id = trace_id.unwrap_or_else(|| panic!("trace_id should exist in the span"));
             emit!(DatadogTracesStatsError {
                 error_message: "Root span was not found. Defaulting to weight of 1.0.",
                 trace_id,
