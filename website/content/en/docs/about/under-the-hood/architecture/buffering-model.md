@@ -13,11 +13,12 @@ While operators typically strive to ensure their Vector deployments are appropri
 expected load, sometimes problems can occur. Maybe an application starts generating more logs than
 normal, or the downstream service where you're sending data starts to respond slower than normal.
 
-Part of Vector's topology design involves propagating _backpressure_, which is a signal that events cannot be
-processed as quickly as they are being received. When one component tries to send more events to a
-component than that component can currently handle, the sending component is informed of this
-indirectly. Backpressure can travel all the way from a sink, up through transforms, back to a
-source, and ultimately, even to clients such as applications sending logs over HTTP.
+Part of Vector's topology design involves propagating _backpressure_, which is a signal that events
+cannot be processed as quickly as they are being received. When one component tries to send more
+events to a component than that component can currently handle, the sending component is informed of
+this indirectly. Backpressure can travel all the way from a [sink][sinks], up through any
+[transforms][transforms], back to the [source][sources], and ultimately, even to clients such as
+applications sending logs over HTTP.
 
 Backpressure is a means of allowing a system to expose whether or not it can handle more work or if
 it is too busy to do so. We rely on backpressure to be able to slow down the consumption or
@@ -63,8 +64,9 @@ the action to take when the buffer is full.
 ### In-memory buffers
 
 We've already talked about in-memory buffers. This buffer type, as you might be able to guess from
-their name, will buffer events in memory. These are the fastest buffer type, but they come with two
-main drawbacks: they can consume memory proportional to their size, and they're not durable.
+its name, will buffer events in memory. In-memory buffers are the fastest buffer type, but they come
+with two main drawbacks: they can consume memory proportional to their size, and they're not
+durable.
 
 The fact that they consume memory is obvious, but it bears mentioning because it represents an
 important factor in capacity planning. In-memory buffers are configured in terms of how many events
@@ -74,6 +76,9 @@ For example, an in-memory buffer configured with a maximum event count of 100,00
 consume only a few megabytes if events were small, but could balloon to hundreds of megabytes if the
 events were in the kilobytes size range. This means that the memory usage profile might change
 substantially if the data being processed by Vector changes upstream and grows in size unexpectedly.
+The size of events is fluid, and based off the internal representation used by Vector. As a rule of
+thumb for capacity planning, you can estimate the size of an event by how large it would be when
+encoded to JSON, without any compression.
 
 Additionally, in-memory buffers are not durable. While Vector provides features like
 [end-to-end acknowledgements][e2e_acks] to ensure that sources don't acknowledge events until they
@@ -250,5 +255,8 @@ also drop events when the buffer is full. As mentioned above, some sources are r
 clients directly, rather than pulling it on demand, and it might be better to simply drop the event
 rather than force the client to wait, which could cause issues further up the stack.
 
+[sinks]: /docs/reference/configuration/sinks/
+[transforms]: /docs/reference/configuration/transforms/
+[sources]: /docs/reference/configuration/sources/
 [e2e_acks]: /docs/about/under-the-hood/architecture/end-to-end-acknowledgements
 [global_data_dir]: /docs/reference/configuration/global-options/#data_dir
