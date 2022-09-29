@@ -1,5 +1,4 @@
 use vector_config::configurable_component;
-
 use crate::{
     codecs::Transformer,
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
@@ -30,6 +29,9 @@ pub struct ClickhouseConfig {
 
     /// The database that contains the table that data will be inserted into.
     pub database: Option<String>,
+    /// Enable using clickhouse native protocol rather than the default jsoneachrow over http.
+    #[serde(default)]
+    pub use_native_proto: bool,
 
     /// Sets `input_format_skip_unknown_fields`, allowing Clickhouse to discard fields not present in the table schema.
     #[serde(default)]
