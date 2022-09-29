@@ -24,6 +24,8 @@ use crate::{
     },
 };
 
+use super::{ElasticsearchCommon, ElasticsearchConfig};
+
 #[derive(Clone)]
 pub struct ElasticsearchRequest {
     pub payload: Bytes,
@@ -85,6 +87,18 @@ pub struct HttpRequestBuilder {
 }
 
 impl HttpRequestBuilder {
+    pub fn new(common: &ElasticsearchCommon, config: &ElasticsearchConfig) -> HttpRequestBuilder {
+        HttpRequestBuilder {
+            bulk_uri: common.bulk_uri.clone(),
+            http_request_config: config.request.clone(),
+            http_auth: common.http_auth.clone(),
+            query_params: common.query_params.clone(),
+            region: common.region.clone(),
+            compression: config.compression,
+            credentials_provider: common.aws_auth.clone(),
+        }
+    }
+
     pub async fn build_request(
         &self,
         es_req: ElasticsearchRequest,
