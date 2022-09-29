@@ -22,7 +22,7 @@ use crate::{
     transforms::metric_to_log::MetricToLog,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ElasticsearchCommon {
     pub base_url: String,
     pub bulk_uri: Uri,
@@ -38,15 +38,15 @@ pub struct ElasticsearchCommon {
 }
 
 impl ElasticsearchCommon {
-    pub async fn parse_config(config: &ElasticsearchConfig) -> crate::Result<Self> {
+    pub async fn parse_config(config: &ElasticsearchConfig, endpoint: &str) -> crate::Result<Self> {
         // Test the configured host, but ignore the result
-        let uri = format!("{}/_test", &config.endpoint);
-        let uri = uri.parse::<Uri>().with_context(|_| InvalidHostSnafu {
-            host: &config.endpoint,
-        })?;
+        let uri = format!("{}/_test", endpoint);
+        let uri = uri
+            .parse::<Uri>()
+            .with_context(|_| InvalidHostSnafu { host: endpoint })?;
         if uri.host().is_none() {
             return Err(ParseError::HostMustIncludeHostname {
-                host: config.endpoint.clone(),
+                host: endpoint.to_string(),
             }
             .into());
         }
@@ -58,7 +58,7 @@ impl ElasticsearchCommon {
             }),
             _ => None,
         };
-        let uri = config.endpoint.parse::<UriSerde>()?;
+        let uri = endpoint.parse::<UriSerde>()?;
         let http_auth = authorization.choose_one(&uri.auth)?;
         let base_url = uri.uri.to_string().trim_end_matches('/').to_owned();
 
@@ -135,6 +135,34 @@ impl ElasticsearchCommon {
             tls_settings,
             metric_to_log,
         })
+    }
+
+    /// Parses endpoints into a vector of ElasticsearchCommons. The resulting vector is guaranteed to not be empty.
+    pub async fn parse_many(config: &ElasticsearchConfig) -> crate::Result<Vec<Self>> {
+        if let Some(endpoint) = config.endpoint.as_ref() {
+            warn!(message = "DEPRECATION, use of deprecated option `endpoint`. Please use `endpoints` option instead.");
+            if config.endpoints.is_empty() {
+                Ok(vec![Self::parse_config(config, endpoint).await?])
+            } else {
+                Err(ParseError::EndpointsExclusive.into())
+            }
+        } else if config.endpoints.is_empty() {
+            Err(ParseError::EndpointRequired.into())
+        } else {
+            let mut commons = Vec::new();
+            for endpoint in config.endpoints.iter() {
+                commons.push(Self::parse_config(config, endpoint).await?);
+            }
+            Ok(commons)
+        }
+    }
+
+    /// Parses a single endpoint, else panics.
+    #[cfg(test)]
+    pub async fn parse_single(config: &ElasticsearchConfig) -> crate::Result<Self> {
+        let mut commons = Self::parse_many(config).await?;
+        assert!(commons.len() == 1);
+        Ok(commons.remove(0))
     }
 
     pub async fn healthcheck(self, client: HttpClient) -> crate::Result<()> {

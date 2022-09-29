@@ -241,7 +241,7 @@ async fn validate_healthchecks(
                     validated &= !opts.deny_warnings;
                 }
             }
-            Ok(Err(())) => failed(format!("Health check for \"{}\" failed", id)),
+            Ok(Err(e)) => failed(format!("Health check for \"{}\" failed: {}", id, e)),
             Err(error) if error.is_cancelled() => {
                 failed(format!("Health check for \"{}\" was cancelled", id))
             }

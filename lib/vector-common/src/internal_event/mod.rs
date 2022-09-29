@@ -97,6 +97,8 @@ pub type Registered<T> = <T as RegisterInternalEvent>::Handle;
 
 pub struct ByteSize(pub usize);
 
+pub struct CountByteSize(pub usize, pub usize);
+
 pub struct Protocol(pub SharedString);
 
 impl Protocol {

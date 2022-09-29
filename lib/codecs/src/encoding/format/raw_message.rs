@@ -46,7 +46,7 @@ impl RawMessageSerializer {
 }
 
 impl Encoder<Event> for RawMessageSerializer {
-    type Error = vector_core::Error;
+    type Error = vector_common::Error;
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let message_key = log_schema().message_key();

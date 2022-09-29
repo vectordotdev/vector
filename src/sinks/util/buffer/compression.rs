@@ -1,34 +1,19 @@
-use std::fmt;
+use std::{collections::BTreeSet, fmt};
 
+use indexmap::IndexMap;
 use serde::{de, ser};
 use vector_config::{
-    configurable_component,
-    schema::{generate_composite_schema, generate_number_schema, generate_string_schema},
+    schema::{
+        apply_metadata, generate_const_string_schema, generate_enum_schema,
+        generate_internal_tagged_variant_schema, generate_one_of_schema, generate_struct_schema,
+        get_or_generate_schema,
+    },
     schemars::{gen::SchemaGenerator, schema::SchemaObject},
-    validation::Validation,
-    Configurable, GenerateError,
+    Configurable, GenerateError, Metadata,
 };
-
-// NOTE: The resulting schema for `Compression` is not going to look right, because of how we do the customized "string
-// or map" stuff. We've done a bunch of work here to get us half-way towards generating a valid schema for it, including
-// add in the `CompressionLevel` type and doing a custom `Configurable` implementation for it... but the real meat of
-// the change would be doing so for `Compression` because of it being an enum and all the boilerplate involved there.
-//
-// It'd be nice to find a succinct way to allow the expression of these constraints, possibly through a declarative
-// macro that helps build the manual `Configurable` implementation such that, while still leaving the developer
-// responsible for generating a correct schema, it would be far closer to a human-readable description of the schema
-// i.e. "this schema can be X or Y, and if X, it can only be these values, or if Y, the value must fall within this
-// specific range" and so on, with methods for describing enum variants, etc.
-//
-// Another complication is that we can _almost_ sort of get there with the existing primitives but `serde` itself has no
-// way to express an enum that functions like what we're doing here i.e. the variant name is parsed from the value,
-// without needing to be a tag field, with the ability to fallback to a newtype variant, etc.
-//
-// Long story short, these custom (de)serialization strategies are hard to encode in a procedural way because they are
-// in fact not themselves declared procedurally.
+use vector_config_common::attributes::CustomAttribute;
 
 /// Compression configuration.
-#[configurable_component(no_ser, no_deser)]
 #[derive(Copy, Clone, Debug, Derivative, Eq, PartialEq)]
 #[derivative(Default)]
 pub enum Compression {
@@ -39,12 +24,12 @@ pub enum Compression {
     /// [Gzip][gzip] compression.
     ///
     /// [gzip]: https://en.wikipedia.org/wiki/Gzip
-    Gzip(#[configurable(derived)] CompressionLevel),
+    Gzip(CompressionLevel),
 
     /// [Zlib][zlib] compression.
     ///
     /// [zlib]: https://en.wikipedia.org/wiki/Zlib
-    Zlib(#[configurable(derived)] CompressionLevel),
+    Zlib(CompressionLevel),
 }
 
 impl Compression {
@@ -213,6 +198,96 @@ impl ser::Serialize for Compression {
     }
 }
 
+// TODO: Consider an approach for generating schema of "string or object" structure used by this type.
+impl Configurable for Compression {
+    fn referenceable_name() -> Option<&'static str> {
+        Some(std::any::type_name::<Self>())
+    }
+
+    fn description() -> Option<&'static str> {
+        Some("Compression configuration.")
+    }
+
+    fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+        const ALGORITHM_NAME: &str = "algorithm";
+        const LEVEL_NAME: &str = "level";
+        const NONE_NAME: &str = "none";
+        const GZIP_NAME: &str = "gzip";
+        const ZLIB_NAME: &str = "zlib";
+
+        // First, we need to be able to handle all of the string-only variants.
+        let const_values = [NONE_NAME, GZIP_NAME, ZLIB_NAME]
+            .iter()
+            .map(|s| serde_json::Value::from(*s))
+            .collect();
+
+        // Now we need to handle when the user specifies the full object-based notation in order to
+        // specify the compression level, and so on.
+        let mut compression_level_metadata = Metadata::default();
+        compression_level_metadata.set_transparent();
+        let compression_level_schema =
+            get_or_generate_schema::<CompressionLevel>(gen, compression_level_metadata)?;
+
+        let mut required = BTreeSet::new();
+        required.insert(ALGORITHM_NAME.to_string());
+
+        // Build the None schema.
+        let mut none_schema = generate_internal_tagged_variant_schema(
+            ALGORITHM_NAME.to_string(),
+            NONE_NAME.to_string(),
+        );
+        let mut none_metadata = Metadata::<()>::with_description("No compression.");
+        none_metadata.add_custom_attribute(CustomAttribute::KeyValue {
+            key: "logical_name".to_string(),
+            value: "None".to_string(),
+        });
+        apply_metadata(&mut none_schema, none_metadata);
+
+        // Build the Gzip schema.
+        let mut gzip_properties = IndexMap::new();
+        gzip_properties.insert(
+            ALGORITHM_NAME.to_string(),
+            generate_const_string_schema(GZIP_NAME.to_string()),
+        );
+        gzip_properties.insert(LEVEL_NAME.to_string(), compression_level_schema.clone());
+
+        let mut gzip_schema = generate_struct_schema(gzip_properties, required.clone(), None);
+        let mut gzip_metadata = Metadata::<()>::with_title("[Gzip][gzip] compression.");
+        gzip_metadata.set_description("[gzip]: https://en.wikipedia.org/wiki/Gzip");
+        gzip_metadata.add_custom_attribute(CustomAttribute::KeyValue {
+            key: "logical_name".to_string(),
+            value: "Gzip".to_string(),
+        });
+        apply_metadata(&mut gzip_schema, gzip_metadata);
+
+        // Build the Zlib schema.
+        let mut zlib_properties = IndexMap::new();
+        zlib_properties.insert(
+            ALGORITHM_NAME.to_string(),
+            generate_const_string_schema(ZLIB_NAME.to_string()),
+        );
+        zlib_properties.insert(LEVEL_NAME.to_string(), compression_level_schema);
+
+        let mut zlib_schema = generate_struct_schema(zlib_properties, required, None);
+        let mut zlib_metadata = Metadata::<()>::with_title("[Zlib]][zlib] compression.");
+        zlib_metadata.set_description("[zlib]: https://en.wikipedia.org/wiki/Zlib");
+        zlib_metadata.add_custom_attribute(CustomAttribute::KeyValue {
+            key: "logical_name".to_string(),
+            value: "Zlib".to_string(),
+        });
+        apply_metadata(&mut zlib_schema, zlib_metadata);
+
+        Ok(generate_one_of_schema(&[
+            // Handle the condensed string form.
+            generate_enum_schema(const_values),
+            // Handle the expanded object form.
+            none_schema,
+            gzip_schema,
+            zlib_schema,
+        ]))
+    }
+}
+
 /// Compression level.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct CompressionLevel(flate2::Compression);
@@ -323,37 +398,25 @@ impl ser::Serialize for CompressionLevel {
     }
 }
 
+// TODO: Consider an approach for generating schema of "string or number" structure used by this type.
 impl Configurable for CompressionLevel {
-    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
-        let as_number = generate_number_schema::<u32>();
-        let as_string = generate_string_schema();
-
-        Ok(generate_composite_schema(&[as_number, as_string]))
+    fn referenceable_name() -> Option<&'static str> {
+        Some(std::any::type_name::<Self>())
     }
 
     fn description() -> Option<&'static str> {
         Some("Compression level.")
     }
 
-    fn metadata() -> vector_config::Metadata<Self> {
-        let mut metadata = vector_config::Metadata::default();
-        if let Some(description) = Self::description() {
-            metadata.set_description(description);
-        }
+    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+        let string_consts = ["none", "fast", "best", "default"]
+            .iter()
+            .map(|s| serde_json::Value::from(*s));
 
-        // Allows the user to specify any number from 0 to 9, or the constants "none", "fast", or "best".
-        //
-        // TODO: Technically, we can define `integer` or `number` for a schema's instance type, which would make the
-        // validation do the right thing, since as-is, while our implicit casting, everything in the schema ends up
-        // looking like it can be a floating-point number. We should add support for generating `integer` schemas, and
-        // then add validator support to do ranges specifically for integers vs numbers (floating-point).
-        metadata.add_validation(Validation::Range {
-            minimum: Some(0.0),
-            maximum: Some(9.0),
-        });
-        metadata.add_validation(Validation::Pattern(String::from("none|fast|best|default")));
+        let level_consts = (0u32..=9).map(serde_json::Value::from);
 
-        metadata
+        let valid_values = string_consts.chain(level_consts).collect();
+        Ok(generate_enum_schema(valid_values))
     }
 }
 

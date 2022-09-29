@@ -1,7 +1,7 @@
 use std::{
     num::NonZeroUsize,
     pin::Pin,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
 };
 
 use crate::{
@@ -13,7 +13,7 @@ use crate::{
 };
 use bytes::BytesMut;
 use codecs::{encoding::SerializerConfig, TextSerializerConfig};
-use futures::{future::BoxFuture, ready, stream::FuturesUnordered, FutureExt, Sink, Stream};
+use futures::{future::BoxFuture, stream::FuturesUnordered, FutureExt, Sink, Stream};
 use pulsar::authentication::oauth2::{OAuth2Authentication, OAuth2Params};
 use pulsar::error::AuthenticationError;
 use pulsar::{

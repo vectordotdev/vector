@@ -12,7 +12,7 @@ use std::{
 use tower::Service;
 use vector_common::{
     finalization::{EventFinalizers, EventStatus, Finalizable},
-    internal_event::EventsSent,
+    internal_event::CountByteSize,
 };
 use vector_core::stream::DriverResponse;
 
@@ -57,12 +57,8 @@ impl DriverResponse for AmqpResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> EventsSent {
-        EventsSent {
-            count: 1,
-            byte_size: self.byte_size,
-            output: None,
-        }
+    fn events_sent(&self) -> CountByteSize {
+        CountByteSize(1, self.byte_size)
     }
 
     fn bytes_sent(&self) -> Option<(usize, &str)> {
