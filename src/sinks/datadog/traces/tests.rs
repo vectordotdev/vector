@@ -1,10 +1,4 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    fs::{self, File},
-    io::{self, BufRead},
-    path::Path,
-    sync::Arc,
-};
+use std::{collections::BTreeMap, sync::Arc};
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
@@ -23,7 +17,7 @@ use crate::{
     sinks::util::test::{build_test_server_status, load_sink},
     test_util::{
         components::{assert_sink_compliance, SINK_TAGS},
-        map_event_batch_stream, next_addr, trace_init,
+        map_event_batch_stream, next_addr,
     },
 };
 
@@ -317,137 +311,4 @@ async fn multiple_traces() {
     assert_eq!(cgs_trace_1.name, "a_name");
     assert_eq!(cgs_trace_1.resource, "trace_1");
     assert_eq!(cgs_trace_1.service, "a_service");
-}
-
-fn json_data_to_btreemap(data: &str) -> BTreeMap<String, Value> {
-    serde_json::from_str(&data).unwrap()
-}
-
-fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
-where
-    P: AsRef<Path>,
-{
-    let file = File::open(filename)?;
-    Ok(io::BufReader::new(file).lines())
-}
-
-fn events_from_sample_data(sample_data_dir: &str) -> Vec<Event> {
-    let mut events = vec![];
-    for file in fs::read_dir(sample_data_dir).unwrap() {
-        let t = file.unwrap().path();
-        let path = t.to_str().unwrap();
-
-        let mut count = 0;
-        if let Ok(lines) = read_lines(path) {
-            for line in lines {
-                if let Ok(data) = line {
-                    let btmap = json_data_to_btreemap(&data);
-                    let event: TraceEvent = btmap.into();
-                    events.push(Event::Trace(event));
-                    count += 1;
-                }
-            }
-        }
-        println!("processed {}", count);
-        println!();
-    }
-
-    events
-}
-
-#[tokio::test]
-async fn thorough_stats() {
-    trace_init();
-
-    let sample_data_dir = "/home/kyle.criddle/workspace/issues/incorrect_apm_stats/json_files";
-    let events = events_from_sample_data(&sample_data_dir);
-
-    let mut rx = start_test(BatchStatus::Delivered, StatusCode::OK, events).await;
-
-    let mut items = Vec::new();
-    while let Some(item) = rx.next().await {
-        items.push(item);
-    }
-
-    let mut num_spans = 0;
-    let mut num_chunks = 0;
-
-    let mut hits_map = HashMap::new();
-    let mut top_hits_map = HashMap::new();
-
-    for item in items {
-        let (parts, body) = item;
-
-        let content_type = parts.headers.get("Content-Type").unwrap();
-
-        // traces
-        if content_type == "application/x-protobuf" {
-            let decoded_payload = dd_proto::TracePayload::decode(body).unwrap();
-
-            for tracer_payload in decoded_payload.tracer_payloads {
-                for chunk in tracer_payload.chunks {
-                    for _span in chunk.spans {
-                        num_spans += 1;
-                    }
-                    num_chunks += 1;
-                }
-            }
-        }
-        // stats
-        else if content_type == "application/msgpack" {
-            let stats_payload: StatsPayload = rmp_serde::from_slice(&body).unwrap();
-            //println!("{:?}", stats_payload);
-
-            for csp in stats_payload.stats {
-                for csb in csp.stats {
-                    for cgs in csb.stats {
-                        let hits = cgs.hits;
-                        let top_hits = cgs.top_level_hits;
-                        let name = cgs.name.clone();
-                        // println!("{:?}", cgs);
-                        hits_map
-                            .entry(name.clone())
-                            .and_modify(|hits_counter| *hits_counter += hits)
-                            .or_insert(hits);
-
-                        top_hits_map
-                            .entry(name)
-                            .and_modify(|hits_counter| *hits_counter += top_hits)
-                            .or_insert(top_hits);
-                    }
-                }
-            }
-        } else {
-            panic!("unidentified flying content type!");
-        }
-    }
-    println!();
-    println!("hit totals:");
-    println!();
-
-    let mut sum = 0;
-    for (k, v) in hits_map {
-        println!("{} : {}", k, v);
-        sum += v;
-    }
-    println!();
-
-    println!("sum: {}", sum);
-    println!();
-
-    println!("actual spans: {}", num_spans);
-    println!("actual chunks: {}", num_chunks);
-
-    println!();
-    println!("top level hit totals:");
-    println!();
-
-    sum = 0;
-    for (k, v) in top_hits_map {
-        println!("{} : {}", k, v);
-        sum += v;
-    }
-    println!();
-    println!("sum: {}", sum);
-    println!();
 }
