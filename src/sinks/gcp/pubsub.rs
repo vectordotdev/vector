@@ -249,7 +249,7 @@ mod tests {
     }
 }
 
-#[cfg(all(test, feature = "gcp-pubsub-integration-tests"))]
+#[cfg(all(test, feature = "gcp-integration-tests"))]
 mod integration_tests {
     use codecs::JsonSerializerConfig;
     use reqwest::{Client, Method, Response};
