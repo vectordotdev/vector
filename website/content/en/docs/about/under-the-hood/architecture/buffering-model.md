@@ -173,7 +173,7 @@ dropped, even when Vector appears to have available processing capacity.
 When configured to "drop newest", Vector will simply drop an event if the buffer is currently full.
 
 This behavior can be useful when the data itself is idempotent (the same value is being sent
-continually) or is generally not high-value, such as trace/debug logging. It allows Vector to
+continually) or is generally not high-value, such as trace or debug logging. It allows Vector to
 effectively shed load, by lowering the number of events in-flight for a topology, while
 simultaneously avoiding the blocking of upstream components.
 
@@ -235,7 +235,7 @@ storage systems.
 
 **Performance is the most important factor.**
 
-You should use in-memory buffers. As noted above, the "drop newest" mode will provide the highest
+You should use in-memory buffers. As noted above, the `drop_newest` mode will provide the highest
 possible performance, but more events may be dropped than expected.
 
 Generally, increasing `max_events` and leaving the default blocking behavior is sufficient to
