@@ -71,7 +71,7 @@ where
                     Event::Trace(_) => {
                         // Although technically this will cause the event to be dropped, due to the sink
                         // config it is not possible to send traces to this sink - so this situation can
-                        // never occur. We don't need to emit an events_dropped event.
+                        // never occur. We don't need to emit an `EventsDropped` event.
                         None
                     }
                 }))
@@ -98,7 +98,7 @@ where
 }
 
 /// Any `None` values returned from this function will already result in a `TemplateRenderingError`
-/// being emitted, so no further `discarded_event` needs emitting.
+/// being emitted, so no further `EventsDropped` event needs emitting.
 pub(super) fn process_log(
     mut log: LogEvent,
     mode: &ElasticsearchCommonMode,
