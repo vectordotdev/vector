@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, fs, io::Write, sync::Arc};
+use std::{collections::BTreeMap, sync::Arc};
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
@@ -218,7 +218,9 @@ fn handle_dd_trace_payload_v0(
         .into_iter()
         .map(|dd_trace| {
             let mut trace_event = TraceEvent::default();
-            //trace_event.insert("trace_id", dd_trace.trace_id as f64);
+
+            // TODO trace_id is being forced into an i64 but
+            // the incoming payload accepts up to u64. This is a bug and needs to be fixed.
             trace_event.insert("trace_id", dd_trace.trace_id as i64);
             trace_event.insert("start_time", Utc.timestamp_nanos(dd_trace.start_time));
             trace_event.insert("end_time", Utc.timestamp_nanos(dd_trace.end_time));
@@ -276,9 +278,9 @@ fn convert_span(dd_span: ddtrace_proto::Span) -> BTreeMap<String, Value> {
     span.insert("name".into(), Value::from(dd_span.name));
 
     span.insert("resource".into(), Value::from(dd_span.resource));
-    //span.insert("trace_id".into(), Value::from(dd_span.trace_id as f64));
-    //span.insert("span_id".into(), Value::from(dd_span.span_id as f64));
-    //span.insert("parent_id".into(), Value::from(dd_span.parent_id as f64));
+
+    // TODO trace_id, span_id, parent_id are being forced into an i64 but
+    // the incoming payload accepts up to u64. This is a bug and needs to be fixed.
     span.insert("trace_id".into(), Value::from(dd_span.trace_id as i64));
     span.insert("span_id".into(), Value::from(dd_span.span_id as i64));
     span.insert("parent_id".into(), Value::from(dd_span.parent_id as i64));
@@ -317,29 +319,6 @@ fn convert_span(dd_span: ddtrace_proto::Span) -> BTreeMap<String, Value> {
                 .collect::<BTreeMap<String, Value>>(),
         ),
     );
-
-    let name = match span.get("name") {
-        Some(Value::Bytes(val)) => String::from_utf8_lossy(val).to_string(), //(*val),
-        _ => "".to_owned(),
-    };
-    let resource = match span.get("resource") {
-        Some(Value::Bytes(val)) => String::from_utf8_lossy(val).to_string(), //(*val),
-        _ => "".to_owned(),
-    };
-
-    if name == "dynamodb.command" && resource == "dynamodb.query" {
-        let span_id = match span.get("span_id") {
-            Some(Value::Integer(val)) => (*val) as u64,
-            _ => 0,
-        };
-        let mut file = fs::OpenOptions::new()
-            .write(true)
-            .append(true)
-            .open("vector-dynamodb-span-ids_source_handle_dd_trace.txt")
-            .unwrap();
-        file.write_all(format!("{}\n", span_id).as_bytes())
-            .expect("write failed");
-    }
 
     span
 }

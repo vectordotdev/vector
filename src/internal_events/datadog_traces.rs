@@ -39,3 +39,26 @@ impl InternalEvent for DatadogTracesEncodingError {
         }
     }
 }
+
+#[derive(Debug)]
+pub struct DatadogTracesStatsError {
+    pub error_message: &'static str,
+    pub trace_id: i64,
+}
+
+impl InternalEvent for DatadogTracesStatsError {
+    fn emit(self) {
+        error!(
+            message = "Trace stats calculation error.",
+            error = %self.error_message,
+            error_type = error_type::PARSER_FAILED,
+            stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => error_type::PARSER_FAILED,
+            "stage" => error_stage::PROCESSING,
+        );
+    }
+}
