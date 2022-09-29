@@ -22,7 +22,10 @@ use crate::{
         HealthcheckError,
     },
     test_util::{
-        components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
+        components::{
+            run_and_assert_sink_compliance, run_and_assert_sink_error, COMPONENT_ERROR_TAGS,
+            HTTP_SINK_TAGS,
+        },
         random_events_with_stream, random_string, trace_init,
     },
     tls::{self, TlsConfig},
@@ -446,7 +449,7 @@ async fn run_insert_tests_with_config(
             events
         });
 
-        run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
+        run_and_assert_sink_error(sink, events, &COMPONENT_ERROR_TAGS).await;
     } else {
         run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
     }

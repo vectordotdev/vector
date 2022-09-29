@@ -17,7 +17,6 @@ use crate::sinks::elasticsearch::sign_request;
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
     http::{Auth, HttpClient},
-    internal_events::ElasticsearchResponseError,
     sinks::util::{
         http::{HttpBatchService, RequestConfig},
         Compression, ElementCount,
@@ -154,10 +153,12 @@ impl Service<ElasticsearchRequest> for ElasticsearchService {
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        // Emission of Error internal event is handled upstream by the caller.
         Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, req: ElasticsearchRequest) -> Self::Future {
+        // Emission of Error internal event is handled upstream by the caller.
         let mut http_service = self.batch_service.clone();
         Box::pin(async move {
             http_service.ready().await?;
@@ -180,25 +181,13 @@ fn get_event_status(response: &Response<Bytes>) -> EventStatus {
     if status.is_success() {
         let body = String::from_utf8_lossy(response.body());
         if body.contains("\"errors\":true") {
-            emit!(ElasticsearchResponseError::new(
-                "Response contained errors.",
-                response
-            ));
             EventStatus::Rejected
         } else {
             EventStatus::Delivered
         }
     } else if status.is_server_error() {
-        emit!(ElasticsearchResponseError::new(
-            "Response wasn't successful.",
-            response,
-        ));
         EventStatus::Errored
     } else {
-        emit!(ElasticsearchResponseError::new(
-            "Response failed.",
-            response,
-        ));
         EventStatus::Rejected
     }
 }
