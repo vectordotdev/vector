@@ -75,10 +75,6 @@ where
 }
 
 pub fn convert_to_flattened_schema(primary: &mut SchemaObject, mut subschemas: Vec<SchemaObject>) {
-    // Now we need to extract our object validation portion into a new schema object, add it to the list of subschemas,
-    // and then update the primary schema to use `allOf`. It is not valid to "extend" a schema via `allOf`, hence why we
-    // have to extract the primary schema object validation first.
-
     // First, we replace the primary schema with an empty schema, because we need to push it the actual primary schema
     // into the list of `allOf` schemas. This is due to the fact that it's not valid to "extend" a schema using `allOf`,
     // so everything has to be in there.
@@ -274,7 +270,7 @@ where
                 // outer field wrapping this schema, and it looks wonky to have it nested within the composite schema.
                 schema.metadata().description = None;
 
-                return Ok(generate_composite_schema(&[null, schema]))
+                return Ok(generate_one_of_schema(&[null, schema]))
             }
         },
         Some(sov) => match sov {
@@ -291,7 +287,7 @@ where
     Ok(schema)
 }
 
-pub fn generate_composite_schema(subschemas: &[SchemaObject]) -> SchemaObject {
+pub fn generate_one_of_schema(subschemas: &[SchemaObject]) -> SchemaObject {
     let subschemas = subschemas
         .iter()
         .map(|s| Schema::Object(s.clone()))
@@ -300,6 +296,21 @@ pub fn generate_composite_schema(subschemas: &[SchemaObject]) -> SchemaObject {
     SchemaObject {
         subschemas: Some(Box::new(SubschemaValidation {
             one_of: Some(subschemas),
+            ..Default::default()
+        })),
+        ..Default::default()
+    }
+}
+
+pub fn generate_all_of_schema(subschemas: &[SchemaObject]) -> SchemaObject {
+    let subschemas = subschemas
+        .iter()
+        .map(|s| Schema::Object(s.clone()))
+        .collect::<Vec<_>>();
+
+    SchemaObject {
+        subschemas: Some(Box::new(SubschemaValidation {
+            all_of: Some(subschemas),
             ..Default::default()
         })),
         ..Default::default()
@@ -321,6 +332,13 @@ pub fn generate_tuple_schema(subschemas: &[SchemaObject]) -> SchemaObject {
             additional_items: Some(Box::new(Schema::Bool(false))),
             ..Default::default()
         })),
+        ..Default::default()
+    }
+}
+
+pub fn generate_enum_schema(values: Vec<Value>) -> SchemaObject {
+    SchemaObject {
+        enum_values: Some(values),
         ..Default::default()
     }
 }

@@ -19,7 +19,7 @@ mod sink {
 
     #[derive(Debug)]
     pub struct SplunkEventEncodeError {
-        pub error: vector_core::Error,
+        pub error: vector_common::Error,
     }
 
     impl InternalEvent for SplunkEventEncodeError {
