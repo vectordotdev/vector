@@ -8,6 +8,8 @@ impl Kind {
     /// This has the same behavior as `Value::remove`.
     #[allow(clippy::needless_pass_by_value)] // only reference types implement Path
     pub fn remove(&mut self, path: &OwnedValuePath, prune: bool) {
+        // TODO: add return type which is just `Kind::get` of the query
+
         let mut segments = &path.segments;
         if segments.is_empty() {
             let mut new_kind = Kind::never();
@@ -25,41 +27,61 @@ impl Kind {
         } else {
             self.remove_inner(segments, prune);
         }
-        // let mut this = self;
+    }
 
-        // for segment in segments {
-        //     match segment {
-        //         OwnedSegment::Field(field) => unimplemented!(),
-        //         OwnedSegment::Index(index) => unimplemented!(),
-        //         OwnedSegment::Coalesce(fields) => unimplemented!(),
-        //         OwnedSegment::Invalid => {
-        //             // Same behavior as `Value::remove`, do nothing. Eventually
-        //             // this variant should be removed from `OwnedValuePath`.
-        //             return;
-        //         }
+    fn remove_inner(&mut self, segments: &[OwnedSegment], prune: bool) -> EmptyState {
+        debug_assert!(!segments.is_empty());
+
+        let first = segments.first().expect("must not be empty");
+        let second = segments.get(1);
+
+        if let Some(second) = second {
+            unimplemented!("more segments");
+        } else {
+            match first {
+                OwnedSegment::Field(field) => {
+                    if let Some(object) = self.as_object_mut() {
+                        let _result = object.known_mut().remove(&field.as_str().into());
+                        object.is_empty()
+                    } else {
+                    }
+                }
+                OwnedSegment::Index(_) => unimplemented!(),
+                OwnedSegment::Coalesce(_) => unimplemented!(),
+                OwnedSegment::Invalid => unimplemented!(),
+            }
+            unimplemented!("last segment");
+        }
+
+        // match (first, second) {
+        //     (_, None) => {
+        //
+        //     }
+        //     _ => unimplemented!()
+        // }
+
+        // match segments.first().expect("must not be empty") {
+        //     OwnedSegment::Field(_) => unimplemented!(),
+        //     OwnedSegment::Index(_) => unimplemented!(),
+        //     OwnedSegment::Coalesce(_) => unimplemented!(),
+        //     OwnedSegment::Invalid => {
+        //         // Same behavior as `Value::remove`, do nothing. Eventually
+        //         // this variant should be removed from `OwnedValuePath`.
+        //         return;
         //     }
         // }
     }
-
-    fn remove_inner(&mut self, segments: &[OwnedSegment], prune: bool) -> RemoveResult {
-        debug_assert!(!segments.is_empty());
-
-        unimplemented!()
-    }
-}
-
-struct RemoveResult {
-    is_empty: bool,
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
     use lookup::owned_value_path;
+    use std::collections::BTreeMap;
 
     #[test]
     #[allow(clippy::too_many_lines)]
-    fn test_at_path() {
+    fn test_remove() {
         struct TestCase {
             kind: Kind,
             path: OwnedValuePath,
@@ -75,16 +97,61 @@ mod test {
                 prune,
                 want,
             },
-        ) in [(
-            "remove integer root",
-            TestCase {
-                kind: Kind::integer(),
-                path: owned_value_path!(),
-                prune: false,
-                want: Kind::null(),
-            },
-        )] {
-            assert_eq!(kind.at_path(&path), want, "test: {}", title);
+        ) in [
+            (
+                "remove integer root",
+                TestCase {
+                    kind: Kind::integer(),
+                    path: owned_value_path!(),
+                    prune: false,
+                    want: Kind::null(),
+                },
+            ),
+            (
+                "remove array root",
+                TestCase {
+                    kind: Kind::array(Collection::from(BTreeMap::from([(
+                        0.into(),
+                        Kind::integer(),
+                    )]))),
+                    path: owned_value_path!(),
+                    prune: false,
+                    want: Kind::array(Collection::empty()),
+                },
+            ),
+            (
+                "remove object root",
+                TestCase {
+                    kind: Kind::object(Collection::from(BTreeMap::from([(
+                        "a".into(),
+                        Kind::integer(),
+                    )]))),
+                    path: owned_value_path!(),
+                    prune: false,
+                    want: Kind::object(Collection::empty()),
+                },
+            ),
+            (
+                "remove object field",
+                TestCase {
+                    kind: Kind::object(Collection::from(BTreeMap::from([(
+                        "a".into(),
+                        Kind::integer(),
+                    )]))),
+                    path: owned_value_path!("a"),
+                    prune: false,
+                    want: Kind::object(Collection::empty()),
+                },
+            ),
+        ] {
+            let mut actual = kind;
+            actual.remove(&path, prune);
+            if actual != want {
+                panic!(
+                    "Test failed: {:?}.\nExpected = {:?}\nActual = {:?}",
+                    title, want, actual
+                );
+            }
         }
     }
 }
