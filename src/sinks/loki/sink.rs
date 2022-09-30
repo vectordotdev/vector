@@ -100,20 +100,6 @@ impl From<std::io::Error> for RequestBuildError {
 
 pub(super) struct LokiRecords(pub Vec<LokiRecord>);
 
-// impl std::ops::Deref for LokiRecords {
-//     type Target = Vec<LokiRecord>;
-//
-//     fn deref(&self) -> &Self::Target {
-//         &self.0
-//     }
-// }
-//
-// impl std::ops::DerefMut for LokiRecords {
-//     fn deref_mut(&mut self) -> &mut Self::Target {
-//         &mut self.0
-//     }
-// }
-
 impl ByteSizeOf for LokiRecords {
     fn allocated_bytes(&self) -> usize {
         self.0
@@ -129,14 +115,6 @@ impl EventCount for LokiRecords {
 }
 
 impl EstimatedJsonEncodedSizeOf for LokiRecords {
-    fn estimated_json_encoded_size_of(&self) -> usize {
-        self.0
-            .iter()
-            .fold(0, |res, item| res + item.estimated_json_encoded_size_of())
-    }
-}
-
-impl EstimatedJsonEncodedSizeOf for &LokiRecords {
     fn estimated_json_encoded_size_of(&self) -> usize {
         self.0
             .iter()

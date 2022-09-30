@@ -9,8 +9,8 @@ use futures::{stream, Stream};
 use quickcheck::{Arbitrary, Gen};
 use vector_buffers::EventCount;
 use vector_common::{
+    estimated_json_encoded_size_of::{EstimatedJsonEncodedSizeOf, JsonEncodedByteCountingValue},
     finalization::{AddBatchNotifier, BatchNotifier, EventFinalizers, Finalizable},
-    json_encoded_size_of::{EstimatedJsonEncodedSizeOf, JsonEncodedByteCountingValue},
 };
 
 use super::{

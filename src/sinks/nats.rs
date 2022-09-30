@@ -7,8 +7,8 @@ use futures::{stream::BoxStream, FutureExt, StreamExt, TryFutureExt};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
 use vector_common::{
+    estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf,
     internal_event::{ByteSize, BytesSent, EventsSent, InternalEventHandle, Protocol},
-    json_encoded_size_of::EstimatedJsonEncodedSizeOf,
 };
 use vector_config::configurable_component;
 

@@ -1,9 +1,11 @@
 use std::{collections::HashMap, error, pin::Pin};
 
 use futures::{Stream, StreamExt};
-use vector_common::internal_event::{emit, EventsSent, DEFAULT_OUTPUT};
-use vector_common::json_encoded_size_of::EstimatedJsonEncodedSizeOf;
-use vector_common::EventDataEq;
+use vector_common::{
+    estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf,
+    internal_event::{emit, EventsSent, DEFAULT_OUTPUT},
+    EventDataEq,
+};
 
 use crate::{
     config::Output,

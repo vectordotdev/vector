@@ -134,7 +134,7 @@ pub struct Serializer {
 
 /// Return the estimated size of `T` as represented by a JSON-encoded string.
 ///
-/// See [`Serializer`] for more details.`
+/// See [`Serializer`] for more details.
 ///
 /// # Errors
 ///
@@ -341,7 +341,7 @@ impl<'a> ser::Serializer for &'a mut Serializer {
     /// doing so would result in a small difference in the reported byte size of the serialized
     /// value.
     fn serialize_f32(self, v: f32) -> Result<()> {
-        self.serialize_f64(v as f64)
+        self.serialize_f64(f64::from(v))
     }
 
     /// This method assumes the float is finite (not NaN or infinite), which holds true for our
@@ -697,6 +697,8 @@ impl<'a> ser::SerializeStructVariant for &'a mut Serializer {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::needless_pass_by_value)]
+
     use std::collections::HashMap;
 
     use super::*;

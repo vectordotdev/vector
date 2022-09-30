@@ -55,7 +55,8 @@ pub use vector_buffers as buffers;
 #[cfg(any(test, feature = "test"))]
 pub use vector_common::event_test_util;
 pub use vector_common::{
-    byte_size_of::ByteSizeOf, internal_event, json_encoded_size_of::EstimatedJsonEncodedSizeOf,
+    byte_size_of::ByteSizeOf, estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf,
+    internal_event,
 };
 
 #[macro_use]

@@ -16,7 +16,7 @@ use lookup::lookup_v2::TargetPath;
 use lookup::PathPrefix;
 use serde::{Deserialize, Serialize, Serializer};
 use vector_common::{
-    json_encoded_size_of::{EstimatedJsonEncodedSizeOf, JsonEncodedByteCountingValue},
+    estimated_json_encoded_size_of::{EstimatedJsonEncodedSizeOf, JsonEncodedByteCountingValue},
     EventDataEq,
 };
 
