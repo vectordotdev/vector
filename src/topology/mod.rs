@@ -31,13 +31,12 @@ use vector_buffers::topology::channel::{BufferReceiverStream, BufferSender};
 use crate::{
     config::{ComponentKey, Config, ConfigDiff, OutputId},
     event::EventArray,
-    topology::{
-        builder::Pieces,
-        task::{Task, TaskOutput},
-    },
+    topology::{builder::Pieces, task::Task},
 };
 
-type TaskHandle = tokio::task::JoinHandle<Result<TaskOutput, ()>>;
+use self::task::{TaskError, TaskResult};
+
+type TaskHandle = tokio::task::JoinHandle<TaskResult>;
 
 type BuiltBuffer = (
     BufferSender<EventArray>,
@@ -145,17 +144,18 @@ pub(super) fn take_healthchecks(
 }
 
 async fn handle_errors(
-    task: impl Future<Output = Result<TaskOutput, ()>>,
+    task: impl Future<Output = TaskResult>,
     abort_tx: mpsc::UnboundedSender<()>,
-) -> Result<TaskOutput, ()> {
+) -> TaskResult {
     AssertUnwindSafe(task)
         .catch_unwind()
         .await
-        .map_err(|_| ())
+        .map_err(|_| TaskError::Panicked)
         .and_then(|res| res)
-        .map_err(|_| {
-            error!("An error occurred that Vector couldn't handle.");
+        .map_err(|e| {
+            error!("An error occurred that Vector couldn't handle: {}.", e);
             let _ = abort_tx.send(());
+            e
         })
 }
 

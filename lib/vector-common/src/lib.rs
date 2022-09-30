@@ -59,3 +59,11 @@ pub mod trigger;
 
 #[macro_use]
 extern crate tracing;
+
+/// Vector's basic error type, dynamically dispatched and safe to send across
+/// threads.
+pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
+
+/// Vector's basic result type, defined in terms of [`Error`] and generic over
+/// `T`.
+pub type Result<T> = std::result::Result<T, Error>;

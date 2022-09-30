@@ -555,8 +555,8 @@ mod tests {
                     other: Collection::from(BTreeMap::from([("bar", Kind::bytes())])),
                     overwrite: false,
                     want: Collection::from(BTreeMap::from([
-                        ("foo", Kind::integer().or_null()),
-                        ("bar", Kind::bytes().or_null()),
+                        ("foo", Kind::integer().or_undefined()),
+                        ("bar", Kind::bytes().or_undefined()),
                     ])),
                 },
             ),
@@ -583,7 +583,7 @@ mod tests {
                     overwrite: false,
                     want: Collection::from(BTreeMap::from([
                         ("foo", Kind::integer().or_bytes()),
-                        ("bar", Kind::boolean().or_null()),
+                        ("bar", Kind::boolean().or_undefined()),
                     ])),
                 },
             ),

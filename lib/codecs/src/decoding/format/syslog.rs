@@ -85,7 +85,7 @@ impl Deserializer for SyslogDeserializer {
         &self,
         bytes: Bytes,
         log_namespace: LogNamespace,
-    ) -> vector_core::Result<SmallVec<[Event; 1]>> {
+    ) -> vector_common::Result<SmallVec<[Event; 1]>> {
         let line = std::str::from_utf8(&bytes)?;
         let line = line.trim();
         let parsed = syslog_loose::parse_message_with_year_exact(line, resolve_year)?;
