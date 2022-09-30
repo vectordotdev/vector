@@ -10,7 +10,7 @@ cargo install wasm-pack
 ```
 
 After installing `web-pack` we must compile our project by running
-```
+```shell
 wasm-pack build --target web
 ```
 
