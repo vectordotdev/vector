@@ -1,6 +1,6 @@
 # VRL WASM Web Playground
 
-This directory houses the exposed VRL function to wasm `run_vrl()` used to power [Vector Remap Language Playground][vrl-playground], or **VRL Playground** for short. Although there is already a local REPL supported for use within the terminal, this playground will support running VRL in the web browser and test input via uploading event files, or specifiying an event via a text input field.
+This directory houses the exposed VRL function to WASM `run_vrl()` used to power [Vector Remap Language Playground][vrl-playground], or **VRL Playground** for short. Although there is already a local REPL supported for use within the terminal, this playground will support running VRL in the web browser and test input via uploading event files, or specifying an event via a text input field.
 
 ## Setup
 To build the project we need to use `wasm-pack`. This compiles our rust code to WebAssembly which can then be used within the browser. Install it by running:
