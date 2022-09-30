@@ -472,6 +472,21 @@ pub async fn build_pieces(
                 rx.by_ref()
                     .filter(|events: &EventArray| ready(filter_events_type(events, input_type)))
                     .inspect(|events| {
+                        // Dummy code to test performance hit of cloning and re-finalizing
+                        use vector_common::finalization::{BatchNotifier, EventFinalizer};
+                        use vector_core::event::Finalizable;
+                        let mut copy = events.clone();
+                        let finalizers = copy.take_finalizers();
+                        let (batch, receiver) = BatchNotifier::new_with_receiver();
+                        copy.iter_events_mut().for_each(|mut event| {
+                            event
+                                .metadata_mut()
+                                .add_finalizer(EventFinalizer::new(batch.clone()))
+                        });
+                        drop(receiver);
+                        drop(finalizers);
+                    })
+                    .inspect(|events| {
                         emit!(EventsReceived {
                             count: events.len(),
                             byte_size: events.size_of(),
