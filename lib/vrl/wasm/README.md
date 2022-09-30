@@ -23,6 +23,7 @@ The `lib.rs` file available to the web browser this will make it so we can use t
 ```
 python3 -m http.server
 ```
+
 Remember to be in the directory where index.html is located for it to function properly.
 
 ## Support
