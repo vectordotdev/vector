@@ -6,6 +6,7 @@ use http::{StatusCode, Uri};
 use hyper::{Body, Request};
 use indoc::indoc;
 use tower::Service;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
@@ -62,7 +63,7 @@ pub struct SematextMetricsConfig {
     pub endpoint: Option<String>,
 
     /// The token that will be used to write to Sematext.
-    pub token: String,
+    pub token: SensitiveString,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -207,7 +208,11 @@ impl Service<Vec<Metric>> for SematextMetricsService {
     }
 
     fn call(&mut self, items: Vec<Metric>) -> Self::Future {
-        let input = encode_events(&self.config.token, &self.config.default_namespace, items);
+        let input = encode_events(
+            self.config.token.inner(),
+            &self.config.default_namespace,
+            items,
+        );
         let body = input.item;
 
         self.inner.call(body)
@@ -304,7 +309,10 @@ mod tests {
     use crate::{
         event::{metric::MetricKind, Event},
         sinks::util::test::{build_test_server, load_sink},
-        test_util::{next_addr, test_generate_config, trace_init},
+        test_util::{
+            components::{assert_sink_compliance, HTTP_SINK_TAGS},
+            next_addr, test_generate_config,
+        },
     };
 
     #[test]
@@ -371,7 +379,7 @@ mod tests {
 
     #[tokio::test]
     async fn smoke() {
-        trace_init();
+        assert_sink_compliance(&HTTP_SINK_TAGS, async {
 
         let (mut config, cx) = load_sink::<SematextMetricsConfig>(indoc! {r#"
             region = "eu"
@@ -437,5 +445,6 @@ mod tests {
         assert_eq!("jvm,metric_type=counter,os.host=somehost,token=atoken pool.used=18874368 1597784400000000006", output[6].1);
         assert_eq!("jvm,metric_type=counter,os.host=somehost,token=atoken pool.committed=18868584 1597784400000000007", output[7].1);
         assert_eq!("jvm,metric_type=counter,os.host=somehost,token=atoken pool.max=18874368 1597784400000000008", output[8].1);
+        }).await;
     }
 }

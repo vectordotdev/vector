@@ -8,7 +8,7 @@ use bytes::Bytes;
 use futures::FutureExt;
 use http::StatusCode;
 use snafu::Snafu;
-use vector_core::{internal_event::EventsSent, stream::DriverResponse};
+use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
 
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
@@ -59,6 +59,7 @@ pub struct AzureBlobResponse {
     pub inner: PutBlockBlobResponse,
     pub count: usize,
     pub events_byte_size: usize,
+    pub byte_size: usize,
 }
 
 impl DriverResponse for AzureBlobResponse {
@@ -66,12 +67,12 @@ impl DriverResponse for AzureBlobResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> EventsSent {
-        EventsSent {
-            count: self.count,
-            byte_size: self.events_byte_size,
-            output: None,
-        }
+    fn events_sent(&self) -> CountByteSize {
+        CountByteSize(self.count, self.events_byte_size)
+    }
+
+    fn bytes_sent(&self) -> Option<(usize, &str)> {
+        Some((self.byte_size, "https"))
     }
 }
 

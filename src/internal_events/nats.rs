@@ -24,7 +24,7 @@ impl InternalEvent for NatsEventSendError {
             error_type = error_type::WRITER_FAILED,
             error_code = io_error_code(&self.error),
             stage = error_stage::SENDING,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,

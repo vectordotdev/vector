@@ -5,17 +5,17 @@ use std::{
     future::Future,
     pin::Pin,
     sync::Arc,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
 };
 
-use futures::{future, ready, FutureExt};
+use futures::{future, FutureExt};
 use stream_cancel::{Trigger, Tripwire};
 use tokio::time::{timeout_at, Instant};
 
 use crate::{config::ComponentKey, trigger::DisabledTrigger};
 
 pub async fn tripwire_handler(closed: bool) {
-    futures::future::poll_fn(|_| {
+    std::future::poll_fn(|_| {
         if closed {
             Poll::Ready(())
         } else {

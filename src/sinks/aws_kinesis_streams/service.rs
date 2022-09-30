@@ -8,7 +8,7 @@ use aws_types::region::Region;
 use futures::future::BoxFuture;
 use tower::Service;
 use tracing::Instrument;
-use vector_core::{internal_event::EventsSent, stream::DriverResponse};
+use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
 
 use crate::{event::EventStatus, sinks::aws_kinesis_streams::request_builder::KinesisRequest};
 
@@ -29,12 +29,8 @@ impl DriverResponse for KinesisResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> EventsSent {
-        EventsSent {
-            count: self.count,
-            byte_size: self.events_byte_size,
-            output: None,
-        }
+    fn events_sent(&self) -> CountByteSize {
+        CountByteSize(self.count, self.events_byte_size)
     }
 }
 
@@ -44,14 +40,13 @@ impl Service<Vec<KinesisRequest>> for KinesisService {
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
+        // Emission of Error internal event is handled upstream by the caller
+
         Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, requests: Vec<KinesisRequest>) -> Self::Future {
-        debug!(
-            message = "Sending records.",
-            events = %requests.len(),
-        );
+        // Emission of Error internal event is handled upstream by the caller
 
         let events_byte_size = requests.iter().map(|req| req.event_byte_size).sum();
         let count = requests.len();

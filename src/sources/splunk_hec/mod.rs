@@ -14,6 +14,7 @@ use serde::Serialize;
 use serde_json::{de::Read as JsonRead, Deserializer, Value as JsonValue};
 use snafu::Snafu;
 use tracing::Span;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 use vector_core::{event::BatchNotifier, ByteSizeOf};
@@ -65,7 +66,7 @@ pub struct SplunkConfig {
     ///
     /// If _not_ supplied, the `Authorization` header will be ignored and requests will not be authenticated.
     #[configurable(deprecated)]
-    token: Option<String>,
+    token: Option<SensitiveString>,
 
     /// Optional list of valid authorization tokens.
     ///
@@ -73,7 +74,7 @@ pub struct SplunkConfig {
     /// would if it was communicating with the Splunk HEC endpoint directly.
     ///
     /// If _not_ supplied, the `Authorization` header will be ignored and requests will not be authenticated.
-    valid_tokens: Option<Vec<String>>,
+    valid_tokens: Option<Vec<SensitiveString>>,
 
     /// Whether or not to forward the Splunk HEC authentication token with events.
     ///
@@ -200,7 +201,7 @@ impl SplunkSource {
 
         SplunkSource {
             valid_credentials: valid_tokens
-                .map(|token| format!("Splunk {}", token))
+                .map(|token| format!("Splunk {}", token.inner()))
                 .collect(),
             protocol,
             idx_ack,
@@ -992,6 +993,7 @@ mod tests {
     use futures_util::Stream;
     use reqwest::{RequestBuilder, Response};
     use serde::Deserialize;
+    use vector_common::sensitive_string::SensitiveString;
     use vector_core::event::EventStatus;
 
     use super::{acknowledgements::HecAcknowledgementsConfig, parse_timestamp, SplunkConfig};
@@ -1026,11 +1028,11 @@ mod tests {
     async fn source(
         acknowledgements: Option<HecAcknowledgementsConfig>,
     ) -> (impl Stream<Item = Event> + Unpin, SocketAddr) {
-        source_with(Some(TOKEN.to_owned()), None, acknowledgements, false).await
+        source_with(Some(TOKEN.to_owned().into()), None, acknowledgements, false).await
     }
 
     async fn source_with(
-        token: Option<String>,
+        token: Option<SensitiveString>,
         valid_tokens: Option<&[&str]>,
         acknowledgements: Option<HecAcknowledgementsConfig>,
         store_hec_token: bool,
@@ -1038,7 +1040,7 @@ mod tests {
         let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
         let address = next_addr();
         let valid_tokens =
-            valid_tokens.map(|tokens| tokens.iter().map(|&token| String::from(token)).collect());
+            valid_tokens.map(|tokens| tokens.iter().map(|v| v.to_string().into()).collect());
         let cx = SourceContext::new_test(sender, None);
         tokio::spawn(async move {
             SplunkConfig {
@@ -1065,7 +1067,7 @@ mod tests {
         compression: Compression,
     ) -> (VectorSink, Healthcheck) {
         HecLogsSinkConfig {
-            default_token: TOKEN.to_owned(),
+            default_token: TOKEN.to_owned().into(),
             endpoint: format!("http://{}", address),
             host_key: "host".to_owned(),
             indexed_fields: vec![],

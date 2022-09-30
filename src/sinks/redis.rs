@@ -16,7 +16,7 @@ use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
     config::{self, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::Event,
-    internal_events::{RedisSendEventError, TemplateRenderingError},
+    internal_events::TemplateRenderingError,
     sinks::util::{
         batch::BatchConfig,
         retries::{RetryAction, RetryLogic},
@@ -228,6 +228,7 @@ impl RedisSinkConfig {
 
         let sink = BatchSink::new(svc, buffer, batch.timeout)
             .with_flat_map(move |event| {
+                // Errors are handled by `Encoder`.
                 stream::iter(encode_event(event, &key, &transformer, &mut encoder)).map(Ok)
             })
             .sink_map_err(|error| error!(message = "Sink failed to flush.", %error));
@@ -293,6 +294,8 @@ fn encode_event(
     transformer.transform(&mut event);
 
     let mut bytes = BytesMut::new();
+
+    // Errors are handled by `Encoder`.
     encoder.encode(event, &mut bytes).ok()?;
     let value = bytes.freeze();
 
@@ -339,10 +342,12 @@ impl Service<Vec<RedisKvEntry>> for RedisSink {
     type Error = RedisError;
     type Future = BoxFuture<'static, RedisPipeResult>;
 
+    // Emission of Error internal event is handled upstream by the caller
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
+    // Emission of Error internal event is handled upstream by the caller
     fn call(&mut self, kvs: Vec<RedisKvEntry>) -> Self::Future {
         let count = kvs.len();
         let mut byte_size = 0;
@@ -382,16 +387,13 @@ impl Service<Vec<RedisKvEntry>> for RedisSink {
         let bytes_sent = self.bytes_sent.clone();
         Box::pin(async move {
             let result: RedisPipeResult = pipe.query_async(&mut conn).await;
-            match &result {
-                Ok(res) => {
-                    if res.is_successful() {
-                        bytes_sent.emit(ByteSize(byte_size));
-                    } else {
-                        warn!("Batch sending was not all successful and will be retried.")
-                    }
+            if let Ok(res) = &result {
+                if res.is_successful() {
+                    bytes_sent.emit(ByteSize(byte_size));
+                } else {
+                    warn!("Batch sending was not all successful and will be retried.")
                 }
-                Err(error) => emit!(RedisSendEventError::new(error)),
-            };
+            }
             result
         })
     }
@@ -576,18 +578,22 @@ mod integration_tests {
             acknowledgements: Default::default(),
         };
 
-        // Publish events.
-        let conn = cnf.build_client().await.unwrap();
-
-        let sink = cnf.new(conn).unwrap();
         let mut events: Vec<Event> = Vec::new();
         for i in 0..num_events {
             let s: String = i.to_string();
             let e = LogEvent::from(s);
             events.push(e.into());
         }
+        let input = stream::iter(events.clone().into_iter().map(Into::into));
 
-        sink.run_events(events.clone()).await.unwrap();
+        // Publish events.
+        let cnf2 = cnf.clone();
+        assert_sink_compliance(&SINK_TAGS, async move {
+            let conn = cnf2.build_client().await.unwrap();
+            cnf2.new(conn).unwrap().run(input).await
+        })
+        .await
+        .expect("Running sink failed");
 
         let mut conn = cnf.build_client().await.unwrap();
 
@@ -650,11 +656,14 @@ mod integration_tests {
         };
 
         // Publish events.
-        let conn = cnf.build_client().await.unwrap();
-
-        let sink = cnf.new(conn).unwrap();
-        let (_input, events) = random_lines_with_stream(100, num_events, None);
-        sink.run(events).await.unwrap();
+        assert_sink_compliance(&SINK_TAGS, async move {
+            let conn = cnf.build_client().await.unwrap();
+            let sink = cnf.new(conn).unwrap();
+            let (_input, events) = random_lines_with_stream(100, num_events, None);
+            sink.run(events).await
+        })
+        .await
+        .expect("Running sink failed");
 
         // Receive events.
         let mut received_msg_num = 0;
