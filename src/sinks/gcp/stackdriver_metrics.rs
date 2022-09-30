@@ -39,6 +39,9 @@ impl SinkBatchSettings for StackdriverMetricsDefaultBatchSettings {
 #[configurable_component(sink("gcp_stackdriver_metrics"))]
 #[derive(Clone, Debug, Default)]
 pub struct StackdriverConfig {
+    #[serde(skip, default = "default_endpoint")]
+    endpoint: String,
+
     /// The project ID to which to publish metrics.
     ///
     /// See the [Google Cloud Platform project management documentation][project_docs] for more details.
@@ -81,6 +84,10 @@ pub struct StackdriverConfig {
 
 fn default_metric_namespace_value() -> String {
     "namespace".to_string()
+}
+
+fn default_endpoint() -> String {
+    "https://monitoring.googleapis.com".to_string()
 }
 
 impl_generate_config_from_default!(StackdriverConfig);
@@ -230,8 +237,8 @@ impl HttpSink for HttpEventSink {
         let body = crate::serde::json::to_bytes(&series).unwrap().freeze();
 
         let uri: Uri = format!(
-            "https://monitoring.googleapis.com/v3/projects/{}/timeSeries",
-            self.config.project_id
+            "{}/v3/projects/{}/timeSeries",
+            self.config.endpoint, self.config.project_id
         )
         .parse()?;
 
@@ -246,4 +253,49 @@ impl HttpSink for HttpEventSink {
 
 async fn healthcheck() -> crate::Result<()> {
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use futures::{future::ready, stream};
+    use vector_core::event::{MetricKind, MetricValue};
+
+    use super::*;
+    use crate::{
+        config::{GenerateConfig, SinkConfig, SinkContext},
+        test_util::{
+            components::{run_and_assert_sink_compliance, SINK_TAGS},
+            http::{always_200_response, spawn_blackhole_http_server},
+        },
+    };
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<StackdriverConfig>();
+    }
+
+    #[tokio::test]
+    async fn component_spec_compliance() {
+        let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
+
+        let config = StackdriverConfig::generate_config().to_string();
+        let mut config =
+            toml::from_str::<StackdriverConfig>(&config).expect("config should be valid");
+
+        // If we don't override the credentials path/API key, it tries to directly call out to the Google Instance
+        // Metadata API, which we clearly don't have in unit tests. :)
+        config.auth.credentials_path = None;
+        config.auth.api_key = Some("fake".to_string().into());
+        config.endpoint = mock_endpoint.to_string();
+
+        let context = SinkContext::new_test();
+        let (sink, _healthcheck) = config.build(context).await.unwrap();
+
+        let event = Event::Metric(Metric::new(
+            "gauge-test",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 1_f64 },
+        ));
+        run_and_assert_sink_compliance(sink, stream::once(ready(event)), &SINK_TAGS).await;
+    }
 }
