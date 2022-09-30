@@ -1,19 +1,18 @@
 #![cfg(feature = "aws-kinesis-streams-integration-tests")]
 #![cfg(test)]
 
-use aws_sdk_kinesis::model::{Record, ShardIteratorType};
-use aws_sdk_kinesis::types::DateTime;
+use aws_sdk_kinesis::{
+    model::{Record, ShardIteratorType},
+    types::DateTime,
+};
 use codecs::TextSerializerConfig;
 use tokio::time::{sleep, Duration};
 
-use super::*;
+use super::{config::KinesisClientBuilder, *};
 use crate::{
     aws::{create_client, AwsAuthentication, RegionOrEndpoint},
     config::{ProxyConfig, SinkConfig, SinkContext},
-    sinks::{
-        aws_kinesis_streams::config::KinesisClientBuilder,
-        util::{BatchConfig, Compression},
-    },
+    sinks::util::{BatchConfig, Compression},
     test_util::{
         components::{run_and_assert_sink_compliance, AWS_SINK_TAGS},
         random_lines_with_stream, random_string,

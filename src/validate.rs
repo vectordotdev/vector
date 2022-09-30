@@ -141,6 +141,14 @@ pub fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
         .map_err(&mut report_error)
         .ok()?;
 
+    // Check secrets in configuration
+    #[cfg(feature = "enterprise")]
+    {
+        config::loading::schema::check_sensitive_fields_from_paths(&paths, &builder)
+            .map_err(&mut report_error)
+            .ok()?;
+    }
+
     // Build
     let (config, build_warnings) = builder
         .build_with_warnings()
@@ -233,7 +241,7 @@ async fn validate_healthchecks(
                     validated &= !opts.deny_warnings;
                 }
             }
-            Ok(Err(())) => failed(format!("Health check for \"{}\" failed", id)),
+            Ok(Err(e)) => failed(format!("Health check for \"{}\" failed: {}", id, e)),
             Err(error) if error.is_cancelled() => {
                 failed(format!("Health check for \"{}\" was cancelled", id))
             }

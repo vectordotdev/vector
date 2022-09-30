@@ -17,7 +17,7 @@ mod service;
 mod sink;
 mod stats;
 
-#[allow(warnings)]
+#[allow(warnings, clippy::pedantic, clippy::nursery)]
 pub(crate) mod ddsketch_full {
     include!(concat!(env!("OUT_DIR"), "/ddsketch_full.rs"));
 }

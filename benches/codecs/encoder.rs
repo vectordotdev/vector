@@ -14,7 +14,7 @@ use vector_common::{btreemap, byte_size_of::ByteSizeOf};
 pub struct JsonLogSerializer;
 
 impl Encoder<Event> for JsonLogSerializer {
-    type Error = vector_core::Error;
+    type Error = vector_common::Error;
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let writer = buffer.writer();
@@ -28,7 +28,7 @@ impl Encoder<Event> for JsonLogSerializer {
 pub struct JsonLogVecSerializer;
 
 impl Encoder<Event> for JsonLogVecSerializer {
-    type Error = vector_core::Error;
+    type Error = vector_common::Error;
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let log = event.as_log();

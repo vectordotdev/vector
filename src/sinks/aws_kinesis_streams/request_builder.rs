@@ -1,17 +1,14 @@
 use std::io;
 
-use aws_sdk_kinesis::model::PutRecordsRequestEntry;
-use aws_sdk_kinesis::types::Blob;
+use aws_sdk_kinesis::{model::PutRecordsRequestEntry, types::Blob};
 use bytes::Bytes;
 use vector_core::ByteSizeOf;
 
+use super::sink::KinesisProcessedEvent;
 use crate::{
     codecs::{Encoder, Transformer},
     event::{Event, EventFinalizers, Finalizable},
-    sinks::{
-        aws_kinesis_streams::sink::KinesisProcessedEvent,
-        util::{request_builder::EncodeResult, Compression, RequestBuilder},
-    },
+    sinks::util::{request_builder::EncodeResult, Compression, RequestBuilder},
 };
 
 pub struct KinesisRequestBuilder {

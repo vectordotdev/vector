@@ -79,7 +79,7 @@ impl GelfSerializer {
     }
 
     /// Encode event and represent it as JSON value.
-    pub fn to_json_value(&self, event: Event) -> Result<serde_json::Value, vector_core::Error> {
+    pub fn to_json_value(&self, event: Event) -> Result<serde_json::Value, vector_common::Error> {
         // input_type() restricts the event type to LogEvents
         let log = to_gelf_event(event.into_log())?;
         serde_json::to_value(&log).map_err(|e| e.to_string().into())
@@ -93,7 +93,7 @@ impl Default for GelfSerializer {
 }
 
 impl Encoder<Event> for GelfSerializer {
-    type Error = vector_core::Error;
+    type Error = vector_common::Error;
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let log = to_gelf_event(event.into_log())?;
@@ -108,7 +108,7 @@ fn err_invalid_type(
     field: &str,
     expected_type: &str,
     actual_type: &str,
-) -> vector_core::Result<()> {
+) -> vector_common::Result<()> {
     InvalidValueTypeSnafu {
         field,
         actual_type,
@@ -119,9 +119,9 @@ fn err_invalid_type(
 }
 
 /// Validates that the GELF required fields exist in the event, coercing in some cases.
-fn coerce_required_fields(mut log: LogEvent) -> vector_core::Result<LogEvent> {
+fn coerce_required_fields(mut log: LogEvent) -> vector_common::Result<LogEvent> {
     // returns Error for missing field
-    fn err_missing_field(field: &str) -> vector_core::Result<()> {
+    fn err_missing_field(field: &str) -> vector_common::Result<()> {
         MissingFieldSnafu { field }
             .fail()
             .map_err(|e| e.to_string().into())
@@ -151,7 +151,7 @@ fn coerce_required_fields(mut log: LogEvent) -> vector_core::Result<LogEvent> {
 /// Validates rules for field names and value types, coercing in some cases.
 fn coerce_field_names_and_values(
     mut log: LogEvent,
-) -> vector_core::Result<(LogEvent, Vec<String>)> {
+) -> vector_common::Result<(LogEvent, Vec<String>)> {
     let mut missing_prefix = vec![];
     if let Some(event_data) = log.as_map_mut() {
         for (field, value) in event_data.iter_mut() {
@@ -204,7 +204,7 @@ fn coerce_field_names_and_values(
 }
 
 /// Validate if the input log event is valid GELF, potentially coercing the event into valid GELF.
-fn to_gelf_event(log: LogEvent) -> vector_core::Result<LogEvent> {
+fn to_gelf_event(log: LogEvent) -> vector_common::Result<LogEvent> {
     let log = coerce_required_fields(log).and_then(|log| {
         coerce_field_names_and_values(log).map(|(mut log, missing_prefix)| {
             // rename additional fields that were flagged as missing the underscore prefix

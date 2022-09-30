@@ -2,12 +2,13 @@ use bytes::Bytes;
 use vector_core::ByteSizeOf;
 
 use super::config::SqsSinkConfig;
-use crate::codecs::{Encoder, Transformer};
-use crate::event::{Event, EventFinalizers, Finalizable};
-use crate::internal_events::TemplateRenderingError;
-use crate::sinks::util::request_builder::EncodeResult;
-use crate::sinks::util::{Compression, EncodedLength, RequestBuilder};
-use crate::template::Template;
+use crate::{
+    codecs::{Encoder, Transformer},
+    event::{Event, EventFinalizers, Finalizable},
+    internal_events::TemplateRenderingError,
+    sinks::util::{request_builder::EncodeResult, Compression, EncodedLength, RequestBuilder},
+    template::Template,
+};
 
 #[derive(Clone)]
 pub struct Metadata {

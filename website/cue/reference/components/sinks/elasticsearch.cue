@@ -117,7 +117,7 @@ components: sinks: elasticsearch: {
 				options: {
 					region: {
 						common:      true
-						description: "The [AWS region](\(urls.aws_regions)) of the target service. This defaults to the region named in the endpoint parameter, or the value of the `$AWS_REGION` or `$AWS_DEFAULT_REGION` environment variables if that cannot be determined, or \"us-east-1\"."
+						description: "The [AWS region](\(urls.aws_regions)) for AWS authentication."
 						required:    false
 						type: string: {
 							default: null
@@ -216,6 +216,34 @@ components: sinks: elasticsearch: {
 				}
 			}
 		}
+		distribution: {
+			common:      false
+			description: "Options for distributing events to multiple endpoints."
+			required:    false
+			type: object: {
+				examples: []
+				options: {
+					retry_initial_backoff_secs: {
+						common:      false
+						description: "Initial timeout, in seconds, between attempts to reactivate endpoints once they become unhealthy."
+						required:    false
+						type: uint: {
+							default: 1
+							unit:    "seconds"
+						}
+					}
+					retry_max_duration_secs: {
+						common:      false
+						description: "Maximum timeout, in seconds, between attempts to reactivate endpoints once they become unhealthy."
+						required:    false
+						type: uint: {
+							default: 3600
+							unit:    "seconds"
+						}
+					}
+				}
+			}
+		}
 		doc_type: {
 			common:      false
 			description: "The `doc_type` for your index data. This is only relevant for Elasticsearch <= 6.X. If you are using >= 7.0 you do not need to set this option since Elasticsearch has removed it."
@@ -225,10 +253,21 @@ components: sinks: elasticsearch: {
 			}
 		}
 		endpoint: {
+			common:      false
 			description: "The Elasticsearch endpoint to send logs to. This should be the full URL as shown in the example."
-			required:    true
+			warnings: ["This option has been deprecated, the `endpoints` option should be used instead."]
+			required: false
 			type: string: {
+				default: null
 				examples: ["http://10.24.32.122:9000", "https://example.com", "https://user:password@example.com"]
+			}
+		}
+		endpoints: {
+			description: "The Elasticsearch endpoints to send logs to. Each endpoint should be the full URL as shown in the example."
+			required:    true
+			type: array: {
+				examples: [["http://10.24.32.122:9000"], ["https://example.com", "https://user:password@example.com"]]
+				items: type: string: {}
 			}
 		}
 		id_key: {
@@ -336,6 +375,21 @@ components: sinks: elasticsearch: {
 				To use [Data streams](\(urls.elasticsearch_data_streams)), set the `mode` to
 				`data_stream`. Use the combination of `data_stream.type`, `data_stream.dataset` and
 				`data_stream.namespace` instead of `index`.
+				"""
+		}
+
+		distribution: {
+			title: "Distribution"
+			body: """
+				If multiple endpoints are specified in `endpoints` option, events will be distributed among them
+				according to their estimated load with failover.
+
+				Rate limit is applied to the sink as a whole, while concurrency settings manage each endpoint individually.
+
+				Health of endpoints is actively monitored and if an endpoint is deemed unhealthy, Vector will stop sending events to it
+				until it is healthy again. This is managed by a circuit breaker that monitors responses and triggers after a sufficient
+				streak of failures. Once triggered it will enter exponential backoff loop and pass a single request in each iteration
+				to test the endpoint. Once a successful response is received, the circuit breaker will reset.
 				"""
 		}
 

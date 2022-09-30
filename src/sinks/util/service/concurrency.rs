@@ -1,6 +1,14 @@
 use serde::Serializer;
 use std::fmt;
-use vector_config::configurable_component;
+use vector_config::{
+    schema::{
+        apply_metadata, generate_const_string_schema, generate_number_schema,
+        generate_one_of_schema,
+    },
+    schemars::{gen::SchemaGenerator, schema::SchemaObject},
+    Configurable, GenerateError, Metadata,
+};
+use vector_config_common::attributes::CustomAttribute;
 
 use serde::{
     de::{self, Unexpected, Visitor},
@@ -8,21 +16,20 @@ use serde::{
 };
 
 /// Configuration for outbound request concurrency.
-#[configurable_component(no_ser, no_deser)]
 #[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
 pub enum Concurrency {
     /// A fixed concurrency of 1.
     ///
-    /// In other words, only one request can be outstanding at any given time.
+    /// Only one request can be outstanding at any given time.
     None,
 
-    /// Concurrency will be managed by Vector's [adaptive concurrency][arc] feature.
+    /// Concurrency will be managed by Vector's [Adaptive Request Concurrency][arc] feature.
     ///
     /// [arc]: https://vector.dev/docs/about/under-the-hood/networking/arc/
     Adaptive,
 
     /// A fixed amount of concurrency will be allowed.
-    Fixed(#[configurable(transparent)] usize),
+    Fixed(usize),
 }
 
 impl Serialize for Concurrency {
@@ -113,6 +120,56 @@ impl<'de> Deserialize<'de> for Concurrency {
         }
 
         deserializer.deserialize_any(UsizeOrAdaptive)
+    }
+}
+
+// TODO: Consider an approach for generating schema of "string or number" structure used by this type.
+impl Configurable for Concurrency {
+    fn referenceable_name() -> Option<&'static str> {
+        Some(std::any::type_name::<Self>())
+    }
+
+    fn description() -> Option<&'static str> {
+        Some("Configuration for outbound request concurrency.")
+    }
+
+    fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
+        let mut none_schema = generate_const_string_schema("none".to_string());
+        let mut none_metadata = Metadata::<()>::with_title("A fixed concurrency of 1.");
+        none_metadata.set_description("Only one request can be outstanding at any given time.");
+        none_metadata.add_custom_attribute(CustomAttribute::KeyValue {
+            key: "logical_name".to_string(),
+            value: "None".to_string(),
+        });
+        apply_metadata(&mut none_schema, none_metadata);
+
+        let mut adaptive_schema = generate_const_string_schema("adaptive".to_string());
+        let mut adaptive_metadata = Metadata::<()>::with_title(
+            "Concurrency will be managed by Vector's [Adaptive Request Concurrency][arc] feature.",
+        );
+        adaptive_metadata
+            .set_description("[arc]: https://vector.dev/docs/about/under-the-hood/networking/arc/");
+        adaptive_metadata.add_custom_attribute(CustomAttribute::KeyValue {
+            key: "logical_name".to_string(),
+            value: "Adaptive".to_string(),
+        });
+        apply_metadata(&mut adaptive_schema, adaptive_metadata);
+
+        let mut fixed_schema = generate_number_schema::<usize>();
+        let mut fixed_metadata =
+            Metadata::<()>::with_description("A fixed amount of concurrency will be allowed.");
+        fixed_metadata.set_transparent();
+        fixed_metadata.add_custom_attribute(CustomAttribute::KeyValue {
+            key: "logical_name".to_string(),
+            value: "Fixed".to_string(),
+        });
+        apply_metadata(&mut fixed_schema, fixed_metadata);
+
+        Ok(generate_one_of_schema(&[
+            none_schema,
+            adaptive_schema,
+            fixed_schema,
+        ]))
     }
 }
 

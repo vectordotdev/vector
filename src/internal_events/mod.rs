@@ -2,6 +2,8 @@ pub mod prelude;
 
 mod adaptive_concurrency;
 mod aggregate;
+#[cfg(any(feature = "sources-amqp", feature = "sinks-amqp"))]
+mod amqp;
 #[cfg(feature = "sources-apache_metrics")]
 mod apache_metrics;
 #[cfg(feature = "api")]
@@ -18,8 +20,6 @@ mod aws_ecs_metrics;
 mod aws_kinesis_firehose;
 #[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs",))]
 mod aws_sqs;
-#[cfg(any(feature = "sinks-azure_blob", feature = "sinks-datadog_archives"))]
-pub(crate) mod azure_blob;
 mod batch;
 mod codecs;
 mod common;
@@ -36,7 +36,6 @@ mod demo_logs;
 mod dnstap;
 #[cfg(feature = "sources-docker_logs")]
 mod docker_logs;
-mod elasticsearch;
 mod encoding_transcode;
 #[cfg(feature = "sources-eventstoredb_metrics")]
 mod eventstoredb_metrics;
@@ -133,6 +132,8 @@ pub(crate) use mongodb_metrics::*;
 
 #[cfg(feature = "transforms-aggregate")]
 pub(crate) use self::aggregate::*;
+#[cfg(any(feature = "sources-amqp", feature = "sinks-amqp"))]
+pub(crate) use self::amqp::*;
 #[cfg(feature = "sources-apache_metrics")]
 pub(crate) use self::apache_metrics::*;
 #[cfg(feature = "api")]
@@ -162,8 +163,6 @@ pub(crate) use self::demo_logs::*;
 pub(crate) use self::dnstap::*;
 #[cfg(feature = "sources-docker_logs")]
 pub(crate) use self::docker_logs::*;
-#[cfg(feature = "sinks-elasticsearch")]
-pub(crate) use self::elasticsearch::*;
 #[cfg(feature = "sources-eventstoredb_metrics")]
 pub(crate) use self::eventstoredb_metrics::*;
 #[cfg(feature = "sources-exec")]

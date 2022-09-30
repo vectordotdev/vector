@@ -123,7 +123,7 @@ impl Kind {
                         let indices = collection
                             .known()
                             .iter()
-                            .filter_map(|(idx, _)| (usize::from(*idx) > index).then(|| idx))
+                            .filter_map(|(idx, _)| (usize::from(*idx) > index).then_some(idx))
                             .copied()
                             .collect::<Vec<_>>();
 

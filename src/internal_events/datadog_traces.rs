@@ -23,7 +23,7 @@ impl InternalEvent for DatadogTracesEncodingError {
             error_reason = %self.error_reason,
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
