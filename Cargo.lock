@@ -8790,7 +8790,6 @@ dependencies = [
  "syslog",
  "tempfile",
  "tikv-jemallocator",
- "time",
  "tokio",
  "tokio-openssl",
  "tokio-postgres",
