@@ -9,7 +9,8 @@ To build the project we need to use `wasm-pack`. This compiles our rust code to 
 cargo install wasm-pack
 ```
 
-After installing `web-pack` we must compile our project by running
+After installing `web-pack` we must compile our project by running:
+
 ```shell
 wasm-pack build --target web
 ```
