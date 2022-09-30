@@ -1,6 +1,6 @@
 #![allow(unused_imports)]
 use std::{sync::Arc, io::Read, net::{Ipv4Addr, Ipv6Addr}};
-use chrono::{TimeZone};
+use chrono::{TimeZone, Date, Utc, DateTime};
 use chrono_tz::Tz;
 use thiserror::Error;
 use bytes::{BufMut, Buf};
@@ -169,13 +169,16 @@ fn into_float(v: Option<&Value>, to_f32: bool) -> crate::Result<CHValue> {
             let target_type = if to_f32 {"f32"} else {"f64"};
             Err(ConvertError::TypeMisMatch(inner.clone(), target_type.to_string()).into())
         }
-    }   
+    }   1
 }
 
 macro_rules! gen_into_ip {
     ($method:ident, $ty:ident, $chtype:ident) => {
-        fn $method(v: Option<&Value>) -> crate::Result<CHValue> {
+        fn $method(v: Option<&Value>, nullable: bool) -> crate::Result<CHValue> {
             if v.is_none() {
+                if nullable {
+                    return CHValue::Nullable()
+                }
                 return Err(ConvertError::NoValue.into());
             }
             let inner = v.unwrap();
@@ -203,20 +206,19 @@ fn into_clickhouse_value(v: Option<&Value>, target_type: &SqlType, nullable: boo
         SqlType::Int16 => into_i16(v, nullable),
         SqlType::Int32 => into_i32(v, nullable),
         SqlType::Int64 => into_i64(v, nullable),
-        SqlType::String => into_string(v),
-        SqlType::FixedString(len) => into_fixed_string(v, *len),
+        SqlType::String => into_string(v, nullable),
+        SqlType::FixedString(len) => into_fixed_string(v, *len, nullable),
         SqlType::Float32 => into_float(v, true),
         SqlType::Float64 => into_float(v, false),
-        SqlType::Date => into_date(v),
+        SqlType::Date => into_date(v, nullable),
         SqlType::DateTime(ty) => {
             match ty {
-                DateTimeType::DateTime32 => into_datetime(v),
-                DateTimeType::DateTime64(pre, tz) => into_datetime64(v, *pre, *tz),
+                DateTimeType::DateTime32 => into_datetime(v, nullable),
                 _ => unimplemented!()
             }
         },
-        SqlType::Ipv4 => into_ipv4(v),
-        SqlType::Ipv6 => into_ipv6(v),
+        SqlType::Ipv4 => into_ipv4(v, nullable),
+        SqlType::Ipv6 => into_ipv6(v, nullable),
         SqlType::Uuid => into_uuid(v),
         SqlType::Nullable(ty) => into_nullable(v, *ty),
         SqlType::Array(ty) => into_array(v, ty),
@@ -228,9 +230,9 @@ fn into_clickhouse_value(v: Option<&Value>, target_type: &SqlType, nullable: boo
     }
 }
 
-fn into_nullable(v: Option<&Value>, target_type: &SqlType) -> crate::Result<CHValue> {
-    let inner = into_clickhouse_value(v, target_type)?;
-    Ok(Some(inner))
+fn into_nullable(v: Option<&Value>, target_type: &SqlType, nullable: bool) -> crate::Result<CHValue> {
+    let inner = into_clickhouse_value(v, target_type, nullable)?;
+    todo!()
 }
 
 fn into_array(v: Option<&Value>, target_type: &SqlType) -> crate::Result<CHValue> {
@@ -303,8 +305,12 @@ fn into_decimal(v: Option<&Value>, scale: u8) -> crate::Result<CHValue> {
 
 const TIME_FORMAT: &str = "%d/%m/%Y %H:%M:%S%.9f%z";
 
-fn into_date(v: Option<&Value>) -> crate::Result<CHValue> {
+fn into_date(v: Option<&Value>, nullable: bool) -> crate::Result<CHValue> {
     if v.is_none() {
+        if nullable {
+            let w: Option<Date<Tz>> = None;
+            return Ok(w.into());
+        }
         return Err(ConvertError::NoValue.into());
     }
     let inner = v.unwrap();
@@ -321,8 +327,12 @@ fn into_date(v: Option<&Value>) -> crate::Result<CHValue> {
     }
 }
 
-fn into_datetime(v: Option<&Value>) -> crate::Result<CHValue> {
+fn into_datetime(v: Option<&Value>, nullable: bool) -> crate::Result<CHValue> {
     if v.is_none() {
+        if nullable {
+            let w: Option<DateTime<Utc>> = None;
+            return Ok(w.into());
+        }
         return Err(ConvertError::NoValue.into());
     }
     let inner = v.unwrap();
@@ -334,22 +344,6 @@ fn into_datetime(v: Option<&Value>) -> crate::Result<CHValue> {
             Ok(Tz::UTC.timestamp_nanos(*ts_nano).into())
         }
         _ => Err(ConvertError::TypeMisMatch(inner.clone(), "datetime".into()).into())
-    }
-}
-
-fn into_datetime64(v: Option<&Value>, precision: u32, tz: Tz) -> crate::Result<CHValue> {
-    if v.is_none() {
-        return Err(ConvertError::NoValue.into());
-    }
-    let inner = v.unwrap();
-    match inner {
-        Value::Timestamp(ts) => {
-            Ok(CHValue::DateTime64(ts.timestamp_nanos(), (precision, tz)))
-        },
-        Value::Integer(ts_nano) => {
-            Ok(CHValue::DateTime64(*ts_nano, (precision, tz)))
-        }
-        _ => Err(ConvertError::TypeMisMatch(inner.clone(), "datetime64".into()).into())
     }
 }
 
