@@ -1,0 +1,47 @@
+# VRL WASM Web Playground
+
+This directory houses the exposed VRL function to wasm `run_vrl()` used to power [Vector Remap Language Playground][vrl-playground], or **VRL Playground** for short. Although there is already a local REPL supported for use within the terminal, this playground will support running VRL in the web browser and test input via uploading event files, or specifiying an event via a text input field.
+
+## Setup
+To build the project we need to use `wasm-pack`. This compiles our rust code to WebAssembly which can then be used within the browser. Install it by running:
+
+```
+cargo install wasm-pack
+```
+
+After installing `web-pack` we must compile our project by running
+```
+wasm-pack build --target web
+```
+
+Notice a `pkg` directory was created which contains `wasm_bg.wasm`, `wasm.js`, `wasm.d.ts` these are the files that will be used by the web browser to run the compiled rust code. 
+
+For more information on rust and WebAssembly please visit [the mozilla docs](mozilla-wasm-rust-docs) or [the rust book wasm chapter](rust-book-wasm)
+
+The `lib.rs` file available to the web browser this will make it so we can use the `run_vrl` function in the console. Notice our `index.html` imports the VRL wasm module from `/pkg/` and sets the `window.run_vrl` function so that we can test VRL within the web browser console. To test out `index.html` we need to host it locally, for example by running: 
+
+```
+python3 -m http.server
+```
+Remember to be in the directory where index.html is located for it to function properly. 
+
+## Support
+Some functions of VRL are not supported or don't function as expected at the moment due to WASM compatibility with some dependencies that functions use, in the future we will modify the functions so that it is supported.
+
+List of functions that aren't supported at the moment: 
+
+- `log()`
+- `decrypt()`
+- `encrypt()`
+- `get_hostname()`
+- `parse_groks()`
+- `random_bytes()`
+- `reverse_dns()`
+
+It is worth checking out this [issue](https://github.com/vectordotdev/vector/pull/6604/files) which has some functions written in a way that would make it be wasm compatible.
+
+[vector]: https://vector.dev
+[vrl]: https://vrl.dev
+[vrl-playground]: https://github.com/vectordotdev/vector/issues/14653
+[mozilla-wasm-rust-docs]: https://developer.mozilla.org/en-US/docs/WebAssembly/Rust_to_wasm
+[rust-book-wasm]: https://rustwasm.github.io/docs/book/
