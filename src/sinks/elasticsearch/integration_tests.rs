@@ -100,11 +100,7 @@ async fn create_template_index(common: &ElasticsearchCommon, name: &str) -> crat
         }))
         .send()
         .await?;
-
-    let status = response.status();
-    let text = response.text().await;
-    dbg!(&text);
-    assert_eq!(status, StatusCode::OK);
+    assert_eq!(response.status(), StatusCode::OK);
     Ok(())
 }
 
