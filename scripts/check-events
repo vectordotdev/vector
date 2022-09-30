@@ -440,7 +440,7 @@ $duplicates = Hash::new { |hash, key| hash[key] = [] }
 
 $all_events.each do |name, event|
   # Check for duplicated signatures
-  if event.impl_internal_event or event.impl_register_event or event.impl_event_handle
+  if event.impl_internal_event or event.impl_event_handle
     signature = event.signature
     if signature
       $duplicates[event.signature].append(name)
