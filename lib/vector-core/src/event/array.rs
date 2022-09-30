@@ -246,7 +246,10 @@ impl EstimatedJsonEncodedSizeOf for EventArray {
                 .map(|v| JsonEncodedByteCountingValue(v.value()).estimated_json_encoded_size_of())
                 .sum(),
 
-            Self::Metrics(a) => a.iter().map(|v| v.estimated_json_encoded_size_of()).sum(),
+            Self::Metrics(a) => a
+                .iter()
+                .map(EstimatedJsonEncodedSizeOf::estimated_json_encoded_size_of)
+                .sum(),
         }
     }
 }
