@@ -25,20 +25,20 @@ struct InstallOpts {
     display_name: Option<String>,
 
     /// Vector config files in TOML format to be used by the service.
-    #[clap(name = "config-toml", long, use_value_delimiter(true))]
+    #[clap(name = "config-toml", long, use_value_delimiter(','))]
     config_paths_toml: Vec<PathBuf>,
 
     /// Vector config files in JSON format to be used by the service.
-    #[clap(name = "config-json", long, use_value_delimiter(true))]
+    #[clap(name = "config-json", long, use_value_delimiter(','))]
     config_paths_json: Vec<PathBuf>,
 
     /// Vector config files in YAML format to be used by the service.
-    #[clap(name = "config-yaml", long, use_value_delimiter(true))]
+    #[clap(name = "config-yaml", long, use_value_delimiter(','))]
     config_paths_yaml: Vec<PathBuf>,
 
     /// The configuration files that will be used by the service.
     /// If no configuration file is specified, will target default configuration file.
-    #[clap(name = "config", short, long, use_value_delimiter(true))]
+    #[clap(name = "config", short, long, use_value_delimiter(','))]
     config_paths: Vec<PathBuf>,
 
     /// Read configuration from files in one or more directories.
@@ -50,7 +50,7 @@ struct InstallOpts {
         short = 'C',
         long,
         env = "VECTOR_CONFIG_DIR",
-        use_value_delimiter(true)
+        use_value_delimiter(',')
     )]
     config_dirs: Vec<PathBuf>,
 }
