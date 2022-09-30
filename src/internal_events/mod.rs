@@ -36,7 +36,6 @@ mod demo_logs;
 mod dnstap;
 #[cfg(feature = "sources-docker_logs")]
 mod docker_logs;
-mod elasticsearch;
 mod encoding_transcode;
 #[cfg(feature = "sources-eventstoredb_metrics")]
 mod eventstoredb_metrics;
@@ -164,8 +163,6 @@ pub(crate) use self::demo_logs::*;
 pub(crate) use self::dnstap::*;
 #[cfg(feature = "sources-docker_logs")]
 pub(crate) use self::docker_logs::*;
-#[cfg(feature = "sinks-elasticsearch")]
-pub(crate) use self::elasticsearch::*;
 #[cfg(feature = "sources-eventstoredb_metrics")]
 pub(crate) use self::eventstoredb_metrics::*;
 #[cfg(feature = "sources-exec")]

@@ -11,6 +11,7 @@ use vector_core::{
 use crate::{
     codecs::Transformer,
     event::{Event, LogEvent, Value},
+    internal_events::SinkRequestBuildError,
     sinks::{
         elasticsearch::{
             encoder::ProcessedEvent, request_builder::ElasticsearchRequestBuilder,
@@ -89,7 +90,12 @@ where
                 future::ready(Some(match event {
                     Event::Metric(metric) => metric_to_log.transform_one(metric),
                     Event::Log(log) => Some(log),
-                    _ => None,
+                    Event::Trace(_) => {
+                        // Although technically this will cause the event to be dropped, due to the sink
+                        // config it is not possible to send traces to this sink - so this situation can
+                        // never occur. We don't need to emit an `EventsDropped` event.
+                        None
+                    }
                 }))
             })
             .filter_map(|x| async move { x })
@@ -100,8 +106,8 @@ where
             .request_builder(request_builder_concurrency_limit, self.request_builder)
             .filter_map(|request| async move {
                 match request {
-                    Err(e) => {
-                        error!("Failed to build Elasticsearch request: {:?}.", e);
+                    Err(error) => {
+                        emit!(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),
@@ -113,7 +119,9 @@ where
     }
 }
 
-pub fn process_log(
+/// Any `None` values returned from this function will already result in a `TemplateRenderingError`
+/// being emitted, so no further `EventsDropped` event needs emitting.
+pub(super) fn process_log(
     mut log: LogEvent,
     mode: &ElasticsearchCommonMode,
     id_key_field: &Option<String>,

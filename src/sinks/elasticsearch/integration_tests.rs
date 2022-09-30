@@ -22,7 +22,10 @@ use crate::{
         HealthcheckError,
     },
     test_util::{
-        components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
+        components::{
+            run_and_assert_sink_compliance, run_and_assert_sink_error, COMPONENT_ERROR_TAGS,
+            HTTP_SINK_TAGS,
+        },
         random_events_with_stream, random_string, trace_init,
     },
     tls::{self, TlsConfig},
@@ -406,9 +409,10 @@ async fn run_insert_tests_with_config(
     break_events: bool,
     batch_status: BatchStatus,
 ) {
-    let common = ElasticsearchCommon::parse_single(config)
+    let common = ElasticsearchCommon::parse_many(config)
         .await
-        .expect("Config error");
+        .expect("Config error")
+        .remove(0);
     let index = match config.mode {
         // Data stream mode uses an index name generated from the event.
         ElasticsearchMode::DataStream => format!(
@@ -446,7 +450,7 @@ async fn run_insert_tests_with_config(
             events
         });
 
-        run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
+        run_and_assert_sink_error(sink, events, &COMPONENT_ERROR_TAGS).await;
     } else {
         run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
     }
