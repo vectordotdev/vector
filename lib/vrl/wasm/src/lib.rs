@@ -1,11 +1,10 @@
 use ::value::Value;
 use value::Secrets;
 
+use vrl::state::TypeState;
+use vrl::{diagnostic::Formatter, prelude::BTreeMap, CompileConfig, Runtime};
 use vrl::{TargetValue, TimeZone, VrlRuntime};
 use wasm_bindgen::prelude::*;
-use vrl::state::TypeState;
-use vrl::{
-    CompileConfig, Runtime, diagnostic::Formatter, prelude::BTreeMap};
 
 #[wasm_bindgen]
 extern "C" {
@@ -42,7 +41,7 @@ pub fn run_vrl(program: &str) -> String {
     match vrl::compile_with_state(program, &functions, &state, config) {
         Ok(result) => {
             let program_obj = result.program;
-            
+
             let res = match vrl_runtime {
                 VrlRuntime::Ast => runtime_ref
                     .resolve(&mut object, &program_obj, &timezone)
@@ -51,16 +50,12 @@ pub fn run_vrl(program: &str) -> String {
 
             match res {
                 Ok(value) => value.to_string(),
-                Err(e) => (e.to_string())
+                Err(e) => (e.to_string()),
             }
-
-        },
+        }
         Err(diagnostics) => {
             // see about console.log()
             return Formatter::new(program, diagnostics).colored().to_string();
         }
     }
 }
-
-
-
