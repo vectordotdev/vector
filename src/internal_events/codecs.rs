@@ -104,7 +104,7 @@ impl<'a> InternalEvent for EncoderSerializeError<'a> {
 #[derive(Debug)]
 pub struct EncoderWriteError<'a, E> {
     pub error: &'a E,
-    pub count: usize,
+    pub count: u64,
 }
 
 impl<E: std::fmt::Display> InternalEvent for EncoderWriteError<'_, E> {

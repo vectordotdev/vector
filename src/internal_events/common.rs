@@ -78,7 +78,7 @@ impl InternalEvent for StreamClosedError {
             "stage" => error_stage::SENDING,
         );
         emit!(ComponentEventsDropped::<UNINTENTIONAL> {
-            count: self.count,
+            count: self.count as u64,
             reason: "Downstream is closed.",
         });
     }
@@ -118,14 +118,14 @@ pub const UNINTENTIONAL: bool = false;
 
 #[derive(Debug)]
 pub struct ComponentEventsDropped<'a, const INTENTIONAL: bool> {
-    pub count: usize,
+    pub count: u64,
     pub reason: &'a str,
 }
 
 impl<'a, const INTENTIONAL: bool> InternalEvent for ComponentEventsDropped<'a, INTENTIONAL> {
     fn emit(self) {
         let count = self.count;
-        self.register().emit(Count(count));
+        self.register().emit(Count(count as usize));
     }
 }
 
