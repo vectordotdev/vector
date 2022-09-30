@@ -122,6 +122,14 @@ impl EstimatedJsonEncodedSizeOf for LokiRecords {
     }
 }
 
+impl EstimatedJsonEncodedSizeOf for &LokiRecords {
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        self.0
+            .iter()
+            .fold(0, |res, item| res + item.estimated_json_encoded_size_of())
+    }
+}
+
 impl RequestBuilder<(PartitionKey, LokiRecords)> for LokiRequestBuilder {
     type Metadata = (Option<String>, EventFinalizers, RequestMetadataBuilder);
     type Events = LokiRecords;
