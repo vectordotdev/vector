@@ -38,7 +38,7 @@ List of functions that aren't supported at the moment:
 - `random_bytes()`
 - `reverse_dns()`
 
-It is worth checking out this [issue](https://github.com/vectordotdev/vector/pull/6604/files) which has some functions written in a way that would make it be wasm compatible.
+It is worth checking out this [issue](https://github.com/vectordotdev/vector/pull/6604/files) which has some functions written in a way that would make it be WASM compatible.
 
 [vector]: https://vector.dev
 [vrl]: https://vrl.dev
