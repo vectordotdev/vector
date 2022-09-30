@@ -136,7 +136,7 @@ vrl-cli = { path = "lib/vrl/cli", optional = true }
 async-stream = { version = "0.3.3", default-features = false }
 async-trait = { version = "0.1.57", default-features = false }
 futures = { version = "0.3.24", default-features = false, features = ["compat", "io-compat"], package = "futures" }
-tokio = { version = "1.21.1", default-features = false, features = ["full"] }
+tokio = { version = "1.21.2", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1.10", default-features = false, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.7", default-features = false, features = ["io", "time"] }
@@ -187,7 +187,7 @@ serde_with = { version = "2.0.1", default-features = false, features = ["macros"
 serde_yaml = { version = "0.9.13", default-features = false }
 
 # Messagepack
-rmp-serde = { version = "1.1.0", default-features = false, optional = true }
+rmp-serde = { version = "1.1.1", default-features = false, optional = true }
 rmpv = { version = "1.0.0", default-features = false, features = ["with-serde"], optional = true }
 
 # Prost
@@ -309,7 +309,7 @@ trust-dns-proto = { version = "0.22.0", default-features = false, features = ["d
 typetag = { version = "0.2.3", default-features = false }
 url = { version = "2.3.1", default-features = false, features = ["serde"] }
 uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
-warp = { version = "0.3.1", default-features = false }
+warp = { version = "0.3.3", default-features = false }
 
 # depending on fork for bumped nix dependency
 # https://github.com/heim-rs/heim/pull/360
@@ -347,7 +347,7 @@ proptest = "1.0"
 quickcheck = "1.0.3"
 reqwest = { version = "0.11", features = ["json"] }
 tempfile = "3.3.0"
-tokio = { version = "1.21.0", features = ["test-util"] }
+tokio = { version = "1.21.2", features = ["test-util"] }
 tokio-test = "0.4.2"
 tower-test = "0.4.0"
 value = { path = "lib/value", features = ["test"] }

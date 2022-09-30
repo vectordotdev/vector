@@ -34,6 +34,7 @@ parser = { package = "vrl-parser", path = "../parser" }
 lookup = { path = "../../lookup" }
 vector-common = { path = "../../vector-common", default-features = false, features = ["conversion", "serde"] }
 vector-config = { path = "../../vector-config" }
+vector-config-common = { path = "../../vector-config-common" }
 vector-config-macros = { path = "../../vector-config-macros" }
 value = { path = "../../value" }
 
