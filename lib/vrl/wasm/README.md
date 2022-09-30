@@ -20,7 +20,7 @@ For more information on rust and WebAssembly please visit [the mozilla docs](moz
 
 The `lib.rs` file available to the web browser this will make it so we can use the `run_vrl` function in the console. Notice our `index.html` imports the VRL wasm module from `/pkg/` and sets the `window.run_vrl` function so that we can test VRL within the web browser console. To test out `index.html` we need to host it locally, for example by running:
 
-```
+```shell
 python3 -m http.server
 ```
 
