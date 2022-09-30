@@ -5,7 +5,7 @@ This directory houses the exposed VRL function to wasm `run_vrl()` used to power
 ## Setup
 To build the project we need to use `wasm-pack`. This compiles our rust code to WebAssembly which can then be used within the browser. Install it by running:
 
-```
+```shell
 cargo install wasm-pack
 ```
 
