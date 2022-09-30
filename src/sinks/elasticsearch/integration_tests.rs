@@ -100,7 +100,11 @@ async fn create_template_index(common: &ElasticsearchCommon, name: &str) -> crat
         }))
         .send()
         .await?;
-    assert_eq!(response.status(), StatusCode::OK);
+
+    let status = response.status();
+    let text = response.text().await;
+    dbg!(&text);
+    assert_eq!(status, StatusCode::OK);
     Ok(())
 }
 
@@ -409,9 +413,10 @@ async fn run_insert_tests_with_config(
     break_events: bool,
     batch_status: BatchStatus,
 ) {
-    let common = ElasticsearchCommon::parse_single(config)
+    let common = ElasticsearchCommon::parse_many(config)
         .await
-        .expect("Config error");
+        .expect("Config error")
+        .remove(0);
     let index = match config.mode {
         // Data stream mode uses an index name generated from the event.
         ElasticsearchMode::DataStream => format!(
