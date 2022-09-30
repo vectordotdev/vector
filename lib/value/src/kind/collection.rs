@@ -242,7 +242,7 @@ impl<T: Ord + Clone> Collection<T> {
                 }
             } else if !overwrite {
                 // other is missing this field, which returns null
-                self_kind.add_null();
+                self_kind.add_undefined();
             }
         }
 
@@ -259,7 +259,7 @@ impl<T: Ord + Clone> Collection<T> {
         } else {
             for (key, other_kind) in other.known {
                 // self is missing this field, which returns null
-                self.known.insert(key, other_kind.or_null());
+                self.known.insert(key, other_kind.or_undefined());
             }
         }
         self.unknown.merge(other.unknown, overwrite);
@@ -281,7 +281,7 @@ impl<T: Ord + Clone> Collection<T> {
 
 /// Collections have an "unknown" component, so it can't know in all cases if the value this
 /// collection represents is actually empty/not empty, so the state is represented with 3 variants.
-enum EmptyState {
+pub enum EmptyState {
     // The collection is guaranteed to be empty.
     AlwaysEmpty,
     // The collection may or may not actually be empty. There is not enough type information to
