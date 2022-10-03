@@ -21,7 +21,7 @@ serde = { version = "1", default-features = false, features = ["derive"] }
 serde_json = { version = "1", default-features = false }
 smallvec = { version = "1", default-features = false, features = ["union"] }
 snafu = { version = "0.7.1", default-features = false, features = ["futures"] }
-syslog_loose = { version = "0.17", default-features = false, optional = true }
+syslog_loose = { version = "0.18", default-features = false, optional = true }
 tokio-util = { version = "0.7", default-features = false, features = ["codec"] }
 tracing = { version = "0.1", default-features = false }
 value = { path = "../value", default-features = false }
