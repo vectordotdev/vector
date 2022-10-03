@@ -25,8 +25,8 @@ components: sinks: loki: {
 			}
 			compression: {
 				enabled: true
-				default: "none"
-				algorithms: ["none", "gzip"]
+				default: "snappy"
+				algorithms: ["none", "gzip", "snappy"]
 				levels: ["none", "fast", "default", "best", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 			}
 			encoding: {
@@ -219,6 +219,18 @@ components: sinks: loki: {
 				pod_labels_name: unicorn
 				"""
 		}
+
+	    request_encoding: {
+	        title: "Request Encoding"
+	        body: """
+	            Loki can receive log entries as either snappy-compressed
+	            protobuf or JSON. If the request is sent as JSON, the
+	            request may also be gzipped.
+
+	            For the `loki` sink this means the body will be encoded based
+	            on the configured `compression`.
+	            """
+	    }
 	}
 
 	telemetry: metrics: {
