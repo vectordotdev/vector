@@ -225,48 +225,17 @@ pub enum SubCommand {
     Vrl(vrl_cli::Opts),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(clap::ValueEnum, Debug, Clone, PartialEq, Eq)]
 pub enum Color {
     Auto,
     Always,
     Never,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(clap::ValueEnum, Debug, Clone, PartialEq, Eq)]
 pub enum LogFormat {
     Text,
     Json,
-}
-
-impl std::str::FromStr for Color {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "auto" => Ok(Color::Auto),
-            "always" => Ok(Color::Always),
-            "never" => Ok(Color::Never),
-            s => Err(format!(
-                "{} is not a valid option, expected `auto`, `always` or `never`",
-                s
-            )),
-        }
-    }
-}
-
-impl std::str::FromStr for LogFormat {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "text" => Ok(LogFormat::Text),
-            "json" => Ok(LogFormat::Json),
-            s => Err(format!(
-                "{} is not a valid option, expected `text` or `json`",
-                s
-            )),
-        }
-    }
 }
 
 pub fn handle_config_errors(errors: Vec<String>) -> exitcode::ExitCode {
