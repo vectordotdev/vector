@@ -121,8 +121,6 @@ where
     {
         let mut flush_keys = tokio::time::interval(self.flush_keys_interval * 2);
 
-        let mut flush_stream = tokio::time::interval(Duration::from_millis(1000));
-
         let limiter = RateLimiter::dashmap_with_clock(self.quota, &self.clock);
 
         Box::pin(stream! {
@@ -179,9 +177,6 @@ where
                 }
                 _ = flush_keys.tick() => {
                     limiter.retain_recent();
-                    false
-                }
-                _ = flush_stream.tick() => {
                     false
                 }
             };
