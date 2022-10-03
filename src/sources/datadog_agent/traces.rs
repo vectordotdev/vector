@@ -220,7 +220,8 @@ fn handle_dd_trace_payload_v0(
             let mut trace_event = TraceEvent::default();
 
             // TODO trace_id is being forced into an i64 but
-            // the incoming payload accepts up to u64. This is a bug and needs to be fixed.
+            // the incoming payload is u64. This is a bug and needs to be fixed per:
+            // https://github.com/vectordotdev/vector/issues/14687
             trace_event.insert("trace_id", dd_trace.trace_id as i64);
             trace_event.insert("start_time", Utc.timestamp_nanos(dd_trace.start_time));
             trace_event.insert("end_time", Utc.timestamp_nanos(dd_trace.end_time));
@@ -279,8 +280,9 @@ fn convert_span(dd_span: ddtrace_proto::Span) -> BTreeMap<String, Value> {
 
     span.insert("resource".into(), Value::from(dd_span.resource));
 
-    // TODO trace_id, span_id, parent_id are being forced into an i64 but
-    // the incoming payload accepts up to u64. This is a bug and needs to be fixed.
+    // TODO trace_id is being forced into an i64 but
+    // the incoming payload is u64. This is a bug and needs to be fixed per:
+    // https://github.com/vectordotdev/vector/issues/14687
     span.insert("trace_id".into(), Value::from(dd_span.trace_id as i64));
     span.insert("span_id".into(), Value::from(dd_span.span_id as i64));
     span.insert("parent_id".into(), Value::from(dd_span.parent_id as i64));

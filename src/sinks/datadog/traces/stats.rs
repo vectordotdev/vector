@@ -262,7 +262,7 @@ impl Bucket {
         let error = match span.get("error") {
             Some(Value::Integer(val)) => *val,
             None => 0,
-            _ => panic!("`error` should be a i64"),
+            _ => panic!("`error` should be an i64"),
         };
         if error != 0 {
             gs.errors += weight;
@@ -270,7 +270,7 @@ impl Bucket {
         let duration = match span.get("duration") {
             Some(Value::Integer(val)) => *val,
             None => 0,
-            _ => panic!("`duration` should be a i64"),
+            _ => panic!("`duration` should be an i64"),
         };
         gs.duration += (duration as f64) * weight;
         if error != 0 {
@@ -282,8 +282,8 @@ impl Bucket {
 }
 
 pub(crate) struct Aggregator {
-    // The key represent the timestamp (in nanoseconds) of the begining of the time window (that last 10 seconds) on
-    // which the associated bucket will calculate statistics.
+    /// The key represents the timestamp (in nanoseconds) of the beginning of the time window (that lasts 10 seconds) on
+    /// which the associated bucket will calculate statistics.
     buckets: BTreeMap<u64, Bucket>,
 }
 
@@ -358,7 +358,7 @@ impl Aggregator {
             None => {
                 let mut b = Bucket {
                     start: btime,
-                    duration: BUCKET_DURATION_NANOSECONDS, // 10 secs in nanosecs
+                    duration: BUCKET_DURATION_NANOSECONDS,
                     data: BTreeMap::new(),
                 };
                 b.add(span, weight, is_top, aggkey);
@@ -423,7 +423,7 @@ impl Aggregator {
             let flush = bucket_start >= flush_cutoff_time;
 
             if flush {
-                debug!("flushing {} start_time bucket.", bucket_start);
+                debug!("Flushing {} start_time bucket.", bucket_start);
             }
             flush
         });
@@ -491,10 +491,12 @@ fn extract_weight_from_root_span(spans: &[&BTreeMap<String, Value>]) -> f64 {
     let mut parent_id_to_child_weight = BTreeMap::<i64, f64>::new();
     let mut span_ids = Vec::<i64>::new();
     for s in spans.iter() {
+        // TODO these need to change to u64 when the following issue is fixe:
+        // https://github.com/vectordotdev/vector/issues/14687
         let parent_id = match s.get("parent_id") {
             Some(Value::Integer(val)) => *val,
             None => 0,
-            _ => panic!("`parent_id` should be a i64"),
+            _ => panic!("`parent_id` should be an i64"),
         };
         let span_id = match s.get("span_id") {
             Some(Value::Integer(val)) => *val,
@@ -533,14 +535,17 @@ fn extract_weight_from_root_span(spans: &[&BTreeMap<String, Value>]) -> f64 {
         parent_id_to_child_weight.insert(parent_id, weight);
     }
 
-    // We remove all span that do have a parent
+    // Remove all spans that have a parent
     span_ids.iter().for_each(|id| {
         parent_id_to_child_weight.remove(id);
     });
 
-    // There should be only one value remaining, the weight from the root span
+    // There should be only one value remaining- the weight from the root span
     if parent_id_to_child_weight.len() != 1 {
-        let trace_id = trace_id.unwrap_or_else(|| panic!("trace_id should exist in the span"));
+        let trace_id = trace_id.unwrap_or_else(|| {
+            error!("Field `trace_id` should exist in the span.");
+            -1
+        });
         emit!(DatadogTracesStatsError {
             error_message: "Didn't reliably find the root span for weight calculation.",
             trace_id,
@@ -551,7 +556,10 @@ fn extract_weight_from_root_span(spans: &[&BTreeMap<String, Value>]) -> f64 {
         .values()
         .next()
         .unwrap_or_else(|| {
-            let trace_id = trace_id.unwrap_or_else(|| panic!("trace_id should exist in the span"));
+            let trace_id = trace_id.unwrap_or_else(|| {
+                error!("Field `trace_id` should exist in the span.");
+                -1
+            });
             emit!(DatadogTracesStatsError {
                 error_message: "Root span was not found. Defaulting to weight of 1.0.",
                 trace_id,
