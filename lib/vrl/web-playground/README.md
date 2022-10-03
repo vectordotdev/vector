@@ -7,6 +7,7 @@ terminal, this playground will support running VRL in the web browser and test
 input via uploading event files, or specifying an event via a text input field.
 
 ## Setup
+
 To build the project we need to use `wasm-pack`. This compiles our Rust code
 to WebAssembly which can then be used within the browser. Install it by running:
 
@@ -41,6 +42,7 @@ python3 -m http.server
 Remember to be in the directory where index.html is located for it to function properly.
 
 ## Support
+
 Some functions of VRL are not supported or don't function as expected at the
 moment due to WASM compatibility with some dependencies that functions use, in
 the future we will modify the functions so that it is supported.
