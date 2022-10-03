@@ -28,7 +28,7 @@ pub enum ExtendedCompression {
 }
 
 /// Compose with basic compression and Loki-specific compression.
-#[configurable_component(sink)]
+#[configurable_component]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[serde(untagged)]
 pub enum CompressionConfigAdapter {
