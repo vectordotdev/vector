@@ -491,7 +491,7 @@ fn extract_weight_from_root_span(spans: &[&BTreeMap<String, Value>]) -> f64 {
     let mut parent_id_to_child_weight = BTreeMap::<i64, f64>::new();
     let mut span_ids = Vec::<i64>::new();
     for s in spans.iter() {
-        // TODO these need to change to u64 when the following issue is fixe:
+        // TODO these need to change to u64 when the following issue is fixed:
         // https://github.com/vectordotdev/vector/issues/14687
         let parent_id = match s.get("parent_id") {
             Some(Value::Integer(val)) => *val,

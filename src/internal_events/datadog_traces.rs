@@ -43,6 +43,8 @@ impl InternalEvent for DatadogTracesEncodingError {
 #[derive(Debug)]
 pub struct DatadogTracesStatsError {
     pub error_message: &'static str,
+    // TODO this need to change to u64 when the following issue is fixed:
+    // https://github.com/vectordotdev/vector/issues/14687
     pub trace_id: i64,
 }
 
