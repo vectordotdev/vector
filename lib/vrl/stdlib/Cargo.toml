@@ -147,6 +147,7 @@ default = [
     "parse_aws_cloudwatch_log_subscription_message",
     "parse_aws_vpc_flow_log",
     "parse_apache_log",
+    "parse_cef",
     "parse_common_log",
     "parse_csv",
     "parse_duration",
@@ -291,6 +292,7 @@ parse_aws_alb_log = ["dep:nom"]
 parse_aws_cloudwatch_log_subscription_message = ["dep:serde_json", "vector-common/aws_cloudwatch_logs_subscription", "dep:chrono"]
 parse_aws_vpc_flow_log = []
 parse_common_log = ["dep:chrono", "dep:once_cell", "dep:regex", "vector-common/conversion"]
+parse_cef = ["parse_key_value"]
 parse_csv = ["dep:csv"]
 parse_duration = ["dep:rust_decimal", "dep:once_cell", "dep:regex"]
 parse_glog = ["dep:chrono", "dep:once_cell", "dep:regex"]
