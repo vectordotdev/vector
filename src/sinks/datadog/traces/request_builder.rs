@@ -57,6 +57,7 @@ pub struct DatadogTracesRequestBuilder {
     endpoint_configuration: DatadogTracesEndpointConfiguration,
     compression: Compression,
     trace_encoder: DatadogTracesEncoder,
+    /// Contains the Aggregated stats across a time window.
     stats_aggregator: Arc<Mutex<stats::Aggregator>>,
 }
 
