@@ -1,7 +1,7 @@
 use ::value::Value;
-use value::Secrets;
-use serde::{Deserialize, Serialize};
 use gloo_utils::format::JsValueSerdeExt;
+use serde::{Deserialize, Serialize};
+use value::Secrets;
 use vrl::state::TypeState;
 use vrl::{diagnostic::Formatter, prelude::BTreeMap, CompileConfig, Runtime};
 use vrl::{TargetValue, TimeZone};
@@ -59,7 +59,9 @@ fn compile(mut input: Input) -> Result<VrlCompileResult, String> {
     let program = match vrl::compile_with_state(&input.program, &functions, &mut state, config) {
         Ok(program) => program,
         Err(diagnostics) => {
-            let msg = Formatter::new(&input.program, diagnostics).colored().to_string();
+            let msg = Formatter::new(&input.program, diagnostics)
+                .colored()
+                .to_string();
             return Err(msg);
         }
     };
@@ -80,6 +82,6 @@ pub fn run_vrl(incoming: &JsValue) -> JsValue {
         Err(err) => {
             log(&err);
             JsValue::from_serde("invalid vrl").unwrap()
-        },
+        }
     }
 }
