@@ -45,7 +45,7 @@ impl VrlCompileResult {
 fn compile(mut input: Input) -> Result<VrlCompileResult, String> {
     let event = &mut input.event;
     let functions = stdlib::all();
-    let mut state = TypeState::default();
+    let state = TypeState::default();
     let mut runtime = Runtime::default();
     let config = CompileConfig::default();
     let timezone = TimeZone::default();
@@ -56,7 +56,7 @@ fn compile(mut input: Input) -> Result<VrlCompileResult, String> {
         secrets: Secrets::new(),
     };
 
-    let program = match vrl::compile_with_state(&input.program, &functions, &mut state, config) {
+    let program = match vrl::compile_with_state(&input.program, &functions, &state, config) {
         Ok(program) => program,
         Err(diagnostics) => {
             let msg = Formatter::new(&input.program, diagnostics)
