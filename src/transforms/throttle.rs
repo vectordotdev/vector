@@ -137,40 +137,40 @@ where
                             Some(event) => {
                                 let mut output = Vec::new();
                                 let (throttle, event) = match self.exclude.as_ref() {
-                                        Some(condition) => {
-                                            let (result, event) = condition.check(event);
-                                            (!result, event)
-                                        },
-                                        _ => (true, event)
-                                    };
-                                    if throttle {
-                                        let key = self.key_field.as_ref().and_then(|t| {
-                                            t.render_string(&event)
-                                                .map_err(|error| {
-                                                    emit!(TemplateRenderingError {
-                                                        error,
-                                                        field: Some("key_field"),
-                                                        drop_event: false,
-                                                    })
+                                    Some(condition) => {
+                                        let (result, event) = condition.check(event);
+                                        (!result, event)
+                                    },
+                                    _ => (true, event)
+                                };
+                                if throttle {
+                                    let key = self.key_field.as_ref().and_then(|t| {
+                                        t.render_string(&event)
+                                            .map_err(|error| {
+                                                emit!(TemplateRenderingError {
+                                                    error,
+                                                    field: Some("key_field"),
+                                                    drop_event: false,
                                                 })
-                                                .ok()
-                                        });
+                                            })
+                                            .ok()
+                                    });
 
-                                        match limiter.check_key(&key) {
-                                            Ok(()) => {
-                                                output.push(event);
-                                            }
-                                            _ => {
-                                                if let Some(key) = key {
-                                                  emit!(ThrottleEventDiscarded{key})
-                                                } else {
-                                                  emit!(ThrottleEventDiscarded{key: "None".to_string()})
-                                                }
+                                    match limiter.check_key(&key) {
+                                        Ok(()) => {
+                                            output.push(event);
+                                        }
+                                        _ => {
+                                            if let Some(key) = key {
+                                                emit!(ThrottleEventDiscarded{key})
+                                            } else {
+                                                emit!(ThrottleEventDiscarded{key: "None".to_string()})
                                             }
                                         }
-                                    } else {
-                                        output.push(event)
                                     }
+                                } else {
+                                    output.push(event)
+                                }
                                 yield stream::iter(output.into_iter());
                                 false
                             }
