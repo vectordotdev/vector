@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use gloo_utils::format::JsValueSerdeExt;
 use vrl::state::TypeState;
 use vrl::{diagnostic::Formatter, prelude::BTreeMap, CompileConfig, Runtime};
-use vrl::{TargetValue, TimeZone, VrlRuntime};
+use vrl::{TargetValue, TimeZone};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
