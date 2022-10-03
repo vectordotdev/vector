@@ -3,10 +3,10 @@
 This directory houses the exposed VRL function to WASM `run_vrl()` used to power [Vector Remap Language Playground][vrl-playground], or **VRL Playground** for short. Although there is already a local REPL supported for use within the terminal, this playground will support running VRL in the web browser and test input via uploading event files, or specifying an event via a text input field.
 
 ## Setup
-To build the project we need to use `wasm-pack`. This compiles our rust code to WebAssembly which can then be used within the browser. Install it by running:
+To build the project we need to use `wasm-pack`. This compiles our Rust code to WebAssembly which can then be used within the browser. Install it by running:
 
 ```shell
-cargo install wasm-pack
+cargo install --version 0.10.3 wasm-pack
 ```
 
 After installing `web-pack` we must compile our project by running:
@@ -15,9 +15,9 @@ After installing `web-pack` we must compile our project by running:
 wasm-pack build --target web
 ```
 
-Notice a `pkg` directory was created which contains `wasm_bg.wasm`, `wasm.js`, `wasm.d.ts` these are the files that will be used by the web browser to run the compiled rust code.
+Notice a `pkg` directory was created which contains `wasm_bg.wasm`, `wasm.js`, `wasm.d.ts` these are the files that will be used by the web browser to run the compiled Rust code.
 
-For more information on rust and WebAssembly please visit [the mozilla docs](mozilla-wasm-rust-docs) or [the rust book wasm chapter](rust-book-wasm)
+For more information on Rust and WebAssembly please visit [the mozilla docs](mozilla-wasm-rust-docs) or [the Rust book wasm chapter](rust-book-wasm)
 
 The `lib.rs` file available to the web browser this will make it so we can use the `run_vrl` function in the console. Notice our `index.html` imports the VRL wasm module from `/pkg/` and sets the `window.run_vrl` function so that we can test VRL within the web browser console. To test out `index.html` we need to host it locally, for example by running:
 
