@@ -7,8 +7,7 @@ use snafu::{ResultExt, Snafu};
 use vector_config::configurable_component;
 
 use crate::{
-    aws::create_client,
-    aws::{AwsAuthentication, RegionOrEndpoint},
+    aws::{create_client, AwsAuthentication, RegionOrEndpoint},
     codecs::EncodingConfig,
     common::sqs::SqsClientBuilder,
     config::{
@@ -33,7 +32,7 @@ pub(super) enum BuildError {
 }
 
 /// Configuration for the `aws_sqs` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("aws_sqs"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct SqsSinkConfig {
@@ -105,7 +104,6 @@ impl GenerateConfig for SqsSinkConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "aws_sqs")]
 impl SinkConfig for SqsSinkConfig {
     async fn build(
         &self,
@@ -122,10 +120,6 @@ impl SinkConfig for SqsSinkConfig {
 
     fn input(&self) -> Input {
         Input::new(self.encoding.config().input_type() & DataType::Log)
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "aws_sqs"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

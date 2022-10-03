@@ -71,7 +71,7 @@ impl Function for Assert {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let condition = arguments.required("condition");
         let message = arguments.optional("message");

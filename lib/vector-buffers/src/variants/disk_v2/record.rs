@@ -191,8 +191,6 @@ pub fn validate_record_archive(buf: &[u8], checksummer: &Hasher) -> RecordStatus
 /// will be returned.  Otherwise, the deserialization error encounted will be provided, which describes the error in a more verbose,
 /// debugging-oriented fashion.
 #[cfg_attr(test, instrument(skip_all, level = "trace"))]
-pub fn try_as_record_archive<'a>(
-    buf: &'a [u8],
-) -> Result<&'a ArchivedRecord<'a>, DeserializeError> {
+pub fn try_as_record_archive(buf: &[u8]) -> Result<&ArchivedRecord<'_>, DeserializeError> {
     try_as_archive::<Record<'_>>(buf)
 }

@@ -7,7 +7,7 @@
 #   │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 #   │ │
 #   │ mutation of read-only value
-#   │ .read_only is read-only, and cannot be modified
+#   │ %read_only is read-only, and cannot be modified
 #   │
 #   = learn more about error code 315 at https://errors.vrl.dev/315
 #   = see language documentation at https://vrl.dev

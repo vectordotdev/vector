@@ -16,6 +16,7 @@ use super::{
 use crate::{
     codecs::Transformer,
     event::Event,
+    internal_events::SinkRequestBuildError,
     sinks::util::{
         builder::SinkBuilderExt,
         metadata::{RequestMetadata, RequestMetadataBuilder},
@@ -162,8 +163,8 @@ where
             .filter_map(
                 |request: Result<NewRelicApiRequest, NewRelicSinkError>| async move {
                     match request {
-                        Err(e) => {
-                            error!("Failed to build New Relic request: {:?}.", e);
+                        Err(error) => {
+                            emit!(SinkRequestBuildError { error });
                             None
                         }
                         Ok(req) => Some(req),

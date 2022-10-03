@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use chrono::{DateTime, NaiveDateTime, Utc};
-use lookup::path;
+use lookup::event_path;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use std::collections::HashMap;
@@ -79,7 +79,7 @@ impl GelfDeserializer {
 
     /// Builds a LogEvent from the parsed GelfMessage.
     /// The logic follows strictly the documented GELF standard.
-    fn message_to_event(&self, parsed: &GelfMessage) -> vector_core::Result<Event> {
+    fn message_to_event(&self, parsed: &GelfMessage) -> vector_common::Result<Event> {
         let mut log = LogEvent::from_str_legacy(parsed.short_message.to_string());
 
         // GELF spec defines the version as 1.1 which has not changed since 2013
@@ -154,7 +154,7 @@ impl GelfDeserializer {
                 // per GELF spec, Additional field values must be either strings or numbers
                 if val.is_string() || val.is_number() {
                     let vector_val: value::Value = val.into();
-                    log.insert(path!(key.as_str()), vector_val);
+                    log.insert(event_path!(key.as_str()), vector_val);
                 } else {
                     let type_ = match val {
                         serde_json::Value::Null => "null",
@@ -193,7 +193,7 @@ impl Deserializer for GelfDeserializer {
         &self,
         bytes: Bytes,
         _log_namespace: LogNamespace,
-    ) -> vector_core::Result<SmallVec<[Event; 1]>> {
+    ) -> vector_common::Result<SmallVec<[Event; 1]>> {
         let line = std::str::from_utf8(&bytes)?;
         let line = line.trim();
 
@@ -209,7 +209,7 @@ mod tests {
     use super::*;
     use bytes::Bytes;
     use chrono::{DateTime, NaiveDateTime, Utc};
-    use lookup::path;
+    use lookup::event_path;
     use pretty_assertions::assert_eq;
     use serde_json::json;
     use smallvec::SmallVec;
@@ -218,7 +218,7 @@ mod tests {
 
     fn deserialize_gelf_input(
         input: &serde_json::Value,
-    ) -> vector_core::Result<SmallVec<[Event; 1]>> {
+    ) -> vector_common::Result<SmallVec<[Event; 1]>> {
         let config = GelfDeserializerConfig;
         let deserializer = config.build();
         let buffer = Bytes::from(serde_json::to_vec(&input).unwrap());
@@ -291,13 +291,13 @@ mod tests {
             Some(&Value::Bytes(Bytes::from_static(b"/tmp/bar")))
         );
         assert_eq!(
-            log.get(path!(add_on_int_in)),
+            log.get(event_path!(add_on_int_in)),
             Some(&Value::Float(
                 ordered_float::NotNan::new(2001.1002).unwrap()
             ))
         );
         assert_eq!(
-            log.get(path!(add_on_str_in)),
+            log.get(event_path!(add_on_str_in)),
             Some(&Value::Bytes(Bytes::from_static(b"A Space Odyssey")))
         );
     }

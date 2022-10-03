@@ -2,7 +2,6 @@ package metadata
 
 components: sources: http_scrape: {
 	title: "HTTP Scrape"
-	alias: "http_scrape"
 
 	classes: {
 		commonly_used: false
@@ -36,7 +35,7 @@ components: sources: http_scrape: {
 				can_verify_certificate: true
 				can_verify_hostname:    true
 				enabled_default:        false
-				enabled_by_scheme:      false
+				enabled_by_scheme:      true
 			}
 		}
 		multiline: enabled: false

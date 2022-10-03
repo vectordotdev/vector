@@ -13,7 +13,7 @@ where
                     Ok(v) => v
                         .as_boolean()
                         .expect("compiler guarantees boolean return type")
-                        .then(|| Ok((key, value))),
+                        .then_some(Ok((key, value))),
                     Err(err) => Some(Err(err)),
                 },
             )
@@ -28,7 +28,7 @@ where
                     Ok(v) => v
                         .as_boolean()
                         .expect("compiler guarantees boolean return type")
-                        .then(|| Ok(value)),
+                        .then_some(Ok(value)),
                     Err(err) => Some(Err(err)),
                 },
             )
@@ -74,7 +74,7 @@ impl Function for Filter {
         &self,
         _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let closure = arguments.required_closure()?;

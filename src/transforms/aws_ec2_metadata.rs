@@ -5,7 +5,8 @@ use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use http::{uri::PathAndQuery, Request, StatusCode, Uri};
 use hyper::{body::to_bytes as body_to_bytes, Body};
-use lookup::lookup_v2::{parse_path, OwnedPath};
+use lookup::lookup_v2::{parse_value_path, OwnedValuePath};
+use lookup::PathPrefix;
 use once_cell::sync::Lazy;
 use serde::Deserialize;
 use snafu::ResultExt as _;
@@ -109,7 +110,7 @@ pub struct Ec2MetadataTransform {
 
 #[derive(Debug, Clone)]
 struct MetadataKey {
-    log_path: OwnedPath,
+    log_path: OwnedValuePath,
     metric_tag: String,
 }
 
@@ -230,7 +231,7 @@ impl Ec2MetadataTransform {
         match event {
             Event::Log(ref mut log) => {
                 state.iter().for_each(|(k, v)| {
-                    log.insert(&k.log_path, v.clone());
+                    log.insert((PathPrefix::Event, &k.log_path), v.clone());
                 });
             }
             Event::Metric(ref mut metric) => {
@@ -519,12 +520,12 @@ impl MetadataClient {
 fn create_key(namespace: &Option<String>, key: &str) -> MetadataKey {
     if let Some(namespace) = namespace {
         MetadataKey {
-            log_path: parse_path(namespace).with_field_appended(key),
+            log_path: parse_value_path(namespace).with_field_appended(key),
             metric_tag: format!("{}.{}", namespace, key),
         }
     } else {
         MetadataKey {
-            log_path: OwnedPath::single_field(key),
+            log_path: OwnedValuePath::single_field(key),
             metric_tag: key.to_owned(),
         }
     }
@@ -579,13 +580,16 @@ enum Ec2MetadataError {
 #[cfg(feature = "aws-ec2-metadata-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use futures::{SinkExt, StreamExt};
-    use lookup::lookup_v2::{parse_path, BorrowedSegment, OwnedPath, OwnedSegment};
+    use lookup::event_path;
+    use lookup::lookup_v2::{parse_value_path, OwnedSegment, OwnedValuePath};
+    use tokio::sync::mpsc;
+    use tokio_stream::wrappers::ReceiverStream;
 
     use super::*;
     use crate::{
-        event::{metric, EventArray, LogEvent, Metric},
-        test_util::{next_addr, trace_init},
+        event::{metric, LogEvent, Metric},
+        test_util::{components::assert_transform_compliance, next_addr},
+        transforms::test::create_topology,
     };
     use warp::Filter;
 
@@ -593,7 +597,7 @@ mod integration_tests {
         std::env::var("EC2_METADATA_ADDRESS").unwrap_or_else(|_| "http://localhost:8111".into())
     }
 
-    fn expected_log_fields() -> Vec<(OwnedPath, &'static str)> {
+    fn expected_log_fields() -> Vec<(OwnedValuePath, &'static str)> {
         vec![
             (
                 vec![OwnedSegment::field(AVAILABILITY_ZONE_KEY)].into(),
@@ -637,7 +641,7 @@ mod integration_tests {
                 vec![OwnedSegment::field(SUBNET_ID_KEY)].into(),
                 "mock-subnet-id",
             ),
-            (parse_path("\"role-name\"[0]"), "mock-user"),
+            (parse_value_path("\"role-name\"[0]"), "mock-user"),
         ]
     }
 
@@ -667,14 +671,6 @@ mod integration_tests {
         )
     }
 
-    async fn make_transform(config: Ec2Metadata) -> Box<dyn TaskTransform<EventArray>> {
-        config
-            .build(&TransformContext::default())
-            .await
-            .unwrap()
-            .into_task()
-    }
-
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<Ec2Metadata>();
@@ -682,40 +678,43 @@ mod integration_tests {
 
     #[tokio::test]
     async fn enrich_log() {
-        trace_init();
+        assert_transform_compliance(async {
+            let mut fields = DEFAULT_FIELD_WHITELIST.clone();
+            fields.extend(vec![String::from(ACCOUNT_ID_KEY)].into_iter());
 
-        let mut fields = DEFAULT_FIELD_WHITELIST.clone();
-        fields.extend(vec![String::from(ACCOUNT_ID_KEY)].into_iter());
+            let transform_config = Ec2Metadata {
+                endpoint: Some(ec2_metadata_address()),
+                fields: Some(fields),
+                ..Default::default()
+            };
 
-        let transform = make_transform(Ec2Metadata {
-            endpoint: Some(ec2_metadata_address()),
-            fields: Some(fields),
-            ..Default::default()
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) =
+                create_topology(ReceiverStream::new(rx), transform_config).await;
+
+            // We need to sleep to let the background task fetch the data.
+            sleep(Duration::from_secs(1)).await;
+
+            let log = LogEvent::default();
+            let mut expected_log = log.clone();
+            for (k, v) in expected_log_fields().iter().cloned() {
+                expected_log.insert((PathPrefix::Event, &k), v);
+            }
+
+            tx.send(log.into()).await.unwrap();
+
+            let event = out.recv().await.unwrap();
+            assert_eq!(event.into_log(), expected_log);
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
         })
         .await;
-
-        let (mut tx, rx) = futures::channel::mpsc::channel(100);
-        let mut stream = transform.transform_events(Box::pin(rx));
-
-        // We need to sleep to let the background task fetch the data.
-        sleep(Duration::from_secs(1)).await;
-
-        let log = LogEvent::default();
-        let mut expected_log = log.clone();
-        for (k, v) in expected_log_fields().iter().cloned() {
-            expected_log.insert(&k, v);
-        }
-
-        tx.send(log.into()).await.unwrap();
-
-        let event = stream.next().await.unwrap();
-        assert_eq!(event.into_log(), expected_log);
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn timeout() {
-        trace_init();
-
         let addr = next_addr();
 
         async fn sleepy() -> Result<impl warp::Reply, std::convert::Infallible> {
@@ -747,8 +746,6 @@ mod integration_tests {
     // validates the configuration setting 'required'=false allows vector to run
     #[tokio::test(flavor = "multi_thread")]
     async fn not_required() {
-        trace_init();
-
         let addr = next_addr();
 
         async fn sleepy() -> Result<impl warp::Reply, std::convert::Infallible> {
@@ -775,198 +772,243 @@ mod integration_tests {
 
     #[tokio::test]
     async fn enrich_metric() {
-        trace_init();
+        assert_transform_compliance(async {
+            let mut fields = DEFAULT_FIELD_WHITELIST.clone();
+            fields.extend(vec![String::from(ACCOUNT_ID_KEY)].into_iter());
 
-        let mut fields = DEFAULT_FIELD_WHITELIST.clone();
-        fields.extend(vec![String::from(ACCOUNT_ID_KEY)].into_iter());
+            let transform_config = Ec2Metadata {
+                endpoint: Some(ec2_metadata_address()),
+                fields: Some(fields),
+                ..Default::default()
+            };
 
-        let transform = make_transform(Ec2Metadata {
-            endpoint: Some(ec2_metadata_address()),
-            fields: Some(fields),
-            ..Default::default()
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) =
+                create_topology(ReceiverStream::new(rx), transform_config).await;
+
+            // We need to sleep to let the background task fetch the data.
+            sleep(Duration::from_secs(1)).await;
+
+            let metric = make_metric();
+            let mut expected_metric = metric.clone();
+            for (k, v) in expected_metric_fields().iter() {
+                expected_metric.insert_tag(k.to_string(), v.to_string());
+            }
+
+            tx.send(metric.into()).await.unwrap();
+
+            let event = out.recv().await.unwrap();
+            assert_eq!(event.into_metric(), expected_metric);
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
         })
         .await;
-
-        let (mut tx, rx) = futures::channel::mpsc::channel(100);
-        let mut stream = transform.transform_events(Box::pin(rx));
-
-        // We need to sleep to let the background task fetch the data.
-        sleep(Duration::from_secs(1)).await;
-
-        let metric = make_metric();
-        let mut expected_metric = metric.clone();
-        for (k, v) in expected_metric_fields().iter() {
-            expected_metric.insert_tag(k.to_string(), v.to_string());
-        }
-
-        tx.send(metric.into()).await.unwrap();
-
-        let event = stream.next().await.unwrap();
-        assert_eq!(event.into_metric(), expected_metric);
     }
 
     #[tokio::test]
     async fn fields_log() {
-        let transform = make_transform(Ec2Metadata {
-            endpoint: Some(ec2_metadata_address()),
-            fields: Some(vec![PUBLIC_IPV4_KEY.into(), REGION_KEY.into()]),
-            ..Default::default()
+        assert_transform_compliance(async {
+            let transform_config = Ec2Metadata {
+                endpoint: Some(ec2_metadata_address()),
+                fields: Some(vec![PUBLIC_IPV4_KEY.into(), REGION_KEY.into()]),
+                ..Default::default()
+            };
+
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) =
+                create_topology(ReceiverStream::new(rx), transform_config).await;
+
+            // We need to sleep to let the background task fetch the data.
+            sleep(Duration::from_secs(1)).await;
+
+            let log = LogEvent::default();
+            let mut expected_log = log.clone();
+            expected_log.insert(format!("\"{}\"", PUBLIC_IPV4_KEY).as_str(), "192.1.1.1");
+            expected_log.insert(format!("\"{}\"", REGION_KEY).as_str(), "us-east-1");
+
+            tx.send(log.into()).await.unwrap();
+
+            let event = out.recv().await.unwrap();
+            assert_eq!(event.into_log(), expected_log);
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
         })
         .await;
-
-        let (mut tx, rx) = futures::channel::mpsc::channel(100);
-        let mut stream = transform.transform_events(Box::pin(rx));
-
-        // We need to sleep to let the background task fetch the data.
-        sleep(Duration::from_secs(1)).await;
-
-        let log = LogEvent::default();
-        let mut expected_log = log.clone();
-        expected_log.insert(format!("\"{}\"", PUBLIC_IPV4_KEY).as_str(), "192.1.1.1");
-        expected_log.insert(format!("\"{}\"", REGION_KEY).as_str(), "us-east-1");
-
-        tx.send(log.into()).await.unwrap();
-
-        let event = stream.next().await.unwrap();
-        assert_eq!(event.into_log(), expected_log);
     }
 
     #[tokio::test]
     async fn fields_metric() {
-        let transform = make_transform(Ec2Metadata {
-            endpoint: Some(ec2_metadata_address()),
-            fields: Some(vec![PUBLIC_IPV4_KEY.into(), REGION_KEY.into()]),
-            ..Default::default()
+        assert_transform_compliance(async {
+            let transform_config = Ec2Metadata {
+                endpoint: Some(ec2_metadata_address()),
+                fields: Some(vec![PUBLIC_IPV4_KEY.into(), REGION_KEY.into()]),
+                ..Default::default()
+            };
+
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) =
+                create_topology(ReceiverStream::new(rx), transform_config).await;
+
+            // We need to sleep to let the background task fetch the data.
+            sleep(Duration::from_secs(1)).await;
+
+            let metric = make_metric();
+            let mut expected_metric = metric.clone();
+            expected_metric.insert_tag(PUBLIC_IPV4_KEY.to_string(), "192.1.1.1".to_string());
+            expected_metric.insert_tag(REGION_KEY.to_string(), "us-east-1".to_string());
+
+            tx.send(metric.into()).await.unwrap();
+
+            let event = out.recv().await.unwrap();
+            assert_eq!(event.into_metric(), expected_metric);
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
         })
         .await;
-
-        let (mut tx, rx) = futures::channel::mpsc::channel(100);
-        let mut stream = transform.transform_events(Box::pin(rx));
-
-        // We need to sleep to let the background task fetch the data.
-        sleep(Duration::from_secs(1)).await;
-
-        let metric = make_metric();
-        let mut expected_metric = metric.clone();
-        expected_metric.insert_tag(PUBLIC_IPV4_KEY.to_string(), "192.1.1.1".to_string());
-        expected_metric.insert_tag(REGION_KEY.to_string(), "us-east-1".to_string());
-
-        tx.send(metric.into()).await.unwrap();
-
-        let event = stream.next().await.unwrap();
-        assert_eq!(event.into_metric(), expected_metric);
     }
 
     #[tokio::test]
     async fn namespace_log() {
         {
-            let transform = make_transform(Ec2Metadata {
-                endpoint: Some(ec2_metadata_address()),
-                namespace: Some("ec2.metadata".into()),
-                ..Default::default()
+            assert_transform_compliance(async {
+                let transform_config = Ec2Metadata {
+                    endpoint: Some(ec2_metadata_address()),
+                    namespace: Some("ec2.metadata".into()),
+                    ..Default::default()
+                };
+
+                let (tx, rx) = mpsc::channel(1);
+                let (topology, mut out) =
+                    create_topology(ReceiverStream::new(rx), transform_config).await;
+
+                // We need to sleep to let the background task fetch the data.
+                sleep(Duration::from_secs(1)).await;
+
+                let log = LogEvent::default();
+
+                tx.send(log.into()).await.unwrap();
+
+                let event = out.recv().await.unwrap();
+
+                assert_eq!(
+                    event.as_log().get("ec2.metadata.\"availability-zone\""),
+                    Some(&"ww-region-1a".into())
+                );
+
+                drop(tx);
+                topology.stop().await;
+                assert_eq!(out.recv().await, None);
             })
             .await;
-
-            let (mut tx, rx) = futures::channel::mpsc::channel(100);
-            let mut stream = transform.transform_events(Box::pin(rx));
-
-            // We need to sleep to let the background task fetch the data.
-            sleep(Duration::from_secs(1)).await;
-
-            let log = LogEvent::default();
-
-            tx.send(log.into()).await.unwrap();
-
-            let event = stream.next().await.unwrap();
-
-            assert_eq!(
-                event.as_log().get("ec2.metadata.\"availability-zone\""),
-                Some(&"ww-region-1a".into())
-            );
         }
 
         {
-            // Set an empty namespace to ensure we don't prepend one.
-            let transform = make_transform(Ec2Metadata {
-                endpoint: Some(ec2_metadata_address()),
-                namespace: Some("".into()),
-                ..Default::default()
+            assert_transform_compliance(async {
+                // Set an empty namespace to ensure we don't prepend one.
+                let transform_config = Ec2Metadata {
+                    endpoint: Some(ec2_metadata_address()),
+                    namespace: Some("".into()),
+                    ..Default::default()
+                };
+
+                let (tx, rx) = mpsc::channel(1);
+                let (topology, mut out) =
+                    create_topology(ReceiverStream::new(rx), transform_config).await;
+
+                // We need to sleep to let the background task fetch the data.
+                sleep(Duration::from_secs(1)).await;
+
+                let log = LogEvent::default();
+
+                tx.send(log.into()).await.unwrap();
+
+                let event = out.recv().await.unwrap();
+                assert_eq!(
+                    event.as_log().get(event_path!(AVAILABILITY_ZONE_KEY)),
+                    Some(&"ww-region-1a".into())
+                );
+
+                drop(tx);
+                topology.stop().await;
+                assert_eq!(out.recv().await, None);
             })
             .await;
-
-            let (mut tx, rx) = futures::channel::mpsc::channel(100);
-            let mut stream = transform.transform_events(Box::pin(rx));
-
-            // We need to sleep to let the background task fetch the data.
-            sleep(Duration::from_secs(1)).await;
-
-            let log = LogEvent::default();
-
-            tx.send(log.into()).await.unwrap();
-
-            let event = stream.next().await.unwrap();
-            assert_eq!(
-                event
-                    .as_log()
-                    .get(&[BorrowedSegment::field(AVAILABILITY_ZONE_KEY)]),
-                Some(&"ww-region-1a".into())
-            );
         }
     }
 
     #[tokio::test]
     async fn namespace_metric() {
         {
-            let transform = make_transform(Ec2Metadata {
-                endpoint: Some(ec2_metadata_address()),
-                namespace: Some("ec2.metadata".into()),
-                ..Default::default()
+            assert_transform_compliance(async {
+                let transform_config = Ec2Metadata {
+                    endpoint: Some(ec2_metadata_address()),
+                    namespace: Some("ec2.metadata".into()),
+                    ..Default::default()
+                };
+
+                let (tx, rx) = mpsc::channel(1);
+                let (topology, mut out) =
+                    create_topology(ReceiverStream::new(rx), transform_config).await;
+
+                // We need to sleep to let the background task fetch the data.
+                sleep(Duration::from_secs(1)).await;
+
+                let metric = make_metric();
+
+                tx.send(metric.into()).await.unwrap();
+
+                let event = out.recv().await.unwrap();
+                assert_eq!(
+                    event
+                        .as_metric()
+                        .tag_value("ec2.metadata.availability-zone"),
+                    Some("ww-region-1a".to_string())
+                );
+
+                drop(tx);
+                topology.stop().await;
+                assert_eq!(out.recv().await, None);
             })
             .await;
-
-            let (mut tx, rx) = futures::channel::mpsc::channel(100);
-            let mut stream = transform.transform_events(Box::pin(rx));
-
-            // We need to sleep to let the background task fetch the data.
-            sleep(Duration::from_secs(1)).await;
-
-            let metric = make_metric();
-
-            tx.send(metric.into()).await.unwrap();
-
-            let event = stream.next().await.unwrap();
-            assert_eq!(
-                event
-                    .as_metric()
-                    .tag_value("ec2.metadata.availability-zone"),
-                Some("ww-region-1a".to_string())
-            );
         }
 
         {
-            // Set an empty namespace to ensure we don't prepend one.
-            let transform = make_transform(Ec2Metadata {
-                endpoint: Some(ec2_metadata_address()),
-                namespace: Some("".into()),
-                ..Default::default()
+            assert_transform_compliance(async {
+                // Set an empty namespace to ensure we don't prepend one.
+                let transform_config = Ec2Metadata {
+                    endpoint: Some(ec2_metadata_address()),
+                    namespace: Some("".into()),
+                    ..Default::default()
+                };
+
+                let (tx, rx) = mpsc::channel(1);
+                let (topology, mut out) =
+                    create_topology(ReceiverStream::new(rx), transform_config).await;
+
+                // We need to sleep to let the background task fetch the data.
+                sleep(Duration::from_secs(1)).await;
+
+                let metric = make_metric();
+
+                tx.send(metric.into()).await.unwrap();
+
+                let event = out.recv().await.unwrap();
+                assert_eq!(
+                    event.as_metric().tag_value(AVAILABILITY_ZONE_KEY),
+                    Some("ww-region-1a".to_string())
+                );
+
+                drop(tx);
+                topology.stop().await;
+                assert_eq!(out.recv().await, None);
             })
             .await;
-
-            let (mut tx, rx) = futures::channel::mpsc::channel(100);
-            let mut stream = transform.transform_events(Box::pin(rx));
-
-            // We need to sleep to let the background task fetch the data.
-            sleep(Duration::from_secs(1)).await;
-
-            let metric = make_metric();
-
-            tx.send(metric.into()).await.unwrap();
-
-            let event = stream.next().await.unwrap();
-            assert_eq!(
-                event.as_metric().tag_value(AVAILABILITY_ZONE_KEY),
-                Some("ww-region-1a".to_string())
-            );
         }
     }
 }

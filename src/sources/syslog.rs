@@ -350,7 +350,7 @@ fn enrich_syslog_event(event: &mut Event, host_key: &str, default_host: Option<B
 
 #[cfg(test)]
 mod test {
-    use lookup::path;
+    use lookup::event_path;
     use std::{
         collections::{BTreeMap, HashMap},
         fmt,
@@ -738,8 +738,8 @@ mod test {
             expected.insert("appname", "liblogging-stdlog");
             expected.insert("origin.software", "rsyslogd");
             expected.insert("origin.swVersion", "8.24.0");
-            expected.insert(path!("origin", "x-pid"), "8979");
-            expected.insert(path!("origin", "x-info"), "http://www.rsyslog.com");
+            expected.insert(event_path!("origin", "x-pid"), "8979");
+            expected.insert(event_path!("origin", "x-info"), "http://www.rsyslog.com");
         }
 
         assert_event_data_eq!(event, expected);
@@ -770,8 +770,8 @@ mod test {
             expected.insert("appname", "liblogging-stdlog");
             expected.insert("origin.software", "rsyslogd");
             expected.insert("origin.swVersion", "8.24.0");
-            expected.insert(path!("origin", "x-pid"), "9043");
-            expected.insert(path!("origin", "x-info"), "http://www.rsyslog.com");
+            expected.insert(event_path!("origin", "x-pid"), "9043");
+            expected.insert(event_path!("origin", "x-info"), "http://www.rsyslog.com");
         }
 
         assert_event_data_eq!(
@@ -822,7 +822,7 @@ mod test {
             send_lines(in_addr, input_lines).await.unwrap();
 
             // Wait a short period of time to ensure the messages get sent.
-            sleep(Duration::from_secs(1)).await;
+            sleep(Duration::from_secs(2)).await;
 
             // Shutdown the source, and make sure we've got all the messages we sent in.
             shutdown
@@ -976,7 +976,7 @@ mod test {
             send_encodable(in_addr, codec, input_lines).await.unwrap();
 
             // Wait a short period of time to ensure the messages get sent.
-            sleep(Duration::from_secs(1)).await;
+            sleep(Duration::from_secs(2)).await;
 
             // Shutdown the source, and make sure we've got all the messages we sent in.
             shutdown

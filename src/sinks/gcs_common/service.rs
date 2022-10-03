@@ -8,8 +8,7 @@ use http::{
 };
 use hyper::Body;
 use tower::Service;
-use vector_common::internal_event::BytesSent;
-use vector_core::{internal_event::EventsSent, stream::DriverResponse};
+use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
 
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
@@ -80,19 +79,15 @@ impl DriverResponse for GcsResponse {
         }
     }
 
-    fn events_sent(&self) -> EventsSent {
-        EventsSent {
-            count: self.metadata.event_count(),
-            byte_size: self.metadata.events_byte_size(),
-            output: None,
-        }
+    fn events_sent(&self) -> CountByteSize {
+        CountByteSize(
+            self.metadata.event_count(),
+            self.metadata.events_byte_size(),
+        )
     }
 
-    fn bytes_sent(&self) -> Option<BytesSent> {
-        Some(BytesSent {
-            byte_size: self.metadata.request_encoded_size(),
-            protocol: self.protocol,
-        })
+    fn bytes_sent(&self) -> Option<(usize, &str)> {
+        Some((self.metadata.request_encoded_size(), self.protocol))
     }
 }
 
@@ -102,10 +97,14 @@ impl Service<GcsRequest> for GcsService {
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, _: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
+        // Emission of Error internal event is handled upstream by the caller.
+
         Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, request: GcsRequest) -> Self::Future {
+        // Emission of Error internal event is handled upstream by the caller.
+
         let settings = request.settings;
         let metadata = request.metadata;
 

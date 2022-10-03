@@ -582,6 +582,7 @@ where
     /// Errors can occur during the encoding, serialization, or I/O stage.  If an error occurs
     /// during any of these stages, an appropriate error variant will be returned describing the error.
     #[instrument(skip(self, record), level = "trace")]
+    #[cfg(test)]
     pub async fn write_record(
         &mut self,
         id: u64,
@@ -1323,6 +1324,7 @@ where
             Ok(())
         }
     }
+
     /// Flushes the writer.
     ///
     /// This must be called for the reader to be able to make progress.

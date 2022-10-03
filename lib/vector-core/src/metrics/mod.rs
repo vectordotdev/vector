@@ -1,5 +1,6 @@
 mod ddsketch;
 mod label_filter;
+mod recency;
 mod recorder;
 mod storage;
 
@@ -14,16 +15,18 @@ use snafu::Snafu;
 
 pub use self::ddsketch::{AgentDDSketch, BinMap, Config};
 use self::{label_filter::VectorLabelFilter, recorder::Registry, recorder::VectorRecorder};
-use crate::event::{Metric, MetricKind, MetricValue};
+use crate::event::{Metric, MetricValue};
 
 type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Snafu)]
+#[derive(Clone, Copy, Debug, PartialEq, Snafu)]
 pub enum Error {
     #[snafu(display("Recorder already initialized."))]
     AlreadyInitialized,
     #[snafu(display("Metrics system was not initialized."))]
     NotInitialized,
+    #[snafu(display("Timeout value of {} must be positive.", timeout))]
+    TimeoutMustBePositive { timeout: f64 },
 }
 
 static CONTROLLER: OnceCell<Controller> = OnceCell::new();
@@ -130,10 +133,20 @@ impl Controller {
     }
 
     /// Set or clear the expiry time after which idle metrics are dropped from the set of captured
-    /// metrics.
-    pub fn set_expiry(&self, timeout: Option<Duration>) {
+    /// metrics. Invalid timeouts (zero or negative values) are silently remapped to no expiry.
+    ///
+    /// # Errors
+    ///
+    /// The contained timeout value must be positive.
+    pub fn set_expiry(&self, timeout: Option<f64>) -> Result<()> {
+        if let Some(timeout) = timeout {
+            if timeout <= 0.0 {
+                return Err(Error::TimeoutMustBePositive { timeout });
+            }
+        }
         self.recorder
-            .with_registry(|registry| registry.set_expiry(timeout));
+            .with_registry(|registry| registry.set_expiry(timeout.map(Duration::from_secs_f64)));
+        Ok(())
     }
 
     /// Take a snapshot of all gathered metrics and expose them as metric
@@ -169,13 +182,11 @@ impl Controller {
         let value = (metrics.len() + 2) as f64;
         metrics.push(Metric::from_metric_kv(
             &CARDINALITY_KEY,
-            MetricKind::Absolute,
             MetricValue::Gauge { value },
             timestamp,
         ));
         metrics.push(Metric::from_metric_kv(
             &CARDINALITY_COUNTER_KEY,
-            MetricKind::Absolute,
             MetricValue::Counter { value },
             timestamp,
         ));
@@ -234,7 +245,7 @@ mod tests {
 
     use crate::event::MetricKind;
 
-    const IDLE_TIMEOUT: Duration = Duration::from_millis(500);
+    const IDLE_TIMEOUT: f64 = 0.5;
 
     fn init_metrics() -> &'static Controller {
         if let Err(error) = init_test() {
@@ -282,14 +293,55 @@ mod tests {
     #[test]
     fn expires_metrics() {
         let controller = init_metrics();
-        controller.set_expiry(Some(IDLE_TIMEOUT));
+        controller.set_expiry(Some(IDLE_TIMEOUT)).unwrap();
 
         metrics::counter!("test2", 1);
         metrics::counter!("test3", 2);
         assert_eq!(controller.capture_metrics().len(), 4);
 
-        std::thread::sleep(IDLE_TIMEOUT * 2);
+        std::thread::sleep(Duration::from_secs_f64(IDLE_TIMEOUT * 2.0));
         metrics::counter!("test2", 3);
         assert_eq!(controller.capture_metrics().len(), 3);
+    }
+
+    #[test]
+    fn expires_metrics_tags() {
+        let controller = init_metrics();
+        controller.set_expiry(Some(IDLE_TIMEOUT)).unwrap();
+
+        metrics::counter!("test4", 1, "tag" => "value1");
+        metrics::counter!("test4", 2, "tag" => "value2");
+        assert_eq!(controller.capture_metrics().len(), 4);
+
+        std::thread::sleep(Duration::from_secs_f64(IDLE_TIMEOUT * 2.0));
+        metrics::counter!("test4", 3, "tag" => "value1");
+        assert_eq!(controller.capture_metrics().len(), 3);
+    }
+
+    #[test]
+    fn skips_expiring_registered() {
+        let controller = init_metrics();
+        controller.set_expiry(Some(IDLE_TIMEOUT)).unwrap();
+
+        let a = metrics::register_counter!("test5");
+        metrics::counter!("test6", 5);
+        assert_eq!(controller.capture_metrics().len(), 4);
+        a.increment(1);
+        assert_eq!(controller.capture_metrics().len(), 4);
+
+        std::thread::sleep(Duration::from_secs_f64(IDLE_TIMEOUT * 2.0));
+        assert_eq!(controller.capture_metrics().len(), 3);
+
+        a.increment(1);
+        let metrics = controller.capture_metrics();
+        assert_eq!(metrics.len(), 3);
+        let metric = metrics
+            .into_iter()
+            .find(|metric| metric.name() == "test5")
+            .expect("Test metric is not present");
+        match metric.value() {
+            MetricValue::Counter { value } => assert_eq!(*value, 2.0),
+            value => panic!("Invalid metric value {:?}", value),
+        }
     }
 }

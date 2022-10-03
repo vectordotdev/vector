@@ -10,7 +10,7 @@ use vector_config::configurable_component;
 
 use crate::{
     codecs::Transformer,
-    config::{log_schema, AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     event::{Event, Value},
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
     http::HttpClient,
@@ -34,7 +34,7 @@ enum HealthcheckError {
 }
 
 /// Configuration for the `gcp_stackdriver_logs` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("gcp_stackdriver_logs"))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct StackdriverConfig {
@@ -172,14 +172,9 @@ pub struct StackdriverResource {
     pub labels: HashMap<String, Template>,
 }
 
-inventory::submit! {
-    SinkDescription::new::<StackdriverConfig>("gcp_stackdriver_logs")
-}
-
 impl_generate_config_from_default!(StackdriverConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "gcp_stackdriver_logs")]
 impl SinkConfig for StackdriverConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let auth = self.auth.build(Scope::LoggingWrite).await?;
@@ -220,10 +215,6 @@ impl SinkConfig for StackdriverConfig {
 
     fn input(&self) -> Input {
         Input::log()
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "gcp_stackdriver_logs"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -347,7 +338,7 @@ fn remap_severity(severity: Value) -> Value {
                         warn!(
                             message = "Unknown severity value string, using DEFAULT.",
                             value = %s,
-                            internal_log_rate_secs = 10
+                            internal_log_rate_limit = true
                         );
                         0
                     }
@@ -358,7 +349,7 @@ fn remap_severity(severity: Value) -> Value {
             warn!(
                 message = "Unknown severity value type, using DEFAULT.",
                 ?value,
-                internal_log_rate_secs = 10
+                internal_log_rate_limit = true
             );
             0
         }
@@ -425,7 +416,7 @@ mod tests {
         // If we don't override the credentials path/API key, it tries to directly call out to the Google Instance
         // Metadata API, which we clearly don't have in unit tests. :)
         config.auth.credentials_path = None;
-        config.auth.api_key = Some("fake".to_string());
+        config.auth.api_key = Some("fake".to_string().into());
         config.endpoint = mock_endpoint.to_string();
 
         let context = SinkContext::new_test();

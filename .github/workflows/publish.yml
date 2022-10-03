@@ -243,7 +243,7 @@ jobs:
         with:
           ref: ${{ inputs.git_ref }}
       - name: Bootstrap runner environment (macOS-specific)
-        run: brew install bash coreutils
+        run: bash scripts/environment/bootstrap-macos-10.sh
       - name: Build Vector
         env:
           TARGET: "x86_64-apple-darwin"

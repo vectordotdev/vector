@@ -6,7 +6,7 @@ use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig,
-        SinkContext, SinkDescription,
+        SinkContext,
     },
     event::Event,
     internal_events::TemplateRenderingError,
@@ -17,7 +17,7 @@ use crate::{
 };
 
 /// Configuration for the `papertrail` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("papertrail"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct PapertrailConfig {
@@ -49,10 +49,6 @@ pub struct PapertrailConfig {
     acknowledgements: AcknowledgementsConfig,
 }
 
-inventory::submit! {
-    SinkDescription::new::<PapertrailConfig>("papertrail")
-}
-
 impl GenerateConfig for PapertrailConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(
@@ -64,7 +60,6 @@ impl GenerateConfig for PapertrailConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "papertrail")]
 impl SinkConfig for PapertrailConfig {
     async fn build(
         &self,
@@ -111,10 +106,6 @@ impl SinkConfig for PapertrailConfig {
 
     fn input(&self) -> Input {
         Input::new(self.encoding.config().input_type() & DataType::Log)
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "papertrail"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

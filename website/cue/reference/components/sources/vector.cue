@@ -63,23 +63,13 @@ components: sources: vector: {
 				examples: ["0.0.0.0:\(_port)"]
 			}
 		}
-		shutdown_timeout_secs: {
-			common:      false
-			description: "The timeout before a connection is forcefully closed during shutdown."
-			required:    false
-			type: uint: {
-				default: 30
-				unit:    "seconds"
-			}
-		}
 		version: {
-			description: "Source API version. Specifying this version ensures that Vector does not break backward compatibility."
+			description: "Source API version. Specifying this version ensures that Vector does not silently break backward compatibility."
 			common:      true
 			required:    false
 			warnings: ["Ensure you use the same version for both the source and sink."]
 			type: string: {
 				enum: {
-					"1": "Vector source API version 1"
 					"2": "Vector source API version 2"
 				}
 				default: "2"

@@ -191,7 +191,7 @@ impl HecAckClient {
         let expired_ack_ids = self
             .acks
             .iter()
-            .filter_map(|(ack_id, (retries, _))| (*retries == 0).then(|| *ack_id))
+            .filter_map(|(ack_id, (retries, _))| (*retries == 0).then_some(*ack_id))
             .collect::<Vec<_>>();
         let mut removed_count = 0.0;
         for ack_id in expired_ack_ids {

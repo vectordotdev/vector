@@ -1,6 +1,7 @@
 use futures::FutureExt;
 use indoc::indoc;
 use tower::ServiceBuilder;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::config::proxy::ProxyConfig;
 
@@ -22,7 +23,7 @@ use crate::{
 };
 
 /// Configuration for the `datadog_events` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("datadog_events"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogEventsConfig {
@@ -46,7 +47,7 @@ pub struct DatadogEventsConfig {
     /// precedence over the default.
     ///
     /// [api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
-    pub default_api_key: String,
+    pub default_api_key: SensitiveString,
 
     #[configurable(derived)]
     pub(super) tls: Option<TlsEnableableConfig>,
@@ -91,13 +92,18 @@ impl DatadogEventsConfig {
     fn build_healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
         let validate_endpoint =
             get_api_validate_endpoint(self.endpoint.as_ref(), self.site.as_ref(), self.region)?;
-        Ok(healthcheck(client, validate_endpoint, self.default_api_key.clone()).boxed())
+        Ok(healthcheck(
+            client,
+            validate_endpoint,
+            self.default_api_key.clone().into(),
+        )
+        .boxed())
     }
 
     fn build_sink(&self, client: HttpClient) -> crate::Result<VectorSink> {
         let service = DatadogEventsService::new(
             self.get_api_events_endpoint(),
-            self.default_api_key.clone(),
+            self.default_api_key.clone().into(),
             client,
         );
 
@@ -116,7 +122,6 @@ impl DatadogEventsConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "datadog_events")]
 impl SinkConfig for DatadogEventsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.build_client(cx.proxy())?;
@@ -128,10 +133,6 @@ impl SinkConfig for DatadogEventsConfig {
 
     fn input(&self) -> Input {
         Input::log()
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "datadog_events"
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

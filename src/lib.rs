@@ -36,9 +36,12 @@ pub mod dns;
 pub mod docker;
 pub mod expiring_hash_map;
 pub mod generate;
+pub mod generate_schema;
 #[macro_use]
 #[allow(unreachable_pub)]
 pub mod internal_events;
+#[cfg(feature = "lapin")]
+pub mod amqp;
 #[cfg(feature = "api")]
 #[allow(unreachable_pub)]
 pub mod api;
@@ -68,6 +71,7 @@ pub(crate) mod nats;
 #[allow(unreachable_pub)]
 pub(crate) mod proto;
 pub mod providers;
+pub mod secrets;
 pub mod serde;
 #[cfg(windows)]
 pub mod service;
@@ -101,8 +105,8 @@ pub mod validate;
 pub mod vector_windows;
 
 pub use source_sender::SourceSender;
-pub use vector_common::shutdown;
-pub use vector_core::{event, metrics, schema, tcp, tls, Error, Result};
+pub use vector_common::{shutdown, Error, Result};
+pub use vector_core::{event, metrics, schema, tcp, tls};
 
 pub fn vector_version() -> impl std::fmt::Display {
     #[cfg(feature = "nightly")]

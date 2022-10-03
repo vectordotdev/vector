@@ -10,7 +10,7 @@ async fn fetch_status(
 
     let mut req = http::Request::get(endpoint.uri)
         .body(hyper::Body::empty())
-        .unwrap();
+        .expect("Building request never fails.");
 
     if let Some(auth) = &config.auth {
         auth.apply(&mut req);
@@ -20,18 +20,6 @@ async fn fetch_status(
 }
 
 pub async fn healthcheck(config: LokiConfig, client: HttpClient) -> crate::Result<()> {
-    let endpoint = config.endpoint.append_path("ready")?;
-
-    let mut req = http::Request::get(endpoint.uri)
-        .body(hyper::Body::empty())
-        .expect("Building request never fails.");
-
-    if let Some(auth) = &config.auth {
-        auth.apply(&mut req);
-    }
-
-    let res = client.send(req).await?;
-
     let status = match fetch_status("ready", &config, &client).await? {
         // Issue https://github.com/vectordotdev/vector/issues/6463
         http::StatusCode::NOT_FOUND => {
@@ -43,6 +31,6 @@ pub async fn healthcheck(config: LokiConfig, client: HttpClient) -> crate::Resul
 
     match status {
         http::StatusCode::OK => Ok(()),
-        _ => Err(format!("A non-successful status returned: {}", res.status()).into()),
+        _ => Err(format!("A non-successful status returned: {}", status).into()),
     }
 }

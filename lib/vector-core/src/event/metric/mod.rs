@@ -8,7 +8,6 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
 use vector_common::EventDataEq;
 use vector_config::configurable_component;
 #[cfg(feature = "vrl")]
@@ -33,7 +32,9 @@ pub use self::value::*;
 
 pub type MetricTags = BTreeMap<String, String>;
 
-#[derive(Clone, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
+/// A metric.
+#[configurable_component]
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct Metric {
     #[serde(flatten)]
     pub(super) series: MetricSeries,
@@ -41,7 +42,8 @@ pub struct Metric {
     #[serde(flatten)]
     pub(super) data: MetricData,
 
-    #[serde(skip_serializing, default = "EventMetadata::default")]
+    /// Internal event metadata.
+    #[serde(skip, default = "EventMetadata::default")]
     metadata: EventMetadata,
 }
 
@@ -279,7 +281,6 @@ impl Metric {
     #[allow(clippy::cast_precision_loss)]
     pub(crate) fn from_metric_kv(
         key: &metrics::Key,
-        kind: MetricKind,
         value: MetricValue,
         timestamp: DateTime<Utc>,
     ) -> Self {
@@ -288,10 +289,10 @@ impl Metric {
             .map(|label| (String::from(label.key()), String::from(label.value())))
             .collect::<MetricTags>();
 
-        Self::new(key.name().to_string(), kind, value)
+        Self::new(key.name().to_string(), MetricKind::Absolute, value)
             .with_namespace(Some("vector"))
             .with_timestamp(Some(timestamp))
-            .with_tags((!labels.is_empty()).then(|| labels))
+            .with_tags((!labels.is_empty()).then_some(labels))
     }
 
     /// Removes a tag from this metric, returning the value of the tag if the tag was previously in the metric.

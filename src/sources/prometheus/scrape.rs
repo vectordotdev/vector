@@ -300,12 +300,9 @@ mod test {
     use crate::{
         config,
         sinks::prometheus::exporter::PrometheusExporterConfig,
-        sources::Sources,
         test_util::{
-            components::{
-                assert_source_compliance, run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS,
-            },
-            next_addr, start_topology, wait_for_tcp,
+            components::{run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS},
+            next_addr, start_topology, trace_init, wait_for_tcp,
         },
         Error,
     };
@@ -532,8 +529,11 @@ mod test {
         }
     }
 
+    // Intentially not using assert_source_compliance here because this is a round-trip test which
+    // means source and sink will both emit `EventsSent` , triggering multi-emission check.
     #[tokio::test]
     async fn test_prometheus_routing() {
+        trace_init();
         let in_addr = next_addr();
         let out_addr = next_addr();
 
@@ -582,7 +582,7 @@ mod test {
         let mut config = config::Config::builder();
         config.add_source(
             "in",
-            Sources::PrometheusScrape(PrometheusScrapeConfig {
+            PrometheusScrapeConfig {
                 endpoints: vec![format!("http://{}", in_addr)],
                 instance_tag: None,
                 endpoint_tag: None,
@@ -591,13 +591,14 @@ mod test {
                 scrape_interval_secs: 1,
                 tls: None,
                 auth: None,
-            }),
+            },
         );
         config.add_sink(
             "out",
             &["in"],
             PrometheusExporterConfig {
                 address: out_addr,
+                auth: None,
                 tls: None,
                 default_namespace: Some("vector".into()),
                 buckets: vec![1.0, 2.0, 4.0],
@@ -609,23 +610,22 @@ mod test {
             },
         );
 
-        assert_source_compliance(&HTTP_PULL_SOURCE_TAGS, async move {
-            let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
-            sleep(Duration::from_secs(1)).await;
+        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+        sleep(Duration::from_secs(1)).await;
 
-            let response = Client::new()
-                .get(format!("http://{}/metrics", out_addr).parse().unwrap())
-                .await
-                .unwrap();
+        let response = Client::new()
+            .get(format!("http://{}/metrics", out_addr).parse().unwrap())
+            .await
+            .unwrap();
 
-            assert!(response.status().is_success());
-            let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
-            let lines = std::str::from_utf8(&body)
-                .unwrap()
-                .lines()
-                .collect::<Vec<_>>();
+        assert!(response.status().is_success());
+        let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+        let lines = std::str::from_utf8(&body)
+            .unwrap()
+            .lines()
+            .collect::<Vec<_>>();
 
-            assert_eq!(lines, vec![
+        assert_eq!(lines, vec![
                 "# HELP vector_http_request_duration_seconds http_request_duration_seconds",
                 "# TYPE vector_http_request_duration_seconds histogram",
                 "vector_http_request_duration_seconds_bucket{le=\"0.05\"} 24054 1612411516789",
@@ -655,8 +655,7 @@ mod test {
                 ],
             );
 
-            topology.stop().await;
-        }).await;
+        topology.stop().await;
     }
 }
 

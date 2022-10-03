@@ -1,8 +1,11 @@
-use crate::{emit, internal_events::ComponentEventsDropped};
+use crate::{
+    emit,
+    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
+};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
-use super::prelude::{error_stage, error_type};
+use vector_common::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct RemapMappingError {
@@ -19,7 +22,7 @@ impl InternalEvent for RemapMappingError {
             error = ?self.error,
             error_type = error_type::CONVERSION_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -27,9 +30,8 @@ impl InternalEvent for RemapMappingError {
             "stage" => error_stage::PROCESSING,
         );
         if self.event_dropped {
-            emit!(ComponentEventsDropped {
+            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
                 count: 1,
-                intentional: false,
                 reason: "Mapping failed with event.",
             });
         }
@@ -49,13 +51,12 @@ impl InternalEvent for RemapMappingAbort {
     fn emit(self) {
         debug!(
             message = "Event mapping aborted.",
-            internal_log_rate_secs = 30
+            internal_log_rate_limit = true
         );
 
         if self.event_dropped {
-            emit!(ComponentEventsDropped {
+            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
                 count: 1,
-                intentional: false,
                 reason: "Event mapping aborted.",
             });
         }

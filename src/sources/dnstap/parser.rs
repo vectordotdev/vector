@@ -17,11 +17,11 @@ use trust_dns_proto::{
 
 use crate::{
     event::{LogEvent, Value},
-    internal_events::DnstapParseError,
+    internal_events::DnstapParseWarning,
     Error, Result,
 };
 
-#[allow(warnings)]
+#[allow(warnings, clippy::all, clippy::pedantic, clippy::nursery)]
 mod dnstap_proto {
     include!(concat!(env!("OUT_DIR"), "/dnstap.rs"));
 }
@@ -30,7 +30,8 @@ use dnstap_proto::{
     message::Type as DnstapMessageType, Dnstap, Message as DnstapMessage, SocketFamily,
     SocketProtocol,
 };
-use lookup::lookup_v2::OwnedPath;
+use lookup::lookup_v2::OwnedValuePath;
+use lookup::PathPrefix;
 
 use super::{
     dns_message::{
@@ -78,7 +79,7 @@ static DNSTAP_MESSAGE_RESPONSE_TYPE_IDS: Lazy<HashSet<i32>> = Lazy::new(|| {
 
 pub struct DnstapParser<'a> {
     event_schema: &'a DnstapEventSchema,
-    parent_key_path: OwnedPath,
+    parent_key_path: OwnedValuePath,
     log_event: &'a mut LogEvent,
 }
 
@@ -105,7 +106,8 @@ impl<'a> DnstapParser<'a> {
     {
         let mut node_path = self.parent_key_path.clone();
         node_path.push_field(key);
-        self.log_event.insert(&node_path, value)
+        self.log_event
+            .insert((PathPrefix::Event, &node_path), value)
     }
 
     pub fn parse_dnstap_data(&mut self, frame: Bytes) -> Result<()> {
@@ -151,9 +153,7 @@ impl<'a> DnstapParser<'a> {
             if dnstap_data_type == "Message" {
                 if let Some(message) = proto_msg.message {
                     if let Err(err) = self.parse_dnstap_message(message) {
-                        emit!(DnstapParseError {
-                            error: err.to_string().as_str()
-                        });
+                        emit!(DnstapParseWarning { error: &err });
                         need_raw_data = true;
                         self.insert(
                             self.event_schema.dnstap_root_data_schema().error(),
@@ -163,8 +163,8 @@ impl<'a> DnstapParser<'a> {
                 }
             }
         } else {
-            emit!(DnstapParseError {
-                error: format!("Unknown dnstap data type: {}", dnstap_data_type_id).as_str()
+            emit!(DnstapParseWarning {
+                error: format!("Unknown dnstap data type: {}", dnstap_data_type_id)
             });
             need_raw_data = true;
         }

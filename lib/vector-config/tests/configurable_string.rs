@@ -21,7 +21,7 @@ fn non_string_key_schema_stdlib_hashmap() {
         tags: HashMap<FakeString, String>,
     }
 
-    let _schema = generate_root_schema::<SimpleHashMapTags>();
+    generate_root_schema::<SimpleHashMapTags>().unwrap();
 }
 
 #[test]
@@ -35,7 +35,7 @@ fn non_string_key_schema_stdlib_btreemap() {
         tags: BTreeMap<FakeString, String>,
     }
 
-    let _schema = generate_root_schema::<SimpleBTreeMapTags>();
+    generate_root_schema::<SimpleBTreeMapTags>().unwrap();
 }
 
 #[test]
@@ -49,5 +49,5 @@ fn non_string_key_schema_stdlib_indexmap() {
         tags: IndexMap<FakeString, String>,
     }
 
-    let _schema = generate_root_schema::<SimpleIndexMapTags>();
+    generate_root_schema::<SimpleIndexMapTags>().unwrap();
 }

@@ -1,3 +1,4 @@
+use lookup::PathPrefix;
 use std::collections::{hash_map::Entry, HashMap};
 use value::{Kind, Value};
 
@@ -132,12 +133,16 @@ impl ExternalEnv {
         &self.target
     }
 
-    pub(crate) fn target_mut(&mut self) -> &mut Details {
-        &mut self.target
-    }
-
     pub fn target_kind(&self) -> &Kind {
         self.target().type_def.kind()
+    }
+
+    pub fn kind(&self, prefix: PathPrefix) -> Kind {
+        match prefix {
+            PathPrefix::Event => self.target_kind(),
+            PathPrefix::Metadata => self.metadata_kind(),
+        }
+        .clone()
     }
 
     pub fn metadata_kind(&self) -> &Kind {
