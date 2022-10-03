@@ -135,7 +135,6 @@ where
                         match maybe_event {
                             None => true,
                             Some(event) => {
-                                let mut output = Vec::new();
                                 let (throttle, event) = match self.exclude.as_ref() {
                                     Some(condition) => {
                                         let (result, event) = condition.check(event);
@@ -143,7 +142,7 @@ where
                                     },
                                     _ => (true, event)
                                 };
-                                if throttle {
+                                let output = if throttle {
                                     let key = self.key_field.as_ref().and_then(|t| {
                                         t.render_string(&event)
                                             .map_err(|error| {
@@ -158,7 +157,7 @@ where
 
                                     match limiter.check_key(&key) {
                                         Ok(()) => {
-                                            output.push(event);
+                                            Some(event)
                                         }
                                         _ => {
                                             if let Some(key) = key {
@@ -166,11 +165,12 @@ where
                                             } else {
                                                 emit!(ThrottleEventDiscarded{key: "None".to_string()})
                                             }
+                                            None
                                         }
                                     }
                                 } else {
-                                    output.push(event)
-                                }
+                                    Some(event)
+                                };
                                 yield stream::iter(output.into_iter());
                                 false
                             }
