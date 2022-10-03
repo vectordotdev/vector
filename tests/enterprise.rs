@@ -1,6 +1,6 @@
 #![cfg(feature = "enterprise-tests")]
 
-use std::{env, path::PathBuf, str::FromStr, thread};
+use std::{env, path::PathBuf, thread};
 
 use http::StatusCode;
 
@@ -46,8 +46,8 @@ fn get_root_opts(config_path: PathBuf) -> RootOpts {
         verbose: 0,
         quiet: 3,
         internal_log_rate_limit: 10,
-        log_format: LogFormat::from_str("text").unwrap(),
-        color: Color::from_str("auto").unwrap(),
+        log_format: LogFormat::Text,
+        color: Color::Auto,
         watch_config: false,
     }
 }
