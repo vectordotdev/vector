@@ -128,7 +128,6 @@ where
         Box::pin(
             stream! {
               loop {
-                let mut output = Vec::new();
                 let done = tokio::select! {
                     biased;
 
@@ -136,6 +135,7 @@ where
                         match maybe_event {
                             None => true,
                             Some(event) => {
+                                let mut output = Vec::new();
                                 let (throttle, event) = match self.exclude.as_ref() {
                                         Some(condition) => {
                                             let (result, event) = condition.check(event);
@@ -171,6 +171,7 @@ where
                                     } else {
                                         output.push(event)
                                     }
+                                yield stream::iter(output.into_iter());
                                 false
                             }
                         }
@@ -183,7 +184,6 @@ where
                         false
                     }
                 };
-                yield stream::iter(output.into_iter());
                 if done { break }
               }
             }
