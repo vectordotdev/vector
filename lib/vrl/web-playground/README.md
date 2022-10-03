@@ -1,6 +1,6 @@
 # VRL WASM Web Playground
 
-This directory houses the exposed VRL function to WASM `run_vrl()` used to 
+This directory houses the exposed VRL function to WASM `run_vrl()` used to
 power [Vector Remap Language Playground][vrl-playground], or **VRL Playground**
 for short. Although there is already a local REPL supported for use within the
 terminal, this playground will support running VRL in the web browser and test
@@ -24,7 +24,7 @@ Notice a `pkg` directory was created which contains `wasm_bg.wasm`, `wasm.js`,
 `wasm.d.ts` these are the files that will be used by the web browser to run the
 compiled Rust code.
 
-For more information on Rust and WebAssembly please visit 
+For more information on Rust and WebAssembly please visit
 [the mozilla docs][mozilla-wasm-rust-docs] or
 [the Rust book wasm chapter][rust-book-wasm]
 
