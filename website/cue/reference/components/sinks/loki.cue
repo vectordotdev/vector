@@ -220,17 +220,17 @@ components: sinks: loki: {
 				"""
 		}
 
-	    request_encoding: {
-	        title: "Request Encoding"
-	        body: """
-	            Loki can receive log entries as either protobuf or JSON requests.
-                Protobuf requests are snappy compressed.
-                JSON requests have either no compression or can be gzip compressed.
+		request_encoding: {
+			title: "Request Encoding"
+			body: """
+				Loki can receive log entries as either protobuf or JSON requests.
+				Protobuf requests are snappy compressed. JSON requests have either
+				no compression or can be gzip compressed.
 
-	            For the `loki` sink this means the body will be encoded based
-	            on the configured `compression`.
-	            """
-	    }
+				For the `loki` sink this means the body will be encoded based
+				on the configured `compression`.
+				"""
+		}
 	}
 
 	telemetry: metrics: {
