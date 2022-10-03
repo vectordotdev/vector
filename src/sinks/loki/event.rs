@@ -8,7 +8,7 @@ use vector_core::{
     ByteSizeOf,
 };
 
-use crate::sinks::util::encoding::Encoder;
+use crate::sinks::util::encoding::{write_all, Encoder};
 
 pub type Labels = Vec<(String, String)>;
 
@@ -27,6 +27,7 @@ impl Encoder<Vec<LokiRecord>> for LokiBatchEncoder {
         input: Vec<LokiRecord>,
         writer: &mut dyn io::Write,
     ) -> io::Result<usize> {
+        let count = input.len();
         let batch = LokiBatch::from(input);
         let body = match self.0 {
             LokiBatchEncoding::Json => {
@@ -49,7 +50,7 @@ impl Encoder<Vec<LokiRecord>> for LokiBatchEncoder {
                 batch.encode()
             }
         };
-        writer.write_all(&body).map(|()| body.len())
+        write_all(writer, count, &body).map(|()| body.len())
     }
 }
 
