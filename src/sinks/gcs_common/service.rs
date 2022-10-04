@@ -97,10 +97,14 @@ impl Service<GcsRequest> for GcsService {
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, _: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
+        // Emission of Error internal event is handled upstream by the caller.
+
         Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, request: GcsRequest) -> Self::Future {
+        // Emission of Error internal event is handled upstream by the caller.
+
         let settings = request.settings;
         let metadata = request.metadata;
 

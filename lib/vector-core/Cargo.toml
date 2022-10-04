@@ -8,10 +8,10 @@ publish = false
 [dependencies]
 async-graphql = { version = "4.0.14", default-features = false, optional = true }
 async-trait = { version = "0.1", default-features = false }
-bitmask-enum = { version = "2.0.1", default-features = false }
+bitmask-enum = { version = "2.1.0", default-features = false }
 bytes = { version = "1.2.1", default-features = false, features = ["serde"] }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
-crossbeam-utils = { version = "0.8.11", default-features = false }
+crossbeam-utils = { version = "0.8.12", default-features = false }
 db-key = { version = "0.0.5", default-features = false, optional = true }
 dyn-clone = { version = "1.0.9", default-features = false }
 enrichment = { path = "../enrichment", optional = true }
@@ -44,7 +44,7 @@ serde_json = { version = "1.0.85", default-features = false }
 serde_with = { version = "2.0.1", default-features = false, features = ["std", "macros"] }
 snafu = { version = "0.7.1", default-features = false }
 socket2 = { version = "0.4.7", default-features = false }
-tokio = { version = "1.21.0", default-features = false, features = ["net"] }
+tokio = { version = "1.21.2", default-features = false, features = ["net"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1", default-features = false, features = ["time"], optional = true }
 tokio-util = { version = "0.7.0", default-features = false, features = ["time"] }
@@ -62,6 +62,7 @@ value = { path = "../value", default-features = false, features = ["lua", "toml"
 vector-buffers = { path = "../vector-buffers", default-features = false }
 vector-common = { path = "../vector-common" }
 vector-config = { path = "../vector-config" }
+vector-config-common = { path = "../vector-config-common" }
 vector-config-macros = { path = "../vector-config-macros" }
 # Rename to "vrl" once we use a release with stable `-Z namespaced-features`:
 # https://doc.rust-lang.org/cargo/reference/unstable.html#namespaced-features

@@ -512,6 +512,7 @@ urls: {
 	vector_aws_s3_sink_auth:                    "/docs/reference/configuration/sinks/aws_s3/#auth"
 	vector_aws_s3_sink_how_it_works:            "/docs/reference/configuration/sinks/aws_s3/#how-it-works"
 	vector_blog:                                "/blog/"
+	vector_buffering_model:                     "/docs/about/under-the-hood/architecture/buffering-model/"
 	vector_bug_issues:                          "\(vector_repo)/issues?q=is%3Aopen+is%3Aissue+label%3A%22type%3A+bug%22"
 	vector_changelog:                           "\(vector_repo)/blob/master/CHANGELOG.md"
 	vector_chat:                                "https://chat.vector.dev"
