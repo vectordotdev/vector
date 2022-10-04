@@ -373,7 +373,7 @@ mod tests {
                 r#"
 [transforms.my_pipelines]
 type = "pipelines"
-inputs = ["syslog"]
+inputs = ["in"]
 
 [[transforms.my_pipelines.logs]]
 name = "foo pipeline"
@@ -384,9 +384,6 @@ name = "foo pipeline"
 name = "bar pipeline"
 filter.type = "vrl"
 filter.source = """true"""
-
-
-
             "#,
             )
             .unwrap();
