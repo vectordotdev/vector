@@ -49,6 +49,8 @@ mod fluent;
 mod gcp_pubsub;
 #[cfg(feature = "transforms-geoip")]
 mod geoip;
+#[cfg(any(feature = "sources-vector", feature = "sources-opentelemetry"))]
+mod grpc;
 mod heartbeat;
 #[cfg(feature = "sources-host_metrics")]
 mod host_metrics;
@@ -181,6 +183,8 @@ pub(crate) use self::fluent::*;
 pub(crate) use self::gcp_pubsub::*;
 #[cfg(feature = "transforms-geoip")]
 pub(crate) use self::geoip::*;
+#[cfg(any(feature = "sources-vector", feature = "sources-opentelemetry"))]
+pub(crate) use self::grpc::*;
 #[cfg(feature = "sources-host_metrics")]
 pub(crate) use self::host_metrics::*;
 #[cfg(any(
