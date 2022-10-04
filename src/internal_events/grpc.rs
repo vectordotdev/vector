@@ -9,11 +9,12 @@ pub struct GrpcInvalidCompressionScheme<'a> {
 
 impl InternalEvent for GrpcInvalidCompressionScheme<'_> {
     fn emit(self) {
-        error!(message = "Invalid compression scheme.",
-               error = ?self.status.message(),
-               error_type = error_type::REQUEST_FAILED,
-               stage = error_stage::RECEIVING,
-               internal_log_rate_secs = 10
+        error!(
+            message = "Invalid compression scheme.",
+            error = ?self.status.message(),
+            error_type = error_type::REQUEST_FAILED,
+            stage = error_stage::RECEIVING,
+            internal_log_rate_secs = true
         );
         counter!(
             "component_errors_total", 1,
@@ -33,11 +34,12 @@ where
     E: std::fmt::Display,
 {
     fn emit(self) {
-        error!(message = "Grpc error.",
-               error = %self.error,
-               error_type = error_type::REQUEST_FAILED,
-               stage = error_stage::RECEIVING,
-               internal_log_rate_secs = 10
+        error!(
+            message = "Grpc error.",
+            error = %self.error,
+            error_type = error_type::REQUEST_FAILED,
+            stage = error_stage::RECEIVING,
+            internal_log_rate_secs = true
         );
         counter!(
             "component_errors_total", 1,
