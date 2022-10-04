@@ -15,7 +15,7 @@ use futures::{Stream, StreamExt};
 use once_cell::sync::OnceCell;
 use rdkafka::{
     consumer::{Consumer, ConsumerContext, Rebalance, StreamConsumer},
-    message::{BorrowedMessage, Message},
+    message::{BorrowedMessage, Headers as _, Message},
     ClientConfig, ClientContext, Statistics,
 };
 use snafu::{ResultExt, Snafu};

@@ -1,5 +1,5 @@
 use bytes::{Bytes, BytesMut};
-use rdkafka::message::OwnedHeaders;
+use rdkafka::message::{Header, OwnedHeaders};
 use tokio_util::codec::Encoder as _;
 use vector_core::{config::LogSchema, ByteSizeOf};
 
