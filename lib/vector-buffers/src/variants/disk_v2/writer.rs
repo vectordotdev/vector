@@ -1324,6 +1324,7 @@ where
             Ok(())
         }
     }
+
     /// Flushes the writer.
     ///
     /// This must be called for the reader to be able to make progress.

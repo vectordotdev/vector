@@ -120,7 +120,7 @@ class Event
 
   # Scan for the emission of ComponentEventsDropped.
   def scan_component_dropped_events(block)
-    if block.match(/emit!\(\s*ComponentEventsDropped.*?\{/)
+    if block.match(/(emit|register)!\(\s*ComponentEventsDropped\b/)
       @emits_component_events_dropped = true
     end
   end
@@ -427,6 +427,7 @@ Find.find('./src', './lib') do |path|
           # Extract the handle type name to join them together
           event.impl_register_event = block[/type Handle = ([A-Za-z0-9]+);/, 1]
           event.scan_register_metrics(block)
+          event.scan_component_dropped_events(block)
         elsif trait == 'InternalEventHandle'
           event.impl_event_handle = true
           event.scan_logs(block)
@@ -440,7 +441,7 @@ $duplicates = Hash::new { |hash, key| hash[key] = [] }
 
 $all_events.each do |name, event|
   # Check for duplicated signatures
-  if event.impl_internal_event or event.impl_register_event or event.impl_event_handle
+  if event.impl_internal_event or event.impl_event_handle
     signature = event.signature
     if signature
       $duplicates[event.signature].append(name)
