@@ -542,11 +542,13 @@ impl MongoDbMetrics {
         }
 
         // mongod_metrics_record_moves_total
-        metrics.push(self.create_metric(
-            "mongod_metrics_record_moves_total",
-            counter!(status.metrics.record.moves),
-            tags!(self.tags),
-        ));
+        if let Some(record) = status.metrics.record {
+            metrics.push(self.create_metric(
+                "mongod_metrics_record_moves_total",
+                counter!(record.moves),
+                tags!(self.tags),
+            ));
+        }
 
         // mongod_metrics_repl_apply_
         metrics.push(self.create_metric(
