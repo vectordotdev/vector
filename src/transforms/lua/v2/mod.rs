@@ -417,7 +417,7 @@ mod tests {
 
             let out = Arc::new(tokio::sync::Mutex::new(out));
 
-            let result = func(tx.clone(), out.clone()).await;
+            let result = func(tx.clone(), Arc::clone(&out)).await;
 
             drop(tx);
             topology.stop().await;
