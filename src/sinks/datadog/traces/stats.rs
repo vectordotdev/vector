@@ -321,11 +321,8 @@ impl Aggregator {
             .unwrap_or(false);
 
         spans.iter().for_each(|span| {
-            let is_top = has_top_level(span, TOP_LEVEL_KEY);
-            if !(is_top
-                || is_measured(span, MEASURED_KEY)
-                || is_partial_snapshot(span, PARTIAL_VERSION_KEY))
-            {
+            let is_top = has_top_level(span);
+            if !(is_top || is_measured(span) || is_partial_snapshot(span)) {
                 return;
             }
             self.handle_span(span, weight, is_top, synthetics, payload_aggkey.clone());
@@ -454,15 +451,15 @@ fn metric_value_is_1(span: &BTreeMap<String, Value>, key: &str) -> bool {
 /// Returns true if span is top-level.
 ///
 /// https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/traceutil/span.go#L28-L31
-fn has_top_level(span: &BTreeMap<String, Value>, key: &str) -> bool {
-    metric_value_is_1(span, key)
+fn has_top_level(span: &BTreeMap<String, Value>) -> bool {
+    metric_value_is_1(span, TOP_LEVEL_KEY)
 }
 
 /// Returns true if a span should be measured (i.e. it should get trace metrics calculated).
 ///
 /// https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/traceutil/span.go#L40-L43
-fn is_measured(span: &BTreeMap<String, Value>, key: &str) -> bool {
-    metric_value_is_1(span, key)
+fn is_measured(span: &BTreeMap<String, Value>) -> bool {
+    metric_value_is_1(span, MEASURED_KEY)
 }
 
 /// Returns true if the span is a partial snapshot.
@@ -471,8 +468,8 @@ fn is_measured(span: &BTreeMap<String, Value>, key: &str) -> bool {
 /// The metric usually increases each time a new version of the same span is sent by the tracer
 ///
 /// https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/traceutil/span.go#L49-L52
-fn is_partial_snapshot(span: &BTreeMap<String, Value>, key: &str) -> bool {
-    match get_metric_value_float(span, key) {
+fn is_partial_snapshot(span: &BTreeMap<String, Value>) -> bool {
+    match get_metric_value_float(span, PARTIAL_VERSION_KEY) {
         Some(f) => f >= 0.0,
         None => false,
     }
@@ -486,7 +483,7 @@ fn extract_weight_from_root_span(spans: &[&BTreeMap<String, Value>]) -> f64 {
         return 1.0;
     }
 
-    let mut trace_id = None;
+    let mut trace_id: Option<usize> = None;
 
     let mut parent_id_to_child_weight = BTreeMap::<i64, f64>::new();
     let mut span_ids = Vec::<i64>::new();
@@ -505,7 +502,7 @@ fn extract_weight_from_root_span(spans: &[&BTreeMap<String, Value>]) -> f64 {
         };
         if trace_id.is_none() {
             trace_id = match s.get("trace_id") {
-                Some(Value::Integer(v)) => Some(*v),
+                Some(Value::Integer(v)) => Some(*v as usize),
                 _ => panic!("`trace_id` should be an i64"),
             }
         }
@@ -540,12 +537,8 @@ fn extract_weight_from_root_span(spans: &[&BTreeMap<String, Value>]) -> f64 {
         parent_id_to_child_weight.remove(id);
     });
 
-    // There should be only one value remaining- the weight from the root span
+    // There should be only one value remaining, the weight from the root span
     if parent_id_to_child_weight.len() != 1 {
-        let trace_id = trace_id.unwrap_or_else(|| {
-            error!("Field `trace_id` should exist in the span.");
-            -1
-        });
         emit!(DatadogTracesStatsError {
             error_message: "Didn't reliably find the root span for weight calculation.",
             trace_id,
@@ -556,10 +549,6 @@ fn extract_weight_from_root_span(spans: &[&BTreeMap<String, Value>]) -> f64 {
         .values()
         .next()
         .unwrap_or_else(|| {
-            let trace_id = trace_id.unwrap_or_else(|| {
-                error!("Field `trace_id` should exist in the span.");
-                -1
-            });
             emit!(DatadogTracesStatsError {
                 error_message: "Root span was not found. Defaulting to weight of 1.0.",
                 trace_id,

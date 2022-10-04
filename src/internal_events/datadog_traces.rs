@@ -43,15 +43,14 @@ impl InternalEvent for DatadogTracesEncodingError {
 #[derive(Debug)]
 pub struct DatadogTracesStatsError {
     pub error_message: &'static str,
-    // TODO this need to change to u64 when the following issue is fixed:
-    // https://github.com/vectordotdev/vector/issues/14687
-    pub trace_id: i64,
+    pub trace_id: Option<usize>,
 }
 
 impl InternalEvent for DatadogTracesStatsError {
     fn emit(self) {
         error!(
             message = "Trace stats calculation error.",
+            trace_id = ?self.trace_id,
             error = %self.error_message,
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
