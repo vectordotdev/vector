@@ -284,10 +284,14 @@ where
         Ok(res) if res.status().is_success() => {
             bytes_received.emit(ByteSize(body_bytes_received));
         }
+        Ok(res) => {
+            emit!(GrpcError {
+                error: format!("Received {}", res.status())
+            });
+        }
         Err(error) => {
             emit!(GrpcError { error: &error });
         }
-        _ => {}
     };
 
     result
