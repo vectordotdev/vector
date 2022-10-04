@@ -551,6 +551,34 @@ mod tests {
         .await
     }
 
+    async fn do_transform_multiple_events(
+        config: LogToMetricConfig,
+        event: Event,
+        count: usize,
+    ) -> Vec<Event> {
+        assert_transform_compliance(async move {
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
+            tx.send(event).await.unwrap();
+
+            let mut results = vec![];
+            for _ in 0..count {
+                let result = tokio::time::timeout(Duration::from_secs(5), out.recv())
+                    .await
+                    .unwrap_or(None);
+                if let Some(event) = result {
+                    results.push(event);
+                }
+            }
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+            results
+        })
+        .await
+    }
+
     #[tokio::test]
     async fn count_http_status_codes() {
         let config = parse_config(
@@ -791,115 +819,108 @@ mod tests {
         assert_eq!(do_transform(config, event).await, None);
     }
 
-    // #[tokio::test]
-    // async fn multiple_metrics() {
-    //     let config = parse_config(
-    //         r#"
-    //         [[metrics]]
-    //         type = "counter"
-    //         field = "status"
-    //
-    //         [[metrics]]
-    //         type = "counter"
-    //         field = "backtrace"
-    //         name = "exception_total"
-    //         "#,
-    //     );
-    //
-    //     let mut event = Event::Log(LogEvent::from("i am a log"));
-    //     event
-    //         .as_mut_log()
-    //         .insert(log_schema().timestamp_key(), ts());
-    //     event.as_mut_log().insert("status", "42");
-    //     event.as_mut_log().insert("backtrace", "message");
-    //     let metadata = event.metadata().clone();
-    //
-    //     let mut transform = LogToMetric::new(config);
-    //
-    //     let mut output = OutputBuffer::default();
-    //     transform.transform(&mut output, event);
-    //     assert_eq!(2, output.len());
-    //     let mut output = output.into_events();
-    //     assert_eq!(
-    //         output.next().unwrap().into_metric(),
-    //         Metric::new_with_metadata(
-    //             "status",
-    //             MetricKind::Incremental,
-    //             MetricValue::Counter { value: 1.0 },
-    //             metadata.clone(),
-    //         )
-    //         .with_timestamp(Some(ts()))
-    //     );
-    //     assert_eq!(
-    //         output.next().unwrap().into_metric(),
-    //         Metric::new_with_metadata(
-    //             "exception_total",
-    //             MetricKind::Incremental,
-    //             MetricValue::Counter { value: 1.0 },
-    //             metadata,
-    //         )
-    //         .with_timestamp(Some(ts()))
-    //     );
-    // }
-    //
-    // #[tokio::test]
-    // async fn multiple_metrics_with_multiple_templates() {
-    //     let config = parse_config(
-    //         r#"
-    //         [[metrics]]
-    //         type = "set"
-    //         field = "status"
-    //         name = "{{host}}_{{worker}}_status_set"
-    //
-    //         [[metrics]]
-    //         type = "counter"
-    //         field = "backtrace"
-    //         name = "{{service}}_exception_total"
-    //         namespace = "{{host}}"
-    //         "#,
-    //     );
-    //
-    //     let mut event = Event::Log(LogEvent::from("i am a log"));
-    //     event
-    //         .as_mut_log()
-    //         .insert(log_schema().timestamp_key(), ts());
-    //     event.as_mut_log().insert("status", "42");
-    //     event.as_mut_log().insert("backtrace", "message");
-    //     event.as_mut_log().insert("host", "local");
-    //     event.as_mut_log().insert("worker", "abc");
-    //     event.as_mut_log().insert("service", "xyz");
-    //     let metadata = event.metadata().clone();
-    //
-    //     let mut transform = LogToMetric::new(config);
-    //
-    //     let mut output = OutputBuffer::default();
-    //     transform.transform(&mut output, event);
-    //     let output: Vec<_> = output.into_events().collect();
-    //     assert_eq!(2, output.len());
-    //     assert_eq!(
-    //         output[0].as_metric(),
-    //         &Metric::new_with_metadata(
-    //             "local_abc_status_set",
-    //             MetricKind::Incremental,
-    //             MetricValue::Set {
-    //                 values: vec!["42".into()].into_iter().collect()
-    //             },
-    //             metadata.clone(),
-    //         )
-    //         .with_timestamp(Some(ts()))
-    //     );
-    //     assert_eq!(
-    //         output[1].as_metric(),
-    //         &Metric::new_with_metadata(
-    //             "xyz_exception_total",
-    //             MetricKind::Incremental,
-    //             MetricValue::Counter { value: 1.0 },
-    //             metadata,
-    //         )
-    //         .with_namespace(Some("local"))
-    //         .with_timestamp(Some(ts()))
-    //     );
-    // }
+    #[tokio::test]
+    async fn multiple_metrics() {
+        let config = parse_config(
+            r#"
+            [[metrics]]
+            type = "counter"
+            field = "status"
+
+            [[metrics]]
+            type = "counter"
+            field = "backtrace"
+            name = "exception_total"
+            "#,
+        );
+
+        let mut event = Event::Log(LogEvent::from("i am a log"));
+        event
+            .as_mut_log()
+            .insert(log_schema().timestamp_key(), ts());
+        event.as_mut_log().insert("status", "42");
+        event.as_mut_log().insert("backtrace", "message");
+        let metadata = event.metadata().clone();
+        let output = do_transform_multiple_events(config, event, 2).await;
+
+        assert_eq!(2, output.len());
+        assert_eq!(
+            output[0].clone().into_metric(),
+            Metric::new_with_metadata(
+                "status",
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 1.0 },
+                metadata.clone(),
+            )
+            .with_timestamp(Some(ts()))
+        );
+        assert_eq!(
+            output[1].clone().into_metric(),
+            Metric::new_with_metadata(
+                "exception_total",
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 1.0 },
+                metadata,
+            )
+            .with_timestamp(Some(ts()))
+        );
+    }
+
+    #[tokio::test]
+    async fn multiple_metrics_with_multiple_templates() {
+        let config = parse_config(
+            r#"
+            [[metrics]]
+            type = "set"
+            field = "status"
+            name = "{{host}}_{{worker}}_status_set"
+
+            [[metrics]]
+            type = "counter"
+            field = "backtrace"
+            name = "{{service}}_exception_total"
+            namespace = "{{host}}"
+            "#,
+        );
+
+        let mut event = Event::Log(LogEvent::from("i am a log"));
+        event
+            .as_mut_log()
+            .insert(log_schema().timestamp_key(), ts());
+        event.as_mut_log().insert("status", "42");
+        event.as_mut_log().insert("backtrace", "message");
+        event.as_mut_log().insert("host", "local");
+        event.as_mut_log().insert("worker", "abc");
+        event.as_mut_log().insert("service", "xyz");
+        let metadata = event.metadata().clone();
+
+        let output = do_transform_multiple_events(config, event, 2).await;
+
+        assert_eq!(2, output.len());
+        assert_eq!(
+            output[0].as_metric(),
+            &Metric::new_with_metadata(
+                "local_abc_status_set",
+                MetricKind::Incremental,
+                MetricValue::Set {
+                    values: vec!["42".into()].into_iter().collect()
+                },
+                metadata.clone(),
+            )
+            .with_timestamp(Some(ts()))
+        );
+        assert_eq!(
+            output[1].as_metric(),
+            &Metric::new_with_metadata(
+                "xyz_exception_total",
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 1.0 },
+                metadata,
+            )
+            .with_namespace(Some("local"))
+            .with_timestamp(Some(ts()))
+        );
+    }
 
     #[tokio::test]
     async fn user_ip_set() {
