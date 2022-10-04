@@ -108,6 +108,7 @@ members = [
   "lib/vrl/tests",
   "lib/vrl/proptests",
   "lib/vrl/vrl",
+  "lib/vrl/web-playground"
 ]
 
 [dependencies]
