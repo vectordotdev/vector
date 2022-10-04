@@ -38,7 +38,7 @@ pub enum Error {
     /// byte messages.
     FramingError(BoxedFramingError),
     /// The error occurred while parsing structured events from a byte frame.
-    ParsingError(vector_core::Error),
+    ParsingError(vector_common::Error),
 }
 
 impl std::fmt::Display for Error {
@@ -324,6 +324,38 @@ impl DeserializerConfig {
             DeserializerConfig::Gelf => GelfDeserializerConfig.schema_definition(log_namespace),
         }
     }
+
+    /// Get the HTTP content type.
+    pub const fn content_type(&self, framer: &FramingConfig) -> &'static str {
+        match (&self, framer) {
+            (
+                DeserializerConfig::Json | DeserializerConfig::NativeJson,
+                FramingConfig::NewlineDelimited { .. },
+            ) => "application/x-ndjson",
+            (
+                DeserializerConfig::Gelf
+                | DeserializerConfig::Json
+                | DeserializerConfig::NativeJson,
+                FramingConfig::CharacterDelimited {
+                    character_delimited:
+                        CharacterDelimitedDecoderOptions {
+                            delimiter: b',',
+                            max_length: Some(usize::MAX),
+                        },
+                },
+            ) => "application/json",
+            (DeserializerConfig::Native, _) => "application/octet-stream",
+            (
+                DeserializerConfig::Json
+                | DeserializerConfig::NativeJson
+                | DeserializerConfig::Bytes
+                | DeserializerConfig::Gelf,
+                _,
+            ) => "text/plain",
+            #[cfg(feature = "syslog")]
+            (DeserializerConfig::Syslog, _) => "text/plain",
+        }
+    }
 }
 
 /// Parse structured events from bytes.
@@ -351,7 +383,7 @@ impl format::Deserializer for Deserializer {
         &self,
         bytes: Bytes,
         log_namespace: LogNamespace,
-    ) -> vector_core::Result<SmallVec<[Event; 1]>> {
+    ) -> vector_common::Result<SmallVec<[Event; 1]>> {
         match self {
             Deserializer::Bytes(deserializer) => deserializer.parse(bytes, log_namespace),
             Deserializer::Json(deserializer) => deserializer.parse(bytes, log_namespace),

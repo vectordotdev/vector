@@ -1,7 +1,7 @@
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
-use super::prelude::{error_stage, error_type};
+use vector_common::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct SyslogUdpReadError {
@@ -13,7 +13,7 @@ impl InternalEvent for SyslogUdpReadError {
         error!(
             message = "Error reading datagram.",
             error = ?self.error,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
             error_type = error_type::READER_FAILED,
             stage = error_stage::RECEIVING,
         );

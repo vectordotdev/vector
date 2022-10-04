@@ -6,14 +6,17 @@ use std::{
     time::Instant,
 };
 
-use futures::{stream::FuturesOrdered, FutureExt, StreamExt};
+use futures::{stream::FuturesOrdered, FutureExt, StreamExt, TryStreamExt};
+use futures_util::stream::FuturesUnordered;
 use once_cell::sync::Lazy;
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
 use tokio::{
     select,
+    sync::oneshot,
     time::{timeout, Duration},
 };
 use tracing::Instrument;
+use vector_config::NamedComponent;
 use vector_core::{
     buffers::{
         topology::{
@@ -30,19 +33,21 @@ use vector_core::{
 use super::{
     fanout::{self, Fanout},
     schema,
-    task::{Task, TaskOutput},
+    task::{Task, TaskOutput, TaskResult},
     BuiltBuffer, ConfigDiff,
 };
 use crate::{
     config::{
-        ComponentKey, DataType, Input, Output, OutputId, ProxyConfig, SinkContext, SourceContext,
-        TransformContext, TransformOuter,
+        ComponentKey, DataType, EnrichmentTableConfig, Input, Output, OutputId, ProxyConfig,
+        SinkConfig, SinkContext, SourceConfig, SourceContext, TransformConfig, TransformContext,
+        TransformOuter,
     },
     event::{EventArray, EventContainer},
     internal_events::EventsReceived,
     shutdown::SourceShutdownCoordinator,
     source_sender::CHUNK_SIZE,
     spawn_named,
+    topology::task::TaskError,
     transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
     utilization::wrap,
     SourceSender,
@@ -156,20 +161,27 @@ pub async fn build_pieces(
     {
         debug!(component = %key, "Building new source.");
 
-        let typetag = source.inner.source_type();
+        let typetag = source.inner.get_component_name();
         let source_outputs = source.inner.outputs(config.schema.log_namespace());
 
         let span = error_span!(
             "source",
             component_kind = "source",
             component_id = %key.id(),
-            component_type = %source.inner.source_type(),
+            component_type = %source.inner.get_component_name(),
             // maintained for compatibility
             component_name = %key.id(),
         );
-        let task_name = format!(">> {} ({}, pump) >>", source.inner.source_type(), key.id());
+        let task_name = format!(
+            ">> {} ({}, pump) >>",
+            source.inner.get_component_name(),
+            key.id()
+        );
 
-        let mut builder = SourceSender::builder().with_buffer(*SOURCE_SENDER_BUFFER_SIZE);
+        let mut builder = {
+            let _span = span.enter();
+            SourceSender::builder().with_buffer(*SOURCE_SENDER_BUFFER_SIZE)
+        };
         let mut pumps = Vec::new();
         let mut controls = HashMap::new();
         let mut schema_definitions = HashMap::with_capacity(source_outputs.len());
@@ -180,10 +192,15 @@ pub async fn build_pieces(
             let (mut fanout, control) = Fanout::new();
             let pump = async move {
                 debug!("Source pump starting.");
+
                 while let Some(array) = rx.next().await {
-                    fanout.send(array).await;
+                    fanout.send(array).await.map_err(|e| {
+                        debug!("Source pump finished with an error.");
+                        TaskError::wrapped(e)
+                    })?;
                 }
-                debug!("Source pump finished.");
+
+                debug!("Source pump finished normally.");
                 Ok(TaskOutput::Source)
             };
 
@@ -203,13 +220,34 @@ pub async fn build_pieces(
             schema_definitions.insert(output.port, schema_definition);
         }
 
+        let (pump_error_tx, mut pump_error_rx) = oneshot::channel();
         let pump = async move {
-            let mut handles = Vec::new();
+            debug!("Source pump supervisor starting.");
+
+            // Spawn all of the per-output pumps and then await their completion.
+            //
+            // If any of the pumps complete with an error, or panic/are cancelled, we return
+            // immediately.
+            let mut handles = FuturesUnordered::new();
             for pump in pumps {
                 handles.push(spawn_named(pump, task_name.as_ref()));
             }
-            for handle in handles {
-                handle.await.expect("join error")?;
+
+            let mut had_pump_error = false;
+            while let Some(output) = handles.try_next().await? {
+                if let Err(e) = output {
+                    // Immediately send the error to the source's wrapper future, but ignore any
+                    // errors during the send, since nested errors wouldn't make any sense here.
+                    let _ = pump_error_tx.send(e);
+                    had_pump_error = true;
+                    break;
+                }
+            }
+
+            if had_pump_error {
+                debug!("Source pump supervisor task finished with an error.");
+            } else {
+                debug!("Source pump supervisor task finished normally.");
             }
             Ok(TaskOutput::Source)
         };
@@ -237,27 +275,54 @@ pub async fn build_pieces(
             Ok(server) => server,
         };
 
-        // The force_shutdown_tripwire is a Future that when it resolves means that this source
-        // has failed to shut down gracefully within its allotted time window and instead should be
-        // forcibly shut down. We accomplish this by select()-ing on the server Task with the
-        // force_shutdown_tripwire. That means that if the force_shutdown_tripwire resolves while
-        // the server Task is still running the Task will simply be dropped on the floor.
-        let server = async {
-            let result = select! {
+        // Build a wrapper future that drives the actual source future, but returns early if we've
+        // been signalled to forcefully shutdown, or if the source pump encounters an error.
+        //
+        // The forceful shutdown will only resolve if the source itself doesn't shutdown gracefully
+        // within the alloted time window. This can occur normally for certain sources, like stdin,
+        // where the I/O is blocking (in a separate thread) and won't wake up to check if it's time
+        // to shutdown unless some input is given.
+        let server = async move {
+            debug!("Source starting.");
+
+            let mut result = select! {
                 biased;
 
-                _ = force_shutdown_tripwire => {
-                    Ok(())
-                },
-                result = server => result,
+                // We've been told that we must forcefully shut down.
+                _ = force_shutdown_tripwire => Ok(()),
+
+                // The source pump encountered an error, which we're now bubbling up here to stop
+                // the source as well, since the source running makes no sense without the pump.
+                //
+                // We only match receiving a message, not the error of the sender being dropped,
+                // just to keep things simpler.
+                Ok(e) = &mut pump_error_rx => Err(e),
+
+                // The source finished normally.
+                result = server => result.map_err(|_| TaskError::Opaque),
             };
+
+            // Even though we already tried to receive any pump task error above, we may have exited
+            // on the source itself returning an error due to task scheduling, where the pump task
+            // encountered an error, sent it over the oneshot, but we were polling the source
+            // already and hit an error trying to send to the now-shutdown pump task.
+            //
+            // Since the error from the source is opaque at the moment (i.e. `()`), we try a final
+            // time to see if the pump task encountered an error, using _that_ instead if so, to
+            // propagate the true error that caused the source to have to stop.
+            if let Ok(e) = pump_error_rx.try_recv() {
+                result = Err(e);
+            }
 
             match result {
                 Ok(()) => {
-                    debug!("Finished.");
+                    debug!("Source finished normally.");
                     Ok(TaskOutput::Source)
                 }
-                Err(()) => Err(()),
+                Err(e) => {
+                    debug!("Source finished with an error.");
+                    Err(e)
+                }
             }
         };
         let server = Task::new(key.clone(), typetag, server);
@@ -323,16 +388,16 @@ pub async fn build_pieces(
         .sinks()
         .filter(|(key, _)| diff.sinks.contains_new(key))
     {
-        debug!(component = %key, "Building new sink");
+        debug!(component = %key, "Building new sink.");
 
         let sink_inputs = &sink.inputs;
         let healthcheck = sink.healthcheck();
         let enable_healthcheck = healthcheck.enabled && config.healthchecks.enabled;
 
-        let typetag = sink.inner.sink_type();
+        let typetag = sink.inner.get_component_name();
         let input_type = sink.inner.input().data_type();
 
-        if config.schema.enabled {
+        if config.schema.validation {
             // At this point, we've validated that all transforms are valid, including any
             // transform that mutates the schema provided by their sources. We can now validate the
             // schema expectations of each individual sink.
@@ -354,7 +419,7 @@ pub async fn build_pieces(
                 component_id = %key.id(),
                 component_type = typetag,
                 component_name = %key.id(),
-                buffer_type = buffer_type,
+                buffer_type,
             );
             let buffer = sink
                 .buffer
@@ -387,6 +452,8 @@ pub async fn build_pieces(
         let (trigger, tripwire) = Tripwire::new();
 
         let sink = async move {
+            debug!("Sink starting.");
+
             // Why is this Arc<Mutex<Option<_>>> needed you ask.
             // In case when this function build_pieces errors
             // this future won't be run so this rx won't be taken
@@ -414,8 +481,12 @@ pub async fn build_pieces(
             )
             .await
             .map(|_| {
-                debug!("Finished.");
+                debug!("Sink finished normally.");
                 TaskOutput::Sink(rx)
+            })
+            .map_err(|_| {
+                debug!("Sink finished with an error.");
+                TaskError::Opaque
             })
         };
 
@@ -441,9 +512,9 @@ pub async fn build_pieces(
                                 // maintained for compatibility
                                 component_name = %component_key.id(),
                             );
-                            Err(())
+                            Err(TaskError::wrapped(error))
                         }
-                        Err(_) => {
+                        Err(e) => {
                             error!(
                                 msg = "Healthcheck: timeout.",
                                 component_kind = "sink",
@@ -452,7 +523,7 @@ pub async fn build_pieces(
                                 // maintained for compatibility
                                 component_name = %component_key.id(),
                             );
-                            Err(())
+                            Err(TaskError::wrapped(Box::new(e)))
                         }
                     })
                     .await
@@ -525,7 +596,7 @@ impl TransformNode {
     ) -> Self {
         Self {
             key,
-            typetag: transform.inner.transform_type(),
+            typetag: transform.inner.get_component_name(),
             inputs: transform.inputs.clone(),
             input_details: transform.inner.input(),
             outputs: transform.inner.outputs(schema_definition),
@@ -565,6 +636,21 @@ fn build_sync_transform(
         runner.run_concurrently().boxed()
     } else {
         runner.run_inline().boxed()
+    };
+
+    let transform = async move {
+        debug!("Synchronous transform starting.");
+
+        match transform.await {
+            Ok(v) => {
+                debug!("Synchronous transform finished normally.");
+                Ok(v)
+            }
+            Err(e) => {
+                debug!("Synchronous transform finished with an error.");
+                Err(e)
+            }
+        }
     };
 
     let mut output_controls = HashMap::new();
@@ -619,12 +705,12 @@ impl Runner {
         });
     }
 
-    async fn send_outputs(&mut self, outputs_buf: &mut TransformOutputsBuf) {
+    async fn send_outputs(&mut self, outputs_buf: &mut TransformOutputsBuf) -> crate::Result<()> {
         self.timer.start_wait();
-        self.outputs.send(outputs_buf).await;
+        self.outputs.send(outputs_buf).await
     }
 
-    async fn run_inline(mut self) -> Result<TaskOutput, ()> {
+    async fn run_inline(mut self) -> TaskResult {
         // 128 is an arbitrary, smallish constant
         const INLINE_BATCH_SIZE: usize = 128;
 
@@ -641,14 +727,15 @@ impl Runner {
         while let Some(events) = input_rx.next().await {
             self.on_events_received(&events);
             self.transform.transform_all(events, &mut outputs_buf);
-            self.send_outputs(&mut outputs_buf).await;
+            self.send_outputs(&mut outputs_buf)
+                .await
+                .map_err(TaskError::wrapped)?;
         }
 
-        debug!("Finished.");
         Ok(TaskOutput::Transform)
     }
 
-    async fn run_concurrently(mut self) -> Result<TaskOutput, ()> {
+    async fn run_concurrently(mut self) -> TaskResult {
         let input_rx = self
             .input_rx
             .take()
@@ -671,7 +758,8 @@ impl Runner {
                     match result {
                         Some(Ok(outputs_buf)) => {
                             let mut outputs_buf: TransformOutputsBuf = outputs_buf;
-                            self.send_outputs(&mut outputs_buf).await;
+                            self.send_outputs(&mut outputs_buf).await
+                                .map_err(TaskError::wrapped)?;
                         }
                         _ => unreachable!("join error or bad poll"),
                     }
@@ -694,7 +782,7 @@ impl Runner {
                                 }
                                 outputs_buf
                             }.in_current_span());
-                            in_flight.push(task);
+                            in_flight.push_back(task);
                         }
                         None => {
                             shutting_down = true;
@@ -711,7 +799,6 @@ impl Runner {
             }
         }
 
-        debug!("Finished.");
         Ok(TaskOutput::Transform)
     }
 }
@@ -745,9 +832,18 @@ fn build_task_transform(
             });
         });
     let transform = async move {
-        fanout.send_stream(stream).await;
-        debug!("Finished.");
-        Ok(TaskOutput::Transform)
+        debug!("Task transform starting.");
+
+        match fanout.send_stream(stream).await {
+            Ok(()) => {
+                debug!("Task transform finished normally.");
+                Ok(TaskOutput::Transform)
+            }
+            Err(e) => {
+                debug!("Task transform finished with an error.");
+                Err(TaskError::wrapped(e))
+            }
+        }
     }
     .boxed();
 

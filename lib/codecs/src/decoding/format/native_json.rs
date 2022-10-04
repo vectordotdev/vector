@@ -26,10 +26,13 @@ impl NativeJsonDeserializerConfig {
     /// The schema produced by the deserializer.
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
         match log_namespace {
-            LogNamespace::Vector => schema::Definition::new(Kind::json(), [log_namespace]),
-            LogNamespace::Legacy => {
-                schema::Definition::new(Kind::object(Collection::json()), [log_namespace])
+            LogNamespace::Vector => {
+                schema::Definition::new_with_default_metadata(Kind::json(), [log_namespace])
             }
+            LogNamespace::Legacy => schema::Definition::new_with_default_metadata(
+                Kind::object(Collection::json()),
+                [log_namespace],
+            ),
         }
     }
 }
@@ -44,7 +47,7 @@ impl Deserializer for NativeJsonDeserializer {
         &self,
         bytes: Bytes,
         _log_namespace: LogNamespace,
-    ) -> vector_core::Result<SmallVec<[Event; 1]>> {
+    ) -> vector_common::Result<SmallVec<[Event; 1]>> {
         // It's common to receive empty frames when parsing NDJSON, since it
         // allows multiple empty newlines. We proceed without a warning here.
         if bytes.is_empty() {

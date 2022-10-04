@@ -1,9 +1,10 @@
 mod ddsketch;
 mod label_filter;
+mod recency;
 mod recorder;
 mod storage;
 
-use std::sync::atomic::Ordering;
+use std::time::Duration;
 
 use chrono::Utc;
 use metrics::Key;
@@ -18,12 +19,14 @@ use crate::event::{Metric, MetricValue};
 
 type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Snafu)]
+#[derive(Clone, Copy, Debug, PartialEq, Snafu)]
 pub enum Error {
     #[snafu(display("Recorder already initialized."))]
     AlreadyInitialized,
     #[snafu(display("Metrics system was not initialized."))]
     NotInitialized,
+    #[snafu(display("Timeout value of {} must be positive.", timeout))]
+    TimeoutMustBePositive { timeout: f64 },
 }
 
 static CONTROLLER: OnceCell<Controller> = OnceCell::new();
@@ -31,8 +34,12 @@ static CONTROLLER: OnceCell<Controller> = OnceCell::new();
 // Cardinality counter parameters, expose the internal metrics registry
 // cardinality. Useful for the end users to help understand the characteristics
 // of their environment and how vectors acts in it.
-const CARDINALITY_KEY_NAME: &str = "internal_metrics_cardinality_total";
+const CARDINALITY_KEY_NAME: &str = "internal_metrics_cardinality";
 static CARDINALITY_KEY: Key = Key::from_static_name(CARDINALITY_KEY_NAME);
+
+// Older deprecated counter key name
+const CARDINALITY_COUNTER_KEY_NAME: &str = "internal_metrics_cardinality_total";
+static CARDINALITY_COUNTER_KEY: Key = Key::from_static_name(CARDINALITY_COUNTER_KEY_NAME);
 
 /// Controller allows capturing metric snapshots.
 pub struct Controller {
@@ -125,30 +132,29 @@ impl Controller {
         CONTROLLER.get().ok_or(Error::NotInitialized)
     }
 
+    /// Set or clear the expiry time after which idle metrics are dropped from the set of captured
+    /// metrics. Invalid timeouts (zero or negative values) are silently remapped to no expiry.
+    ///
+    /// # Errors
+    ///
+    /// The contained timeout value must be positive.
+    pub fn set_expiry(&self, timeout: Option<f64>) -> Result<()> {
+        if let Some(timeout) = timeout {
+            if timeout <= 0.0 {
+                return Err(Error::TimeoutMustBePositive { timeout });
+            }
+        }
+        self.recorder
+            .with_registry(|registry| registry.set_expiry(timeout.map(Duration::from_secs_f64)));
+        Ok(())
+    }
+
     /// Take a snapshot of all gathered metrics and expose them as metric
     /// [`Event`](crate::event::Event)s.
-    #[allow(clippy::cast_precision_loss)]
     pub fn capture_metrics(&self) -> Vec<Metric> {
         let timestamp = Utc::now();
-        let mut metrics = Vec::<Metric>::new();
 
-        self.recorder.with_registry(|registry| {
-            registry.visit_counters(|key, counter| {
-                // NOTE this will truncate if the value is greater than 2**52.
-                let value = counter.load(Ordering::Relaxed) as f64;
-                let value = MetricValue::Counter { value };
-                metrics.push(Metric::from_metric_kv(key, value, timestamp));
-            });
-            registry.visit_gauges(|key, gauge| {
-                let value = gauge.load(Ordering::Relaxed);
-                let value = MetricValue::Gauge { value };
-                metrics.push(Metric::from_metric_kv(key, value, timestamp));
-            });
-            registry.visit_histograms(|key, histogram| {
-                let value = histogram.make_metric();
-                metrics.push(Metric::from_metric_kv(key, value, timestamp));
-            });
-        });
+        let mut metrics = self.recorder.with_registry(Registry::visit_metrics);
 
         // Add aliases for deprecated metrics
         for i in 0..metrics.len() {
@@ -172,12 +178,16 @@ impl Controller {
             }
         }
 
-        let cardinality = MetricValue::Counter {
-            value: (metrics.len() + 1) as f64,
-        };
+        #[allow(clippy::cast_precision_loss)]
+        let value = (metrics.len() + 2) as f64;
         metrics.push(Metric::from_metric_kv(
             &CARDINALITY_KEY,
-            cardinality,
+            MetricValue::Gauge { value },
+            timestamp,
+        ));
+        metrics.push(Metric::from_metric_kv(
+            &CARDINALITY_COUNTER_KEY,
+            MetricValue::Counter { value },
             timestamp,
         ));
 
@@ -233,26 +243,105 @@ macro_rules! update_counter {
 mod tests {
     use super::*;
 
-    fn prepare_metrics(cardinality: usize) -> &'static Controller {
-        let _ = init_test();
-        let controller = Controller::get().unwrap();
-        controller.reset();
+    use crate::event::MetricKind;
 
-        for idx in 0..cardinality {
-            metrics::counter!("test", 1, "idx" => idx.to_string());
+    const IDLE_TIMEOUT: f64 = 0.5;
+
+    fn init_metrics() -> &'static Controller {
+        if let Err(error) = init_test() {
+            assert!(
+                error == Error::AlreadyInitialized,
+                "Failed to initialize metrics recorder: {:?}",
+                error
+            );
         }
-
-        assert_eq!(controller.capture_metrics().len(), cardinality + 1);
-
-        controller
+        Controller::get().expect("Could not get global metrics controller")
     }
 
     #[test]
     fn cardinality_matches() {
-        for cardinality in &[0, 1, 10, 100, 1000, 10000] {
-            let controller = prepare_metrics(*cardinality);
-            let list = controller.capture_metrics();
-            assert_eq!(list.len(), cardinality + 1);
+        for cardinality in [0, 1, 10, 100, 1000, 10000] {
+            let _ = init_test();
+            let controller = Controller::get().unwrap();
+            controller.reset();
+
+            for idx in 0..cardinality {
+                metrics::counter!("test", 1, "idx" => idx.to_string());
+            }
+
+            let metrics = controller.capture_metrics();
+            assert_eq!(metrics.len(), cardinality + 2);
+
+            #[allow(clippy::cast_precision_loss)]
+            let value = metrics.len() as f64;
+            for metric in metrics {
+                match metric.name() {
+                    CARDINALITY_KEY_NAME => {
+                        assert_eq!(metric.value(), &MetricValue::Gauge { value });
+                        assert_eq!(metric.kind(), MetricKind::Absolute);
+                    }
+                    CARDINALITY_COUNTER_KEY_NAME => {
+                        assert_eq!(metric.value(), &MetricValue::Counter { value });
+                        assert_eq!(metric.kind(), MetricKind::Absolute);
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn expires_metrics() {
+        let controller = init_metrics();
+        controller.set_expiry(Some(IDLE_TIMEOUT)).unwrap();
+
+        metrics::counter!("test2", 1);
+        metrics::counter!("test3", 2);
+        assert_eq!(controller.capture_metrics().len(), 4);
+
+        std::thread::sleep(Duration::from_secs_f64(IDLE_TIMEOUT * 2.0));
+        metrics::counter!("test2", 3);
+        assert_eq!(controller.capture_metrics().len(), 3);
+    }
+
+    #[test]
+    fn expires_metrics_tags() {
+        let controller = init_metrics();
+        controller.set_expiry(Some(IDLE_TIMEOUT)).unwrap();
+
+        metrics::counter!("test4", 1, "tag" => "value1");
+        metrics::counter!("test4", 2, "tag" => "value2");
+        assert_eq!(controller.capture_metrics().len(), 4);
+
+        std::thread::sleep(Duration::from_secs_f64(IDLE_TIMEOUT * 2.0));
+        metrics::counter!("test4", 3, "tag" => "value1");
+        assert_eq!(controller.capture_metrics().len(), 3);
+    }
+
+    #[test]
+    fn skips_expiring_registered() {
+        let controller = init_metrics();
+        controller.set_expiry(Some(IDLE_TIMEOUT)).unwrap();
+
+        let a = metrics::register_counter!("test5");
+        metrics::counter!("test6", 5);
+        assert_eq!(controller.capture_metrics().len(), 4);
+        a.increment(1);
+        assert_eq!(controller.capture_metrics().len(), 4);
+
+        std::thread::sleep(Duration::from_secs_f64(IDLE_TIMEOUT * 2.0));
+        assert_eq!(controller.capture_metrics().len(), 3);
+
+        a.increment(1);
+        let metrics = controller.capture_metrics();
+        assert_eq!(metrics.len(), 3);
+        let metric = metrics
+            .into_iter()
+            .find(|metric| metric.name() == "test5")
+            .expect("Test metric is not present");
+        match metric.value() {
+            MetricValue::Counter { value } => assert_eq!(*value, 2.0),
+            value => panic!("Invalid metric value {:?}", value),
         }
     }
 }

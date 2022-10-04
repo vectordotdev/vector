@@ -1,41 +1,41 @@
 use ::value::Value;
-use lookup_lib::LookupBuf;
+use lookup_lib::{OwnedTargetPath, OwnedValuePath};
 use vrl::prelude::*;
 
-fn unnest(path: &expression::Query, root_lookup: &LookupBuf, ctx: &mut Context) -> Resolved {
+fn unnest(path: &expression::Query, ctx: &mut Context) -> Resolved {
     let lookup_buf = path.path();
 
     match path.target() {
-        expression::Target::External => {
+        expression::Target::External(prefix) => {
             let root = ctx
                 .target()
-                .target_get(root_lookup)
+                .target_get(&OwnedTargetPath::root(*prefix))
                 .expect("must never fail")
                 .expect("always a value");
             unnest_root(root, lookup_buf)
         }
         expression::Target::Internal(v) => {
             let value = ctx.state().variable(v.ident()).unwrap_or(&Value::Null);
-            let root = value.get_by_path(root_lookup).expect("always a value");
+            let root = value.get(&OwnedValuePath::root()).expect("always a value");
             unnest_root(root, lookup_buf)
         }
         expression::Target::Container(expr) => {
             let value = expr.resolve(ctx)?;
-            let root = value.get_by_path(root_lookup).expect("always a value");
+            let root = value.get(&OwnedValuePath::root()).expect("always a value");
             unnest_root(root, lookup_buf)
         }
         expression::Target::FunctionCall(expr) => {
             let value = expr.resolve(ctx)?;
-            let root = value.get_by_path(root_lookup).expect("always a value");
+            let root = value.get(&OwnedValuePath::root()).expect("always a value");
             unnest_root(root, lookup_buf)
         }
     }
 }
 
-fn unnest_root(root: &Value, path: &LookupBuf) -> Resolved {
-    let values = root
-        .get_by_path(path)
-        .cloned()
+fn unnest_root(root: &Value, path: &OwnedValuePath) -> Resolved {
+    let mut trimmed = root.clone();
+    let values = trimmed
+        .remove(path, true)
         .ok_or(value::Error::Expected {
             got: Kind::null(),
             expected: Kind::array(Collection::any()),
@@ -45,8 +45,8 @@ fn unnest_root(root: &Value, path: &LookupBuf) -> Resolved {
     let events = values
         .into_iter()
         .map(|value| {
-            let mut event = root.clone();
-            event.insert_by_path(path, value);
+            let mut event = trimmed.clone();
+            event.insert(path, value);
             event
         })
         .collect::<Vec<_>>();
@@ -97,75 +97,45 @@ impl Function for Unnest {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let path = arguments.required_query("path")?;
-        let root = LookupBuf::root();
-
-        Ok(Box::new(UnnestFn { path, root }))
-    }
-
-    fn compile_argument(
-        &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        match (name, expr) {
-            ("path", Some(expr)) => {
-                let query = match expr {
-                    expression::Expr::Query(query) => query,
-                    _ => {
-                        return Err(Box::new(vrl::function::Error::UnexpectedExpression {
-                            keyword: "path",
-                            expected: "query",
-                            expr: expr.clone(),
-                        }))
-                    }
-                };
-
-                Ok(Some(Box::new(query.clone()) as _))
-            }
-            _ => Ok(None),
-        }
+        Ok(UnnestFn { path }.as_expr())
     }
 }
 
 #[derive(Debug, Clone)]
 struct UnnestFn {
     path: expression::Query,
-    root: LookupBuf,
 }
 
 impl UnnestFn {
     #[cfg(test)]
     fn new(path: &str) -> Self {
-        use std::str::FromStr;
+        use lookup_lib::{lookup_v2::parse_value_path, PathPrefix};
 
         Self {
             path: expression::Query::new(
-                expression::Target::External,
-                FromStr::from_str(path).unwrap(),
+                expression::Target::External(PathPrefix::Event),
+                parse_value_path(path),
             ),
-            root: LookupBuf::root(),
         }
     }
 }
 
-impl Expression for UnnestFn {
+impl FunctionExpression for UnnestFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        unnest(&self.path, &self.root, ctx)
+        unnest(&self.path, ctx)
     }
 
-    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &state::TypeState) -> TypeDef {
         use expression::Target;
 
         match self.path.target() {
-            Target::External => invert_array_at_path(
-                &TypeDef::from(state.1.target_kind().clone()),
+            Target::External(prefix) => invert_array_at_path(
+                &TypeDef::from(state.external.kind(*prefix)),
                 self.path.path(),
             ),
             Target::Internal(v) => invert_array_at_path(&v.type_def(state), self.path.path()),
@@ -186,7 +156,7 @@ impl Expression for UnnestFn {
 ///    { "a" => { "b" => { "c" => 3 } } },
 ///  ]`
 ///
-pub(crate) fn invert_array_at_path(typedef: &TypeDef, path: &LookupBuf) -> TypeDef {
+pub(crate) fn invert_array_at_path(typedef: &TypeDef, path: &OwnedValuePath) -> TypeDef {
     let kind = typedef.kind().at_path(path);
 
     let mut array = if let Some(array) = kind.into_array() {
@@ -217,7 +187,9 @@ pub(crate) fn invert_array_at_path(typedef: &TypeDef, path: &LookupBuf) -> TypeD
 
 #[cfg(test)]
 mod tests {
+    use lookup_lib::lookup_v2::parse_value_path;
     use vector_common::{btreemap, TimeZone};
+    use vrl::state::TypeState;
 
     use super::*;
 
@@ -426,7 +398,7 @@ mod tests {
         ];
 
         for case in cases {
-            let path = LookupBuf::from_str(case.path).unwrap();
+            let path = parse_value_path(case.path);
             let new = invert_array_at_path(&case.old, &path);
             assert_eq!(case.new, new, "{}", path);
         }
@@ -476,6 +448,7 @@ mod tests {
             )}),
             Kind::object(Collection::empty()),
         );
+        let state = TypeState { local, external };
 
         let tz = TimeZone::default();
         for (object, expected, func, expected_typedef) in cases {
@@ -483,7 +456,7 @@ mod tests {
             let mut runtime_state = vrl::state::Runtime::default();
             let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
 
-            let got_typedef = func.type_def((&local, &external));
+            let got_typedef = func.type_def(&state);
 
             let got = func
                 .resolve(&mut ctx)

@@ -26,18 +26,13 @@ use tokio::{
 };
 use vector_buffers::{BufferConfig, BufferType, WhenFull};
 
+mod backpressure;
+mod compliance;
 #[cfg(all(feature = "sinks-socket", feature = "sources-socket"))]
 mod crash;
-
+mod doesnt_reload;
 #[cfg(all(feature = "sources-http", feature = "sinks-http"))]
 mod end_to_end;
-
-#[cfg(all(feature = "sinks-blackhole", feature = "sources-stdin"))]
-mod transient_state;
-
-#[cfg(all(feature = "sinks-console", feature = "sources-demo_logs"))]
-mod source_finished;
-
 #[cfg(all(
     feature = "sources-prometheus",
     feature = "sinks-prometheus",
@@ -45,14 +40,13 @@ mod source_finished;
     feature = "sources-splunk_hec"
 ))]
 mod reload;
-
-#[cfg(all(feature = "sinks-console", feature = "sources-socket"))]
-mod doesnt_reload;
-
-mod backpressure;
-mod compliance;
+#[cfg(all(feature = "sinks-console", feature = "sources-demo_logs"))]
+mod source_finished;
+mod transient_state;
 
 fn basic_config() -> Config {
+    trace_init();
+
     let mut config = Config::builder();
     config.add_source("in1", basic_source().1);
     config.add_sink("out1", &["in1"], basic_sink(10).1);
@@ -60,6 +54,8 @@ fn basic_config() -> Config {
 }
 
 fn basic_config_with_sink_failing_healthcheck() -> Config {
+    trace_init();
+
     let mut config = Config::builder();
     config.add_source("in1", basic_source().1);
     config.add_sink("out1", &["in1"], basic_sink_failing_healthcheck(10).1);
@@ -82,8 +78,7 @@ fn into_message_stream(array: EventArray) -> impl futures::Stream<Item = String>
 async fn topology_shutdown_while_active() {
     trace_init();
 
-    let (mut in1, mut source1, counter) = basic_source_with_event_counter();
-    source1.set_force_shutdown(true);
+    let (mut in1, source1, counter) = basic_source_with_event_counter(true);
 
     let transform1 = basic_transform(" transformed", 0.0);
     let (out1, sink1) = basic_sink(10);
@@ -132,6 +127,8 @@ async fn topology_shutdown_while_active() {
 
 #[tokio::test]
 async fn topology_source_and_sink() {
+    trace_init();
+
     let (mut in1, source1) = basic_source();
     let (out1, sink1) = basic_sink(10);
 
@@ -153,6 +150,8 @@ async fn topology_source_and_sink() {
 
 #[tokio::test]
 async fn topology_multiple_sources() {
+    trace_init();
+
     let (mut in1, source1) = basic_source();
     let (mut in2, source2) = basic_source();
     let (mut out1, sink1) = basic_sink(10);
@@ -217,6 +216,8 @@ async fn topology_multiple_sinks() {
 
 #[tokio::test]
 async fn topology_transform_chain() {
+    trace_init();
+
     let (mut in1, source1) = basic_source();
     let transform1 = basic_transform(" first", 0.0);
     let transform2 = basic_transform(" second", 0.0);
@@ -287,6 +288,8 @@ async fn topology_remove_one_source() {
 
 #[tokio::test]
 async fn topology_remove_one_sink() {
+    trace_init();
+
     let (mut in1, source1) = basic_source();
     let (out1, sink1) = basic_sink(10);
     let (out2, sink2) = basic_sink(10);
@@ -540,6 +543,8 @@ async fn topology_swap_sink() {
 #[ignore] // TODO: issue #2186
 #[tokio::test]
 async fn topology_swap_transform_is_atomic() {
+    trace_init();
+
     let (mut in1, source1) = basic_source();
     let transform1v1 = basic_transform(" transformed", 0.0);
     let (out1, sink1) = basic_sink(10);
@@ -736,6 +741,8 @@ async fn topology_healthcheck_not_run_on_unchanged_reload() {
 
 #[tokio::test]
 async fn topology_healthcheck_run_for_changes_on_reload() {
+    trace_init();
+
     let mut config = Config::builder();
     // We can't just drop the sender side since that will close the source.
     let (_ch0, src) = basic_source();
@@ -773,14 +780,12 @@ async fn topology_disk_buffer_flushes_on_idle() {
     let mut sink1_outer = SinkOuter::new(
         // read from both the source and the transform
         vec![String::from("in1"), String::from("t1")],
-        Box::new(sink1),
+        sink1,
     );
-    sink1_outer.buffer = BufferConfig {
-        stages: vec![BufferType::DiskV1 {
-            max_size: std::num::NonZeroU64::new(1024).unwrap(),
-            when_full: WhenFull::DropNewest,
-        }],
-    };
+    sink1_outer.buffer = BufferConfig::Single(BufferType::DiskV1 {
+        max_size: std::num::NonZeroU64::new(1024).unwrap(),
+        when_full: WhenFull::DropNewest,
+    });
     config.add_sink_outer("out1", sink1_outer);
 
     let (topology, _crash) = start_topology(config.build().unwrap(), false).await;

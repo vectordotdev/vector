@@ -67,9 +67,9 @@ impl Function for Sha2 {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let variant = arguments
@@ -78,28 +78,7 @@ impl Function for Sha2 {
             .try_bytes()
             .expect("variant not bytes");
 
-        Ok(Box::new(Sha2Fn { value, variant }))
-    }
-
-    fn compile_argument(
-        &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        match (name, expr) {
-            ("variant", Some(expr)) => {
-                let variant = expr
-                    .as_enum("variant", variants())?
-                    .try_bytes()
-                    .expect("variant not bytes");
-
-                Ok(Some(Box::new(variant) as _))
-            }
-            ("variant", None) => Ok(Some(Box::new(Bytes::from("SHA-512/256")) as _)),
-            _ => Ok(None),
-        }
+        Ok(Sha2Fn { value, variant }.as_expr())
     }
 }
 
@@ -109,7 +88,7 @@ struct Sha2Fn {
     variant: Bytes,
 }
 
-impl Expression for Sha2Fn {
+impl FunctionExpression for Sha2Fn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let variant = &self.variant;
@@ -117,7 +96,7 @@ impl Expression for Sha2Fn {
         sha2(value, variant)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::bytes().infallible()
     }
 }

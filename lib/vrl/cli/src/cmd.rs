@@ -9,47 +9,48 @@ use std::{
 
 use ::value::Value;
 use clap::Parser;
-use lookup::LookupBuf;
+use lookup::{owned_value_path, OwnedTargetPath};
 use value::Secrets;
 use vector_common::TimeZone;
-use vrl::state::ExternalEnv;
+use vrl::state::TypeState;
 use vrl::{diagnostic::Formatter, state, Program, Runtime, Target, VrlRuntime};
+use vrl::{CompilationResult, CompileConfig};
 
 #[cfg(feature = "repl")]
 use super::repl;
 use super::Error;
 
 #[derive(Parser, Debug)]
-#[clap(name = "VRL", about = "Vector Remap Language CLI")]
+#[command(name = "VRL", about = "Vector Remap Language CLI")]
 pub struct Opts {
     /// The VRL program to execute. The program ".foo = true", for example, sets the event object's
     /// `foo` field to `true`.
-    #[clap(name = "PROGRAM")]
+    #[arg(id = "PROGRAM")]
     program: Option<String>,
 
     /// The file containing the event object(s) to handle. JSON events should be one per line..
-    #[clap(short, long = "input", parse(from_os_str))]
+    #[arg(short, long = "input")]
     input_file: Option<PathBuf>,
 
     /// The file containing the VRL program to execute. This can be used instead of `PROGRAM`.
-    #[clap(short, long = "program", conflicts_with("PROGRAM"), parse(from_os_str))]
+    #[arg(short, long = "program", conflicts_with("PROGRAM"))]
     program_file: Option<PathBuf>,
 
     /// Print the (modified) event object instead of the result of the final expression. Setting
     /// this flag is equivalent to using `.` as the final expression.
-    #[clap(short = 'o', long)]
+    #[arg(short = 'o', long)]
     print_object: bool,
 
     /// The timezone used to parse dates.
-    #[clap(short = 'z', long)]
+    #[arg(short = 'z', long)]
     timezone: Option<String>,
 
     /// Should we use the VM to evaluate the VRL
-    #[clap(short, long = "runtime", default_value_t)]
+    #[arg(short, long = "runtime", default_value_t)]
     runtime: VrlRuntime,
 
     // Should the CLI emit warnings
-    #[clap(long = "print-warnings")]
+    #[arg(long = "print-warnings")]
     print_warnings: bool,
 }
 
@@ -124,16 +125,20 @@ fn run(opts: &Opts) -> Result<(), Error> {
         let objects = opts.read_into_objects()?;
         let source = opts.read_program()?;
 
-        let mut external = ExternalEnv::default();
         // The CLI should be moved out of the "vrl" module, and then it can use the `vector-core::compile_vrl` function which includes this automatically
-        external.set_read_only_metadata_path(LookupBuf::from("vector"), true);
+        let mut config = CompileConfig::default();
+        config.set_read_only_path(OwnedTargetPath::metadata(owned_value_path!("vector")), true);
 
-        let (program, warnings) =
-            vrl::compile_with_external(&source, &stdlib::all(), &mut external).map_err(
-                |diagnostics| {
-                    Error::Parse(Formatter::new(&source, diagnostics).colored().to_string())
-                },
-            )?;
+        let state = TypeState::default();
+
+        let CompilationResult {
+            program,
+            warnings,
+            config: _,
+        } = vrl::compile_with_state(&source, &stdlib::all(), &state, CompileConfig::default())
+            .map_err(|diagnostics| {
+                Error::Parse(Formatter::new(&source, diagnostics).colored().to_string())
+            })?;
 
         #[allow(clippy::print_stderr)]
         if opts.print_warnings {

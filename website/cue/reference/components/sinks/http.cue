@@ -46,6 +46,7 @@ components: sinks: http: {
 				can_verify_certificate: true
 				can_verify_hostname:    true
 				enabled_default:        false
+				enabled_by_scheme:      true
 			}
 			to: {
 				service: {
@@ -69,7 +70,7 @@ components: sinks: http: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
+		notices: ["Input type support can depend on configured `encoding.codec`"]
 	}
 
 	configuration: {
@@ -102,9 +103,16 @@ components: sinks: http: {
 	}
 
 	input: {
-		logs:    true
-		metrics: null
-		traces:  false
+		logs: true
+		metrics: {
+			counter:      true
+			distribution: true
+			gauge:        true
+			histogram:    true
+			summary:      true
+			set:          true
+		}
+		traces: true
 	}
 
 	telemetry: metrics: {

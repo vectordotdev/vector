@@ -116,7 +116,7 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v3
 
-      - uses: actions/github-script@v6
+      - uses: actions/github-script@v6.3.1
         id: set-matrix
         with:
           script: |
@@ -170,7 +170,7 @@ jobs:
           tags: type=raw, value=${{ needs.compute-soak-meta.outputs.baseline-tag }}
 
       - name: Build and push 'soak-vector' image
-        uses: docker/build-push-action@v3.1.0
+        uses: docker/build-push-action@v3.1.1
         with:
           context: baseline-vector/
           file: soaks/Dockerfile
@@ -215,7 +215,7 @@ jobs:
           tags: type=raw, value=${{ needs.compute-soak-meta.outputs.comparison-tag }}
 
       - name: Build 'soak-vector' image
-        uses: docker/build-push-action@v3.1.0
+        uses: docker/build-push-action@v3.1.1
         with:
           context: comparison-vector/
           file: soaks/Dockerfile

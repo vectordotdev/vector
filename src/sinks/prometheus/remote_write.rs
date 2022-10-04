@@ -1,8 +1,11 @@
+use std::sync::Arc;
 use std::task;
 
+use aws_types::credentials::SharedCredentialsProvider;
+use aws_types::region::Region;
 use bytes::{Bytes, BytesMut};
 use futures::{future::BoxFuture, stream, FutureExt, SinkExt};
-use http::Uri;
+use http::{Request, Uri};
 use prost::Message;
 use snafu::{ResultExt, Snafu};
 use vector_config::configurable_component;
@@ -10,17 +13,19 @@ use vector_core::ByteSizeOf;
 
 use super::collector::{self, MetricCollector as _};
 use crate::{
-    config::{self, AcknowledgementsConfig, Input, SinkConfig, SinkDescription},
+    aws::RegionOrEndpoint,
+    config::{self, AcknowledgementsConfig, Input, SinkConfig},
     event::{Event, Metric},
     http::{Auth, HttpClient},
-    internal_events::TemplateRenderingError,
+    internal_events::{EndpointBytesSent, TemplateRenderingError},
     sinks::{
         self,
+        prometheus::PrometheusRemoteWriteAuth,
         util::{
             batch::BatchConfig,
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             http::HttpRetryLogic,
-            EncodedEvent, PartitionBuffer, PartitionInnerBuffer, SinkBatchSettings,
+            uri, EncodedEvent, PartitionBuffer, PartitionInnerBuffer, SinkBatchSettings,
             TowerRequestConfig,
         },
     },
@@ -41,10 +46,12 @@ impl SinkBatchSettings for PrometheusRemoteWriteDefaultBatchSettings {
 enum Errors {
     #[snafu(display(r#"Prometheus remote_write sink cannot accept "set" metrics"#))]
     SetMetricInvalid,
+    #[snafu(display("aws.region required when AWS authentication is in use"))]
+    AwsRegionRequired,
 }
 
 /// Configuration for the `prometheus_remote_write` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("prometheus_remote_write"))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct RemoteWriteConfig {
@@ -94,17 +101,23 @@ pub struct RemoteWriteConfig {
     pub tls: Option<TlsConfig>,
 
     #[configurable(derived)]
-    pub auth: Option<Auth>,
-}
+    pub auth: Option<PrometheusRemoteWriteAuth>,
 
-inventory::submit! {
-    SinkDescription::new::<RemoteWriteConfig>("prometheus_remote_write")
+    #[configurable(derived)]
+    pub aws: Option<RegionOrEndpoint>,
+
+    #[configurable(derived)]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 impl_generate_config_from_default!(RemoteWriteConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "prometheus_remote_write")]
 impl SinkConfig for RemoteWriteConfig {
     async fn build(
         &self,
@@ -119,16 +132,47 @@ impl SinkConfig for RemoteWriteConfig {
 
         let client = HttpClient::new(tls_settings, cx.proxy())?;
         let tenant_id = self.tenant_id.clone();
-        let auth = self.auth.clone();
 
-        let healthcheck = healthcheck(endpoint.clone(), client.clone()).boxed();
+        let (http_auth, credentials_provider, aws_region) = match &self.auth {
+            Some(PrometheusRemoteWriteAuth::Basic { user, password }) => (
+                Some(Auth::Basic {
+                    user: user.clone(),
+                    password: password.clone().into(),
+                }),
+                None,
+                None,
+            ),
+            Some(PrometheusRemoteWriteAuth::Aws(aws_auth)) => {
+                let region = self
+                    .aws
+                    .as_ref()
+                    .map(|config| config.region())
+                    .ok_or(Errors::AwsRegionRequired)?
+                    .ok_or(Errors::AwsRegionRequired)?;
+
+                (
+                    None,
+                    Some(aws_auth.credentials_provider(region.clone()).await?),
+                    Some(region),
+                )
+            }
+            None => (None, None, None),
+        };
+
+        let http_request_builder = Arc::new(HttpRequestBuilder {
+            endpoint: endpoint.clone(),
+            aws_region,
+            credentials_provider,
+            http_auth,
+        });
+
+        let healthcheck = healthcheck(client.clone(), Arc::clone(&http_request_builder)).boxed();
         let service = RemoteWriteService {
-            endpoint,
             default_namespace: self.default_namespace.clone(),
             client,
             buckets,
             quantiles,
-            auth,
+            http_request_builder,
         };
 
         let sink = {
@@ -147,7 +191,7 @@ impl SinkConfig for RemoteWriteConfig {
                                     emit!(TemplateRenderingError {
                                         error,
                                         field: Some("tenant_id"),
-                                        drop_event: false,
+                                        drop_event: true,
                                     })
                                 })
                                 .ok()
@@ -171,12 +215,8 @@ impl SinkConfig for RemoteWriteConfig {
         Input::metric()
     }
 
-    fn sink_type(&self) -> &'static str {
-        "prometheus_remote_write"
-    }
-
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        None
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
@@ -185,11 +225,14 @@ struct PartitionKey {
     tenant_id: Option<String>,
 }
 
-async fn healthcheck(endpoint: Uri, client: HttpClient) -> crate::Result<()> {
-    let request = http::Request::get(endpoint)
-        .body(hyper::Body::empty())
-        .unwrap();
-
+async fn healthcheck(
+    client: HttpClient,
+    http_request_builder: Arc<HttpRequestBuilder>,
+) -> crate::Result<()> {
+    let body = bytes::Bytes::new();
+    let request = http_request_builder
+        .build_request(http::Method::GET, body.into(), None)
+        .await?;
     let response = client.send(request).await?;
 
     match response.status() {
@@ -209,12 +252,11 @@ impl MetricNormalize for PrometheusMetricNormalize {
 
 #[derive(Clone)]
 struct RemoteWriteService {
-    endpoint: Uri,
     default_namespace: Option<String>,
     client: HttpClient,
     buckets: Vec<f64>,
     quantiles: Vec<f64>,
-    auth: Option<Auth>,
+    http_request_builder: Arc<HttpRequestBuilder>,
 }
 
 impl RemoteWriteService {
@@ -250,26 +292,69 @@ impl tower::Service<PartitionInnerBuffer<Vec<Metric>, PartitionKey>> for RemoteW
         let body = self.encode_events(events);
         let body = snap_block(body);
 
-        let mut builder = http::Request::post(self.endpoint.clone())
+        let client = self.client.clone();
+        let request_builder = Arc::clone(&self.http_request_builder);
+
+        Box::pin(async move {
+            let request = request_builder
+                .build_request(http::Method::POST, body, key.tenant_id)
+                .await?;
+
+            let (protocol, endpoint) = uri::protocol_endpoint(request.uri().clone());
+
+            let response = client.send(request).await?;
+            let (parts, body) = response.into_parts();
+            let body = hyper::body::to_bytes(body).await?;
+
+            emit!(EndpointBytesSent {
+                byte_size: body.len(),
+                protocol: &protocol,
+                endpoint: &endpoint
+            });
+
+            Ok(hyper::Response::from_parts(parts, body))
+        })
+    }
+}
+
+pub struct HttpRequestBuilder {
+    pub endpoint: Uri,
+    pub aws_region: Option<Region>,
+    pub http_auth: Option<Auth>,
+    pub credentials_provider: Option<SharedCredentialsProvider>,
+}
+
+impl HttpRequestBuilder {
+    pub async fn build_request(
+        &self,
+        method: http::Method,
+        body: Vec<u8>,
+        tenant_id: Option<String>,
+    ) -> Result<Request<hyper::Body>, crate::Error> {
+        let mut builder = http::Request::builder()
+            .method(method)
+            .uri(self.endpoint.clone())
             .header("X-Prometheus-Remote-Write-Version", "0.1.0")
             .header("Content-Encoding", "snappy")
             .header("Content-Type", "application/x-protobuf");
-        if let Some(tenant_id) = key.tenant_id {
+
+        if let Some(tenant_id) = &tenant_id {
             builder = builder.header("X-Scope-OrgID", tenant_id);
         }
 
         let mut request = builder.body(body.into()).unwrap();
-        if let Some(auth) = &self.auth {
-            auth.apply(&mut request);
+        if let Some(http_auth) = &self.http_auth {
+            http_auth.apply(&mut request);
         }
-        let client = self.client.clone();
 
-        Box::pin(async move {
-            let response = client.send(request).await?;
-            let (parts, body) = response.into_parts();
-            let body = hyper::body::to_bytes(body).await?;
-            Ok(hyper::Response::from_parts(parts, body))
-        })
+        if let Some(credentials_provider) = &self.credentials_provider {
+            sign_request(&mut request, credentials_provider, &self.aws_region).await?;
+        }
+
+        let (parts, body) = request.into_parts();
+        let request: Request<hyper::Body> = hyper::Request::from_parts(parts, body.into());
+
+        Ok(request)
     }
 }
 
@@ -277,6 +362,14 @@ fn snap_block(data: Bytes) -> Vec<u8> {
     snap::raw::Encoder::new()
         .compress_vec(&data)
         .expect("Out of memory")
+}
+
+async fn sign_request(
+    request: &mut http::Request<Bytes>,
+    credentials_provider: &SharedCredentialsProvider,
+    region: &Option<Region>,
+) -> crate::Result<()> {
+    crate::aws::sign_request("aps", request, credentials_provider, region).await
 }
 
 #[cfg(test)]
@@ -291,7 +384,10 @@ mod tests {
         config::SinkContext,
         event::{MetricKind, MetricValue},
         sinks::util::test::build_test_server,
-        test_util,
+        test_util::{
+            self,
+            components::{assert_sink_compliance, HTTP_SINK_TAGS},
+        },
     };
 
     #[test]
@@ -358,6 +454,31 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn sends_authenticated_aws_request() {
+        let outputs = send_request(
+            indoc! {r#"
+                tenant_id = "tenant-%Y"
+                [aws]
+                region = "foo"
+                [auth]
+                strategy = "aws"
+                access_key_id = "foo"
+                secret_access_key = "bar"
+            "#},
+            vec![create_event("gauge-2".into(), 32.0)],
+        )
+        .await;
+
+        assert_eq!(outputs.len(), 1);
+        let (headers, _req) = &outputs[0];
+
+        let auth = headers["authorization"]
+            .to_str()
+            .expect("Missing AWS authorization header");
+        assert!(auth.starts_with("AWS4-HMAC-SHA256"));
+    }
+
+    #[tokio::test]
     async fn sends_x_scope_orgid_header() {
         let outputs = send_request(
             r#"tenant_id = "tenant""#,
@@ -419,39 +540,42 @@ mod tests {
         config: &str,
         events: Vec<Event>,
     ) -> Vec<(HeaderMap, proto::WriteRequest)> {
-        let addr = test_util::next_addr();
-        let (rx, trigger, server) = build_test_server(addr);
-        tokio::spawn(server);
+        assert_sink_compliance(&HTTP_SINK_TAGS, async {
+            let addr = test_util::next_addr();
+            let (rx, trigger, server) = build_test_server(addr);
+            tokio::spawn(server);
 
-        let config = format!("endpoint = \"http://{}/write\"\n{}", addr, config);
-        let config: RemoteWriteConfig = toml::from_str(&config).unwrap();
-        let cx = SinkContext::new_test();
+            let config = format!("endpoint = \"http://{}/write\"\n{}", addr, config);
+            let config: RemoteWriteConfig = toml::from_str(&config).unwrap();
+            let cx = SinkContext::new_test();
 
-        let (sink, _) = config.build(cx).await.unwrap();
-        sink.run_events(events).await.unwrap();
+            let (sink, _) = config.build(cx).await.unwrap();
+            sink.run_events(events).await.unwrap();
 
-        drop(trigger);
+            drop(trigger);
 
-        rx.map(|(parts, body)| {
-            assert_eq!(parts.method, "POST");
-            assert_eq!(parts.uri.path(), "/write");
-            let headers = parts.headers;
-            assert_eq!(headers["x-prometheus-remote-write-version"], "0.1.0");
-            assert_eq!(headers["content-encoding"], "snappy");
-            assert_eq!(headers["content-type"], "application/x-protobuf");
+            rx.map(|(parts, body)| {
+                assert_eq!(parts.method, "POST");
+                assert_eq!(parts.uri.path(), "/write");
+                let headers = parts.headers;
+                assert_eq!(headers["x-prometheus-remote-write-version"], "0.1.0");
+                assert_eq!(headers["content-encoding"], "snappy");
+                assert_eq!(headers["content-type"], "application/x-protobuf");
 
-            if config.auth.is_some() {
-                assert!(headers.contains_key("authorization"));
-            }
+                if config.auth.is_some() {
+                    assert!(headers.contains_key("authorization"));
+                }
 
-            let decoded = snap::raw::Decoder::new()
-                .decompress_vec(&body)
-                .expect("Invalid snappy compressed data");
-            let request =
-                proto::WriteRequest::decode(Bytes::from(decoded)).expect("Invalid protobuf");
-            (headers, request)
+                let decoded = snap::raw::Decoder::new()
+                    .decompress_vec(&body)
+                    .expect("Invalid snappy compressed data");
+                let request =
+                    proto::WriteRequest::decode(Bytes::from(decoded)).expect("Invalid protobuf");
+                (headers, request)
+            })
+            .collect::<Vec<_>>()
+            .await
         })
-        .collect::<Vec<_>>()
         .await
     }
 
@@ -491,6 +615,7 @@ mod integration_tests {
         config::{SinkConfig, SinkContext},
         event::{metric::MetricValue, Event},
         sinks::influxdb::test_util::{cleanup_v1, format_timestamp, onboarding_v1, query_v1},
+        test_util::components::{assert_sink_compliance, HTTP_SINK_TAGS},
         tls::{self, TlsConfig},
     };
 
@@ -508,57 +633,58 @@ mod integration_tests {
     }
 
     async fn insert_metrics(url: &str) {
-        crate::test_util::trace_init();
+        assert_sink_compliance(&HTTP_SINK_TAGS, async {
+            let database = onboarding_v1(url).await;
 
-        let database = onboarding_v1(url).await;
+            let cx = SinkContext::new_test();
 
-        let cx = SinkContext::new_test();
-
-        let config = RemoteWriteConfig {
-            endpoint: format!("{}/api/v1/prom/write?db={}", url, database),
-            tls: Some(TlsConfig {
-                ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
+            let config = RemoteWriteConfig {
+                endpoint: format!("{}/api/v1/prom/write?db={}", url, database),
+                tls: Some(TlsConfig {
+                    ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
+                    ..Default::default()
+                }),
                 ..Default::default()
-            }),
-            ..Default::default()
-        };
-        let events = create_events(0..5, |n| n * 11.0);
+            };
+            let events = create_events(0..5, |n| n * 11.0);
 
-        let (sink, _) = config.build(cx).await.expect("error building config");
-        sink.run_events(events.clone()).await.unwrap();
+            let (sink, _) = config.build(cx).await.expect("error building config");
+            sink.run_events(events.clone()).await.unwrap();
 
-        let result = query(url, &format!("show series on {}", database)).await;
+            let result = query(url, &format!("show series on {}", database)).await;
 
-        let values = &result["results"][0]["series"][0]["values"];
-        assert_eq!(values.as_array().unwrap().len(), 5);
+            let values = &result["results"][0]["series"][0]["values"];
+            assert_eq!(values.as_array().unwrap().len(), 5);
 
-        for event in events {
-            let metric = event.into_metric();
-            let result = query(
-                url,
-                &format!(r#"SELECT * FROM "{}".."{}""#, database, metric.name()),
-            )
-            .await;
+            for event in events {
+                let metric = event.into_metric();
+                let result = query(
+                    url,
+                    &format!(r#"SELECT * FROM "{}".."{}""#, database, metric.name()),
+                )
+                .await;
 
-            let metrics = decode_metrics(&result["results"][0]["series"][0]);
-            assert_eq!(metrics.len(), 1);
-            let output = &metrics[0];
+                let metrics = decode_metrics(&result["results"][0]["series"][0]);
+                assert_eq!(metrics.len(), 1);
+                let output = &metrics[0];
 
-            match metric.value() {
-                MetricValue::Gauge { value } => {
-                    assert_eq!(output["value"], Value::Number((*value as u32).into()))
+                match metric.value() {
+                    MetricValue::Gauge { value } => {
+                        assert_eq!(output["value"], Value::Number((*value as u32).into()))
+                    }
+                    _ => panic!("Unhandled metric value, fix the test"),
                 }
-                _ => panic!("Unhandled metric value, fix the test"),
+                for (tag, value) in metric.tags().unwrap() {
+                    assert_eq!(output[&tag[..]], Value::String(value.to_string()));
+                }
+                let timestamp =
+                    format_timestamp(metric.timestamp().unwrap(), chrono::SecondsFormat::Millis);
+                assert_eq!(output["time"], Value::String(timestamp));
             }
-            for (tag, value) in metric.tags().unwrap() {
-                assert_eq!(output[&tag[..]], Value::String(value.to_string()));
-            }
-            let timestamp =
-                format_timestamp(metric.timestamp().unwrap(), chrono::SecondsFormat::Millis);
-            assert_eq!(output["time"], Value::String(timestamp));
-        }
 
-        cleanup_v1(url, &database).await;
+            cleanup_v1(url, &database).await;
+        })
+        .await
     }
 
     async fn query(url: &str, query: &str) -> Value {

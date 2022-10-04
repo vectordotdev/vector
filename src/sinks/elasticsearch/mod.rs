@@ -1,6 +1,7 @@
 mod common;
 mod config;
 mod encoder;
+mod health;
 mod request_builder;
 mod retry;
 mod service;
@@ -20,11 +21,11 @@ pub use config::*;
 pub use encoder::ElasticsearchEncoder;
 use http::{uri::InvalidUri, Request};
 use snafu::Snafu;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
 use crate::aws::AwsAuthentication;
 use crate::{
-    config::SinkDescription,
     event::{EventRef, LogEvent},
     internal_events::TemplateRenderingError,
     template::{Template, TemplateParseError},
@@ -41,7 +42,7 @@ pub enum ElasticsearchAuth {
         user: String,
 
         /// Basic authentication password.
-        password: String,
+        password: SensitiveString,
     },
 
     /// Amazon OpenSearch Service-specific authentication.
@@ -108,10 +109,6 @@ impl TryFrom<&str> for BulkAction {
             _ => Err(format!("Invalid bulk action: {}", input)),
         }
     }
-}
-
-inventory::submit! {
-    SinkDescription::new::<ElasticsearchConfig>("elasticsearch")
 }
 
 impl_generate_config_from_default!(ElasticsearchConfig);
@@ -187,4 +184,10 @@ pub enum ParseError {
     BatchActionTemplate { source: TemplateParseError },
     #[snafu(display("aws.region required when AWS authentication is in use"))]
     RegionRequired,
+    #[snafu(display("Endpoints option must be specified"))]
+    EndpointRequired,
+    #[snafu(display(
+        "`endpoint` and `endpoints` options are mutually exclusive. Please use `endpoints` option."
+    ))]
+    EndpointsExclusive,
 }

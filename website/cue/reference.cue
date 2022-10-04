@@ -55,7 +55,7 @@ _values: {
 // * `removed` - The component has been removed.
 #DevelopmentStatus: "beta" | "stable" | "deprecated" | "removed"
 
-#EncodingCodec: "json" | "logfmt" | "text" | "native" | "native_json" | "avro"
+#EncodingCodec: "json" | "logfmt" | "text" | "native" | "native_json" | "avro" | "gelf"
 
 #Endpoint: {
 	description: string
@@ -529,7 +529,7 @@ _values: {
 	// `examples` clarify values through examples. This should be used
 	// when examples cannot be derived from the `default` or `enum`
 	// options.
-	examples: [#Object] | *[]
+	examples: [#Object, ...#Object] | *[]
 
 	// `options` represent the child options for this option.
 	options: #Schema
@@ -613,7 +613,7 @@ _values: {
 	unit: #Unit | null
 }
 
-#Unit: "bytes" | "events" | "milliseconds" | "requests" | "seconds" | "lines" | "concurrency"
+#Unit: "bytes" | "events" | "milliseconds" | "nanoseconds" | "requests" | "seconds" | "lines" | "concurrency"
 
 administration: _
 components:     _

@@ -1,6 +1,6 @@
 #![cfg(feature = "enterprise-tests")]
 
-use std::{env, path::PathBuf, str::FromStr, thread};
+use std::{env, path::PathBuf, thread};
 
 use http::StatusCode;
 
@@ -45,8 +45,9 @@ fn get_root_opts(config_path: PathBuf) -> RootOpts {
         threads: None,
         verbose: 0,
         quiet: 3,
-        log_format: LogFormat::from_str("text").unwrap(),
-        color: Color::from_str("auto").unwrap(),
+        internal_log_rate_limit: 10,
+        log_format: LogFormat::Text,
+        color: Color::Auto,
         watch_config: false,
     }
 }
@@ -65,6 +66,8 @@ async fn vector_continues_on_reporting_error() {
     let endpoint = server.uri();
 
     env::set_var(ENDPOINT_CONFIG_ENV_VAR, endpoint);
+    env::set_var(DATADOG_API_KEY_ENV_VAR_SHORT, "api_key");
+    env::set_var("DD_CONFIGURATION_KEY", "configuration_key");
     let config_file = PathBuf::from(format!(
         "{}/tests/data/enterprise/base.toml",
         env!("CARGO_MANIFEST_DIR")
@@ -87,6 +90,8 @@ async fn vector_continues_on_reporting_error() {
     })
     .join()
     .unwrap();
+
+    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
     assert!(!server.received_requests().await.unwrap().is_empty());
     assert!(vector_continued);

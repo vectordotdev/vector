@@ -10,7 +10,8 @@ components: sources: aws_sqs: components._aws & {
 				enabled:                true
 				can_verify_certificate: true
 				can_verify_hostname:    true
-				enabled_default:        false
+				enabled_default:        true
+				enabled_by_scheme:      true
 			}
 			checkpoint: enabled: false
 			proxy: enabled:      true
@@ -45,7 +46,7 @@ components: sources: aws_sqs: components._aws & {
 		}
 		requirements: [
 			"""
-					The AWS SQS source requires an SQS queue.
+				The AWS SQS source requires an SQS queue.
 				""",
 		]
 		warnings: []

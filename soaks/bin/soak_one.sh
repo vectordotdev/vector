@@ -138,12 +138,18 @@ do
                    --config-path "/etc/lading/lading.yaml" \
                    --global-labels "variant=${VARIANT},target=vector,experiment=${SOAK_NAME}" \
                    --capture-path "/tmp/captures/${VARIANT}.captures" \
-                   --target-environment-variables "VECTOR_THREADS=${VECTOR_CPUS},VECTOR_REQUIRE_HEALTHY=true" \
+                   --target-environment-variables "VECTOR_THREADS=${VECTOR_CPUS},VECTOR_REQUIRE_HEALTHY=true,DD_API_KEY=DD_API_KEY,DD_CONFIGURATION_KEY=DD_CONFIGURATION_KEY" \
                    --target-stderr-path /tmp/captures/vector.stderr.log \
                    --target-stdout-path /tmp/captures/vector.stdout.log \
                    --experiment-duration-seconds "${TOTAL_SAMPLES}" \
                    --warmup-duration-seconds "${WARMUP_SECONDS}" \
                    /usr/bin/vector
+    echo "::group::Vector stdout"
+    cat "${SOAK_CAPTURE_DIR}/vector.stdout.log"
+    echo "::endgroup::"
+    echo "::group::Vector stderr"
+    cat "${SOAK_CAPTURE_DIR}/vector.stderr.log"
+    echo "::endgroup::"
     popd > /dev/null
 done
 

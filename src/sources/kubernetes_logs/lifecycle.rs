@@ -1,13 +1,13 @@
 use std::{
     future::Future,
     pin::Pin,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
 };
 
 use futures::{
     channel::oneshot,
     future::{select, BoxFuture, Either},
-    pin_mut, ready,
+    pin_mut,
     stream::FuturesOrdered,
     FutureExt, StreamExt,
 };
@@ -118,7 +118,7 @@ impl<'bound, 'lc> Slot<'bound, 'lc> {
     /// shutdown via the signal passed from the corresponding
     /// [`ShutdownHandle`].
     pub fn bind(self, future: BoxFuture<'bound, ()>) {
-        self.lifecycle.futs.push(future);
+        self.lifecycle.futs.push_back(future);
         self.lifecycle.fut_shutdowns.push(self.shutdown_trigger);
     }
 }

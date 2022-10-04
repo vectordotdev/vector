@@ -1,58 +1,57 @@
 use std::path::PathBuf;
 
 use clap::Parser;
-use serde_json::Value;
 
-use super::{load_builder_from_paths, load_source_from_paths, process_paths, ConfigBuilder};
+use super::{load_builder_from_paths, load_source_from_paths, process_paths};
 use crate::cli::handle_config_errors;
 use crate::config;
 
 #[derive(Parser, Debug, Clone)]
-#[clap(rename_all = "kebab-case")]
+#[command(rename_all = "kebab-case")]
 pub struct Opts {
     /// Pretty print JSON
-    #[clap(short, long)]
+    #[arg(short, long)]
     pretty: bool,
 
     /// Include default values where missing from config
-    #[clap(short, long)]
+    #[arg(short, long)]
     include_defaults: bool,
 
     /// Read configuration from one or more files. Wildcard paths are supported.
     /// File format is detected from the file name.
     /// If zero files are specified the default config path
     /// `/etc/vector/vector.toml` will be targeted.
-    #[clap(
-        name = "config",
+    #[arg(
+        id = "config",
         short,
         long,
         env = "VECTOR_CONFIG",
-        use_value_delimiter(true)
+        value_delimiter(',')
     )]
     paths: Vec<PathBuf>,
 
     /// Vector config files in TOML format.
-    #[clap(name = "config-toml", long, use_value_delimiter(true))]
+    #[arg(id = "config-toml", long, value_delimiter(','))]
     paths_toml: Vec<PathBuf>,
 
     /// Vector config files in JSON format.
-    #[clap(name = "config-json", long, use_value_delimiter(true))]
+    #[arg(id = "config-json", long, value_delimiter(','))]
     paths_json: Vec<PathBuf>,
 
     /// Vector config files in YAML format.
-    #[clap(name = "config-yaml", long, use_value_delimiter(true))]
+    #[arg(id = "config-yaml", long, value_delimiter(','))]
     paths_yaml: Vec<PathBuf>,
 
     /// Read configuration from files in one or more directories.
     /// File format is detected from the file name.
     ///
     /// Files not ending in .toml, .json, .yaml, or .yml will be ignored.
-    #[clap(
-        name = "config-dir",
+    #[arg(
+        id = "config-dir",
         short = 'C',
         long,
         env = "VECTOR_CONFIG_DIR",
-        use_value_delimiter(true)
+        value_delimiter(',')
     )]
     pub config_dirs: Vec<PathBuf>,
 }
@@ -72,89 +71,6 @@ impl Opts {
                 .map(|dir| config::ConfigPath::Dir(dir.to_path_buf())),
         )
         .collect()
-    }
-}
-
-/// Helper to merge JSON. Handles objects and array concatenation.
-fn merge_json(a: &mut Value, b: Value) {
-    match (a, b) {
-        (Value::Object(ref mut a), Value::Object(b)) => {
-            for (k, v) in b {
-                merge_json(a.entry(k).or_insert(Value::Null), v);
-            }
-        }
-        (a, b) => {
-            *a = b;
-        }
-    }
-}
-
-/// Helper to sort array values.
-fn sort_json_array_values(json: &mut Value) {
-    match json {
-        Value::Array(ref mut arr) => {
-            for v in arr.iter_mut() {
-                sort_json_array_values(v);
-            }
-
-            // Since `Value` does not have a native ordering, we first convert
-            // to string, sort, and then convert back to `Value`.
-            //
-            // Practically speaking, there should not be config options that mix
-            // many JSON types in a single array. This is mainly to sort fields
-            // like component inputs.
-            let mut a = arr
-                .iter()
-                .map(|v| serde_json::to_string(v).unwrap())
-                .collect::<Vec<_>>();
-            a.sort();
-            *arr = a
-                .iter()
-                .map(|v| serde_json::from_str(v.as_str()).unwrap())
-                .collect::<Vec<_>>();
-        }
-        Value::Object(ref mut json) => {
-            for (_, v) in json {
-                sort_json_array_values(v);
-            }
-        }
-        _ => {}
-    }
-}
-
-/// Convert a raw user config to a JSON string
-fn serialize_to_json(
-    source: toml::value::Table,
-    source_builder: &ConfigBuilder,
-    include_defaults: bool,
-    pretty_print: bool,
-) -> serde_json::Result<String> {
-    // Convert table to JSON
-    let mut source_json = serde_json::to_value(source)
-        .expect("should serialize config source to JSON. Please report.");
-
-    // If a user has requested default fields, we'll serialize a `ConfigBuilder`. Otherwise,
-    // we'll serialize the raw user provided config (without interpolated env vars, to preserve
-    // the original source).
-    if include_defaults {
-        // For security, we don't want environment variables to be interpolated in the final
-        // output, but we *do* want defaults. To work around this, we'll serialize `ConfigBuilder`
-        // to JSON, and merge in the raw config which will contain the pre-interpolated strings.
-        let mut builder = serde_json::to_value(&source_builder)
-            .expect("should serialize ConfigBuilder to JSON. Please report.");
-
-        merge_json(&mut builder, source_json);
-
-        source_json = builder
-    }
-
-    sort_json_array_values(&mut source_json);
-
-    // Get a JSON string. This will either be pretty printed or (default) minified.
-    if pretty_print {
-        serde_json::to_string_pretty(&source_json)
-    } else {
-        serde_json::to_string(&source_json)
     }
 }
 
@@ -180,11 +96,17 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
         Err(errs) => return handle_config_errors(errs),
     };
 
-    let json = serialize_to_json(source, &builder, opts.include_defaults, opts.pretty);
+    let json = super::util::json::serialize(source, &builder, opts.include_defaults, opts.pretty);
+    let json = json.expect("config should be serializable");
+
+    #[cfg(feature = "enterprise")]
+    if let Err(errs) = super::loading::schema::check_sensitive_fields_from_string(&json, &builder) {
+        return handle_config_errors(errs);
+    }
 
     #[allow(clippy::print_stdout)]
     {
-        println!("{}", json.expect("config should be serializable"));
+        println!("{}", json);
     }
 
     exitcode::OK
@@ -200,16 +122,13 @@ mod tests {
         SeedableRng,
     };
     use serde_json::json;
+    use vector_config::component::{SinkDescription, SourceDescription, TransformDescription};
 
     use crate::{
-        config::{
-            cmd::serialize_to_json, vars, ConfigBuilder, SinkDescription, SourceDescription,
-            TransformDescription,
-        },
+        config::util::json::{merge as merge_json, serialize as serialize_to_json},
+        config::{vars, ConfigBuilder},
         generate::{generate_example, TransformInputsStrategy},
     };
-
-    use super::merge_json;
 
     #[test]
     fn test_array_override() {

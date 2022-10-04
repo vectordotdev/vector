@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use futures_util::FutureExt;
 use tower::ServiceBuilder;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::sink::VectorSink;
 
@@ -26,7 +27,7 @@ use crate::{
 };
 
 /// Configuration of the `splunk_hec_metrics` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("splunk_hec_metrics"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct HecMetricsSinkConfig {
@@ -40,7 +41,7 @@ pub struct HecMetricsSinkConfig {
     ///
     /// If an event has a token set in its metadata, it will prevail over the one set here.
     #[serde(alias = "token")]
-    pub default_token: String,
+    pub default_token: SensitiveString,
 
     /// The base URL of the Splunk instance.
     pub endpoint: String,
@@ -97,7 +98,7 @@ impl GenerateConfig for HecMetricsSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             default_namespace: None,
-            default_token: "${VECTOR_SPLUNK_HEC_TOKEN}".to_owned(),
+            default_token: "${VECTOR_SPLUNK_HEC_TOKEN}".to_owned().into(),
             endpoint: "http://localhost:8088".to_owned(),
             host_key: host_key(),
             index: None,
@@ -114,13 +115,12 @@ impl GenerateConfig for HecMetricsSinkConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "splunk_hec_metrics")]
 impl SinkConfig for HecMetricsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = create_client(&self.tls, cx.proxy())?;
         let healthcheck = build_healthcheck(
             self.endpoint.clone(),
-            self.default_token.clone(),
+            self.default_token.inner().to_owned(),
             client.clone(),
         )
         .boxed();
@@ -132,12 +132,8 @@ impl SinkConfig for HecMetricsSinkConfig {
         Input::metric()
     }
 
-    fn sink_type(&self) -> &'static str {
-        "splunk_hec_metrics"
-    }
-
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements.inner)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements.inner
     }
 }
 
@@ -161,7 +157,7 @@ impl HecMetricsSinkConfig {
         let http_request_builder = Arc::new(HttpRequestBuilder::new(
             self.endpoint.clone(),
             EndpointTarget::default(),
-            self.default_token.clone(),
+            self.default_token.inner().to_owned(),
             self.compression,
         ));
         let http_service = ServiceBuilder::new()

@@ -19,12 +19,12 @@ use chrono::{SecondsFormat, Utc};
 use codecs::{encoding::Framer, JsonSerializer, NewlineDelimitedEncoder};
 use goauth::scopes::Scope;
 use http::header::{HeaderName, HeaderValue};
-use lookup::path;
+use lookup::event_path;
 use rand::{thread_rng, Rng};
 use snafu::Snafu;
 use tower::ServiceBuilder;
 use uuid::Uuid;
-use vector_config::configurable_component;
+use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
     config::{log_schema, AcknowledgementsConfig, LogSchema},
     event::{Event, EventFinalizers, Finalizable},
@@ -87,7 +87,7 @@ impl SinkBatchSettings for DatadogArchivesDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 900.0;
 }
 /// Configuration for the `datadog_archives` sink.
-#[configurable_component(sink)]
+#[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogArchivesSinkConfig {
@@ -549,8 +549,8 @@ impl crate::sinks::util::encoding::Encoder<Vec<Event>> for DatadogArchivesEncodi
                     .unwrap_or_else(chrono::Utc::now)
                     .to_rfc3339_opts(SecondsFormat::Millis, true),
             );
-            log_event.rename_key(self.log_schema.message_key(), path!("message"));
-            log_event.rename_key(self.log_schema.host_key(), path!("host"));
+            log_event.rename_key(self.log_schema.message_key(), event_path!("message"));
+            log_event.rename_key(self.log_schema.host_key(), event_path!("host"));
 
             let mut attributes = BTreeMap::new();
 
@@ -746,15 +746,14 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogGcsRequestBuilder {
 fn generate_object_key(key_prefix: Option<String>, partition_key: String) -> String {
     let filename = Uuid::new_v4().to_string();
 
-    let key = format!(
+    format!(
         "{}/{}{}.{}",
         key_prefix.unwrap_or_default(),
         partition_key,
         filename,
         "json.gz"
     )
-    .replace("//", "/");
-    key
+    .replace("//", "/")
 }
 
 #[derive(Debug)]
@@ -820,8 +819,16 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogAzureRequestBuilder {
     }
 }
 
+// This is implemented manually to satisfy `SinkConfig`, because if we derive it automatically via
+// `#[configurable_component(sink("..."))]`, it would register the sink in a way that allowed it to
+// be used in `vector generate`, etc... and we don't want that.
+//
+// TODO: When the sink is fully supported and we expose it for use/within the docs, remove this.
+impl NamedComponent for DatadogArchivesSinkConfig {
+    const NAME: &'static str = "datadog_archives";
+}
+
 #[async_trait::async_trait]
-#[typetag::serde(name = "datadog_archives")]
 impl SinkConfig for DatadogArchivesSinkConfig {
     async fn build(
         &self,
@@ -835,12 +842,8 @@ impl SinkConfig for DatadogArchivesSinkConfig {
         Input::log()
     }
 
-    fn sink_type(&self) -> &'static str {
-        "datadog_archives"
-    }
-
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 

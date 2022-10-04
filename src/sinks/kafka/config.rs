@@ -20,7 +20,7 @@ use crate::{
 pub(crate) const QUEUED_MIN_MESSAGES: u64 = 100000;
 
 /// Configuration for the `kafka` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("kafka"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct KafkaSinkConfig {
@@ -97,7 +97,7 @@ const fn default_message_timeout_ms() -> u64 {
 
 /// Used to determine the options to set in configs, since both Kafka consumers and producers have
 /// unique options, they use the same struct, and the error if given the wrong options.
-#[derive(Debug, PartialOrd, PartialEq)]
+#[derive(Debug, PartialOrd, PartialEq, Eq)]
 pub enum KafkaRole {
     Consumer,
     Producer,
@@ -216,7 +216,6 @@ impl GenerateConfig for KafkaSinkConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "kafka")]
 impl SinkConfig for KafkaSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink = KafkaSink::new(self.clone())?;
@@ -228,12 +227,8 @@ impl SinkConfig for KafkaSinkConfig {
         Input::new(self.encoding.config().input_type() & (DataType::Log | DataType::Metric))
     }
 
-    fn sink_type(&self) -> &'static str {
-        "kafka"
-    }
-
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 

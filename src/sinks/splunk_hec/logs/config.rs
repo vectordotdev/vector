@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use codecs::TextSerializerConfig;
 use futures_util::FutureExt;
-use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::sink::VectorSink;
 
@@ -29,7 +29,7 @@ use crate::{
 };
 
 /// Configuration for the `splunk_hec_logs` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("splunk_hec_logs"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct HecLogsSinkConfig {
@@ -37,7 +37,7 @@ pub struct HecLogsSinkConfig {
     ///
     /// If an event has a token set in its metadata, it will prevail over the one set here.
     #[serde(alias = "token")]
-    pub default_token: String,
+    pub default_token: SensitiveString,
 
     /// The base URL of the Splunk instance.
     pub endpoint: String,
@@ -123,7 +123,7 @@ const fn default_endpoint_target() -> EndpointTarget {
 impl GenerateConfig for HecLogsSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            default_token: "${VECTOR_SPLUNK_HEC_TOKEN}".to_owned(),
+            default_token: "${VECTOR_SPLUNK_HEC_TOKEN}".to_owned().into(),
             endpoint: "endpoint".to_owned(),
             host_key: host_key(),
             indexed_fields: vec![],
@@ -145,13 +145,12 @@ impl GenerateConfig for HecLogsSinkConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "splunk_hec_logs")]
 impl SinkConfig for HecLogsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = create_client(&self.tls, cx.proxy())?;
         let healthcheck = build_healthcheck(
             self.endpoint.clone(),
-            self.default_token.clone(),
+            self.default_token.inner().to_owned(),
             client.clone(),
         )
         .boxed();
@@ -164,12 +163,8 @@ impl SinkConfig for HecLogsSinkConfig {
         Input::new(self.encoding.config().input_type() & DataType::Log)
     }
 
-    fn sink_type(&self) -> &'static str {
-        "splunk_hec_logs"
-    }
-
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements.inner)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements.inner
     }
 }
 
@@ -201,7 +196,7 @@ impl HecLogsSinkConfig {
         let http_request_builder = Arc::new(HttpRequestBuilder::new(
             self.endpoint.clone(),
             self.endpoint_target,
-            self.default_token.clone(),
+            self.default_token.inner().to_owned(),
             self.compression,
         ));
         let http_service = ServiceBuilder::new()
@@ -237,33 +232,6 @@ impl HecLogsSinkConfig {
         };
 
         Ok(VectorSink::from_event_streamsink(sink))
-    }
-}
-
-// Add a compatibility alias to avoid breaking existing configs
-#[derive(Clone, Debug, Deserialize, Serialize)]
-struct HecSinkCompatConfig {
-    #[serde(flatten)]
-    config: HecLogsSinkConfig,
-}
-
-#[async_trait::async_trait]
-#[typetag::serde(name = "splunk_hec")]
-impl SinkConfig for HecSinkCompatConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        self.config.build(cx).await
-    }
-
-    fn input(&self) -> Input {
-        self.config.input()
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "splunk_hec"
-    }
-
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        self.config.acknowledgements()
     }
 }
 

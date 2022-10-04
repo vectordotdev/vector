@@ -3,6 +3,7 @@ use std::{convert::TryInto, sync::Arc};
 use azure_storage_blobs::prelude::*;
 use codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
 use tower::ServiceBuilder;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
 use super::request_builder::AzureBlobRequestOptions;
@@ -23,7 +24,7 @@ use crate::{
 };
 
 /// Configuration for the `azure_blob` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("azure_blob"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct AzureBlobSinkConfig {
@@ -32,7 +33,7 @@ pub struct AzureBlobSinkConfig {
     /// Authentication with access key is the only supported authentication method.
     ///
     /// Either `storage_account`, or this field, must be specified.
-    pub connection_string: Option<String>,
+    pub connection_string: Option<SensitiveString>,
 
     /// The Azure Blob Storage Account name.
     ///
@@ -115,7 +116,7 @@ pub struct AzureBlobSinkConfig {
 impl GenerateConfig for AzureBlobSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            connection_string: Some(String::from("DefaultEndpointsProtocol=https;AccountName=some-account-name;AccountKey=some-account-key;")),
+            connection_string: Some(String::from("DefaultEndpointsProtocol=https;AccountName=some-account-name;AccountKey=some-account-key;").into()),
             storage_account: Some(String::from("some-account-name")),
             container_name: String::from("logs"),
             blob_prefix: Some(String::from("blob")),
@@ -132,12 +133,11 @@ impl GenerateConfig for AzureBlobSinkConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "azure_blob")]
 impl SinkConfig for AzureBlobSinkConfig {
     async fn build(&self, _cx: SinkContext) -> Result<(VectorSink, Healthcheck)> {
         let client = azure_common::config::build_client(
-            self.connection_string.clone(),
-            self.storage_account.clone(),
+            self.connection_string.as_ref().map(|v| v.to_string()),
+            self.storage_account.as_ref().map(|v| v.to_string()),
             self.container_name.clone(),
         )?;
 
@@ -153,12 +153,8 @@ impl SinkConfig for AzureBlobSinkConfig {
         Input::new(self.encoding.config().1.input_type() & DataType::Log)
     }
 
-    fn sink_type(&self) -> &'static str {
-        "azure_blob"
-    }
-
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 

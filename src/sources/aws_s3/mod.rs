@@ -18,10 +18,7 @@ use crate::common::sqs::SqsClientBuilder;
 use crate::tls::TlsConfig;
 use crate::{
     aws::auth::AwsAuthentication,
-    config::{
-        AcknowledgementsConfig, DataType, Output, ProxyConfig, SourceConfig, SourceContext,
-        SourceDescription,
-    },
+    config::{AcknowledgementsConfig, DataType, Output, ProxyConfig, SourceConfig, SourceContext},
     line_agg,
     serde::bool_or_struct,
 };
@@ -30,7 +27,7 @@ pub mod sqs;
 
 /// Compression scheme for objects retrieved from S3.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative, PartialEq)]
+#[derive(Clone, Copy, Debug, Derivative, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 #[derivative(Default)]
 pub enum Compression {
@@ -56,7 +53,9 @@ pub enum Compression {
 #[serde(rename_all = "lowercase")]
 #[derivative(Default)]
 enum Strategy {
-    /// Consumes objects by processing bucket notification events sent to an [AWS SQS queue](\(urls.aws_sqs)).
+    /// Consumes objects by processing bucket notification events sent to an [AWS SQS queue][aws_sqs].
+    ///
+    /// [aws_sqs]: https://aws.amazon.com/sqs/
     #[derivative(Default)]
     Sqs,
 }
@@ -67,7 +66,7 @@ enum Strategy {
 // when there's required fields.
 //
 // Maybe showing defaults at all, when there are required properties, doesn't actually make sense? :thinkies:
-#[configurable_component(source)]
+#[configurable_component(source("aws_s3"))]
 #[derive(Clone, Debug, Default)]
 #[serde(default, deny_unknown_fields)]
 pub struct AwsS3Config {
@@ -108,14 +107,9 @@ pub struct AwsS3Config {
     tls_options: Option<TlsConfig>,
 }
 
-inventory::submit! {
-    SourceDescription::new::<AwsS3Config>("aws_s3")
-}
-
 impl_generate_config_from_default!(AwsS3Config);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "aws_s3")]
 impl SourceConfig for AwsS3Config {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let multiline_config: Option<line_agg::Config> = self
@@ -135,10 +129,6 @@ impl SourceConfig for AwsS3Config {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "aws_s3"
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -261,12 +251,12 @@ async fn s3_object_decoder(
     }
 }
 
-/// try to determine the compression given the:
-/// * content-encoding
-/// * content-type
-/// * key name (for file extension)
-///
-/// It will use this information in this order
+// try to determine the compression given the:
+// * content-encoding
+// * content-type
+// * key name (for file extension)
+//
+// It will use this information in this order
 fn determine_compression(
     content_encoding: Option<&str>,
     content_type: Option<&str>,
@@ -390,8 +380,9 @@ mod integration_tests {
         line_agg,
         sources::util::MultilineConfig,
         test_util::{
-            collect_n, components::assert_source_compliance, lines_from_gzip_file, random_lines,
-            trace_init,
+            collect_n,
+            components::{assert_source_compliance, SOURCE_TAGS},
+            lines_from_gzip_file, random_lines, trace_init,
         },
         SourceSender,
     };
@@ -607,7 +598,7 @@ mod integration_tests {
         expected_lines: Vec<String>,
         status: EventStatus,
     ) {
-        assert_source_compliance(&["protocol"], async move {
+        assert_source_compliance(&SOURCE_TAGS, async move {
             let key = key.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
 
             let s3 = s3_client().await;

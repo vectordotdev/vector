@@ -8,7 +8,7 @@ use chrono::{
 use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
 use snafu::Snafu;
-use vector_config::configurable_component;
+use vector_config::{configurable_component, ConfigurableString};
 
 use crate::{
     config::log_schema,
@@ -16,6 +16,18 @@ use crate::{
 };
 
 static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\{\{(?P<key>[^\}]+)\}\}").unwrap());
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Snafu)]
+pub enum TemplateParseError {
+    #[snafu(display("Invalid strftime item"))]
+    StrftimeError,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Snafu)]
+pub enum TemplateRenderingError {
+    #[snafu(display("Missing fields on event: {:?}", missing_keys))]
+    MissingKeys { missing_keys: Vec<String> },
+}
 
 /// A templated field.
 ///
@@ -46,18 +58,6 @@ impl Template {
     pub fn is_empty(&self) -> bool {
         self.src.is_empty()
     }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Snafu)]
-pub enum TemplateParseError {
-    #[snafu(display("Invalid strftime item"))]
-    StrftimeError,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Snafu)]
-pub enum TemplateRenderingError {
-    #[snafu(display("Missing fields on event: {:?}", missing_keys))]
-    MissingKeys { missing_keys: Vec<String> },
 }
 
 impl TryFrom<&str> for Template {
@@ -115,6 +115,9 @@ impl fmt::Display for Template {
         write!(f, "{}", self.src)
     }
 }
+
+// This is safe because we literally defer to `String` for the schema of `Template`.
+impl ConfigurableString for Template {}
 
 const fn is_error(item: &Item) -> bool {
     matches!(item, Item::Error)
@@ -178,7 +181,7 @@ impl Template {
     }
 }
 
-fn render_fields<'a>(src: &str, event: EventRef<'a>) -> Result<String, TemplateRenderingError> {
+fn render_fields(src: &str, event: EventRef<'_>) -> Result<String, TemplateRenderingError> {
     let mut missing_keys = Vec::new();
     let out = RE
         .replace_all(src, |caps: &Captures<'_>| {
@@ -242,6 +245,7 @@ mod tests {
 
     use super::*;
     use crate::event::{Event, LogEvent, MetricKind, MetricValue};
+    use lookup::metadata_path;
 
     #[test]
     fn get_fields() {
@@ -289,6 +293,17 @@ mod tests {
         let template = Template::try_from("{{log_stream}}").unwrap();
 
         assert_eq!(Ok(Bytes::from("stream")), template.render(&event))
+    }
+
+    #[test]
+    fn render_log_metadata() {
+        let mut event = Event::Log(LogEvent::from("hello world"));
+        event
+            .as_mut_log()
+            .insert(metadata_path!("metadata_key"), "metadata_value");
+        let template = Template::try_from("{{%metadata_key}}").unwrap();
+
+        assert_eq!(Ok(Bytes::from("metadata_value")), template.render(&event))
     }
 
     #[test]

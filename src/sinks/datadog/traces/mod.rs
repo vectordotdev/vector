@@ -17,17 +17,14 @@ mod service;
 mod sink;
 mod stats;
 
+#[allow(warnings, clippy::pedantic, clippy::nursery)]
 pub(crate) mod ddsketch_full {
     include!(concat!(env!("OUT_DIR"), "/ddsketch_full.rs"));
 }
 
+#[allow(warnings)]
 pub(crate) mod dd_proto {
     include!(concat!(env!("OUT_DIR"), "/dd_trace.rs"));
 }
 
 pub use self::config::DatadogTracesConfig;
-use crate::config::SinkDescription;
-
-inventory::submit! {
-    SinkDescription::new::<DatadogTracesConfig>("datadog_traces")
-}

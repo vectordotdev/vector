@@ -72,7 +72,7 @@ pub(crate) fn decode_log_body(
         // The datadog agent may send an empty payload as a keep alive
         debug!(
             message = "Empty payload ignored.",
-            internal_log_rate_secs = 30
+            internal_log_rate_limit = true
         );
         return Ok(Vec::new());
     }
@@ -112,11 +112,13 @@ pub(crate) fn decode_log_body(
                                 source_name,
                                 log,
                                 path!("status"),
+                                path!("status"),
                                 status.clone(),
                             );
                             namespace.insert_source_metadata(
                                 source_name,
                                 log,
+                                path!("timestamp"),
                                 path!("timestamp"),
                                 timestamp,
                             );
@@ -124,11 +126,13 @@ pub(crate) fn decode_log_body(
                                 source_name,
                                 log,
                                 path!("hostname"),
+                                path!("hostname"),
                                 hostname.clone(),
                             );
                             namespace.insert_source_metadata(
                                 source_name,
                                 log,
+                                path!("service"),
                                 path!("service"),
                                 service.clone(),
                             );
@@ -136,11 +140,13 @@ pub(crate) fn decode_log_body(
                                 source_name,
                                 log,
                                 path!("ddsource"),
+                                path!("ddsource"),
                                 ddsource.clone(),
                             );
                             namespace.insert_source_metadata(
                                 source_name,
                                 log,
+                                path!("ddtags"),
                                 path!("ddtags"),
                                 ddtags.clone(),
                             );

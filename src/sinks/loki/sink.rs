@@ -7,7 +7,7 @@ use regex::Regex;
 use snafu::Snafu;
 use tokio_util::codec::Encoder as _;
 use vector_core::{
-    event::{self, Event, EventFinalizers, Finalizable, Value},
+    event::{Event, EventFinalizers, Finalizable, Value},
     partition::Partitioner,
     sink::StreamSink,
     stream::BatcherSettings,
@@ -19,13 +19,15 @@ use super::{
     event::{LokiBatchEncoder, LokiEvent, LokiRecord, PartitionKey},
     service::{LokiRequest, LokiRetryLogic, LokiService},
 };
+use crate::sinks::loki::config::{CompressionConfigAdapter, ExtendedCompression};
+use crate::sinks::loki::event::LokiBatchEncoding;
 use crate::{
     codecs::{Encoder, Transformer},
     config::log_schema,
     http::HttpClient,
     internal_events::{
         LokiEventUnlabeled, LokiOutOfOrderEventDropped, LokiOutOfOrderEventRewritten,
-        TemplateRenderingError,
+        SinkRequestBuildError, TemplateRenderingError,
     },
     sinks::util::{
         builder::SinkBuilderExt,
@@ -79,7 +81,7 @@ impl Partitioner for RecordPartitioner {
 
 #[derive(Clone)]
 pub struct LokiRequestBuilder {
-    compression: Compression,
+    compression: CompressionConfigAdapter,
     encoder: LokiBatchEncoder,
 }
 
@@ -106,7 +108,10 @@ impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
     type Error = RequestBuildError;
 
     fn compression(&self) -> Compression {
-        self.compression
+        match self.compression {
+            CompressionConfigAdapter::Original(compression) => compression,
+            CompressionConfigAdapter::Extended(_) => Compression::None,
+        }
     }
 
     fn encoder(&self) -> &Self::Encoder {
@@ -131,7 +136,7 @@ impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
     ) -> Self::Request {
         let (tenant_id, finalizers, metadata_builder) = metadata;
         let metadata = metadata_builder.build(&payload);
-        let compression = self.compression();
+        let compression = self.compression;
 
         LokiRequest {
             compression,
@@ -204,7 +209,7 @@ impl EventEncoder {
         let schema = log_schema();
         let timestamp_key = schema.timestamp_key();
         let timestamp = match event.as_log().get(timestamp_key) {
-            Some(event::Value::Timestamp(ts)) => ts.timestamp_nanos(),
+            Some(Value::Timestamp(ts)) => ts.timestamp_nanos(),
             _ => chrono::Utc::now().timestamp_nanos(),
         };
 
@@ -264,12 +269,12 @@ impl FilteredRecord {
 }
 
 impl ByteSizeOf for FilteredRecord {
-    fn allocated_bytes(&self) -> usize {
-        self.inner.allocated_bytes()
-    }
-
     fn size_of(&self) -> usize {
         self.inner.size_of()
+    }
+
+    fn allocated_bytes(&self) -> usize {
+        self.inner.allocated_bytes()
     }
 }
 
@@ -348,11 +353,17 @@ impl LokiSink {
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
+        let batch_encoder = match config.compression {
+            CompressionConfigAdapter::Original(_) => LokiBatchEncoder(LokiBatchEncoding::Json),
+            CompressionConfigAdapter::Extended(ExtendedCompression::Snappy) => {
+                LokiBatchEncoder(LokiBatchEncoding::Protobuf)
+            }
+        };
 
         Ok(Self {
             request_builder: LokiRequestBuilder {
                 compression,
-                encoder: Default::default(),
+                encoder: batch_encoder,
             },
             encoder: EventEncoder {
                 key_partitioner: KeyPartitioner::new(config.tenant_id),
@@ -400,19 +411,23 @@ impl LokiSink {
                         })
                         .collect::<Vec<_>>();
                     if count > 0 {
-                        emit!(LokiOutOfOrderEventRewritten { count });
+                        emit!(LokiOutOfOrderEventRewritten {
+                            count: count as u64
+                        });
                     }
                     Some((partition, result))
                 } else {
-                    emit!(LokiOutOfOrderEventDropped { count: batch.len() });
+                    emit!(LokiOutOfOrderEventDropped {
+                        count: batch.len() as u64
+                    });
                     None
                 }
             })
             .request_builder(Some(request_builder_concurrency), self.request_builder)
             .filter_map(|request| async move {
                 match request {
-                    Err(e) => {
-                        error!("Failed to build Loki request: {:?}.", e);
+                    Err(error) => {
+                        emit!(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),

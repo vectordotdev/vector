@@ -8,7 +8,7 @@ use std::{
 use bytes::{Buf, Bytes, BytesMut};
 use codecs::StreamDecodingError;
 use flate2::read::ZlibDecoder;
-use lookup::path;
+use lookup::event_path;
 use smallvec::{smallvec, SmallVec};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Decoder;
@@ -19,7 +19,7 @@ use super::util::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
-        SourceConfig, SourceContext, SourceDescription,
+        SourceConfig, SourceContext,
     },
     event::{Event, LogEvent, Value},
     serde::bool_or_struct,
@@ -29,7 +29,7 @@ use crate::{
 };
 
 /// Configuration for the `logstash` source.
-#[configurable_component(source)]
+#[configurable_component(source("logstash"))]
 #[derive(Clone, Debug)]
 pub struct LogstashConfig {
     /// The address to listen for connections on.
@@ -54,10 +54,6 @@ pub struct LogstashConfig {
     acknowledgements: AcknowledgementsConfig,
 }
 
-inventory::submit! {
-    SourceDescription::new::<LogstashConfig>("logstash")
-}
-
 impl GenerateConfig for LogstashConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
@@ -73,7 +69,6 @@ impl GenerateConfig for LogstashConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "logstash")]
 impl SourceConfig for LogstashConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let source = LogstashSource {
@@ -103,10 +98,6 @@ impl SourceConfig for LogstashConfig {
         vec![Output::default(DataType::Log)]
     }
 
-    fn source_type(&self) -> &'static str {
-        "logstash"
-    }
-
     fn resources(&self) -> Vec<Resource> {
         vec![self.address.into()]
     }
@@ -118,7 +109,7 @@ impl SourceConfig for LogstashConfig {
 
 #[derive(Debug, Clone)]
 struct LogstashSource {
-    timestamp_converter: crate::types::Conversion,
+    timestamp_converter: types::Conversion,
 }
 
 impl TcpSource for LogstashSource {
@@ -139,7 +130,7 @@ impl TcpSource for LogstashSource {
             if log.get(log_schema().timestamp_key()).is_none() {
                 // Attempt to parse @timestamp if it exists; otherwise set to receipt time.
                 let timestamp = log
-                    .get(path!("@timestamp"))
+                    .get(event_path!("@timestamp"))
                     .and_then(|timestamp| {
                         self.timestamp_converter
                             .convert::<Value>(timestamp.coerce_to_bytes())
@@ -366,8 +357,8 @@ impl Decoder for LogstashDecoder {
                     use LogstashProtocolVersion::*;
 
                     match LogstashProtocolVersion::try_from(src.get_u8())? {
-                        V1 => LogstashDecoderReadState::ReadType(LogstashProtocolVersion::V1),
-                        V2 => LogstashDecoderReadState::ReadType(LogstashProtocolVersion::V2),
+                        V1 => LogstashDecoderReadState::ReadType(V1),
+                        V2 => LogstashDecoderReadState::ReadType(V2),
                     }
                 }
                 LogstashDecoderReadState::ReadType(protocol) => {
@@ -378,23 +369,11 @@ impl Decoder for LogstashDecoder {
                     use LogstashFrameType::*;
 
                     match LogstashFrameType::try_from(src.get_u8())? {
-                        WindowSize => LogstashDecoderReadState::ReadFrame(
-                            protocol,
-                            LogstashFrameType::WindowSize,
-                        ),
-                        Data => {
-                            LogstashDecoderReadState::ReadFrame(protocol, LogstashFrameType::Data)
-                        }
-                        Json => {
-                            LogstashDecoderReadState::ReadFrame(protocol, LogstashFrameType::Json)
-                        }
-                        Compressed => LogstashDecoderReadState::ReadFrame(
-                            protocol,
-                            LogstashFrameType::Compressed,
-                        ),
-                        Ack => {
-                            LogstashDecoderReadState::ReadFrame(protocol, LogstashFrameType::Ack)
-                        }
+                        WindowSize => LogstashDecoderReadState::ReadFrame(protocol, WindowSize),
+                        Data => LogstashDecoderReadState::ReadFrame(protocol, Data),
+                        Json => LogstashDecoderReadState::ReadFrame(protocol, Json),
+                        Compressed => LogstashDecoderReadState::ReadFrame(protocol, Compressed),
+                        Ack => LogstashDecoderReadState::ReadFrame(protocol, Ack),
                     }
                 }
                 // The window size indicates how many events the writer will send before waiting
@@ -674,7 +653,7 @@ mod test {
         req.into()
     }
 
-    async fn send_req(address: std::net::SocketAddr, pairs: &[(&str, &str)], sends_ack: bool) {
+    async fn send_req(address: SocketAddr, pairs: &[(&str, &str)], sends_ack: bool) {
         let seq = thread_rng().gen_range(1..u32::MAX);
         let mut socket = tokio::net::TcpStream::connect(address).await.unwrap();
 
@@ -784,7 +763,7 @@ mod integration_tests {
         tls: Option<TlsEnableableConfig>,
     ) -> impl Stream<Item = Event> + Unpin {
         let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
-        let address: std::net::SocketAddr = address.parse().unwrap();
+        let address: SocketAddr = address.parse().unwrap();
         let tls_options = match tls {
             Some(options) => options,
             None => TlsEnableableConfig::default(),

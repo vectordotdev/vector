@@ -20,7 +20,7 @@ use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{
         log_schema, AcknowledgementsConfig, GenerateConfig, Output, Resource, SourceConfig,
-        SourceContext, SourceDescription,
+        SourceContext,
     },
     event::{Event, LogEvent},
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
@@ -29,11 +29,11 @@ use crate::{
     sources::util::{add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     tls::TlsEnableableConfig,
 };
-use lookup::path;
+use lookup::event_path;
 use vector_core::config::LogNamespace;
 
 /// Configuration for `heroku_logs` source.
-#[configurable_component(source)]
+#[configurable_component(source("heroku_logs"))]
 #[derive(Clone, Debug)]
 pub struct LogplexConfig {
     /// The address to listen for connections on.
@@ -62,14 +62,6 @@ pub struct LogplexConfig {
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
-}
-
-inventory::submit! {
-    SourceDescription::new::<LogplexConfig>("logplex")
-}
-
-inventory::submit! {
-    SourceDescription::new::<LogplexConfig>("heroku_logs")
 }
 
 impl GenerateConfig for LogplexConfig {
@@ -108,7 +100,6 @@ impl HttpSource for LogplexSource {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "heroku_logs")]
 impl SourceConfig for LogplexConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let decoder = DecodingConfig::new(
@@ -137,43 +128,8 @@ impl SourceConfig for LogplexConfig {
         vec![Output::default(self.decoding.output_type())]
     }
 
-    fn source_type(&self) -> &'static str {
-        "heroku_logs"
-    }
-
     fn resources(&self) -> Vec<Resource> {
         vec![Resource::tcp(self.address)]
-    }
-
-    fn can_acknowledge(&self) -> bool {
-        true
-    }
-}
-
-// Add a compatibility alias to avoid breaking existing configs
-
-/// Configuration for the `logplex` source.
-#[configurable_component(source)]
-#[derive(Clone, Debug)]
-pub struct LogplexCompatConfig(#[configurable(transparent)] LogplexConfig);
-
-#[async_trait::async_trait]
-#[typetag::serde(name = "logplex")]
-impl SourceConfig for LogplexCompatConfig {
-    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        self.0.build(cx).await
-    }
-
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
-        self.0.outputs(global_log_namespace)
-    }
-
-    fn source_type(&self) -> &'static str {
-        self.0.source_type()
-    }
-
-    fn resources(&self) -> Vec<Resource> {
-        self.0.resources()
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -274,8 +230,8 @@ fn line_to_events(mut decoder: Decoder, line: String) -> SmallVec<[Event; 1]> {
 
                             log.try_insert(log_schema().host_key(), hostname.to_owned());
 
-                            log.try_insert(path!("app_name"), app_name.to_owned());
-                            log.try_insert(path!("proc_id"), proc_id.to_owned());
+                            log.try_insert(event_path!("app_name"), app_name.to_owned());
+                            log.try_insert(event_path!("proc_id"), proc_id.to_owned());
                         }
 
                         events.push(event);
@@ -293,7 +249,7 @@ fn line_to_events(mut decoder: Decoder, line: String) -> SmallVec<[Event; 1]> {
         warn!(
             message = "Line didn't match expected logplex format, so raw message is forwarded.",
             fields = parts.len(),
-            internal_log_rate_secs = 10
+            internal_log_rate_limit = true
         );
 
         events.push(LogEvent::from_str_legacy(line).into())
@@ -374,7 +330,7 @@ mod tests {
         let len = body.lines().count();
         let mut req = reqwest::Client::new().post(&format!("http://{}/events?{}", address, query));
         if let Some(auth) = auth {
-            req = req.basic_auth(auth.username, Some(auth.password));
+            req = req.basic_auth(auth.username, Some(auth.password.inner()));
         }
         req.header("Logplex-Msg-Count", len)
             .header("Logplex-Frame-Id", "frame-foo")
@@ -390,7 +346,7 @@ mod tests {
     fn make_auth() -> HttpSourceAuthConfig {
         HttpSourceAuthConfig {
             username: random_string(16),
-            password: random_string(16),
+            password: random_string(16).into(),
         }
     }
 

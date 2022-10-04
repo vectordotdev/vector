@@ -36,9 +36,12 @@ pub mod dns;
 pub mod docker;
 pub mod expiring_hash_map;
 pub mod generate;
+pub mod generate_schema;
 #[macro_use]
 #[allow(unreachable_pub)]
 pub mod internal_events;
+#[cfg(feature = "lapin")]
+pub mod amqp;
 #[cfg(feature = "api")]
 #[allow(unreachable_pub)]
 pub mod api;
@@ -65,12 +68,10 @@ pub mod line_agg;
 pub mod list;
 #[cfg(any(feature = "sources-nats", feature = "sinks-nats"))]
 pub(crate) mod nats;
-#[cfg(feature = "opentelemetry")]
-#[allow(unreachable_pub)]
-pub mod opentelemetry;
 #[allow(unreachable_pub)]
 pub(crate) mod proto;
 pub mod providers;
+pub mod secrets;
 pub mod serde;
 #[cfg(windows)]
 pub mod service;
@@ -85,11 +86,8 @@ pub mod stats;
 #[cfg(feature = "api-client")]
 #[allow(unreachable_pub)]
 mod tap;
-pub(crate) mod tcp;
 pub mod template;
 pub mod test_util;
-#[allow(unreachable_pub)]
-pub(crate) mod tls;
 #[cfg(feature = "api-client")]
 #[allow(unreachable_pub)]
 pub(crate) mod top;
@@ -107,8 +105,8 @@ pub mod validate;
 pub mod vector_windows;
 
 pub use source_sender::SourceSender;
-pub use vector_common::shutdown;
-pub use vector_core::{event, metrics, schema, Error, Result};
+pub use vector_common::{shutdown, Error, Result};
+pub use vector_core::{event, metrics, schema, tcp, tls};
 
 pub fn vector_version() -> impl std::fmt::Display {
     #[cfg(feature = "nightly")]
@@ -140,7 +138,7 @@ pub fn get_version() -> String {
     format!("{} ({})", pkg_version, build_string)
 }
 
-#[allow(unused)]
+#[allow(warnings)]
 pub mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }

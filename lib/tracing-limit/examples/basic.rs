@@ -17,7 +17,7 @@ fn main() {
             info!(
                 message = "This message is rate limited",
                 count = &i,
-                internal_log_rate_secs = 5,
+                internal_log_rate_limit = true,
             );
             std::thread::sleep(std::time::Duration::from_millis(1000));
         }

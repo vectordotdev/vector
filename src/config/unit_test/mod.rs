@@ -18,10 +18,11 @@ use uuid::Uuid;
 use value::Kind;
 use vector_core::config::LogNamespace;
 
-use self::unit_test_components::{
+pub use self::unit_test_components::{
     UnitTestSinkCheck, UnitTestSinkConfig, UnitTestSinkResult, UnitTestSourceConfig,
+    UnitTestStreamSinkConfig, UnitTestStreamSourceConfig,
 };
-use super::{compiler::expand_globs, graph::Graph, OutputId};
+use super::{compiler::expand_globs, graph::Graph, OutputId, TransformConfig};
 use crate::{
     conditions::Condition,
     config::{
@@ -29,9 +30,7 @@ use crate::{
         SinkOuter, SourceOuter, TestDefinition, TestInput, TestInputValue, TestOutput,
     },
     event::{Event, LogEvent, Value},
-    schema,
-    serde::OneOrMany,
-    signal,
+    schema, signal,
     topology::{
         self,
         builder::{self, Pieces},
@@ -272,7 +271,7 @@ impl UnitTestBuildMetadata {
             let sink_ids = ids.clone();
             let sink_config = UnitTestSinkConfig {
                 test_name: test_name.to_string(),
-                transform_ids: ids.stringify().into_vec(),
+                transform_ids: ids.iter().map(|id| id.to_string()).collect(),
                 result_tx: Arc::new(Mutex::new(Some(tx))),
                 check: UnitTestSinkCheck::Checks(checks),
             };
@@ -292,15 +291,14 @@ impl UnitTestBuildMetadata {
             };
 
             test_result_rxs.push(rx);
-            template_sinks.insert(id.clone().into(), sink_config);
+            template_sinks.insert(vec![id.clone()], sink_config);
         }
 
         let sinks = template_sinks
             .into_iter()
             .map(|(transform_ids, sink_config)| {
-                let transform_ids_str = transform_ids.stringify().into_vec();
+                let transform_ids_str = transform_ids.iter().map(ToString::to_string).collect();
                 let sink_ids = transform_ids
-                    .into_vec()
                     .iter()
                     .map(|transform_id| {
                         self.sink_ids
@@ -312,7 +310,7 @@ impl UnitTestBuildMetadata {
                 let sink_id = sink_ids.join(",");
                 (
                     ComponentKey::from(sink_id),
-                    SinkOuter::new(transform_ids_str, Box::new(sink_config)),
+                    SinkOuter::new(transform_ids_str, sink_config),
                 )
             })
             .collect::<IndexMap<_, _>>();
@@ -462,7 +460,7 @@ fn get_loose_end_outputs_sink(config: &ConfigBuilder) -> Option<SinkOuter<String
     let transform_ids = config.transforms.iter().flat_map(|(key, transform)| {
         transform
             .inner
-            .outputs(&schema::Definition::new(
+            .outputs(&schema::Definition::new_with_default_metadata(
                 Kind::any(),
                 [LogNamespace::Legacy, LogNamespace::Vector],
             ))
@@ -501,7 +499,7 @@ fn get_loose_end_outputs_sink(config: &ConfigBuilder) -> Option<SinkOuter<String
             result_tx: Arc::new(Mutex::new(None)),
             check: UnitTestSinkCheck::NoOp,
         };
-        Some(SinkOuter::new(loose_end_outputs, Box::new(noop_sink)))
+        Some(SinkOuter::new(loose_end_outputs, noop_sink))
     }
 }
 
@@ -546,8 +544,8 @@ fn build_and_validate_inputs(
 
 fn build_outputs(
     test_outputs: &[TestOutput],
-) -> Result<IndexMap<OneOrMany<OutputId>, Vec<Vec<Condition>>>, Vec<String>> {
-    let mut outputs: IndexMap<OneOrMany<OutputId>, Vec<Vec<Condition>>> = IndexMap::new();
+) -> Result<IndexMap<Vec<OutputId>, Vec<Vec<Condition>>>, Vec<String>> {
+    let mut outputs: IndexMap<Vec<OutputId>, Vec<Vec<Condition>>> = IndexMap::new();
     let mut errors = Vec::new();
 
     for output in test_outputs {
@@ -569,7 +567,7 @@ fn build_outputs(
         }
 
         outputs
-            .entry(output.extract_from.clone())
+            .entry(output.extract_from.clone().to_vec())
             .and_modify(|existing_conditions| existing_conditions.push(conditions.clone()))
             .or_insert(vec![conditions.clone()]);
     }

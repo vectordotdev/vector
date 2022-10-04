@@ -24,7 +24,7 @@ pub async fn respond(
     tx.send(())
         .await
         .expect("Error sending 'before' status from test server");
-    waiter.lock().await;
+    let _ = waiter.lock().await;
     Ok(Response::builder()
         .status(status)
         .body(Body::empty())
@@ -76,6 +76,8 @@ pub fn http_client(
 }
 
 async fn http_to_http(status: StatusCode, response: StatusCode) {
+    test_util::trace_init();
+
     let address1 = test_util::next_addr();
     let address2 = test_util::next_addr();
     let config = config::load_from_str(

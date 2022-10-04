@@ -1,13 +1,18 @@
-use aws_sdk_firehose::error::{
-    DescribeDeliveryStreamError, PutRecordBatchError, PutRecordBatchErrorKind,
+use aws_sdk_firehose::{
+    error::{DescribeDeliveryStreamError, PutRecordBatchError, PutRecordBatchErrorKind},
+    types::SdkError,
+    Client as KinesisFirehoseClient,
 };
-use aws_sdk_firehose::types::SdkError;
-use aws_sdk_firehose::Client as KinesisFirehoseClient;
 use futures::FutureExt;
 use snafu::Snafu;
 use tower::ServiceBuilder;
 use vector_config::configurable_component;
 
+use super::{
+    request_builder::KinesisRequestBuilder,
+    service::{KinesisResponse, KinesisService},
+    sink::KinesisSink,
+};
 use crate::{
     aws::{create_client, is_retriable_error, AwsAuthentication, ClientBuilder, RegionOrEndpoint},
     codecs::{Encoder, EncodingConfig},
@@ -16,11 +21,6 @@ use crate::{
         SinkContext,
     },
     sinks::{
-        aws_kinesis_firehose::{
-            request_builder::KinesisRequestBuilder,
-            service::{KinesisResponse, KinesisService},
-            sink::KinesisSink,
-        },
         util::{
             retries::RetryLogic, BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings,
             TowerRequestConfig,
@@ -45,7 +45,7 @@ impl SinkBatchSettings for KinesisFirehoseDefaultBatchSettings {
 }
 
 /// Configuration for the `aws_kinesis_firehose` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("aws_kinesis_firehose"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct KinesisFirehoseSinkConfig {
@@ -88,7 +88,7 @@ pub struct KinesisFirehoseSinkConfig {
     pub acknowledgements: AcknowledgementsConfig,
 }
 
-#[derive(Debug, PartialEq, Snafu)]
+#[derive(Debug, PartialEq, Eq, Snafu)]
 pub enum BuildError {
     #[snafu(display(
         "Batch max size is too high. The value must be {} bytes or less",
@@ -141,7 +141,6 @@ impl ClientBuilder for KinesisFirehoseClientBuilder {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "aws_kinesis_firehose")]
 impl SinkConfig for KinesisFirehoseSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.create_client(&cx.proxy).await?;
@@ -176,7 +175,6 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
 
         let sink = KinesisSink {
             batch_settings,
-
             service,
             request_builder,
         };
@@ -187,12 +185,8 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
         Input::new(self.encoding.config().input_type() & DataType::Log)
     }
 
-    fn sink_type(&self) -> &'static str {
-        "aws_kinesis_firehose"
-    }
-
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 

@@ -7,10 +7,12 @@ pub mod logs;
 pub mod metrics;
 pub mod traces;
 
+#[allow(warnings, clippy::pedantic, clippy::nursery)]
 pub(crate) mod ddmetric_proto {
     include!(concat!(env!("OUT_DIR"), "/datadog.agentpayload.rs"));
 }
 
+#[allow(warnings)]
 pub(crate) mod ddtrace_proto {
     include!(concat!(env!("OUT_DIR"), "/dd_trace.rs"));
 }
@@ -28,7 +30,7 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tracing::Span;
 use value::Kind;
-use vector_config::configurable_component;
+use vector_config::{configurable_component, NamedComponent};
 use vector_core::config::LogNamespace;
 use vector_core::event::{BatchNotifier, BatchStatus};
 use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Reply};
@@ -37,7 +39,7 @@ use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
-        SourceConfig, SourceContext, SourceDescription,
+        SourceConfig, SourceContext,
     },
     event::Event,
     internal_events::{HttpBytesReceived, HttpDecompressError, StreamClosedError},
@@ -53,7 +55,7 @@ pub const METRICS: &str = "metrics";
 pub const TRACES: &str = "traces";
 
 /// Configuration for the `datadog_agent` source.
-#[configurable_component(source)]
+#[configurable_component(source("datadog_agent"))]
 #[derive(Clone, Debug)]
 pub struct DatadogAgentConfig {
     /// The address to accept connections on.
@@ -124,12 +126,7 @@ impl GenerateConfig for DatadogAgentConfig {
     }
 }
 
-inventory::submit! {
-    SourceDescription::new::<DatadogAgentConfig>("datadog_agent")
-}
-
 #[async_trait::async_trait]
-#[typetag::serde(name = "datadog_agent")]
 impl SourceConfig for DatadogAgentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
@@ -140,6 +137,7 @@ impl SourceConfig for DatadogAgentConfig {
             .or_else(|| cx.schema_definitions.get(&None))
             .expect("registered log schema required")
             .clone();
+
         let metrics_schema_definition = cx
             .schema_definitions
             .get(&Some(METRICS.to_owned()))
@@ -163,6 +161,9 @@ impl SourceConfig for DatadogAgentConfig {
         let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
         let filters = source.build_warp_filters(cx.out, acknowledgements, self)?;
         let shutdown = cx.shutdown;
+
+        info!(message = "Building HTTP server.", address = %self.address);
+
         Ok(Box::pin(async move {
             let span = Span::current();
             let routes = filters
@@ -176,6 +177,7 @@ impl SourceConfig for DatadogAgentConfig {
                         Err(r)
                     }
                 });
+
             warp::serve(routes)
                 .serve_incoming_with_graceful_shutdown(
                     listener.accept_stream(),
@@ -188,53 +190,59 @@ impl SourceConfig for DatadogAgentConfig {
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
-        let log_namespace = global_log_namespace.merge(self.log_namespace);
-
-        let definition = match log_namespace {
-            LogNamespace::Legacy => {
-                match self.decoding {
-                    // See: `LogMsg` struct.
-                    DeserializerConfig::Bytes => self
-                        .decoding
-                        .schema_definition(log_namespace)
-                        .with_field("message", Kind::bytes(), Some("message"))
-                        .with_field("status", Kind::bytes(), Some("severity"))
-                        .with_field("timestamp", Kind::timestamp(), Some("timestamp"))
-                        .with_field("hostname", Kind::bytes(), Some("host"))
-                        .with_field("service", Kind::bytes(), Some("service"))
-                        .with_field("ddsource", Kind::bytes(), Some("source"))
-                        .with_field("ddtags", Kind::bytes(), Some("tags")),
-
-                    // JSON deserializer can overwrite existing fields at runtime, so we have to treat
-                    // those events as if there is no known type details we can provide, other than the
-                    // details provided by the generic JSON schema definition.
-                    DeserializerConfig::Json => self.decoding.schema_definition(log_namespace),
-
-                    // Syslog deserializer allows for arbritrary "structured data" that can overwrite
-                    // existing fields, similar to the JSON deserializer.
-                    //
-                    // See also: https://datatracker.ietf.org/doc/html/rfc5424#section-6.3
-                    #[cfg(feature = "sources-syslog")]
-                    DeserializerConfig::Syslog => self.decoding.schema_definition(log_namespace),
-
-                    DeserializerConfig::Native => self.decoding.schema_definition(log_namespace),
-                    DeserializerConfig::NativeJson => {
-                        self.decoding.schema_definition(log_namespace)
-                    }
-                    DeserializerConfig::Gelf => self.decoding.schema_definition(log_namespace),
-                }
-            }
-            LogNamespace::Vector => self
-                .decoding
-                .schema_definition(log_namespace)
-                .with_metadata_field("message", Kind::bytes())
-                .with_metadata_field("status", Kind::bytes())
-                .with_metadata_field("timestamp", Kind::timestamp())
-                .with_metadata_field("hostname", Kind::bytes())
-                .with_metadata_field("service", Kind::bytes())
-                .with_metadata_field("ddsource", Kind::bytes())
-                .with_metadata_field("ddtags", Kind::bytes()),
-        };
+        let definition = self
+            .decoding
+            .schema_definition(global_log_namespace.merge(self.log_namespace))
+            .with_source_metadata(
+                self.get_component_name(),
+                Some("message"),
+                "message",
+                Kind::bytes(),
+                Some("message"),
+            )
+            .with_source_metadata(
+                self.get_component_name(),
+                Some("status"),
+                "status",
+                Kind::bytes(),
+                Some("severity"),
+            )
+            .with_source_metadata(
+                self.get_component_name(),
+                Some("timestamp"),
+                "timestamp",
+                Kind::timestamp(),
+                Some("timestamp"),
+            )
+            .with_source_metadata(
+                self.get_component_name(),
+                Some("hostname"),
+                "hostname",
+                Kind::bytes(),
+                Some("host"),
+            )
+            .with_source_metadata(
+                self.get_component_name(),
+                Some("service"),
+                "service",
+                Kind::bytes(),
+                Some("service"),
+            )
+            .with_source_metadata(
+                self.get_component_name(),
+                Some("ddsource"),
+                "ddsource",
+                Kind::bytes(),
+                Some("source"),
+            )
+            .with_source_metadata(
+                self.get_component_name(),
+                Some("ddtags"),
+                "ddtags",
+                Kind::bytes(),
+                Some("tags"),
+            )
+            .with_standard_vector_source_metadata();
 
         if self.multiple_outputs {
             vec![
@@ -247,10 +255,6 @@ impl SourceConfig for DatadogAgentConfig {
         } else {
             vec![Output::default(DataType::all()).with_schema_definition(definition)]
         }
-    }
-
-    fn source_type(&self) -> &'static str {
-        "datadog_agent"
     }
 
     fn resources(&self) -> Vec<Resource> {

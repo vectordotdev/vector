@@ -2,7 +2,7 @@ use bytes::Bytes;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
-use super::prelude::{error_stage, error_type};
+use vector_common::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct StatsdInvalidRecordError<'a> {
@@ -21,7 +21,7 @@ impl<'a> InternalEvent for StatsdInvalidRecordError<'a> {
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
             bytes = %String::from_utf8_lossy(&self.bytes),
-            rate_limit_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -83,7 +83,7 @@ impl<T: std::fmt::Debug + std::fmt::Display> InternalEvent for StatsdSocketError
             error_code = %error_code,
             error_type = error_type::CONNECTION_FAILED,
             stage = error_stage::RECEIVING,
-            rate_limit_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,

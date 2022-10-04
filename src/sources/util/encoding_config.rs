@@ -2,7 +2,7 @@ use vector_config::configurable_component;
 
 /// Character set encoding.
 #[configurable_component]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct EncodingConfig {
     /// Encoding of the source messages.

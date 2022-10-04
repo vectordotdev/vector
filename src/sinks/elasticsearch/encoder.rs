@@ -30,7 +30,7 @@ impl ByteSizeOf for ProcessedEvent {
     }
 }
 
-#[derive(PartialEq, Default, Clone, Debug)]
+#[derive(PartialEq, Eq, Default, Clone, Debug)]
 pub struct ElasticsearchEncoder {
     pub transformer: Transformer,
     pub doc_type: String,

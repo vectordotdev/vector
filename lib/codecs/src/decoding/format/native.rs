@@ -31,7 +31,9 @@ impl NativeDeserializerConfig {
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
         match log_namespace {
             LogNamespace::Legacy => schema::Definition::empty_legacy_namespace(),
-            LogNamespace::Vector => schema::Definition::new(Kind::any(), [log_namespace]),
+            LogNamespace::Vector => {
+                schema::Definition::new_with_default_metadata(Kind::any(), [log_namespace])
+            }
         }
     }
 }
@@ -45,7 +47,7 @@ impl Deserializer for NativeDeserializer {
         &self,
         bytes: Bytes,
         _log_namespace: LogNamespace,
-    ) -> vector_core::Result<SmallVec<[Event; 1]>> {
+    ) -> vector_common::Result<SmallVec<[Event; 1]>> {
         if bytes.is_empty() {
             Ok(smallvec![])
         } else {

@@ -26,7 +26,7 @@ jobs:
     timeout-minutes: 3
     if: github.ref != 'refs/heads/master'
     steps:
-      - uses: styfle/cancel-workflow-action@0.10.0
+      - uses: styfle/cancel-workflow-action@0.10.1
         with:
           access_token: ${{ secrets.GITHUB_TOKEN }}
           all_but_latest: true # can cancel workflows scheduled later
@@ -68,7 +68,7 @@ jobs:
             org.opencontainers.image.title=Soak Builder
 
       - name: Build and push Docker image (linux/amd64)
-        uses: docker/build-push-action@v3.1.0
+        uses: docker/build-push-action@v3.1.1
         with:
           context: .
           file: soaks/Dockerfile.builder

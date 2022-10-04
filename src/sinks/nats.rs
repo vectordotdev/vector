@@ -6,16 +6,15 @@ use codecs::JsonSerializerConfig;
 use futures::{stream::BoxStream, FutureExt, StreamExt, TryFutureExt};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
-use vector_common::internal_event::{BytesSent, EventsSent};
+use vector_common::internal_event::{
+    ByteSize, BytesSent, EventsSent, InternalEventHandle, Protocol,
+};
 use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
-    config::{
-        AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
-        SinkDescription,
-    },
+    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     event::{Event, EventStatus, Finalizable},
     internal_events::{NatsEventSendError, TemplateRenderingError},
     nats::{from_tls_auth_config, NatsAuthConfig, NatsConfigError},
@@ -43,7 +42,7 @@ enum BuildError {
  */
 
 /// Configuration for the `nats` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("nats"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct NatsSinkConfig {
@@ -82,10 +81,6 @@ fn default_name() -> String {
     String::from("vector")
 }
 
-inventory::submit! {
-    SinkDescription::new::<NatsSinkConfig>("nats")
-}
-
 impl GenerateConfig for NatsSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
@@ -102,7 +97,6 @@ impl GenerateConfig for NatsSinkConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "nats")]
 impl SinkConfig for NatsSinkConfig {
     async fn build(
         &self,
@@ -117,12 +111,8 @@ impl SinkConfig for NatsSinkConfig {
         Input::new(self.encoding.config().input_type() & DataType::Log)
     }
 
-    fn sink_type(&self) -> &'static str {
-        "nats"
-    }
-
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
@@ -172,6 +162,8 @@ impl NatsSink {
 #[async_trait]
 impl StreamSink<Event> for NatsSink {
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
+        let bytes_sent = register!(BytesSent::from(Protocol::TCP));
+
         while let Some(mut event) = input.next().await {
             let finalizers = event.take_finalizers();
 
@@ -183,7 +175,7 @@ impl StreamSink<Event> for NatsSink {
                         field: Some("subject"),
                         drop_event: true,
                     });
-                    finalizers.update_status(EventStatus::Errored);
+                    finalizers.update_status(EventStatus::Rejected);
                     continue;
                 }
             };
@@ -195,7 +187,7 @@ impl StreamSink<Event> for NatsSink {
             let mut bytes = BytesMut::new();
             if self.encoder.encode(event, &mut bytes).is_err() {
                 // Error is handled by `Encoder`.
-                finalizers.update_status(EventStatus::Errored);
+                finalizers.update_status(EventStatus::Rejected);
                 continue;
             }
 
@@ -213,10 +205,7 @@ impl StreamSink<Event> for NatsSink {
                         count: 1,
                         output: None
                     });
-                    emit!(BytesSent {
-                        byte_size: bytes.len(),
-                        protocol: "tcp"
-                    });
+                    bytes_sent.emit(ByteSize(bytes.len()));
                 }
             }
         }
@@ -336,8 +325,8 @@ mod integration_tests {
             tls: None,
             auth: Some(NatsAuthConfig::UserPassword {
                 user_password: NatsAuthUserPassword {
-                    user: "natsuser".into(),
-                    password: "natspass".into(),
+                    user: "natsuser".to_string(),
+                    password: "natspass".to_string().into(),
                 },
             }),
         };
@@ -364,8 +353,8 @@ mod integration_tests {
             tls: None,
             auth: Some(NatsAuthConfig::UserPassword {
                 user_password: NatsAuthUserPassword {
-                    user: "natsuser".into(),
-                    password: "wrongpass".into(),
+                    user: "natsuser".to_string(),
+                    password: "wrongpass".to_string().into(),
                 },
             }),
         };
@@ -395,7 +384,7 @@ mod integration_tests {
             tls: None,
             auth: Some(NatsAuthConfig::Token {
                 token: NatsAuthToken {
-                    value: "secret".into(),
+                    value: "secret".to_string().into(),
                 },
             }),
         };
@@ -425,7 +414,7 @@ mod integration_tests {
             tls: None,
             auth: Some(NatsAuthConfig::Token {
                 token: NatsAuthToken {
-                    value: "wrongsecret".into(),
+                    value: "wrongsecret".to_string().into(),
                 },
             }),
         };

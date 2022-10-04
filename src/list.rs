@@ -1,13 +1,13 @@
 use clap::Parser;
 use serde::Serialize;
 
-use crate::config::{SinkDescription, SourceDescription, TransformDescription};
+use vector_config::component::{SinkDescription, SourceDescription, TransformDescription};
 
 #[derive(Parser, Debug)]
-#[clap(rename_all = "kebab-case")]
+#[command(rename_all = "kebab-case")]
 pub struct Opts {
     /// Format the list in an encoding scheme.
-    #[clap(long, default_value = "text", possible_values = &["text", "json", "avro"])]
+    #[arg(long, default_value = "text", value_parser(["text", "json", "avro"]))]
     format: Format,
 }
 

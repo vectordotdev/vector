@@ -151,7 +151,7 @@ impl<Fut: Future> FuturesSet<Fut> for FuturesOrdered<Fut> {
     }
 
     fn push(&mut self, future: Fut) {
-        Self::push(self, future);
+        Self::push_back(self, future);
     }
 }
 
@@ -174,7 +174,7 @@ pub struct FinalizerFuture<T> {
 impl<T> Future for FinalizerFuture<T> {
     type Output = (<BatchStatusReceiver as Future>::Output, T);
     fn poll(mut self: Pin<&mut Self>, ctx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
-        let status = futures::ready!(self.receiver.poll_unpin(ctx));
+        let status = std::task::ready!(self.receiver.poll_unpin(ctx));
         // The use of this above in a `Futures{Ordered|Unordered|`
         // will only take this once before dropping the future.
         Poll::Ready((status, self.entry.take().unwrap_or_else(|| unreachable!())))

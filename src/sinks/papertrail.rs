@@ -6,7 +6,7 @@ use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig,
-        SinkContext, SinkDescription,
+        SinkContext,
     },
     event::Event,
     internal_events::TemplateRenderingError,
@@ -17,7 +17,7 @@ use crate::{
 };
 
 /// Configuration for the `papertrail` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("papertrail"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct PapertrailConfig {
@@ -39,10 +39,14 @@ pub struct PapertrailConfig {
     /// The value to use as the `process` in Papertrail.
     #[configurable(metadata(templateable))]
     process: Option<Template>,
-}
 
-inventory::submit! {
-    SinkDescription::new::<PapertrailConfig>("papertrail")
+    #[configurable(derived)]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 impl GenerateConfig for PapertrailConfig {
@@ -56,7 +60,6 @@ impl GenerateConfig for PapertrailConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "papertrail")]
 impl SinkConfig for PapertrailConfig {
     async fn build(
         &self,
@@ -105,12 +108,8 @@ impl SinkConfig for PapertrailConfig {
         Input::new(self.encoding.config().input_type() & DataType::Log)
     }
 
-    fn sink_type(&self) -> &'static str {
-        "papertrail"
-    }
-
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        None
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 

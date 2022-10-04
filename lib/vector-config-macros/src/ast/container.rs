@@ -2,7 +2,10 @@ use std::collections::HashSet;
 
 use darling::{error::Accumulator, util::Flag, FromAttributes};
 use serde_derive_internals::{ast as serde_ast, Ctxt, Derive};
-use syn::{DeriveInput, ExprPath, Generics, Ident, Type, TypeParam};
+use syn::{
+    DeriveInput, ExprPath, GenericArgument, Generics, Ident, PathArguments, PathSegment, Type,
+    TypeParam,
+};
 use vector_config_common::attributes::CustomAttribute;
 
 use super::{
@@ -21,6 +24,8 @@ const ERR_MISSING_DESC: &str = "all structs/enums must have a description i.e. `
 const ERR_ASYMMETRIC_SERDE_TYPE_CONVERSION: &str = "any container using `from`/`try_from`/`into` via `#[serde(...)]` must do so symmetrically i.e. the from/into types must match";
 const ERR_SERDE_TYPE_CONVERSION_FROM_TRY_FROM: &str = "`#[serde(from)]` and `#[serde(try_from)]` cannot be identical, as it is impossible for an infallible conversion from T to also be fallible";
 
+/// A source data structure annotated with `#[derive(Configurable)]`, parsed into an internal
+/// representation.
 pub struct Container<'a> {
     original: &'a DeriveInput,
     name: String,
@@ -31,6 +36,7 @@ pub struct Container<'a> {
 }
 
 impl<'a> Container<'a> {
+    /// Creates a new `Container<'a>` from the raw derive macro input.
     pub fn from_derive_input(input: &'a DeriveInput) -> darling::Result<Container<'a>> {
         // We can't do anything unless `serde` can also handle this container. We specifically only care about
         // deserialization here, because the schema tells us what we can _give_ to Vector.
@@ -130,6 +136,16 @@ impl<'a> Container<'a> {
                     serde_ast::Data::Enum(variants) => {
                         let variants = variants
                             .iter()
+                            // When an item is marked as being skipped -- `#[serde(skip)]` -- we
+                            // want to filter out variants that are skipped entirely, because
+                            // otherwise they have to meet all the criteria (doc comment, etc)
+                            // despite the fact they won't be part of the configuration schema
+                            // anyways, and we can't filter it out after the below step because all
+                            // we get is the errors until they can be validated completely.
+                            .filter(|variant| {
+                                !variant.attrs.skip_deserializing()
+                                    && !variant.attrs.skip_serializing()
+                            })
                             .map(|variant| {
                                 Variant::from_ast(
                                     variant,
@@ -150,8 +166,12 @@ impl<'a> Container<'a> {
                                 );
                             }
 
-                            // All variants must have a description.  No derived/transparent mode.
-                            if variant.description().is_none() {
+                            // All variants must have a description, except for untagged enums.
+                            //
+                            // This allows untagged enums used for "(de)serialize as A, B, or C"
+                            // purposes to avoid needless titles/descriptions when their fields will
+                            // implicitly provide that.
+                            if variant.description().is_none() && tagging != Tagging::None {
                                 accumulator.push(
                                     darling::Error::custom(ERR_NO_ENUM_VARIANT_DESCRIPTION)
                                         .with_span(variant),
@@ -223,42 +243,120 @@ impl<'a> Container<'a> {
             })
     }
 
+    /// Ident of the container.
+    ///
+    /// This is simply the name or type of a struct/enum, but is not parsed directly as a type via
+    /// `syn`, only an `Ident`.
     pub fn ident(&self) -> &Ident {
         &self.original.ident
     }
 
+    /// Generics for the container, if any.
     pub fn generics(&self) -> &Generics {
         &self.original.generics
     }
 
+    /// Data for the container.
+    ///
+    /// This would be the fields of a struct, or the variants for an enum.
     pub fn data(&self) -> &Data {
         &self.data
     }
 
+    /// Name of the container when deserializing.
+    ///
+    /// This may be different than the name of the container itself depending on whether it has been
+    /// altered with `serde` helper attributes i.e. `#[serde(rename = "...")]`.
     pub fn name(&self) -> &str {
         self.name.as_str()
     }
 
+    /// Title of the container, if any.
+    ///
+    /// The title specifically refers to the headline portion of a doc comment. For example, if a
+    /// struct has the following doc comment:
+    ///
+    /// ```text
+    /// /// My special struct.
+    /// ///
+    /// /// Here's why it's special:
+    /// /// ...
+    /// struct Wrapper(u64);
+    /// ```
+    ///
+    /// then the title would be `My special struct`. If the doc comment only contained `My special
+    /// struct.`, then we would consider the title _empty_. See `description` for more details on
+    /// detecting titles vs descriptions.
     pub fn title(&self) -> Option<&String> {
         self.attrs.title.as_ref()
     }
 
+    /// Description of the struct, if any.
+    ///
+    /// The description specifically refers to the body portion of a doc comment, or the headline if
+    /// only a headline exists.. For example, if a struct has the following doc comment:
+    ///
+    /// ```text
+    /// /// My special struct.
+    /// ///
+    /// /// Here's why it's special:
+    /// /// ...
+    /// struct Wrapper(u64);
+    /// ```
+    ///
+    /// then the title would be everything that comes after `My special struct`. If the doc comment
+    /// only contained `My special struct.`, then the description would be `My special struct.`, and
+    /// the title would be empty. In this way, the description will always be some port of a doc
+    /// comment, depending on the formatting applied.
+    ///
+    /// This logic was chosen to mimic how Rust's own `rustdoc` tool works, where it will use the
+    /// "title" portion as a high-level description for an item, only showing the title and
+    /// description together when drilling down to the documentation for that specific item. JSON
+    /// Schema supports both title and description for a schema, and so we expose both.
     pub fn description(&self) -> Option<&String> {
         self.attrs.description.as_ref()
     }
 
+    /// Virtual type of this container, if any.
+    ///
+    /// In some cases, a type may be representable by an entirely different type, and then converted
+    /// to the desired type using the common `TryFrom`/`From`/`Into` conversion traits. This is a
+    /// common pattern with `serde` to re-use existing conversion logic (such as taking a raw string
+    /// and parsing it to see if it's a valid regular expression, and so on) but represents a
+    /// divergence between the type we're generating a schema for and the actual type that will be
+    /// getting (de)serialized.
+    ///
+    /// When we detect a container with the right `serde` helper attributes (see the code in
+    /// `from_derive_input` for details), we switch to treating this container as, for the purpose
+    /// of schema generation, having the type specified by those helper attributes.
     pub fn virtual_newtype(&self) -> Option<Type> {
         self.virtual_newtype.clone()
     }
 
+    /// Path to a function to call to generate a default value for the container, if any.
+    ///
+    /// This will boil down to something like `std::default::Default::default` or
+    /// `name_of_in_scope_method_to_call`, where we generate code to actually call that path as a
+    /// function to generate the default value we include in the schema for this container.
     pub fn default_value(&self) -> Option<ExprPath> {
         self.default_value.clone()
     }
 
+    /// Whether or not the container is deprecated.
+    ///
+    /// Applying the `#[configurable(deprecated)]` helper attribute will mark this container as
+    /// deprecated from the perspective of the resulting schema. It does not interact with Rust's
+    /// standard `#[deprecated]` attribute, neither automatically applying it nor deriving the
+    /// deprecation status of a field when it is present.
     pub fn deprecated(&self) -> bool {
         self.attrs.deprecated.is_some()
     }
 
+    /// Metadata (custom attributes) for the container, if any.
+    ///
+    /// Attributes can take the shape of flags (`#[configurable(metadata(im_a_teapot))]`) or
+    /// key/value pairs (`#[configurable(metadata(status = "beta"))]`) to allow rich, semantic
+    /// metadata to be attached directly to containers.
     pub fn metadata(&self) -> impl Iterator<Item = CustomAttribute> {
         self.attrs
             .metadata
@@ -267,7 +365,7 @@ impl<'a> Container<'a> {
             .flat_map(|metadata| metadata.attributes())
     }
 
-    /// Gets the generic types that are used within fields or variants that are part of the schemas.
+    /// Gets the generic types that are used within fields or variants that are part of the schema.
     ///
     /// In order to ensure we can allow for a maximally flexible `Configurable` trait, we add bounds to generic types that are
     /// present on derived containers so that bounds don't need to be added on the actual container itself, essentially
@@ -282,19 +380,15 @@ impl<'a> Container<'a> {
             Data::Struct(_, fields) => fields
                 .iter()
                 .filter(|f| f.visible())
-                .filter_map(|f| match f.ty() {
-                    Type::Path(tp) => tp.path.get_ident().cloned(),
-                    _ => None,
-                })
+                .filter_map(|f| get_generic_type_param_idents(f.ty()))
+                .flatten()
                 .collect::<HashSet<_>>(),
             Data::Enum(variants) => variants
                 .iter()
                 .filter(|v| v.visible())
                 .flat_map(|v| v.fields().iter())
-                .filter_map(|f| match f.ty() {
-                    Type::Path(tp) => tp.path.get_ident().cloned(),
-                    _ => None,
-                })
+                .filter_map(|f| get_generic_type_param_idents(f.ty()))
+                .flatten()
                 .collect::<HashSet<_>>(),
         };
 
@@ -331,5 +425,148 @@ impl Attributes {
         self.description = self.description.or(doc_description);
 
         Ok(self)
+    }
+}
+
+/// Gets the idents for a type that potentially represent generic type parameters.
+///
+/// We use this function to take the `Type` of a field, and figure out if it has any generic type
+/// parameters, such as the `T` in `Vec<T>`. As the type itself might be the generic parameter (just
+/// a plain `T`) we potentially return the ident of the type itself unless we can determine that the
+/// type path has generic type arguments.
+fn get_generic_type_param_idents(ty: &Type) -> Option<Vec<Ident>> {
+    match ty {
+        Type::Path(tp) => match tp.path.segments.len() {
+            0 => unreachable!(
+                "A type path with no path segments should not be possible to construct normally."
+            ),
+            // A single path segment would be something like `String` or `Vec<T>`, so we
+            // do need to check for both scenarios.
+            1 => match tp.path.segments.first() {
+                None => unreachable!("Can only reach match arm if segment length was 1."),
+                Some(segment) => get_generic_args_from_path_segment(segment, true),
+            },
+            _ => {
+                let idents = tp
+                    .path
+                    .segments
+                    .iter()
+                    .filter_map(|segment| get_generic_args_from_path_segment(segment, false))
+                    .flatten()
+                    .collect::<Vec<_>>();
+
+                if idents.is_empty() {
+                    None
+                } else {
+                    Some(idents)
+                }
+            }
+        },
+        _ => None,
+    }
+}
+
+fn get_generic_args_from_path_segment(
+    segment: &PathSegment,
+    return_self: bool,
+) -> Option<Vec<Ident>> {
+    match &segment.arguments {
+        // If the segment has no brackets/parens, return its ident as-is if we should return self.
+        // When we're trying to parse a higher-level type path that has multiple segments, we
+        // wouldn't want to return the segment's ident, because if we were parsing
+        // `std::vec::Vec<T>`, that would lead to us returning `std`, `vec`, and `T`... the first
+        // two of which would make no sense, obviously.
+        PathArguments::None => {
+            if return_self {
+                Some(vec![segment.ident.clone()])
+            } else {
+                None
+            }
+        }
+        PathArguments::AngleBracketed(angle_args) => {
+            let args = angle_args
+                .args
+                .iter()
+                .filter_map(|generic| match generic {
+                    // We only care about generic type arguments.
+                    GenericArgument::Type(gty) => get_generic_type_path_ident(gty),
+                    _ => None,
+                })
+                .collect::<Vec<_>>();
+
+            if args.is_empty() {
+                None
+            } else {
+                Some(args)
+            }
+        }
+        // We don't support parenthesized generic arguments as they only come up in the case of
+        // function pointers, and we don't support those with `Configurable`.
+        PathArguments::Parenthesized(_) => None,
+    }
+}
+
+/// Gets the ident of a `Type` when it is a "path" type.
+///
+/// Path types look like `String` or `std::vec::Vec<T>`, and represent a type you could accept as a
+/// generic type argument.
+fn get_generic_type_path_ident(ty: &Type) -> Option<Ident> {
+    match ty {
+        Type::Path(tp) => tp.path.get_ident().cloned(),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use proc_macro2::Ident;
+    use quote::format_ident;
+    use syn::{parse_quote, Type};
+
+    use super::get_generic_type_param_idents;
+
+    fn literals_to_idents(idents: &[&str]) -> Vec<Ident> {
+        idents.iter().map(|raw| format_ident!("{}", raw)).collect()
+    }
+
+    #[test]
+    fn test_get_generic_type_param_idents() {
+        // A "direct" type reference, like a type that's already in scope, is a single ident so we
+        // do want to capture that.
+        let direct_concrete_type: Type = parse_quote! { String };
+        let idents = get_generic_type_param_idents(&direct_concrete_type)
+            .expect("idents should have been found");
+        assert_eq!(literals_to_idents(&["String"]), idents);
+
+        // Segmented type paths like this can't get represented as idents, which is also why they
+        // can't possibly represent a generic type parameter, as a generic type parameter is always
+        // a single ident, i.e. `T`.
+        let qualified_concrete_type: Type = parse_quote! { std::string::String };
+        let idents = get_generic_type_param_idents(&qualified_concrete_type);
+        assert_eq!(None, idents);
+
+        // This one is pretty obvious.
+        let direct_generic_type: Type = parse_quote! { T };
+        let idents = get_generic_type_param_idents(&direct_generic_type)
+            .expect("idents should have been found");
+        assert_eq!(literals_to_idents(&["T"]), idents);
+
+        // We should always extract the generic type parameter, even for a "direct" type reference.
+        let contained_generic_type: Type = parse_quote! { Vec<T> };
+        let idents = get_generic_type_param_idents(&contained_generic_type)
+            .expect("idents should have been found");
+        assert_eq!(literals_to_idents(&["T"]), idents);
+
+        // Similarly, we should always extract the generic type parameter for segmented type paths,
+        // since we traverse all segments.
+        let qualified_contained_generic_type: Type = parse_quote! { std::vec::Vec<T> };
+        let idents = get_generic_type_param_idents(&qualified_contained_generic_type)
+            .expect("idents should have been found");
+        assert_eq!(literals_to_idents(&["T"]), idents);
+
+        // We don't support parenthesized type parameters, like when using a function pointer type.
+        let parenthesized_type: Type = parse_quote! { Something<Fn(bool) -> String> };
+        let idents = get_generic_type_param_idents(&parenthesized_type);
+        assert_eq!(None, idents);
     }
 }

@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 
 use rdkafka::{consumer::ConsumerContext, ClientConfig, ClientContext, Statistics};
 use snafu::Snafu;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
 use crate::{internal_events::KafkaStatisticsReceived, tls::TlsEnableableConfig};
@@ -65,7 +66,7 @@ pub struct KafkaSaslConfig {
     pub(crate) username: Option<String>,
 
     /// The SASL password.
-    pub(crate) password: Option<String>,
+    pub(crate) password: Option<SensitiveString>,
 
     /// The SASL mechanism to use.
     pub(crate) mechanism: Option<String>,
@@ -87,10 +88,10 @@ impl KafkaAuthConfig {
         if sasl_enabled {
             let sasl = self.sasl.as_ref().unwrap();
             if let Some(username) = &sasl.username {
-                client.set("sasl.username", username);
+                client.set("sasl.username", username.as_str());
             }
             if let Some(password) = &sasl.password {
-                client.set("sasl.password", password);
+                client.set("sasl.password", password.inner());
             }
             if let Some(mechanism) = &sasl.mechanism {
                 client.set("sasl.mechanism", mechanism);

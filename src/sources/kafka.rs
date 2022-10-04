@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, HashMap},
     io::Cursor,
     sync::Arc,
 };
@@ -15,7 +15,7 @@ use futures::{Stream, StreamExt};
 use once_cell::sync::OnceCell;
 use rdkafka::{
     consumer::{Consumer, ConsumerContext, Rebalance, StreamConsumer},
-    message::{BorrowedMessage, Headers, Message},
+    message::{BorrowedMessage, Message},
     ClientConfig, ClientContext, Statistics,
 };
 use snafu::{ResultExt, Snafu};
@@ -28,14 +28,11 @@ use vector_common::{byte_size_of::ByteSizeOf, finalizer::OrderedFinalizer};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{
-        log_schema, AcknowledgementsConfig, LogSchema, Output, SourceConfig, SourceContext,
-        SourceDescription,
-    },
+    config::{log_schema, AcknowledgementsConfig, LogSchema, Output, SourceConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, Event, Value},
     internal_events::{
-        KafkaBytesReceived, KafkaEventsReceived, KafkaNegativeAcknowledgmentError,
-        KafkaOffsetUpdateError, KafkaReadError, StreamClosedError,
+        KafkaBytesReceived, KafkaEventsReceived, KafkaOffsetUpdateError, KafkaReadError,
+        StreamClosedError,
     },
     kafka,
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
@@ -52,7 +49,7 @@ enum BuildError {
 }
 
 /// Configuration for the `kafka` source.
-#[configurable_component(source)]
+#[configurable_component(source("kafka"))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
@@ -198,14 +195,9 @@ fn default_headers_key() -> String {
     "headers".into()
 }
 
-inventory::submit! {
-    SourceDescription::new::<KafkaSourceConfig>("kafka")
-}
-
 impl_generate_config_from_default!(KafkaSourceConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "kafka")]
 impl SourceConfig for KafkaSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let consumer = create_consumer(self)?;
@@ -229,10 +221,6 @@ impl SourceConfig for KafkaSourceConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(self.decoding.output_type())]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "kafka"
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -263,13 +251,17 @@ async fn kafka_source(
     let mut stream = consumer.stream();
     let keys = Keys::from(log_schema(), &config);
 
-    let mut topics = Topics::new(&config);
-
     loop {
         tokio::select! {
             _ = &mut shutdown => break,
             entry = ack_stream.next() => if let Some((status, entry)) = entry {
-                handle_ack(&mut topics, status, entry, &consumer);
+                if status == BatchStatus::Delivered {
+                    if let Err(error) =
+                        consumer.store_offset(&entry.topic, entry.partition, entry.offset)
+                    {
+                        emit!(KafkaOffsetUpdateError { error });
+                    }
+                }
             },
             message = stream.next() => match message {
                 None => break,  // WHY?
@@ -282,7 +274,7 @@ async fn kafka_source(
                         partition: msg.partition(),
                     });
 
-                    parse_message(msg, &decoder, keys, &finalizer, &mut out, &consumer, &topics).await;
+                    parse_message(msg, decoder.clone(), keys, &finalizer, &mut out, &consumer).await;
                 }
             },
         }
@@ -291,72 +283,15 @@ async fn kafka_source(
     Ok(())
 }
 
-struct Topics {
-    subscribed: HashSet<String>,
-    failed: HashSet<String>,
-}
-
-impl Topics {
-    fn new(config: &KafkaSourceConfig) -> Self {
-        Self {
-            subscribed: config.topics.iter().cloned().collect(),
-            failed: Default::default(),
-        }
-    }
-}
-
-fn handle_ack(
-    topics: &mut Topics,
-    status: BatchStatus,
-    entry: FinalizerEntry,
-    consumer: &StreamConsumer<CustomContext>,
-) {
-    if !topics.failed.contains(&entry.topic) {
-        if status == BatchStatus::Delivered {
-            if let Err(error) = consumer.store_offset(&entry.topic, entry.partition, entry.offset) {
-                emit!(KafkaOffsetUpdateError { error });
-            }
-        } else {
-            emit!(KafkaNegativeAcknowledgmentError {
-                topic: &entry.topic,
-                partition: entry.partition,
-                offset: entry.offset,
-            });
-            // Try to unsubscribe from the named topic. Note that the
-            // subscribed topics list could be missing the named topic
-            // for two reasons:
-            // 1. Multiple batches of events from the same topic could
-            // be flight and all receive a negative acknowledgement,
-            // in which case it will only be present for the first
-            // response.
-            // 2. The topic list may contain wildcards, in which case
-            // there may not be an exact match for the topic name.
-            if topics.subscribed.remove(&entry.topic) {
-                let topics: Vec<&str> = topics.subscribed.iter().map(|s| s.as_str()).collect();
-                // There is no direct way to unsubscribe from a named
-                // topic, as the unsubscribe library function drops
-                // all topics. The subscribe function, however,
-                // replaces the list of subscriptions, from which we
-                // have removed the topic above.  Ignore any errors,
-                // as we drop output from the topic below anyways.
-                let _ = consumer.subscribe(&topics);
-            }
-            // Don't update the offset after a failed ack
-            topics.failed.insert(entry.topic);
-        }
-    }
-}
-
 async fn parse_message(
     msg: BorrowedMessage<'_>,
-    decoder: &Decoder,
+    decoder: Decoder,
     keys: Keys<'_>,
     finalizer: &Option<Arc<OrderedFinalizer<FinalizerEntry>>>,
     out: &mut SourceSender,
     consumer: &Arc<StreamConsumer<CustomContext>>,
-    topics: &Topics,
 ) {
-    if let Some((count, mut stream)) = parse_stream(&msg, decoder, keys, topics) {
+    if let Some((count, mut stream)) = parse_stream(&msg, decoder, keys) {
         match finalizer {
             Some(finalizer) => {
                 let (batch, receiver) = BatchNotifier::new_with_receiver();
@@ -392,21 +327,16 @@ async fn parse_message(
 // Turn the received message into a stream of parsed events.
 fn parse_stream<'a>(
     msg: &BorrowedMessage<'a>,
-    decoder: &Decoder,
+    decoder: Decoder,
     keys: Keys<'a>,
-    topics: &Topics,
 ) -> Option<(usize, impl Stream<Item = Event> + 'a)> {
-    if topics.failed.contains(msg.topic()) {
-        return None;
-    }
-
     let payload = msg.payload()?; // skip messages with empty payload
 
     let rmsg = ReceivedMessage::from(msg);
 
     let payload = Cursor::new(Bytes::copy_from_slice(payload));
 
-    let mut stream = FramedRead::new(payload, decoder.clone());
+    let mut stream = FramedRead::new(payload, decoder);
     let (count, _) = stream.size_hint();
     let stream = stream! {
         while let Some(result) = stream.next().await {
@@ -722,20 +652,29 @@ mod integration_test {
 
     #[tokio::test]
     async fn consumes_event_with_acknowledgements() {
-        send_receive(true, 10).await;
+        send_receive(true, |_| false, 10).await;
     }
 
     #[tokio::test]
     async fn consumes_event_without_acknowledgements() {
-        send_receive(false, 10).await;
+        send_receive(false, |_| false, 10).await;
     }
 
     #[tokio::test]
-    async fn handles_negative_acknowledgements() {
-        send_receive(true, 2).await;
+    async fn handles_one_negative_acknowledgement() {
+        send_receive(true, |n| n == 2, 10).await;
     }
 
-    async fn send_receive(acknowledgements: bool, receive_count: usize) {
+    #[tokio::test]
+    async fn handles_permanent_negative_acknowledgement() {
+        send_receive(true, |n| n >= 2, 2).await;
+    }
+
+    async fn send_receive(
+        acknowledgements: bool,
+        error_at: impl Fn(usize) -> bool,
+        receive_count: usize,
+    ) {
         const SEND_COUNT: usize = 10;
 
         let topic = format!("test-topic-{}", random_string(10));
@@ -745,7 +684,7 @@ mod integration_test {
         let now = send_events(topic.clone(), 10).await;
 
         let events = assert_source_compliance(&["protocol", "topic", "partition"], async move {
-            let (tx, rx) = SourceSender::new_test_error_after(receive_count);
+            let (tx, rx) = SourceSender::new_test_errors(error_at);
             let (trigger_shutdown, shutdown_done) = spawn_kafka(tx, config, acknowledgements);
             let events = collect_n(rx, SEND_COUNT).await;
             // Yield to the finalization task to let it collect the
@@ -803,11 +742,11 @@ mod integration_test {
         let (pipe, recv) = SourceSender::new_with_buffer(100);
         let recv = BufferReceiver::new(recv.into()).into_stream();
         let recv = recv.then(move |mut events| async move {
-            events.for_each_log(|log| {
+            events.iter_logs_mut().for_each(|log| {
                 log.insert("pipeline_id", id.to_string());
             });
             sleep(delay).await;
-            events.for_each_event(|mut event| {
+            events.iter_events_mut().for_each(|mut event| {
                 let metadata = event.metadata_mut();
                 metadata.update_status(status);
                 metadata.update_sources();

@@ -5,6 +5,7 @@ use http::Uri;
 use indoc::indoc;
 use snafu::ResultExt;
 use tower::ServiceBuilder;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 use vector_core::config::{proxy::ProxyConfig, AcknowledgementsConfig};
 
@@ -53,7 +54,7 @@ impl SinkBatchSettings for DatadogTracesDefaultBatchSettings {
 }
 
 /// Configuration for the `datadog_traces` sink.
-#[configurable_component(sink)]
+#[configurable_component(sink("datadog_traces"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogTracesConfig {
@@ -71,7 +72,7 @@ pub struct DatadogTracesConfig {
     /// precedence over the default.
     ///
     /// [api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
-    pub default_api_key: String,
+    pub default_api_key: SensitiveString,
 
     #[configurable(derived)]
     pub tls: Option<TlsEnableableConfig>,
@@ -152,7 +153,7 @@ impl DatadogTracesConfig {
 
 impl DatadogTracesConfig {
     pub fn build_sink(&self, client: HttpClient) -> crate::Result<VectorSink> {
-        let default_api_key: Arc<str> = Arc::from(self.default_api_key.clone().as_str());
+        let default_api_key: Arc<str> = Arc::from(self.default_api_key.inner());
         let request_limits = self.request.unwrap_with(&DEFAULT_REQUEST_LIMITS);
         let endpoints = self.generate_traces_endpoint_configuration()?;
         let batcher_settings = self
@@ -177,7 +178,12 @@ impl DatadogTracesConfig {
     pub fn build_healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
         let validate_endpoint =
             get_api_validate_endpoint(self.endpoint.as_ref(), self.site.as_ref(), None)?;
-        Ok(healthcheck(client, validate_endpoint, self.default_api_key.clone()).boxed())
+        Ok(healthcheck(
+            client,
+            validate_endpoint,
+            self.default_api_key.inner().to_string(),
+        )
+        .boxed())
     }
 
     pub fn build_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
@@ -194,7 +200,6 @@ impl DatadogTracesConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "datadog_traces")]
 impl SinkConfig for DatadogTracesConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.build_client(&cx.proxy)?;
@@ -207,12 +212,8 @@ impl SinkConfig for DatadogTracesConfig {
         Input::trace()
     }
 
-    fn sink_type(&self) -> &'static str {
-        "datadog_traces"
-    }
-
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
