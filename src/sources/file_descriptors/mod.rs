@@ -8,7 +8,6 @@ use codecs::{
     StreamDecodingError,
 };
 use futures::{channel::mpsc, executor, SinkExt, StreamExt};
-use tokio::task;
 use tokio_util::{codec::FramedRead, io::StreamReader};
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::NamedComponent;
@@ -64,7 +63,7 @@ pub trait FileDescriptorConfig: NamedComponent {
         // This is recommended by Tokio, as otherwise the process will not shut down
         // until another newline is entered. See
         // https://github.com/tokio-rs/tokio/blob/a73428252b08bf1436f12e76287acbc4600ca0e5/tokio/src/io/stdin.rs#L33-L42
-        task::spawn_blocking(move || {
+        std::thread::spawn(move || {
             info!("Capturing {}.", description);
             read_from_fd(reader, sender);
         });
