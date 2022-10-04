@@ -4299,6 +4299,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "879777f0cc6f3646a044de60e4ab98c75617e3f9580f7a2032e6ad7ea0cd3054"
 
 [[package]]
+name = "loki-logproto"
+version = "0.1.0"
+dependencies = [
+ "bytes 1.2.1",
+ "chrono",
+ "prost 0.10.4",
+ "prost-build 0.10.4",
+ "prost-types 0.10.1",
+ "snap",
+]
+
+[[package]]
 name = "lookup"
 version = "0.1.0"
 dependencies = [
@@ -8784,6 +8796,7 @@ dependencies = [
  "libc",
  "listenfd",
  "logfmt",
+ "loki-logproto",
  "lookup",
  "lru",
  "maxminddb",

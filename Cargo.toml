@@ -84,6 +84,7 @@ members = [
   "lib/file-source",
   "lib/k8s-e2e-tests",
   "lib/k8s-test-framework",
+  "lib/loki-logproto",
   "lib/lookup",
   "lib/portpicker",
   "lib/prometheus-parser",
@@ -131,6 +132,7 @@ vector-config-macros = { path = "lib/vector-config-macros" }
 vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl"] }
 vector-vrl-functions = { path = "lib/vector-vrl-functions" }
 vrl-cli = { path = "lib/vrl/cli", optional = true }
+loki-logproto = { path = "lib/loki-logproto", optional = true }
 
 # Tokio / Futures
 async-stream = { version = "0.3.3", default-features = false }
@@ -669,7 +671,7 @@ sinks-humio = ["sinks-splunk_hec", "transforms-metric_to_log"]
 sinks-influxdb = []
 sinks-kafka = ["dep:rdkafka"]
 sinks-logdna = []
-sinks-loki = []
+sinks-loki = ["loki-logproto"]
 sinks-nats = ["dep:nats", "dep:nkeys"]
 sinks-new_relic_logs = ["sinks-http"]
 sinks-new_relic = []
