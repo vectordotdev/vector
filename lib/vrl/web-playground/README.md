@@ -15,25 +15,26 @@ to WebAssembly which can then be used within the browser. Install it by running:
 cargo install 0.10.3 wasm-pack
 ```
 
-After installing `web-pack` we must compile our project by running:
+After installing `wasm-pack` we must compile our project by running:
 
 ```shell
 wasm-pack build --target web
 ```
 
 Notice a `pkg` directory was created which contains `wasm_bg.wasm`, `wasm.js`,
-`wasm.d.ts` these are the files that will be used by the web browser to run the
+these are the files that will be used by the web browser to run the
 compiled Rust code.
 
 For more information on Rust and WebAssembly please visit
 [the mozilla docs][mozilla-wasm-rust-docs] or
 [the Rust book wasm chapter][rust-book-wasm]
 
-The `lib.rs` file is available to the web browser. This will make it so we can
-use the `run_vrl` function in the console. Notice our `index.html` imports the
-VRL wasm module from `/pkg/` and sets the `window.run_vrl` function so that
-we can test VRL within the web browser console. To test out `index.html` we
-need to host it locally, for example by running:
+The `lib.rs` file is the entry point of the `web-playground` library.
+This will make it so we can use the `run_vrl` function in the console.
+Notice our `index.html` imports the VRL wasm module from `/pkg/` and
+sets the `window.run_vrl` function so that we can test VRL within
+the web browser console. To test out `index.html` we need to host it
+locally, for example by running:
 
 ```shell
 python3 -m http.server
