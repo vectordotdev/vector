@@ -22,7 +22,7 @@ use vector_common::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
 };
 
-use crate::internal_events::{GrpcError, GrpcInvalidCompressionScheme};
+use crate::internal_events::{GrpcError, GrpcInvalidCompressionSchemeError};
 
 // Every gRPC message has a five byte header:
 // - a compressed flag (u8, 0/1 for compressed/decompressed)
@@ -321,7 +321,7 @@ where
         match CompressionScheme::from_encoding_header(&req) {
             // There was a header for the encoding, but it was either invalid data or a scheme we don't support.
             Err(status) => {
-                emit!(GrpcInvalidCompressionScheme { status: &status });
+                emit!(GrpcInvalidCompressionSchemeError { status: &status });
                 Box::pin(async move { Ok(status.to_http()) })
             }
 

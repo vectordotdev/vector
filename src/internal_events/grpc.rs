@@ -3,11 +3,11 @@ use vector_common::internal_event::{error_stage, error_type};
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct GrpcInvalidCompressionScheme<'a> {
+pub struct GrpcInvalidCompressionSchemeError<'a> {
     pub status: &'a tonic::Status,
 }
 
-impl InternalEvent for GrpcInvalidCompressionScheme<'_> {
+impl InternalEvent for GrpcInvalidCompressionSchemeError<'_> {
     fn emit(self) {
         error!(
             message = "Invalid compression scheme.",
