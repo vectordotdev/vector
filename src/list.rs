@@ -7,31 +7,15 @@ use vector_config::component::{SinkDescription, SourceDescription, TransformDesc
 #[command(rename_all = "kebab-case")]
 pub struct Opts {
     /// Format the list in an encoding scheme.
-    #[arg(long, default_value = "text", value_parser(["text", "json", "avro"]))]
+    #[arg(long, default_value = "text")]
     format: Format,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(clap::ValueEnum, Debug, Clone, PartialEq)]
 enum Format {
     Text,
     Json,
     Avro,
-}
-
-impl std::str::FromStr for Format {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "text" => Ok(Format::Text),
-            "json" => Ok(Format::Json),
-            "avro" => Ok(Format::Avro),
-            s => Err(format!(
-                "{} is not a valid option, expected `text` or `json`",
-                s
-            )),
-        }
-    }
 }
 
 #[derive(Serialize)]
