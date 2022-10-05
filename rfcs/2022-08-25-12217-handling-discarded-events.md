@@ -21,7 +21,7 @@ a uniform fashion in all components.
 ### Out of scope
 
 - Handling of discarded data in sources before it is translated into events.
-- Handling of discarded sink batch buffers.
+- Handling of discarded sink request data after it is translated from events.
 
 ## Pain
 
