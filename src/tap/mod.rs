@@ -21,7 +21,7 @@ pub struct Opts {
     limit: u32,
 
     /// Encoding format for events printed to screen
-    #[arg(default_value = "json", value_parser(["json", "yaml", "logfmt"]), short = 'f', long)]
+    #[arg(default_value = "json", short = 'f', long)]
     format: TapEncodingFormat,
 
     /// Components IDs to observe (comma-separated; accepts glob patterns)
