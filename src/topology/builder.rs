@@ -345,12 +345,19 @@ pub async fn build_pieces(
         let merged_definition =
             schema::merged_definition(&transform.inputs, config, &mut definition_cache);
 
-        for output in transform.inner.outputs(&merged_definition) {
-            let definition = match output.log_schema_definition {
-                Some(definition) => definition,
-                None => merged_definition.clone(),
-            };
+        let span = error_span!(
+            "transform",
+            component_kind = "transform",
+            component_id = %key.id(),
+            component_type = %transform.inner.get_component_name(),
+            // maintained for compatibility
+            component_name = %key.id(),
+        );
 
+        for output in transform.inner.outputs(&merged_definition) {
+            let definition = output
+                .log_schema_definition
+                .unwrap_or_else(|| merged_definition.clone());
             schema_definitions.insert(output.port, definition);
         }
 
@@ -364,7 +371,12 @@ pub async fn build_pieces(
 
         let node = TransformNode::from_parts(key.clone(), transform, &merged_definition);
 
-        let transform = match transform.inner.build(&context).await {
+        let transform = match transform
+            .inner
+            .build(&context)
+            .instrument(span.clone())
+            .await
+        {
             Err(error) => {
                 errors.push(format!("Transform \"{}\": {}", key, error));
                 continue;
@@ -377,7 +389,10 @@ pub async fn build_pieces(
 
         inputs.insert(key.clone(), (input_tx, node.inputs.clone()));
 
-        let (transform_task, transform_outputs) = build_transform(transform, node, input_rx);
+        let (transform_task, transform_outputs) = {
+            let _span = span.enter();
+            build_transform(transform, node, input_rx)
+        };
 
         outputs.extend(transform_outputs);
         tasks.insert(key.clone(), transform_task);
@@ -822,7 +837,6 @@ fn build_task_transform(
                 byte_size: events.size_of(),
             })
         });
-    // FIXME: Does this get the tags right (span)?
     let events_sent = register!(EventsSent::from(internal_event::Output(None)));
     let stream = t
         .transform(Box::pin(filtered))
