@@ -9,14 +9,14 @@ use tracing::Span;
 use super::tracing::WithAllocationGroup;
 
 thread_local! {
-    /// The currently executing allocation grop.
+    /// The currently executing allocation group.
     ///
     /// Any allocations which occur on this thread will be associated with whichever token is
     /// present at the time of the allocation.
     pub static CURRENT_ALLOCATION_GROUP: RefCell<AllocationGroupId> = RefCell::new(AllocationGroupId::ROOT);
 }
 
-/// The identifier that uniquely identifiers an allocation group.
+/// The identifier that uniquely identifies an allocation group.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct AllocationGroupId(NonZeroUsize);
 
@@ -43,7 +43,7 @@ impl AllocationGroupId {
     /// distinguish allocator events between various allocation groups.
     ///
     /// Group IDs must be attached to a [`Span`][tracing::Span] in order to become active,
-    /// assocating allocations and deallocations within an active span as being attached to the
+    /// associating allocations and deallocations within an active span as being attached to the
     /// given allocation group.
     pub fn register() -> Option<AllocationGroupId> {
         static GROUP_ID: AtomicUsize = AtomicUsize::new(AllocationGroupId::ROOT.0.get() + 1);
@@ -155,7 +155,7 @@ where
 
 /// Calls `f` after suspending the active allocation group.
 ///
-/// In constrast to `try_with_suspended_allocation_group`, this method will always call `f` after attempting to suspend
+/// In contrast to `try_with_suspended_allocation_group`, this method will always call `f` after attempting to suspend
 /// the active allocation group, even if it was already suspended.
 ///
 /// In practice, this method is primarily useful for "run this function and don't trace any (de)allocations at all" while
