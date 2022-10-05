@@ -369,23 +369,22 @@ mod tests {
         use crate::event::LogEvent;
 
         assert_transform_compliance(async move {
-            let config = toml::from_str::<PipelinesConfig>(
-                r#"
-[transforms.my_pipelines]
-type = "pipelines"
-inputs = ["in"]
+            let config = toml::from_str::<PipelinesConfig>(indoc::indoc! {r#"
+                    [transforms.my_pipelines]
+                    type = "pipelines"
+                    inputs = ["in"]
 
-[[transforms.my_pipelines.logs]]
-name = "foo pipeline"
+                    [[transforms.my_pipelines.logs]]
+                    name = "foo pipeline"
 
-[[transforms.my_pipelines.logs.transforms]]
+                    [[transforms.my_pipelines.logs.transforms]]
 
-[[transforms.my_pipelines.logs]]
-name = "bar pipeline"
-filter.type = "vrl"
-filter.source = """true"""
+                    [[transforms.my_pipelines.logs]]
+                    name = "bar pipeline"
+                    filter.type = "vrl"
+                    filter.source = """true"""
             "#,
-            )
+            })
             .unwrap();
 
             let (tx, rx) = mpsc::channel(1);
