@@ -37,7 +37,7 @@ pub struct LuaConfig {
 impl LuaConfig {
     pub fn build(&self) -> crate::Result<Transform> {
         warn!(
-            "The `lua` transform API version 1 is deprecated. Please convert your script to version 2."
+            "DEPRECATED The `lua` transform API version 1 is deprecated. Please convert your script to version 2."
         );
         Lua::new(self.source.clone(), self.search_dirs.clone()).map(Transform::event_task)
     }
