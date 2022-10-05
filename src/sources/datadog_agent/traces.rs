@@ -179,17 +179,15 @@ fn convert_dd_tracer_payload(payload: ddtrace_proto::TracerPayload) -> Vec<Trace
             trace_tags.extend(tags.clone());
             trace_event.insert("tags", Value::from(trace_tags));
 
-            let n_spans = trace.spans.len();
+            trace_event.insert(
+                "spans",
+                trace
+                    .spans
+                    .into_iter()
+                    .map(|s| Value::from(convert_span(s)))
+                    .collect::<Vec<Value>>(),
+            );
 
-            let spans = trace
-                .spans
-                .into_iter()
-                .map(|s| Value::from(convert_span(s)))
-                .collect::<Vec<Value>>();
-
-            assert_eq!(n_spans, spans.len(), "Not all spans converted!");
-
-            trace_event.insert("spans", spans);
             trace_event.insert("container_id", payload.container_id.clone());
             trace_event.insert("language_name", payload.language_name.clone());
             trace_event.insert("language_version", payload.language_version.clone());
