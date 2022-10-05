@@ -106,7 +106,7 @@ pub struct Count(pub usize);
 #[derive(Clone, Copy)]
 pub struct CountByteSize(pub usize, pub usize);
 
-// Wrapper types used to hold inputs for registering an event
+// Wrapper types used to hold parameters for registering events
 
 pub struct Output(pub Option<SharedString>);
 
