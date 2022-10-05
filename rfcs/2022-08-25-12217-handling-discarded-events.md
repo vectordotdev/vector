@@ -79,7 +79,8 @@ add a new optional configuration setting to indicate the internal disposition of
 `outputs.NAME.disposition`. This will have two non-default values, `"drop"` to mark all events going
 to that output as delivered and then drop them, and `"reject"` to mark them as having failed.  If
 this setting is not present and a component has an unhandled output, a default behavior of `"drop"`
-will be assumed, which matches the current behavior.
+will be assumed, which matches the current behavior. Once validation of output handling is enforced
+as above, this default will be removed.
 
 So, to configure the new discard output as discarding events with an error result, users would add the
 following:
