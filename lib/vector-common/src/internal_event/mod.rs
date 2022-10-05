@@ -95,8 +95,13 @@ pub fn register<E: RegisterInternalEvent>(event: E) -> E::Handle {
 
 pub type Registered<T> = <T as RegisterInternalEvent>::Handle;
 
+#[derive(Clone, Copy)]
 pub struct ByteSize(pub usize);
 
+#[derive(Clone, Copy)]
+pub struct Count(pub usize);
+
+#[derive(Clone, Copy)]
 pub struct CountByteSize(pub usize, pub usize);
 
 pub struct Protocol(pub SharedString);

@@ -72,7 +72,7 @@ components: sinks: [Name=string]: {
 			description: """
 				Configures the sink specific buffer behavior.
 
-				More information about the individual buffer types, and buffer behavior, can be found in the [Buffering Model][\(urls.vector_buffering_model)] section.
+				More information about the individual buffer types, and buffer behavior, can be found in the [Buffering Model](\(urls.vector_buffering_model)) section.
 				"""
 			required:    false
 			type: object: {

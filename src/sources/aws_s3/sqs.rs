@@ -603,9 +603,10 @@ impl IngestorProcess {
 
 // https://docs.aws.amazon.com/AmazonS3/latest/userguide/how-to-enable-disable-notification-intro.html
 #[derive(Clone, Debug, Deserialize)]
+#[serde(untagged)]
 enum Event {
-    TestEvent(S3TestEvent),
     Event(S3Event),
+    TestEvent(S3TestEvent),
 }
 
 #[derive(Clone, Debug, Deserialize)]
