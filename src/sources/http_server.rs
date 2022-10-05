@@ -54,8 +54,8 @@ pub enum HttpMethod {
     Delete,
 }
 
-/// Configuration for the `http` source.
-#[configurable_component(source("http"))]
+/// Configuration for the `http_server` source.
+#[configurable_component(source("http_server"))]
 #[derive(Clone, Debug)]
 pub struct SimpleHttpConfig {
     /// The address to listen for connections on.

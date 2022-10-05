@@ -180,8 +180,9 @@ pub enum Sources {
     #[cfg(feature = "sources-host_metrics")]
     HostMetrics(#[configurable(derived)] host_metrics::HostMetricsConfig),
 
-    /// HTTP.
+    /// HTTP Server.
     #[cfg(feature = "sources-http_server")]
+    #[serde(alias = "http")]
     HttpServer(#[configurable(derived)] http_server::SimpleHttpConfig),
 
     /// HTTP Scrape.
