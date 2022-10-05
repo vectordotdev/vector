@@ -15,9 +15,9 @@ use tokio_util::udp::UdpFramed;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
-use crate::codecs::Decoder;
 #[cfg(unix)]
 use crate::sources::util::build_unix_stream_source;
+use crate::{codecs::Decoder, internal_events::StreamClosedError};
 use crate::{
     config::{log_schema, DataType, GenerateConfig, Output, Resource, SourceConfig, SourceContext},
     event::Event,
@@ -307,7 +307,8 @@ pub fn udp(
                 Ok(())
             }
             Err(error) => {
-                error!(message = "Error sending line.", %error);
+                let (count, _) = stream.size_hint();
+                emit!(StreamClosedError { error, count });
                 Err(())
             }
         }
