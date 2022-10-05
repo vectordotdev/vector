@@ -17,10 +17,11 @@ use vector_core::config::LogNamespace;
 
 #[cfg(unix)]
 use crate::sources::util::build_unix_stream_source;
-use crate::{codecs::Decoder, internal_events::StreamClosedError};
 use crate::{
+    codecs::Decoder,
     config::{log_schema, DataType, GenerateConfig, Output, Resource, SourceConfig, SourceContext},
     event::Event,
+    internal_events::StreamClosedError,
     internal_events::SyslogUdpReadError,
     shutdown::ShutdownSignal,
     sources::util::{SocketListenAddr, TcpNullAcker, TcpSource},
