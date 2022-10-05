@@ -822,7 +822,7 @@ mod test {
             send_lines(in_addr, input_lines).await.unwrap();
 
             // Wait a short period of time to ensure the messages get sent.
-            sleep(Duration::from_secs(1)).await;
+            sleep(Duration::from_secs(2)).await;
 
             // Shutdown the source, and make sure we've got all the messages we sent in.
             shutdown
@@ -976,7 +976,7 @@ mod test {
             send_encodable(in_addr, codec, input_lines).await.unwrap();
 
             // Wait a short period of time to ensure the messages get sent.
-            sleep(Duration::from_secs(1)).await;
+            sleep(Duration::from_secs(2)).await;
 
             // Shutdown the source, and make sure we've got all the messages we sent in.
             shutdown

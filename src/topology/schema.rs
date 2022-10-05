@@ -303,12 +303,7 @@ pub trait ComponentContainer {
 }
 
 fn get_output_for_port(outputs: Vec<Output>, port: &Option<String>) -> Option<Output> {
-    for output in outputs {
-        if &output.port == port {
-            return Some(output);
-        }
-    }
-    None
+    outputs.into_iter().find(|output| &output.port == port)
 }
 
 impl ComponentContainer for Config {

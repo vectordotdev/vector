@@ -70,7 +70,7 @@ impl Deserializer for JsonDeserializer {
         &self,
         bytes: Bytes,
         log_namespace: LogNamespace,
-    ) -> vector_core::Result<SmallVec<[Event; 1]>> {
+    ) -> vector_common::Result<SmallVec<[Event; 1]>> {
         // It's common to receive empty frames when parsing NDJSON, since it
         // allows multiple empty newlines. We proceed without a warning here.
         if bytes.is_empty() {

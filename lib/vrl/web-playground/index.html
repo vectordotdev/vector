@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="utf-8" />
+    <title>VRL playground</title>
+  </head>
+  <body>
+    <h1>[draft] VRL playground wasm</h1>
+    <p>Open up the developer console and try running run_vrl({program: 'keys({"name": "jonathan"})', event: {}
+    })')</p>
+    <script type="module">
+      import init, { run_vrl } from "./pkg/wasm.js";
+      init().then(() => {
+        window.run_vrl = run_vrl;
+      });
+    </script>
+
+  </body>
+</html>

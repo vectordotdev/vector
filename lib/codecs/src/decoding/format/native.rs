@@ -47,7 +47,7 @@ impl Deserializer for NativeDeserializer {
         &self,
         bytes: Bytes,
         _log_namespace: LogNamespace,
-    ) -> vector_core::Result<SmallVec<[Event; 1]>> {
+    ) -> vector_common::Result<SmallVec<[Event; 1]>> {
         if bytes.is_empty() {
             Ok(smallvec![])
         } else {

@@ -134,7 +134,7 @@ pub struct CommandServerStatusMetrics {
     pub get_last_error: CommandServerStatusMetricsGetLastError,
     pub operation: CommandServerStatusMetricsOperation,
     pub query_executor: CommandServerStatusMetricsQueryExecutor,
-    pub record: CommandServerStatusMetricsRecord,
+    pub record: Option<CommandServerStatusMetricsRecord>,
     pub repl: CommandServerStatusMetricsRepl,
     pub ttl: CommandServerStatusMetricsReplTtl,
 }
