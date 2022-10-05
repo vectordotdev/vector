@@ -94,7 +94,11 @@ mod tests {
 
     use super::*;
     use crate::{
-        config::log_schema, test_util::components::assert_source_compliance, SourceSender,
+        config::log_schema,
+        test_util::components::{
+            assert_source_compliance, assert_source_error, COMPONENT_ERROR_TAGS, SOURCE_TAGS,
+        },
+        SourceSender,
     };
     use futures::StreamExt;
 
@@ -105,7 +109,7 @@ mod tests {
 
     #[tokio::test]
     async fn file_descriptor_decodes_line() {
-        assert_source_compliance(&["protocol"], async {
+        assert_source_compliance(&SOURCE_TAGS, async {
             let (tx, rx) = SourceSender::new_test();
             let (read_fd, write_fd) = pipe().unwrap();
             let config = FileDescriptorSourceConfig {
@@ -144,27 +148,30 @@ mod tests {
 
     #[tokio::test]
     async fn file_descriptor_handles_invalid_fd() {
-        let (tx, rx) = SourceSender::new_test();
-        let (_read_fd, write_fd) = pipe().unwrap();
-        let config = FileDescriptorSourceConfig {
-            max_length: crate::serde::default_max_length(),
-            host_key: Default::default(),
-            framing: None,
-            decoding: default_decoding(),
-            fd: write_fd as u32, // intentionally giving the source a write-only fd
-        };
+        assert_source_error(&COMPONENT_ERROR_TAGS, async {
+            let (tx, rx) = SourceSender::new_test();
+            let (_read_fd, write_fd) = pipe().unwrap();
+            let config = FileDescriptorSourceConfig {
+                max_length: crate::serde::default_max_length(),
+                host_key: Default::default(),
+                framing: None,
+                decoding: default_decoding(),
+                fd: write_fd as u32, // intentionally giving the source a write-only fd
+            };
 
-        let mut stream = rx;
+            let mut stream = rx;
 
-        write(write_fd, b"hello world\nhello world again\n").unwrap();
-        close(write_fd).unwrap();
+            write(write_fd, b"hello world\nhello world again\n").unwrap();
+            close(write_fd).unwrap();
 
-        let context = SourceContext::new_test(tx, None);
-        config.build(context).await.unwrap().await.unwrap();
+            let context = SourceContext::new_test(tx, None);
+            config.build(context).await.unwrap().await.unwrap();
 
-        // The error "Bad file descriptor" will be logged when the source attempts to read
-        // for the first time.
-        let event = stream.next().await;
-        assert!(event.is_none());
+            // The error "Bad file descriptor" will be logged when the source attempts to read
+            // for the first time.
+            let event = stream.next().await;
+            assert!(event.is_none());
+        })
+        .await;
     }
 }

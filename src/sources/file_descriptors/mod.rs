@@ -17,7 +17,7 @@ use vector_core::ByteSizeOf;
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::log_schema,
-    internal_events::{EventsReceived, StreamClosedError},
+    internal_events::{EventsReceived, FileDescriptorReadError, StreamClosedError},
     shutdown::ShutdownSignal,
     SourceSender,
 };
@@ -81,6 +81,7 @@ pub trait FileDescriptorConfig: NamedComponent {
 }
 
 type Sender = mpsc::Sender<std::result::Result<bytes::Bytes, std::io::Error>>;
+
 fn read_from_fd<R>(mut reader: R, mut sender: Sender)
 where
     R: Send + io::BufRead + 'static,
@@ -114,7 +115,12 @@ async fn process_stream(
     hostname: Option<String>,
 ) -> Result<(), ()> {
     let bytes_received = register!(BytesReceived::from(Protocol::NONE));
-    let stream = StreamReader::new(receiver);
+    let stream = receiver.inspect(|result| {
+        if let Err(error) = result {
+            emit!(FileDescriptorReadError { error: &error });
+        }
+    });
+    let stream = StreamReader::new(stream);
     let mut stream = FramedRead::new(stream, decoder).take_until(shutdown);
     let mut stream = stream! {
         while let Some(result) = stream.next().await {
