@@ -41,6 +41,7 @@
   <p>Open up the developer console and try running run_vrl('upcase("hello world")')</p>
   
   <button onClick="handleRunCode()">run code</button>
+  <button onClick="handleShareCode()">share code</button>
   <div id="input-section">
     <div id="cell">
       <p class="cell-title">Program</p>
@@ -105,6 +106,20 @@ ts, err = parse_timestamp(.timestamp, format: "%s")
         theme: 'vs-light',
         minimap: { enabled: false }
       });
+      const queryString = window.location.search;
+      if (queryString.length != 0) {
+        const urlParams = new URLSearchParams(queryString);
+        const stateParam = urlParams.get('state');
+
+        let urlState = JSON.parse(atob(stateParam));
+
+        window.programEditor.setValue(urlState["program"]);
+        window.eventEditor.setValue(JSON.stringify(urlState["event"], null, '\t'));
+
+        console.log("stateparams:", JSON.parse(atob(stateParam)));
+
+        console.log("run vrl stateparam:", run_vrl(JSON.parse(atob(stateParam))));
+      }
     });
   </script>
   
@@ -130,6 +145,18 @@ ts, err = parse_timestamp(.timestamp, format: "%s")
 
     }
 
+  </script>
+  <script>
+    function handleShareCode() {
+      let state = {
+      program: window.programEditor.getValue(),
+      event: JSON.parse(window.eventEditor.getValue())
+      }
+
+      console.log(state);
+      console.log(btoa(JSON.stringify(state)));
+      window.history.pushState(state, "", `?state=${ btoa(JSON.stringify(state)) }`);
+    }
   </script>
 </body>
 
