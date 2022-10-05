@@ -10,9 +10,11 @@ facilities.
 
 ## Try Using the VRL subcommand
 
-You can run these examples using the `vector vrl` subcommand with `--input` (single-line JSON file
-representing the incoming event) and `--program` (VRL program) to pass in the example input and
-program as well as `--print-object` to show the modified object.
+You can run these examples using the `vector vrl` subcommand with `--input` (input is newline
+delemited JSON file representing a list of events).  and `--program` (VRL program) to pass in the
+example input and program as well as `--print-object` to show the modified object. The below
+examples show pretty-printed JSON for the input events, so collapse these to single lines when
+passing in via `--input`.
 
 For example: `vector vrl --input input.json --program program.vrl --print-object`. This closely
 matches how VRL will receive the input in a running Vector instance.
