@@ -125,7 +125,7 @@ ts, err = parse_timestamp(.timestamp, format: "%s")
   
   
   <script type="module">
-    import init, { run_vrl } from "./pkg/wasm.js";
+    import init, { run_vrl } from "./pkg/vrl_web_playground.js";
     init().then(() => {
       window.run_vrl = run_vrl;
       // console.log(run_vrl("."));
