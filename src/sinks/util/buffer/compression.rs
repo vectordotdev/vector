@@ -208,6 +208,15 @@ impl Configurable for Compression {
         Some("Compression configuration.")
     }
 
+    fn metadata() -> Metadata<Self> {
+        let mut metadata = Metadata::default();
+        if let Some(description) = Self::description() {
+            metadata.set_description(description);
+        }
+        metadata.add_custom_attribute(CustomAttribute::kv("enum_tagging", "external"));
+        metadata
+    }
+
     fn generate_schema(gen: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
         const ALGORITHM_NAME: &str = "algorithm";
         const LEVEL_NAME: &str = "level";

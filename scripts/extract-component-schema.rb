@@ -68,11 +68,6 @@ def is_single_value_schema(root_schema, schema)
     return false
   end
 
-  # If the type of the schema is a single value that is _not_ `array` or `object`, or `const` is
-  # specified and also is not an array or object, or `enum` where each value is a single value, with
-  #identi then
-  # we have a single value schema.
-
   # Our primary check, where we assert that one of the following is true:
   # - `type` is a string, and the value is present in `allowed_types`
   # - `type` is an array, with a single element, whose value is present in `allowed_types`
@@ -175,7 +170,18 @@ def resolve_schema_property_type(root_schema, property)
     # We might be dealing with a const schema, where a constant value is the only valid match.
     const_value = property["const"]
     if !const_value.nil?
-      return { "const" => const_value }
+      const_type = type_as_string(const_value)
+      return { const_type => { "const" => const_value } }
+    end
+
+    # Similarly, we might be dealing with an enum schema, where a set of constant values are the
+    # only valid match. Since enums can _technically_ be different types, we group each value by its
+    # type, and then emit an "enum" property for each group with the grouped values.
+    enum_values = property["enum"]
+    if !enum_values.nil?
+      grouped = enum_values.group_by { |value| type_as_string(value) }
+      grouped.transform_values! { |values| { "enum" => values } }
+      return grouped
     end
 
     # We might be dealing with a "resolved" schema, which is where we wrap another layer around a
@@ -378,8 +384,22 @@ def resolve_enum_subschemas(root_schema, schema)
       resolved_subschema = resolve_schema(root_schema, subschema)
 
       # Extract the tag property and figure out any necessary intersections, etc.
+      #
+      # Technically, a `const` value in JSON Schema can be an array or object, too... but like, we
+      # only ever use `const` for describing enum variants and what not, so this is my middle-ground
+      # approach to also allow for other constant-y types, but not objects/arrays which would
+      # just... not make sense.
       tag_subschema = resolved_subschema.delete(enum_tag_field)
-      tag_value = tag_subschema.dig("type", "const")
+      tag_value = nil
+  
+      for allowed_type in ["string", "number", "boolean"] do
+        maybe_tag_value = tag_subschema.dig("type", allowed_type, "const")
+        if !maybe_tag_value.nil?
+          tag_value = maybe_tag_value
+          break
+        end
+      end
+
       if tag_value.nil?
         puts "All enum subschemas representing an internally-tagged enum must have the tag field use a const value."
         puts "Tag subschema: #{tag_subschema}"
@@ -488,7 +508,7 @@ puts "      Unique properties after last resolved enum subschema: #{unique_resol
     end
   end
 
-  # Schema pattern: mixed-use single value enums.
+  # Fallback schema pattern: mixed-use enums.
   #
   # These are enums that can basically be some combination of possible values: `Concurrency` is the
   # canonical example as it can be set via `"none"`, `"adaptive"`, or an integer between 1 and...
@@ -496,78 +516,19 @@ puts "      Unique properties after last resolved enum subschema: #{unique_resol
   #
   # We just end up emitting a composite type output to cover each possibility, so the above would
   # have the `string` type with an `enum` of `"none"` and `"adaptive"`, and the uint type for the
-  # integer side.
-  #
-  # TODO: We don't handle every single possible combination flawlessly here. For example, a
-  # subschema that could be a generic string _or_ a specific const value can't be trivially
-  # specified, because once we think we're dealing with a bunch of possible const string values,
-  # etc... we're sort of locked in.
-  if enum_tagging == "external"
-    puts "  Trying to resolve enum subschemas as mixed-use single value enum..."
+  # integer side. This code mostly assumes the upstream schema is itself correct, in terms of not
+  # providing a schema that is too ambiguous to properly validate against an input document.
+  puts "  Trying to resolve enum subschemas as mixed-use enum..."
 
-    # See if all of the subschemas are "single value" schemas.
-    if subschemas.all? { |subschema| is_single_value_schema(root_schema, subschema) }
-      puts "Enum subschemas are all 'single value' schemas."
+  type_defs = {}
+  type_modes = {}
 
-      # Now we need to group these subschemas into their respective type buckets, with some
-      # constraints. We track both the per-type definitions, as well as what "mode" each type is,
-      # so that we can detect incompatibilites, such as if we've already seen a bunch of subschemas
-      # with const values that are, say, numbers... and then we hit another subschema that accepts
-      # any generic number.
-      #
-      # We don't want to allow clashes like that because they're hard to generate sensible docs
-      # output for, and they might just be plain non-sensicial in terms of actual deserialization.
-      types = {}
-      type_modes = {}
+  subschemas.each { |subschema|
+    resolved_subschema = resolve_schema_property_type(root_schema, subschema)
+    type_defs.merge!(resolved_subschema)
+  }
 
-      subschemas.each { |subschema|
-        if !subschema["const"].nil? || !subschema["enum"].nil?
-          # We're dealing with a const/enum subschema, so get the _type_ of the value of `const` or
-          # `enum`, which will inform us what data type we start an "enum" definition for.
-          enum_values = subschema["enum"] || [subschema["const"]]
-          enum_value_type = type_as_string(enum_values[0])
-
-          # Make sure we're not clashing in terms of mode (enum vs any).
-          existing_type_mode = type_modes[enum_value_type]
-          if !existing_type_mode.nil? && existing_type_mode != "enum"
-            puts "Already tracking a type definition for '#{enum_value_type}' of '#{existing_type_mode}', but tried to add 'enum'."
-            exit
-          else
-            type_modes[enum_value_type] = "enum"
-          end
-
-          # Merge in the enum values we just got with whatever is already there for the type
-          # definition, creating the type definition if it doesn't yet exist.
-          existing_type_def = types.fetch(enum_value_type, { "enum" => [] })
-          existing_type_def["enum"] << enum_values
-          types[enum_value_type] = existing_type_def
-        else
-          # We're dealing with a "any valid value" subschema, so like the const/enum codepath, grab
-          # the value type, make sure we aren't clashing, etc etc.
-          any_value_type = get_schema_type(subschema)
-
-          # Make sure we're not clashing in terms of mode (enum vs any), but also, make sure nothing
-          # else already claimed this type definition, since also having duplicate subschemas for
-          # the same type wouldn't make any sense... and is probably indicative of invalid logic in
-          # the configuration schema codegen.
-          existing_type_mode = type_modes[any_value_type]
-          if !existing_type_mode.nil?
-            puts "Already tracking a type definition for '#{any_value_type}' of '#{existing_type_mode}', but tried to add 'any'."
-            exit
-          else
-            # TODO: This is where we would add things like validation constraints, etc, to the type definition.
-            type_modes[any_value_type] = "any"
-            types[any_value_type] = {}
-          end
-        end
-      }
-
-      return { "_resolved" => { "type" => types , "annotations" => "mixed_use" } }
-    end
-  end
-
-  puts "Failed to resolve enum subschemas as anmy known enum pattern."
-  exit
+  { "_resolved" => { "type" => type_defs , "annotations" => "mixed_use" } }
 end
 
 def get_rendered_description_from_schema(schema)
