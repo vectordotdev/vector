@@ -463,7 +463,7 @@ sources-logs = [
   "sources-fluent",
   "sources-gcp_pubsub",
   "sources-heroku_logs",
-  "sources-http",
+  "sources-http_server",
   "sources-http_scrape",
   "sources-internal_logs",
   "sources-journald",
@@ -510,9 +510,9 @@ sources-file = ["dep:file-source"]
 sources-file-descriptor = ["tokio-util/io"]
 sources-fluent = ["dep:base64", "listenfd", "tokio-util/net", "dep:rmpv", "dep:rmp-serde", "dep:serde_bytes"]
 sources-gcp_pubsub = ["gcp", "dep:h2", "dep:prost-types", "protobuf-build", "dep:tonic"]
-sources-heroku_logs = ["sources-utils-http", "sources-utils-http-query", "sources-http"]
+sources-heroku_logs = ["sources-utils-http", "sources-utils-http-query", "sources-http_server"]
 sources-host_metrics =  ["heim/cpu", "heim/host", "heim/memory", "heim/net"]
-sources-http = ["sources-utils-http", "sources-utils-http-query"]
+sources-http_server = ["sources-utils-http", "sources-utils-http-query"]
 sources-http_scrape = ["sources-utils-http-scrape"]
 sources-internal_logs = []
 sources-internal_metrics = []
@@ -523,7 +523,7 @@ sources-logstash = ["listenfd", "tokio-util/net"]
 sources-mongodb_metrics = ["dep:mongodb"]
 sources-nats = ["dep:nats", "dep:nkeys"]
 sources-nginx_metrics = ["dep:nom"]
-sources-opentelemetry = ["dep:hex", "dep:opentelemetry-proto", "dep:prost-types", "sources-http", "sources-utils-http", "sources-vector"]
+sources-opentelemetry = ["dep:hex", "dep:opentelemetry-proto", "dep:prost-types", "sources-http_server", "sources-utils-http", "sources-vector"]
 sources-postgresql_metrics = ["dep:postgres-openssl", "dep:tokio-postgres"]
 sources-prometheus = ["dep:prometheus-parser", "sinks-prometheus", "sources-utils-http-scrape"]
 sources-redis= ["dep:redis"]
@@ -538,7 +538,7 @@ sources-utils-http-encoding = ["dep:snap", "sources-utils-http-error"]
 sources-utils-http-error = []
 sources-utils-http-prelude = ["sources-utils-http", "sources-utils-http-auth", "sources-utils-http-encoding", "sources-utils-http-error"]
 sources-utils-http-query = []
-sources-utils-http-scrape = ["sources-utils-http", "sources-http"]
+sources-utils-http-scrape = ["sources-utils-http", "sources-http_server"]
 sources-utils-udp = []
 sources-utils-unix = []
 sources-vector = ["dep:tonic", "protobuf-build"]

@@ -1,4 +1,4 @@
-#[cfg(any(feature = "sources-http"))]
+#[cfg(any(feature = "sources-http_server"))]
 mod body_decoding;
 mod encoding_config;
 #[cfg(all(unix, feature = "sources-dnstap"))]
@@ -41,7 +41,7 @@ pub use unix_datagram::build_unix_datagram_source;
 pub use unix_stream::build_unix_stream_source;
 pub use wrappers::{AfterRead, AfterReadExt};
 
-#[cfg(any(feature = "sources-http"))]
+#[cfg(any(feature = "sources-http_server"))]
 pub use self::body_decoding::Encoding;
 #[cfg(feature = "sources-utils-http-query")]
 pub use self::http::add_query_parameters;
