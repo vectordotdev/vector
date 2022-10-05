@@ -41,6 +41,18 @@ impl Collection<Index> {
             Some(self.min_length())
         }
     }
+
+    /// Removes the known value at the given index and shifts the
+    /// elements to the left
+    pub fn remove_shift(&mut self, index: usize) {
+        let min_length = self.min_length();
+        self.known_mut().remove(&index.into());
+        for i in index..min_length {
+            if let Some(value) = self.known_mut().remove(&(index + 1).into()) {
+                self.known_mut().insert(index.into(), value);
+            }
+        }
+    }
 }
 
 impl From<usize> for Index {

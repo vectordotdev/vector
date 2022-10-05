@@ -161,14 +161,70 @@ impl Kind {
                             .disable_should_compact(!removed_known && !maybe_removed_unknown)
                             .apply_global_compact_option(compact)
                     } else {
-                        unimplemented!()
+                        CompactOptions::from(EmptyState::NeverEmpty)
                     }
                 }
                 OwnedSegment::Index(index) => {
                     if let Some(array) = self.as_array_mut() {
-                        unimplemented!("index={:?}", index)
+                        let mut index = *index;
+                        if index < 0 {
+                            let negative_index = (-index) as usize;
+
+                            if array.unknown_kind().contains_any_defined() {
+                                let original = array.clone();
+                                *array = original.clone();
+
+                                let min_index = array
+                                    .largest_known_index()
+                                    .map_or(0, |x| x + 1 - negative_index);
+
+                                // println!("Min index={:?}", min_index);
+
+                                if let Some(largest_known_index) = array.largest_known_index() {
+                                    println!("Min index={:?}", min_index);
+                                    println!("largest_known_index index={:?}", largest_known_index);
+                                    for i in min_index..=largest_known_index {
+                                        println!("i={}", i);
+                                        let mut single_shift = original.clone();
+                                        single_shift.remove_shift(i);
+                                        array.merge(single_shift, false);
+                                    }
+                                }
+                                return CompactOptions {
+                                    should_compact: min_index == 0,
+                                    should_not_compact: true,
+                                };
+                            } else {
+                                if let Some(largest_known_index) = array.largest_known_index() {
+                                    if largest_known_index >= negative_index - 1 {
+                                        // The exact index to remove is known.
+                                        index = (largest_known_index as isize) + 1 + index;
+                                    } else {
+                                        // Removing a non-existing index
+                                        return CompactOptions::from(EmptyState::NeverEmpty);
+                                    }
+                                } else {
+                                    // Removing a non-existing index
+                                    return CompactOptions::from(EmptyState::NeverEmpty);
+                                }
+                            }
+                        }
+
+                        let index = index as usize;
+                        let min_length = array.min_length();
+                        if min_length >= index {
+                            array.remove_shift(index);
+                            CompactOptions::from(array.is_empty())
+                                .apply_global_compact_option(compact)
+                        } else {
+                            // The removed index isn't guaranteed to exist.
+                            // Elements might be removed, but known indices won't be modified.
+                            // Unknown values don't change from a removal, so there is nothing to change here.
+                            CompactOptions::from(EmptyState::MaybeEmpty)
+                                .apply_global_compact_option(compact)
+                        }
                     } else {
-                        unimplemented!()
+                        CompactOptions::from(EmptyState::NeverEmpty)
                     }
                 }
                 OwnedSegment::Coalesce(_) => unimplemented!(),
@@ -433,7 +489,7 @@ mod test {
                 },
             ),
             (
-                "remove known index",
+                "remove known index 0",
                 TestCase {
                     kind: Kind::array(Collection::from(BTreeMap::from([(
                         0.into(),
@@ -442,6 +498,154 @@ mod test {
                     path: owned_value_path!(0),
                     compact: true,
                     want: Kind::array(Collection::empty()),
+                },
+            ),
+            (
+                "remove known index 0, shift elements",
+                TestCase {
+                    kind: Kind::array(Collection::from(BTreeMap::from([
+                        (0.into(), Kind::integer()),
+                        (1.into(), Kind::float()),
+                    ]))),
+                    path: owned_value_path!(0),
+                    compact: true,
+                    want: Kind::array(Collection::from(BTreeMap::from([(
+                        0.into(),
+                        Kind::float(),
+                    )]))),
+                },
+            ),
+            (
+                "remove known index 1, shift elements",
+                TestCase {
+                    kind: Kind::array(Collection::from(BTreeMap::from([
+                        (0.into(), Kind::integer()),
+                        (1.into(), Kind::float()),
+                        (2.into(), Kind::bytes()),
+                    ]))),
+                    path: owned_value_path!(1),
+                    compact: true,
+                    want: Kind::array(Collection::from(BTreeMap::from([
+                        (0.into(), Kind::integer()),
+                        (1.into(), Kind::bytes()),
+                    ]))),
+                },
+            ),
+            (
+                "remove field from non-object",
+                TestCase {
+                    kind: Kind::integer(),
+                    path: owned_value_path!("a"),
+                    compact: false,
+                    want: Kind::integer(),
+                },
+            ),
+            (
+                "remove index from non-array",
+                TestCase {
+                    kind: Kind::integer(),
+                    path: owned_value_path!(0),
+                    compact: false,
+                    want: Kind::integer(),
+                },
+            ),
+            (
+                "remove index -1",
+                TestCase {
+                    kind: Kind::array(Collection::from(BTreeMap::from([(
+                        0.into(),
+                        Kind::integer(),
+                    )]))),
+                    path: owned_value_path!(-1),
+                    compact: false,
+                    want: Kind::array(Collection::empty()),
+                },
+            ),
+            (
+                "remove index -2",
+                TestCase {
+                    kind: Kind::array(Collection::from(BTreeMap::from([
+                        (0.into(), Kind::integer()),
+                        (1.into(), Kind::float()),
+                    ]))),
+                    path: owned_value_path!(-2),
+                    compact: false,
+                    want: Kind::array(Collection::from(BTreeMap::from([(
+                        0.into(),
+                        Kind::float(),
+                    )]))),
+                },
+            ),
+            (
+                "remove negative index non-existing element",
+                TestCase {
+                    kind: Kind::array(Collection::from(BTreeMap::from([(
+                        0.into(),
+                        Kind::integer(),
+                    )]))),
+                    path: owned_value_path!(-2),
+                    compact: false,
+                    want: Kind::array(Collection::from(BTreeMap::from([(
+                        0.into(),
+                        Kind::integer(),
+                    )]))),
+                },
+            ),
+            (
+                "remove negative index empty array",
+                TestCase {
+                    kind: Kind::array(Collection::empty()),
+                    path: owned_value_path!(-1),
+                    compact: false,
+                    want: Kind::array(Collection::empty()),
+                },
+            ),
+            (
+                "remove negative index with unknown",
+                TestCase {
+                    kind: Kind::array(Collection::empty().with_unknown(Kind::integer())),
+                    path: owned_value_path!(-1),
+                    compact: false,
+                    want: Kind::array(Collection::empty().with_unknown(Kind::integer())),
+                },
+            ),
+            (
+                "remove negative index with unknown 2",
+                TestCase {
+                    kind: Kind::array(
+                        Collection::from(BTreeMap::from([(0.into(), Kind::float())]))
+                            .with_unknown(Kind::integer()),
+                    ),
+                    path: owned_value_path!(-1),
+                    compact: false,
+                    want: Kind::array(
+                        Collection::from(BTreeMap::from([(
+                            0.into(),
+                            Kind::float().or_integer().or_undefined(),
+                        )]))
+                        .with_unknown(Kind::integer()),
+                    ),
+                },
+            ),
+            (
+                "remove negative index with unknown 3",
+                TestCase {
+                    kind: Kind::array(
+                        Collection::from(BTreeMap::from([
+                            (0.into(), Kind::float()),
+                            (1.into(), Kind::bytes()),
+                        ]))
+                        .with_unknown(Kind::integer()),
+                    ),
+                    path: owned_value_path!(-1),
+                    compact: false,
+                    want: Kind::array(
+                        Collection::from(BTreeMap::from([
+                            (0.into(), Kind::float()),
+                            (1.into(), Kind::float().or_integer().or_undefined()),
+                        ]))
+                        .with_unknown(Kind::integer()),
+                    ),
                 },
             ),
         ] {
