@@ -132,7 +132,7 @@ impl SourceConfig for PrometheusScrapeConfig {
             shutdown: cx.shutdown,
         };
 
-        Ok(http_scrape(inputs, builder, cx.out).boxed())
+        Ok(http_scrape(inputs, builder, cx.out, None).boxed())
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {

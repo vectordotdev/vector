@@ -16,6 +16,7 @@ use std::time::{Duration, Instant};
 use std::{collections::HashMap, future::ready};
 use tokio_stream::wrappers::IntervalStream;
 
+use crate::sources::http_scrape::scrape::HttpMethod;
 use crate::{
     http::{Auth, HttpClient},
     internal_events::{
@@ -105,6 +106,7 @@ pub(crate) async fn http_scrape<
     inputs: GenericHttpScrapeInputs,
     context_builder: B,
     mut out: SourceSender,
+    http_method: Option<HttpMethod>,
 ) -> Result<(), ()> {
     let mut stream = IntervalStream::new(tokio::time::interval(Duration::from_secs(
         inputs.interval_secs,
@@ -122,7 +124,14 @@ pub(crate) async fn http_scrape<
         let context_builder = context_builder.clone();
         let mut context = context_builder.build(&url);
 
-        let mut builder = Request::get(&url);
+        let mut builder = if let Some(http_method) = http_method {
+            match http_method {
+                HttpMethod::Get => Request::get(&url),
+                HttpMethod::Post => Request::post(&url),
+            }
+        } else {
+            Request::get(&url)
+        };
 
         // add user specified headers
         for (header, values) in &inputs.headers {

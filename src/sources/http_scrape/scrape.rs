@@ -33,6 +33,20 @@ use vector_core::{
     event::Event,
 };
 
+/// HTTP method.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative)]
+#[derivative(Default)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum HttpMethod {
+    /// HTTP GET method.
+    #[derivative(Default)]
+    Get,
+
+    /// HTTP POST method.
+    Post,
+}
+
 /// Configuration for the `http_scrape` source.
 #[configurable_component(source("http_scrape"))]
 #[derive(Clone, Debug)]
@@ -67,6 +81,10 @@ pub struct HttpScrapeConfig {
     #[serde(default)]
     pub headers: HashMap<String, Vec<String>>,
 
+    /// Specifies the action of the HTTP request.
+    #[serde(default)]
+    pub method: HttpMethod,
+
     /// TLS configuration.
     #[configurable(derived)]
     pub tls: Option<TlsConfig>,
@@ -89,6 +107,7 @@ impl Default for HttpScrapeConfig {
             decoding: default_decoding(),
             framing: default_framing_message_based(),
             headers: HashMap::new(),
+            method: HttpMethod::Get,
             tls: None,
             auth: None,
             log_namespace: None,
@@ -136,7 +155,7 @@ impl SourceConfig for HttpScrapeConfig {
             shutdown: cx.shutdown,
         };
 
-        Ok(http_scrape(inputs, context, cx.out).boxed())
+        Ok(http_scrape(inputs, context, cx.out, Some(self.method)).boxed())
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
