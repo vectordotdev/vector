@@ -22,8 +22,15 @@ pub struct TransformOuter<T>
 where
     T: Configurable + Serialize,
 {
-    /// Inputs to the transforms.
-    #[serde(default = "Default::default")] // https://github.com/serde-rs/serde/issues/1541
+    /// A list of upstream [source][sources] or [transform][transforms] IDs.
+    ///
+    /// Wildcards (`*`) are supported.
+    ///
+    /// See [configuration][configuration] for more info.
+    ///
+    /// [sources]: https://vector.dev/docs/reference/configuration/sources/
+    /// [transforms]: https://vector.dev/docs/reference/configuration/sources/
+    /// [configuration]: https://vector.dev/docs/reference/configuration/
     pub inputs: Vec<T>,
 
     #[serde(flatten)]

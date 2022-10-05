@@ -17,8 +17,8 @@ use vector_config_common::validation::Validation;
 use crate::{
     schema::{
         assert_string_schema_for_map, generate_array_schema, generate_bool_schema,
-        generate_map_schema, generate_number_schema, generate_optional_schema, generate_set_schema,
-        generate_string_schema,
+        generate_map_schema, generate_number_schema, generate_set_schema,
+        generate_string_schema, get_or_generate_schema,
     },
     str::ConfigurableString,
     Configurable, GenerateError, Metadata,
@@ -56,7 +56,7 @@ where
         let mut inner_metadata = T::metadata();
         inner_metadata.set_transparent();
 
-        generate_optional_schema(gen, inner_metadata)
+        get_or_generate_schema(gen, inner_metadata)
     }
 }
 
