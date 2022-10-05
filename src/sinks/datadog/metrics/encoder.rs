@@ -772,8 +772,8 @@ mod tests {
     #[test]
     fn encode_counter_with_interval_as_rate() {
         // When a counter explicitly has an interval, we need to encode it as a rate. This means
-        // diving the value by the interval (in seconds) and setting the metric type so that when it
-        // lands on the DD side, they can multiply the value by the interval (in seconds) and get
+        // dividing the value by the interval (in seconds) and setting the metric type so that when
+        // it lands on the DD side, they can multiply the value by the interval (in seconds) and get
         // back the correct total value for that time period.
 
         let value = 423.1331;
