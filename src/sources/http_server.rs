@@ -313,7 +313,7 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     use super::SimpleHttpConfig;
-    use crate::sources::http::HttpMethod;
+    use crate::sources::http_server::HttpMethod;
     use crate::{
         config::{log_schema, SourceConfig, SourceContext},
         event::{Event, EventStatus, Value},

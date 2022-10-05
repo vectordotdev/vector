@@ -23,7 +23,7 @@ use crate::{
     internal_events::{
         HttpBadRequest, HttpBytesReceived, HttpEventsReceived, HttpInternalError, StreamClosedError,
     },
-    sources::http::HttpMethod,
+    sources::http_server::HttpMethod,
     tls::{MaybeTlsSettings, TlsEnableableConfig},
     SourceSender,
 };
