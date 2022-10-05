@@ -8930,6 +8930,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
+ "clap 4.0.9",
  "futures 0.3.24",
  "graphql_client",
  "indoc",
