@@ -14,7 +14,7 @@ pub mod grpc;
 ))]
 mod http;
 #[cfg(any(feature = "sources-http_client", feature = "sources-prometheus"))]
-pub mod http_scrape;
+pub mod http_client;
 #[cfg(any(feature = "sources-aws_sqs", feature = "sources-gcp_pubsub"))]
 mod message_decoding;
 pub mod multiline_config;

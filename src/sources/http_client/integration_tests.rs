@@ -64,9 +64,9 @@ async fn invalid_endpoint() {
     .await;
 }
 
-/// Logs (raw bytes) should be scraped and decoded successfully.
+/// Logs (raw bytes) should be collected and decoded successfully.
 #[tokio::test]
-async fn scraped_logs_bytes() {
+async fn collected_logs_bytes() {
     let events = run_compliance(HttpClientConfig {
         endpoint: format!("{}/logs/bytes", dufs_address()),
         scrape_interval_secs: INTERVAL_SECS,
@@ -87,9 +87,9 @@ async fn scraped_logs_bytes() {
     );
 }
 
-/// Logs (json) should be scraped and decoded successfully.
+/// Logs (json) should be collected and decoded successfully.
 #[tokio::test]
-async fn scraped_logs_json() {
+async fn collected_logs_json() {
     let events = run_compliance(HttpClientConfig {
         endpoint: format!("{}/logs/json.json", dufs_address()),
         scrape_interval_secs: INTERVAL_SECS,
@@ -110,9 +110,9 @@ async fn scraped_logs_json() {
     );
 }
 
-/// Metrics should be scraped and decoded successfully.
+/// Metrics should be collected and decoded successfully.
 #[tokio::test]
-async fn scraped_metrics_native_json() {
+async fn collected_metrics_native_json() {
     let events = run_compliance(HttpClientConfig {
         endpoint: format!("{}/metrics/native.json", dufs_address()),
         scrape_interval_secs: INTERVAL_SECS,
@@ -134,9 +134,9 @@ async fn scraped_metrics_native_json() {
     );
 }
 
-/// Traces should be scraped and decoded successfully.
+/// Traces should be collected and decoded successfully.
 #[tokio::test]
-async fn scraped_trace_native_json() {
+async fn collected_trace_native_json() {
     let events = run_compliance(HttpClientConfig {
         endpoint: format!("{}/traces/native.json", dufs_address()),
         scrape_interval_secs: INTERVAL_SECS,
@@ -257,7 +257,7 @@ async fn tls_valid() {
 /// The source should shutdown cleanly when the shutdown signal is received.
 #[tokio::test]
 async fn shutdown() {
-    let source_id = ComponentKey::from("http_scrape_shutdown");
+    let source_id = ComponentKey::from("http_client_shutdown");
     let source = HttpClientConfig {
         endpoint: format!("{}/logs/json.json", dufs_address()),
         scrape_interval_secs: INTERVAL_SECS,

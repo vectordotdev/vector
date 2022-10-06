@@ -1,9 +1,10 @@
 package metadata
 
-components: sources: http: {
+components: sources: http_server: {
 	_port: 80
 
-	title: "HTTP"
+	title: "HTTP Server"
+	alias: "http"
 
 	classes: {
 		commonly_used: false
@@ -168,7 +169,7 @@ components: sources: http: {
 					description: "The name of the source type."
 					required:    true
 					type: string: {
-						examples: ["http"]
+						examples: ["http_server"]
 					}
 				}
 				timestamp: fields._current_timestamp
@@ -225,7 +226,7 @@ components: sources: http: {
 					timestamp:     _values.current_timestamp
 					path:          _path
 					"User-Agent":  _user_agent
-					"source_type": "http"
+					"source_type": "http_server"
 				}
 			}]
 		},
@@ -259,7 +260,7 @@ components: sources: http: {
 					timestamp:     _values.current_timestamp
 					_path_key:     _path
 					"User-Agent":  _user_agent
-					"source_type": "http"
+					"source_type": "http_server"
 				}
 			}]
 		},

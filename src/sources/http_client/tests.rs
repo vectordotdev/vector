@@ -29,7 +29,7 @@ pub(crate) async fn run_compliance(config: HttpClientConfig) -> Vec<Event> {
 }
 
 #[test]
-fn http_scrape_generate_config() {
+fn http_client_generate_config() {
     test_generate_config::<HttpClientConfig>();
 }
 

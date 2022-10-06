@@ -1,5 +1,5 @@
 #[cfg(feature = "sources-http_client")]
-pub mod scrape;
+pub mod client;
 
 #[cfg(test)]
 mod tests;
@@ -7,4 +7,4 @@ mod tests;
 #[cfg(all(test, feature = "http-client-integration-tests"))]
 mod integration_tests;
 
-pub use scrape::HttpClientConfig;
+pub use client::HttpClientConfig;
