@@ -8,6 +8,7 @@ use serde_bytes;
 use super::{ddsketch_full, sink::PartitionKey};
 use crate::{
     event::{TraceEvent, Value},
+    internal_events::DatadogTracesStatsError,
     metrics::AgentDDSketch,
 };
 
@@ -17,6 +18,12 @@ const SAMPLING_RATE_KEY: &str = "_sample_rate";
 const TAG_STATUS_CODE: &str = "http.status_code";
 const TAG_SYNTHETICS: &str = "synthetics";
 const TOP_LEVEL_KEY: &str = "_top_level";
+
+/// The duration of time in nanoseconds that a bucket covers.
+const BUCKET_DURATION_NANOSECONDS: u64 = 10_000_000_000;
+
+/// The number of bucket durations to keep in memory before flushing them.
+const BUCKET_WINDOW_LEN: u64 = 2;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 struct AggregationKey {
@@ -254,14 +261,16 @@ impl Bucket {
         gs.hits += weight;
         let error = match span.get("error") {
             Some(Value::Integer(val)) => *val,
-            _ => 0,
+            None => 0,
+            _ => panic!("`error` should be an i64"),
         };
         if error != 0 {
             gs.errors += weight;
         }
         let duration = match span.get("duration") {
             Some(Value::Integer(val)) => *val,
-            _ => 0,
+            None => 0,
+            _ => panic!("`duration` should be an i64"),
         };
         gs.duration += (duration as f64) * weight;
         if error != 0 {
@@ -272,22 +281,26 @@ impl Bucket {
     }
 }
 
-struct Aggregator {
-    // The key represent the timestamp (in nanoseconds) of the begining of the time window (that last 10 seconds) on
-    // which the associated bucket will calculate statistics.
+pub(crate) struct Aggregator {
+    /// The key represents the timestamp (in nanoseconds) of the beginning of the time window (that lasts 10 seconds) on
+    /// which the associated bucket will calculate statistics.
     buckets: BTreeMap<u64, Bucket>,
+    /// The oldeest timestamp we will allow for the current time bucket.
+    oldest_timestamp: u64,
 }
 
 impl Aggregator {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             buckets: BTreeMap::new(),
+            oldest_timestamp: align_timestamp(Utc::now().timestamp_nanos() as u64),
         }
     }
 
-    /// This implementation uses https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/stats/concentrator.go#L148-L184
-    /// as a basis. It takes a trace, iterates over its constituting spans and upon matching conditions it updates statistics (mostly using the top level span).
+    /// Iterates over a trace's constituting spans and upon matching conditions it updates statistics (mostly using the top level span).
     fn handle_trace(&mut self, partition_key: &PartitionKey, trace: &TraceEvent) {
+        // Based on https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/stats/concentrator.go#L148-L184
+
         let spans = match trace.get("spans") {
             Some(Value::Array(v)) => v.iter().filter_map(|s| s.as_object()).collect(),
             _ => vec![],
@@ -310,21 +323,19 @@ impl Aggregator {
             .get("origin")
             .map(|v| v.to_string_lossy().starts_with(TAG_SYNTHETICS))
             .unwrap_or(false);
+
         spans.iter().for_each(|span| {
-            let is_top = metric_flag(span, TOP_LEVEL_KEY);
-            if !(is_top
-                || metric_flag(span, MEASURED_KEY)
-                || metric_flag(span, PARTIAL_VERSION_KEY))
-            {
+            let is_top = has_top_level(span);
+            if !(is_top || is_measured(span) || is_partial_snapshot(span)) {
                 return;
             }
+
             self.handle_span(span, weight, is_top, synthetics, payload_aggkey.clone());
         });
     }
 
-    /// This implementation uses https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/stats/statsraw.go#L147-L182
-    /// as a basis. It uses a key constructed using various span/trace properties (see `AggregationKey`)
-    /// and aggregates some statistics per key over 10 seconds windows.
+    /// Aggregates statistics per key over 10 seconds windows.
+    /// The key is constructed from various span/trace properties (see `AggregationKey`).
     fn handle_span(
         &mut self,
         span: &BTreeMap<String, Value>,
@@ -333,13 +344,31 @@ impl Aggregator {
         synthetics: bool,
         payload_aggkey: PayloadAggregationKey,
     ) {
+        // Based on: https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/stats/statsraw.go#L147-L182
+
         let aggkey = AggregationKey::new_aggregation_from_span(span, payload_aggkey, synthetics);
+
         let start = match span.get("start") {
-            Some(Value::Timestamp(val)) => val.timestamp_nanos(),
-            _ => Utc::now().timestamp_nanos(),
+            Some(Value::Timestamp(val)) => val.timestamp_nanos() as u64,
+            _ => Utc::now().timestamp_nanos() as u64,
         };
-        // 10 seconds bucket
-        let btime = (start - (start % 10_000_000_000)) as u64;
+
+        let duration = match span.get("duration") {
+            Some(Value::Integer(val)) => *val as u64,
+            None => 0,
+            _ => panic!("`duration` should be an i64"),
+        };
+
+        let end = start + duration;
+
+        // 10 second bucket window
+        let mut btime = align_timestamp(end);
+
+        // If too far in the past, use the oldest-allowed time bucket instead
+        if btime < self.oldest_timestamp {
+            btime = self.oldest_timestamp
+        }
+
         match self.buckets.get_mut(&btime) {
             Some(b) => {
                 b.add(span, weight, is_top, aggkey);
@@ -347,7 +376,7 @@ impl Aggregator {
             None => {
                 let mut b = Bucket {
                     start: btime,
-                    duration: 10_000_000_000, // 10 secs in nanosecs
+                    duration: BUCKET_DURATION_NANOSECONDS,
                     data: BTreeMap::new(),
                 };
                 b.add(span, weight, is_top, aggkey);
@@ -398,36 +427,121 @@ impl Aggregator {
         });
         m
     }
+
+    /// Flushes the bucket cache of stale entries.
+    /// It means that we cache and can compute stats only for the last `BUCKET_WINDOW_LEN * BUCKET_DURATION_NANOSECONDS` and after such time,
+    /// buckets are then flushed. This only applies to past buckets. Stats buckets in the future are cached with no restriction.
+    fn flush(&mut self) {
+        // Based on https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/stats/concentrator.go#L38-L41
+        // , and https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/stats/concentrator.go#L195-L207
+
+        let now = Utc::now().timestamp_nanos() as u64;
+        let flush_cutoff_time = now - (BUCKET_DURATION_NANOSECONDS * BUCKET_WINDOW_LEN);
+
+        // remove entries from the cache if the start time is outside the retaining window
+        self.buckets.retain(|&bucket_start, _bucket| {
+            let retain = bucket_start > flush_cutoff_time;
+
+            if !retain {
+                debug!("Flushing {} start_time bucket.", bucket_start);
+            }
+            retain
+        });
+
+        // update the oldest_timestamp allowed, to prevent having stats for an already flushed
+        // bucket
+        self.oldest_timestamp = align_timestamp(now);
+    }
 }
 
-fn metric_flag(span: &BTreeMap<String, Value>, key: &str) -> bool {
+/// Returns the provided timestamp truncated to the bucket size.
+/// This is the start time of the time bucket in which such timestamp falls.
+const fn align_timestamp(start: u64) -> u64 {
+    // Based on https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/stats/concentrator.go#L232-L234
+    start - (start % BUCKET_DURATION_NANOSECONDS)
+}
+
+/// Assumes that all metrics are all encoded as Value::Float.
+/// Return the f64 of the specified key or None of key not present.
+fn get_metric_value_float(span: &BTreeMap<String, Value>, key: &str) -> Option<f64> {
     span.get("metrics")
         .and_then(|m| m.as_object())
         .map(|m| match m.get(key) {
-            Some(Value::Float(f)) => f.into_inner().signum() == 1.0,
-            _ => false,
+            Some(Value::Float(f)) => Some(f.into_inner()),
+            None => None,
+            _ => panic!("`metric` values should be all be f64"),
         })
-        .unwrap_or(false)
+        .unwrap_or(None)
 }
 
-/// This extract the relative weight sfrom the top level span (i.e. the span that does not have
-/// a parent). The weigth calculation is borrowed from https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/stats/weight.go#L17-L26.
+/// Returns true if the value of this metric is equal to 1.0
+fn metric_value_is_1(span: &BTreeMap<String, Value>, key: &str) -> bool {
+    match get_metric_value_float(span, key) {
+        Some(f) => f == 1.0,
+        None => false,
+    }
+}
+
+/// Returns true if span is top-level.
+fn has_top_level(span: &BTreeMap<String, Value>) -> bool {
+    // Based on: https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/traceutil/span.go#L28-L31
+
+    metric_value_is_1(span, TOP_LEVEL_KEY)
+}
+
+/// Returns true if a span should be measured (i.e. it should get trace metrics calculated).
+fn is_measured(span: &BTreeMap<String, Value>) -> bool {
+    // Based on https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/traceutil/span.go#L40-L43
+
+    metric_value_is_1(span, MEASURED_KEY)
+}
+
+/// Returns true if the span is a partial snapshot.
+/// These types of spans are partial images of long-running spans.
+/// When incomplete, a partial snapshot has a metric _dd.partial_version which is a positive integer.
+/// The metric usually increases each time a new version of the same span is sent by the tracer
+fn is_partial_snapshot(span: &BTreeMap<String, Value>) -> bool {
+    // Based on: https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/traceutil/span.go#L49-L52
+
+    match get_metric_value_float(span, PARTIAL_VERSION_KEY) {
+        Some(f) => f >= 0.0,
+        None => false,
+    }
+}
+
+/// This extracts the relative weights from the top level span (i.e. the span that does not have
+/// a parent). The weight calculation is borrowed from
 fn extract_weight_from_root_span(spans: &[&BTreeMap<String, Value>]) -> f64 {
+    // Based on https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/stats/weight.go#L17-L26.
+
     if spans.is_empty() {
         return 1.0;
     }
+
+    let mut trace_id: Option<usize> = None;
+
     let mut parent_id_to_child_weight = BTreeMap::<i64, f64>::new();
     let mut span_ids = Vec::<i64>::new();
     for s in spans.iter() {
+        // TODO these need to change to u64 when the following issue is fixed:
+        // https://github.com/vectordotdev/vector/issues/14687
         let parent_id = match s.get("parent_id") {
             Some(Value::Integer(val)) => *val,
-            _ => 0,
+            None => 0,
+            _ => panic!("`parent_id` should be an i64"),
         };
         let span_id = match s.get("span_id") {
             Some(Value::Integer(val)) => *val,
-            _ => 0,
+            None => 0,
+            _ => panic!("`span_id` should be an i64"),
         };
-        let sample_rate = s
+        if trace_id.is_none() {
+            trace_id = match s.get("trace_id") {
+                Some(Value::Integer(v)) => Some(*v as usize),
+                _ => panic!("`trace_id` should be an i64"),
+            }
+        }
+        let weight = s
             .get("metrics")
             .and_then(|m| m.as_object())
             .map(|m| match m.get(SAMPLING_RATE_KEY) {
@@ -442,33 +556,53 @@ fn extract_weight_from_root_span(spans: &[&BTreeMap<String, Value>]) -> f64 {
                 _ => 1.0,
             })
             .unwrap_or(1.0);
+
+        // found root
         if parent_id == 0 {
-            return sample_rate;
+            return weight;
         }
+
         span_ids.push(span_id);
-        parent_id_to_child_weight.insert(parent_id, sample_rate);
+
+        parent_id_to_child_weight.insert(parent_id, weight);
     }
-    // We remove all span that do have a parent
+
+    // Remove all spans that have a parent
     span_ids.iter().for_each(|id| {
         parent_id_to_child_weight.remove(id);
     });
-    // There should be only one value remaining, the weigth from the root span
+
+    // There should be only one value remaining, the weight from the root span
     if parent_id_to_child_weight.len() != 1 {
-        debug!("Didn't reliably find the root span.");
+        emit!(DatadogTracesStatsError {
+            error_message: "Didn't reliably find the root span for weight calculation.",
+            trace_id,
+        });
     }
 
     *parent_id_to_child_weight
         .values()
         .next()
         .unwrap_or_else(|| {
-            debug!("Root span was not found.");
+            emit!(DatadogTracesStatsError {
+                error_message: "Root span was not found. Defaulting to weight of 1.0.",
+                trace_id,
+            });
             &1.0
         })
 }
 
-pub(crate) fn compute_apm_stats(key: &PartitionKey, traces: &[TraceEvent]) -> StatsPayload {
-    let mut aggregator = Aggregator::new();
+pub(crate) fn compute_apm_stats(
+    key: &PartitionKey,
+    aggregator: &mut Aggregator,
+    traces: &[TraceEvent],
+) -> StatsPayload {
+    // flush stale entries from the cache
+    aggregator.flush();
+
+    // process the incoming traces
     traces.iter().for_each(|t| aggregator.handle_trace(key, t));
+
     StatsPayload {
         agent_hostname: key.hostname.clone().unwrap_or_default(),
         agent_env: key.env.clone().unwrap_or_default(),
