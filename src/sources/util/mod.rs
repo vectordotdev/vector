@@ -12,7 +12,7 @@ pub mod grpc;
     feature = "sources-utils-http-prelude",
     feature = "sources-utils-http-query"
 ))]
-mod http;
+pub mod http;
 #[cfg(any(feature = "sources-http_scrape", feature = "sources-prometheus"))]
 pub mod http_scrape;
 #[cfg(any(feature = "sources-aws_sqs", feature = "sources-gcp_pubsub"))]
