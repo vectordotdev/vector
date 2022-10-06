@@ -90,45 +90,37 @@ impl Kind {
                         if index < 0 {
                             unimplemented!()
                         } else {
-                            unimplemented!()
+                            match array.known_mut().get_mut(&(index as usize).into()) {
+                                None => {
+                                    unimplemented!()
+                                }
+                                Some(child) => {
+                                    let compact_options =
+                                        child.remove_inner(&segments[1..], compact);
+
+                                    if compact_options.should_compact
+                                        && !compact_options.should_not_compact
+                                    {
+                                        // always compact
+                                        array.remove_shift(index as usize)
+                                    } else if compact_options.should_compact
+                                        && compact_options.should_not_compact
+                                    {
+                                        // maybe compact
+                                        let not_compacted = array.clone();
+                                        array.remove_shift(index as usize);
+                                        array.merge(not_compacted, false);
+                                    } else {
+                                        // never compact: do nothing, already correct.
+                                    }
+
+                                    // The compaction is propagated only if the current collection is also empty
+                                    compact_options.disable_should_compact(
+                                        !CompactOptions::from(array.is_empty()).should_compact,
+                                    )
+                                }
+                            }
                         }
-                        // match array.known_mut().get_mut(&Index::from(*index)) {
-                        //     None => {
-                        //         unimplemented!()
-                        //         // CompactOptions {
-                        //         //     should_compact: object
-                        //         //         .unknown_kind()
-                        //         //         .at_path(&segments[1..])
-                        //         //         .contains_any_defined(),
-                        //         //     should_not_compact: true,
-                        //         // }.apply_global_compact_option(compact)
-                        //     }
-                        //     Some(child) => {
-                        //         unimplemented!()
-                        //         // let compact_options = child.remove_inner(&segments[1..], compact);
-                        //         //
-                        //         // if compact_options.should_compact
-                        //         //     && !compact_options.should_not_compact
-                        //         // {
-                        //         //     // always compact
-                        //         //     object.known_mut().remove(&Field::from(field.to_owned()));
-                        //         // } else if compact_options.should_compact
-                        //         //     && compact_options.should_not_compact
-                        //         // {
-                        //         //     // maybe compact
-                        //         //     let not_compacted = object.clone();
-                        //         //     object.known_mut().remove(&Field::from(field.to_owned()));
-                        //         //     object.merge(not_compacted, false);
-                        //         // } else {
-                        //         //     // never compact: do nothing, already correct.
-                        //         // }
-                        //         //
-                        //         // // The compaction is propagated only if the current collection is also empty
-                        //         // compact_options.disable_should_compact(
-                        //         //     !CompactOptions::from(object.is_empty()).should_compact,
-                        //         // )
-                        //     }
-                        // }
                     } else {
                         // guaranteed to not delete anything
                         CompactOptions {
@@ -177,14 +169,8 @@ impl Kind {
                                 let min_index = array
                                     .largest_known_index()
                                     .map_or(0, |x| x + 1 - negative_index);
-
-                                // println!("Min index={:?}", min_index);
-
                                 if let Some(largest_known_index) = array.largest_known_index() {
-                                    println!("Min index={:?}", min_index);
-                                    println!("largest_known_index index={:?}", largest_known_index);
                                     for i in min_index..=largest_known_index {
-                                        println!("i={}", i);
                                         let mut single_shift = original.clone();
                                         single_shift.remove_shift(i);
                                         array.merge(single_shift, false);
@@ -642,10 +628,82 @@ mod test {
                     want: Kind::array(
                         Collection::from(BTreeMap::from([
                             (0.into(), Kind::float()),
-                            (1.into(), Kind::float().or_integer().or_undefined()),
+                            (1.into(), Kind::bytes().or_integer().or_undefined()),
                         ]))
                         .with_unknown(Kind::integer()),
                     ),
+                },
+            ),
+            (
+                "remove nested index",
+                TestCase {
+                    kind: Kind::array(Collection::from(BTreeMap::from([
+                        (
+                            0.into(),
+                            Kind::array(Collection::from(BTreeMap::from([
+                                (0.into(), Kind::float()),
+                                (1.into(), Kind::integer()),
+                            ]))),
+                        ),
+                        (1.into(), Kind::bytes()),
+                    ]))),
+                    path: owned_value_path!(0, 0),
+                    compact: false,
+                    want: Kind::array(Collection::from(BTreeMap::from([
+                        (
+                            0.into(),
+                            Kind::array(Collection::from(BTreeMap::from([(
+                                0.into(),
+                                Kind::integer(),
+                            )]))),
+                        ),
+                        (1.into(), Kind::bytes()),
+                    ]))),
+                },
+            ),
+            (
+                "remove nested index, compact",
+                TestCase {
+                    kind: Kind::array(Collection::from(BTreeMap::from([
+                        (
+                            0.into(),
+                            Kind::array(Collection::from(BTreeMap::from([(
+                                0.into(),
+                                Kind::float(),
+                            )]))),
+                        ),
+                        (1.into(), Kind::bytes()),
+                    ]))),
+                    path: owned_value_path!(0, 0),
+                    compact: true,
+                    want: Kind::array(Collection::from(BTreeMap::from([(
+                        0.into(),
+                        Kind::bytes(),
+                    )]))),
+                },
+            ),
+            (
+                "remove nested index, maybe compact",
+                TestCase {
+                    kind: Kind::array(Collection::from(BTreeMap::from([
+                        (
+                            0.into(),
+                            Kind::array(
+                                Collection::from(BTreeMap::from([(0.into(), Kind::float())]))
+                                    .with_unknown(Kind::regex()),
+                            ),
+                        ),
+                        (1.into(), Kind::bytes()),
+                    ]))),
+                    path: owned_value_path!(0, 0),
+                    compact: true,
+                    want: Kind::array(Collection::from(BTreeMap::from([
+                        (
+                            0.into(),
+                            Kind::array(Collection::empty().with_unknown(Kind::regex())).or_bytes(),
+                        ),
+                        (1.into(), Kind::bytes().or_undefined()),
+                    ]))),
                 },
             ),
         ] {
@@ -654,7 +712,7 @@ mod test {
             actual.remove(&path, compact);
             if actual != want {
                 panic!(
-                    "Test failed: {:?}.\nExpected = {:?}\nActual =   {:?}",
+                    "Test failed: {:#?}.\nExpected = {:#?}\nActual =   {:#?}",
                     title,
                     want.debug_info(),
                     actual.debug_info()
