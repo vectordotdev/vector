@@ -7,8 +7,13 @@ rescue LoadError => ex
   exit
 end
 
+def nested_merge(base, override)
+  merger = proc { |_, v1, v2| Hash === v1 && Hash === v2 ? v1.merge(v2, &merger) : Array === v1 && Array === v2 ? v1 | v2 : [:undefined, nil, :nil].include?(v2) ? v1 : v2 }
+  base.merge(override.to_h, &merger)
+end
+
 # Gets the JSON Schema-compatible type name for the given Ruby Value.
-def type_as_string(value)
+def type_str(value)
   if value.is_a?(String)
     "string"
   elsif value.is_a?(Numeric)
@@ -24,71 +29,25 @@ def type_as_string(value)
   end
 end
 
-# Gets whether or not the given schema is a composite schema.
-#
-# Composite schemas are represented by `allOf` in JSON Schema, where the validation step of a
-# composite schema is in fact ensuring that all subschemas validate against the given document.
-def is_composite_schema(schema)
-  !schema["allOf"].nil?
-end
-
-# Gets whether or not the given schema is an enum schema.
-#
-# Enum schemas are represented by `oneOf` in JSON Schema, where the validation step of an
-# enum schema is ensuring that at least one of the subschemas validates against the given document.
-def is_enum_schema(schema)
-  !schema["oneOf"].nil?
-end
-
 # Gets the schema type for the given schema.
-#
-# The schema type (i.e. the `type` property in a schema) must either being a string, or an array
-# with a single string element. Otherwise, `nil` is returned.
 def get_schema_type(schema)
-  schema_type = schema["type"]
-  if schema_type.is_a?(String)
-    return schema_type
-  elsif schema_type.is_a?(Array) && schema_type.length == 1 && schema_type[0].is_a?(String)
-    schema_type[0]
+  if schema.has_key?("allOf")
+    "all-of"
+  elsif schema.has_key?("oneOf")
+    "one-of"
+  elsif schema.has_key?("type")
+    schema["type"]
+  elsif schema.has_key?("const")
+    "const"
+  elsif schema.has_key?("enum")
+    "enum"
   end
-end
-
-# Gets whether or not the given schema is a "single value" schema.
-#
-# A single value schema is any schema that maps to a single value, whether it's a "const" or a
-# string, number, or boolean. Arrays and objects do not count, and composite/enum schemas are also
-# not considered single value schemas, even if they only contain a single subschema which itself is
-# a single value schema.
-def is_single_value_schema(root_schema, schema)
-  # Resolve any schema reference first.
-  schema = resolve_schema_reference(root_schema, schema)
-
-  # Cannot be a composite or enum schema.
-  if !schema["allOf"].nil? || !schema["oneOf"].nil?
-    return false
-  end
-
-  # Our primary check, where we assert that one of the following is true:
-  # - `type` is a string, and the value is present in `allowed_types`
-  # - `type` is an array, with a single element, whose value is present in `allowed_types`
-  # - `const` is present, and neither an array nor hash
-  # - `enum` is present, is an array, has no values that are an array or hash, and has elements that
-  #   are all of the same type (i.e. all strings, or all numbers)
-  allowed_types = ["string", "number", "boolean", "integer"]
-  schema_type = get_schema_type(schema)
-  const_value = schema["const"]
-  enum_value = schema["enum"]
-  allowed_types.include?(schema_type) ||
-    allowed_types.include?(type_as_string(const_value)) ||
-    (enum_value.is_a?(Array) && enum_value.all? { |evalue|
-      allowed_types.include?(type_as_string(evalue)) && type_as_string(evalue) == type_as_string(enum_value[0])
-    })
 end
 
 # Gets a schema definition from the root schema, by name.
-def get_schema_by_name(root, schema_name)
+def get_schema_by_name(root_schema, schema_name)
   schema_name = schema_name.gsub(/#\/definitions\//, "")
-  schema_def = root.dig("definitions", schema_name)
+  schema_def = root_schema.dig("definitions", schema_name)
   if schema_def.nil?
     puts "Could not find schema definition '#{schema_name}' in given schema."
     exit
@@ -105,11 +64,7 @@ end
 # For any overlapping fields in the given schema and the referenced schema, the fields from the
 # given schema will win.
 def resolve_schema_reference(root, schema)
-  puts "Entered `resolve_schema_reference`."
-
-  if !schema["$ref"].nil?
-    puts "  Schema reference detected ('#{schema["$ref"]}'), resolving..."
-
+  while !schema["$ref"].nil?
     resolved_schema = get_schema_by_name(root, schema["$ref"])
 
     current_schema = schema.clone
@@ -120,176 +75,115 @@ def resolve_schema_reference(root, schema)
   schema
 end
 
-def resolve_schema_property_type(root_schema, property)
-  puts "Entered `resolve_schema_property_type`."
-
-  property = resolve_schema_reference(root_schema, property)
-
-  # Like `resolve_schema`, we might be asked to handle a composite/enum schema for an individual
-  # property on an object, so if we detect that, we need to hairpin that back to `resolve_schema` to
-  # handle it in a uniform fashion.
-  if is_composite_schema(property) || is_enum_schema(property)
-    puts "  Schema provided for property type resolution is composite/enum, resolving that first..."
-    property = resolve_schema(root_schema, property)
-    puts "  Finished resolving composite/enum schema, resuming property type resolution."
-  end
-
-  case property["type"]
-  when "array"
-    { "array" => { "items" => { "type" => resolve_schema_property_type(root_schema, property["items"]) } } }
-  when "object"
-    # This is perhaps a little weird, but we hairpin back to `resolve_schema`.
-    #
-    # When we get here, it's because we're processing a property of an object... where the property
-    # itself will also inherently be a schema. It might be a simple scalar schema, or a schema
-    # reference, or whatever... but it's a schema, and so we need to fully resolve it first.
-    #
-    # Based on the format that the output data needs to be in, however, we can't just directly nest
-    # the resolved schema for an object within the property that uses it, but we instead must add
-    # this little indirection layer of `"options": { ... }` first.
-    { "object" => { "options" => resolve_schema(root_schema, property) } }
-  when "string"
-    string_def = {}
-
-    string_def["default"] = property["default"] if property["default"].is_a? String
-
-    { "string" => string_def }
-  when "number"
-    number_def = {}
-
-    number_def["default"] = property["default"] if property["default"].is_a? Numeric
-
-    { "number" => number_def }
-  when "boolean"
-    bool_def = {}
-
-    bool_def["default"] = property["default"] if [true, false].include? property["default"]
-
-    { "bool" => bool_def }
-  else
-    # We might be dealing with a const schema, where a constant value is the only valid match.
-    const_value = property["const"]
-    if !const_value.nil?
-      const_type = type_as_string(const_value)
-      return { const_type => { "const" => const_value } }
-    end
-
-    # Similarly, we might be dealing with an enum schema, where a set of constant values are the
-    # only valid match. Since enums can _technically_ be different types, we group each value by its
-    # type, and then emit an "enum" property for each group with the grouped values.
-    enum_values = property["enum"]
-    if !enum_values.nil?
-      grouped = enum_values.group_by { |value| type_as_string(value) }
-      grouped.transform_values! { |values| { "enum" => values } }
-      return grouped
-    end
-
-    # We might be dealing with a "resolved" schema, which is where we wrap another layer around a
-    # schema so that we can bundle annotations/metadata next to it for allowing downstream code to
-    # additionally modify the resulting output.
-    #
-    # If we are, then handle it, otherwise... yell loudly.
-    if property.has_key?("_resolved")
-      puts "  Property schema was resolved with annotations, unwrapping..."
-
-      # "Resolved" schemas should already be in the shape that we would otherwise be returning here,
-      # so we actually just need to unnest them by a single level to maintain that.
-
-      # TODO: Where should be dealing with annotations? For the buffer type stuff, we would need to
-      # be pushing that back up to `resolve_schema` so that it could adjust the resulting
-      # description, etc.
-
-      unwrapped = property.dig("_resolved", "type")
-      #puts "    Unwrapped: #{unwrapped}"
-      return unwrapped
-    else
-      puts "Unknown type '#{property["type"]}' in configuration schema:"
-      puts "Schema: #{property}"
-      exit
-    end
-  end
-end
-
 # Fully resolves the schema.
 #
 # This recursively resolves schema references, as well as flattening them into a single object, and
 # transforming certain usages -- composite/enum (`allOf`, `oneOf`), etc -- into more human-readable
 # forms.
 def resolve_schema(root_schema, schema)
-  puts "Entered `resolve_schema`."
+  puts "Schema: #{schema}"
 
-  # If this schema is referencing another schema definition, resolve that reference first, which
-  # will essentially hydrate that reference by merging it into the current schema.
-  schema = resolve_schema_reference(root_schema, schema)
-
-  resolved_properties = {}
-
-  # Figure out if we're looking at a composite schema (`allOf`), an enum schema (`oneOf`), or a
-  # plain schema.
-  if is_composite_schema(schema)
-    # Composite schemas are simple, since we just add all of their resolved properties together.
-    schema["allOf"].each { |subschema|
-      resolved_subproperties = resolve_schema(root_schema, subschema)
-      resolved_properties.merge!(resolved_subproperties)
-    }
-  elsif is_enum_schema(schema)
-    # We completely defer resolution of enum schemas to `resolve_enum_subschemas` because there's a
-    # lot of tricks and matching we need to do to suss out patterns that can be represented in more
-    # condensed resolved forms.
-    resolved_subproperties = resolve_enum_subschemas(root_schema, schema)
-    puts "  Resolved following properties from enum subschemas: #{resolved_subproperties["_resolved"].keys}"
-    resolved_properties.merge!(resolved_subproperties)
-  else
-    # We're dealing with a "plain" schema, which would be any of the normal types such as `string`,
-    # `number`, `object`, and so on.
-
-    # First, skip any field that is marked to be skipped. We use this, primarily, to influence
-    # resolution for split definitions such as components. A sink's configuration is the sum of the
-    # `SinkOuter` and the sink's specific enum variant, so we need to resolve them separately and
-    # then rejoin them later on.
-    if schema.dig("_metadata", "config_docs_skip")
-      return {}
-    end
-
-    # Based on how we resolve schemas, we should never encounter a pure scalar schema here (string,
-    # number, etc) expect as a property on an object schema.
-    if schema["type"] != "object"
-      puts "Cannot resolve schema definitions that are not composite, enum, or object-based schemas."
-      exit
-    end
-
-    required = schema["required"] || []
-
-    puts "  Schema: #{schema}"
-    puts "  Resolving object schema with following properties: #{schema["properties"].keys}"
-
-    schema["properties"].each { |property_name, property|
-      puts "  Resolving property '#{property_name}'..."
-      puts "    Property schema: #{property}"
-
-      # Almost all of the magic occurs in `resolve_schema_property_type` where we're handling the
-      # property type. For scalars, it's essentially a passthrough, but for arrays and objects, we
-      # specifically handle those as they're nested _slightly_ different.
-      resolved_property = {
-        "type" => resolve_schema_property_type(root_schema, property),
-        "required" => required.include?(property_name),
-      }
-
-      if !property["title"].nil?
-        resolved_property["title"] = property["title"]
-      end
-
-      if !property["description"].nil?
-        resolved_property["description"] = property["description"]
-      end
-
-      resolved_properties[property_name] = resolved_property
-
-      puts "  Resolved property '#{property_name}'."
-    }
+  # First, skip any schema that is marked to be skipped. We use this, primarily, to influence
+  # resolution for split definitions such as components.
+  #
+  # For example, the configuration of a sink is the sum of the "base" sink properties -- inputs,
+  # buffer, etc -- and the enum subschema represented by the sink-specific Big Enum (tm)... but we
+  # don't want to resolve that _into_ the definition of `SinkOuter` because we'll do that manually
+  # at a later point.
+  if schema.dig("_metadata", "config_docs_skip")
+    return
   end
 
-  resolved_properties
+  # If this schema references another schema definition, resolve that schema definition and merge
+  # it back into our schema, flattening it out.
+  schema = resolve_schema_reference(root_schema, schema)
+
+  # Now simply resolve the schema, depending on what type it is.
+  resolved = case get_schema_type(schema)
+    when "all-of"
+      # Composite schemas are indeed the sum of all of their parts, so resolve each subschema and
+      # merge their resolved state together.
+      reduced = schema["allOf"].filter_map { |subschema| resolve_schema(root_schema, subschema) }
+        .reduce { |acc, item| nested_merge(acc, item) }
+      reduced["type"]
+    when "one-of"
+      # We completely defer resolution of enum schemas to `resolve_enum_schema` because there's a
+      # lot of tricks and matching we need to do to suss out patterns that can be represented in more
+      # condensed resolved forms.
+      resolve_enum_schema(root_schema, schema)
+    when "array"
+      { "array" => { "items" => resolve_schema(root_schema, schema["items"]) } }
+    when "object"
+      # TODO: Not all objects have an actual set of properties, such as anything using
+      # `additionalProperties` to allow for arbitrary key/values to be set, which is why we're
+      # handling the case of nothing in `properties`... but we probably want to be able to better
+      # handle expressing this in the output.. or maybe it doesn't matter, dunno!
+      required_properties = schema["required"] || []
+      properties = schema["properties"] || {}
+
+      options = properties.filter_map { |property_name, property_schema|
+        resolved_property = resolve_schema(root_schema, property_schema)
+        if !resolved_property.nil?
+          resolved_property["required"] = required_properties.include?(property_name)
+
+          [property_name, resolved_property]
+        end
+      }
+
+      { "object" => { "options" => options.to_h } }
+    when "string"
+      string_def = {}
+      string_def["default"] = schema["default"] if !schema["default"].nil?
+  
+      { "string" => string_def }
+    when "number"
+      number_def = {}
+      number_def["default"] = schema["default"] if !schema["default"].nil?
+  
+      { "number" => number_def }
+    when "boolean"
+      bool_def = {}
+      bool_def["default"] = schema["default"] if !schema["default"].nil?
+  
+      { "bool" => bool_def }
+    when "const"
+      # For `const` schemas, just figure out the type of the constant value so we can generate the
+      # resolved output.
+      const_value = schema["const"]
+      const_type = type_str(const_value)
+      { const_type => { "const" => const_value } }
+    when "enum"
+      # Similarly to `const` schemas, `enum` schemas are merely multiple possible constant values. Given
+      # that JSON Schema does allow for the constant values to differ in type, we group them all by
+      # type to get the resolved output.
+      enum_values = schema["enum"]
+      grouped = enum_values.group_by { |value| type_str(value) }
+      grouped.transform_values! { |values| { "enum" => values } }
+      grouped
+    else
+      # We might be dealing with a "resolved" schema, which is where we wrap another layer around a
+      # schema so that we can bundle annotations/metadata next to it for allowing downstream code to
+      # additionally modify the resulting output.
+      #
+      # If we are, then handle it, otherwise... yell loudly.
+      if schema.has_key?("_resolved")
+        puts "  Property schema was resolved with annotations, unwrapping..."
+  
+        # "Resolved" schemas should already be in the shape that we would otherwise be returning here,
+        # so we actually just need to unnest them by a single level to maintain that.
+  
+        # TODO: Where should we be dealing with annotations? For the buffer type stuff, we would need to
+        # be pushing that back up to `resolve_schema` so that it could adjust the resulting
+        # description, etc.
+  
+        schema.dig("_resolved", "type")
+      else
+        puts "Failed to resolve the schema. Schema: #{schema}"
+        exit
+      end
+    end
+
+  { "type" => resolved }
 end
 
 # Gets a reduced version of a schema.
@@ -299,23 +193,24 @@ end
 # specifically the values that are allowed/valid -- are the same, while ignoring things like titles
 # and descriptions.
 def get_reduced_schema(schema)
-  disallowed_properties = ["title", "description", "_metadata"]
-  schema.delete_if { |key, value| disallowed_properties.include?(key) }
+  # TODO: We may or may not have to also do reduction at further levels i.e. clean up `properties`
+  # when the schema has the object type, etc.
 
-  if is_composite_schema(schema)
+  allowed_properties = ["type", "const", "enum", "allOf", "oneOf", "$ref"]
+  schema.delete_if { |key, value| !allowed_properties.include?(key) }
+
+  if schema.has_key?("allOf")
     schema["allOf"].map!(get_reduced_schema)
   end
 
-  if is_enum_schema(schema)
+  if schema.has_key?("oneOf")
     schema["oneOf"].map!(get_reduced_schema)
   end
 
   schema
 end
 
-def resolve_enum_subschemas(root_schema, schema)
-  puts "Entered `resolve_enum_subschemas`."
-
+def resolve_enum_schema(root_schema, schema)
   subschemas = schema["oneOf"]
   subschema_count = subschemas.count
 
@@ -337,8 +232,6 @@ def resolve_enum_subschemas(root_schema, schema)
   if subschema_count == 2
     array_idx = subschemas.index { |subschema| subschema["type"] == "array" }
     if !array_idx.nil?
-      puts "  Trying to resolve enum subschemas as X-or-array-of-X..."
-
       single_idx = if array_idx == 0 then 1 else 0 end
 
       # We 'reduce' the subschemas which strips out all things that aren't fundamental to describing
@@ -372,114 +265,111 @@ def resolve_enum_subschemas(root_schema, schema)
   # `memory`. We do this for every property that _isn't_ the adjacent tag, but the adjacent tag
   # _does_ get included in the resulting properties.
   if enum_tagging == "internal"
-    puts "  Trying to resolve enum subschemas as simple internally-tagged enum..."
+    # This transformation only makes sense when all subschemas are objects, so only resolve the ones
+    # that are objects, and only proceed if all of them were resolved.
+    resolved_subschemas = subschemas.filter_map { |subschema|
+      resolve_schema(root_schema, subschema) if get_schema_type(subschema) == "object"
+    }
 
-    unique_resolved_properties = {}
-    unique_tag_values = {}
+    if resolved_subschemas.count == subschemas.count
+      unique_resolved_properties = {}
+      unique_tag_values = {}
 
-    subschemas.each { |subschema|
-      puts "    Resolving internally-tagged enum subschema..."
+      resolved_subschemas.each { |resolved_subschema|
+        # Unwrap the resolved subschema since we only want to interact with the definition, not the
+        # wrapper boilerplate.
+        resolved_subschema = resolved_subschema.dig("type", "object", "options")
 
-      # For each subschema, resolve all of its properties.
-      resolved_subschema = resolve_schema(root_schema, subschema)
-
-      # Extract the tag property and figure out any necessary intersections, etc.
-      #
-      # Technically, a `const` value in JSON Schema can be an array or object, too... but like, we
-      # only ever use `const` for describing enum variants and what not, so this is my middle-ground
-      # approach to also allow for other constant-y types, but not objects/arrays which would
-      # just... not make sense.
-      tag_subschema = resolved_subschema.delete(enum_tag_field)
-      tag_value = nil
-  
-      for allowed_type in ["string", "number", "boolean"] do
-        maybe_tag_value = tag_subschema.dig("type", allowed_type, "const")
-        if !maybe_tag_value.nil?
-          tag_value = maybe_tag_value
-          break
+        # Extract the tag property and figure out any necessary intersections, etc.
+        #
+        # Technically, a `const` value in JSON Schema can be an array or object, too... but like, we
+        # only ever use `const` for describing enum variants and what not, so this is my middle-ground
+        # approach to also allow for other constant-y types, but not objects/arrays which would
+        # just... not make sense.
+        tag_subschema = resolved_subschema.delete(enum_tag_field)
+        tag_value = nil
+    
+        for allowed_type in ["string", "number", "boolean"] do
+          maybe_tag_value = tag_subschema.dig("type", allowed_type, "const")
+          if !maybe_tag_value.nil?
+            tag_value = maybe_tag_value
+            break
+          end
         end
-      end
 
-      if tag_value.nil?
-        puts "All enum subschemas representing an internally-tagged enum must have the tag field use a const value."
-        puts "Tag subschema: #{tag_subschema}"
-        exit
-      end
+        if tag_value.nil?
+          puts "All enum subschemas representing an internally-tagged enum must have the tag field use a const value."
+          puts "Tag subschema: #{tag_subschema}"
+          exit
+        end
 
-      if unique_tag_values.has_key?(tag_value)
-        puts "Found duplicate tag value '#{tag_value}' when resolving enum subschemas."
-        exit
-      end
+        if unique_tag_values.has_key?(tag_value)
+          puts "Found duplicate tag value '#{tag_value}' when resolving enum subschemas."
+          exit
+        end
 
-      puts "      Resolved subschema for tag value '#{tag_value}' has following properties: #{resolved_subschema.keys}"
+        unique_tag_values[tag_value] = tag_subschema
 
-      unique_tag_values[tag_value] = tag_subschema
+        # Now merge all of the properties from the given subschema, so long as the overlapping
+        # properties have the same schema.
+        resolved_subschema.each { |property, property_schema|
+          resolved_property = unique_resolved_properties[property]
+          if !resolved_property.nil?
+            # The property is already being tracked, so just do a check to make sure the property from our
+            # current subschema matches the existing property, schema-wise, before we update it.
+            reduced_existing_property = get_reduced_schema(resolved_property["_resolved"])
+            reduced_new_property = get_reduced_schema(property_schema)
 
-      # Now merge all of the properties from the given subschema, so long as the overlapping
-      # properties have the same schema.
-      resolved_subschema.each { |property, property_schema|
-        resolved_property = unique_resolved_properties[property]
-        if !resolved_property.nil?
-          # The property is already being tracked, so just do a check to make sure the property from our
-          # current subschema matches the existing property, schema-wise, before we update it.
-          reduced_existing_property = get_reduced_schema(resolved_property["_resolved"])
-          reduced_new_property = get_reduced_schema(property_schema)
+            if reduced_existing_property != reduced_new_property
+              puts "Had overlapping property '#{property}' from resolved enum subschema, but schemas differed:"
+              puts "Existing property schema (reduced): #{reduced_existing_property}"
+              puts "New property schema (reduced): #{reduced_new_property}"
+              exit
+            end
 
-          if reduced_existing_property != reduced_new_property
-            puts "Had overlapping property '#{property}' from resolved enum subschema, but schemas differed:"
-            puts "Existing property schema (reduced): #{reduced_existing_property}"
-            puts "New property schema (reduced): #{reduced_new_property}"
-            exit
+            # The schemas match, so just update the list of "relevant when" values.
+            resolved_property["relevant_when"].push(tag_value)
+          else
+            # First time seeing this particular property, so insert it.
+            resolved_property = { "_resolved" => property_schema, "relevant_when" => [tag_value] }
           end
 
-puts "relevant_when: #{resolved_property}"
-
-          # The schemas match, so just update the list of "relevant when" values.
-          resolved_property["relevant_when"].push(tag_value)
-        else
-          puts "First time seeing property '#{property}' during enum subschema resolution."
-          # First time seeing this particular property, so insert it.
-          resolved_property = { "_resolved" => property_schema, "relevant_when" => [tag_value] }
-        end
-
-        unique_resolved_properties[property] = resolved_property
-      }
-
-puts "    Resolved internally-tagged enum subschema for tag value '#{tag_value}'."
-puts "      Unique properties after last resolved enum subschema: #{unique_resolved_properties.keys}"
-    }
-
-    # Now that we've gone through all of the non-tag field, possibly overlapped properties, go
-    # through and modify the properties so that we only keep the "relevant when" values if the
-    # list of those values does not match the full set of unique tag values. We don't want to show
-    # "relevant when" for fields that all variants share, basically.
-    unique_tags = unique_tag_values.keys
-
-    unique_resolved_properties.transform_values! { |value|
-      # We check if a given property is relevant to all tag values by getting an intersection
-      # between `relevant_when` and the list of unique tag values, as well as asserting that the
-      # list lengths are identical.
-      relevant_when = value["relevant_when"]
-      if relevant_when.length == unique_tags.length && relevant_when & unique_tags == unique_tags
-        value.delete("relevant_when")
-      end
-
-      value
-    }
-
-    # Now we build our property for the tag field itself, and add that in before returning all of
-    # the unique resolved properties.
-    tag_property = {
-      "type" => {
-        "string" => {
-          "enum" => unique_tag_values.transform_values { |schema| get_rendered_description_from_schema(schema) },
+          unique_resolved_properties[property] = resolved_property
         }
       }
-    }
 
-    unique_resolved_properties[enum_tag_field] = tag_property
+      # Now that we've gone through all of the non-tag field, possibly overlapped properties, go
+      # through and modify the properties so that we only keep the "relevant when" values if the
+      # list of those values does not match the full set of unique tag values. We don't want to show
+      # "relevant when" for fields that all variants share, basically.
+      unique_tags = unique_tag_values.keys
 
-    return { "_resolved" => unique_resolved_properties }
+      unique_resolved_properties.transform_values! { |value|
+        # We check if a given property is relevant to all tag values by getting an intersection
+        # between `relevant_when` and the list of unique tag values, as well as asserting that the
+        # list lengths are identical.
+        relevant_when = value["relevant_when"]
+        if relevant_when.length == unique_tags.length && relevant_when & unique_tags == unique_tags
+          value.delete("relevant_when")
+        end
+
+        value
+      }
+
+      # Now we build our property for the tag field itself, and add that in before returning all of
+      # the unique resolved properties.
+      tag_property = {
+        "type" => {
+          "string" => {
+            "enum" => unique_tag_values.transform_values { |schema| get_rendered_description_from_schema(schema) },
+          }
+        }
+      }
+
+      unique_resolved_properties[enum_tag_field] = tag_property
+
+      return { "_resolved" => { "type" => "object", "options" => unique_resolved_properties } }
+    end
   end
 
   # Schema pattern: simple externally tagged enum with only unit variants.
@@ -487,8 +377,6 @@ puts "      Unique properties after last resolved enum subschema: #{unique_resol
   # This a common pattern where basic enums that only have unit variants -- i.e. `enum { A, B, C }`
   # -- end up being represented by a bunch of subschemas that are purely `const` values.
   if enum_tagging == "external"
-    puts "  Trying to resolve enum subschemas as simple externally-tagged unit variants-only enum..."
-
     tag_values = {}
 
     subschemas.each { |subschema|
@@ -518,17 +406,13 @@ puts "      Unique properties after last resolved enum subschema: #{unique_resol
   # have the `string` type with an `enum` of `"none"` and `"adaptive"`, and the uint type for the
   # integer side. This code mostly assumes the upstream schema is itself correct, in terms of not
   # providing a schema that is too ambiguous to properly validate against an input document.
-  puts "  Trying to resolve enum subschemas as mixed-use enum..."
-
   type_defs = {}
   type_modes = {}
 
-  subschemas.each { |subschema|
-    resolved_subschema = resolve_schema_property_type(root_schema, subschema)
-    type_defs.merge!(resolved_subschema)
-  }
+  type_defs = subschemas.filter_map { |subschema| resolve_schema(root_schema, subschema) }
+    .reduce { |acc, item| nested_merge(acc, item) }
 
-  { "_resolved" => { "type" => type_defs , "annotations" => "mixed_use" } }
+  { "_resolved" => { "type" => type_defs }, "annotations" => "mixed_use" }
 end
 
 def get_rendered_description_from_schema(schema)
@@ -577,6 +461,7 @@ component_bases = root_schema["definitions"].filter_map { |key, definition|
 .reduce(:+)
 
 component_bases.each { |component_type, schema|
+  puts " <!> Resolving base definition for #{component_type}..."
   base_config = resolve_schema(root_schema, schema)
   final = { "base" => { "components" => { component_type => { "configuration" => base_config } } } }
 

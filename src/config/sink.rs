@@ -43,7 +43,6 @@ where
     healthcheck: SinkHealthcheckOptions,
 
     #[configurable(derived)]
-    #[configurable(metadata(config_docs_skip))]
     #[serde(
         default,
         skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
