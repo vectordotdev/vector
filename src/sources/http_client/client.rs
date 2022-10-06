@@ -19,8 +19,8 @@ use crate::{
     sources::util::{
         http::HttpMethod,
         http_client::{
-            build_url, call, default_scrape_interval_secs, GenericHttpClientInputs, HttpClientBuilder,
-            HttpScraperContext,
+            build_url, call, default_scrape_interval_secs, GenericHttpClientInputs,
+            HttpClientBuilder, HttpScraperContext,
         },
     },
     tls::{TlsConfig, TlsSettings},
@@ -87,15 +87,11 @@ pub struct HttpClientConfig {
     pub log_namespace: Option<bool>,
 }
 
-<<<<<<< HEAD:src/sources/http_client/client.rs
-impl Default for HttpClientConfig {
-=======
 const fn default_http_method() -> HttpMethod {
     HttpMethod::Get
 }
 
-impl Default for HttpScrapeConfig {
->>>>>>> master:src/sources/http_scrape/scrape.rs
+impl Default for HttpClientConfig {
     fn default() -> Self {
         Self {
             endpoint: "http://localhost:9898/logs".to_string(),
@@ -152,11 +148,7 @@ impl SourceConfig for HttpClientConfig {
             shutdown: cx.shutdown,
         };
 
-<<<<<<< HEAD:src/sources/http_client/client.rs
-        Ok(call(inputs, context, cx.out).boxed())
-=======
-        Ok(http_scrape(inputs, context, cx.out, self.method).boxed())
->>>>>>> master:src/sources/http_scrape/scrape.rs
+        Ok(call(inputs, context, cx.out, self.method).boxed())
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
