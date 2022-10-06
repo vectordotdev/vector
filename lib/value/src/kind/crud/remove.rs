@@ -38,23 +38,19 @@ impl Kind {
 
         if let Some(second) = second {
             // more than 1 segment left
-
             match first {
                 OwnedSegment::Field(field) => {
+                    let mut at_path_kind = self.at_path(segments);
                     if let Some(object) = self.as_object_mut() {
                         match object.known_mut().get_mut(&Field::from(field.to_owned())) {
-                            None => CompactOptions {
-                                should_compact: object
-                                    .unknown_kind()
-                                    .at_path(&segments[1..])
-                                    .contains_any_defined(),
-                                should_not_compact: true,
+                            None => {
+                                // The modified value is discarded here (It's not needed)
+                                &mut at_path_kind
                             }
-                            .apply_global_compact_option(compact),
-                            Some(child) => child
-                                .remove_inner(&segments[1..], compact)
-                                .compact(object, field.to_owned()),
+                            Some(child) => child,
                         }
+                        .remove_inner(&segments[1..], compact)
+                        .compact(object, field.to_owned())
                     } else {
                         // guaranteed to not delete anything
                         CompactOptions {
@@ -64,6 +60,7 @@ impl Kind {
                     }
                 }
                 OwnedSegment::Index(index) => {
+                    let mut at_path_kind = self.at_path(segments);
                     if let Some(array) = self.as_array_mut() {
                         let mut index = *index;
                         if index < 0 {
@@ -80,30 +77,19 @@ impl Kind {
                                 if let Some(largest_known_index) = array.largest_known_index() {
                                     for i in min_index..=largest_known_index {
                                         let mut single_remove = original.clone();
-                                        match single_remove.known_mut().get_mut(&i.into()) {
-                                            None => {
-                                                unimplemented!()
-                                                // CompactOptions {
-                                                //     should_compact: array
-                                                //         .unknown_kind()
-                                                //         .at_path(&segments[1..])
-                                                //         .contains_any_defined(),
-                                                //     should_not_compact: true,
-                                                // }
-                                                //     .apply_global_compact_option(compact),
-                                            }
-                                            Some(child) => {
-                                                child
-                                                    .remove_inner(&segments[1..], compact)
-                                                    .compact(&mut single_remove, i);
-                                            }
+                                        if let Some(child) =
+                                            single_remove.known_mut().get_mut(&i.into())
+                                        {
+                                            child
+                                                .remove_inner(&segments[1..], compact)
+                                                .compact(&mut single_remove, i);
                                         }
                                         array.merge(single_remove, false);
                                     }
                                 }
+
                                 return CompactOptions {
-                                    // TODO: add more conditions here (index 0 might not be removed)
-                                    should_compact: min_index == 0,
+                                    should_compact: array.min_length() <= 1,
                                     should_not_compact: true,
                                 };
                             } else {
@@ -117,18 +103,14 @@ impl Kind {
                         }
 
                         match array.known_mut().get_mut(&(index as usize).into()) {
-                            None => CompactOptions {
-                                should_compact: array
-                                    .unknown_kind()
-                                    .at_path(&segments[1..])
-                                    .contains_any_defined(),
-                                should_not_compact: true,
+                            None => {
+                                // The modified value is discarded here (It's not needed)
+                                &mut at_path_kind
                             }
-                            .apply_global_compact_option(compact),
-                            Some(child) => child
-                                .remove_inner(&segments[1..], compact)
-                                .compact(array, index as usize),
+                            Some(child) => child,
                         }
+                        .remove_inner(&segments[1..], compact)
+                        .compact(array, index as usize)
                     } else {
                         // guaranteed to not delete anything
                         CompactOptions {
@@ -147,6 +129,7 @@ impl Kind {
                 }
             }
         } else {
+            // only 1 segment left
             match first {
                 OwnedSegment::Field(field) => {
                     if let Some(object) = self.as_object_mut() {
@@ -787,10 +770,25 @@ mod test {
                     ),
                     path: owned_value_path!(-1, 0),
                     compact: false,
-                    want: Kind::array(Collection::from(BTreeMap::from([(
-                        0.into(),
-                        Kind::bytes(),
-                    )]))),
+                    want: Kind::array(
+                        Collection::from(BTreeMap::from([(
+                            0.into(),
+                            Kind::array(Collection::from(BTreeMap::from([(
+                                0.into(),
+                                Kind::integer().or_undefined(),
+                            )]))),
+                        )]))
+                        .with_unknown(Kind::float()),
+                    ),
+                },
+            ),
+            (
+                "remove nested negative unknown index - empty array",
+                TestCase {
+                    kind: Kind::array(Collection::empty().with_unknown(Kind::float())),
+                    path: owned_value_path!(-1, 0),
+                    compact: false,
+                    want: Kind::array(Collection::empty().with_unknown(Kind::float())),
                 },
             ),
         ] {

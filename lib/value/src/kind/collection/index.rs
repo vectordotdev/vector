@@ -23,7 +23,16 @@ impl Collection<Index> {
     /// Returns the largest known index, or None if no known indices exist.
     #[must_use]
     pub fn largest_known_index(&self) -> Option<usize> {
-        self.known().keys().map(|i| i.to_usize()).max()
+        self.known()
+            .iter()
+            .filter_map(|(i, kind)| {
+                if kind.contains_any_defined() {
+                    Some(i.to_usize())
+                } else {
+                    None
+                }
+            })
+            .max()
     }
 
     /// Converts a negative index to a positive index (only if the exact positive index is known)
