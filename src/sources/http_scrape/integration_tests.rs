@@ -10,12 +10,12 @@ use crate::{
     http::Auth,
     serde::default_decoding,
     serde::default_framing_message_based,
-    sources::http_scrape::scrape::NAME,
     tls,
     tls::TlsConfig,
     SourceSender,
 };
 use codecs::decoding::DeserializerConfig;
+use vector_config::NamedComponent;
 use vector_core::config::log_schema;
 
 use super::{
@@ -39,7 +39,7 @@ fn dufs_https_address() -> String {
 
 /// The error path should not yield any events and must emit the required error internal events.
 /// Consider extracting this function into test_util , if it is always true that if the error
-/// internal event metric is fired that no events would be outputed by the source.
+/// internal event metric is fired that no events would be outputted by the source.
 pub(crate) async fn run_error(config: HttpScrapeConfig) {
     let events =
         run_and_assert_source_error(config, Duration::from_secs(3), &COMPONENT_ERROR_TAGS).await;
@@ -81,7 +81,10 @@ async fn scraped_logs_bytes() {
     .await;
     // panics if not log event
     let log = events[0].as_log();
-    assert_eq!(log[log_schema().source_type_key()], NAME.into());
+    assert_eq!(
+        log[log_schema().source_type_key()],
+        HttpScrapeConfig::NAME.into()
+    );
 }
 
 /// Logs (json) should be scraped and decoded successfully.
@@ -101,7 +104,10 @@ async fn scraped_logs_json() {
     .await;
     // panics if not log event
     let log = events[0].as_log();
-    assert_eq!(log[log_schema().source_type_key()], NAME.into());
+    assert_eq!(
+        log[log_schema().source_type_key()],
+        HttpScrapeConfig::NAME.into()
+    );
 }
 
 /// Metrics should be scraped and decoded successfully.
@@ -124,7 +130,7 @@ async fn scraped_metrics_native_json() {
     let metric = events[0].as_metric();
     assert_eq!(
         metric.tags().unwrap()[log_schema().source_type_key()],
-        NAME.to_string()
+        HttpScrapeConfig::NAME.to_string()
     );
 }
 
@@ -145,7 +151,10 @@ async fn scraped_trace_native_json() {
     .await;
 
     let trace = events[0].as_trace();
-    assert_eq!(trace.as_map()[log_schema().source_type_key()], NAME.into());
+    assert_eq!(
+        trace.as_map()[log_schema().source_type_key()],
+        HttpScrapeConfig::NAME.into()
+    );
 }
 
 /// Passing no authentication for the auth-gated endpoint should yield errors.

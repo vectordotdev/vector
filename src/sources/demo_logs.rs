@@ -182,7 +182,7 @@ async fn demo_logs_source(
     mut out: SourceSender,
     log_namespace: LogNamespace,
 ) -> Result<(), ()> {
-    let maybe_interval: Option<f64> = (interval != 0.0).then(|| interval);
+    let maybe_interval: Option<f64> = (interval != 0.0).then_some(interval);
 
     let mut interval = maybe_interval.map(|i| time::interval(Duration::from_secs_f64(i)));
 

@@ -1,12 +1,12 @@
 # result: {
 #   "x": {},
-#   "x_type": { "object": {"foo": {"boolean": true, "null": true }}},
+#   "x_type": { "object": {"foo": {"boolean": true, "undefined": true }}},
 #   "y": { "foo": true },
-#   "y_type": { "object": {"foo": {"boolean": true, "null": true }}},
+#   "y_type": { "object": {"foo": {"boolean": true, "undefined": true }}},
 #   "x2": {},
-#   "x2_type": { "object": {"foo": {"boolean": true, "null": true }}},
+#   "x2_type": { "object": {"foo": {"boolean": true, "undefined": true }}},
 #   "y2": { "foo": true },
-#   "y2_type": { "object": {"foo": {"boolean": true, "null": true }}}
+#   "y2_type": { "object": {"foo": {"boolean": true, "undefined": true }}}
 # }
 
 .x = if true {

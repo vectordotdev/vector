@@ -24,7 +24,7 @@ pub mod enterprise;
 pub mod format;
 mod graph;
 mod id;
-mod loading;
+pub(crate) mod loading;
 pub mod provider;
 mod schema;
 mod secret;
@@ -32,6 +32,7 @@ mod sink;
 mod source;
 mod transform;
 pub mod unit_test;
+pub(crate) mod util;
 mod validation;
 mod vars;
 pub mod watcher;
@@ -100,7 +101,7 @@ pub struct Config {
     #[cfg(feature = "api")]
     pub api: api::Options,
     pub schema: schema::Options,
-    pub version: Option<String>,
+    pub hash: Option<String>,
     #[cfg(feature = "enterprise")]
     pub enterprise: Option<enterprise::Options>,
     pub global: GlobalOptions,

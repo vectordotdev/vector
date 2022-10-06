@@ -7,8 +7,7 @@ use snafu::{ResultExt, Snafu};
 use vector_config::configurable_component;
 
 use crate::{
-    aws::create_client,
-    aws::{AwsAuthentication, RegionOrEndpoint},
+    aws::{create_client, AwsAuthentication, RegionOrEndpoint},
     codecs::EncodingConfig,
     common::sqs::SqsClientBuilder,
     config::{

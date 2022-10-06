@@ -119,7 +119,7 @@ impl From<OwnedValuePath> for String {
             .enumerate()
             .map(|(i, segment)| match segment {
                 OwnedSegment::Field(field) => {
-                    serialize_field(field.as_ref(), (i != 0).then(|| "."))
+                    serialize_field(field.as_ref(), (i != 0).then_some("."))
                 }
                 OwnedSegment::Index(index) => format!("[{}]", index),
                 OwnedSegment::Invalid => {
@@ -144,7 +144,7 @@ impl From<OwnedValuePath> for String {
                         coalesce_i += 1;
                         output.push_str(&field_output);
                     }
-                    output += &serialize_field(last.as_ref(), (coalesce_i != 0).then(|| "|"));
+                    output += &serialize_field(last.as_ref(), (coalesce_i != 0).then_some("|"));
                     output += ")";
                     output
                 }

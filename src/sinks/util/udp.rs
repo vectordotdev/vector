@@ -1,13 +1,13 @@
 use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     pin::Pin,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
     time::Duration,
 };
 
 use async_trait::async_trait;
 use bytes::BytesMut;
-use futures::{future::BoxFuture, ready, stream::BoxStream, FutureExt, StreamExt};
+use futures::{future::BoxFuture, stream::BoxStream, FutureExt, StreamExt};
 use snafu::{ResultExt, Snafu};
 use tokio::{net::UdpSocket, sync::oneshot, time::sleep};
 use tokio_util::codec::Encoder;

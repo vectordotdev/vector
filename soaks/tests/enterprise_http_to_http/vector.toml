@@ -4,8 +4,8 @@ data_dir = "/var/lib/vector"
 ## Enterprise
 ##
 [enterprise]
-api_key = "DD_API_KEY"
-configuration_key = "DD_CONFIGURATION_KEY"
+api_key = "${DD_API_KEY}"
+configuration_key = "${DD_CONFIGURATION_KEY}"
 endpoint = "http://localhost:8080"
 
 ##
@@ -17,7 +17,7 @@ type = "internal_metrics"
 
 [sources.http_source]
 type = "http"
-acknowledgements = false
+acknowledgements.enabled = false
 address = "0.0.0.0:8282"
 
 ##

@@ -1,5 +1,7 @@
 mod config_builder;
 mod loader;
+#[cfg(feature = "enterprise")]
+pub(crate) mod schema;
 mod secret;
 mod source;
 
@@ -151,6 +153,12 @@ pub async fn load_from_paths_with_provider_and_secrets(
         load_builder_from_paths(config_paths)?
     };
 
+    // Check secrets in configuration
+    #[cfg(feature = "enterprise")]
+    {
+        crate::config::loading::schema::check_sensitive_fields_from_paths(config_paths, &builder)?;
+    }
+
     validation::check_provider(&builder)?;
     signal_handler.clear();
 
@@ -161,6 +169,8 @@ pub async fn load_from_paths_with_provider_and_secrets(
     }
 
     let (new_config, build_warnings) = builder.build_with_warnings()?;
+
+    validation::check_buffer_preconditions(&new_config).await?;
 
     for warning in secrets_warning
         .into_iter()
