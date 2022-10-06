@@ -369,6 +369,6 @@ components: sources: [Name=string]: {
 		events_out_total:                 components.sources.internal_metrics.output.metrics.events_out_total
 		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
 		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
-		lag_time_seconds:                 components.sources.internal_metrics.output.metrics.lag_time_seconds
+		source_lag_time_seconds:          components.sources.internal_metrics.output.metrics.source_lag_time_seconds
 	}
 }
