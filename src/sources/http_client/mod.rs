@@ -7,4 +7,4 @@ mod tests;
 #[cfg(all(test, feature = "http-client-integration-tests"))]
 mod integration_tests;
 
-pub use scrape::HttpScrapeConfig;
+pub use scrape::HttpClientConfig;

@@ -36,7 +36,7 @@ use vector_core::{
 /// Configuration for the `http_client` source.
 #[configurable_component(source("http_client"))]
 #[derive(Clone, Debug)]
-pub struct HttpScrapeConfig {
+pub struct HttpClientConfig {
     /// Endpoint to scrape events from. The full path must be specified.
     /// Example: "http://127.0.0.1:9898/logs"
     pub endpoint: String,
@@ -80,7 +80,7 @@ pub struct HttpScrapeConfig {
     pub log_namespace: Option<bool>,
 }
 
-impl Default for HttpScrapeConfig {
+impl Default for HttpClientConfig {
     fn default() -> Self {
         Self {
             endpoint: "http://localhost:9898/logs".to_string(),
@@ -96,10 +96,10 @@ impl Default for HttpScrapeConfig {
     }
 }
 
-impl_generate_config_from_default!(HttpScrapeConfig);
+impl_generate_config_from_default!(HttpClientConfig);
 
 #[async_trait::async_trait]
-impl SourceConfig for HttpScrapeConfig {
+impl SourceConfig for HttpClientConfig {
     async fn build(&self, cx: SourceContext) -> Result<sources::Source> {
         // build the url
         let endpoints = vec![self.endpoint.clone()];
@@ -196,7 +196,7 @@ impl HttpScrapeContext {
                         log,
                         log_schema().source_type_key(),
                         "source_type",
-                        HttpScrapeConfig::NAME,
+                        HttpClientConfig::NAME,
                     );
                     self.log_namespace.insert_vector_metadata(
                         log,
@@ -208,13 +208,13 @@ impl HttpScrapeContext {
                 Event::Metric(ref mut metric) => {
                     metric.insert_tag(
                         log_schema().source_type_key().to_string(),
-                        HttpScrapeConfig::NAME.to_string(),
+                        HttpClientConfig::NAME.to_string(),
                     );
                 }
                 Event::Trace(ref mut trace) => {
                     trace.insert(
                         log_schema().source_type_key(),
-                        Bytes::from(HttpScrapeConfig::NAME),
+                        Bytes::from(HttpClientConfig::NAME),
                     );
                 }
             }
