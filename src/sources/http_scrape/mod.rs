@@ -1,10 +1,10 @@
-#[cfg(feature = "sources-http_scrape")]
+#[cfg(feature = "sources-http_client")]
 pub mod scrape;
 
 #[cfg(test)]
 mod tests;
 
-#[cfg(all(test, feature = "http-scrape-integration-tests"))]
+#[cfg(all(test, feature = "http-client-integration-tests"))]
 mod integration_tests;
 
 pub use scrape::HttpScrapeConfig;

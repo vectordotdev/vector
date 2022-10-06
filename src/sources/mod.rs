@@ -40,7 +40,7 @@ pub mod gcp_pubsub;
 pub mod heroku_logs;
 #[cfg(feature = "sources-host_metrics")]
 pub mod host_metrics;
-#[cfg(feature = "sources-http_scrape")]
+#[cfg(feature = "sources-http_client")]
 pub mod http_scrape;
 #[cfg(feature = "sources-http_server")]
 pub mod http_server;

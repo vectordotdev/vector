@@ -55,7 +55,7 @@ services:
       - "--no-fail-fast"
       - "--no-default-features"
       - "--features"
-      - "http-scrape-integration-tests"
+      - "http-client-integration-tests"
       - "--lib"
       - "sources::http_scrape::"
     depends_on:

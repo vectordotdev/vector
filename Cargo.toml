@@ -464,7 +464,7 @@ sources-logs = [
   "sources-gcp_pubsub",
   "sources-heroku_logs",
   "sources-http_server",
-  "sources-http_scrape",
+  "sources-http_client",
   "sources-internal_logs",
   "sources-journald",
   "sources-kafka",
@@ -512,8 +512,8 @@ sources-fluent = ["dep:base64", "listenfd", "tokio-util/net", "dep:rmpv", "dep:r
 sources-gcp_pubsub = ["gcp", "dep:h2", "dep:prost-types", "protobuf-build", "dep:tonic"]
 sources-heroku_logs = ["sources-utils-http", "sources-utils-http-query", "sources-http_server"]
 sources-host_metrics =  ["heim/cpu", "heim/host", "heim/memory", "heim/net"]
+sources-http_client = ["sources-utils-http-scrape"]
 sources-http_server = ["sources-utils-http", "sources-utils-http-query"]
-sources-http_scrape = ["sources-utils-http-scrape"]
 sources-internal_logs = []
 sources-internal_metrics = []
 sources-journald = []
@@ -724,7 +724,7 @@ all-integration-tests = [
   "gcp-cloud-storage-integration-tests",
   "gcp-integration-tests",
   "gcp-pubsub-integration-tests",
-  "http-scrape-integration-tests",
+  "http-client-integration-tests",
   "humio-integration-tests",
   "influxdb-integration-tests",
   "kafka-integration-tests",
@@ -784,7 +784,7 @@ gcp-cloud-storage-integration-tests = ["sinks-gcp"]
 gcp-integration-tests = ["sinks-gcp"]
 gcp-pubsub-integration-tests = ["sinks-gcp", "sources-gcp_pubsub"]
 humio-integration-tests = ["sinks-humio"]
-http-scrape-integration-tests = ["sources-http_scrape"]
+http-client-integration-tests = ["sources-http_client"]
 influxdb-integration-tests = ["sinks-influxdb"]
 kafka-integration-tests = ["sinks-kafka", "sources-kafka"]
 logstash-integration-tests = ["docker", "sources-logstash"]
