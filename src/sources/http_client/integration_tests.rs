@@ -1,5 +1,5 @@
-//! Integration tests for http_scrape source.
-//! The container configuration file is `docker-compose.http_scrape.yml`
+//! Integration tests for http_client source.
+//! The container configuration file is `docker-compose.http_client.yml`
 //! It leverages a static file server ("dufs"), which serves the files in tests/data/http-scrape
 
 use std::collections::HashMap;

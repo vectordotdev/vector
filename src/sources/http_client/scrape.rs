@@ -33,8 +33,8 @@ use vector_core::{
     event::Event,
 };
 
-/// Configuration for the `http_scrape` source.
-#[configurable_component(source("http_scrape"))]
+/// Configuration for the `http_client` source.
+#[configurable_component(source("http_client"))]
 #[derive(Clone, Debug)]
 pub struct HttpScrapeConfig {
     /// Endpoint to scrape events from. The full path must be specified.

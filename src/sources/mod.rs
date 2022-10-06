@@ -41,7 +41,7 @@ pub mod heroku_logs;
 #[cfg(feature = "sources-host_metrics")]
 pub mod host_metrics;
 #[cfg(feature = "sources-http_client")]
-pub mod http_scrape;
+pub mod http_client;
 #[cfg(feature = "sources-http_server")]
 pub mod http_server;
 #[cfg(feature = "sources-internal_logs")]
@@ -186,8 +186,8 @@ pub enum Sources {
     HttpServer(#[configurable(derived)] http_server::SimpleHttpConfig),
 
     /// HTTP Scrape.
-    #[cfg(feature = "sources-http_scrape")]
-    HttpScrape(#[configurable(derived)] http_scrape::HttpScrapeConfig),
+    #[cfg(feature = "sources-http_client")]
+    HttpScrape(#[configurable(derived)] http_client::HttpScrapeConfig),
 
     /// Internal Logs.
     #[cfg(feature = "sources-internal_logs")]
@@ -342,7 +342,7 @@ impl NamedComponent for Sources {
             Self::HostMetrics(config) => config.get_component_name(),
             #[cfg(feature = "sources-http_server")]
             Self::HttpServer(config) => config.get_component_name(),
-            #[cfg(feature = "sources-http_scrape")]
+            #[cfg(feature = "sources-http_client")]
             Self::HttpScrape(config) => config.get_component_name(),
             #[cfg(feature = "sources-internal_logs")]
             Self::InternalLogs(config) => config.get_component_name(),
