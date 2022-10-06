@@ -9,6 +9,7 @@ use vector_config::configurable_component;
 use vector_core::{config::LogNamespace, event::Event};
 
 use super::parser;
+use crate::sources::util::http::HttpMethod;
 use crate::{
     config::{self, GenerateConfig, Output, SourceConfig, SourceContext},
     http::Auth,
@@ -132,7 +133,7 @@ impl SourceConfig for PrometheusScrapeConfig {
             shutdown: cx.shutdown,
         };
 
-        Ok(http_scrape(inputs, builder, cx.out).boxed())
+        Ok(http_scrape(inputs, builder, cx.out, HttpMethod::Get).boxed())
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
