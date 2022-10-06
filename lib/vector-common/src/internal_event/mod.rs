@@ -146,13 +146,10 @@ macro_rules! registered_event {
     // Sub-matcher to implement the common bits in the above two cases.
     (
         => $event:ident {
-            $( $field:ident: $type:ty, )*
+            $( $field:ident: $type:ty = $value:expr, )*
         }
 
-        fn register($slf:ident)
-            $register_body:block
-
-        fn emit(&$slf2:ident, $data_name:ident: $data:ident)
+        fn emit(&$slf:ident, $data_name:ident: $data:ident)
             $emit_body:block
     ) => {
         paste::paste!{
@@ -168,8 +165,11 @@ macro_rules! registered_event {
                     Some(stringify!($event))
                 }
 
-                fn register($slf) -> [<$event Handle>]
-                    $register_body
+                fn register($slf) -> Self::Handle {
+                    Self::Handle {
+                        $( $field: $value, )*
+                    }
+                }
             }
 
             impl $crate::internal_event::InternalEventHandle for [<$event Handle>] {

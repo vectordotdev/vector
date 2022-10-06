@@ -8,15 +8,8 @@ crate::registered_event!(
         byte_size: usize,
         protocol: SharedString,
     } => {
-        bytes_sent: Counter,
-        protocol: SharedString,
-    }
-
-    fn register(self) {
-        Self::Handle {
-            bytes_sent: register_counter!("component_sent_bytes_total", "protocol" => self.protocol.clone()),
-            protocol: self.protocol,
-        }
+        bytes_sent: Counter = register_counter!("component_sent_bytes_total", "protocol" => self.protocol.clone()),
+        protocol: SharedString = self.protocol,
     }
 
     fn emit(&self, byte_size: ByteSize) {

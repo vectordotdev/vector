@@ -8,17 +8,11 @@ use crate::{
 
 vector_common::registered_event! (
     FilterEventsDropped => {
-        events_dropped: Registered<ComponentEventsDropped<'static, INTENTIONAL>>,
-        events_discarded: Counter,
-    }
-
-    fn register(self) {
-        Self::Handle {
-            events_dropped: register!(ComponentEventsDropped::<INTENTIONAL>::from(
+        events_dropped: Registered<ComponentEventsDropped<'static, INTENTIONAL>>
+            = register!(ComponentEventsDropped::<INTENTIONAL>::from(
                 "Events matched filter condition."
             )),
-            events_discarded: register_counter!("events_discarded_total"),
-        }
+        events_discarded: Counter = register_counter!("events_discarded_total"),
     }
 
     fn emit(&self, data: Count) {
