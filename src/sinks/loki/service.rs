@@ -12,9 +12,10 @@ use vector_core::{
     stream::DriverResponse,
 };
 
+use crate::sinks::loki::config::{CompressionConfigAdapter, ExtendedCompression};
 use crate::{
     http::{get_http_scheme_from_uri, Auth, HttpClient},
-    sinks::util::{metadata::RequestMetadata, retries::RetryLogic, Compression, UriSerde},
+    sinks::util::{metadata::RequestMetadata, retries::RetryLogic, UriSerde},
 };
 
 #[derive(Clone)]
@@ -70,7 +71,7 @@ impl DriverResponse for LokiResponse {
 
 #[derive(Clone)]
 pub struct LokiRequest {
-    pub compression: Compression,
+    pub compression: CompressionConfigAdapter,
     pub finalizers: EventFinalizers,
     pub payload: Bytes,
     pub tenant_id: Option<String>,
@@ -107,8 +108,13 @@ impl Service<LokiRequest> for LokiService {
     }
 
     fn call(&mut self, request: LokiRequest) -> Self::Future {
-        let mut req =
-            http::Request::post(&self.endpoint.uri).header("Content-Type", "application/json");
+        let content_type = match request.compression {
+            CompressionConfigAdapter::Original(_) => "application/json",
+            CompressionConfigAdapter::Extended(ExtendedCompression::Snappy) => {
+                "application/x-protobuf"
+            }
+        };
+        let mut req = http::Request::post(&self.endpoint.uri).header("Content-Type", content_type);
         let protocol = get_http_scheme_from_uri(&self.endpoint.uri);
 
         if let Some(tenant_id) = request.tenant_id {
