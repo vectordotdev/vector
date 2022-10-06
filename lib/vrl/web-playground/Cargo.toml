@@ -1,5 +1,5 @@
 [package]
-name = "wasm"
+name = "vrl-web-playground"
 version = "0.1.0"
 edition = "2021"
 
@@ -15,6 +15,10 @@ value = { path = "../../value", default-features = false }
 serde = { version = "1.0", features = ["derive"] }
 serde-wasm-bindgen = "0.4"
 gloo-utils = { version = "0.1", features = ["serde"] }
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3.21"
+indoc = "1.0.3"
 
 [dependencies.stdlib]
 package = "vrl-stdlib"

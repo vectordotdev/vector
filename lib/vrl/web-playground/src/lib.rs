@@ -7,6 +7,9 @@ use vrl::{diagnostic::Formatter, prelude::BTreeMap, CompileConfig, Runtime};
 use vrl::{TargetValue, TimeZone};
 use wasm_bindgen::prelude::*;
 
+#[cfg(test)]
+mod tests;
+
 #[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen(js_namespace = console)]
@@ -81,7 +84,7 @@ pub fn run_vrl(incoming: &JsValue) -> JsValue {
         Ok(res) => JsValue::from_serde(&res).unwrap(),
         Err(err) => {
             log(&err);
-            JsValue::from_serde("invalid vrl").unwrap()
+            JsValue::from_serde(&err).unwrap()
         }
     }
 }
