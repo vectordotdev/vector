@@ -40,9 +40,9 @@ killall -s SIGHUP vector
 
 ### Linux
 
-#### APT, dpkg, RPM, YUM
+#### APT, dpkg, RPM, YUM, pacman
 
-If you've installed Vector using [APT], [dpkg], [RPM], or [YUM], you can manage it using [systemctl].
+If you've installed Vector using [APT], [dpkg], [RPM], [YUM] or [pacman], you can manage it using [systemctl].
 
 {{< tabs default="Start" >}}
 {{< tab title="Start" >}}
@@ -237,6 +237,7 @@ Running Vector instances accept the IPC [signals](#signals) and produce the [exi
 [msi]: /docs/setup/installation/package-managers/msi
 [nix]: /docs/setup/installation/package-managers/nix
 [rpm]: /docs/setup/installation/package-managers/rpm
+[pacman]: /docs/setup/installation/package-managers/pacman
 [sources]: /docs/reference/configuration/sources
 [systemctl]: https://man7.org/linux/man-pages//man1/systemctl.1.html
 [watch_config]: /docs/reference/cli/#vector-watch-config

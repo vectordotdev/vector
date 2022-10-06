@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use tokio::time::Duration;
 use warp::{http::HeaderMap, Filter};
 
+use crate::sources::util::http::HttpMethod;
 use crate::{serde::default_decoding, serde::default_framing_message_based};
 use codecs::decoding::{
     CharacterDelimitedDecoderOptions, DeserializerConfig, FramingConfig,
@@ -52,6 +53,7 @@ async fn bytes_decoding() {
         decoding: default_decoding(),
         framing: default_framing_message_based(),
         headers: HashMap::new(),
+        method: HttpMethod::Get,
         tls: None,
         auth: None,
         log_namespace: None,
@@ -81,6 +83,7 @@ async fn json_decoding_newline_delimited() {
             newline_delimited: NewlineDelimitedDecoderOptions::default(),
         },
         headers: HashMap::new(),
+        method: HttpMethod::Get,
         tls: None,
         auth: None,
         log_namespace: None,
@@ -113,6 +116,7 @@ async fn json_decoding_character_delimited() {
             },
         },
         headers: HashMap::new(),
+        method: HttpMethod::Get,
         tls: None,
         auth: None,
         log_namespace: None,
@@ -145,6 +149,7 @@ async fn request_query_applied() {
         decoding: DeserializerConfig::Json,
         framing: default_framing_message_based(),
         headers: HashMap::new(),
+        method: HttpMethod::Get,
         tls: None,
         auth: None,
         log_namespace: None,
@@ -209,6 +214,7 @@ async fn headers_applied() {
             "f00".to_string(),
             vec!["bazz".to_string(), "bizz".to_string()],
         )]),
+        method: HttpMethod::Get,
         auth: None,
         tls: None,
         log_namespace: None,
@@ -236,6 +242,7 @@ async fn accept_header_override() {
         decoding: DeserializerConfig::Bytes,
         framing: default_framing_message_based(),
         headers: HashMap::from([("ACCEPT".to_string(), vec!["application/json".to_string()])]),
+        method: HttpMethod::Get,
         auth: None,
         tls: None,
         log_namespace: None,

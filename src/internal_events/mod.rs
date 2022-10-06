@@ -41,6 +41,8 @@ mod encoding_transcode;
 mod eventstoredb_metrics;
 #[cfg(feature = "sources-exec")]
 mod exec;
+#[cfg(any(feature = "sources-file-descriptor", feature = "sources-stdin"))]
+mod file_descriptor;
 #[cfg(feature = "transforms-filter")]
 mod filter;
 #[cfg(feature = "sources-fluent")]
@@ -175,6 +177,8 @@ pub(crate) use self::exec::*;
     feature = "sinks-file",
 ))]
 pub(crate) use self::file::*;
+#[cfg(any(feature = "sources-file-descriptor", feature = "sources-stdin"))]
+pub(crate) use self::file_descriptor::*;
 #[cfg(feature = "transforms-filter")]
 pub(crate) use self::filter::*;
 #[cfg(feature = "sources-fluent")]

@@ -16,9 +16,12 @@ use crate::{
     serde::default_decoding,
     serde::default_framing_message_based,
     sources,
-    sources::util::http_client::{
-        build_url, call, default_scrape_interval_secs, GenericHttpClientInputs, HttpClientBuilder,
-        HttpScraperContext,
+    sources::util::{
+        http::HttpMethod,
+        http_client::{
+            build_url, call, default_scrape_interval_secs, GenericHttpClientInputs, HttpClientBuilder,
+            HttpScraperContext,
+        },
     },
     tls::{TlsConfig, TlsSettings},
     Result,
@@ -67,6 +70,10 @@ pub struct HttpClientConfig {
     #[serde(default)]
     pub headers: HashMap<String, Vec<String>>,
 
+    /// Specifies the action of the HTTP request.
+    #[serde(default = "default_http_method")]
+    pub method: HttpMethod,
+
     /// TLS configuration.
     #[configurable(derived)]
     pub tls: Option<TlsConfig>,
@@ -80,7 +87,15 @@ pub struct HttpClientConfig {
     pub log_namespace: Option<bool>,
 }
 
+<<<<<<< HEAD:src/sources/http_client/client.rs
 impl Default for HttpClientConfig {
+=======
+const fn default_http_method() -> HttpMethod {
+    HttpMethod::Get
+}
+
+impl Default for HttpScrapeConfig {
+>>>>>>> master:src/sources/http_scrape/scrape.rs
     fn default() -> Self {
         Self {
             endpoint: "http://localhost:9898/logs".to_string(),
@@ -89,6 +104,7 @@ impl Default for HttpClientConfig {
             decoding: default_decoding(),
             framing: default_framing_message_based(),
             headers: HashMap::new(),
+            method: default_http_method(),
             tls: None,
             auth: None,
             log_namespace: None,
@@ -136,7 +152,11 @@ impl SourceConfig for HttpClientConfig {
             shutdown: cx.shutdown,
         };
 
+<<<<<<< HEAD:src/sources/http_client/client.rs
         Ok(call(inputs, context, cx.out).boxed())
+=======
+        Ok(http_scrape(inputs, context, cx.out, self.method).boxed())
+>>>>>>> master:src/sources/http_scrape/scrape.rs
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
