@@ -278,7 +278,7 @@ fn convert_span(dd_span: ddtrace_proto::Span) -> BTreeMap<String, Value> {
 
     span.insert("resource".into(), Value::from(dd_span.resource));
 
-    // TODO trace_id is being forced into an i64 but
+    // TODO trace_id, span_id and parent_id are being forced into an i64 but
     // the incoming payload is u64. This is a bug and needs to be fixed per:
     // https://github.com/vectordotdev/vector/issues/14687
     span.insert("trace_id".into(), Value::from(dd_span.trace_id as i64));
