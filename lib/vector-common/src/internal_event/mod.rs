@@ -120,3 +120,62 @@ impl From<&'static str> for Protocol {
         Self(SharedString::const_str(s))
     }
 }
+
+/// Macro to take care of some of the repetitive boilerplate in implementing a registered event. See
+/// the other events in this module for examples of how to use this.
+#[macro_export]
+macro_rules! registered_event {
+    // A registered event struct with no fields (zero-sized type).
+    ($event:ident => $($tail:tt)*) => {
+        #[derive(Debug)]
+        pub struct $event;
+
+        $crate::registered_event!(=> $event $($tail)*);
+    };
+
+    // A normal registered event struct.
+    ($event:ident { $( $field:ident: $type:ty, )* } => $($tail:tt)*) => {
+        #[derive(Debug)]
+        pub struct $event {
+            $( pub $field: $type, )*
+        }
+
+        $crate::registered_event!(=> $event $($tail)*);
+    };
+
+    // Sub-matcher to implement the common bits in the above two cases.
+    (
+        => $event:ident $handle:ident {
+            $( $field:ident: $type:ty, )*
+        }
+
+        fn register($slf:ident)
+            $register_body:block
+
+        fn emit(&$slf2:ident, $data_name:ident: $data:ident)
+            $emit_body:block
+    ) => {
+        #[derive(Clone)]
+        pub struct $handle {
+            $( $field: $type, )*
+        }
+
+        impl $crate::internal_event::RegisterInternalEvent for $event {
+            type Handle = $handle;
+
+            fn name(&self) -> Option<&'static str> {
+                Some(stringify!($event))
+            }
+
+            fn register($slf) -> $handle
+                $register_body
+        }
+
+        impl $crate::internal_event::InternalEventHandle for $handle {
+            type Data = $data;
+
+            fn emit(&$slf, $data_name: $data)
+                $emit_body
+        }
+    };
+}
