@@ -1,20 +1,6 @@
 version: "3"
 
 services:
-  # TODO if not using DD agent source in vector, this service can be removed entirely
-  datadog-trace-agent-to-vector:
-    image: docker.io/datadog/agent:7.39.1
-    networks:
-      - backend
-    environment:
-      - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
-      - DD_APM_ENABLED=true
-      - DD_APM_DD_URL=http://runner:8081
-      - DD_HEALTH_PORT=8183
-      - DD_CMD_PORT=5002
-      - DD_USE_DOGSTATSD=false
-    volumes:
-      - ${PWD}/tests/data/datadog-traces/conf.yaml:/etc/datadog-agent/conf.d/test.d/conf.yaml
   datadog-trace-agent-only:
     image: docker.io/datadog/agent:7.39.1
     networks:
@@ -48,18 +34,14 @@ services:
       - "--features"
       - "datadog-traces-integration-tests"
       - "--lib"
-        # TODO revert when solid
-        #- "::datadog::traces::"
-      - "::datadog::traces::integration_tests::apm_stats_e2e_test_dd_agent_to_vector_correctness"
+      - "::datadog::traces::"
     environment:
       - TRACE_AGENT_ONLY_URL=http://datadog-trace-agent-only:8126/v0.3/traces
-      - TRACE_AGENT_VECTOR_URL=http://datadog-trace-agent-to-vector:8126/v0.3/traces
       - TEST_DATADOG_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
       - AGENT_TO_VECTOR_PORT=8081
       - AGENT_ONLY_PORT=8082
     depends_on:
       - datadog-trace-agent-only
-      - datadog-trace-agent-to-vector
     volumes:
       - ${PWD}:/code
       - target:/code/target

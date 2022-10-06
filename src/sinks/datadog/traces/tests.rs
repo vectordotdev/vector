@@ -59,6 +59,7 @@ fn simple_span(
     start: i64,
     duration: i64,
     span_id: i64,
+    error: i64,
 ) -> BTreeMap<String, Value> {
     BTreeMap::<String, Value>::from([
         ("service".to_string(), Value::from("a_service")),
@@ -70,7 +71,7 @@ fn simple_span(
         ("parent_id".to_string(), Value::Integer(789)),
         ("start".to_string(), Value::from(Utc.timestamp_nanos(start))),
         ("duration".to_string(), Value::Integer(duration)),
-        ("error".to_string(), Value::Integer(404)),
+        ("error".to_string(), Value::Integer(error)),
         (
             "meta".to_string(),
             Value::Object(BTreeMap::<String, Value>::from([
@@ -99,10 +100,12 @@ pub fn simple_trace_event_detailed(
     start: Option<i64>,
     duration: Option<i64>,
     span_id: Option<i64>,
+    error: Option<i64>,
 ) -> TraceEvent {
     let duration = duration.unwrap_or(1_000_000);
     let start = start.unwrap_or(1_431_648_000_000_001i64);
     let span_id = span_id.unwrap_or(456);
+    let error = error.unwrap_or(404);
 
     let mut t = TraceEvent::default();
     t.insert("language", "a_language");
@@ -115,14 +118,14 @@ pub fn simple_trace_event_detailed(
     t.insert(
         "spans",
         Value::Array(vec![Value::from(simple_span(
-            resource, start, duration, span_id,
+            resource, start, duration, span_id, error,
         ))]),
     );
     t
 }
 
 pub fn simple_trace_event(resource: String) -> TraceEvent {
-    simple_trace_event_detailed(resource, None, None, None)
+    simple_trace_event_detailed(resource, None, None, None, None)
 }
 
 fn validate_simple_span(span: dd_proto::Span, resource: String) {
