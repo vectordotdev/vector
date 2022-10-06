@@ -81,7 +81,7 @@ impl SinkConfig for SematextLogsConfig {
         };
 
         let (sink, healthcheck) = ElasticsearchConfig {
-            endpoint,
+            endpoints: vec![endpoint],
             compression: Compression::None,
             doc_type: Some(
                 "\

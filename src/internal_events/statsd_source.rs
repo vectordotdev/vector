@@ -1,39 +1,7 @@
-use bytes::Bytes;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 use vector_common::internal_event::{error_stage, error_type};
-
-#[derive(Debug)]
-pub struct StatsdInvalidRecordError<'a> {
-    pub error: &'a crate::sources::statsd::parser::ParseError,
-    pub bytes: Bytes,
-}
-
-const INVALID_PACKET: &str = "invalid_packet";
-
-impl<'a> InternalEvent for StatsdInvalidRecordError<'a> {
-    fn emit(self) {
-        error!(
-            message = "Invalid packet from statsd, discarding.",
-            error = %self.error,
-            error_code = INVALID_PACKET,
-            error_type = error_type::PARSER_FAILED,
-            stage = error_stage::PROCESSING,
-            bytes = %String::from_utf8_lossy(&self.bytes),
-            internal_log_rate_limit = true,
-        );
-        counter!(
-            "component_errors_total", 1,
-            "error_code" => INVALID_PACKET,
-            "error_type" => error_type::PARSER_FAILED,
-            "stage" => error_stage::PROCESSING,
-        );
-        // deprecated
-        counter!("invalid_record_total", 1,);
-        counter!("invalid_record_bytes_total", self.bytes.len() as u64);
-    }
-}
 
 #[derive(Debug)]
 enum StatsdSocketErrorType {

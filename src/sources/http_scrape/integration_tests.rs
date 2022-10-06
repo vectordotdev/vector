@@ -5,6 +5,7 @@
 use std::collections::HashMap;
 use tokio::time::{Duration, Instant};
 
+use crate::sources::util::http::HttpMethod;
 use crate::{
     config::{ComponentKey, SourceConfig, SourceContext},
     http::Auth,
@@ -57,6 +58,7 @@ async fn invalid_endpoint() {
         decoding: default_decoding(),
         framing: default_framing_message_based(),
         headers: HashMap::new(),
+        method: HttpMethod::Get,
         auth: None,
         tls: None,
         log_namespace: None,
@@ -74,6 +76,7 @@ async fn scraped_logs_bytes() {
         decoding: DeserializerConfig::Bytes,
         framing: default_framing_message_based(),
         headers: HashMap::new(),
+        method: HttpMethod::Get,
         auth: None,
         tls: None,
         log_namespace: None,
@@ -97,6 +100,7 @@ async fn scraped_logs_json() {
         decoding: DeserializerConfig::Json,
         framing: default_framing_message_based(),
         headers: HashMap::new(),
+        method: HttpMethod::Get,
         auth: None,
         tls: None,
         log_namespace: None,
@@ -120,6 +124,7 @@ async fn scraped_metrics_native_json() {
         decoding: DeserializerConfig::NativeJson,
         framing: default_framing_message_based(),
         headers: HashMap::new(),
+        method: HttpMethod::Get,
         auth: None,
         tls: None,
         log_namespace: None,
@@ -144,6 +149,7 @@ async fn scraped_trace_native_json() {
         decoding: DeserializerConfig::NativeJson,
         framing: default_framing_message_based(),
         headers: HashMap::new(),
+        method: HttpMethod::Get,
         auth: None,
         tls: None,
         log_namespace: None,
@@ -167,6 +173,7 @@ async fn unauthorized_no_auth() {
         decoding: DeserializerConfig::Json,
         framing: default_framing_message_based(),
         headers: HashMap::new(),
+        method: HttpMethod::Get,
         auth: None,
         tls: None,
         log_namespace: None,
@@ -184,6 +191,7 @@ async fn unauthorized_wrong_auth() {
         decoding: DeserializerConfig::Json,
         framing: default_framing_message_based(),
         headers: HashMap::new(),
+        method: HttpMethod::Get,
         tls: None,
         auth: Some(Auth::Basic {
             user: "white_rabbit".to_string(),
@@ -204,6 +212,7 @@ async fn authorized() {
         decoding: DeserializerConfig::Json,
         framing: default_framing_message_based(),
         headers: HashMap::new(),
+        method: HttpMethod::Get,
         tls: None,
         auth: Some(Auth::Basic {
             user: "user".to_string(),
@@ -224,6 +233,7 @@ async fn tls_invalid_ca() {
         decoding: DeserializerConfig::Json,
         framing: default_framing_message_based(),
         headers: HashMap::new(),
+        method: HttpMethod::Get,
         tls: Some(TlsConfig {
             ca_file: Some("tests/data/http-scrape/certs/invalid-ca-cert.pem".into()),
             ..Default::default()
@@ -244,6 +254,7 @@ async fn tls_valid() {
         decoding: DeserializerConfig::Json,
         framing: default_framing_message_based(),
         headers: HashMap::new(),
+        method: HttpMethod::Get,
         tls: Some(TlsConfig {
             ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
             ..Default::default()
@@ -265,6 +276,7 @@ async fn shutdown() {
         decoding: DeserializerConfig::Json,
         framing: default_framing_message_based(),
         headers: HashMap::new(),
+        method: HttpMethod::Get,
         tls: None,
         auth: None,
         log_namespace: None,

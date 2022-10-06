@@ -9,7 +9,7 @@ use prost::Message;
 use proto_event::EventWrapper;
 use tonic::{body::BoxBody, IntoRequest};
 use vector_core::{
-    event::proto as proto_event, internal_event::EventsSent, stream::DriverResponse,
+    event::proto as proto_event, internal_event::CountByteSize, stream::DriverResponse,
 };
 
 use super::VectorSinkError;
@@ -38,12 +38,8 @@ impl DriverResponse for VectorResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> EventsSent {
-        EventsSent {
-            count: self.events_count,
-            byte_size: self.events_byte_size,
-            output: None,
-        }
+    fn events_sent(&self) -> CountByteSize {
+        CountByteSize(self.events_count, self.events_byte_size)
     }
 }
 

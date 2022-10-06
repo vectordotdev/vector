@@ -1,9 +1,11 @@
 use std::time::Instant;
 
 use crate::emit;
-use metrics::{counter, histogram};
+use metrics::{counter, histogram, register_counter, Counter};
 pub use vector_core::internal_event::EventsReceived;
-use vector_core::internal_event::InternalEvent;
+use vector_core::internal_event::{
+    Count, InternalEvent, InternalEventHandle, RegisterInternalEvent,
+};
 
 use vector_common::internal_event::{error_stage, error_type};
 
@@ -122,12 +124,49 @@ pub struct ComponentEventsDropped<'a, const INTENTIONAL: bool> {
 
 impl<'a, const INTENTIONAL: bool> InternalEvent for ComponentEventsDropped<'a, INTENTIONAL> {
     fn emit(self) {
+        let count = self.count;
+        self.register().emit(Count(count as usize));
+    }
+}
+
+impl<'a, const INTENTIONAL: bool> From<&'a str> for ComponentEventsDropped<'a, INTENTIONAL> {
+    fn from(reason: &'a str) -> Self {
+        Self { count: 0, reason }
+    }
+}
+
+impl<'a, const INTENTIONAL: bool> RegisterInternalEvent
+    for ComponentEventsDropped<'a, INTENTIONAL>
+{
+    type Handle = ComponentEventsDroppedHandle<'a, INTENTIONAL>;
+    fn register(self) -> Self::Handle {
+        Self::Handle {
+            discarded_events: register_counter!(
+                "component_discarded_events_total",
+                "intentional" => if INTENTIONAL { "true" } else { "false" },
+            ),
+            reason: self.reason,
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct ComponentEventsDroppedHandle<'a, const INTENTIONAL: bool> {
+    discarded_events: Counter,
+    reason: &'a str,
+}
+
+impl<'a, const INTENTIONAL: bool> InternalEventHandle
+    for ComponentEventsDroppedHandle<'a, INTENTIONAL>
+{
+    type Data = Count;
+    fn emit(&self, data: Self::Data) {
         let message = "Events dropped";
         if INTENTIONAL {
             debug!(
                 message,
                 intentional = INTENTIONAL,
-                count = self.count,
+                count = data.0,
                 reason = self.reason,
                 internal_log_rate_limit = true,
             );
@@ -135,16 +174,12 @@ impl<'a, const INTENTIONAL: bool> InternalEvent for ComponentEventsDropped<'a, I
             error!(
                 message,
                 intentional = INTENTIONAL,
-                count = self.count,
+                count = data.0,
                 reason = self.reason,
                 internal_log_rate_limit = true,
             );
         }
-        counter!(
-            "component_discarded_events_total",
-            self.count,
-            "intentional" => if INTENTIONAL { "true" } else { "false" },
-        );
+        self.discarded_events.increment(data.0 as u64);
     }
 }
 

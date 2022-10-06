@@ -21,36 +21,36 @@ use super::repl;
 use super::Error;
 
 #[derive(Parser, Debug)]
-#[clap(name = "VRL", about = "Vector Remap Language CLI")]
+#[command(name = "VRL", about = "Vector Remap Language CLI")]
 pub struct Opts {
     /// The VRL program to execute. The program ".foo = true", for example, sets the event object's
     /// `foo` field to `true`.
-    #[clap(name = "PROGRAM")]
+    #[arg(id = "PROGRAM")]
     program: Option<String>,
 
     /// The file containing the event object(s) to handle. JSON events should be one per line..
-    #[clap(short, long = "input", parse(from_os_str))]
+    #[arg(short, long = "input")]
     input_file: Option<PathBuf>,
 
     /// The file containing the VRL program to execute. This can be used instead of `PROGRAM`.
-    #[clap(short, long = "program", conflicts_with("PROGRAM"), parse(from_os_str))]
+    #[arg(short, long = "program", conflicts_with("PROGRAM"))]
     program_file: Option<PathBuf>,
 
     /// Print the (modified) event object instead of the result of the final expression. Setting
     /// this flag is equivalent to using `.` as the final expression.
-    #[clap(short = 'o', long)]
+    #[arg(short = 'o', long)]
     print_object: bool,
 
     /// The timezone used to parse dates.
-    #[clap(short = 'z', long)]
+    #[arg(short = 'z', long)]
     timezone: Option<String>,
 
     /// Should we use the VM to evaluate the VRL
-    #[clap(short, long = "runtime", default_value_t)]
+    #[arg(short, long = "runtime", default_value_t)]
     runtime: VrlRuntime,
 
     // Should the CLI emit warnings
-    #[clap(long = "print-warnings")]
+    #[arg(long = "print-warnings")]
     print_warnings: bool,
 }
 
