@@ -23,36 +23,11 @@ use crate::{
     event::{Event, Value},
     serde::{bool_or_struct, default_decoding},
     sources::util::{
-        add_query_parameters, Encoding, ErrorMessage, HttpSource, HttpSourceAuthConfig,
+        add_query_parameters, http::HttpMethod, Encoding, ErrorMessage, HttpSource,
+        HttpSourceAuthConfig,
     },
     tls::TlsEnableableConfig,
 };
-
-/// HTTP method.
-#[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative)]
-#[derivative(Default)]
-#[serde(rename_all = "UPPERCASE")]
-pub enum HttpMethod {
-    /// HTTP HEAD method.
-    Head,
-
-    /// HTTP GET method.
-    Get,
-
-    /// HTTP POST method.
-    #[derivative(Default)]
-    Post,
-
-    /// HTTP Put method.
-    Put,
-
-    /// HTTP PATCH method.
-    Patch,
-
-    /// HTTP DELETE method.
-    Delete,
-}
 
 /// Configuration for the `http` source.
 #[configurable_component(source("http"))]
@@ -101,7 +76,7 @@ pub struct SimpleHttpConfig {
     path_key: String,
 
     /// Specifies the action of the HTTP request.
-    #[serde(default)]
+    #[serde(default = "default_http_method")]
     method: HttpMethod,
 
     #[configurable(derived)]
@@ -127,9 +102,9 @@ impl GenerateConfig for SimpleHttpConfig {
             query_parameters: Vec::new(),
             tls: None,
             auth: None,
-            path: "/".to_string(),
-            path_key: "path".to_string(),
-            method: HttpMethod::Post,
+            path: default_path(),
+            path_key: default_path_key(),
+            method: default_http_method(),
             strict_path: true,
             framing: None,
             decoding: Some(default_decoding()),
@@ -137,6 +112,10 @@ impl GenerateConfig for SimpleHttpConfig {
         })
         .unwrap()
     }
+}
+
+const fn default_http_method() -> HttpMethod {
+    HttpMethod::Post
 }
 
 fn default_path() -> String {

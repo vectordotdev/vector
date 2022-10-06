@@ -16,9 +16,12 @@ use crate::{
     serde::default_decoding,
     serde::default_framing_message_based,
     sources,
-    sources::util::http_scrape::{
-        build_url, default_scrape_interval_secs, http_scrape, GenericHttpScrapeInputs,
-        HttpScraperBuilder, HttpScraperContext,
+    sources::util::{
+        http::HttpMethod,
+        http_scrape::{
+            build_url, default_scrape_interval_secs, http_scrape, GenericHttpScrapeInputs,
+            HttpScraperBuilder, HttpScraperContext,
+        },
     },
     tls::{TlsConfig, TlsSettings},
     Result,
@@ -32,20 +35,6 @@ use vector_core::{
     config::{log_schema, LogNamespace, Output},
     event::Event,
 };
-
-/// HTTP method.
-#[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative)]
-#[derivative(Default)]
-#[serde(rename_all = "UPPERCASE")]
-pub enum HttpMethod {
-    /// HTTP GET method.
-    #[derivative(Default)]
-    Get,
-
-    /// HTTP POST method.
-    Post,
-}
 
 /// Configuration for the `http_scrape` source.
 #[configurable_component(source("http_scrape"))]
@@ -82,7 +71,7 @@ pub struct HttpScrapeConfig {
     pub headers: HashMap<String, Vec<String>>,
 
     /// Specifies the action of the HTTP request.
-    #[serde(default)]
+    #[serde(default = "default_http_method")]
     pub method: HttpMethod,
 
     /// TLS configuration.
@@ -98,6 +87,10 @@ pub struct HttpScrapeConfig {
     pub log_namespace: Option<bool>,
 }
 
+const fn default_http_method() -> HttpMethod {
+    HttpMethod::Get
+}
+
 impl Default for HttpScrapeConfig {
     fn default() -> Self {
         Self {
@@ -107,7 +100,7 @@ impl Default for HttpScrapeConfig {
             decoding: default_decoding(),
             framing: default_framing_message_based(),
             headers: HashMap::new(),
-            method: HttpMethod::Get,
+            method: default_http_method(),
             tls: None,
             auth: None,
             log_namespace: None,
@@ -155,7 +148,7 @@ impl SourceConfig for HttpScrapeConfig {
             shutdown: cx.shutdown,
         };
 
-        Ok(http_scrape(inputs, context, cx.out, Some(self.method)).boxed())
+        Ok(http_scrape(inputs, context, cx.out, self.method).boxed())
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {

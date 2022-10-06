@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use tokio::time::Duration;
 use warp::{http::HeaderMap, Filter};
 
-use crate::sources::http_scrape::scrape::HttpMethod;
+use crate::sources::util::http::HttpMethod;
 use crate::{serde::default_decoding, serde::default_framing_message_based};
 use codecs::decoding::{
     CharacterDelimitedDecoderOptions, DeserializerConfig, FramingConfig,

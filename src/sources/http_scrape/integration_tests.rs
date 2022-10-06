@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 use tokio::time::{Duration, Instant};
 
-use crate::sources::http_scrape::scrape::HttpMethod;
+use crate::sources::util::http::HttpMethod;
 use crate::{
     config::{ComponentKey, SourceConfig, SourceContext},
     http::Auth,

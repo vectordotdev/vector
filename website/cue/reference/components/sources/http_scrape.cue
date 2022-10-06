@@ -79,8 +79,12 @@ components: sources: http_scrape: {
 			type: string: {
 				default: "GET"
 				enum: {
+					"HEAD":   "HTTP HEAD method."
 					"GET":    "HTTP GET method."
+					"PUT":    "HTTP PUT method."
 					"POST":   "HTTP POST method."
+					"PATCH":  "HTTP PATCH method."
+					"DELETE": "HTTP DELETE method."
 				}
 			}
 		}
