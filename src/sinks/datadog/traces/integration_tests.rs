@@ -74,7 +74,7 @@ async fn run_server(name: String, port: u16, tx: Sender<StatsPayload>) {
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
 
-    println!("HTTP server for `{}` listening on {}", name, addr);
+    info!("HTTP server for `{}` listening on {}", name, addr);
 
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
@@ -91,7 +91,7 @@ async fn process_traces(Extension(_state): Extension<Arc<AppState>>, request: Re
 
     if let Some(content_type) = content_type {
         if content_type.starts_with("application/x-protobuf") {
-            debug!("got trace payload!");
+            debug!("Got trace payload.");
         }
     }
 }
@@ -109,7 +109,7 @@ async fn process_stats(Extension(state): Extension<Arc<AppState>>, mut request: 
 
     if let Some(content_type) = content_type {
         if content_type.starts_with("application/msgpack") {
-            debug!("`{}` server got stats payload!", state.name);
+            debug!("`{}` server got stats payload.", state.name);
 
             let body = request.body_mut();
             let compressed_body_bytes = hyper::body::to_bytes(body)
@@ -123,7 +123,7 @@ async fn process_stats(Extension(state): Extension<Arc<AppState>>, mut request: 
 
             let payload: StatsPayload = rmp_serde::from_slice(&decompressed_body_bytes).unwrap();
 
-            println!(
+            info!(
                 "`{}` server received and deserialized stats payload.",
                 state.name
             );
@@ -177,6 +177,7 @@ fn build_traces_payload(start: i64, duration: i64, span_id: i64) -> Vec<Vec<Span
 // Sends traces into the Agent container.
 // Send two separate requests with thin the same bucket time window to invoke the aggregation logic in the Agent.
 async fn send_agent_traces(start: i64, duration: i64, span_id: i64) {
+    // sends a trace to each of the urls
     async fn send_trace(urls: &Vec<String>, start: i64, duration: i64, span_id: i64) -> bool {
         let traces_payload = build_traces_payload(start, duration, span_id);
         let client = reqwest::Client::new();
@@ -191,11 +192,11 @@ async fn send_agent_traces(start: i64, duration: i64, span_id: i64) {
                 .unwrap();
 
             if res.status() != hyper::StatusCode::OK {
-                println!("error sending traces to {}, res: {:?}", url, res);
+                error!("Error sending traces to {}, res: {:?}.", url, res);
                 return false;
             }
         }
-        println!("sent a trace to the Agent.");
+        info!("Sent a trace to the Agent.");
         true
     }
 
@@ -268,7 +269,7 @@ async fn run_sink_and_send_traces(start: i64, duration: i64, span_id: i64) {
 
             let stream = map_event_batch_stream(stream::iter(traces), Some(batch));
 
-            println!("sent traces to vector.");
+            info!("Sent traces to vector.");
             sink.run(stream).await.unwrap();
         }
 
@@ -340,11 +341,8 @@ fn validate_stats(agent_stats: &StatsPayload, vector_stats: &StatsPayload) {
     let agent_s = agent_bucket.stats.first().unwrap();
     let vector_s = vector_bucket.stats.first().unwrap();
 
-    println!();
-    println!("agent_stats : {:?}", agent_s);
-    println!();
-    println!("vector_stats : {:?}", vector_s);
-    println!();
+    info!("\nagent_stats : {:?}", agent_s);
+    info!("\nvector_stats : {:?}", vector_s);
 
     assert!(agent_s.service == vector_s.service);
     assert!(agent_s.name == vector_s.name);
