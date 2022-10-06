@@ -35,7 +35,7 @@ use vector_core::event::{BatchNotifier, BatchStatus};
 
 // The port for an http server to receive data from vector
 fn vector_port() -> u16 {
-    std::env::var("AGENT_TO_VECTOR_PORT")
+    std::env::var("VECTOR_PORT")
         .unwrap_or_else(|_| "8081".to_string())
         .parse::<u16>()
         .unwrap()
@@ -43,7 +43,7 @@ fn vector_port() -> u16 {
 
 // The port for an http server to receive data from the agent
 fn agent_port() -> u16 {
-    std::env::var("AGENT_ONLY_PORT")
+    std::env::var("AGENT_PORT")
         .unwrap_or_else(|_| "8082".to_string())
         .parse::<u16>()
         .unwrap()
@@ -51,7 +51,7 @@ fn agent_port() -> u16 {
 
 // The agent url to post traces to.
 fn trace_agent_only_url() -> String {
-    std::env::var("TRACE_AGENT_ONLY_URL")
+    std::env::var("TRACE_AGENT_URL")
         .unwrap_or_else(|_| "http://127.0.0.1:8126/v0.3/traces".to_owned())
 }
 
@@ -290,7 +290,7 @@ async fn receive_the_stats(
     rx_agent_only: &mut Receiver<StatsPayload>,
     rx_agent_vector: &mut Receiver<StatsPayload>,
 ) -> (StatsPayload, StatsPayload) {
-    let timeout = sleep(Duration::from_secs(25));
+    let timeout = sleep(Duration::from_secs(30));
     tokio::pin!(timeout);
 
     let mut stats_agent_vector = None;
@@ -379,7 +379,7 @@ async fn apm_stats_e2e_test_dd_agent_to_vector_correctness() {
     }
 
     // allow the agent to start up
-    sleep(Duration::from_secs(5)).await;
+    sleep(Duration::from_secs(8)).await;
 
     let start = Utc::now().timestamp_nanos();
     let duration = 20;

@@ -1,7 +1,0 @@
-
-# "disables" sampling
-apm_config:
-  max_traces_per_second: 999999
-  errors_per_second: 9999999
-  max_memory: 0
-  max_cpu_percent: 0

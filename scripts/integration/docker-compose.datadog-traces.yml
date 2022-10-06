@@ -1,7 +1,7 @@
 version: "3"
 
 services:
-  datadog-trace-agent-only:
+  datadog-trace-agent:
     image: docker.io/datadog/agent:7.39.1
     networks:
       - backend
@@ -12,8 +12,16 @@ services:
       - DD_HEALTH_PORT=8183
       - DD_CMD_PORT=5002
       - DD_USE_DOGSTATSD=false
-    volumes:
-      - ${PWD}/tests/data/datadog-traces/conf.yaml:/etc/datadog-agent/conf.d/test.d/conf.yaml
+      # This option supposedly allows stats payloads to send as soon as data comes in,
+      # but if it is enabled then no stats are received at all *shrug*
+        #- DD_APM_SYNC_FLUSHING=true
+      # Below disables sampling
+      - DD_APM_MAX_TPS=999999
+      - DD_APM_ERROR_TPS=999999
+      - DD_APM_MAX_MEMORY=0
+      - DD_APM_MAX_CPU_PERCENT=0
+    #volumes:
+      #- ${PWD}/tests/data/datadog-traces/conf.yaml:/etc/datadog-agent/conf.d/test.d/conf.yaml
   runner:
     build:
       context: ${PWD}
@@ -36,12 +44,13 @@ services:
       - "--lib"
       - "::datadog::traces::"
     environment:
-      - TRACE_AGENT_ONLY_URL=http://datadog-trace-agent-only:8126/v0.3/traces
+      - TEST_LOG=${TEST_LOG}
+      - TRACE_AGENT_URL=http://datadog-trace-agent:8126/v0.3/traces
       - TEST_DATADOG_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
-      - AGENT_TO_VECTOR_PORT=8081
-      - AGENT_ONLY_PORT=8082
+      - VECTOR_PORT=8081
+      - AGENT_PORT=8082
     depends_on:
-      - datadog-trace-agent-only
+      - datadog-trace-agent
     volumes:
       - ${PWD}:/code
       - target:/code/target
