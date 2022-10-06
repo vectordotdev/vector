@@ -1042,7 +1042,7 @@ mod test {
             target_assignments: vec![],
         };
         let mut target = VrlTarget::new(Event::Metric(metric), &info);
-        let _ = target.target_insert(
+        let _result = target.target_insert(
             &OwnedTargetPath::event(owned_value_path!("tags")),
             Value::Object(BTreeMap::from([("a".into(), "b".into())])),
         );
