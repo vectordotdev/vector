@@ -5,13 +5,13 @@ use super::{ByteSize, Protocol, SharedString};
 crate::registered_event!(
     BytesReceived {
         protocol: SharedString,
-    } => Handle {
+    } => {
         protocol: SharedString,
         received_bytes: Counter,
     }
 
     fn register(self) {
-        Handle {
+        Self::Handle {
             received_bytes: register_counter!("component_received_bytes_total", "protocol" => self.protocol.clone()),
             protocol: self.protocol,
         }

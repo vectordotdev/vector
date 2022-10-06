@@ -7,13 +7,13 @@ use crate::{
 };
 
 vector_common::registered_event! (
-    FilterEventsDropped => Handle {
+    FilterEventsDropped => {
         events_dropped: Registered<ComponentEventsDropped<'static, INTENTIONAL>>,
         events_discarded: Counter,
     }
 
     fn register(self) {
-        Handle {
+        Self::Handle {
             events_dropped: register!(ComponentEventsDropped::<INTENTIONAL>::from(
                 "Events matched filter condition."
             )),

@@ -7,16 +7,14 @@ crate::registered_event!(
     BytesSent {
         byte_size: usize,
         protocol: SharedString,
-    } => Handle {
+    } => {
         bytes_sent: Counter,
         protocol: SharedString,
     }
 
     fn register(self) {
-        let bytes_sent =
-            register_counter!("component_sent_bytes_total", "protocol" => self.protocol.clone());
-        Handle {
-            bytes_sent,
+        Self::Handle {
+            bytes_sent: register_counter!("component_sent_bytes_total", "protocol" => self.protocol.clone()),
             protocol: self.protocol,
         }
     }

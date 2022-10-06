@@ -56,6 +56,7 @@ futures = { version = "0.3.24", default-features = false, features = ["std"] }
 metrics = "0.20.1"
 nom = { version = "7", optional = true }
 ordered-float = { version = "3.1.0", default-features = false }
+paste = "1.0.9"
 pin-project = { version = "1.0.12", default-features = false }
 serde_json = { version = "1.0.85", default-features = false, features = ["std", "raw_value"] }
 serde = { version = "1.0.145", optional = true, features = ["derive"] }

@@ -145,7 +145,7 @@ macro_rules! registered_event {
 
     // Sub-matcher to implement the common bits in the above two cases.
     (
-        => $event:ident $handle:ident {
+        => $event:ident {
             $( $field:ident: $type:ty, )*
         }
 
@@ -155,27 +155,29 @@ macro_rules! registered_event {
         fn emit(&$slf2:ident, $data_name:ident: $data:ident)
             $emit_body:block
     ) => {
-        #[derive(Clone)]
-        pub struct $handle {
-            $( $field: $type, )*
-        }
-
-        impl $crate::internal_event::RegisterInternalEvent for $event {
-            type Handle = $handle;
-
-            fn name(&self) -> Option<&'static str> {
-                Some(stringify!($event))
+        paste::paste!{
+            #[derive(Clone)]
+            pub struct [<$event Handle>] {
+                $( $field: $type, )*
             }
 
-            fn register($slf) -> $handle
-                $register_body
-        }
+            impl $crate::internal_event::RegisterInternalEvent for $event {
+                type Handle = [<$event Handle>];
 
-        impl $crate::internal_event::InternalEventHandle for $handle {
-            type Data = $data;
+                fn name(&self) -> Option<&'static str> {
+                    Some(stringify!($event))
+                }
 
-            fn emit(&$slf, $data_name: $data)
-                $emit_body
+                fn register($slf) -> [<$event Handle>]
+                    $register_body
+            }
+
+            impl $crate::internal_event::InternalEventHandle for [<$event Handle>] {
+                type Data = $data;
+
+                fn emit(&$slf, $data_name: $data)
+                    $emit_body
+            }
         }
     };
 }
