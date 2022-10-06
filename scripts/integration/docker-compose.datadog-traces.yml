@@ -14,7 +14,7 @@ services:
       - DD_USE_DOGSTATSD=false
       # This option supposedly allows stats payloads to send as soon as data comes in,
       # but if it is enabled then no stats are received at all *shrug*
-        #- DD_APM_SYNC_FLUSHING=true
+      #- DD_APM_SYNC_FLUSHING=true
       # Below disables sampling
       - DD_APM_MAX_TPS=999999
       - DD_APM_ERROR_TPS=999999

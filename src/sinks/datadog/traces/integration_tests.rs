@@ -290,7 +290,7 @@ async fn receive_the_stats(
     rx_agent_only: &mut Receiver<StatsPayload>,
     rx_agent_vector: &mut Receiver<StatsPayload>,
 ) -> (StatsPayload, StatsPayload) {
-    let timeout = sleep(Duration::from_secs(30));
+    let timeout = sleep(Duration::from_secs(60));
     tokio::pin!(timeout);
 
     let mut stats_agent_vector = None;
