@@ -1,6 +1,6 @@
 //! Integration tests for http_client source.
 //! The container configuration file is `docker-compose.http_client.yml`
-//! It leverages a static file server ("dufs"), which serves the files in tests/data/http-scrape
+//! It leverages a static file server ("dufs"), which serves the files in tests/data/http-client
 
 use std::collections::HashMap;
 use tokio::time::{Duration, Instant};
@@ -225,7 +225,7 @@ async fn tls_invalid_ca() {
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         tls: Some(TlsConfig {
-            ca_file: Some("tests/data/http-scrape/certs/invalid-ca-cert.pem".into()),
+            ca_file: Some("tests/data/http-client/certs/invalid-ca-cert.pem".into()),
             ..Default::default()
         }),
         auth: None,
