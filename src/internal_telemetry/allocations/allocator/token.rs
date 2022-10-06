@@ -85,14 +85,6 @@ pub struct AllocationGroupToken {
 
 impl AllocationGroupToken {
     pub fn enter(&mut self) {
-        if self.previous.is_some() {
-            panic!(
-                "Should not be entering a token which has already been entered: previous={}, id={}",
-                self.previous.unwrap().as_raw(),
-                self.id.as_raw()
-            );
-        }
-
         let previous = set_current_allocation_group(self.id);
         self.previous = Some(previous);
     }
