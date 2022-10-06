@@ -1,4 +1,4 @@
-use crate::kind::collection::EmptyState;
+use crate::kind::collection::{CollectionRemove, EmptyState};
 use crate::kind::{Collection, Field, Index};
 use crate::Kind;
 use lookup::lookup_v2::OwnedSegment;
@@ -51,30 +51,9 @@ impl Kind {
                                 should_not_compact: true,
                             }
                             .apply_global_compact_option(compact),
-                            Some(child) => {
-                                let compact_options = child.remove_inner(&segments[1..], compact);
-
-                                if compact_options.should_compact
-                                    && !compact_options.should_not_compact
-                                {
-                                    // always compact
-                                    object.known_mut().remove(&Field::from(field.to_owned()));
-                                } else if compact_options.should_compact
-                                    && compact_options.should_not_compact
-                                {
-                                    // maybe compact
-                                    let not_compacted = object.clone();
-                                    object.known_mut().remove(&Field::from(field.to_owned()));
-                                    object.merge(not_compacted, false);
-                                } else {
-                                    // never compact: do nothing, already correct.
-                                }
-
-                                // The compaction is propagated only if the current collection is also empty
-                                compact_options.disable_should_compact(
-                                    !CompactOptions::from(object.is_empty()).should_compact,
-                                )
-                            }
+                            Some(child) => child
+                                .remove_inner(&segments[1..], compact)
+                                .compact(object, field.to_owned()),
                         }
                     } else {
                         // guaranteed to not delete anything
@@ -86,40 +65,69 @@ impl Kind {
                 }
                 OwnedSegment::Index(index) => {
                     if let Some(array) = self.as_array_mut() {
-                        let index = *index;
+                        let mut index = *index;
                         if index < 0 {
-                            unimplemented!()
-                        } else {
-                            match array.known_mut().get_mut(&(index as usize).into()) {
-                                None => {
-                                    unimplemented!()
-                                }
-                                Some(child) => {
-                                    let compact_options =
-                                        child.remove_inner(&segments[1..], compact);
+                            let negative_index = (-index) as usize;
 
-                                    if compact_options.should_compact
-                                        && !compact_options.should_not_compact
-                                    {
-                                        // always compact
-                                        array.remove_shift(index as usize)
-                                    } else if compact_options.should_compact
-                                        && compact_options.should_not_compact
-                                    {
-                                        // maybe compact
-                                        let not_compacted = array.clone();
-                                        array.remove_shift(index as usize);
-                                        array.merge(not_compacted, false);
-                                    } else {
-                                        // never compact: do nothing, already correct.
+                            if array.unknown_kind().contains_any_defined() {
+                                let original = array.clone();
+                                *array = original.clone();
+
+                                let min_index = array
+                                    .largest_known_index()
+                                    .map_or(0, |x| x + 1 - negative_index);
+
+                                if let Some(largest_known_index) = array.largest_known_index() {
+                                    for i in min_index..=largest_known_index {
+                                        let mut single_remove = original.clone();
+                                        match single_remove.known_mut().get_mut(&i.into()) {
+                                            None => {
+                                                unimplemented!()
+                                                // CompactOptions {
+                                                //     should_compact: array
+                                                //         .unknown_kind()
+                                                //         .at_path(&segments[1..])
+                                                //         .contains_any_defined(),
+                                                //     should_not_compact: true,
+                                                // }
+                                                //     .apply_global_compact_option(compact),
+                                            }
+                                            Some(child) => {
+                                                child
+                                                    .remove_inner(&segments[1..], compact)
+                                                    .compact(&mut single_remove, i);
+                                            }
+                                        }
+                                        array.merge(single_remove, false);
                                     }
-
-                                    // The compaction is propagated only if the current collection is also empty
-                                    compact_options.disable_should_compact(
-                                        !CompactOptions::from(array.is_empty()).should_compact,
-                                    )
+                                }
+                                return CompactOptions {
+                                    // TODO: add more conditions here (index 0 might not be removed)
+                                    should_compact: min_index == 0,
+                                    should_not_compact: true,
+                                };
+                            } else {
+                                if let Some(positive_index) = array.get_positive_index(index) {
+                                    index = positive_index as isize;
+                                } else {
+                                    // Removing a non-existing index
+                                    return CompactOptions::from(EmptyState::NeverEmpty);
                                 }
                             }
+                        }
+
+                        match array.known_mut().get_mut(&(index as usize).into()) {
+                            None => CompactOptions {
+                                should_compact: array
+                                    .unknown_kind()
+                                    .at_path(&segments[1..])
+                                    .contains_any_defined(),
+                                should_not_compact: true,
+                            }
+                            .apply_global_compact_option(compact),
+                            Some(child) => child
+                                .remove_inner(&segments[1..], compact)
+                                .compact(array, index as usize),
                         }
                     } else {
                         // guaranteed to not delete anything
@@ -181,14 +189,8 @@ impl Kind {
                                     should_not_compact: true,
                                 };
                             } else {
-                                if let Some(largest_known_index) = array.largest_known_index() {
-                                    if largest_known_index >= negative_index - 1 {
-                                        // The exact index to remove is known.
-                                        index = (largest_known_index as isize) + 1 + index;
-                                    } else {
-                                        // Removing a non-existing index
-                                        return CompactOptions::from(EmptyState::NeverEmpty);
-                                    }
+                                if let Some(positive_index) = array.get_positive_index(index) {
+                                    index = positive_index as isize;
                                 } else {
                                     // Removing a non-existing index
                                     return CompactOptions::from(EmptyState::NeverEmpty);
@@ -227,6 +229,28 @@ struct CompactOptions {
 }
 
 impl CompactOptions {
+    fn compact<T>(self, collection: &mut Collection<T>, key: impl Into<T>) -> Self
+    where
+        T: Ord + Clone,
+        Collection<T>: CollectionRemove<Key = T>,
+    {
+        let key = &key.into();
+        if self.should_compact && !self.should_not_compact {
+            // always compact
+            collection.remove_known(key);
+        } else if self.should_compact && self.should_not_compact {
+            // maybe compact
+            let not_compacted = collection.clone();
+            collection.remove_known(key);
+            collection.merge(not_compacted, false);
+        } else {
+            // never compact: do nothing, already correct.
+        }
+
+        // The compaction is propagated only if the current collection is also empty
+        self.disable_should_compact(!CompactOptions::from(collection.is_empty()).should_compact)
+    }
+
     /// If the value is true, the `should_compact` option is set to false
     fn disable_should_compact(mut self, value: bool) -> Self {
         if value {
@@ -704,6 +728,69 @@ mod test {
                         ),
                         (1.into(), Kind::bytes().or_undefined()),
                     ]))),
+                },
+            ),
+            (
+                "remove nested index, maybe compact",
+                TestCase {
+                    kind: Kind::array(Collection::from(BTreeMap::from([
+                        (
+                            0.into(),
+                            Kind::array(Collection::empty().with_unknown(Kind::any())),
+                        ),
+                        (1.into(), Kind::bytes()),
+                    ]))),
+                    path: owned_value_path!(0, 0, 0),
+                    compact: true,
+                    want: Kind::array(Collection::from(BTreeMap::from([
+                        (
+                            0.into(),
+                            Kind::array(Collection::empty().with_unknown(Kind::any())).or_bytes(),
+                        ),
+                        (1.into(), Kind::bytes().or_undefined()),
+                    ]))),
+                },
+            ),
+            (
+                "remove nested negative index, compact",
+                TestCase {
+                    kind: Kind::array(Collection::from(BTreeMap::from([
+                        (
+                            0.into(),
+                            Kind::array(Collection::from(BTreeMap::from([(
+                                0.into(),
+                                Kind::integer(),
+                            )]))),
+                        ),
+                        (1.into(), Kind::bytes()),
+                    ]))),
+                    path: owned_value_path!(-2, 0),
+                    compact: true,
+                    want: Kind::array(Collection::from(BTreeMap::from([(
+                        0.into(),
+                        Kind::bytes(),
+                    )]))),
+                },
+            ),
+            (
+                "remove nested negative unknown index",
+                TestCase {
+                    kind: Kind::array(
+                        Collection::from(BTreeMap::from([(
+                            0.into(),
+                            Kind::array(Collection::from(BTreeMap::from([(
+                                0.into(),
+                                Kind::integer(),
+                            )]))),
+                        )]))
+                        .with_unknown(Kind::float()),
+                    ),
+                    path: owned_value_path!(-1, 0),
+                    compact: false,
+                    want: Kind::array(Collection::from(BTreeMap::from([(
+                        0.into(),
+                        Kind::bytes(),
+                    )]))),
                 },
             ),
         ] {

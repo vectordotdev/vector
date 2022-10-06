@@ -1,3 +1,4 @@
+use crate::kind::collection::CollectionRemove;
 use crate::kind::Collection;
 
 /// An `index` type that can be used in `Collection<Index>`
@@ -23,6 +24,25 @@ impl Collection<Index> {
     #[must_use]
     pub fn largest_known_index(&self) -> Option<usize> {
         self.known().keys().map(|i| i.to_usize()).max()
+    }
+
+    /// Converts a negative index to a positive index (only if the exact positive index is known)
+    #[must_use]
+    pub fn get_positive_index(&self, index: isize) -> Option<usize> {
+        if self.unknown_kind().contains_any_defined() {
+            // positive index can't be known if there are unknown values
+            return None;
+        }
+
+        let negative_index = (-index) as usize;
+        if let Some(largest_known_index) = self.largest_known_index() {
+            if largest_known_index >= negative_index - 1 {
+                // The exact index to remove is known.
+                return Some(((largest_known_index as isize) + 1 + index) as usize);
+            }
+        }
+        // Removing a non-existing index
+        return None;
     }
 
     /// The minimum possible length an array could be given the type information.
@@ -52,6 +72,14 @@ impl Collection<Index> {
                 self.known_mut().insert(index.into(), value);
             }
         }
+    }
+}
+
+impl CollectionRemove for Collection<Index> {
+    type Key = Index;
+
+    fn remove_known(&mut self, key: &Index) {
+        self.remove_shift(key.0)
     }
 }
 
