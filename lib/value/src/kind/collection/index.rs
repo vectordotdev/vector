@@ -51,7 +51,7 @@ impl Collection<Index> {
             }
         }
         // Removing a non-existing index
-        return None;
+        None
     }
 
     /// The minimum possible length an array could be given the type information.

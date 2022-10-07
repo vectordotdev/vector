@@ -294,14 +294,6 @@ impl<'a> ValuePath<'a> for &'a [OwnedSegment] {
     }
 }
 
-impl<'a, const N: usize> ValuePath<'a> for &'a [OwnedSegment; N] {
-    type Iter = OwnedSegmentSliceIter<'a>;
-
-    fn segment_iter(&self) -> Self::Iter {
-        (&self[..]).segment_iter()
-    }
-}
-
 impl<'a> ValuePath<'a> for &'a OwnedValuePath {
     type Iter = OwnedSegmentSliceIter<'a>;
 

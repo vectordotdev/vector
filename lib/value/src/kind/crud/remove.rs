@@ -94,13 +94,11 @@ impl Kind {
                                 } else {
                                     CompactOptions::Never
                                 };
+                            } else if let Some(positive_index) = array.get_positive_index(index) {
+                                index = positive_index as isize;
                             } else {
-                                if let Some(positive_index) = array.get_positive_index(index) {
-                                    index = positive_index as isize;
-                                } else {
-                                    // Removing a non-existing index
-                                    return CompactOptions::from(EmptyState::NeverEmpty);
-                                }
+                                // Removing a non-existing index
+                                return CompactOptions::from(EmptyState::Never);
                             }
                         }
 
@@ -127,7 +125,7 @@ impl Kind {
 
                         for field in fields {
                             let field_kind =
-                                original.at_path(&[OwnedSegment::Field(field.to_string())]);
+                                original.at_path([OwnedSegment::Field(field.to_string())].as_ref());
 
                             if field_kind.contains_any_defined() {
                                 let mut child_kind = original.clone();
@@ -162,7 +160,7 @@ impl Kind {
                 OwnedSegment::Invalid => CompactOptions::Never,
             }
         } else {
-            return CompactOptions::new(self.contains_any_defined(), self.contains_undefined());
+            CompactOptions::new(self.contains_any_defined(), self.contains_undefined())
         }
     }
 }
@@ -250,9 +248,9 @@ impl CompactOptions {
 impl From<EmptyState> for CompactOptions {
     fn from(state: EmptyState) -> Self {
         match state {
-            EmptyState::NeverEmpty => Self::Never,
-            EmptyState::MaybeEmpty => Self::Maybe,
-            EmptyState::AlwaysEmpty => Self::Always,
+            EmptyState::Never => Self::Never,
+            EmptyState::Maybe => Self::Maybe,
+            EmptyState::Always => Self::Always,
         }
     }
 }

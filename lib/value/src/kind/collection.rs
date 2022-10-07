@@ -125,12 +125,12 @@ impl<T: Ord + Clone> Collection<T> {
     pub fn is_empty(&self) -> EmptyState {
         if self.known.is_empty() {
             if self.unknown_kind().contains_any_defined() {
-                EmptyState::MaybeEmpty
+                EmptyState::Maybe
             } else {
-                EmptyState::AlwaysEmpty
+                EmptyState::Always
             }
         } else {
-            EmptyState::NeverEmpty
+            EmptyState::Never
         }
     }
 
@@ -290,12 +290,12 @@ pub trait CollectionRemove {
 #[derive(Debug)]
 pub enum EmptyState {
     // The collection is guaranteed to be empty.
-    AlwaysEmpty,
+    Always,
     // The collection may or may not actually be empty. There is not enough type information to
     // determine. (There are unknown fields/indices that may exist, but there are no known values)
-    MaybeEmpty,
+    Maybe,
     // The collection is guaranteed to NOT be empty.
-    NeverEmpty,
+    Never,
 }
 
 impl<T: Ord> From<BTreeMap<T, Kind>> for Collection<T> {
