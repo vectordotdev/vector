@@ -16,7 +16,7 @@ a uniform fashion in all components.
 
 ### In scope
 
-- Handling of discarded and errored events in sources, transforms, and sinks.
+- Handling of discarded events in sources, transforms, and sinks.
 
 ### Out of scope
 
@@ -25,8 +25,8 @@ a uniform fashion in all components.
 
 ## Pain
 
-Vector has a number of ways in which components may drop events due that are outside of the
-operator's control:
+Vector has a number of ways in which components may drop events due to errors that are outside of
+the operator's control:
 
 - Transform processing
 - Sink encoding failure
@@ -42,7 +42,7 @@ destinations for diagnosis.
 
 There are three parts to the proposed solution:
 
-1. Add a new standardized output to all components that may discard events.
+1. Add a new standardized output to all components that may discard events after errors.
 2. Update configuration validation to require that all outputs are handled.
 3. Add a new configuration for discarding or rejecting outputs.
 
@@ -51,12 +51,13 @@ There are three parts to the proposed solution:
 #### Add Discarded Event Output
 
 We will introduce a new output to all components that would otherwise discard events, named
-`discards`.
+`errors`. Note that some components already have such an named output. This proposal standardizes
+that output naming and provides additional support for handling it.
 
 #### Validate Handling All Outputs
 
 Additionally, we will enhance the configuration validation to determine if all outputs are
-handled. This will provide notification of the new discard outputs and ensure users are aware of the
+handled. This will provide notification of the new error output and ensure users are aware of the
 new feature.
 
 In order to avoid breaking existing configurations, this validation will initially produce a
@@ -79,14 +80,14 @@ this setting is not present and a component has an unhandled output, a default b
 will be assumed, which matches the current behavior. Once validation of output handling is enforced
 as above, this default will be removed.
 
-So, to configure the new discard output as discarding events with an error result, users would add the
+So, to configure the new error output as discarding events with an error result, users would add the
 following:
 
 ```toml
 [transforms.example]
 type = "remap"
 …
-outputs.discards.disposition = "reject"
+outputs.errors.disposition = "reject"
 ```
 
 ### Implementation
@@ -165,8 +166,14 @@ all function transforms that may discard events will be rewritten to the synchro
 ##### "Synchronous" Transforms
 
 Synchronous transforms already have support for named outputs. These will be configured with a new
-named `discards` output. The output buffer `TransformOputputsBuf` will be extended with additional
+named `errors` output. The output buffer `TransformOutputsBuf` will be extended with additional
 convenience methods to making discarding events more straightforward.
+
+```rust
+struct TransformOutputsBuf {
+    pub fn push_error(&mut self, event: Event);
+}
+```
 
 ##### "Task" Transforms
 
@@ -174,7 +181,7 @@ Each of the current task transforms will be refactored into either a simpler syn
 will be handled as above, or into a more specialized `RuntimeTransform` (`aggregate` and `lua` version 2). The
 runtime transform type runs inside of a task which, in turn, takes a transform output buffer as an
 input parameter. That framework will be rewritten to accept named outputs, with the associated
-convenience methods for handling discards. Further, since it is the only instance of a task
+convenience methods for handling errors. Further, since it is the only instance of a task
 transform, that framework will replace the task transform, allowing us to build the outputs in the
 topology builder.
 
@@ -202,10 +209,10 @@ pub enum OutputBuffer {
 
 #### Sinks
 
-Sinks do not have "outputs" as such. In order to add a discard output, we will need to wrap the
+Sinks do not have "outputs" as such. In order to add a error output, we will need to wrap the
 incoming events with an optional stream adapter. It will be built and added during topology
-building, depending on the presence of a discard output handler. This handler will hold on to a copy
-of the events and forward them on to the discard output when needed:
+building, depending on the presence of an output handler for `errors`. This handler will hold on to
+a copy of the events and forward them on to the error output when needed:
 
 1. Clone the input event array.
 1. Apply a new finalizer to the cloned events.
@@ -250,7 +257,7 @@ the code while avoiding others.
 ### Output Disposition
 
 Instead of the output disposition configuration mechanism described above, we could add a simple
-shorthand that is specific to the new discard output, such as `on_discard: "drop"`. However, there
+shorthand that is specific to the new error output, such as `on_errors: "drop"`. However, there
 are components that already have multiple outputs, or at least the option of having multiple
 outputs. Once we enforce that all outputs are handled, these will also become an issue for some
 users, which recommends the need for a more generic solution.
@@ -271,10 +278,10 @@ blackhole output as an input.  ie
 ```toml
 [sources.sample1]
 …
-outputs.error = "blackhole"
+outputs.errors = "discard"
 
 [sinks.sample2]
-inputs = ["sample1.error"]
+inputs = ["sample1.errors"]
 ```
 
 If, on the other hand, we add the discard configuration outside of the outputting component, that
@@ -285,7 +292,7 @@ isn't much of a simplification over just creating the blackhole component. ie
 …
 
 [blackhole_outputs]
-inputs = ["sample1.error"]
+inputs = ["sample1.errors"]
 ```
 
 The proposed form was chosen as it allowed for the maximum flexability for configuring the discarded
@@ -334,8 +341,6 @@ in isolation.
 - Should the option for turning unhandled output enforcement into a hard error be written as a more
   generic switch to turn _all_ deprecations into errors?
 
-- Do we need separate outputs to distinguish between discards and errors?
-
 - Do we want to have a third value for `output.X.disposition` to allow for marking events as either
   permanently failed (ie rejected) vs temporarily failed (ie errored)?
 
@@ -348,11 +353,11 @@ in isolation.
 Incremental steps to execute this change. These will be converted to issues after the RFC is approved:
 
 - [ ] Add new output configuration settings.
-- [ ] Add output disposition and new discard output to `SourceSender`.
-- [ ] Update sources to discard events through the output buffers.
+- [ ] Add output disposition and new error output to `SourceSender`.
+- [ ] Update sources (`kubernetes_logs`) to discard events through the output buffers.
 - [ ] Update transform `OutputBuffer` to add non-send dispositions.
-- [ ] Add discard output to function transform.
-- [ ] Add discard output to sync transform.
+- [ ] Add error output to function transform.
+- [ ] Add error output to sync transform.
 - [ ] Convert function transforms to synchronous transforms.
 - [ ] Update sync transforms to discard events through the output buffers.
 - [ ] Make runtime transforms a primitive transform type.
