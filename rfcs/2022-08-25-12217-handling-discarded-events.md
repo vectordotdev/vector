@@ -32,9 +32,6 @@ operator's control:
 - Sink encoding failure
 - Sink partitioning failure
 - Failure to write to disk buffer
-- Incompatible event type
-- Unhandled metric value type
-- Unwired component output
 - Failure to send to next component
 
 This leads to the potential for lost events and even silently dropped events. Users want to be able
