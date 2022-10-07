@@ -128,7 +128,37 @@ impl Kind {
                         }
                     }
                 }
-                OwnedSegment::Coalesce(_) => unimplemented!(),
+                OwnedSegment::Coalesce(fields) => {
+                    let original = self.clone();
+                    *self = Kind::never();
+
+                    let mut compact_options = CompactOptions {
+                        should_compact: false,
+                        should_not_compact: false,
+                    };
+
+                    for field in fields {
+                        let field_kind =
+                            original.at_path(&[OwnedSegment::Field(field.to_string())]);
+
+                        if field_kind.contains_any_defined() {
+                            let mut child_kind = original.clone();
+                            let mut child_segments = segments.to_vec();
+                            child_segments[0] = OwnedSegment::Field(field.to_owned());
+
+                            compact_options
+                                .merge(child_kind.remove_inner(&child_segments, compact).compact());
+
+                            *self = self.union(child_kind);
+
+                            if !field_kind.contains_undefined() {
+                                // No other field will be visited, so return early
+                                return compact_options;
+                            }
+                        }
+                    }
+                    compact_options
+                }
                 OwnedSegment::Invalid => {
                     // guaranteed to not delete anything
                     CompactOptions {
@@ -208,19 +238,35 @@ impl Kind {
                     }
                 }
                 OwnedSegment::Coalesce(fields) => {
-                    // let mut output
+                    let original = self.clone();
+                    *self = Kind::never();
+
+                    let mut compact_options = CompactOptions {
+                        should_compact: false,
+                        should_not_compact: false,
+                    };
+
                     for field in fields {
-                        let field_kind = self.get(&[OwnedSegment::Field(field.to_string())]);
-                        let contains_undefined = field_kind.contains_undefined();
-                        match (
-                            field_kind.contains_undefined(),
-                            field_kind.contains_any_defined(),
-                        ) {
-                            (true, true) => unimplemented!(),
+                        let field_kind =
+                            original.at_path(&[OwnedSegment::Field(field.to_string())]);
+
+                        if field_kind.contains_any_defined() {
+                            let mut child_kind = original.clone();
+                            compact_options.merge(
+                                child_kind.remove_inner(
+                                    &[OwnedSegment::Field(field.to_owned())],
+                                    compact,
+                                ),
+                            );
+                            *self = self.union(child_kind);
+
+                            if !field_kind.contains_undefined() {
+                                // No other field will be visited, so return early
+                                return compact_options;
+                            }
                         }
-                        let compact_options =
-                            self.remove_inner(&[OwnedSegment::Field(field.to_owned())], compact);
                     }
+                    compact_options
                 }
                 OwnedSegment::Invalid => unimplemented!(),
             }
@@ -255,6 +301,12 @@ impl CompactOptions {
 
         // The compaction is propagated only if the current collection is also empty
         self.disable_should_compact(!CompactOptions::from(collection.is_empty()).should_compact)
+    }
+
+    /// Combines two sets of options. Each setting is "or"ed together.
+    fn merge(&mut self, other: Self) {
+        self.should_compact |= other.should_compact;
+        self.should_not_compact |= other.should_not_compact;
     }
 
     /// If the value is true, the `should_compact` option is set to false
@@ -816,7 +868,7 @@ mod test {
                 },
             ),
             (
-                "coalesce simple",
+                "coalesce 1",
                 TestCase {
                     kind: Kind::object(Collection::from(BTreeMap::from([(
                         "a".into(),
@@ -824,12 +876,72 @@ mod test {
                     )]))),
                     path: parse_value_path("(a|b)"),
                     compact: false,
-                    want: Kind::object(Collection::from(BTreeMap::from([(
-                        "a".into(),
-                        Kind::integer(),
-                    )]))),
+                    want: Kind::object(Collection::empty()),
                 },
             ),
+            (
+                "coalesce 2",
+                TestCase {
+                    kind: Kind::object(Collection::from(BTreeMap::from([(
+                        "b".into(),
+                        Kind::integer(),
+                    )]))),
+                    path: parse_value_path("(a|b)"),
+                    compact: false,
+                    want: Kind::object(Collection::empty()),
+                },
+            ),
+            (
+                "coalesce 3",
+                TestCase {
+                    kind: Kind::object(Collection::from(BTreeMap::from([
+                        ("a".into(), Kind::integer().or_undefined()),
+                        ("b".into(), Kind::float()),
+                    ]))),
+                    path: parse_value_path("(a|b)"),
+                    compact: false,
+                    want: Kind::object(Collection::from(BTreeMap::from([
+                        ("a".into(), Kind::integer().or_undefined()),
+                        ("b".into(), Kind::float().or_undefined()),
+                    ]))),
+                },
+            ),
+            (
+                "coalesce 3",
+                TestCase {
+                    kind: Kind::object(Collection::from(BTreeMap::from([
+                        ("a".into(), Kind::integer().or_undefined()),
+                        ("b".into(), Kind::float().or_undefined()),
+                    ]))),
+                    path: parse_value_path("(a|b)"),
+                    compact: false,
+                    want: Kind::object(Collection::from(BTreeMap::from([
+                        ("a".into(), Kind::integer().or_undefined()),
+                        ("b".into(), Kind::float().or_undefined()),
+                    ]))),
+                },
+            ),
+            // (
+            //     "nested coalesce 1",
+            //     TestCase {
+            //         kind: Kind::object(Collection::from(BTreeMap::from([(
+            //             "a".into(),
+            //             Kind::object(Collection::from(BTreeMap::from([(
+            //                 "b".into(),
+            //                 Kind::integer(),
+            //             )]))),
+            //         )]))),
+            //         path: parse_value_path("(a|a2).b"),
+            //         compact: false,
+            //         want: Kind::object(Collection::from(BTreeMap::from([(
+            //             "a".into(),
+            //             Kind::object(Collection::from(BTreeMap::from([(
+            //                 "b".into(),
+            //                 Kind::integer(),
+            //             )]))),
+            //         )]))),
+            //     },
+            // ),
         ] {
             println!("Test: {:?}", title);
             let mut actual = kind;
