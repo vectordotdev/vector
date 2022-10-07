@@ -178,8 +178,24 @@ impl Expression for DelFn {
 
         let return_type = self.query.apply_type_info(&mut state);
 
-        // TODO: fix compact option
-        self.query.delete_type_def(&mut state.external, false);
+        let compact: Option<bool> = self
+            .compact
+            .as_ref()
+            .and_then(|compact| compact.as_value())
+            .and_then(|compact| compact.as_boolean());
+
+        if let Some(compact) = compact {
+            self.query.delete_type_def(&mut state.external, compact);
+        } else {
+            let mut false_result = state.external.clone();
+            self.query.delete_type_def(&mut false_result, false);
+
+            let mut true_result = state.external.clone();
+            self.query.delete_type_def(&mut true_result, true);
+
+            state.external = false_result.merge(true_result);
+        }
+
         TypeInfo::new(state, return_type)
     }
 }

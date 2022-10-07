@@ -121,6 +121,7 @@ impl<T: Ord + Clone> Collection<T> {
         self.unknown.is_exact()
     }
 
+    /// Returns an enum describing if the collection is empty.
     #[must_use]
     pub fn is_empty(&self) -> EmptyState {
         if self.known.is_empty() {

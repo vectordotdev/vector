@@ -1,3 +1,5 @@
+//! All code related to removing from a [`Kind`].
+
 use crate::kind::collection::{CollectionRemove, EmptyState};
 use crate::kind::{Collection, Field};
 use crate::Kind;
