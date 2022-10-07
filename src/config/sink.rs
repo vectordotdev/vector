@@ -26,7 +26,7 @@ where
     /// See [configuration][configuration] for more info.
     ///
     /// [sources]: https://vector.dev/docs/reference/configuration/sources/
-    /// [transforms]: https://vector.dev/docs/reference/configuration/sources/
+    /// [transforms]: https://vector.dev/docs/reference/configuration/transforms/
     /// [configuration]: https://vector.dev/docs/reference/configuration/
     pub inputs: Vec<T>,
 
@@ -35,6 +35,7 @@ where
     /// This must be a valid URI, which requires at least the scheme and host. All other
     /// components -- port, path, etc -- are allowed as well.
     #[configurable(deprecated)]
+    #[configurable(metadata(hidden))]
     #[configurable(validation(format = "uri"))]
     healthcheck_uri: Option<UriSerde>,
 
@@ -57,7 +58,7 @@ where
     proxy: ProxyConfig,
 
     #[serde(flatten)]
-    #[configurable(metadata(config_docs_skip))]
+    #[configurable(metadata(hidden))]
     pub inner: Sinks,
 }
 

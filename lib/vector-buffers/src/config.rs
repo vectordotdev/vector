@@ -194,7 +194,11 @@ impl DiskUsage {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case", tag = "type")]
 pub enum BufferType {
-    /// A buffer stage backed by an in-memory channel provided by `tokio`.
+    /// A buffer stage backed by an in-memory channel provided by `tokio``g.
+    ///
+    /// This is more performant, but less durable. Data will be lost if Vector is restarted
+    /// forcefully or crashes.
+    #[configurable(title = "Events are buffered in memory.")]
     #[serde(rename = "memory")]
     Memory {
         /// The maximum number of events allowed in the buffer.
@@ -207,7 +211,11 @@ pub enum BufferType {
     },
 
     /// A buffer stage backed by an on-disk database, powered by LevelDB.
+    ///
+    /// This is less performant, but more durable. Data that has been synchronized to disk will not
+    /// be lost if Vector is restarted forcefully or crashes.
     #[configurable(deprecated)]
+    #[configurable(title = "Events are buffered on disk. (version 1)")]
     #[serde(rename = "disk_v1")]
     DiskV1 {
         /// The maximum size of the buffer on disk.
@@ -221,6 +229,12 @@ pub enum BufferType {
     },
 
     /// A buffer stage backed by disk.
+    ///
+    /// This is less performant, but more durable. Data that has been synchronized to disk will not
+    /// be lost if Vector is restarted forcefully or crashes.
+    ///
+    /// Data is synchronized to disk every 500ms.
+    #[configurable(title = "Events are buffered on disk. (version 2)")]
     #[serde(rename = "disk")]
     DiskV2 {
         /// The maximum size of the buffer on disk.

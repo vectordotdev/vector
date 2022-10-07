@@ -12,7 +12,7 @@ use std::{
 use indexmap::IndexMap;
 use schemars::{gen::SchemaGenerator, schema::SchemaObject};
 use serde::Serialize;
-use vector_config_common::validation::Validation;
+use vector_config_common::{attributes::CustomAttribute, validation::Validation};
 
 use crate::{
     schema::{
@@ -20,6 +20,7 @@ use crate::{
         generate_map_schema, generate_number_schema, generate_set_schema,
         generate_string_schema, get_or_generate_schema,
     },
+    num::ConfigurableNumber,
     str::ConfigurableString,
     Configurable, GenerateError, Metadata,
 };
@@ -96,6 +97,18 @@ macro_rules! impl_configuable_numeric {
 	($($ty:ty),+) => {
 		$(
 			impl Configurable for $ty {
+                fn metadata() -> Metadata<Self> {
+                    let mut metadata = Metadata::default();
+                    if let Some(description) = Self::description() {
+                        metadata.set_description(description);
+                    }
+
+                    let numeric_type = <Self as ConfigurableNumber>::class();
+                    metadata.add_custom_attribute(CustomAttribute::kv("numeric_type", numeric_type));
+
+                    metadata
+                }
+
                 fn validate_metadata(metadata: &Metadata<Self>) -> Result<(), GenerateError> {
                     $crate::__ensure_numeric_validation_bounds::<Self>(metadata)
                 }
