@@ -94,29 +94,40 @@ outputs.errors.disposition = "reject"
 
 #### Configuration
 
-The new options will show up in all of the enclosing configuration option structures:
+The new `output.*.disposition` configuration mapping will be added to components as needed to
+support configuring outputs. In order for the validation to access it, a new method will be added to
+all component configuration traits:
 
 ```rust
-struct SourceOuter {
-    …
+trait SourceConfig: NamedComponent + Debug + Send + Sync {
+    /// Gets the list of outputs exposed by this source (existing).
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<config::Output>;
 
-    /// The configuration of all named outputs.
-    outputs: HashMap<String, OutputConfig>,
+    /// The actual user configuration of outputs.
+    /// Will be `None` if no such configuration is present on this component.
+    fn outputs_config(&self) -> Option<&OutputsConfig>;
 }
 
-struct TransformOuter {
-    …
+trait TransformConfig: DescribeOutputs + NamedComponent + Debug + Send + Sync {
+    /// Gets the list of outputs exposed by this transform (existing).
+    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<config::Output>;
 
-    /// The configuration of all named outputs.
-    outputs: HashMap<String, OutputConfig>,
+    /// The actual user configuration of outputs.
+    /// Will be `None` if no such configuration is present on this component.
+    fn outputs_config(&self) -> Option<&OutputsConfig>;
 }
 
-struct SinkOuter {
-    …
+trait SinkConfig: DescribeOutputs + NamedComponent + Debug + Send + Sync {
+    /// Gets the list of outputs exposed by this sink.
+    fn outputs(&self) -> Vec<config::Output>;
 
-    /// The configuration of all named outputs.
-    outputs: HashMap<String, OutputConfig>,
+    /// The actual user configuration of outputs.
+    /// Will be `None` if no such configuration is present on this component.
+    fn outputs_config(&self) -> Option<&OutputsConfig>;
 }
+
+/// Configuration for a set of named outputs.
+struct OutputsConfig(HashMap<String, OutputConfig>);
 
 struct OutputConfig {
     #[serde(default)]
@@ -347,6 +358,9 @@ in isolation.
 - What should be done with the existing discarded event metrics? Should they always be emitted, or
   only when the output isn't consumed by another component? Do we need another disposition marker to
   indicate discards are not to be counted as errors?
+
+- Does the list of outputs exposed by the sink need the schema definition passed in like transforms
+  do?
 
 ## Plan Of Attack
 
