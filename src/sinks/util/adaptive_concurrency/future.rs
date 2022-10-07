@@ -4,11 +4,10 @@ use std::{
     future::Future,
     pin::Pin,
     sync::Arc,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
     time::Instant,
 };
 
-use futures::ready;
 use pin_project::pin_project;
 use tokio::sync::OwnedSemaphorePermit;
 

@@ -14,7 +14,7 @@ use tower::Service;
 use tracing::Instrument;
 use vector_core::{
     event::{EventFinalizers, EventStatus, Finalizable},
-    internal_event::EventsSent,
+    internal_event::CountByteSize,
     stream::DriverResponse,
 };
 
@@ -67,12 +67,8 @@ impl DriverResponse for LogApiResponse {
         self.event_status
     }
 
-    fn events_sent(&self) -> EventsSent {
-        EventsSent {
-            count: self.count,
-            byte_size: self.events_byte_size,
-            output: None,
-        }
+    fn events_sent(&self) -> CountByteSize {
+        CountByteSize(self.count, self.events_byte_size)
     }
 
     fn bytes_sent(&self) -> Option<(usize, &str)> {

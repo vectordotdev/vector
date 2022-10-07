@@ -5,7 +5,7 @@ use futures::{future::BoxFuture, TryFutureExt};
 use tower::Service;
 use tracing::Instrument;
 use vector_core::{
-    event::EventStatus, internal_event::EventsSent, stream::DriverResponse, ByteSizeOf,
+    event::EventStatus, internal_event::CountByteSize, stream::DriverResponse, ByteSizeOf,
 };
 
 use super::request_builder::SendMessageEntry;
@@ -62,11 +62,7 @@ impl DriverResponse for SendMessageResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> EventsSent {
-        EventsSent {
-            count: 1,
-            byte_size: self.byte_size,
-            output: None,
-        }
+    fn events_sent(&self) -> CountByteSize {
+        CountByteSize(1, self.byte_size)
     }
 }

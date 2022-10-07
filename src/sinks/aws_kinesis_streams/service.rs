@@ -8,7 +8,7 @@ use aws_types::region::Region;
 use futures::future::BoxFuture;
 use tower::Service;
 use tracing::Instrument;
-use vector_core::{internal_event::EventsSent, stream::DriverResponse};
+use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
 
 use crate::{event::EventStatus, sinks::aws_kinesis_streams::request_builder::KinesisRequest};
 
@@ -29,12 +29,8 @@ impl DriverResponse for KinesisResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> EventsSent {
-        EventsSent {
-            count: self.count,
-            byte_size: self.events_byte_size,
-            output: None,
-        }
+    fn events_sent(&self) -> CountByteSize {
+        CountByteSize(self.count, self.events_byte_size)
     }
 }
 

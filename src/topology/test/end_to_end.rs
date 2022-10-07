@@ -24,7 +24,7 @@ pub async fn respond(
     tx.send(())
         .await
         .expect("Error sending 'before' status from test server");
-    waiter.lock().await;
+    let _ = waiter.lock().await;
     Ok(Response::builder()
         .status(status)
         .body(Body::empty())

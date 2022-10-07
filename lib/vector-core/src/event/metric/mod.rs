@@ -300,6 +300,11 @@ impl Metric {
         self.series.remove_tag(key)
     }
 
+    /// Removes all the tags.
+    pub fn remove_tags(&mut self) {
+        self.series.remove_tags();
+    }
+
     /// Returns `true` if `name` tag is present, and matches the provided `value`
     pub fn tag_matches(&self, name: &str, value: &str) -> bool {
         self.tags()
