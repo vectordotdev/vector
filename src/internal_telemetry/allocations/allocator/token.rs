@@ -90,22 +90,7 @@ impl AllocationGroupToken {
     }
 
     pub fn exit(&mut self) {
-        match self.previous.take() {
-            None => panic!(
-                "Should not be exiting a token which has not yet been entered: id={}",
-                self.id.as_raw()
-            ),
-            Some(previous) => {
-                let current = set_current_allocation_group(previous);
-                if self.id != current {
-                    panic!(
-                        "Expected current allocation group for thread to be {}, but got {}.",
-                        self.id.as_raw(),
-                        current.as_raw()
-                    );
-                }
-            }
-        }
+        self.previous.take();
     }
 }
 
