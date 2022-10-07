@@ -329,7 +329,7 @@ in isolation.
 ## Outstanding Questions
 
 - Do we want to automate the process of rewriting configurations that have missing output handlers,
-  or can we just leave the behavior as producing an error?
+  or is it adequate to just have a configuration validator?
 
 - Should the option for turning unhandled output enforcement into a hard error be written as a more
   generic switch to turn _all_ deprecations into errors?
