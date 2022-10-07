@@ -257,10 +257,11 @@ users, which recommends the need for a more generic solution.
 
 ### Unhandled Output Configuration
 
-Simplifying the configuration of previously unhandled outputs presents a bit of a Catch-22. Without
-any help from Vector, this would require users to explicitly route the unhandled outputs to a new
-`blackhole` sink. So, we want to add a shorthand to avoid the extra configuration that would
-require, and potentially the extra running component internally.
+Simplifying the configuration of previously unhandled outputs presents a bit of a Catch-22. As it
+stands now, if we just add additional outputs and require all outputs to be handled, we would
+require users to explicitly route the unhandled outputs to a new `blackhole` sink or equivalent. So,
+we want to add a shorthand to avoid the extra configuration that would require, and potentially the
+extra running component internally.
 
 The form of that shorthand presents a bit of a conundrum, though.  The configuration for consuming
 outputs happens in the `inputs` section of downstream components. If we add the discard
