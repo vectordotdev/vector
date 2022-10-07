@@ -292,12 +292,17 @@ impl Metric {
         Self::new(key.name().to_string(), MetricKind::Absolute, value)
             .with_namespace(Some("vector"))
             .with_timestamp(Some(timestamp))
-            .with_tags((!labels.is_empty()).then(|| labels))
+            .with_tags((!labels.is_empty()).then_some(labels))
     }
 
     /// Removes a tag from this metric, returning the value of the tag if the tag was previously in the metric.
     pub fn remove_tag(&mut self, key: &str) -> Option<String> {
         self.series.remove_tag(key)
+    }
+
+    /// Removes all the tags.
+    pub fn remove_tags(&mut self) {
+        self.series.remove_tags();
     }
 
     /// Returns `true` if `name` tag is present, and matches the provided `value`

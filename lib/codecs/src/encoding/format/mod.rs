@@ -27,15 +27,18 @@ use vector_core::event::Event;
 
 /// Serialize a structured event into a byte frame.
 pub trait Serializer:
-    tokio_util::codec::Encoder<Event, Error = vector_core::Error> + DynClone + Debug + Send + Sync
+    tokio_util::codec::Encoder<Event, Error = vector_common::Error> + DynClone + Debug + Send + Sync
 {
 }
 
 /// Default implementation for `Serializer`s that implement
 /// `tokio_util::codec::Encoder`.
 impl<Encoder> Serializer for Encoder where
-    Encoder:
-        tokio_util::codec::Encoder<Event, Error = vector_core::Error> + Clone + Debug + Send + Sync
+    Encoder: tokio_util::codec::Encoder<Event, Error = vector_common::Error>
+        + Clone
+        + Debug
+        + Send
+        + Sync
 {
 }
 

@@ -12,6 +12,7 @@ use vector_core::{
 
 use crate::{
     event::Event,
+    internal_events::SinkRequestBuildError,
     sinks::util::{partitioner::KeyPartitioner, RequestBuilder, SinkBuilderExt},
 };
 
@@ -45,7 +46,7 @@ where
     Svc::Response: DriverResponse + Send + 'static,
     Svc::Error: fmt::Debug + Into<crate::Error> + Send,
     RB: RequestBuilder<(String, Vec<Event>)> + Send + Sync + 'static,
-    RB::Error: fmt::Debug + Send,
+    RB::Error: fmt::Display + Send,
     RB::Request: Finalizable + Send,
 {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
@@ -57,12 +58,17 @@ where
 
         let sink = input
             .batched_partitioned(partitioner, settings)
-            .filter_map(|(key, batch)| async move { key.map(move |k| (k, batch)) })
+            .filter_map(|(key, batch)| async move {
+                // We don't need to emit an error here if the event is dropped since this will occur if the template
+                // couldn't be rendered during the partitioning. A `TemplateRenderingError` is already emitted when
+                // that occurs.
+                key.map(move |k| (k, batch))
+            })
             .request_builder(builder_limit, request_builder)
             .filter_map(|request| async move {
                 match request {
-                    Err(e) => {
-                        error!("Failed to build Azure Blob request: {:?}.", e);
+                    Err(error) => {
+                        emit!(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),
@@ -82,7 +88,7 @@ where
     Svc::Response: DriverResponse + Send + 'static,
     Svc::Error: fmt::Debug + Into<crate::Error> + Send,
     RB: RequestBuilder<(String, Vec<Event>)> + Send + Sync + 'static,
-    RB::Error: fmt::Debug + Send,
+    RB::Error: fmt::Display + Send,
     RB::Request: Finalizable + Send,
 {
     async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {

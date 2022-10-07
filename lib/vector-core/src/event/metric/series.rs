@@ -46,6 +46,11 @@ impl MetricSeries {
         (self.tags.get_or_insert_with(Default::default)).insert(key, value)
     }
 
+    /// Removes all the tags.
+    pub fn remove_tags(&mut self) {
+        self.tags = None;
+    }
+
     /// Removes the tag entry for the named key, if it exists, and returns the old value.
     ///
     /// *Note:* This will drop the tags map if the tag was the last entry in it.

@@ -107,7 +107,7 @@ impl SourceConfig for OpentelemetryConfig {
             pipeline: cx.out.clone(),
             acknowledgements,
         })
-        .accept_gzip();
+        .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
         let grpc_source = run_grpc_server(
             self.grpc.address,
             grpc_tls_settings,

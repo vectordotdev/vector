@@ -18,7 +18,7 @@ const DEFAULT_LOAD_TIMEOUT: Duration = Duration::from_secs(5);
 #[serde(deny_unknown_fields, untagged)]
 pub enum AwsAuthentication {
     /// Authenticate using a fixed access key and secret pair.
-    Static {
+    AccessKey {
         /// The AWS access key ID.
         access_key_id: SensitiveString,
 
@@ -66,7 +66,7 @@ impl AwsAuthentication {
         service_region: Region,
     ) -> crate::Result<SharedCredentialsProvider> {
         match self {
-            Self::Static {
+            Self::AccessKey {
                 access_key_id,
                 secret_access_key,
             } => Ok(SharedCredentialsProvider::new(Credentials::from_keys(
@@ -97,7 +97,7 @@ impl AwsAuthentication {
 
     #[cfg(test)]
     pub fn test_auth() -> AwsAuthentication {
-        AwsAuthentication::Static {
+        AwsAuthentication::AccessKey {
             access_key_id: "dummy".to_string().into(),
             secret_access_key: "dummy".to_string().into(),
         }
@@ -220,7 +220,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(matches!(config.auth, AwsAuthentication::Static { .. }));
+        assert!(matches!(config.auth, AwsAuthentication::AccessKey { .. }));
     }
 
     #[test]

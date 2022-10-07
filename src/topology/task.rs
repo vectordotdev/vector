@@ -7,6 +7,8 @@ use std::{
 
 use futures::{future::BoxFuture, FutureExt};
 use pin_project::pin_project;
+use snafu::Snafu;
+use tokio::task::JoinError;
 use vector_buffers::topology::channel::BufferReceiverStream;
 use vector_core::event::EventArray;
 
@@ -21,11 +23,41 @@ pub(crate) enum TaskOutput {
     Healthcheck,
 }
 
+#[derive(Debug, Snafu)]
+pub(crate) enum TaskError {
+    #[snafu(display("the task was cancelled before it completed"))]
+    Cancelled,
+    #[snafu(display("the task panicked and was aborted"))]
+    Panicked,
+    #[snafu(display("the task completed with an error"))]
+    Opaque,
+    #[snafu(display("{}", source))]
+    Wrapped { source: crate::Error },
+}
+
+impl TaskError {
+    pub fn wrapped(e: crate::Error) -> Self {
+        Self::Wrapped { source: e }
+    }
+}
+
+impl From<JoinError> for TaskError {
+    fn from(e: JoinError) -> Self {
+        if e.is_cancelled() {
+            Self::Cancelled
+        } else {
+            Self::Panicked
+        }
+    }
+}
+
+pub(crate) type TaskResult = Result<TaskOutput, TaskError>;
+
 /// High level topology task.
 #[pin_project]
 pub(crate) struct Task {
     #[pin]
-    inner: BoxFuture<'static, Result<TaskOutput, ()>>,
+    inner: BoxFuture<'static, TaskResult>,
     key: ComponentKey,
     typetag: String,
 }
@@ -34,7 +66,7 @@ impl Task {
     pub fn new<S, Fut>(key: ComponentKey, typetag: S, inner: Fut) -> Self
     where
         S: Into<String>,
-        Fut: Future<Output = Result<TaskOutput, ()>> + Send + 'static,
+        Fut: Future<Output = TaskResult> + Send + 'static,
     {
         Self {
             inner: inner.boxed(),
@@ -53,7 +85,7 @@ impl Task {
 }
 
 impl Future for Task {
-    type Output = Result<TaskOutput, ()>;
+    type Output = TaskResult;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this: &mut Task = self.get_mut();

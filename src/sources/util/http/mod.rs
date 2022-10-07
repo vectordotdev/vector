@@ -4,6 +4,7 @@ mod auth;
 mod encoding;
 #[cfg(feature = "sources-utils-http-error")]
 mod error;
+mod method;
 #[cfg(feature = "sources-utils-http-prelude")]
 mod prelude;
 #[cfg(any(
@@ -19,6 +20,7 @@ pub use auth::{HttpSourceAuth, HttpSourceAuthConfig};
 pub use encoding::decode;
 #[cfg(feature = "sources-utils-http-error")]
 pub use error::ErrorMessage;
+pub use method::HttpMethod;
 #[cfg(feature = "sources-utils-http-prelude")]
 pub use prelude::HttpSource;
 #[cfg(feature = "sources-utils-http-query")]

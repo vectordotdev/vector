@@ -2,11 +2,11 @@ use std::{
     io::{Error as IoError, ErrorKind},
     marker::Unpin,
     pin::Pin,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
 };
 
 use bytes::Bytes;
-use futures::{ready, Sink};
+use futures::Sink;
 use pin_project::{pin_project, pinned_drop};
 use tokio::io::AsyncWrite;
 use tokio_util::codec::{BytesCodec, FramedWrite};

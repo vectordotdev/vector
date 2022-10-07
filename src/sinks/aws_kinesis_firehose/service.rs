@@ -6,7 +6,7 @@ use aws_sdk_firehose::{
 use futures::future::BoxFuture;
 use hyper::service::Service;
 use tracing::Instrument;
-use vector_core::{internal_event::EventsSent, stream::DriverResponse};
+use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
 
 use super::request_builder::KinesisRequest;
 use crate::event::EventStatus;
@@ -28,12 +28,8 @@ impl DriverResponse for KinesisResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> EventsSent {
-        EventsSent {
-            count: self.count,
-            byte_size: self.events_byte_size,
-            output: None,
-        }
+    fn events_sent(&self) -> CountByteSize {
+        CountByteSize(self.count, self.events_byte_size)
     }
 }
 

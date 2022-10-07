@@ -3,7 +3,6 @@ use std::{fmt, num::NonZeroUsize};
 use async_trait::async_trait;
 use futures::{stream::BoxStream, StreamExt};
 use tower::Service;
-use vector_config::NamedComponent;
 use vector_core::stream::DriverResponse;
 
 use crate::{
@@ -11,10 +10,7 @@ use crate::{
     event::Event,
     internal_events::{ParserMissingFieldError, SinkRequestBuildError, DROP_EVENT},
     sinks::{
-        datadog::events::{
-            request_builder::{DatadogEventsRequest, DatadogEventsRequestBuilder},
-            DatadogEventsConfig,
-        },
+        datadog::events::request_builder::{DatadogEventsRequest, DatadogEventsRequestBuilder},
         util::{SinkBuilderExt, StreamSink},
     },
 };
@@ -39,10 +35,7 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError {
-                            name: DatadogEventsConfig::NAME,
-                            error
-                        });
+                        emit!(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),
