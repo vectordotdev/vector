@@ -26,12 +26,12 @@ impl Kind {
             }
             *self = new_kind;
         } else {
+            println!("Input = {:?}", self.debug_info());
             let _compact_options = self.remove_inner(segments, prune);
         }
     }
 
     fn remove_inner(&mut self, segments: &[OwnedSegment], compact: bool) -> CompactOptions {
-        debug_assert!(!segments.is_empty());
         if self.is_never() {
             // If `self` is `never`, the program would have already terminated
             // so this removal can't happen.
@@ -42,95 +42,102 @@ impl Kind {
             };
         }
 
-        let first = segments.first().expect("must not be empty");
-        let second = segments.get(1);
+        if let Some(first) = segments.first() {
+        } else {
+            return CompactOptions {
+                should_compact: self.contains_any_defined(),
+                should_not_compact: self.contains_undefined(),
+            };
+        }
 
-        if let Some(second) = second {
-            // more than 1 segment left
-            match first {
-                OwnedSegment::Field(field) => {
-                    let mut at_path_kind = self.at_path(segments);
-                    if let Some(object) = self.as_object_mut() {
-                        match object.known_mut().get_mut(&Field::from(field.to_owned())) {
-                            None => {
-                                // The modified value is discarded here (It's not needed)
-                                &mut at_path_kind
-                            }
-                            Some(child) => child,
+        match segments.first().expect("must not be empty") {
+            OwnedSegment::Field(field) => {
+                let mut at_path_kind = self.at_path(segments);
+                if let Some(object) = self.as_object_mut() {
+                    match object.known_mut().get_mut(&Field::from(field.to_owned())) {
+                        None => {
+                            // The modified value is discarded here (It's not needed)
+                            &mut at_path_kind
                         }
-                        .remove_inner(&segments[1..], compact)
-                        .compact(object, field.to_owned())
-                    } else {
-                        // guaranteed to not delete anything
-                        CompactOptions {
-                            should_compact: false,
-                            should_not_compact: true,
-                        }
+                        Some(child) => child,
+                    }
+                    .remove_inner(&segments[1..], compact)
+                    .compact(object, field.to_owned(), compact)
+                } else {
+                    // guaranteed to not delete anything
+                    CompactOptions {
+                        should_compact: false,
+                        should_not_compact: true,
                     }
                 }
-                OwnedSegment::Index(index) => {
-                    let mut at_path_kind = self.at_path(segments);
-                    if let Some(array) = self.as_array_mut() {
-                        let mut index = *index;
-                        if index < 0 {
-                            let negative_index = (-index) as usize;
+            }
 
-                            if array.unknown_kind().contains_any_defined() {
-                                let original = array.clone();
-                                *array = original.clone();
+            OwnedSegment::Index(index) => {
+                let mut at_path_kind = self.at_path(segments);
+                if let Some(array) = self.as_array_mut() {
+                    let mut index = *index;
+                    if index < 0 {
+                        let negative_index = (-index) as usize;
 
-                                let min_index = array
-                                    .largest_known_index()
-                                    .map_or(0, |x| x + 1 - negative_index);
+                        if array.unknown_kind().contains_any_defined() {
+                            let original = array.clone();
+                            *array = original.clone();
 
-                                if let Some(largest_known_index) = array.largest_known_index() {
-                                    for i in min_index..=largest_known_index {
-                                        let mut single_remove = original.clone();
-                                        if let Some(child) =
-                                            single_remove.known_mut().get_mut(&i.into())
-                                        {
-                                            child
-                                                .remove_inner(&segments[1..], compact)
-                                                .compact(&mut single_remove, i);
-                                        }
-                                        array.merge(single_remove, false);
+                            let min_index = array
+                                .largest_known_index()
+                                .map_or(0, |x| x + 1 - negative_index);
+
+                            if let Some(largest_known_index) = array.largest_known_index() {
+                                for i in min_index..=largest_known_index {
+                                    let mut single_remove = original.clone();
+                                    if let Some(child) =
+                                        single_remove.known_mut().get_mut(&i.into())
+                                    {
+                                        child.remove_inner(&segments[1..], compact).compact(
+                                            &mut single_remove,
+                                            i,
+                                            compact,
+                                        );
                                     }
+                                    array.merge(single_remove, false);
                                 }
+                            }
 
-                                return CompactOptions {
-                                    should_compact: array.min_length() <= 1,
-                                    should_not_compact: true,
-                                };
+                            return CompactOptions {
+                                should_compact: array.min_length() <= 1,
+                                should_not_compact: true,
+                            };
+                        } else {
+                            if let Some(positive_index) = array.get_positive_index(index) {
+                                index = positive_index as isize;
                             } else {
-                                if let Some(positive_index) = array.get_positive_index(index) {
-                                    index = positive_index as isize;
-                                } else {
-                                    // Removing a non-existing index
-                                    return CompactOptions::from(EmptyState::NeverEmpty);
-                                }
+                                // Removing a non-existing index
+                                return CompactOptions::from(EmptyState::NeverEmpty);
                             }
-                        }
-
-                        match array.known_mut().get_mut(&(index as usize).into()) {
-                            None => {
-                                // The modified value is discarded here (It's not needed)
-                                &mut at_path_kind
-                            }
-                            Some(child) => child,
-                        }
-                        .remove_inner(&segments[1..], compact)
-                        .compact(array, index as usize)
-                    } else {
-                        // guaranteed to not delete anything
-                        CompactOptions {
-                            should_compact: false,
-                            should_not_compact: true,
                         }
                     }
+
+                    match array.known_mut().get_mut(&(index as usize).into()) {
+                        None => {
+                            // The modified value is discarded here (It's not needed)
+                            &mut at_path_kind
+                        }
+                        Some(child) => child,
+                    }
+                    .remove_inner(&segments[1..], compact)
+                    .compact(array, index as usize, compact)
+                } else {
+                    // guaranteed to not delete anything
+                    CompactOptions {
+                        should_compact: false,
+                        should_not_compact: true,
+                    }
                 }
-                OwnedSegment::Coalesce(fields) => {
-                    let original = self.clone();
-                    *self = Kind::never();
+            }
+            OwnedSegment::Coalesce(fields) => {
+                let original = self.clone();
+                if let Some(object) = self.as_object_mut() {
+                    let mut output = Kind::never();
 
                     let mut compact_options = CompactOptions {
                         should_compact: false,
@@ -146,20 +153,25 @@ impl Kind {
                             let mut child_segments = segments.to_vec();
                             child_segments[0] = OwnedSegment::Field(field.to_owned());
 
-                            compact_options
-                                .merge(child_kind.remove_inner(&child_segments, compact).compact());
+                            compact_options.merge(
+                                child_kind.remove_inner(&child_segments, compact).compact(
+                                    object,
+                                    field.to_string(),
+                                    compact,
+                                ),
+                            );
 
-                            *self = self.union(child_kind);
+                            output = output.union(child_kind);
 
                             if !field_kind.contains_undefined() {
                                 // No other field will be visited, so return early
-                                return compact_options;
+                                break;
                             }
                         }
                     }
+                    *self = output;
                     compact_options
-                }
-                OwnedSegment::Invalid => {
+                } else {
                     // guaranteed to not delete anything
                     CompactOptions {
                         should_compact: false,
@@ -167,108 +179,12 @@ impl Kind {
                     }
                 }
             }
-        } else {
-            // only 1 segment left
-            match first {
-                OwnedSegment::Field(field) => {
-                    if let Some(object) = self.as_object_mut() {
-                        let removed_known = object
-                            .known_mut()
-                            .remove(&field.as_str().into())
-                            .map_or(false, |kind| kind.contains_any_defined());
-
-                        let maybe_removed_unknown = object.unknown_kind().contains_any_defined();
-
-                        CompactOptions::from(object.is_empty())
-                            .disable_should_compact(!removed_known && !maybe_removed_unknown)
-                            .apply_global_compact_option(compact)
-                    } else {
-                        CompactOptions::from(EmptyState::NeverEmpty)
-                    }
+            OwnedSegment::Invalid => {
+                // guaranteed to not delete anything
+                CompactOptions {
+                    should_compact: false,
+                    should_not_compact: true,
                 }
-                OwnedSegment::Index(index) => {
-                    if let Some(array) = self.as_array_mut() {
-                        let mut index = *index;
-                        if index < 0 {
-                            let negative_index = (-index) as usize;
-
-                            if array.unknown_kind().contains_any_defined() {
-                                let original = array.clone();
-                                *array = original.clone();
-
-                                let min_index = array
-                                    .largest_known_index()
-                                    .map_or(0, |x| x + 1 - negative_index);
-                                if let Some(largest_known_index) = array.largest_known_index() {
-                                    for i in min_index..=largest_known_index {
-                                        let mut single_shift = original.clone();
-                                        single_shift.remove_shift(i);
-                                        array.merge(single_shift, false);
-                                    }
-                                }
-                                return CompactOptions {
-                                    should_compact: min_index == 0,
-                                    should_not_compact: true,
-                                };
-                            } else {
-                                if let Some(positive_index) = array.get_positive_index(index) {
-                                    index = positive_index as isize;
-                                } else {
-                                    // Removing a non-existing index
-                                    return CompactOptions::from(EmptyState::NeverEmpty);
-                                }
-                            }
-                        }
-
-                        let index = index as usize;
-                        let min_length = array.min_length();
-                        if min_length >= index {
-                            array.remove_shift(index);
-                            CompactOptions::from(array.is_empty())
-                                .apply_global_compact_option(compact)
-                        } else {
-                            // The removed index isn't guaranteed to exist.
-                            // Elements might be removed, but known indices won't be modified.
-                            // Unknown values don't change from a removal, so there is nothing to change here.
-                            CompactOptions::from(EmptyState::MaybeEmpty)
-                                .apply_global_compact_option(compact)
-                        }
-                    } else {
-                        CompactOptions::from(EmptyState::NeverEmpty)
-                    }
-                }
-                OwnedSegment::Coalesce(fields) => {
-                    let original = self.clone();
-                    *self = Kind::never();
-
-                    let mut compact_options = CompactOptions {
-                        should_compact: false,
-                        should_not_compact: false,
-                    };
-
-                    for field in fields {
-                        let field_kind =
-                            original.at_path(&[OwnedSegment::Field(field.to_string())]);
-
-                        if field_kind.contains_any_defined() {
-                            let mut child_kind = original.clone();
-                            compact_options.merge(
-                                child_kind.remove_inner(
-                                    &[OwnedSegment::Field(field.to_owned())],
-                                    compact,
-                                ),
-                            );
-                            *self = self.union(child_kind);
-
-                            if !field_kind.contains_undefined() {
-                                // No other field will be visited, so return early
-                                return compact_options;
-                            }
-                        }
-                    }
-                    compact_options
-                }
-                OwnedSegment::Invalid => unimplemented!(),
             }
         }
     }
@@ -281,9 +197,14 @@ struct CompactOptions {
 }
 
 impl CompactOptions {
-    fn compact<T>(self, collection: &mut Collection<T>, key: impl Into<T>) -> Self
+    fn compact<T>(
+        self,
+        collection: &mut Collection<T>,
+        key: impl Into<T>,
+        continue_compact: bool,
+    ) -> Self
     where
-        T: Ord + Clone,
+        T: Ord + Clone + std::fmt::Debug,
         Collection<T>: CollectionRemove<Key = T>,
     {
         let key = &key.into();
@@ -299,8 +220,9 @@ impl CompactOptions {
             // never compact: do nothing, already correct.
         }
 
-        // The compaction is propagated only if the current collection is also empty
-        self.disable_should_compact(!CompactOptions::from(collection.is_empty()).should_compact)
+        CompactOptions::from(collection.is_empty())
+            .disable_should_compact(!self.should_compact)
+            .disable_should_compact(!continue_compact)
     }
 
     /// Combines two sets of options. Each setting is "or"ed together.
@@ -313,6 +235,7 @@ impl CompactOptions {
     fn disable_should_compact(mut self, value: bool) -> Self {
         if value {
             self.should_compact = false;
+            self.should_not_compact = true;
         }
         self
     }
@@ -907,7 +830,7 @@ mod test {
                 },
             ),
             (
-                "coalesce 3",
+                "coalesce 4",
                 TestCase {
                     kind: Kind::object(Collection::from(BTreeMap::from([
                         ("a".into(), Kind::integer().or_undefined()),
@@ -921,29 +844,26 @@ mod test {
                     ]))),
                 },
             ),
-            // (
-            //     "nested coalesce 1",
-            //     TestCase {
-            //         kind: Kind::object(Collection::from(BTreeMap::from([(
-            //             "a".into(),
-            //             Kind::object(Collection::from(BTreeMap::from([(
-            //                 "b".into(),
-            //                 Kind::integer(),
-            //             )]))),
-            //         )]))),
-            //         path: parse_value_path("(a|a2).b"),
-            //         compact: false,
-            //         want: Kind::object(Collection::from(BTreeMap::from([(
-            //             "a".into(),
-            //             Kind::object(Collection::from(BTreeMap::from([(
-            //                 "b".into(),
-            //                 Kind::integer(),
-            //             )]))),
-            //         )]))),
-            //     },
-            // ),
+            (
+                "nested coalesce 1",
+                TestCase {
+                    kind: Kind::object(Collection::from(BTreeMap::from([(
+                        "a".into(),
+                        Kind::object(Collection::from(BTreeMap::from([(
+                            "b".into(),
+                            Kind::integer(),
+                        )]))),
+                    )]))),
+                    path: parse_value_path("(a|a2).b"),
+                    compact: false,
+                    want: Kind::object(Collection::from(BTreeMap::from([(
+                        "a".into(),
+                        Kind::object(Collection::empty()),
+                    )]))),
+                },
+            ),
         ] {
-            println!("Test: {:?}", title);
+            println!("=========== Test: {:?} ===========", title);
             let mut actual = kind;
             actual.remove(&path, compact);
             if actual != want {

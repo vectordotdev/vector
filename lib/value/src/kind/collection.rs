@@ -287,6 +287,7 @@ pub trait CollectionRemove {
 
 /// Collections have an "unknown" component, so it can't know in all cases if the value this
 /// collection represents is actually empty/not empty, so the state is represented with 3 variants.
+#[derive(Debug)]
 pub enum EmptyState {
     // The collection is guaranteed to be empty.
     AlwaysEmpty,
