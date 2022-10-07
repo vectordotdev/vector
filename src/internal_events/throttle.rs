@@ -1,3 +1,5 @@
+use crate::emit;
+use crate::internal_events::{ComponentEventsDropped, INTENTIONAL};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -13,5 +15,10 @@ impl InternalEvent for ThrottleEventDiscarded {
             "events_discarded_total", 1,
             "key" => self.key,
         );
+
+        emit!(ComponentEventsDropped::<INTENTIONAL> {
+            count: 1,
+            reason: "Rate limit exceeded."
+        })
     }
 }
