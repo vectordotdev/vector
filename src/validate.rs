@@ -12,41 +12,41 @@ use crate::{
 const TEMPORARY_DIRECTORY: &str = "validate_tmp";
 
 #[derive(Parser, Debug)]
-#[clap(rename_all = "kebab-case")]
+#[command(rename_all = "kebab-case")]
 pub struct Opts {
     /// Disables environment checks. That includes component checks and health checks.
-    #[clap(long)]
+    #[arg(long)]
     pub no_environment: bool,
 
     /// Fail validation on warnings that are probably a mistake in the configuration
     /// or are recommended to be fixed.
-    #[clap(short, long)]
+    #[arg(short, long)]
     pub deny_warnings: bool,
 
     /// Vector config files in TOML format to validate.
-    #[clap(
-        name = "config-toml",
+    #[arg(
+        id = "config-toml",
         long,
         env = "VECTOR_CONFIG_TOML",
-        use_value_delimiter(true)
+        value_delimiter(',')
     )]
     pub paths_toml: Vec<PathBuf>,
 
     /// Vector config files in JSON format to validate.
-    #[clap(
-        name = "config-json",
+    #[arg(
+        id = "config-json",
         long,
         env = "VECTOR_CONFIG_JSON",
-        use_value_delimiter(true)
+        value_delimiter(',')
     )]
     pub paths_json: Vec<PathBuf>,
 
     /// Vector config files in YAML format to validate.
-    #[clap(
-        name = "config-yaml",
+    #[arg(
+        id = "config-yaml",
         long,
         env = "VECTOR_CONFIG_YAML",
-        use_value_delimiter(true)
+        value_delimiter(',')
     )]
     pub paths_yaml: Vec<PathBuf>,
 
@@ -54,19 +54,19 @@ pub struct Opts {
     /// Format is detected from the file name.
     /// If none are specified the default config path `/etc/vector/vector.toml`
     /// will be targeted.
-    #[clap(env = "VECTOR_CONFIG", use_value_delimiter(true))]
+    #[arg(env = "VECTOR_CONFIG", value_delimiter(','))]
     pub paths: Vec<PathBuf>,
 
     /// Read configuration from files in one or more directories.
     /// File format is detected from the file name.
     ///
     /// Files not ending in .toml, .json, .yaml, or .yml will be ignored.
-    #[clap(
-        name = "config-dir",
+    #[arg(
+        id = "config-dir",
         short = 'C',
         long,
         env = "VECTOR_CONFIG_DIR",
-        use_value_delimiter(true)
+        value_delimiter(',')
     )]
     pub config_dirs: Vec<PathBuf>,
 }
