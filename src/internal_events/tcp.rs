@@ -4,7 +4,7 @@ use metrics::counter;
 use vector_common::internal_event::{error_stage, error_type};
 use vector_core::internal_event::InternalEvent;
 
-use crate::{emit, internal_events::SocketConnectionError, tls::TlsError};
+use crate::{emit, internal_events::SocketOutgoingConnectionError, tls::TlsError};
 
 #[derive(Debug)]
 pub struct TcpSocketConnectionEstablished {
@@ -23,15 +23,15 @@ impl InternalEvent for TcpSocketConnectionEstablished {
 }
 
 #[derive(Debug)]
-pub struct TcpSocketConnectionError<E> {
+pub struct TcpSocketOutgoingConnectionError<E> {
     pub error: E,
 }
 
-impl<E: std::error::Error> InternalEvent for TcpSocketConnectionError<E> {
+impl<E: std::error::Error> InternalEvent for TcpSocketOutgoingConnectionError<E> {
     fn emit(self) {
         // ## skip check-duplicate-events ##
         // ## skip check-validity-events ##
-        emit!(SocketConnectionError { error: self.error });
+        emit!(SocketOutgoingConnectionError { error: self.error });
         // deprecated
         counter!("connection_failed_total", 1, "mode" => "tcp");
     }

@@ -13,8 +13,8 @@ use crate::{
     codecs::Transformer,
     event::{Event, Finalizable},
     internal_events::{
-        ConnectionOpen, OpenGauge, SocketMode, UnixSocketConnectionError,
-        UnixSocketConnectionEstablished, UnixSocketError,
+        ConnectionOpen, OpenGauge, SocketMode, UnixSocketConnectionEstablished, UnixSocketError,
+        UnixSocketOutgoingConnectionError,
     },
     sink::VecSinkExt,
     sinks::{
@@ -99,7 +99,7 @@ impl UnixConnector {
                     return stream;
                 }
                 Err(error) => {
-                    emit!(UnixSocketConnectionError { error });
+                    emit!(UnixSocketOutgoingConnectionError { error });
                     sleep(backoff.next().unwrap()).await;
                 }
             }

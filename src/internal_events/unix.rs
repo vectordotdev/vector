@@ -4,7 +4,7 @@ use metrics::counter;
 use vector_common::internal_event::{error_stage, error_type};
 use vector_core::internal_event::InternalEvent;
 
-use crate::{emit, internal_events::SocketConnectionError};
+use crate::{emit, internal_events::SocketOutgoingConnectionError};
 
 #[derive(Debug)]
 pub struct UnixSocketConnectionEstablished<'a> {
@@ -19,15 +19,15 @@ impl InternalEvent for UnixSocketConnectionEstablished<'_> {
 }
 
 #[derive(Debug)]
-pub struct UnixSocketConnectionError<E> {
+pub struct UnixSocketOutgoingConnectionError<E> {
     pub error: E,
 }
 
-impl<E: std::error::Error> InternalEvent for UnixSocketConnectionError<E> {
+impl<E: std::error::Error> InternalEvent for UnixSocketOutgoingConnectionError<E> {
     fn emit(self) {
         // ## skip check-duplicate-events ##
         // ## skip check-validity-events ##
-        emit!(SocketConnectionError { error: self.error });
+        emit!(SocketOutgoingConnectionError { error: self.error });
         // deprecated
         counter!("connection_failed_total", 1, "mode" => "unix");
     }

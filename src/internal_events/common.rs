@@ -56,25 +56,25 @@ impl<'a> InternalEvent for EndpointBytesSent<'a> {
 }
 
 #[derive(Debug)]
-pub struct SocketConnectionError<E> {
+pub struct SocketOutgoingConnectionError<E> {
     pub error: E,
 }
 
-impl<E: std::error::Error> InternalEvent for SocketConnectionError<E> {
+impl<E: std::error::Error> InternalEvent for SocketOutgoingConnectionError<E> {
     fn emit(self) {
         error!(
             message = "Unable to connect.",
             error = %self.error,
             error_code = "failed_connecting",
             error_type = error_type::CONNECTION_FAILED,
-            stage = error_stage::PROCESSING,
+            stage = error_stage::SENDING,
             internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
             "error_code" => "failed_connecting",
             "error_type" => error_type::CONNECTION_FAILED,
-            "stage" => error_stage::PROCESSING,
+            "stage" => error_stage::SENDING,
         );
     }
 }
