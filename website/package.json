@@ -65,6 +65,6 @@
     "since 2017-06"
   ],
   "devDependencies": {
-    "@netlify/plugin-lighthouse": "^2.1.2"
+    "@netlify/plugin-lighthouse": "^3.7.1"
   }
 }
