@@ -2,7 +2,7 @@ use axum::{
     body::Body,
     extract::Extension,
     http::{header::CONTENT_TYPE, Request},
-    routing::post,
+    routing::{get, post},
     Router,
 };
 use chrono::Utc;
@@ -16,32 +16,31 @@ use tokio::sync::mpsc::{self, Receiver, Sender};
 use tokio::time::{sleep, Duration};
 
 use crate::{
-    config::SinkConfig,
+    config::{ConfigBuilder, SinkConfig},
     event::Event,
     sinks::{
-        datadog::traces::{
-            stats::StatsPayload,
-            tests::{simple_trace_event, simple_trace_event_detailed},
-            DatadogTracesConfig,
-        },
+        datadog::traces::{stats::StatsPayload, tests::simple_trace_event, DatadogTracesConfig},
         util::test::load_sink,
     },
+    sources::datadog_agent::DatadogAgentConfig,
     test_util::{
         components::{assert_sink_compliance, SINK_TAGS},
-        map_event_batch_stream, trace_init,
+        map_event_batch_stream, start_topology, trace_init,
     },
+    topology::RunningTopology,
 };
 use vector_core::event::{BatchNotifier, BatchStatus};
 
-// The port for an http server to receive data from vector
-fn vector_port() -> u16 {
+/// The port on which the Agent will send traces to vector, and vector `datadog_agent` source will
+/// listen on
+fn vector_receive_port() -> u16 {
     std::env::var("VECTOR_PORT")
         .unwrap_or_else(|_| "8081".to_string())
         .parse::<u16>()
         .unwrap()
 }
 
-// The port for an http server to receive data from the agent
+/// The port for the http server to receive data from the agent
 fn agent_port() -> u16 {
     std::env::var("AGENT_PORT")
         .unwrap_or_else(|_| "8082".to_string())
@@ -49,25 +48,37 @@ fn agent_port() -> u16 {
         .unwrap()
 }
 
-// The agent url to post traces to.
+/// The port for the http server to receive data from vector
+const fn vector_server_port() -> u16 {
+    1234
+}
+
+/// The agent url to post traces to [Agent only]
 fn trace_agent_only_url() -> String {
     std::env::var("TRACE_AGENT_URL")
         .unwrap_or_else(|_| "http://127.0.0.1:8126/v0.3/traces".to_owned())
 }
 
-// Shared state for the HTTP server
+/// The agent url to post traces to [Agent -> Vector].
+fn trace_agent_to_vector_url() -> String {
+    std::env::var("TRACE_AGENT_TO_VECTOR_URL")
+        .unwrap_or_else(|_| "http://127.0.0.1:8126/v0.3/traces".to_owned())
+}
+
+/// Shared state for the HTTP server
 struct AppState {
     name: String,
     tx: Sender<StatsPayload>,
 }
 
-// build the app with a route and run our app with hyper
+/// Runs an HTTP server on the specified port.
 async fn run_server(name: String, port: u16, tx: Sender<StatsPayload>) {
     let state = Arc::new(AppState {
         name: name.clone(),
         tx,
     });
     let app = Router::new()
+        .route("/api/v1/validate", get(validate))
         .route("/api/v0.2/traces", post(process_traces))
         .route("/api/v0.2/stats", post(process_stats))
         .layer(Extension(state));
@@ -82,9 +93,13 @@ async fn run_server(name: String, port: u16, tx: Sender<StatsPayload>) {
         .unwrap();
 }
 
-// At a later time (perhaps if we make this a full e2e test), we could parse the trace payloads
-// from vector and the agent and compare. As it stands, we have unit tests validating the trace
-// structure for the sink so not much value in doing that yet.
+// Needed for the sink healthcheck
+async fn validate() -> &'static str {
+    ""
+}
+
+/// At a later time we could parse the trace payloads from vector and the agent and compare those
+/// for consistency as well.
 async fn process_traces(Extension(_state): Extension<Arc<AppState>>, request: Request<Body>) {
     let content_type_header = request.headers().get(CONTENT_TYPE);
     let content_type = content_type_header.and_then(|value| value.to_str().ok());
@@ -96,8 +111,8 @@ async fn process_traces(Extension(_state): Extension<Arc<AppState>>, request: Re
     }
 }
 
-// process a POST request from the stats endpoint.
-// De-compresses and De-serializes the payload, then forwards it on the Sender channel.
+/// process a POST request from the stats endpoint.
+/// De-compresses and De-serializes the payload, then forwards it on the Sender channel.
 async fn process_stats(Extension(state): Extension<Arc<AppState>>, mut request: Request<Body>) {
     debug!(
         "`{}` server process_stats request: {:?}",
@@ -174,9 +189,9 @@ fn build_traces_payload(start: i64, duration: i64, span_id: i64) -> Vec<Vec<Span
     vec![vec![span]]
 }
 
-// Sends traces into the Agent container.
-// Send two separate requests with thin the same bucket time window to invoke the aggregation logic in the Agent.
-async fn send_agent_traces(start: i64, duration: i64, span_id: i64) {
+/// Sends traces into the Agent containers.
+/// Send two separate requests with thin the same bucket time window to invoke the aggregation logic in the Agent.
+async fn send_agent_traces(urls: &Vec<String>, start: i64, duration: i64, span_id: i64) {
     // sends a trace to each of the urls
     async fn send_trace(urls: &Vec<String>, start: i64, duration: i64, span_id: i64) -> bool {
         let traces_payload = build_traces_payload(start, duration, span_id);
@@ -195,97 +210,32 @@ async fn send_agent_traces(start: i64, duration: i64, span_id: i64) {
                 error!("Error sending traces to {}, res: {:?}.", url, res);
                 return false;
             }
+            info!("Sent a trace to the Agent at {}.", url);
         }
-        info!("Sent a trace to the Agent.");
         true
     }
 
-    // If at a later time we create a more "complete" end to end test which will send data through
-    // the full vector topology [agent -> datadog_agent_source -> datadog_traces_sink] , then we
-    // can just add the url for the traces endpoint of that container here.
-    let urls = vec![trace_agent_only_url()];
-
     // send first set of trace data
-    if !send_trace(&urls, start, duration, span_id + 1).await {
+    if !send_trace(urls, start, duration, span_id).await {
         panic!("can't perform checks if traces aren't accepted by agent.");
     }
 
-    sleep(Duration::from_secs(1)).await;
+    sleep(Duration::from_millis(100)).await;
 
     // send second set of trace data
-    if !send_trace(&urls, start + 1, duration, span_id + 1).await {
+    if !send_trace(urls, start, duration, span_id + 1).await {
         panic!("can't perform checks if traces aren't accepted by agent.");
     }
 }
 
-// The sink is run with a max batch size of one, and a stream containing two trace events.
-// The two trace events are intentionally configured within the same time bucket window.
-// This creates a scenario where the stats payload that is output by the sink after processing the
-// *second* batch of events (the second event) >should< contain the aggregated statistics of both
-// of the trace events. i.e , the hit count for that bucket should be equal to "2" , not "1".
-async fn run_sink_and_send_traces(start: i64, duration: i64, span_id: i64) {
-    assert_sink_compliance(&SINK_TAGS, async {
-        let config = indoc! {r#"
-                default_api_key = "atoken"
-                compression = "gzip"
-                site = "datadoghq.com"
-                endpoint = "http://0.0.0.0:8081"
-                batch.max_events = 1
-            "#};
-
-        let api_key = std::env::var("TEST_DATADOG_API_KEY")
-            .expect("couldn't find the Datatog api key in environment variables");
-        assert!(!api_key.is_empty(), "TEST_DATADOG_API_KEY required");
-
-        let config = config.replace("atoken", &api_key);
-        let (config, cx) = load_sink::<DatadogTracesConfig>(config.as_str()).unwrap();
-
-        let (sink, _) = config.build(cx).await.unwrap();
-        let (batch, receiver) = BatchNotifier::new_with_receiver();
-
-        {
-            let traces = vec![
-                Event::Trace(
-                    simple_trace_event_detailed(
-                        "a_resource".to_string(),
-                        Some(start),
-                        Some(duration),
-                        Some(span_id),
-                        Some(0),
-                    )
-                    .with_batch_notifier(&batch),
-                ),
-                Event::Trace(
-                    simple_trace_event_detailed(
-                        "a_resource".to_string(),
-                        Some(start + 1),
-                        Some(duration),
-                        Some(span_id + 1),
-                        Some(0),
-                    )
-                    .with_batch_notifier(&batch),
-                ),
-            ];
-
-            let stream = map_event_batch_stream(stream::iter(traces), Some(batch));
-
-            info!("Sent traces to vector.");
-            sink.run(stream).await.unwrap();
-        }
-
-        assert_eq!(receiver.await, BatchStatus::Delivered);
-    })
-    .await;
-}
-
-// Receives the stats payloads from the Receiver channels from both of the server instances.
-// If either of the servers does not respond with a stats payload, the test will fail.
-// The lastest received stats payload is the only one considered. This is the same logic that the
-// Datadog UI follows.
-// Wait for up to 25 seconds for the stats payload to arrive. The Agent can take some time to send
-// the stats out.
-// TODO: Looking into if there is a way to configure the agent bucket interval to force the
-// flushing to occur faster (reducing the timeout we use and overall runtime of the test)
+/// Receives the stats payloads from the Receiver channels from both of the server instances.
+/// If either of the servers does not respond with a stats payload, the test will fail.
+/// The lastest received stats payload is the only one considered. This is the same logic that the
+/// Datadog UI follows.
+/// Wait for up to 25 seconds for the stats payload to arrive. The Agent can take some time to send
+/// the stats out.
+/// TODO: Looking into if there is a way to configure the agent bucket interval to force the
+/// flushing to occur faster (reducing the timeout we use and overall runtime of the test)
 async fn receive_the_stats(
     rx_agent_only: &mut Receiver<StatsPayload>,
     rx_agent_vector: &mut Receiver<StatsPayload>,
@@ -323,19 +273,22 @@ async fn receive_the_stats(
     (stats_agent_only.unwrap(), stats_agent_vector.unwrap())
 }
 
-// Compares the stats payload (specifically the bucket for the time window we sent events on)
-// between the Vector and Agent for consistency.
+/// Compares the stats payload (specifically the bucket for the time window we sent events on)
+/// between the Vector and Agent for consistency.
 fn validate_stats(agent_stats: &StatsPayload, vector_stats: &StatsPayload) {
     let agent_bucket = agent_stats.stats.first().unwrap().stats.first().unwrap();
 
     let vector_bucket = vector_stats.stats.first().unwrap().stats.first().unwrap();
-    assert!(
-        agent_bucket.start == vector_bucket.start,
-        "bucket start times do not match"
-    );
+
+    // NOTE: intentionally not validating the bucket start times because due to the nature of the
+    // test the bucket start times might not align perfectly, but everything else should.
+
     assert!(
         agent_bucket.duration == vector_bucket.duration,
         "bucket durations do not match"
+    );
+    assert!(agent_bucket.stats.len() == vector_bucket.stats.len(),
+        "vector and agent reporting different number of buckets"
     );
 
     let agent_s = agent_bucket.stats.first().unwrap();
@@ -351,12 +304,79 @@ fn validate_stats(agent_stats: &StatsPayload, vector_stats: &StatsPayload) {
     assert!(agent_s.r#type == vector_s.r#type);
     assert!(agent_s.db_type == vector_s.db_type);
     assert!(agent_s.hits == vector_s.hits);
+
+    assert!(agent_s.hits == 2);
+
     assert!(agent_s.errors == vector_s.errors);
     assert!(agent_s.duration == vector_s.duration);
     assert!(agent_s.synthetics == vector_s.synthetics);
     assert!(agent_s.top_level_hits == vector_s.top_level_hits);
 }
 
+/// Starts the vector instance with a datadog agent source and a datadog traces sink.
+/// The input to the source is one of the Agent containers.
+/// The output of the sink is our HTTP server.
+/// Each member (topology, shutdown) of the Return value of this function must be kept
+/// in scope by the caller until the test is done.
+///
+/// The sink is run with a max batch size of one.
+/// The two trace events are intentionally configured within the same time bucket window.
+/// This creates a scenario where the stats payload that is output by the sink after processing the
+/// *second* batch of events (the second event) *should* contain the aggregated statistics of both
+/// of the trace events. i.e , the hit count for that bucket should be equal to "2" , not "1".
+async fn start_vector() -> (RunningTopology, tokio::sync::mpsc::UnboundedReceiver<()>) {
+    let dd_agent_address = format!("0.0.0.0:{}", vector_receive_port());
+
+    let source_config = toml::from_str::<DatadogAgentConfig>(&format!(
+        indoc! { r#"
+            address = "{}"
+            multiple_outputs = true
+        "#},
+        dd_agent_address,
+    ))
+    .unwrap();
+
+    let mut builder = ConfigBuilder::default();
+    builder.add_source("in", source_config);
+
+    let dd_traces_endpoint = format!("http://127.0.0.1:{}", vector_server_port());
+    let cfg = format!(
+        indoc! { r#"
+            default_api_key = "atoken"
+            endpoint = "{}"
+            batch.max_events = 1
+        "#},
+        dd_traces_endpoint
+    );
+
+    let api_key = std::env::var("TEST_DATADOG_API_KEY")
+        .expect("couldn't find the Datatog api key in environment variables");
+    assert!(!api_key.is_empty(), "TEST_DATADOG_API_KEY required");
+    let cfg = cfg.replace("atoken", &api_key);
+
+    let sink_config = toml::from_str::<DatadogTracesConfig>(&cfg).unwrap();
+
+    builder.add_sink("out", &["in.traces"], sink_config);
+
+    let config = builder.build().expect("building config should not fail");
+
+    let (topology, shutdown) = start_topology(config, false).await;
+    info!("Started vector.");
+
+    (topology, shutdown)
+}
+
+/// An end-to-end test which validates the APM stats payloads output by of the `datadog_traces` sink are
+/// correct by comparing them with the same APM stats payloads output by the Agent.
+/// Two Agent containers are initialized, and fed the same trace data.
+/// One Agent container feeds into an HTTP server where we parse the stats. The other Agent
+/// container feeds traces into the Datadog Agent source of Vector, which outputs to the traces
+/// sink and finally the same HTTP server to process stats payloads.
+/// The fields of the stats payloads are then compared.
+///
+/// This test specifically verifies the Aggregation of stats across multiple batches of events
+/// through vector. Consumers of the Agent's stats payloads expect the Aggregation of stats for a
+/// 20 second time window on any given stats payload within that time window.
 #[tokio::test]
 async fn apm_stats_e2e_test_dd_agent_to_vector_correctness() {
     trace_init();
@@ -369,7 +389,7 @@ async fn apm_stats_e2e_test_dd_agent_to_vector_correctness() {
     {
         // [vector -> the server]
         tokio::spawn(async move {
-            run_server("vector".to_string(), vector_port(), tx_agent_vector).await;
+            run_server("vector".to_string(), vector_server_port(), tx_agent_vector).await;
         });
 
         // [agent -> the server]
@@ -378,20 +398,23 @@ async fn apm_stats_e2e_test_dd_agent_to_vector_correctness() {
         });
     }
 
-    // allow the agent to start up
+    // allow the Agent containers to start up
     sleep(Duration::from_secs(8)).await;
 
+    // starts the vector source and sink
+    // panics if vector errors during startup
+    let (_topology, _shutdown) = start_vector().await;
+
+    // the URLs of the Agent trace endpoints that traces will be sent to
+    let urls = vec![trace_agent_only_url(), trace_agent_to_vector_url()];
+
     let start = Utc::now().timestamp_nanos();
-    let duration = 20;
+    let duration = 1;
     let span_id = 3;
 
-    // starts the sink and sends the traces through it
-    // panics if the batch status was not Delivered.
-    run_sink_and_send_traces(start, duration, span_id).await;
-
-    // sends the traces through the agent
+    // sends the traces through the agent containers
     // panics if the HTTP post fails
-    send_agent_traces(start, duration, span_id).await;
+    send_agent_traces(&urls, start, duration, span_id).await;
 
     // receive the stats on the channel receivers from the servers
     let (stats_agent, stats_vector) =

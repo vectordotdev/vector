@@ -54,24 +54,21 @@ async fn start_test(
     .await
 }
 
-fn simple_span(
-    resource: String,
-    start: i64,
-    duration: i64,
-    span_id: i64,
-    error: i64,
-) -> BTreeMap<String, Value> {
+fn simple_span(resource: String) -> BTreeMap<String, Value> {
     BTreeMap::<String, Value>::from([
         ("service".to_string(), Value::from("a_service")),
         ("name".to_string(), Value::from("a_name")),
         ("resource".to_string(), Value::from(resource)),
         ("type".to_string(), Value::from("a_type")),
         ("trace_id".to_string(), Value::Integer(123)),
-        ("span_id".to_string(), Value::Integer(span_id)),
+        ("span_id".to_string(), Value::Integer(456)),
         ("parent_id".to_string(), Value::Integer(789)),
-        ("start".to_string(), Value::from(Utc.timestamp_nanos(start))),
-        ("duration".to_string(), Value::Integer(duration)),
-        ("error".to_string(), Value::Integer(error)),
+        (
+            "start".to_string(),
+            Value::from(Utc.timestamp_nanos(1_431_648_000_000_001i64)),
+        ),
+        ("duration".to_string(), Value::Integer(1_000_000)),
+        ("error".to_string(), Value::Integer(404)),
         (
             "meta".to_string(),
             Value::Object(BTreeMap::<String, Value>::from([
@@ -95,18 +92,7 @@ fn simple_span(
     ])
 }
 
-pub fn simple_trace_event_detailed(
-    resource: String,
-    start: Option<i64>,
-    duration: Option<i64>,
-    span_id: Option<i64>,
-    error: Option<i64>,
-) -> TraceEvent {
-    let duration = duration.unwrap_or(1_000_000);
-    let start = start.unwrap_or(1_431_648_000_000_001i64);
-    let span_id = span_id.unwrap_or(456);
-    let error = error.unwrap_or(404);
-
+pub fn simple_trace_event(resource: String) -> TraceEvent {
     let mut t = TraceEvent::default();
     t.insert("language", "a_language");
     t.insert("agent_version", "1.23456");
@@ -117,15 +103,9 @@ pub fn simple_trace_event_detailed(
     t.insert("error_tps", Value::Integer(5));
     t.insert(
         "spans",
-        Value::Array(vec![Value::from(simple_span(
-            resource, start, duration, span_id, error,
-        ))]),
+        Value::Array(vec![Value::from(simple_span(resource))]),
     );
     t
-}
-
-pub fn simple_trace_event(resource: String) -> TraceEvent {
-    simple_trace_event_detailed(resource, None, None, None, None)
 }
 
 fn validate_simple_span(span: dd_proto::Span, resource: String) {
