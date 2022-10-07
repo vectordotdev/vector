@@ -32,6 +32,15 @@ impl Kind {
 
     fn remove_inner(&mut self, segments: &[OwnedSegment], compact: bool) -> CompactOptions {
         debug_assert!(!segments.is_empty());
+        if self.is_never() {
+            // If `self` is `never`, the program would have already terminated
+            // so this removal can't happen.
+            *self = Self::never();
+            return CompactOptions {
+                should_compact: false,
+                should_not_compact: true,
+            };
+        }
 
         let first = segments.first().expect("must not be empty");
         let second = segments.get(1);
@@ -198,7 +207,21 @@ impl Kind {
                         CompactOptions::from(EmptyState::NeverEmpty)
                     }
                 }
-                OwnedSegment::Coalesce(_) => unimplemented!(),
+                OwnedSegment::Coalesce(fields) => {
+                    // let mut output
+                    for field in fields {
+                        let field_kind = self.get(&[OwnedSegment::Field(field.to_string())]);
+                        let contains_undefined = field_kind.contains_undefined();
+                        match (
+                            field_kind.contains_undefined(),
+                            field_kind.contains_any_defined(),
+                        ) {
+                            (true, true) => unimplemented!(),
+                        }
+                        let compact_options =
+                            self.remove_inner(&[OwnedSegment::Field(field.to_owned())], compact);
+                    }
+                }
                 OwnedSegment::Invalid => unimplemented!(),
             }
         }
@@ -277,6 +300,7 @@ impl From<EmptyState> for CompactOptions {
 #[cfg(test)]
 mod test {
     use super::*;
+    use lookup::lookup_v2::parse_value_path;
     use lookup::owned_value_path;
     use std::collections::BTreeMap;
 
@@ -789,6 +813,21 @@ mod test {
                     path: owned_value_path!(-1, 0),
                     compact: false,
                     want: Kind::array(Collection::empty().with_unknown(Kind::float())),
+                },
+            ),
+            (
+                "coalesce simple",
+                TestCase {
+                    kind: Kind::object(Collection::from(BTreeMap::from([(
+                        "a".into(),
+                        Kind::integer(),
+                    )]))),
+                    path: parse_value_path("(a|b)"),
+                    compact: false,
+                    want: Kind::object(Collection::from(BTreeMap::from([(
+                        "a".into(),
+                        Kind::integer(),
+                    )]))),
                 },
             ),
         ] {
