@@ -1636,9 +1636,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.0.9"
+version = "4.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "30607dd93c420c6f1f80b544be522a0238a7db35e6a12968d28910983fee0df0"
+checksum = "3b1a0a4208c6c483b952ad35c6eed505fc13b46f08f631b81e828084a9318d74"
 dependencies = [
  "atty",
  "bitflags",
@@ -1652,9 +1652,9 @@ dependencies = [
 
 [[package]]
 name = "clap_derive"
-version = "4.0.9"
+version = "4.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4a307492e1a34939f79d3b6b9650bd2b971513cd775436bf2b78defeb5af00b"
+checksum = "db342ce9fda24fb191e2ed4e102055a4d381c1086a06630174cd8da8d5d917ce"
 dependencies = [
  "heck 0.4.0",
  "proc-macro-error",
@@ -8787,7 +8787,7 @@ dependencies = [
  "bytesize",
  "chrono",
  "cidr-utils",
- "clap 4.0.9",
+ "clap 4.0.10",
  "codecs",
  "colored",
  "console-subscriber",
@@ -8946,7 +8946,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
- "clap 4.0.9",
+ "clap 4.0.10",
  "futures 0.3.24",
  "graphql_client",
  "indoc",
@@ -8969,7 +8969,7 @@ dependencies = [
  "async-trait",
  "bytecheck",
  "bytes 1.2.1",
- "clap 4.0.9",
+ "clap 4.0.10",
  "crc32fast",
  "criterion",
  "crossbeam-queue",
@@ -9205,7 +9205,7 @@ dependencies = [
 name = "vrl-cli"
 version = "0.1.0"
 dependencies = [
- "clap 4.0.9",
+ "clap 4.0.10",
  "exitcode",
  "indoc",
  "lookup",
@@ -9344,7 +9344,7 @@ dependencies = [
  "ansi_term",
  "chrono",
  "chrono-tz",
- "clap 4.0.9",
+ "clap 4.0.10",
  "enrichment",
  "glob",
  "lookup",
