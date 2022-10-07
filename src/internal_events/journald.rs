@@ -18,6 +18,7 @@ impl InternalEvent for JournaldInvalidRecordError {
             text = %self.text,
             stage = error_stage::PROCESSING,
             error_type = error_type::PARSER_FAILED,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -41,6 +42,7 @@ impl InternalEvent for JournaldStartJournalctlError {
             error = %self.error,
             stage = error_stage::RECEIVING,
             error_type = error_type::COMMAND_FAILED,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -62,6 +64,7 @@ impl InternalEvent for JournaldReadError {
             error = %self.error,
             stage = error_stage::PROCESSING,
             error_type = error_type::READER_FAILED,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -86,6 +89,7 @@ impl InternalEvent for JournaldCheckpointSetError {
             error = %self.error,
             stage = error_stage::PROCESSING,
             error_type = error_type::IO_FAILED,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -109,6 +113,7 @@ impl InternalEvent for JournaldCheckpointFileOpenError {
             error = %self.error,
             stage = error_stage::RECEIVING,
             error_type = error_type::IO_FAILED,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,

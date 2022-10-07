@@ -99,6 +99,7 @@ impl InternalEvent for PrometheusNormalizationError {
             message = reason,
             error_type = error_type::CONVERSION_FAILED,
             stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
