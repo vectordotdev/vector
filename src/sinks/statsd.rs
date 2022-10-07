@@ -486,7 +486,7 @@ mod test {
                 statistic: StatisticKind::Histogram,
             },
         )
-            .with_tags(Some(tags()));
+        .with_tags(Some(tags()));
 
         let metric1_part1_compressed = Metric::new(
             "distribution",
@@ -496,7 +496,7 @@ mod test {
                 statistic: StatisticKind::Histogram,
             },
         )
-            .with_tags(Some(tags()));
+        .with_tags(Some(tags()));
         let metric1_part2_compressed = Metric::new(
             "distribution",
             MetricKind::Incremental,
@@ -505,7 +505,7 @@ mod test {
                 statistic: StatisticKind::Histogram,
             },
         )
-            .with_tags(Some(tags()));
+        .with_tags(Some(tags()));
         let event = Event::Metric(metric1);
         let mut encoder = StatsdEncoder {
             default_namespace: None,
