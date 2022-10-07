@@ -258,6 +258,7 @@ impl From<EmptyState> for CompactOptions {
 }
 
 #[cfg(test)]
+#[allow(clippy::manual_assert)]
 mod test {
     use super::*;
     use lookup::lookup_v2::parse_value_path;
