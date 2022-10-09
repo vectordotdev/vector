@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use vector_config::configurable_component;
 use crate::{
     codecs::Transformer,
@@ -13,7 +14,10 @@ use crate::{
     tls::TlsConfig,
 };
 
-use super::http_sink::build_http_sink;
+use super::{
+    http_sink::build_http_sink,
+    native_sink::build_native_sink,
+};
 
 /// Configuration for the `clickhouse` sink.
 #[configurable_component(sink("clickhouse"))]
@@ -36,6 +40,9 @@ pub struct ClickhouseConfig {
     /// Sets `input_format_skip_unknown_fields`, allowing Clickhouse to discard fields not present in the table schema.
     #[serde(default)]
     pub skip_unknown_fields: bool,
+    /// table column names like {"col1":"String", "col_2":"Nullable(UInt16)", ...}
+    #[serde(default)]
+    pub table_def: BTreeMap<String, String>,
 
     #[configurable(derived)]
     #[serde(default = "Compression::gzip_default")]
@@ -78,7 +85,11 @@ impl SinkConfig for ClickhouseConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         // later we can build different sink(http, native) here
         // according to the clickhouseConfig
-        build_http_sink(self, cx).await
+        if !self.use_native_proto {
+            build_http_sink(self, cx).await
+        } else {
+            build_native_sink(self, cx).await
+        }
     }
 
     fn input(&self) -> Input {

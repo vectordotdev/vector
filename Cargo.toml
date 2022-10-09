@@ -242,6 +242,7 @@ csv = { version = "1.1", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
 dirs-next = { version = "2.0.0", default-features = false, optional = true }
 dyn-clone = { version = "1.0.9", default-features = false }
+either = { version = "1.6.1", default-features = false, optional = true }
 encoding_rs = { version = "0.8.31", default-features = false, features = ["serde"] }
 enum_dispatch = { version = "0.3.8", default-features = false }
 exitcode = { version = "1.1.2", default-features = false }
@@ -656,7 +657,7 @@ sinks-azure_blob = ["dep:azure_core", "dep:azure_identity", "dep:azure_storage",
 sinks-azure_monitor_logs = []
 sinks-blackhole = []
 sinks-chronicle = []
-sinks-clickhouse = ["dep:clickhouse-rs", "dep:thiserror", "dep:chrono-tz"]
+sinks-clickhouse = ["dep:clickhouse-rs", "dep:thiserror", "dep:chrono-tz", "dep:either", "dep:nom"]
 sinks-console = []
 sinks-datadog_archives = ["sinks-aws_s3", "sinks-azure_blob", "sinks-gcp"]
 sinks-datadog_events = []

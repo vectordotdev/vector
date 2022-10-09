@@ -8766,6 +8766,7 @@ dependencies = [
  "dirs-next",
  "dnsmsg-parser",
  "dyn-clone",
+ "either",
  "encoding_rs",
  "enrichment",
  "enum_dispatch",
