@@ -3,6 +3,7 @@ use std::{
     pin::Pin,
     task::{ready, Context, Poll},
 };
+use std::time::Duration;
 
 use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
@@ -18,7 +19,7 @@ use pulsar::authentication::oauth2::{OAuth2Authentication, OAuth2Params};
 use pulsar::error::AuthenticationError;
 use pulsar::{
     message::proto, producer::SendFuture, proto::CommandSendReceipt, Authentication,
-    Error as PulsarError, Producer, Pulsar, TokioExecutor,
+    Error as PulsarError, Producer, Pulsar, TokioExecutor, OperationRetryOptions as RetryOptions
 };
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
@@ -51,6 +52,9 @@ pub struct PulsarSinkConfig {
 
     #[configurable(derived)]
     pub encoding: EncodingConfig,
+
+    #[configurable(derived)]
+    pub operation_retry_options: OperationRetryOptions,
 
     #[configurable(derived)]
     auth: Option<AuthConfig>,
@@ -106,6 +110,18 @@ pub struct OAuth2Config {
     scope: Option<String>,
 }
 
+/// Pulsar topics lookup operation retry options.
+#[configurable_component]
+#[derive(Debug, Clone)]
+pub struct OperationRetryOptions {
+    /// time limit to receive an answer to a Pulsar operation
+    pub operation_timeout: Duration,
+    /// delay between operation retries after a ServiceNotReady error
+    pub retry_delay: Duration,
+    /// maximum number of operation retries. None indicates infinite retries
+    pub max_retries: Option<u32>,
+}
+
 type PulsarProducer = Producer<TokioExecutor>;
 type BoxedPulsarProducer = Box<PulsarProducer>;
 
@@ -150,6 +166,11 @@ impl GenerateConfig for PulsarSinkConfig {
             topic: "topic-1234".to_string(),
             partition_key_field: Some("message".to_string()),
             encoding: TextSerializerConfig::new().into(),
+            operation_retry_options: OperationRetryOptions {
+                operation_timeout: Duration::from_secs(30),
+                retry_delay: Duration::from_secs(5),
+                max_retries: None,
+            },
             auth: None,
             acknowledgements: Default::default(),
         })
@@ -224,8 +245,18 @@ impl PulsarSinkConfig {
                 ))),
             };
         }
-
-        let pulsar = builder.build().await?;
+        let mut operation_retry_options = RetryOptions::default();
+        if self.operation_retry_options.max_retries > Some(0) {
+            operation_retry_options.max_retries = self.operation_retry_options.max_retries
+        }
+        if self.operation_retry_options.operation_timeout > Duration::from_secs(0) {
+            operation_retry_options.operation_timeout = self.operation_retry_options.operation_timeout
+        }
+        if self.operation_retry_options.retry_delay > Duration::from_secs(0) {
+            operation_retry_options.retry_delay = self.operation_retry_options.retry_delay
+        }
+        let pulsar = builder
+            .with_operation_retry_options(operation_retry_options).build().await?;
         if let SerializerConfig::Avro { avro } = self.encoding.config() {
             pulsar
                 .producer()
@@ -436,6 +467,11 @@ mod integration_tests {
             endpoint: pulsar_address(),
             topic: topic.clone(),
             encoding: TextSerializerConfig::new().into(),
+            operation_retry_options: OperationRetryOptions {
+                operation_timeout: Duration::from_secs(30),
+                retry_delay: Duration::from_secs(5),
+                max_retries: None,
+            },
             auth: None,
             acknowledgements: Default::default(),
             partition_key_field: Some("message".to_string()),
