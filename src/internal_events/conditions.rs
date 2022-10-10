@@ -13,9 +13,9 @@ impl<'a> InternalEvent for VrlConditionExecutionError<'a> {
         error!(
             message = "VRL condition execution failed.",
             error = %self.error,
-            internal_log_rate_limit = true,
             error_type = error_type::SCRIPT_FAILED,
             stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
