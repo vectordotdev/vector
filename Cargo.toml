@@ -303,7 +303,6 @@ socket2 = { version = "0.4.7", default-features = false }
 stream-cancel = { version = "0.8.1", default-features = false }
 strip-ansi-escapes = { version = "0.1.1", default-features = false }
 syslog = { version = "6.0.1", default-features = false, optional = true }
-thiserror = { version = "1.0.37", optional = true }
 tikv-jemallocator = { version = "0.5.0", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.7", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 tokio-tungstenite = {version = "0.17.2", default-features = false, features = ["connect"], optional = true}
@@ -660,7 +659,7 @@ sinks-azure_blob = ["dep:azure_core", "dep:azure_identity", "dep:azure_storage",
 sinks-azure_monitor_logs = []
 sinks-blackhole = []
 sinks-chronicle = []
-sinks-clickhouse = ["dep:clickhouse-rs", "dep:thiserror", "dep:chrono-tz", "dep:either", "dep:nom"]
+sinks-clickhouse = ["dep:clickhouse-rs", "dep:chrono-tz", "dep:either", "dep:nom"]
 sinks-console = []
 sinks-datadog_archives = ["sinks-aws_s3", "sinks-azure_blob", "sinks-gcp"]
 sinks-datadog_events = []

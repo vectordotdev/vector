@@ -5,8 +5,7 @@ use clickhouse_rs::{Pool, types::SqlType,};
 use vector_core::stream::BatcherSettings;
 use async_trait::async_trait;
 
-
-use super::{ClickhouseConfig, native_service::ClickhouseService, parse::parse_sql_type};
+use super::{ClickhouseConfig, native_service::ClickhouseService, parse::parse_field_type};
 use crate::{
     config::{SinkContext, SinkHealthcheckOptions},
     event::Event,
@@ -31,7 +30,7 @@ pub(super) async fn build_native_sink(cfg: &ClickhouseConfig, cx: SinkContext) -
 fn gen_table_schema(table: &BTreeMap<String, String>) -> crate::Result<Vec<(String, SqlType)>> {
     let mut table_schema = Vec::with_capacity(table.len());
     for (k,v) in table {
-        match parse_sql_type(v.as_str()) {
+        match parse_field_type(v.as_str()) {
             Ok((_, t)) => {
                 table_schema.push((k.to_owned(), t));
             },
