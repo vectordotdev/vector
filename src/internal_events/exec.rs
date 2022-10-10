@@ -244,6 +244,9 @@ impl InternalEvent for ExecChannelClosedError {
             "error_type" => error_type::COMMAND_FAILED,
             "stage" => error_stage::RECEIVING,
         );
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason: exec_reason });
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+            count: 1,
+            reason: exec_reason
+        });
     }
 }
