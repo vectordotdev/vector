@@ -1,10 +1,10 @@
 use std::net::SocketAddr;
 
 use metrics::counter;
+use vector_common::internal_event::{error_stage, error_type};
 use vector_core::internal_event::InternalEvent;
 
-use crate::tls::TlsError;
-use vector_common::internal_event::{error_stage, error_type};
+use crate::{emit, internal_events::SocketOutgoingConnectionError, tls::TlsError};
 
 #[derive(Debug)]
 pub struct TcpSocketConnectionEstablished {
@@ -23,26 +23,15 @@ impl InternalEvent for TcpSocketConnectionEstablished {
 }
 
 #[derive(Debug)]
-pub struct TcpSocketConnectionError<E> {
+pub struct TcpSocketOutgoingConnectionError<E> {
     pub error: E,
 }
 
-impl<E: std::error::Error> InternalEvent for TcpSocketConnectionError<E> {
+impl<E: std::error::Error> InternalEvent for TcpSocketOutgoingConnectionError<E> {
     fn emit(self) {
-        error!(
-            message = "Unable to connect.",
-            error = %self.error,
-            error_code = "failed_connecting",
-            error_type = error_type::WRITER_FAILED,
-            stage = error_stage::SENDING,
-            internal_log_rate_limit = true,
-        );
-        counter!(
-            "component_errors_total", 1,
-            "error_code" => "failed_connecting",
-            "error_type" => error_type::WRITER_FAILED,
-            "stage" => error_stage::SENDING,
-        );
+        // ## skip check-duplicate-events ##
+        // ## skip check-validity-events ##
+        emit!(SocketOutgoingConnectionError { error: self.error });
         // deprecated
         counter!("connection_failed_total", 1, "mode" => "tcp");
     }

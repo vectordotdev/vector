@@ -23,8 +23,8 @@ use crate::{
     dns,
     event::{Event, EventStatus, Finalizable},
     internal_events::{
-        SocketEventsSent, SocketMode, UdpSendIncompleteError, UdpSocketConnectionError,
-        UdpSocketConnectionEstablished, UdpSocketError,
+        SocketEventsSent, SocketMode, UdpSendIncompleteError, UdpSocketConnectionEstablished,
+        UdpSocketError, UdpSocketOutgoingConnectionError,
     },
     sinks::{
         util::{retries::ExponentialBackoff, StreamSink},
@@ -157,7 +157,7 @@ impl UdpConnector {
                     return socket;
                 }
                 Err(error) => {
-                    emit!(UdpSocketConnectionError { error });
+                    emit!(UdpSocketOutgoingConnectionError { error });
                     sleep(backoff.next().unwrap()).await;
                 }
             }
