@@ -94,9 +94,9 @@ pub struct PrometheusNormalizationError;
 
 impl InternalEvent for PrometheusNormalizationError {
     fn emit(self) {
-        let reason = "Prometheuse metric normalization failed.";
+        let normalization_reason = "Prometheuse metric normalization failed.";
         error!(
-            message = reason,
+            message = normalization_reason,
             error_type = error_type::CONVERSION_FAILED,
             stage = error_stage::PROCESSING,
             internal_log_rate_limit = true,
@@ -106,6 +106,9 @@ impl InternalEvent for PrometheusNormalizationError {
             "error_type" => error_type::CONVERSION_FAILED,
             "stage" => error_stage::PROCESSING,
         );
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+            count: 1,
+            reason: normalization_reason
+        });
     }
 }

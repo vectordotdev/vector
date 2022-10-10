@@ -232,9 +232,9 @@ pub struct ExecChannelClosedError;
 
 impl InternalEvent for ExecChannelClosedError {
     fn emit(self) {
-        let exec_channel_closed_reason = "Receive channel closed, unable to send.";
+        let exec_reason = "Receive channel closed, unable to send.";
         error!(
-            message = exec_channel_closed_reason,
+            message = exec_reason,
             error_type = error_type::COMMAND_FAILED,
             stage = error_stage::RECEIVING,
             internal_log_rate_limit = true,
@@ -246,7 +246,7 @@ impl InternalEvent for ExecChannelClosedError {
         );
         emit!(ComponentEventsDropped::<UNINTENTIONAL> {
             count: 1,
-            reason: exec_channel_closed_reason
+            reason: exec_reason
         });
     }
 }

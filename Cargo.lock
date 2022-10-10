@@ -1636,9 +1636,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.0.9"
+version = "4.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "30607dd93c420c6f1f80b544be522a0238a7db35e6a12968d28910983fee0df0"
+checksum = "3b1a0a4208c6c483b952ad35c6eed505fc13b46f08f631b81e828084a9318d74"
 dependencies = [
  "atty",
  "bitflags",
@@ -1652,9 +1652,9 @@ dependencies = [
 
 [[package]]
 name = "clap_derive"
-version = "4.0.9"
+version = "4.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4a307492e1a34939f79d3b6b9650bd2b971513cd775436bf2b78defeb5af00b"
+checksum = "db342ce9fda24fb191e2ed4e102055a4d381c1086a06630174cd8da8d5d917ce"
 dependencies = [
  "heck 0.4.0",
  "proc-macro-error",
@@ -1715,7 +1715,7 @@ dependencies = [
  "lookup",
  "memchr",
  "once_cell",
- "ordered-float 3.1.0",
+ "ordered-float 3.2.0",
  "pretty_assertions",
  "prost 0.11.0",
  "regex",
@@ -2232,7 +2232,7 @@ dependencies = [
  "nom",
  "once_cell",
  "onig",
- "ordered-float 3.1.0",
+ "ordered-float 3.2.0",
  "peeking_take_while",
  "regex",
  "serde_json",
@@ -5322,7 +5322,7 @@ dependencies = [
  "bytes 1.2.1",
  "chrono",
  "hex",
- "ordered-float 3.1.0",
+ "ordered-float 3.2.0",
  "prost 0.11.0",
  "prost-build 0.11.1",
  "tonic",
@@ -5351,9 +5351,9 @@ dependencies = [
 
 [[package]]
 name = "ordered-float"
-version = "3.1.0"
+version = "3.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "98ffdb14730ed2ef599c65810c15b000896e21e8776b512de0db0c3d7335cc2a"
+checksum = "129d36517b53c461acc6e1580aeb919c8ae6708a4b1eae61c4463a615d4f0411"
 dependencies = [
  "num-traits",
 ]
@@ -5938,7 +5938,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "lookup",
- "ordered-float 3.1.0",
+ "ordered-float 3.2.0",
  "proptest",
  "vrl-diagnostic",
  "vrl-parser",
@@ -6859,9 +6859,9 @@ dependencies = [
 
 [[package]]
 name = "schemars"
-version = "0.8.10"
+version = "0.8.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1847b767a3d62d95cbf3d8a9f0e421cf57a0d8aa4f411d4b16525afb0284d4ed"
+checksum = "2a5fb6c61f29e723026dc8e923d94c694313212abbecbbe5f55a7748eec5b307"
 dependencies = [
  "dyn-clone",
  "indexmap",
@@ -6872,9 +6872,9 @@ dependencies = [
 
 [[package]]
 name = "schemars_derive"
-version = "0.8.10"
+version = "0.8.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af4d7e1b012cb3d9129567661a63755ea4b8a7386d339dc945ae187e403c6743"
+checksum = "f188d036977451159430f3b8dc82ec76364a42b7e289c2b18a9a18f4470058e9"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -7710,9 +7710,9 @@ checksum = "507e9898683b6c43a9aa55b64259b721b52ba226e0f3779137e50ad114a4c90b"
 
 [[package]]
 name = "test-case"
-version = "2.2.1"
+version = "2.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07aea929e9488998b64adc414c29fe5620398f01c2e3f58164122b17e567a6d5"
+checksum = "21d6cf5a7dffb3f9dceec8e6b8ca528d9bd71d36c9f074defb548ce161f598c0"
 dependencies = [
  "test-case-macros",
 ]
@@ -8724,7 +8724,7 @@ dependencies = [
  "indoc",
  "lookup",
  "mlua",
- "ordered-float 3.1.0",
+ "ordered-float 3.2.0",
  "quickcheck",
  "regex",
  "serde",
@@ -8787,7 +8787,7 @@ dependencies = [
  "bytesize",
  "chrono",
  "cidr-utils",
- "clap 4.0.9",
+ "clap 4.0.10",
  "codecs",
  "colored",
  "console-subscriber",
@@ -8857,7 +8857,7 @@ dependencies = [
  "openssl-probe",
  "openssl-src",
  "opentelemetry-proto",
- "ordered-float 3.1.0",
+ "ordered-float 3.2.0",
  "percent-encoding",
  "pin-project",
  "portpicker",
@@ -8946,7 +8946,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
- "clap 4.0.9",
+ "clap 4.0.10",
  "futures 0.3.24",
  "graphql_client",
  "indoc",
@@ -8969,7 +8969,7 @@ dependencies = [
  "async-trait",
  "bytecheck",
  "bytes 1.2.1",
- "clap 4.0.9",
+ "clap 4.0.10",
  "crc32fast",
  "criterion",
  "crossbeam-queue",
@@ -9020,7 +9020,7 @@ dependencies = [
  "futures 0.3.24",
  "metrics",
  "nom",
- "ordered-float 3.1.0",
+ "ordered-float 3.2.0",
  "pin-project",
  "serde",
  "serde_json",
@@ -9117,7 +9117,7 @@ dependencies = [
  "noisy_float",
  "once_cell",
  "openssl",
- "ordered-float 3.1.0",
+ "ordered-float 3.2.0",
  "parking_lot",
  "pin-project",
  "pretty_assertions",
@@ -9190,7 +9190,7 @@ dependencies = [
  "criterion",
  "indoc",
  "lookup",
- "ordered-float 3.1.0",
+ "ordered-float 3.2.0",
  "serde_json",
  "value",
  "vector-common",
@@ -9205,7 +9205,7 @@ dependencies = [
 name = "vrl-cli"
 version = "0.1.0"
 dependencies = [
- "clap 4.0.9",
+ "clap 4.0.10",
  "exitcode",
  "indoc",
  "lookup",
@@ -9236,7 +9236,7 @@ dependencies = [
  "indoc",
  "lalrpop-util",
  "lookup",
- "ordered-float 3.1.0",
+ "ordered-float 3.2.0",
  "paste",
  "regex",
  "serde",
@@ -9276,7 +9276,7 @@ dependencies = [
  "lalrpop",
  "lalrpop-util",
  "lookup",
- "ordered-float 3.1.0",
+ "ordered-float 3.2.0",
  "paste",
  "test-case",
  "thiserror",
@@ -9344,7 +9344,7 @@ dependencies = [
  "ansi_term",
  "chrono",
  "chrono-tz",
- "clap 4.0.9",
+ "clap 4.0.10",
  "enrichment",
  "glob",
  "lookup",
