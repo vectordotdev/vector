@@ -16,8 +16,9 @@ impl InternalEvent for JournaldInvalidRecordError {
             message = "Invalid record from journald, discarding.",
             error = ?self.error,
             text = %self.text,
-            stage = error_stage::PROCESSING,
             error_type = error_type::PARSER_FAILED,
+            stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -39,8 +40,9 @@ impl InternalEvent for JournaldStartJournalctlError {
         error!(
             message = "Error starting journalctl process.",
             error = %self.error,
-            stage = error_stage::RECEIVING,
             error_type = error_type::COMMAND_FAILED,
+            stage = error_stage::RECEIVING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -60,8 +62,9 @@ impl InternalEvent for JournaldReadError {
         error!(
             message = "Cound not read from journald.",
             error = %self.error,
-            stage = error_stage::PROCESSING,
             error_type = error_type::READER_FAILED,
+            stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -84,8 +87,9 @@ impl InternalEvent for JournaldCheckpointSetError {
             message = "Could not set journald checkpoint.",
             filename = ?self.filename,
             error = %self.error,
-            stage = error_stage::PROCESSING,
             error_type = error_type::IO_FAILED,
+            stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -107,8 +111,9 @@ impl InternalEvent for JournaldCheckpointFileOpenError {
             message = "Unable to open checkpoint file.",
             path = ?self.path,
             error = %self.error,
-            stage = error_stage::RECEIVING,
             error_type = error_type::IO_FAILED,
+            stage = error_stage::RECEIVING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,

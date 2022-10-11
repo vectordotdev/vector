@@ -65,6 +65,7 @@ impl InternalEvent for KubernetesLogsEventAnnotationError<'_> {
             error_code = ANNOTATION_FAILED,
             error_type = error_type::READER_FAILED,
             stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,

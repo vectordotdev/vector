@@ -47,6 +47,7 @@ impl<E: std::fmt::Display> InternalEvent for UnixSocketError<'_, E> {
             path = ?self.path,
             error_type = error_type::CONNECTION_FAILED,
             stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -73,6 +74,7 @@ impl<'a> InternalEvent for UnixSocketFileDeleteError<'a> {
             error_code = "delete_socket_file",
             error_type = error_type::WRITER_FAILED,
             stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
