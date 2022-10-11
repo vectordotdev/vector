@@ -94,9 +94,10 @@ mod tests {
     use std::io::Cursor;
 
     use super::*;
-    use crate::config::log_schema;
     use crate::{
-        shutdown::ShutdownSignal, test_util::components::assert_source_compliance, SourceSender,
+        config::log_schema, shutdown::ShutdownSignal,
+        test_util::components::assert_source_compliance, test_util::components::SOURCE_TAGS,
+        SourceSender,
     };
     use futures::StreamExt;
 
@@ -107,7 +108,7 @@ mod tests {
 
     #[tokio::test]
     async fn stdin_decodes_line() {
-        assert_source_compliance(&["protocol"], async {
+        assert_source_compliance(&SOURCE_TAGS, async {
             let (tx, rx) = SourceSender::new_test();
             let config = StdinConfig::default();
             let buf = Cursor::new("hello world\nhello world again");

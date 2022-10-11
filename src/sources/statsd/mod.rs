@@ -19,8 +19,7 @@ use crate::{
     config::{self, GenerateConfig, Output, Resource, SourceConfig, SourceContext},
     event::Event,
     internal_events::{
-        EventsReceived, SocketBytesReceived, SocketMode, StatsdInvalidRecordError,
-        StatsdSocketError, StreamClosedError,
+        EventsReceived, SocketBytesReceived, SocketMode, StatsdSocketError, StreamClosedError,
     },
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
@@ -230,13 +229,7 @@ impl decoding::format::Deserializer for StatsdDeserializer {
                 }
                 Ok(smallvec![event])
             }
-            Err(error) => {
-                emit!(StatsdInvalidRecordError {
-                    error: &error,
-                    bytes
-                });
-                Err(Box::new(error))
-            }
+            Err(error) => Err(Box::new(error)),
         }
     }
 }
@@ -320,7 +313,10 @@ mod test {
     use super::*;
     use crate::test_util::{
         collect_limited,
-        components::{assert_source_compliance, SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS},
+        components::{
+            assert_source_compliance, assert_source_error, COMPONENT_ERROR_TAGS,
+            SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS,
+        },
         metrics::{assert_counter, assert_distribution, assert_gauge, assert_set},
         next_addr,
     };
@@ -367,6 +363,27 @@ mod test {
                 }
             });
             test_statsd(config, sender).await;
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn test_statsd_error() {
+        assert_source_error(&COMPONENT_ERROR_TAGS, async move {
+            let in_addr = next_addr();
+            let config = StatsdConfig::Tcp(TcpConfig::from_address(in_addr.into()));
+            let (sender, mut receiver) = mpsc::channel(200);
+            tokio::spawn(async move {
+                while let Some(bytes) = receiver.next().await {
+                    tokio::net::TcpStream::connect(in_addr)
+                        .await
+                        .unwrap()
+                        .write_all(bytes)
+                        .await
+                        .unwrap();
+                }
+            });
+            test_invalid_statsd(config, sender).await;
         })
         .await;
     }
@@ -466,5 +483,50 @@ mod test {
             &[(1.0, 0), (2.0, 0), (4.0, 500), (f64::INFINITY, 500)],
         );
         assert_set(&metrics, series!("set"), &["0", "1"]);
+    }
+
+    async fn test_invalid_statsd(
+        statsd_config: StatsdConfig,
+        mut sender: mpsc::Sender<&'static [u8]>,
+    ) {
+        // Build our statsd source and then spawn it.  We use a big pipeline buffer because each
+        // packet we send has a lot of metrics per packet.  We could technically count them all up
+        // and have a more accurate number here, but honestly, who cares?  This is big enough.
+        let component_key = ComponentKey::from("statsd");
+        let (tx, _rx) = SourceSender::new_with_buffer(4096);
+        let (source_ctx, shutdown) = SourceContext::new_shutdown(&component_key, tx);
+        let sink = statsd_config
+            .build(source_ctx)
+            .await
+            .expect("failed to build statsd source");
+
+        tokio::spawn(async move {
+            sink.await.expect("sink should not fail");
+        });
+
+        // Wait like 250ms to give the sink time to start running and become ready to handle
+        // traffic.
+        //
+        // TODO: It'd be neat if we could make `ShutdownSignal` track when it was polled at least once,
+        // and then surface that (via one of the related types, maybe) somehow so we could use it as
+        // a signal for "the sink is ready, it's polled the shutdown future at least once, which
+        // means it's trying to accept connections, etc" and would be far more deterministic than this.
+        sleep(Duration::from_millis(250)).await;
+
+        // Send 10 invalid statsd messages
+        for _ in 0..10 {
+            sender.send(b"invalid statsd message").await.unwrap();
+
+            // Space things out slightly to try to avoid dropped packets.
+            sleep(Duration::from_millis(10)).await;
+        }
+
+        // Now wait for another small period of time to make sure we've processed the messages.
+        // After that, trigger shutdown so our source closes and allows us to deterministically read
+        // everything that was in up without having to know the exact count.
+        sleep(Duration::from_millis(250)).await;
+        shutdown
+            .shutdown_all(Instant::now() + Duration::from_millis(100))
+            .await;
     }
 }

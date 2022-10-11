@@ -851,12 +851,6 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		lag_time_seconds: {
-			description:       "The difference between the timestamp recorded in each event and the time when it was ingested, expressed as fractional seconds."
-			type:              "histogram"
-			default_namespace: "vector"
-			tags:              _component_tags
-		}
 		logging_driver_errors_total: {
 			description: """
 				The total number of logging driver errors encountered caused by not using either
@@ -981,6 +975,12 @@ components: sources: internal_metrics: {
 		send_errors_total: {
 			description:       "The total number of errors sending messages."
 			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		source_lag_time_seconds: {
+			description:       "The difference between the timestamp recorded in each event and the time when it was ingested, expressed as fractional seconds."
+			type:              "histogram"
 			default_namespace: "vector"
 			tags:              _component_tags
 		}

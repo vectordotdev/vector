@@ -8,6 +8,7 @@ use futures::{future::BoxFuture, stream, FutureExt, SinkExt};
 use http::{Request, Uri};
 use prost::Message;
 use snafu::{ResultExt, Snafu};
+use tower::Service;
 use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
@@ -278,15 +279,17 @@ impl RemoteWriteService {
     }
 }
 
-impl tower::Service<PartitionInnerBuffer<Vec<Metric>, PartitionKey>> for RemoteWriteService {
+impl Service<PartitionInnerBuffer<Vec<Metric>, PartitionKey>> for RemoteWriteService {
     type Response = http::Response<Bytes>;
     type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
+    // Emission of an internal event in case of errors is handled upstream by the caller.
     fn poll_ready(&mut self, _task: &mut task::Context<'_>) -> task::Poll<Result<(), Self::Error>> {
         task::Poll::Ready(Ok(()))
     }
 
+    // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, buffer: PartitionInnerBuffer<Vec<Metric>, PartitionKey>) -> Self::Future {
         let (events, key) = buffer.into_parts();
         let body = self.encode_events(events);
