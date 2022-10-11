@@ -1,29 +1,26 @@
-use std::collections::HashMap;
+use std::collections::HashSet;
 
 use kube::core::ObjectMeta;
 
 #[derive(Default)]
 pub struct MetaCache {
-    pub cache: HashMap<MetaDescribe, bool>,
+    pub cache: HashSet<MetaDescribe>,
 }
 
 impl MetaCache {
     pub fn new() -> Self {
         Self {
-            cache: HashMap::new(),
+            cache: HashSet::new(),
         }
     }
-    pub fn store(&mut self, meta_desc: MetaDescribe, active: bool) {
-        self.cache.insert(meta_desc, active);
+    pub fn store(&mut self, meta_desc: MetaDescribe) {
+        self.cache.insert(meta_desc);
     }
     pub fn delete(&mut self, meta_desc: MetaDescribe) {
-        self.cache.retain(|x, _| *x != meta_desc);
+        self.cache.retain(|x| *x != meta_desc);
     }
-    pub fn is_active(&self, meta_descr: &MetaDescribe) -> bool {
-        match self.cache.get(meta_descr) {
-            Some(cache_value) => cache_value.to_owned(),
-            None => false,
-        }
+    pub fn contains(&self, meta_desc: &MetaDescribe) -> bool {
+        self.cache.contains(meta_desc)
     }
     pub fn clear(&mut self) {
         self.cache.clear();
@@ -62,7 +59,7 @@ mod tests {
         };
         let meta_desc = MetaDescribe::from_meta(&obj_meta);
 
-        meta_cache.store(meta_desc, true);
+        meta_cache.store(meta_desc);
         assert_eq!(1, meta_cache.cache.len());
     }
 
@@ -77,7 +74,7 @@ mod tests {
         };
         let meta_desc = MetaDescribe::from_meta(&obj_meta);
 
-        meta_cache.store(meta_desc.clone(), true);
+        meta_cache.store(meta_desc.clone());
         assert_eq!(1, meta_cache.cache.len());
         meta_cache.delete(meta_desc);
         assert_eq!(0, meta_cache.cache.len());
@@ -94,9 +91,7 @@ mod tests {
         };
         let meta_desc = MetaDescribe::from_meta(&obj_meta);
 
-        meta_cache.store(meta_desc.clone(), true);
-        assert!(meta_cache.is_active(&meta_desc));
-        meta_cache.store(meta_desc.clone(), false);
-        assert!(!meta_cache.is_active(&meta_desc));
+        meta_cache.store(meta_desc.clone());
+        assert!(meta_cache.contains(&meta_desc));
     }
 }

@@ -37,13 +37,13 @@ pub async fn custom_reflector<K, W>(
                                 trace!(message = "Processing Applied event.", ?event);
                                 store.apply_watcher_event(&event);
                                 let meta_descr = MetaDescribe::from_meta(obj.meta());
-                                meta_cache.store(meta_descr, true);
+                                meta_cache.store(meta_descr);
                             }
                             // Delay reconciling any `Deleted` events
                             watcher::Event::Deleted(ref obj) => {
                                 delay_queue.insert(event.to_owned(), delay_deletion);
                                 let meta_descr = MetaDescribe::from_meta(obj.meta());
-                                meta_cache.store(meta_descr, false);
+                                meta_cache.delete(meta_descr);
                             }
                             // Clear all delayed events on `Restarted` events
                             watcher::Event::Restarted(_) => {
@@ -71,7 +71,7 @@ pub async fn custom_reflector<K, W>(
                         match event {
                             watcher::Event::Deleted(ref obj) => {
                                 let meta_desc = MetaDescribe::from_meta(obj.meta());
-                                if meta_cache.is_active(&meta_desc) {
+                                if meta_cache.contains(&meta_desc) {
                                     trace!(message = "Skipping event, object is still used.", ?event)
                                 } else {
                                     trace!(message = "Processing Deleted event.", ?event);
