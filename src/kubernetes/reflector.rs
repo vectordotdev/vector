@@ -170,7 +170,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn deleted_should_not_remove_object_that_stil_used() {
+    async fn deleted_should_not_remove_object_still_in_use() {
         let store_w = store::Writer::default();
         let store = store_w.as_reader();
         let cm = ConfigMap {
