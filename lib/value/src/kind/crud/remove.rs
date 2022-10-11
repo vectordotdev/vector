@@ -9,13 +9,13 @@ use lookup::OwnedValuePath;
 impl Kind {
     /// Removes the `Kind` at the given `path` within `self`.
     /// This has the same behavior as `Value::remove`.
-    #[allow(clippy::needless_pass_by_value)] // only reference types implement Path
-    pub fn remove(&mut self, path: &OwnedValuePath, prune: bool) -> Kind {
+    #[allow(clippy::return_self_not_must_use)] // It is fine to ignore the output here
+    pub fn remove(&mut self, path: &OwnedValuePath, prune: bool) -> Self {
         let removed_type = self.get(path);
 
         let segments = &path.segments;
         if segments.is_empty() {
-            let mut new_kind = Kind::never();
+            let mut new_kind = Self::never();
             if self.contains_object() {
                 new_kind.add_object(Collection::empty());
             }
@@ -33,6 +33,7 @@ impl Kind {
         removed_type
     }
 
+    #[allow(clippy::too_many_lines)]
     fn remove_inner(&mut self, segments: &[OwnedSegment], compact: bool) -> CompactOptions {
         if self.is_never() {
             // If `self` is `never`, the program would have already terminated
@@ -45,20 +46,19 @@ impl Kind {
             match first {
                 OwnedSegment::Field(field) => {
                     let mut at_path_kind = self.at_path(segments);
-                    if let Some(object) = self.as_object_mut() {
-                        match object.known_mut().get_mut(&Field::from(field.to_owned())) {
-                            None => {
-                                // The modified value is discarded here (It's not needed)
-                                &mut at_path_kind
+
+                    self.as_object_mut()
+                        .map_or(CompactOptions::Never, |object| {
+                            match object.known_mut().get_mut(&Field::from(field.clone())) {
+                                None => {
+                                    // The modified value is discarded here (It's not needed)
+                                    &mut at_path_kind
+                                }
+                                Some(child) => child,
                             }
-                            Some(child) => child,
-                        }
-                        .remove_inner(&segments[1..], compact)
-                        .compact(object, field.to_owned(), compact)
-                    } else {
-                        // guaranteed to not delete anything
-                        CompactOptions::Never
-                    }
+                            .remove_inner(&segments[1..], compact)
+                            .compact(object, field.clone(), compact)
+                        })
                 }
 
                 OwnedSegment::Index(index) => {
@@ -120,8 +120,10 @@ impl Kind {
                 }
                 OwnedSegment::Coalesce(fields) => {
                     let original = self.clone();
+
+                    #[allow(clippy::option_if_let_else)] // false positive due to lifetime issues
                     if let Some(object) = self.as_object_mut() {
-                        let mut output = Kind::never();
+                        let mut output = Self::never();
 
                         let mut compact_options = None;
 
@@ -132,7 +134,7 @@ impl Kind {
                             if field_kind.contains_any_defined() {
                                 let mut child_kind = original.clone();
                                 let mut child_segments = segments.to_vec();
-                                child_segments[0] = OwnedSegment::Field(field.to_owned());
+                                child_segments[0] = OwnedSegment::Field(field.clone());
 
                                 let child_compact_options = child_kind
                                     .remove_inner(&child_segments, compact)
@@ -197,35 +199,35 @@ impl CompactOptions {
         let key = &key.into();
 
         match self {
-            CompactOptions::Always => collection.remove_known(key),
-            CompactOptions::Maybe => {
+            Self::Always => collection.remove_known(key),
+            Self::Maybe => {
                 let not_compacted = collection.clone();
                 collection.remove_known(key);
                 collection.merge(not_compacted, false);
             }
-            CompactOptions::Never => {
+            Self::Never => {
                 // do nothing, already correct}
             }
         }
 
-        CompactOptions::from(collection.is_empty())
+        Self::from(collection.is_empty())
             .disable_should_compact(!self.should_compact())
             .disable_should_compact(!continue_compact)
     }
 
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     fn should_compact(&self) -> bool {
         match self {
-            CompactOptions::Always => true,
-            CompactOptions::Maybe => true,
-            CompactOptions::Never => false,
+            Self::Always | Self::Maybe => true,
+            Self::Never => false,
         }
     }
 
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     fn should_not_compact(&self) -> bool {
         match self {
-            CompactOptions::Always => false,
-            CompactOptions::Maybe => true,
-            CompactOptions::Never => true,
+            Self::Always => false,
+            Self::Maybe | Self::Never => true,
         }
     }
 

@@ -88,7 +88,7 @@ impl CollectionRemove for Collection<Index> {
     type Key = Index;
 
     fn remove_known(&mut self, key: &Index) {
-        self.remove_shift(key.0)
+        self.remove_shift(key.0);
     }
 }
 
