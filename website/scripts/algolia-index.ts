@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import cheerio from "cheerio";
+import * as cheerio from "cheerio";
 import { Element } from "domhandler";
 import dotEnv from "dotenv-defaults";
 import fs from "fs";
@@ -100,17 +100,23 @@ async function indexHTMLFiles(
       if (level) {
         payload.push({
           level,
+          // @ts-ignore
           domId: $(node).attr("id"),
           tagName: node.tagName,
+          // @ts-ignore
           content: $(node)
             .text()
             .replace(/[\n\t]/g, " "),
         });
       }
 
+      // @ts-ignore
       $(node)
         .children()
-        .map((_, d) => traverse(d));
+        .map((_, d) => {
+          // @ts-ignore
+          traverse(d)
+        });
     };
 
     for (let i = 0; i < containers.length; i++) {
@@ -208,7 +214,7 @@ async function indexHTMLFiles(
 }
 
 async function buildIndex() {
-  var allRecords: AlgoliaRecord[] = [];
+  let allRecords: AlgoliaRecord[] = [];
 
   console.log(`Building Vector search index`);
 
@@ -255,7 +261,7 @@ async function buildIndex() {
   for (const section of sections) {
     let files = await glob(section.path);
     console.log(chalk.blue(`Indexing ${section.displayPath}...`));
-    indexHTMLFiles(allRecords, section.name, files, section.ranking);
+    await indexHTMLFiles(allRecords, section.name, files, section.ranking);
   }
 
   console.log(chalk.green(`Success. ${allRecords.length} records have been successfully indexed.`));
