@@ -6,7 +6,7 @@ publish = "public"
 #ignore = "./scripts/build-ignore.sh"
 
 [build.environment]
-HUGO_VERSION = "0.84.0"
+HUGO_VERSION = "0.104.3"
 ALGOLIA_INDEX_FILE="public/search.json"
 
 [context.production]
