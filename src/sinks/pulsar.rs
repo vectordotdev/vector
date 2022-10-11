@@ -112,11 +112,14 @@ pub struct OAuth2Config {
 
 /// Pulsar topics lookup operation retry options.
 #[configurable_component]
+#[serde_with::serde_as]
 #[derive(Debug, Clone)]
 pub struct OperationRetryOptions {
     /// time limit to receive an answer to a Pulsar operation
+    #[serde_as(as = "serde_with::DurationSeconds<i64>")]
     pub operation_timeout: Duration,
     /// delay between operation retries after a ServiceNotReady error
+    #[serde_as(as = "serde_with::DurationSeconds<i64>")]
     pub retry_delay: Duration,
     /// maximum number of operation retries. None indicates infinite retries
     pub max_retries: Option<u32>,
