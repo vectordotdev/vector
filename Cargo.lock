@@ -1097,7 +1097,7 @@ dependencies = [
  "serde_json",
  "time",
  "url",
- "uuid 1.1.2",
+ "uuid 1.2.1",
 ]
 
 [[package]]
@@ -1117,7 +1117,7 @@ dependencies = [
  "serde_json",
  "time",
  "url",
- "uuid 1.1.2",
+ "uuid 1.2.1",
 ]
 
 [[package]]
@@ -1141,7 +1141,7 @@ dependencies = [
  "sha2 0.10.6",
  "time",
  "url",
- "uuid 1.1.2",
+ "uuid 1.2.1",
 ]
 
 [[package]]
@@ -1163,7 +1163,7 @@ dependencies = [
  "serde_json",
  "time",
  "url",
- "uuid 1.1.2",
+ "uuid 1.2.1",
 ]
 
 [[package]]
@@ -4276,7 +4276,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "14e4fcc00ff6731d94b70e16e71f43bda62883461f31230742e3bc6dddf12988"
 dependencies = [
  "libc",
- "uuid 1.1.2",
+ "uuid 1.2.1",
  "winapi",
 ]
 
@@ -6104,7 +6104,7 @@ dependencies = [
  "tokio-native-tls",
  "tokio-util",
  "url",
- "uuid 1.1.2",
+ "uuid 1.2.1",
 ]
 
 [[package]]
@@ -8699,9 +8699,9 @@ dependencies = [
 
 [[package]]
 name = "uuid"
-version = "1.1.2"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd6469f4314d5f1ffec476e05f17cc9a78bc7a27a6a857842170bdf8d6f98d2f"
+checksum = "feb41e78f93363bb2df8b0e86a2ca30eed7806ea16ea0c790d757cf93f79be83"
 dependencies = [
  "getrandom 0.2.6",
  "rand 0.8.5",
@@ -8920,7 +8920,7 @@ dependencies = [
  "tui",
  "typetag",
  "url",
- "uuid 1.1.2",
+ "uuid 1.2.1",
  "value",
  "vector-api-client",
  "vector-buffers",
@@ -8957,7 +8957,7 @@ dependencies = [
  "tokio-stream",
  "tokio-tungstenite",
  "url",
- "uuid 1.1.2",
+ "uuid 1.2.1",
 ]
 
 [[package]]
@@ -9329,7 +9329,7 @@ dependencies = [
  "uaparser",
  "url",
  "utf8-width",
- "uuid 1.1.2",
+ "uuid 1.2.1",
  "value",
  "vector-common",
  "vrl",
