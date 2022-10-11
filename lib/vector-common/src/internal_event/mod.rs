@@ -123,6 +123,29 @@ impl From<&'static str> for Protocol {
 
 /// Macro to take care of some of the repetitive boilerplate in implementing a registered event. See
 /// the other events in this module for examples of how to use this.
+///
+/// ## Usage
+///
+/// ```ignore
+/// registered_event!(
+///     Event {
+///         event_field: &'static str,
+///     } => {
+///         handle_field: Counter = register_counter!("name", "tag" => self.event_field),
+///     }
+///     fn emit(&self, data: DataType) {
+///         self.handle_field.increment(data.0);
+///     }
+/// );
+/// ```
+///
+/// In this example, the first set of fields describes the data required to register the event. This
+/// is what would be used by the `register!` macro. For example, `register!(Event { event_field:
+/// "something" })`. The second set of fields describes the data required to store the registered
+/// handle, namely the `Counter`s and `Gauge`s that record the handle from `metrics` as well as any
+/// associated data for emitting traces or debug messages, followed by an initialization assignment
+/// value. The `emit` function is the code required to update the metrics and generate any log
+/// messages.
 #[macro_export]
 macro_rules! registered_event {
     // A registered event struct with no fields (zero-sized type).
