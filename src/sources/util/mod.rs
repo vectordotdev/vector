@@ -19,7 +19,7 @@ pub mod http_scrape;
 mod message_decoding;
 pub mod multiline_config;
 #[cfg(feature = "listenfd")]
-mod tcp;
+pub mod net;
 #[cfg(all(unix, any(feature = "sources-socket", feature = "sources-utils-unix",)))]
 mod unix;
 #[cfg(all(unix, feature = "sources-socket"))]
@@ -31,8 +31,6 @@ mod wrappers;
 #[cfg(feature = "sources-file")]
 pub use encoding_config::EncodingConfig;
 pub use multiline_config::MultilineConfig;
-#[cfg(feature = "listenfd")]
-pub use tcp::{SocketListenAddr, TcpNullAcker, TcpSource, TcpSourceAck, TcpSourceAcker};
 #[cfg(all(unix, any(feature = "sources-socket", feature = "sources-utils-unix",)))]
 pub use unix::change_socket_permissions;
 #[cfg(all(unix, feature = "sources-socket",))]
