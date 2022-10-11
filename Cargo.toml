@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.24.1"
+version = "0.24.2"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2021"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
