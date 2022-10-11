@@ -152,13 +152,13 @@ impl Service<ElasticsearchRequest> for ElasticsearchService {
     type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
+    // Emission of an internal event in case of errors is handled upstream by the caller.
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        // Emission of Error internal event is handled upstream by the caller.
         Poll::Ready(Ok(()))
     }
 
+    // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, req: ElasticsearchRequest) -> Self::Future {
-        // Emission of Error internal event is handled upstream by the caller.
         let mut http_service = self.batch_service.clone();
         Box::pin(async move {
             http_service.ready().await?;

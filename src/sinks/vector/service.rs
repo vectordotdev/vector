@@ -8,6 +8,7 @@ use hyper_proxy::ProxyConnector;
 use prost::Message;
 use proto_event::EventWrapper;
 use tonic::{body::BoxBody, IntoRequest};
+use tower::Service;
 use vector_core::{
     event::proto as proto_event, internal_event::CountByteSize, stream::DriverResponse,
 };
@@ -79,11 +80,12 @@ impl VectorService {
     }
 }
 
-impl tower::Service<VectorRequest> for VectorService {
+impl Service<VectorRequest> for VectorService {
     type Response = VectorResponse;
     type Error = Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
+    // Emission of an internal event in case of errors is handled upstream by the caller.
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         // Readiness check of the client is done through the `push_events()`
         // call happening inside `call()`. That check blocks until the client is
@@ -93,6 +95,7 @@ impl tower::Service<VectorRequest> for VectorService {
         Poll::Ready(Ok(()))
     }
 
+    // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, list: VectorRequest) -> Self::Future {
         let mut service = self.clone();
         let events_count = list.events.len();
@@ -131,15 +134,17 @@ pub struct HyperSvc {
     client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
 }
 
-impl tower::Service<hyper::Request<BoxBody>> for HyperSvc {
+impl Service<hyper::Request<BoxBody>> for HyperSvc {
     type Response = hyper::Response<hyper::Body>;
     type Error = hyper::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
+    // Emission of an internal event in case of errors is handled upstream by the caller.
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
+    // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, mut req: hyper::Request<BoxBody>) -> Self::Future {
         let uri = Uri::builder()
             .scheme(self.uri.scheme().unwrap().clone())
