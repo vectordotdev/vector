@@ -190,6 +190,8 @@ impl vrl_lib::Target for VrlTarget {
                             ["tags"] => {
                                 let value =
                                     value.clone().try_object().map_err(|e| e.to_string())?;
+
+                                metric.remove_tags();
                                 for (field, value) in &value {
                                     metric.insert_tag(
                                         field.as_str().to_owned(),
@@ -1017,6 +1019,43 @@ mod test {
                     target.target_get(&path).map(Option::<&Value>::cloned)
                 );
             }
+        }
+    }
+
+    #[test]
+    fn metric_set_tags() {
+        let metric = Metric::new(
+            "name",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.23 },
+        )
+        .with_tags(Some({
+            let mut map = MetricTags::new();
+            map.insert("tig".to_string(), "tog".to_string());
+            map
+        }));
+
+        let info = ProgramInfo {
+            fallible: false,
+            abortable: false,
+            target_queries: vec![],
+            target_assignments: vec![],
+        };
+        let mut target = VrlTarget::new(Event::Metric(metric), &info);
+        let _result = target.target_insert(
+            &OwnedTargetPath::event(owned_value_path!("tags")),
+            Value::Object(BTreeMap::from([("a".into(), "b".into())])),
+        );
+
+        match target {
+            VrlTarget::Metric { metric, value: _ } => {
+                assert!(metric.tags().is_some());
+                assert_eq!(
+                    metric.tags().unwrap(),
+                    &BTreeMap::from([("a".into(), "b".into())])
+                );
+            }
+            _ => panic!("must be a metric"),
         }
     }
 

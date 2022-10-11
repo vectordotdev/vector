@@ -13,9 +13,9 @@ impl InternalEvent for SyslogUdpReadError {
         error!(
             message = "Error reading datagram.",
             error = ?self.error,
-            internal_log_rate_limit = true,
             error_type = error_type::READER_FAILED,
             stage = error_stage::RECEIVING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
