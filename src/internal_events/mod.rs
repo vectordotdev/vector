@@ -41,6 +41,8 @@ mod encoding_transcode;
 mod eventstoredb_metrics;
 #[cfg(feature = "sources-exec")]
 mod exec;
+#[cfg(any(feature = "sources-file-descriptor", feature = "sources-stdin"))]
+mod file_descriptor;
 #[cfg(feature = "transforms-filter")]
 mod filter;
 #[cfg(feature = "sources-fluent")]
@@ -49,6 +51,8 @@ mod fluent;
 mod gcp_pubsub;
 #[cfg(feature = "transforms-geoip")]
 mod geoip;
+#[cfg(any(feature = "sources-vector", feature = "sources-opentelemetry"))]
+mod grpc;
 mod heartbeat;
 #[cfg(feature = "sources-host_metrics")]
 mod host_metrics;
@@ -173,6 +177,8 @@ pub(crate) use self::exec::*;
     feature = "sinks-file",
 ))]
 pub(crate) use self::file::*;
+#[cfg(any(feature = "sources-file-descriptor", feature = "sources-stdin"))]
+pub(crate) use self::file_descriptor::*;
 #[cfg(feature = "transforms-filter")]
 pub(crate) use self::filter::*;
 #[cfg(feature = "sources-fluent")]
@@ -181,6 +187,8 @@ pub(crate) use self::fluent::*;
 pub(crate) use self::gcp_pubsub::*;
 #[cfg(feature = "transforms-geoip")]
 pub(crate) use self::geoip::*;
+#[cfg(any(feature = "sources-vector", feature = "sources-opentelemetry"))]
+pub(crate) use self::grpc::*;
 #[cfg(feature = "sources-host_metrics")]
 pub(crate) use self::host_metrics::*;
 #[cfg(any(

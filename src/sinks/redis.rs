@@ -342,12 +342,12 @@ impl Service<Vec<RedisKvEntry>> for RedisSink {
     type Error = RedisError;
     type Future = BoxFuture<'static, RedisPipeResult>;
 
-    // Emission of Error internal event is handled upstream by the caller
+    // Emission of an internal event in case of errors is handled upstream by the caller.
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
-    // Emission of Error internal event is handled upstream by the caller
+    // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, kvs: Vec<RedisKvEntry>) -> Self::Future {
         let count = kvs.len();
         let mut byte_size = 0;

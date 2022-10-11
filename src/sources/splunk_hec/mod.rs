@@ -1010,7 +1010,10 @@ mod tests {
         sources::splunk_hec::acknowledgements::{HecAckStatusRequest, HecAckStatusResponse},
         test_util::{
             collect_n,
-            components::{assert_source_compliance, HTTP_PUSH_SOURCE_TAGS},
+            components::{
+                assert_source_compliance, assert_source_error, COMPONENT_ERROR_TAGS,
+                HTTP_PUSH_SOURCE_TAGS,
+            },
             next_addr, wait_for_tcp,
         },
         SourceSender,
@@ -1503,16 +1506,19 @@ mod tests {
 
     #[tokio::test]
     async fn invalid_token() {
-        let (_source, address) = source(None).await;
-        let opts = SendWithOpts {
-            channel: Some(Channel::Header("channel")),
-            forwarded_for: None,
-        };
+        assert_source_error(&COMPONENT_ERROR_TAGS, async {
+            let (_source, address) = source(None).await;
+            let opts = SendWithOpts {
+                channel: Some(Channel::Header("channel")),
+                forwarded_for: None,
+            };
 
-        assert_eq!(
-            401,
-            send_with(address, "services/collector/event", "", "nope", &opts).await
-        );
+            assert_eq!(
+                401,
+                send_with(address, "services/collector/event", "", "nope", &opts).await
+            );
+        })
+        .await;
     }
 
     #[tokio::test]

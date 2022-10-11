@@ -182,7 +182,7 @@ components: transforms: lua: {
 			description: "Transform API version. Specifying this version ensures that Vector does not break backward compatibility."
 			required:    true
 			type: string: enum: {
-				"1": "Lua transform API version 1"
+				"1": "Lua transform API version 1. This version is deprecated and will be removed in a future version."
 				"2": "Lua transform API version 2"
 			}
 		}

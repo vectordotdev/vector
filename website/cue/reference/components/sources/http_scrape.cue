@@ -72,6 +72,22 @@ components: sources: http_scrape: {
 				examples: [{"Your-Custom-Header": "it's-value"}]
 			}
 		}
+		method: {
+			common:      false
+			description: "Specifies the action of the HTTP request."
+			required:    false
+			type: string: {
+				default: "GET"
+				enum: {
+					"HEAD":   "HTTP HEAD method."
+					"GET":    "HTTP GET method."
+					"PUT":    "HTTP PUT method."
+					"POST":   "HTTP POST method."
+					"PATCH":  "HTTP PATCH method."
+					"DELETE": "HTTP DELETE method."
+				}
+			}
+		}
 		query: {
 			common: false
 			description: """
