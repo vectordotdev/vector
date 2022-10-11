@@ -18,7 +18,7 @@ use crate::{
         self,
         util::http_client::{
             build_url, call, default_scrape_interval_secs, GenericHttpClientInputs,
-            HttpClientBuilder, HttpScraperContext,
+            HttpClientBuilder, HttpClientContext,
         },
     },
     tls::{TlsConfig, TlsSettings},
@@ -212,7 +212,7 @@ struct PrometheusScrapeContext {
     endpoint_info: Option<EndpointInfo>,
 }
 
-impl HttpScraperContext for PrometheusScrapeContext {
+impl HttpClientContext for PrometheusScrapeContext {
     /// Parses the Prometheus HTTP response into metric events
     fn on_response(&mut self, url: &Uri, _header: &Parts, body: &Bytes) -> Option<Vec<Event>> {
         let body = String::from_utf8_lossy(body);

@@ -1,11 +1,11 @@
 //! Common logic for sources that are HTTP clients.
 //!
-//! Specific HTTP scraping sources will:
+//! Specific HTTP client sources will:
 //!   - Call build_url() to build the URL(s) to call.
-//!   - Implmement a specific context struct which:
+//!   - Implement a specific context struct which:
 //!       - Contains the data that source needs in order to process the HTTP responses into internal_events
 //!       - Implements the HttpClient trait
-//!   - Call call() supplying the generic inputs for scraping and the source-specific
+//!   - Call call() supplying the generic inputs for calling and the source-specific
 //!     context.
 
 use bytes::Bytes;
@@ -53,14 +53,14 @@ pub(crate) const fn default_scrape_interval_secs() -> u64 {
 /// Builds the context, allowing the source-specific implementation to leverage data from the
 /// config and the current HTTP request.
 pub(crate) trait HttpClientBuilder {
-    type Context: HttpScraperContext;
+    type Context: HttpClientContext;
 
     /// Called before the HTTP request is made to build out the context.
     fn build(&self, url: &Uri) -> Self::Context;
 }
 
 /// Methods that allow context-specific behavior during the scraping procedure.
-pub(crate) trait HttpScraperContext {
+pub(crate) trait HttpClientContext {
     /// Called after the HTTP request succeeds and returns the decoded/parsed Event array.
     fn on_response(&mut self, url: &Uri, header: &Parts, body: &Bytes) -> Option<Vec<Event>>;
 
@@ -100,8 +100,8 @@ pub(crate) fn build_url(uri: &Uri, query: &HashMap<String, Vec<String>>) -> Uri 
 ///   - The HTTP response is decoded/parsed into events by the specific context.
 ///   - The events are then sent to the output stream.
 pub(crate) async fn call<
-    B: HttpClientBuilder<Context = C> + std::marker::Send + Clone,
-    C: HttpScraperContext + std::marker::Send,
+    B: HttpClientBuilder<Context = C> + Send + Clone,
+    C: HttpClientContext + Send,
 >(
     inputs: GenericHttpClientInputs,
     context_builder: B,

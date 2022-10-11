@@ -9,6 +9,7 @@ use snafu::ResultExt;
 use std::collections::HashMap;
 use tokio_util::codec::Decoder as _;
 
+use crate::sources::util::http_client;
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{SourceConfig, SourceContext},
@@ -20,7 +21,7 @@ use crate::{
         http::HttpMethod,
         http_client::{
             build_url, call, default_scrape_interval_secs, GenericHttpClientInputs,
-            HttpClientBuilder, HttpScraperContext,
+            HttpClientBuilder,
         },
     },
     tls::{TlsConfig, TlsSettings},
@@ -243,7 +244,7 @@ impl HttpClientBuilder for HttpClientContext {
     }
 }
 
-impl HttpScraperContext for HttpClientContext {
+impl http_client::HttpClientContext for HttpClientContext {
     /// Decodes the HTTP response body into events per the decoder configured.
     fn on_response(
         &mut self,
