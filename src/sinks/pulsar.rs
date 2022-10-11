@@ -112,15 +112,12 @@ pub struct OAuth2Config {
 
 /// Pulsar topics lookup operation retry options.
 #[configurable_component]
-#[serde_with::serde_as]
 #[derive(Debug, Clone)]
 pub struct OperationRetryOptions {
     /// time limit to receive an answer to a Pulsar operation
-    #[serde_as(as = "serde_with::DurationSeconds<i64>")]
-    pub operation_timeout: Duration,
+    pub operation_timeout: u64,
     /// delay between operation retries after a ServiceNotReady error
-    #[serde_as(as = "serde_with::DurationSeconds<i64>")]
-    pub retry_delay: Duration,
+    pub retry_delay: u64,
     /// maximum number of operation retries. None indicates infinite retries
     pub max_retries: Option<u32>,
 }
@@ -170,8 +167,8 @@ impl GenerateConfig for PulsarSinkConfig {
             partition_key_field: Some("message".to_string()),
             encoding: TextSerializerConfig::new().into(),
             operation_retry_options: OperationRetryOptions {
-                operation_timeout: Duration::from_secs(30),
-                retry_delay: Duration::from_secs(5),
+                operation_timeout: 30,
+                retry_delay: 5,
                 max_retries: None,
             },
             auth: None,
@@ -252,11 +249,13 @@ impl PulsarSinkConfig {
         if self.operation_retry_options.max_retries > Some(0) {
             operation_retry_options.max_retries = self.operation_retry_options.max_retries
         }
-        if self.operation_retry_options.operation_timeout > Duration::from_secs(0) {
-            operation_retry_options.operation_timeout = self.operation_retry_options.operation_timeout
+        if self.operation_retry_options.operation_timeout > 0 {
+            operation_retry_options.operation_timeout =
+                Duration::from_secs(self.operation_retry_options.operation_timeout)
         }
-        if self.operation_retry_options.retry_delay > Duration::from_secs(0) {
-            operation_retry_options.retry_delay = self.operation_retry_options.retry_delay
+        if self.operation_retry_options.retry_delay > 0 {
+            operation_retry_options.retry_delay =
+                Duration::from_secs(self.operation_retry_options.retry_delay)
         }
         let pulsar = builder
             .with_operation_retry_options(operation_retry_options).build().await?;
@@ -471,8 +470,8 @@ mod integration_tests {
             topic: topic.clone(),
             encoding: TextSerializerConfig::new().into(),
             operation_retry_options: OperationRetryOptions {
-                operation_timeout: Duration::from_secs(30),
-                retry_delay: Duration::from_secs(5),
+                operation_timeout: 30,
+                retry_delay: 5,
                 max_retries: None,
             },
             auth: None,
