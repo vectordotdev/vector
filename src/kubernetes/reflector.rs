@@ -50,6 +50,7 @@ pub async fn custom_reflector<K, W>(
                                 trace!(message = "Processing Restarted event.", ?event);
                                 delay_queue.clear();
                                 store.apply_watcher_event(&event);
+                                meta_cache.clear();
                             }
                         }
                     },

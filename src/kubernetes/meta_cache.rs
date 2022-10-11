@@ -25,6 +25,9 @@ impl MetaCache {
             None => false,
         }
     }
+    pub fn clear(&mut self) {
+        self.cache.clear();
+    }
 }
 
 #[derive(PartialEq, Eq, Hash, Clone)]
