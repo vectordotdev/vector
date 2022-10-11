@@ -1,7 +1,10 @@
-use std::{num::{
-    NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI8, NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU8,
-    NonZeroUsize,
-}, fmt};
+use std::{
+    fmt,
+    num::{
+        NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI8, NonZeroU16, NonZeroU32, NonZeroU64,
+        NonZeroU8, NonZeroUsize,
+    },
+};
 
 use num_traits::{Bounded, One, ToPrimitive, Zero};
 use serde_json::Number;

@@ -13,7 +13,7 @@ use crate::sinks::{util::UriSerde, Healthcheck, Sinks};
 
 /// Fully resolved sink component.
 #[configurable_component]
-#[configurable(metadata(config_docs_base_type = "sink"))]
+#[configurable(metadata(component_base_type = "sink"))]
 #[derive(Clone, Debug)]
 pub struct SinkOuter<T>
 where

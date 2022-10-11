@@ -15,12 +15,12 @@ use serde::Serialize;
 use vector_config_common::{attributes::CustomAttribute, validation::Validation};
 
 use crate::{
+    num::ConfigurableNumber,
     schema::{
         assert_string_schema_for_map, generate_array_schema, generate_bool_schema,
-        generate_map_schema, generate_number_schema, generate_set_schema,
-        generate_string_schema, get_or_generate_schema,
+        generate_map_schema, generate_number_schema, generate_set_schema, generate_string_schema,
+        get_or_generate_schema,
     },
-    num::ConfigurableNumber,
     str::ConfigurableString,
     Configurable, GenerateError, Metadata,
 };

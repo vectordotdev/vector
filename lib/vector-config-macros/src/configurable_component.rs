@@ -326,17 +326,17 @@ pub fn configurable_component_impl(args: TokenStream, item: TokenStream) -> Toke
         }
     });
 
-    let maybe_component_name = options.typed_component()
-        .map(|tc| {
-            let maybe_component_name_registration = tc.get_component_name_registration();
-            let maybe_component_name_metadata = tc.get_component_name()
-                .map(|name| quote! { #[configurable(metadata(component_name = #name))] });
-    
-            quote! {
-                #maybe_component_name_metadata
-                #maybe_component_name_registration
-            }
-        });
+    let maybe_component_name = options.typed_component().map(|tc| {
+        let maybe_component_name_registration = tc.get_component_name_registration();
+        let maybe_component_name_metadata = tc
+            .get_component_name()
+            .map(|name| quote! { #[configurable(metadata(component_name = #name))] });
+
+        quote! {
+            #maybe_component_name_metadata
+            #maybe_component_name_registration
+        }
+    });
 
     let maybe_component_desc = options
         .typed_component()

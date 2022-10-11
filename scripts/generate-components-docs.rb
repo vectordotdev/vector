@@ -144,7 +144,7 @@ def get_schema_by_name(root_schema, schema_name)
   schema_name = schema_name.gsub(/#\/definitions\//, "")
   schema_def = root_schema.dig("definitions", schema_name)
   if schema_def.nil?
-    nested_log "Could not find schema definition '#{schema_name}' in given schema."
+    puts "Could not find schema definition '#{schema_name}' in given schema."
     exit
   end
 
@@ -643,15 +643,83 @@ def get_rendered_description_from_schema(schema)
   description.strip
 end
 
-if ARGV.length < 3
-  puts "usage: extract-component-schema.rb <configuration schema path> <component type> <component name>"
+def render_and_import_schema(root_schema, schema, friendly_name, config_map_path, cue_relative_path)
+  puts "[*] Resolving schema definition for #{friendly_name}..."
+
+  # Try and resolve the schema, unwrapping it as an object schema which is a requirement/expectation
+  # of all component-level schemas. We additionally sort all of the object properties, which makes
+  # sure the docs are generated in alphabetical order.
+  resolved_schema = resolve_schema(root_schema, schema)
+
+  unwrapped_resolved_schema = resolved_schema.dig("type", "object", "options")
+  if unwrapped_resolved_schema.nil?
+    puts "Configuration types must always resolve to an object schema."
+    exit
+  end
+
+  unwrapped_resolved_schema = sort_hash_nested(unwrapped_resolved_schema)
+
+  # Set up the appropriate structure for the value based on the configuration map path. It defines
+  # the nested levels of the map where our resolved schema should go, as well as a means to generate
+  # an appropriate prefix for our temporary file.
+  data = {}
+  last = data
+  config_map_path.each { |segment|
+    if last.dig(segment).nil?
+      last[segment] = {}
+    end
+
+    last = last[segment]
+  }
+
+  last["configuration"] = unwrapped_resolved_schema
+
+  config_map_path.prepend("config-schema-base")
+  tmp_file_prefix = config_map_path.join("-")
+
+  final = { "base" => { "components" => data } }
+  final_json = JSON.pretty_generate(final)
+
+  # Write the resolved schema as JSON, which we'll then use to import into a Cue file.
+  json_output_file = write_to_temp_file(["config-schema-#{tmp_file_prefix}-", ".json"], final_json)
+  puts "[✓] Wrote #{friendly_name} schema to '#{json_output_file}'. (#{final_json.length} bytes)"
+
+  # Try importing it as Cue.
+  puts "[*] Importing #{friendly_name} schema as Cue file..."
+  cue_output_file = "website/cue/reference/components/#{cue_relative_path}"
+  if !system("cue", "import", "-f", "-o", cue_output_file, "-p", "metadata", json_output_file)
+    puts "[!] Failed to import #{friendly_name} schema as valid Cue."
+    exit
+  end
+  puts "[✓] Imported #{friendly_name} schema as Cue."
+end
+
+def render_and_import_base_component_schema(root_schema, schema, component_type)
+  render_and_import_schema(
+    root_schema,
+    schema,
+    "base #{component_type} configuration",
+    [component_type],
+    "base/#{component_type}.cue"
+  )
+end
+
+def render_and_import_component_schema(root_schema, schema, component_type, component_name)
+  render_and_import_schema(
+    root_schema,
+    schema,
+    "'#{component_name}' #{component_type} configuration",
+    [component_type, component_name],
+    "#{component_type}s/base/#{component_name}.cue"
+  )
+end
+
+if ARGV.length < 1
+  puts "usage: extract-component-schema.rb <configuration schema path>"
   exit
 end
 
 schema_path = ARGV[0]
-component_type = ARGV[1]
-component_name = ARGV[2]
-
 schema_file = File.open schema_path
 root_schema = JSON.load schema_file
 
@@ -664,34 +732,27 @@ component_types = ["source", "transform", "sink"]
 # settings, and proxy settings... and then the configuration for a sink would be those, plus
 # whatever the sink itself defines.
 component_bases = root_schema["definitions"].filter_map { |key, definition|
-  config_docs_base_type = definition.dig("_metadata", "config_docs_base_type")
-  {config_docs_base_type => definition} if component_types.include? config_docs_base_type
+  component_base_type = definition.dig("_metadata", "component_base_type")
+  { component_base_type => definition } if component_types.include? component_base_type
 }
-.reduce(:merge)
+.reduce { |acc, item| nested_merge(acc, item) }
+
+puts "Base schemas: #{component_bases}"
 
 component_bases.each { |component_type, schema|
-  puts "[*] Resolving base definition for #{component_type}..."
-  base_config = resolve_schema(root_schema, schema)
+  render_and_import_base_component_schema(root_schema, schema, component_type)
+}
 
-  unwrapped_base_config = base_config.dig("type", "object", "options")
-  if unwrapped_base_config.nil?
-    puts "Base configuration types must always resolve to an object schema."
-    exit
-  end
+# Now we'll generate the base configuration for each component.
+all_components = root_schema["definitions"].filter_map { |key, definition|
+  component_type = definition.dig("_metadata", "component_type")
+  component_name = definition.dig("_metadata", "component_name")
+  { component_type => { component_name => definition } } if component_types.include? component_type
+}
+.reduce { |acc, item| nested_merge(acc, item) }
 
-  unwrapped_base_config = sort_hash_nested(unwrapped_base_config)
-
-  final = { "base" => { "components" => { component_type => { "configuration" => unwrapped_base_config } } } }
-
-  final_json = JSON.pretty_generate(final)
-  json_output_file = write_to_temp_file(["config-schema-base-#{component_type}-", ".json"], final_json)
-  puts "[✓] Wrote base #{component_type} configuration to '#{json_output_file}'. (#{final_json.length} bytes)"
-
-  puts "[*] Importing base #{component_type} configuration as Cue file..."
-  cue_output_file = "#{component_type}_base.cue"
-  if !system("cue", "import", "-f", "-o", cue_output_file, "-p", "metadata", json_output_file)
-    puts "[!] Failed to import base #{component_type} configuration as Cue."
-    exit
-  end
-  puts "[✓] Imported base #{component_type} configuration as Cue."
+all_components.each { |component_type, components|
+  components.each { |component_name, schema|
+    render_and_import_component_schema(root_schema, schema, component_type, component_name)
+  }
 }

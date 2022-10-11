@@ -13,7 +13,7 @@ use crate::{shutdown::ShutdownSignal, sources::Sources, SourceSender};
 
 /// Fully resolved source component.
 #[configurable_component]
-#[configurable(metadata(config_docs_base_type = "source"))]
+#[configurable(metadata(component_base_type = "source"))]
 #[derive(Clone, Debug)]
 pub struct SourceOuter {
     #[configurable(derived)]

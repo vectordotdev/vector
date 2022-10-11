@@ -367,7 +367,9 @@ fn generate_container_metadata(
     // wouldn't want to relist all the shared fields per variant.... we just want to be able to
     // describe which variant has to be used for its unique (variant specific) fields to be
     // relevant.
-    let enum_metadata_attrs = container.tagging().map(|tagging| tagging.as_enum_metadata());
+    let enum_metadata_attrs = container
+        .tagging()
+        .map(|tagging| tagging.as_enum_metadata());
     let enum_metadata =
         get_metadata_custom_attributes(meta_ident, enum_metadata_attrs.into_iter().flatten());
 

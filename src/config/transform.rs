@@ -17,7 +17,7 @@ use super::ComponentKey;
 
 /// Fully resolved transform component.
 #[configurable_component]
-#[configurable(metadata(config_docs_base_type = "transform"))]
+#[configurable(metadata(component_base_type = "transform"))]
 #[derive(Clone, Debug)]
 pub struct TransformOuter<T>
 where
