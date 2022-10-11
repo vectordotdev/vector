@@ -68,8 +68,8 @@ impl Query {
         }
     }
 
-    // Not all deletions are supported yet, errors are ignored here.
-    // see: https://github.com/vectordotdev/vector/issues/13460
+    // Only "external" paths are supported. Non external paths are ignored
+    // see: https://github.com/vectordotdev/vector/issues/11246
     pub fn delete_type_def(&self, external: &mut ExternalEnv, compact: bool) {
         if let Some(target_path) = self.external_path() {
             match target_path.prefix {
