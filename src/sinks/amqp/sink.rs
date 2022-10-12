@@ -10,7 +10,8 @@ use futures_util::stream::BoxStream;
 use lapin::options::ConfirmSelectOptions;
 use std::sync::Arc;
 use tower::ServiceBuilder;
-use vector_core::sink::StreamSink;
+use vector_buffers::EventCount;
+use vector_core::{sink::StreamSink, ByteSizeOf};
 
 use super::{
     config::AmqpSinkConfig, encoder::AmqpEncoder, request_builder::AmqpRequestBuilder,
@@ -26,6 +27,19 @@ pub(super) struct AmqpEvent {
     pub(super) event: Event,
     pub(super) exchange: String,
     pub(super) routing_key: String,
+}
+
+impl EventCount for AmqpEvent {
+    fn event_count(&self) -> usize {
+        // An AmqpEvent represents one event.
+        1
+    }
+}
+
+impl ByteSizeOf for AmqpEvent {
+    fn allocated_bytes(&self) -> usize {
+        self.event.size_of()
+    }
 }
 
 pub(super) struct AmqpSink {

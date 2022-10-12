@@ -3,7 +3,10 @@
 //! it into the raw bytes and other data needed to send the request to `AMQP`.
 use crate::{
     event::Event,
-    sinks::util::{request_builder::EncodeResult, Compression, RequestBuilder},
+    sinks::util::{
+        metadata::RequestMetadataBuilder, request_builder::EncodeResult, Compression,
+        RequestBuilder,
+    },
 };
 use bytes::Bytes;
 use std::io;
@@ -25,7 +28,7 @@ pub(super) struct AmqpRequestBuilder {
 }
 
 impl RequestBuilder<AmqpEvent> for AmqpRequestBuilder {
-    type Metadata = AmqpMetadata;
+    type Metadata = (AmqpMetadata, RequestMetadataBuilder);
     type Events = Event;
     type Encoder = AmqpEncoder;
     type Payload = Bytes;
@@ -46,8 +49,9 @@ impl RequestBuilder<AmqpEvent> for AmqpRequestBuilder {
             routing_key: input.routing_key,
             finalizers: input.event.take_finalizers(),
         };
+        let builder = RequestMetadataBuilder::from_events(&input);
 
-        (metadata, input.event)
+        ((metadata, builder), input.event)
     }
 
     fn build_request(
@@ -55,12 +59,14 @@ impl RequestBuilder<AmqpEvent> for AmqpRequestBuilder {
         metadata: Self::Metadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
+        let (amqp_metadata, builder) = metadata;
         let body = payload.into_payload();
         AmqpRequest::new(
             body,
-            metadata.exchange,
-            metadata.routing_key,
-            metadata.finalizers,
+            amqp_metadata.exchange,
+            amqp_metadata.routing_key,
+            amqp_metadata.finalizers,
+            builder.build(&payload),
         )
     }
 }
