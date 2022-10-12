@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     sync::Arc,
     net::{Ipv4Addr, Ipv6Addr}
 };
@@ -142,6 +143,7 @@ fn into_clickhouse_value(v: Option<&Value>, target_type: &SqlType) -> CResult {
         SqlType::Ipv6 => into_ipv6(v),
         SqlType::Nullable(ty) => into_nullable(v, *ty),
         SqlType::Array(ty) => into_array(v, ty),
+        SqlType::Map(_, ty) => into_map(v, ty),
         _ => unimplemented!(),
     }
 }
@@ -178,7 +180,23 @@ fn into_array(v: Option<&Value>, target_type: &SqlType) -> CResult {
     }
 }
 
-
+// only support Map(String, xxx)
+fn into_map(v: Option<&Value>, target_type: &SqlType) -> CResult {
+    if v.is_none() {
+        return Err(ConvertError::NoValue);
+    }
+    let inner = v.unwrap();
+    match inner {
+        Value::Object(bt) => {
+            let mut hm = HashMap::with_capacity(bt.len());
+            for (k,v) in bt {
+                hm.insert(CHValue::String(Arc::new(k.clone().into_bytes())), into_clickhouse_value(Some(v), target_type)?);
+            }
+            Ok(CHValue::Map(SqlType::String.into(), (*target_type).clone().into(), Arc::new(hm)))
+        },
+        _ => Err(ConvertError::TypeMisMatch{from: inner.clone(), to: target_type.to_string().into_owned()})
+    }
+}
 
 fn into_string(v: Option<&Value>) -> CResult {
     if v.is_none() {

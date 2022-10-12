@@ -105,10 +105,16 @@ fn parse_nullable(s: &str) -> IResult<&str, SqlType> {
 fn parse_nullable_inner(s: &str) -> IResult<&str, SqlType> {
     alt((
         parse_datetime64,
+        parse_datetime,
         parse_static_type,
         parse_fixed_string,
         parse_decimal,
     ))(s)
+}
+
+fn parse_datetime(s: &str) -> IResult<&str, SqlType> {
+    let (rest, _) = tag("DateTime")(s)?;
+    Ok((rest, SqlType::DateTime(DateTimeType::DateTime32)))
 }
 
 fn parse_datetime64(s: &str) -> IResult<&str, SqlType> {
