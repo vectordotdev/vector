@@ -41,7 +41,7 @@ fn vector_receive_port() -> u16 {
 }
 
 /// The port for the http server to receive data from the agent
-fn agent_port() -> u16 {
+fn server_port_for_agent() -> u16 {
     std::env::var("AGENT_PORT")
         .unwrap_or_else(|_| "8082".to_string())
         .parse::<u16>()
@@ -49,7 +49,7 @@ fn agent_port() -> u16 {
 }
 
 /// The port for the http server to receive data from vector
-const fn vector_server_port() -> u16 {
+const fn server_port_for_vector() -> u16 {
     1234
 }
 
@@ -111,7 +111,7 @@ async fn process_traces(Extension(_state): Extension<Arc<AppState>>, request: Re
     }
 }
 
-/// process a POST request from the stats endpoint.
+/// Process a POST request from the stats endpoint.
 /// De-compresses and De-serializes the payload, then forwards it on the Sender channel.
 async fn process_stats(Extension(state): Extension<Arc<AppState>>, mut request: Request<Body>) {
     debug!(
@@ -351,7 +351,7 @@ async fn start_vector() -> (RunningTopology, tokio::sync::mpsc::UnboundedReceive
     let mut builder = ConfigBuilder::default();
     builder.add_source("in", source_config);
 
-    let dd_traces_endpoint = format!("http://127.0.0.1:{}", vector_server_port());
+    let dd_traces_endpoint = format!("http://127.0.0.1:{}", server_port_for_vector());
     let cfg = format!(
         indoc! { r#"
             default_api_key = "atoken"
@@ -401,12 +401,17 @@ async fn apm_stats_e2e_test_dd_agent_to_vector_correctness() {
     {
         // [vector -> the server]
         tokio::spawn(async move {
-            run_server("vector".to_string(), vector_server_port(), tx_agent_vector).await;
+            run_server(
+                "vector".to_string(),
+                server_port_for_vector(),
+                tx_agent_vector,
+            )
+            .await;
         });
 
         // [agent -> the server]
         tokio::spawn(async move {
-            run_server("agent".to_string(), agent_port(), tx_agent_only).await;
+            run_server("agent".to_string(), server_port_for_agent(), tx_agent_only).await;
         });
     }
 
