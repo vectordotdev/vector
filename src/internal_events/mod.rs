@@ -108,10 +108,6 @@ mod socket;
 mod splunk_hec;
 #[cfg(feature = "sinks-statsd")]
 mod statsd_sink;
-#[cfg(feature = "sources-statsd")]
-mod statsd_source;
-#[cfg(feature = "sources-syslog")]
-mod syslog;
 #[cfg(feature = "transforms-tag_cardinality_limit")]
 mod tag_cardinality_limit;
 mod tcp;
@@ -246,10 +242,6 @@ pub(crate) use self::sematext_metrics::*;
 pub(crate) use self::splunk_hec::*;
 #[cfg(feature = "sinks-statsd")]
 pub(crate) use self::statsd_sink::*;
-#[cfg(feature = "sources-statsd")]
-pub(crate) use self::statsd_source::*;
-#[cfg(feature = "sources-syslog")]
-pub(crate) use self::syslog::*;
 #[cfg(feature = "transforms-tag_cardinality_limit")]
 pub(crate) use self::tag_cardinality_limit::*;
 #[cfg(feature = "transforms-throttle")]
