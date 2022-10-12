@@ -159,11 +159,9 @@ impl Conditional for Vrl {
 
 #[cfg(test)]
 mod test {
-    use std::collections::BTreeMap;
-
     use super::*;
     use crate::{
-        event::{Metric, MetricKind, MetricValue},
+        event::{MetricTags, Metric, MetricKind, MetricValue},
         log_event,
     };
 
@@ -221,7 +219,7 @@ mod test {
                     )
                     .with_namespace(Some("zerk"))
                     .with_tags(Some({
-                        let mut tags = BTreeMap::new();
+                        let mut tags = MetricTags::default();
                         tags.insert("host".into(), "zoobub".into());
                         tags
                     })),

@@ -1,7 +1,7 @@
 #[cfg(feature = "vrl")]
 use std::convert::TryFrom;
 use std::{
-    collections::{btree_map, BTreeMap},
+    collections::btree_map,
     convert::AsRef,
     fmt::{self, Display, Formatter},
     num::NonZeroU32,
@@ -27,10 +27,11 @@ pub use self::data::*;
 mod series;
 pub use self::series::*;
 
+mod tags;
+pub use self::tags::*;
+
 mod value;
 pub use self::value::*;
-
-pub type MetricTags = BTreeMap<String, String>;
 
 /// A metric.
 #[configurable_component]

@@ -1,11 +1,9 @@
-use std::collections::BTreeMap;
-
 use serde::{
     de::{MapAccess, Visitor},
     Deserialize, Deserializer,
 };
 
-use crate::event::{Metric, MetricKind, MetricValue};
+use crate::event::{Metric, MetricKind, MetricTags, MetricValue};
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +15,7 @@ pub struct Stats {
 impl Stats {
     pub fn metrics(&self, namespace: Option<String>) -> Vec<Metric> {
         let mut result = Vec::new();
-        let mut tags = BTreeMap::new();
+        let mut tags = MetricTags::default();
         let now = chrono::Utc::now();
         let namespace = namespace.unwrap_or_else(|| "eventstoredb".to_string());
 

@@ -290,11 +290,11 @@ impl TaskTransform<Event> for TagCardinalityLimit {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
+    use vector_core::metric_tags;
 
     use super::*;
     use crate::{
-        event::{metric, Event, Metric},
+        event::{metric, Event, Metric, MetricTags},
         transforms::tag_cardinality_limit::{default_cache_size, BloomFilterConfig, Mode},
     };
 
@@ -303,7 +303,7 @@ mod tests {
         crate::test_util::test_generate_config::<TagCardinalityLimitConfig>();
     }
 
-    fn make_metric(tags: BTreeMap<String, String>) -> Event {
+    fn make_metric(tags: MetricTags) -> Event {
         Event::Metric(
             Metric::new(
                 "event",
@@ -349,17 +349,9 @@ mod tests {
     }
 
     fn drop_event(mut transform: TagCardinalityLimit) {
-        let tags1: BTreeMap<String, String> =
-            vec![("tag1".into(), "val1".into())].into_iter().collect();
-        let event1 = make_metric(tags1);
-
-        let tags2: BTreeMap<String, String> =
-            vec![("tag1".into(), "val2".into())].into_iter().collect();
-        let event2 = make_metric(tags2);
-
-        let tags3: BTreeMap<String, String> =
-            vec![("tag1".into(), "val3".into())].into_iter().collect();
-        let event3 = make_metric(tags3);
+        let event1 = make_metric(metric_tags!("tag1" => "val1"));
+        let event2 = make_metric(metric_tags!("tag1" => "val2"));
+        let event3 = make_metric(metric_tags!("tag1"=>"val3"));
 
         let new_event1 = transform.transform_one(event1.clone()).unwrap();
         let new_event2 = transform.transform_one(event2.clone()).unwrap();
@@ -382,28 +374,13 @@ mod tests {
     }
 
     fn drop_tag(mut transform: TagCardinalityLimit) {
-        let tags1: BTreeMap<String, String> = vec![
-            ("tag1".into(), "val1".into()),
-            ("tag2".into(), "val1".into()),
-        ]
-        .into_iter()
-        .collect();
+        let tags1 = metric_tags!("tag1" => "val1", "tag2" => "val1");
         let event1 = make_metric(tags1);
 
-        let tags2: BTreeMap<String, String> = vec![
-            ("tag1".into(), "val2".into()),
-            ("tag2".into(), "val1".into()),
-        ]
-        .into_iter()
-        .collect();
+        let tags2 = metric_tags!("tag1" => "val2", "tag2" => "val1");
         let event2 = make_metric(tags2);
 
-        let tags3: BTreeMap<String, String> = vec![
-            ("tag1".into(), "val3".into()),
-            ("tag2".into(), "val1".into()),
-        ]
-        .into_iter()
-        .collect();
+        let tags3 = metric_tags!("tag1" => "val3", "tag2" => "val1");
         let event3 = make_metric(tags3);
 
         let new_event1 = transform.transform_one(event1.clone()).unwrap();
@@ -434,29 +411,14 @@ mod tests {
     /// Test that hitting the value limit on one tag does not affect the ability to take new
     /// values for other tags.
     fn separate_value_limit_per_tag(mut transform: TagCardinalityLimit) {
-        let tags1: BTreeMap<String, String> = vec![
-            ("tag1".into(), "val1".into()),
-            ("tag2".into(), "val1".into()),
-        ]
-        .into_iter()
-        .collect();
+        let tags1 = metric_tags!("tag1" => "val1", "tag2" => "val1");
         let event1 = make_metric(tags1);
 
-        let tags2: BTreeMap<String, String> = vec![
-            ("tag1".into(), "val2".into()),
-            ("tag2".into(), "val1".into()),
-        ]
-        .into_iter()
-        .collect();
+        let tags2 = metric_tags!("tag1" => "val2", "tag2" => "val1");
         let event2 = make_metric(tags2);
 
         // Now value limit is reached for "tag1", but "tag2" still has values available.
-        let tags3: BTreeMap<String, String> = vec![
-            ("tag1".into(), "val1".into()),
-            ("tag1".into(), "val2".into()),
-        ]
-        .into_iter()
-        .collect();
+        let tags3 = metric_tags!("tag1" => "val1", "tag1" => "val2");
         let event3 = make_metric(tags3);
 
         let new_event1 = transform.transform_one(event1.clone()).unwrap();
