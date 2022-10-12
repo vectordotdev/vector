@@ -4,6 +4,7 @@ description: Receive logs emitted by an [HTTP](https://en.wikipedia.org/wiki/Hyp
 kind: source
 layout: component
 tags: ["http", "server", "component", "source", "logs"]
+aliases: ["/docs/reference/configuration/sources/http"]
 ---
 
 {{/*

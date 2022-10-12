@@ -180,13 +180,16 @@ pub enum Sources {
     #[cfg(feature = "sources-host_metrics")]
     HostMetrics(#[configurable(derived)] host_metrics::HostMetricsConfig),
 
+    /// HTTP.
+    #[cfg(feature = "sources-http_server")]
+    Http(#[configurable(derived)] http_server::HttpConfig),
+
     /// HTTP Client.
     #[cfg(feature = "sources-http_client")]
     HttpClient(#[configurable(derived)] http_client::HttpClientConfig),
 
     /// HTTP Server.
     #[cfg(feature = "sources-http_server")]
-    #[serde(alias = "http")]
     HttpServer(#[configurable(derived)] http_server::SimpleHttpConfig),
 
     /// Internal Logs.
@@ -340,6 +343,8 @@ impl NamedComponent for Sources {
             Self::HerokuLogs(config) => config.get_component_name(),
             #[cfg(feature = "sources-host_metrics")]
             Self::HostMetrics(config) => config.get_component_name(),
+            #[cfg(feature = "sources-http_server")]
+            Self::Http(config) => config.get_component_name(),
             #[cfg(feature = "sources-http_client")]
             Self::HttpClient(config) => config.get_component_name(),
             #[cfg(feature = "sources-http_server")]
