@@ -555,6 +555,10 @@ cli: {
 				"""
 			type: string: default: null
 		}
+		VECTOR_HOSTNAME: {
+			description: "The hostname for the current process, overriding the result of `gethostname` when not empty."
+			type: string: default: null
+		}
 		VECTOR_LOG: {
 			description: "Vector's log level. Each log level includes messages from higher priority levels."
 			type: string: {
