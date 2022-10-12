@@ -767,7 +767,7 @@ struct DatadogAzureRequestBuilder {
 }
 
 impl RequestBuilder<(String, Vec<Event>)> for DatadogAzureRequestBuilder {
-    type Metadata = AzureBlobMetadata;
+    type Metadata = (AzureBlobMetadata, RequestMetadataBuilder);
     type Events = Vec<Event>;
     type Encoder = DatadogArchivesEncoding;
     type Payload = Bytes;
@@ -791,8 +791,9 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogAzureRequestBuilder {
             byte_size: events.size_of(),
             finalizers,
         };
+        let builder = RequestMetadataBuilder::from_events(&events);
 
-        (metadata, events)
+        ((metadata, builder), events)
     }
 
     fn build_request(
@@ -800,24 +801,27 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogAzureRequestBuilder {
         mut metadata: Self::Metadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        metadata.partition_key =
-            generate_object_key(self.blob_prefix.clone(), metadata.partition_key);
+        let (azure_metadata, builder) = metadata;
+
+        azure_metadata.partition_key =
+            generate_object_key(self.blob_prefix.clone(), azure_metadata.partition_key);
 
         let blob_data = payload.into_payload();
 
         trace!(
             message = "Sending events.",
             bytes = ?blob_data.len(),
-            events_len = ?metadata.count,
+            events_len = ?azure_metadata.count,
             container = ?self.container_name,
-            blob = ?metadata.partition_key
+            blob = ?azure_metadata.partition_key
         );
 
         AzureBlobRequest {
             blob_data,
             content_encoding: DEFAULT_COMPRESSION.content_encoding(),
             content_type: "application/gzip",
-            metadata,
+            metadata: azure_metadata,
+            request_metadata: builder.build(&payload),
         }
     }
 }

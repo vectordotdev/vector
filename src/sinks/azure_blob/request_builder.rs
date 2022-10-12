@@ -9,7 +9,10 @@ use crate::{
     event::{Event, Finalizable},
     sinks::{
         azure_common::config::{AzureBlobMetadata, AzureBlobRequest},
-        util::{request_builder::EncodeResult, Compression, RequestBuilder},
+        util::{
+            metadata::RequestMetadataBuilder, request_builder::EncodeResult, Compression,
+            RequestBuilder,
+        },
     },
 };
 
@@ -23,7 +26,7 @@ pub struct AzureBlobRequestOptions {
 }
 
 impl RequestBuilder<(String, Vec<Event>)> for AzureBlobRequestOptions {
-    type Metadata = AzureBlobMetadata;
+    type Metadata = (AzureBlobMetadata, RequestMetadataBuilder);
     type Events = Vec<Event>;
     type Encoder = (Transformer, Encoder<Framer>);
     type Payload = Bytes;
@@ -48,7 +51,9 @@ impl RequestBuilder<(String, Vec<Event>)> for AzureBlobRequestOptions {
             finalizers,
         };
 
-        (metadata, events)
+        let builder = RequestMetadataBuilder::from_events(&events);
+
+        ((metadata, builder), events)
     }
 
     fn build_request(
@@ -56,6 +61,8 @@ impl RequestBuilder<(String, Vec<Event>)> for AzureBlobRequestOptions {
         mut metadata: Self::Metadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
+        let (azure_metadata, builder) = metadata;
+
         let blob_name = {
             let formatted_ts = Utc::now().format(self.blob_time_format.as_str());
 
@@ -65,23 +72,27 @@ impl RequestBuilder<(String, Vec<Event>)> for AzureBlobRequestOptions {
         };
 
         let extension = self.compression.extension();
-        metadata.partition_key = format!("{}{}.{}", metadata.partition_key, blob_name, extension);
+        azure_metadata.partition_key = format!(
+            "{}{}.{}",
+            azure_metadata.partition_key, blob_name, extension
+        );
 
-        let payload = payload.into_payload();
+        let payload_bytes = payload.into_payload();
 
         debug!(
             message = "Sending events.",
-            bytes = ?payload.len(),
-            events_len = ?metadata.count,
-            blob = ?metadata.partition_key,
+            bytes = ?payload_bytes.len(),
+            events_len = ?azure_metadata.count,
+            blob = ?azure_metadata.partition_key,
             container = ?self.container_name,
         );
 
         AzureBlobRequest {
-            blob_data: payload,
+            blob_data: payload_bytes,
             content_encoding: self.compression.content_encoding(),
             content_type: self.compression.content_type(),
-            metadata,
+            metadata: azure_metadata,
+            request_metadata: builder.build(&payload),
         }
     }
 }
