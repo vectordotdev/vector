@@ -1,5 +1,7 @@
-// ## skip check-dropped-events ##
-
+use crate::{
+    emit,
+    internal_events::{ComponentEventsDropped, INTENTIONAL},
+};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -8,6 +10,7 @@ pub struct LokiEventUnlabeled;
 
 impl InternalEvent for LokiEventUnlabeled {
     fn emit(self) {
+        // Deprecated
         counter!("processing_errors_total", 1,
                 "error_type" => "unlabeled_event");
     }
@@ -15,39 +18,41 @@ impl InternalEvent for LokiEventUnlabeled {
 
 #[derive(Debug)]
 pub struct LokiOutOfOrderEventDropped {
-    pub count: usize,
+    pub count: u64,
 }
 
 impl InternalEvent for LokiOutOfOrderEventDropped {
     fn emit(self) {
-        debug!(
-            message = "Received out-of-order events; dropping events.",
-            count = %self.count,
-            internal_log_rate_limit = true,
-        );
-        counter!("events_discarded_total", self.count as u64,
-                "reason" => "out_of_order"); // deprecated
-        counter!("processing_errors_total", 1,
-                "error_type" => "out_of_order"); // deprecated
-        counter!("component_discarded_events_total", self.count as u64,
+        emit!(ComponentEventsDropped::<INTENTIONAL> {
+            count: self.count,
+            reason: "out_of_order",
+        });
+
+        // Deprecated
+        counter!("events_discarded_total", self.count,
                 "reason" => "out_of_order");
+        counter!("processing_errors_total", 1,
+                "error_type" => "out_of_order");
     }
 }
 
 #[derive(Debug)]
 pub struct LokiOutOfOrderEventRewritten {
-    pub count: usize,
+    pub count: u64,
 }
 
 impl InternalEvent for LokiOutOfOrderEventRewritten {
     fn emit(self) {
         debug!(
-            message = "Received out-of-order events, rewriting timestamps.",
-            count = %self.count,
+            message = "Timestamps rewritten.",
+            count = self.count,
+            reason = "out_of_order",
             internal_log_rate_limit = true,
         );
+        counter!("rewritten_timestamp_events_total", self.count);
+
+        // Deprecated
         counter!("processing_errors_total", 1,
-                "error_type" => "out_of_order"); // deprecated
-        counter!("rewritten_timestamp_events_total", self.count as u64);
+                "error_type" => "out_of_order");
     }
 }

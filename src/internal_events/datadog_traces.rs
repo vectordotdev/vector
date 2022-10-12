@@ -23,7 +23,7 @@ impl InternalEvent for DatadogTracesEncodingError {
             error_reason = %self.error_reason,
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -37,5 +37,29 @@ impl InternalEvent for DatadogTracesEncodingError {
                 reason,
             });
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct DatadogTracesStatsError {
+    pub error_message: &'static str,
+    pub trace_id: Option<usize>,
+}
+
+impl InternalEvent for DatadogTracesStatsError {
+    fn emit(self) {
+        error!(
+            message = "Trace stats calculation error.",
+            trace_id = ?self.trace_id,
+            error = %self.error_message,
+            error_type = error_type::PARSER_FAILED,
+            stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => error_type::PARSER_FAILED,
+            "stage" => error_stage::PROCESSING,
+        );
     }
 }

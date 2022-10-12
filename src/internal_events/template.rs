@@ -27,6 +27,7 @@ impl<'a> InternalEvent for TemplateRenderingError<'a> {
             error = %self.error,
             error_type = error_type::TEMPLATE_FAILED,
             stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
         );
 
         counter!(

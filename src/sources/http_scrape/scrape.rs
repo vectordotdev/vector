@@ -16,9 +16,12 @@ use crate::{
     serde::default_decoding,
     serde::default_framing_message_based,
     sources,
-    sources::util::http_scrape::{
-        build_url, default_scrape_interval_secs, http_scrape, GenericHttpScrapeInputs,
-        HttpScraperBuilder, HttpScraperContext,
+    sources::util::{
+        http::HttpMethod,
+        http_scrape::{
+            build_url, default_scrape_interval_secs, http_scrape, GenericHttpScrapeInputs,
+            HttpScraperBuilder, HttpScraperContext,
+        },
     },
     tls::{TlsConfig, TlsSettings},
     Result,
@@ -27,14 +30,11 @@ use codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     StreamDecodingError,
 };
-use vector_config::configurable_component;
+use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
     config::{log_schema, LogNamespace, Output},
     event::Event,
 };
-
-/// The name of this source
-pub(crate) const NAME: &str = "http_scrape";
 
 /// Configuration for the `http_scrape` source.
 #[configurable_component(source("http_scrape"))]
@@ -70,6 +70,10 @@ pub struct HttpScrapeConfig {
     #[serde(default)]
     pub headers: HashMap<String, Vec<String>>,
 
+    /// Specifies the action of the HTTP request.
+    #[serde(default = "default_http_method")]
+    pub method: HttpMethod,
+
     /// TLS configuration.
     #[configurable(derived)]
     pub tls: Option<TlsConfig>,
@@ -83,6 +87,10 @@ pub struct HttpScrapeConfig {
     pub log_namespace: Option<bool>,
 }
 
+const fn default_http_method() -> HttpMethod {
+    HttpMethod::Get
+}
+
 impl Default for HttpScrapeConfig {
     fn default() -> Self {
         Self {
@@ -92,6 +100,7 @@ impl Default for HttpScrapeConfig {
             decoding: default_decoding(),
             framing: default_framing_message_based(),
             headers: HashMap::new(),
+            method: default_http_method(),
             tls: None,
             auth: None,
             log_namespace: None,
@@ -139,7 +148,7 @@ impl SourceConfig for HttpScrapeConfig {
             shutdown: cx.shutdown,
         };
 
-        Ok(http_scrape(inputs, context, cx.out).boxed())
+        Ok(http_scrape(inputs, context, cx.out, self.method).boxed())
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
@@ -199,7 +208,7 @@ impl HttpScrapeContext {
                         log,
                         log_schema().source_type_key(),
                         "source_type",
-                        NAME,
+                        HttpScrapeConfig::NAME,
                     );
                     self.log_namespace.insert_vector_metadata(
                         log,
@@ -209,10 +218,16 @@ impl HttpScrapeContext {
                     );
                 }
                 Event::Metric(ref mut metric) => {
-                    metric.insert_tag(log_schema().source_type_key().to_string(), NAME.to_string());
+                    metric.insert_tag(
+                        log_schema().source_type_key().to_string(),
+                        HttpScrapeConfig::NAME.to_string(),
+                    );
                 }
                 Event::Trace(ref mut trace) => {
-                    trace.insert(log_schema().source_type_key(), Bytes::from(NAME));
+                    trace.insert(
+                        log_schema().source_type_key(),
+                        Bytes::from(HttpScrapeConfig::NAME),
+                    );
                 }
             }
         }

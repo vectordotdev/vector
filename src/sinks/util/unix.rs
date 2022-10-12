@@ -13,8 +13,8 @@ use crate::{
     codecs::Transformer,
     event::{Event, Finalizable},
     internal_events::{
-        ConnectionOpen, OpenGauge, SocketMode, UnixSocketConnectionError,
-        UnixSocketConnectionEstablished, UnixSocketError,
+        ConnectionOpen, OpenGauge, SocketMode, UnixSocketConnectionEstablished, UnixSocketError,
+        UnixSocketOutgoingConnectionError,
     },
     sink::VecSinkExt,
     sinks::{
@@ -29,8 +29,11 @@ use crate::{
 
 #[derive(Debug, Snafu)]
 pub enum UnixError {
-    #[snafu(display("Connect error: {}", source))]
-    ConnectError { source: tokio::io::Error },
+    #[snafu(display("Failed connecting to socket at path {}: {}", path.display(), source))]
+    ConnectionError {
+        source: tokio::io::Error,
+        path: PathBuf,
+    },
 }
 
 /// A Unix Domain Socket sink.
@@ -80,7 +83,11 @@ impl UnixConnector {
     }
 
     async fn connect(&self) -> Result<UnixStream, UnixError> {
-        UnixStream::connect(&self.path).await.context(ConnectSnafu)
+        UnixStream::connect(&self.path)
+            .await
+            .context(ConnectionSnafu {
+                path: self.path.clone(),
+            })
     }
 
     async fn connect_backoff(&self) -> UnixStream {
@@ -92,10 +99,7 @@ impl UnixConnector {
                     return stream;
                 }
                 Err(error) => {
-                    emit!(UnixSocketConnectionError {
-                        error,
-                        path: &self.path
-                    });
+                    emit!(UnixSocketOutgoingConnectionError { error });
                     sleep(backoff.next().unwrap()).await;
                 }
             }

@@ -148,7 +148,7 @@ impl Configuration {
                     .help("Sets the buffer type to use")
                     .short('t')
                     .long("buffer-type")
-                    .possible_values(&["disk-v1", "disk-v2", "in-memory"])
+                    .value_parser(["disk-v1", "disk-v2", "in-memory"])
                     .default_value("disk-v2"),
             )
             .arg(
@@ -185,35 +185,35 @@ impl Configuration {
             .get_matches();
 
         let buffer_type = matches
-            .value_of("buffer_type")
+            .get_one::<String>("buffer_type")
             .map(|s| s.to_string())
             .expect("default value for buffer_type should always be present");
         let read_total_records = matches
-            .value_of("read_total_records")
+            .get_one::<String>("read_total_records")
             .map(Ok)
             .expect("default value for read_total_records should always be present")
             .and_then(|s| s.parse::<usize>())
             .map_err(|e| e.to_string())?;
         let write_total_records = matches
-            .value_of("write_total_records")
+            .get_one::<String>("write_total_records")
             .map(Ok)
             .expect("default value for write_total_records should always be present")
             .and_then(|s| s.parse::<usize>())
             .map_err(|e| e.to_string())?;
         let write_batch_size = matches
-            .value_of("write_batch_size")
+            .get_one::<String>("write_batch_size")
             .map(Ok)
             .expect("default value for write_batch_size should always be present")
             .and_then(|s| s.parse::<usize>())
             .map_err(|e| e.to_string())?;
         let min_record_size = matches
-            .value_of("min_record_size")
+            .get_one::<String>("min_record_size")
             .map(Ok)
             .expect("default value for min_record_size should always be present")
             .and_then(|s| s.parse::<usize>())
             .map_err(|e| e.to_string())?;
         let max_record_size = matches
-            .value_of("max_record_size")
+            .get_one::<String>("max_record_size")
             .map(Ok)
             .expect("default value for max_record_size should always be present")
             .and_then(|s| s.parse::<usize>())

@@ -4,6 +4,7 @@ use snafu::{ResultExt, Snafu};
 use vector_common::TimeZone;
 use vector_config::configurable_component;
 
+use super::super::default_data_dir;
 use super::{proxy::ProxyConfig, AcknowledgementsConfig, LogSchema};
 use crate::serde::bool_or_struct;
 
@@ -147,4 +148,66 @@ impl GlobalOptions {
             .with_context(|_| CouldNotCreateSnafu { subdir, data_dir })?;
         Ok(data_subdir)
     }
+
+    /// Merge a second global configuration into self, and return the new merged data.
+    ///
+    /// # Errors
+    ///
+    /// Returns a list of textual errors if there is a merge conflict between the two global
+    /// configs.
+    pub fn merge(&self, with: Self) -> Result<Self, Vec<String>> {
+        let mut errors = Vec::new();
+
+        if conflicts(&self.proxy.http, &with.proxy.http) {
+            errors.push("conflicting values for 'proxy.http' found".to_owned());
+        }
+
+        if conflicts(&self.proxy.https, &with.proxy.https) {
+            errors.push("conflicting values for 'proxy.https' found".to_owned());
+        }
+
+        if !self.proxy.no_proxy.is_empty() && !with.proxy.no_proxy.is_empty() {
+            errors.push("conflicting values for 'proxy.no_proxy' found".to_owned());
+        }
+
+        let data_dir = if self.data_dir.is_none() || self.data_dir == default_data_dir() {
+            with.data_dir
+        } else if with.data_dir != default_data_dir() && self.data_dir != with.data_dir {
+            // If two configs both set 'data_dir' and have conflicting values
+            // we consider this an error.
+            errors.push("conflicting values for 'data_dir' found".to_owned());
+            None
+        } else {
+            self.data_dir.clone()
+        };
+
+        // If the user has multiple config files, we must *merge* log schemas
+        // until we meet a conflict, then we are allowed to error.
+        let mut log_schema = self.log_schema.clone();
+        if let Err(merge_errors) = log_schema.merge(&with.log_schema) {
+            errors.extend(merge_errors);
+        }
+
+        if self.timezone != with.timezone {
+            errors.push("conflicting values for 'timezone' found".to_owned());
+        }
+
+        if errors.is_empty() {
+            Ok(Self {
+                data_dir,
+                log_schema,
+                acknowledgements: self.acknowledgements.merge_default(&with.acknowledgements),
+                timezone: self.timezone,
+                proxy: self.proxy.merge(&with.proxy),
+                expire_metrics: self.expire_metrics.or(with.expire_metrics),
+                expire_metrics_secs: self.expire_metrics_secs.or(with.expire_metrics_secs),
+            })
+        } else {
+            Err(errors)
+        }
+    }
+}
+
+fn conflicts<T: PartialEq>(this: &Option<T>, that: &Option<T>) -> bool {
+    matches!((this, that), (Some(this), Some(that)) if this != that)
 }

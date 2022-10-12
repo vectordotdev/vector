@@ -8,7 +8,6 @@ use codecs::{
     StreamDecodingError,
 };
 use futures::{channel::mpsc, executor, SinkExt, StreamExt};
-use tokio::task;
 use tokio_util::{codec::FramedRead, io::StreamReader};
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::NamedComponent;
@@ -18,7 +17,7 @@ use vector_core::ByteSizeOf;
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::log_schema,
-    internal_events::{EventsReceived, StreamClosedError},
+    internal_events::{EventsReceived, FileDescriptorReadError, StreamClosedError},
     shutdown::ShutdownSignal,
     SourceSender,
 };
@@ -64,7 +63,7 @@ pub trait FileDescriptorConfig: NamedComponent {
         // This is recommended by Tokio, as otherwise the process will not shut down
         // until another newline is entered. See
         // https://github.com/tokio-rs/tokio/blob/a73428252b08bf1436f12e76287acbc4600ca0e5/tokio/src/io/stdin.rs#L33-L42
-        task::spawn_blocking(move || {
+        std::thread::spawn(move || {
             info!("Capturing {}.", description);
             read_from_fd(reader, sender);
         });
@@ -82,6 +81,7 @@ pub trait FileDescriptorConfig: NamedComponent {
 }
 
 type Sender = mpsc::Sender<std::result::Result<bytes::Bytes, std::io::Error>>;
+
 fn read_from_fd<R>(mut reader: R, mut sender: Sender)
 where
     R: Send + io::BufRead + 'static,
@@ -115,7 +115,12 @@ async fn process_stream(
     hostname: Option<String>,
 ) -> Result<(), ()> {
     let bytes_received = register!(BytesReceived::from(Protocol::NONE));
-    let stream = StreamReader::new(receiver);
+    let stream = receiver.inspect(|result| {
+        if let Err(error) = result {
+            emit!(FileDescriptorReadError { error: &error });
+        }
+    });
+    let stream = StreamReader::new(stream);
     let mut stream = FramedRead::new(stream, decoder).take_until(shutdown);
     let mut stream = stream! {
         while let Some(result) = stream.next().await {
