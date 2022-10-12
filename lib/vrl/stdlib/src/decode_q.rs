@@ -150,7 +150,7 @@ fn decode_word(charset: Option<&str>, encoding: &str, input: &str) -> Result<Str
     Ok(cow.into_owned().into())
 }
 
-/// Parses input into (head, (charset, encoding, encoded text), trailing)
+/// Parses input into (head, (charset, encoding, encoded text))
 fn parse_delimited_q<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     input: &'a str,
 ) -> IResult<&'a str, (&'a str, Option<(Option<&'a str>, &'a str, &'a str)>), E> {
