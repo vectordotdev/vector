@@ -232,10 +232,10 @@ async fn send_agent_traces(urls: &Vec<String>, start: i64, duration: i64, span_i
 /// If either of the servers does not respond with a stats payload, the test will fail.
 /// The lastest received stats payload is the only one considered. This is the same logic that the
 /// Datadog UI follows.
-/// Wait for up to 25 seconds for the stats payload to arrive. The Agent can take some time to send
+/// Wait for up to 30 seconds for the stats payload to arrive. The Agent can take some time to send
 /// the stats out.
 /// TODO: Looking into if there is a way to configure the agent bucket interval to force the
-/// flushing to occur faster (reducing the timeout we use and overall runtime of the test)
+/// flushing to occur faster (reducing the timeout we use and overall runtime of the test).
 async fn receive_the_stats(
     rx_agent_only: &mut Receiver<StatsPayload>,
     rx_agent_vector: &mut Receiver<StatsPayload>,
@@ -246,17 +246,24 @@ async fn receive_the_stats(
     let mut stats_agent_vector = None;
     let mut stats_agent_only = None;
 
+    let mut n_payloads_from_vector = 0;
+
+    // wait on the receive of stats payloads. expect one from agent, two from vector.
+    // The second payload from vector should be the aggregate.
     loop {
         tokio::select! {
             d1 = rx_agent_vector.recv() => {
                 stats_agent_vector = d1;
-                if stats_agent_only.is_some() && stats_agent_vector.is_some() {
+                if stats_agent_vector.is_some() {
+                    n_payloads_from_vector += 1
+                }
+                if stats_agent_only.is_some() && n_payloads_from_vector == 2 {
                     break;
                 }
             },
             d2 = rx_agent_only.recv() => {
                 stats_agent_only = d2;
-                if stats_agent_only.is_some() && stats_agent_vector.is_some() {
+                if stats_agent_only.is_some() && n_payloads_from_vector == 2 {
                     break;
                 }
             },
@@ -269,6 +276,10 @@ async fn receive_the_stats(
         "received no stats from vector"
     );
     assert!(stats_agent_only.is_some(), "received no stats from agent");
+    assert!(
+        n_payloads_from_vector == 2,
+        "only received one payload from vector"
+    );
 
     (stats_agent_only.unwrap(), stats_agent_vector.unwrap())
 }
@@ -287,7 +298,8 @@ fn validate_stats(agent_stats: &StatsPayload, vector_stats: &StatsPayload) {
         agent_bucket.duration == vector_bucket.duration,
         "bucket durations do not match"
     );
-    assert!(agent_bucket.stats.len() == vector_bucket.stats.len(),
+    assert!(
+        agent_bucket.stats.len() == vector_bucket.stats.len(),
         "vector and agent reporting different number of buckets"
     );
 
