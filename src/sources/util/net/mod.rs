@@ -1,6 +1,6 @@
-#[cfg(feature = "net-utils-tcp")]
+#[cfg(feature = "sources-utils-net-tcp")]
 mod tcp;
-#[cfg(feature = "net-utils-udp")]
+#[cfg(feature = "sources-utils-net-udp")]
 mod udp;
 
 use std::{fmt, net::SocketAddr};
@@ -10,9 +10,9 @@ use vector_config::configurable_component;
 
 use crate::config::{Protocol, Resource};
 
-#[cfg(feature = "net-utils-tcp")]
+#[cfg(feature = "sources-utils-net-tcp")]
 pub use self::tcp::{TcpNullAcker, TcpSource, TcpSourceAck, TcpSourceAcker};
-#[cfg(feature = "net-utils-udp")]
+#[cfg(feature = "sources-utils-net-udp")]
 pub use self::udp::try_bind_udp_socket;
 
 /// A listening address that can be given directly or be managed via `systemd` socket activation.
@@ -40,13 +40,13 @@ impl SocketListenAddr {
     }
 
     /// Gets this listen address as a `Resource`, specifically for TCP.
-    #[cfg(feature = "net-utils-tcp")]
+    #[cfg(feature = "sources-utils-net-tcp")]
     pub const fn as_tcp_resource(self) -> Resource {
         self.as_resource(Protocol::Tcp)
     }
 
     /// Gets this listen address as a `Resource`, specifically for UDP.
-    #[cfg(feature = "net-utils-udp")]
+    #[cfg(feature = "sources-utils-net-udp")]
     pub const fn as_udp_resource(self) -> Resource {
         self.as_resource(Protocol::Udp)
     }
