@@ -10,7 +10,6 @@ use nom::{
     sequence::{delimited, pair, separated_pair},
     IResult,
 };
-use quoted_printable;
 use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
 
@@ -91,16 +90,14 @@ fn decode_q(bytes: Value) -> Resolved {
                 let mut result = result?;
 
                 result.push_str(head);
-                if let Some((charset, encoding, input)) = word {
-                    result.push_str(&decode_word(charset, encoding, input)?);
+                if let Some(word) = word {
+                    result.push_str(&word.decode_word()?);
                 }
 
                 Ok(result)
             },
         ),
-        map(parse_internal_q, |(charset, encoding, input)| {
-            decode_word(charset, encoding, input)
-        }),
+        map(parse_internal_q, |word| word.decode_word()),
     ))(input)
     .map_err(|e| match e {
         nom::Err::Error(e) | nom::Err::Failure(e) => {
@@ -117,43 +114,10 @@ fn decode_q(bytes: Value) -> Resolved {
     Ok(decoded.into())
 }
 
-fn decode_word(charset: Option<&str>, encoding: &str, input: &str) -> Result<String> {
-    // Modified version from https://github.com/staktrace/mailparse/blob/a83d961fe53fd6504d75ee951a0e91dfea03c830/src/header.rs#L39
-
-    // Decode
-    let decoded = match encoding {
-        "B" | "b" => BASE64_MIME
-            .decode(input.as_bytes())
-            .map_err(|_| "Unable to decode base64 value")?,
-        "Q" | "q" => {
-            // The quoted_printable module does a trim_end on the input, so if
-            // that affects the output we should save and restore the trailing
-            // whitespace
-            let to_decode = input.replace("_", " ");
-            let trimmed = to_decode.trim_end();
-            let mut d = quoted_printable::decode(&trimmed, quoted_printable::ParseMode::Robust);
-            if d.is_ok() && to_decode.len() != trimmed.len() {
-                d.as_mut()
-                    .unwrap()
-                    .extend_from_slice(to_decode[trimmed.len()..].as_bytes());
-            }
-            d.map_err(|_| "Unable to decode quoted_printable value")?
-        }
-        _ => return Err(format!("Invalid encoding: {:?}", encoding).into()),
-    };
-
-    // Convert to UTF-8
-    let charset = charset.unwrap_or("utf-8");
-    let charset = Charset::for_label_no_replacement(charset.as_bytes())
-        .ok_or_else(|| format!("Unable to decode {:?} value", charset))?;
-    let (cow, _) = charset.decode_without_bom_handling(&decoded);
-    Ok(cow.into_owned().into())
-}
-
 /// Parses input into (head, (charset, encoding, encoded text))
 fn parse_delimited_q<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     input: &'a str,
-) -> IResult<&'a str, (&'a str, Option<(Option<&'a str>, &'a str, &'a str)>), E> {
+) -> IResult<&'a str, (&'a str, Option<EncodedWord<'a>>), E> {
     pair(
         take_until("=?"),
         opt(delimited(tag("=?"), parse_internal_q, tag("?="))),
@@ -163,7 +127,7 @@ fn parse_delimited_q<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
 /// Parses inside of encoded word into (charset, encoding, encoded text)
 fn parse_internal_q<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     input: &'a str,
-) -> IResult<&'a str, (Option<&'a str>, &'a str, &'a str), E> {
+) -> IResult<&'a str, EncodedWord<'a>, E> {
     map(
         separated_pair(
             opt(take_until1("?")),
@@ -174,8 +138,53 @@ fn parse_internal_q<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
                 alt((take_until("?="), |input| Ok(("", input)))),
             ),
         ),
-        |(charset, (encoding, text))| (charset, encoding, text),
+        |(charset, (encoding, input))| EncodedWord {
+            charset,
+            encoding,
+            input,
+        },
     )(input)
+}
+
+struct EncodedWord<'a> {
+    charset: Option<&'a str>,
+    encoding: &'a str,
+    input: &'a str,
+}
+
+impl<'a> EncodedWord<'a> {
+    fn decode_word(&self) -> Result<String> {
+        // Modified version from https://github.com/staktrace/mailparse/blob/a83d961fe53fd6504d75ee951a0e91dfea03c830/src/header.rs#L39
+
+        // Decode
+        let decoded = match self.encoding {
+            "B" | "b" => BASE64_MIME
+                .decode(self.input.as_bytes())
+                .map_err(|_| "Unable to decode base64 value")?,
+            "Q" | "q" => {
+                // The quoted_printable module does a trim_end on the input, so if
+                // that affects the output we should save and restore the trailing
+                // whitespace
+                let to_decode = self.input.replace('_', " ");
+                let trimmed = to_decode.trim_end();
+                let mut d = quoted_printable::decode(&trimmed, quoted_printable::ParseMode::Robust);
+                if d.is_ok() && to_decode.len() != trimmed.len() {
+                    d.as_mut()
+                        .unwrap()
+                        .extend_from_slice(to_decode[trimmed.len()..].as_bytes());
+                }
+                d.map_err(|_| "Unable to decode quoted_printable value")?
+            }
+            _ => return Err(format!("Invalid encoding: {:?}", self.encoding).into()),
+        };
+
+        // Convert to UTF-8
+        let charset = self.charset.unwrap_or("utf-8");
+        let charset = Charset::for_label_no_replacement(charset.as_bytes())
+            .ok_or_else(|| format!("Unable to decode {:?} value", charset))?;
+        let (cow, _) = charset.decode_without_bom_handling(&decoded);
+        Ok(cow.into_owned())
+    }
 }
 
 #[cfg(test)]
@@ -185,23 +194,23 @@ mod test {
 
     #[test]
     fn internal() {
-        let (remaining, (charset, encoding, input)) =
+        let (remaining, word) =
             parse_internal_q::<VerboseError<&str>>("utf-8?Q?hello=5Fworld=40example=2ecom")
                 .unwrap();
         assert_eq!(remaining, "");
-        assert_eq!(charset, Some("utf-8"));
-        assert_eq!(encoding, "Q");
-        assert_eq!(input, "hello=5Fworld=40example=2ecom");
+        assert_eq!(word.charset, Some("utf-8"));
+        assert_eq!(word.encoding, "Q");
+        assert_eq!(word.input, "hello=5Fworld=40example=2ecom");
     }
 
     #[test]
     fn internal_no_charset() {
-        let (remaining, (charset, encoding, input)) =
+        let (remaining, word) =
             parse_internal_q::<VerboseError<&str>>("?Q?hello=5Fworld=40example=2ecom").unwrap();
         assert_eq!(remaining, "");
-        assert_eq!(charset, None);
-        assert_eq!(encoding, "Q");
-        assert_eq!(input, "hello=5Fworld=40example=2ecom");
+        assert_eq!(word.charset, None);
+        assert_eq!(word.encoding, "Q");
+        assert_eq!(word.input, "hello=5Fworld=40example=2ecom");
     }
 
     test_function![
