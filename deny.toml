@@ -31,4 +31,9 @@ ignore = [
     # We resolved this by patching chrono to use a version that doesn't depend on `time` v0.1
     # https://github.com/vectordotdev/vector/issues/9679
     "RUSTSEC-2020-0159",
+
+    # No default limit put on request bodies
+    # Ignoring as part of 0.24.2 release to avoid behavior change as input is trusted, but will be
+    # included in 0.25.0
+    "RUSTSEC-2022-0055"
 ]
