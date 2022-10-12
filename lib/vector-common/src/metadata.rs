@@ -34,6 +34,27 @@ impl RequestMetadata {
     pub const fn request_wire_size(&self) -> usize {
         self.request_wire_size
     }
+
+    pub fn from_batch(metadata_vec: &Vec<RequestMetadata>) -> Self {
+        let mut event_count = 0;
+        let mut events_byte_size = 0;
+        let mut request_encoded_size = 0;
+        let mut request_wire_size = 0;
+
+        for m in metadata_vec {
+            event_count += m.event_count();
+            events_byte_size += m.events_byte_size();
+            request_encoded_size += m.request_encoded_size();
+            request_wire_size += m.request_wire_size();
+        }
+
+        Self {
+            event_count,
+            events_byte_size,
+            request_encoded_size,
+            request_wire_size,
+        }
+    }
 }
 
 ///

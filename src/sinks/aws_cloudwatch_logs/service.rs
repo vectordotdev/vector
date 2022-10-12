@@ -158,7 +158,11 @@ impl Service<BatchCloudwatchRequest> for CloudwatchLogsPartitionSvc {
 
     fn call(&mut self, req: BatchCloudwatchRequest) -> Self::Future {
         let events_count = req.events.len();
-        let events_byte_size = req.events.iter().map(|x| x.event_byte_size).sum();
+        let events_byte_size = req
+            .events
+            .iter()
+            .map(|x| x.metadata.events_byte_size())
+            .sum();
         let key = req.key;
         let events = req
             .events

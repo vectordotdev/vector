@@ -1,6 +1,9 @@
+use std::num::NonZeroUsize;
+
 use bytes::BytesMut;
 use chrono::Utc;
 use tokio_util::codec::Encoder as _;
+use vector_common::metadata::RequestMetadata;
 use vector_core::{
     event::{EventFinalizers, Finalizable},
     ByteSizeOf,
@@ -12,7 +15,7 @@ use crate::{
     config::LogSchema,
     event::{Event, Value},
     internal_events::AwsCloudwatchLogsMessageSizeError,
-    sinks::aws_cloudwatch_logs::CloudwatchKey,
+    sinks::{aws_cloudwatch_logs::CloudwatchKey, util::metadata::RequestMetadataBuilder},
     template::Template,
 };
 
@@ -25,9 +28,10 @@ const MAX_MESSAGE_SIZE: usize = MAX_EVENT_SIZE - EVENT_SIZE_OVERHEAD;
 pub struct CloudwatchRequest {
     pub key: CloudwatchKey,
     pub(super) message: String,
-    pub event_byte_size: usize,
+    //pub event_byte_size: usize,
     pub timestamp: i64,
     pub finalizers: EventFinalizers,
+    pub metadata: RequestMetadata,
 }
 
 impl Finalizable for CloudwatchRequest {
@@ -93,12 +97,18 @@ impl CloudwatchRequestBuilder {
             });
             return None;
         }
+
+        let builder = RequestMetadataBuilder::from_events(&event);
+        let bytes_len =
+            NonZeroUsize::new(message_bytes.len()).expect("payload should never be zero length");
+        let metadata = builder.with_request_size(bytes_len);
+
         Some(CloudwatchRequest {
             key,
             message,
-            event_byte_size,
             timestamp,
             finalizers,
+            metadata,
         })
     }
 }
