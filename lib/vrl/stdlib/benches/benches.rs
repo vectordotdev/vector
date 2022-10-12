@@ -279,7 +279,7 @@ bench_function! {
 }
 
 bench_function! {
-    decode_base64 => vrl_stdlib::DecodeQ;
+    decode_q => vrl_stdlib::DecodeQ;
 
     base_64 {
         args: func_args![value: "=?utf-8?b?SGVsbG8sIFdvcmxkIQ==?="],
