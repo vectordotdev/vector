@@ -6,6 +6,7 @@
 
 #![cfg(feature = "kubernetes")]
 
+pub mod meta_cache;
 pub mod pod_manager_logic;
 pub mod reflector;
 
