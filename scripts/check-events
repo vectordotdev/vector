@@ -48,12 +48,14 @@ end
 
 # A class to hold error reports and common functionality
 class Event
-  attr_accessor :path, :skip_dropped_events, :uses, :impl_internal_event, :impl_register_event, :impl_event_handle
+  attr_accessor :path, :skip_dropped_events, :uses, :skip_duplicate_check, :skip_validity_check, :impl_internal_event, :impl_register_event, :impl_event_handle
   attr_reader :name, :reports, :logs
   attr_writer :members
 
   def initialize(name)
     @path = nil
+    @skip_duplicate_check = false
+    @skip_validity_check = false
     @skip_dropped_events = false
     @emits_component_events_dropped = false
     @name = name
@@ -415,6 +417,9 @@ Find.find('./src', './lib') do |path|
       do |_space, trait, event_name, block|
         event = $all_events[event_name]
 
+        event.skip_duplicate_check = block.match? /## skip check-duplicate-events ##/i
+        event.skip_validity_check = block.match? /## skip check-validity-events ##/i
+
         if trait == 'InternalEvent'
           # Look-aside internal events that defer their implementation to a registered event.
           if ! block.include? 'register('
@@ -441,7 +446,7 @@ $duplicates = Hash::new { |hash, key| hash[key] = [] }
 
 $all_events.each do |name, event|
   # Check for duplicated signatures
-  if event.impl_internal_event or event.impl_event_handle
+  if !event.skip_duplicate_check and (event.impl_internal_event or event.impl_event_handle)
     signature = event.signature
     if signature
       $duplicates[event.signature].append(name)
@@ -449,24 +454,26 @@ $all_events.each do |name, event|
   end
 
   # Check events for validity
-  if event.impl_internal_event
-    unless event.valid?
-      puts "#{event.path}: Errors in event #{event.name}:"
-      event.reports.each { |report| puts "    #{report}" }
-      error_count += 1
-    end
-  elsif event.impl_register_event
-    handle = $all_events[event.impl_register_event]
-    if handle
-      unless event.valid_with_handle? handle
+  if !event.skip_validity_check
+    if event.impl_internal_event
+      unless event.valid?
         puts "#{event.path}: Errors in event #{event.name}:"
         event.reports.each { |report| puts "    #{report}" }
         error_count += 1
       end
-    else
-      puts "Registered event #{event.name} references non-exitent handle #{event.impl_register_event}"
-      error_count += 1
-      next
+    elsif event.impl_register_event
+      handle = $all_events[event.impl_register_event]
+      if handle
+        unless event.valid_with_handle? handle
+          puts "#{event.path}: Errors in event #{event.name}:"
+          event.reports.each { |report| puts "    #{report}" }
+          error_count += 1
+        end
+      else
+        puts "Registered event #{event.name} references non-existent handle #{event.impl_register_event}"
+        error_count += 1
+        next
+      end
     end
   end
 end

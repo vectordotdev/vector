@@ -25,6 +25,7 @@ impl InternalEvent for AwsEc2MetadataRefreshError {
             error = %self.error,
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,

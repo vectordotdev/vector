@@ -12,7 +12,7 @@ use tokio_util::codec::Decoder;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
-use super::util::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
+use super::util::net::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
@@ -97,7 +97,7 @@ impl SourceConfig for FluentConfig {
     }
 
     fn resources(&self) -> Vec<Resource> {
-        vec![self.address.into()]
+        vec![self.address.as_tcp_resource()]
     }
 
     fn can_acknowledge(&self) -> bool {

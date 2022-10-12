@@ -403,7 +403,7 @@ mod tests {
     }
 
     async fn emit_and_test(make_event: impl FnOnce(DateTime<Utc>) -> Event) {
-        let _ = metrics::init_test();
+        metrics::init_test();
         let (mut sender, _stream) = SourceSender::new_test();
         let millis = thread_rng().gen_range(10..10000);
         let timestamp = Utc::now() - Duration::milliseconds(millis);

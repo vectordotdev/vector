@@ -1,5 +1,5 @@
 use metrics::{counter, decrement_gauge, gauge, increment_gauge};
-use vector_common::internal_event::InternalEvent;
+use vector_common::internal_event::{error_type, InternalEvent};
 
 pub struct BufferCreated {
     pub idx: usize,
@@ -100,7 +100,7 @@ impl InternalEvent for BufferReadError {
             message = "Error encountered during buffer read.",
             error = %self.error,
             error_code = self.error_code,
-            error_type = "reader_failed",
+            error_type = error_type::READER_FAILED,
             stage = "processing",
             internal_log_rate_limit = true,
         );
