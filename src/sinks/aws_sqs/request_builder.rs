@@ -1,4 +1,5 @@
 use bytes::Bytes;
+use vector_common::metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::ByteSizeOf;
 
 use super::config::SqsSinkConfig;
@@ -6,14 +7,16 @@ use crate::{
     codecs::{Encoder, Transformer},
     event::{Event, EventFinalizers, Finalizable},
     internal_events::TemplateRenderingError,
-    sinks::util::{request_builder::EncodeResult, Compression, EncodedLength, RequestBuilder},
+    sinks::util::{
+        metadata::RequestMetadataBuilder, request_builder::EncodeResult, Compression,
+        EncodedLength, RequestBuilder,
+    },
     template::Template,
 };
 
 #[derive(Clone)]
-pub struct Metadata {
+pub struct SqsMetadata {
     pub finalizers: EventFinalizers,
-    pub event_byte_size: usize,
     pub message_group_id: Option<String>,
     pub message_deduplication_id: Option<String>,
 }
@@ -42,7 +45,7 @@ impl SqsRequestBuilder {
 }
 
 impl RequestBuilder<Event> for SqsRequestBuilder {
-    type Metadata = Metadata;
+    type Metadata = (SqsMetadata, RequestMetadataBuilder);
     type Events = Event;
     type Encoder = (Transformer, Encoder<()>);
     type Payload = Bytes;
@@ -89,13 +92,14 @@ impl RequestBuilder<Event> for SqsRequestBuilder {
             None => None,
         };
 
-        let metadata = Metadata {
+        let builder = RequestMetadataBuilder::from_events(&event);
+
+        let metadata = SqsMetadata {
             finalizers: event.take_finalizers(),
-            event_byte_size,
             message_group_id,
             message_deduplication_id,
         };
-        (metadata, event)
+        ((metadata, builder), event)
     }
 
     fn build_request(
@@ -103,14 +107,18 @@ impl RequestBuilder<Event> for SqsRequestBuilder {
         metadata: Self::Metadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let payload = payload.into_payload();
-        let message_body = String::from(std::str::from_utf8(&payload).unwrap());
+        let payload_bytes = payload.into_payload();
+        let message_body = String::from(std::str::from_utf8(&payload_bytes).unwrap());
+
+        let (sqs_metadata, builder) = metadata;
+
         SendMessageEntry {
             message_body,
-            message_group_id: metadata.message_group_id,
-            message_deduplication_id: metadata.message_deduplication_id,
+            message_group_id: sqs_metadata.message_group_id,
+            message_deduplication_id: sqs_metadata.message_deduplication_id,
             queue_url: self.queue_url.clone(),
-            finalizers: metadata.finalizers,
+            finalizers: sqs_metadata.finalizers,
+            metadata: builder.build(&payload),
         }
     }
 }
@@ -122,6 +130,7 @@ pub(crate) struct SendMessageEntry {
     pub message_deduplication_id: Option<String>,
     pub queue_url: String,
     finalizers: EventFinalizers,
+    pub metadata: RequestMetadata,
 }
 
 impl ByteSizeOf for SendMessageEntry {
@@ -141,5 +150,11 @@ impl EncodedLength for SendMessageEntry {
 impl Finalizable for SendMessageEntry {
     fn take_finalizers(&mut self) -> EventFinalizers {
         self.finalizers.take_finalizers()
+    }
+}
+
+impl MetaDescriptive for SendMessageEntry {
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
     }
 }
