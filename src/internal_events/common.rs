@@ -137,8 +137,6 @@ impl InternalEvent for CollectionCompleted {
     }
 }
 
-<<<<<<< HEAD
-=======
 #[allow(dead_code)]
 pub const INTENTIONAL: bool = true;
 pub const UNINTENTIONAL: bool = false;

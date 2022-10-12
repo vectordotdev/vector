@@ -10,6 +10,7 @@ use futures::future::BoxFuture;
 use md5::Digest;
 use tower::Service;
 use tracing::Instrument;
+use vector_common::metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::{
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_event::CountByteSize,
@@ -23,6 +24,7 @@ pub struct S3Request {
     pub body: Bytes,
     pub bucket: String,
     pub metadata: S3Metadata,
+    pub request_metadata: RequestMetadata,
     pub content_encoding: Option<&'static str>,
     pub options: S3Options,
 }
@@ -33,11 +35,15 @@ impl Finalizable for S3Request {
     }
 }
 
+impl MetaDescriptive for S3Request {
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.request_metadata
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct S3Metadata {
     pub partition_key: String,
-    pub count: usize,
-    pub byte_size: usize,
     pub finalizers: EventFinalizers,
 }
 
@@ -109,8 +115,8 @@ impl Service<S3Request> for S3Service {
             }
             tagging.finish()
         });
-        let count = request.metadata.count;
-        let events_byte_size = request.metadata.byte_size;
+        let count = request.request_metadata.event_count();
+        let events_byte_size = request.request_metadata.events_byte_size();
 
         let client = self.client.clone();
 

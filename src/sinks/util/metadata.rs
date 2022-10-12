@@ -6,9 +6,10 @@ use vector_core::ByteSizeOf;
 
 use super::request_builder::EncodeResult;
 
+#[derive(Clone, Default, Debug)]
 pub struct RequestMetadataBuilder {
-    event_count: usize,
-    events_byte_size: usize,
+    pub event_count: usize,
+    pub events_byte_size: usize,
 }
 
 impl RequestMetadataBuilder {
@@ -22,7 +23,14 @@ impl RequestMetadataBuilder {
         }
     }
 
-    pub const fn with_request_size(self, size: NonZeroUsize) -> RequestMetadata {
+    pub fn new(event_count: usize, events_byte_size: usize) -> Self {
+        Self {
+            event_count,
+            events_byte_size,
+        }
+    }
+
+    pub const fn with_request_size(&self, size: NonZeroUsize) -> RequestMetadata {
         RequestMetadata {
             event_count: self.event_count,
             events_byte_size: self.events_byte_size,
@@ -31,7 +39,7 @@ impl RequestMetadataBuilder {
         }
     }
 
-    pub fn build<T>(self, result: &EncodeResult<T>) -> RequestMetadata {
+    pub fn build<T>(&self, result: &EncodeResult<T>) -> RequestMetadata {
         RequestMetadata {
             event_count: self.event_count,
             events_byte_size: self.events_byte_size,

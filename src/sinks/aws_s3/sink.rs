@@ -4,7 +4,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use codecs::encoding::Framer;
 use uuid::Uuid;
-use vector_core::{event::Finalizable, ByteSizeOf};
+use vector_core::event::Finalizable;
 
 use crate::{
     codecs::{Encoder, Transformer},
@@ -14,7 +14,10 @@ use crate::{
             config::S3Options,
             service::{S3Metadata, S3Request},
         },
-        util::{request_builder::EncodeResult, Compression, RequestBuilder},
+        util::{
+            metadata::RequestMetadataBuilder, request_builder::EncodeResult, Compression,
+            RequestBuilder,
+        },
     },
 };
 
@@ -30,7 +33,7 @@ pub struct S3RequestOptions {
 }
 
 impl RequestBuilder<(String, Vec<Event>)> for S3RequestOptions {
-    type Metadata = S3Metadata;
+    type Metadata = (S3Metadata, RequestMetadataBuilder);
     type Events = Vec<Event>;
     type Encoder = (Transformer, Encoder<Framer>);
     type Payload = Bytes;
@@ -48,14 +51,14 @@ impl RequestBuilder<(String, Vec<Event>)> for S3RequestOptions {
     fn split_input(&self, input: (String, Vec<Event>)) -> (Self::Metadata, Self::Events) {
         let (partition_key, mut events) = input;
         let finalizers = events.take_finalizers();
+
+        let builder = RequestMetadataBuilder::from_events(events);
         let metadata = S3Metadata {
             partition_key,
-            count: events.len(),
-            byte_size: events.size_of(),
             finalizers,
         };
 
-        (metadata, events)
+        ((metadata, builder), events)
     }
 
     fn build_request(
@@ -63,6 +66,8 @@ impl RequestBuilder<(String, Vec<Event>)> for S3RequestOptions {
         mut metadata: Self::Metadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
+        let (s3metadata, builder) = metadata;
+
         let filename = {
             let formatted_ts = Utc::now().format(self.filename_time_format.as_str());
 
@@ -76,12 +81,14 @@ impl RequestBuilder<(String, Vec<Event>)> for S3RequestOptions {
             .as_ref()
             .cloned()
             .unwrap_or_else(|| self.compression.extension().into());
-        metadata.partition_key = format!("{}{}.{}", metadata.partition_key, filename, extension);
+        s3metadata.partition_key =
+            format!("{}{}.{}", s3metadata.partition_key, filename, extension);
 
         S3Request {
             body: payload.into_payload(),
             bucket: self.bucket.clone(),
-            metadata,
+            metadata: s3metadata,
+            request_metadata: builder.build(&payload),
             content_encoding: self.compression.content_encoding(),
             options: self.api_options.clone(),
         }

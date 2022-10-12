@@ -9,7 +9,10 @@ use super::{
 };
 use crate::sinks::{
     splunk_hec::common::request::HecRequest,
-    util::{request_builder::EncodeResult, Compression, RequestBuilder},
+    util::{
+        metadata::RequestMetadataBuilder, request_builder::EncodeResult, Compression,
+        RequestBuilder,
+    },
 };
 
 pub struct HecLogsRequestBuilder {
@@ -19,14 +22,13 @@ pub struct HecLogsRequestBuilder {
 
 #[derive(Debug, Clone)]
 pub struct RequestMetadata {
-    events_count: usize,
-    events_byte_size: usize,
     finalizers: EventFinalizers,
     partition: Option<Arc<str>>,
     source: Option<String>,
     sourcetype: Option<String>,
     index: Option<String>,
     host: Option<String>,
+    builder: RequestMetadataBuilder,
 }
 
 impl RequestBuilder<(Option<Partitioned>, Vec<HecProcessedEvent>)> for HecLogsRequestBuilder {
@@ -52,18 +54,18 @@ impl RequestBuilder<(Option<Partitioned>, Vec<HecProcessedEvent>)> for HecLogsRe
         let (mut partition, mut events) = input;
 
         let finalizers = events.take_finalizers();
-        let events_byte_size: usize = events.iter().map(|e| e.metadata.event_byte_size).sum();
+
+        let builder = RequestMetadataBuilder::from_events(&events);
 
         (
             RequestMetadata {
-                events_count: events.len(),
-                events_byte_size,
                 finalizers,
                 partition: partition.as_ref().and_then(|p| p.token.clone()),
                 source: partition.as_mut().and_then(|p| p.source.take()),
                 sourcetype: partition.as_mut().and_then(|p| p.sourcetype.take()),
                 index: partition.as_mut().and_then(|p| p.index.take()),
                 host: partition.as_mut().and_then(|p| p.host.take()),
+                builder,
             },
             events,
         )
@@ -77,13 +79,12 @@ impl RequestBuilder<(Option<Partitioned>, Vec<HecProcessedEvent>)> for HecLogsRe
         HecRequest {
             body: payload.into_payload(),
             finalizers: metadata.finalizers,
-            events_count: metadata.events_count,
-            events_byte_size: metadata.events_byte_size,
             passthrough_token: metadata.partition,
             source: metadata.source,
             sourcetype: metadata.sourcetype,
             index: metadata.index,
             host: metadata.host,
+            metadata: metadata.builder.build(&payload),
         }
     }
 }

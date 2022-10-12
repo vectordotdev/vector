@@ -6,7 +6,10 @@ use vector_core::event::{EventFinalizers, Finalizable};
 use super::{encoder::HecMetricsEncoder, sink::HecProcessedEvent};
 use crate::sinks::{
     splunk_hec::common::request::HecRequest,
-    util::{request_builder::EncodeResult, Compression, RequestBuilder},
+    util::{
+        metadata::RequestMetadataBuilder, request_builder::EncodeResult, Compression,
+        RequestBuilder,
+    },
 };
 
 pub struct HecMetricsRequestBuilder {
@@ -14,7 +17,13 @@ pub struct HecMetricsRequestBuilder {
 }
 
 impl RequestBuilder<(Option<Arc<str>>, Vec<HecProcessedEvent>)> for HecMetricsRequestBuilder {
-    type Metadata = (usize, usize, EventFinalizers, Option<Arc<str>>);
+    type Metadata = (
+        usize,
+        usize,
+        EventFinalizers,
+        Option<Arc<str>>,
+        RequestMetadataBuilder,
+    );
     type Events = Vec<HecProcessedEvent>;
     type Encoder = HecMetricsEncoder;
     type Payload = Bytes;
@@ -37,12 +46,15 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<HecProcessedEvent>)> for HecMetricsRe
         let finalizers = events.take_finalizers();
         let events_byte_size: usize = events.iter().map(|e| e.metadata.event_byte_size).sum();
 
+        let metadata_builder = RequestMetadataBuilder::from_events(&events);
+
         (
             (
                 events.len(),
                 events_byte_size,
                 finalizers,
                 passthrough_token,
+                metadata_builder,
             ),
             events,
         )
@@ -53,17 +65,17 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<HecProcessedEvent>)> for HecMetricsRe
         metadata: Self::Metadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (events_count, events_byte_size, finalizers, passthrough_token) = metadata;
+        let (events_count, events_byte_size, finalizers, passthrough_token, metadata_builder) =
+            metadata;
         HecRequest {
             body: payload.into_payload(),
             finalizers,
-            events_count,
-            events_byte_size,
             passthrough_token,
             index: None,
             source: None,
             sourcetype: None,
             host: None,
+            metadata: metadata_builder.build(&payload),
         }
     }
 }

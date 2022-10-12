@@ -9,6 +9,7 @@ use prost::Message;
 use proto_event::EventWrapper;
 use tonic::{body::BoxBody, IntoRequest};
 use tower::Service;
+use vector_common::metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::{
     event::proto as proto_event, internal_event::CountByteSize, stream::DriverResponse,
 };
@@ -18,7 +19,7 @@ use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_events::EndpointBytesSent,
     proto::vector as proto_vector,
-    sinks::util::uri,
+    sinks::util::{metadata::RequestMetadataBuilder, uri},
     Error,
 };
 
@@ -48,12 +49,20 @@ impl DriverResponse for VectorResponse {
 pub struct VectorRequest {
     pub events: Vec<EventWrapper>,
     pub finalizers: EventFinalizers,
-    pub events_byte_size: usize,
+    pub request: proto_vector::PushEventsRequest,
+    pub metadata: RequestMetadata,
+    pub builder: RequestMetadataBuilder,
 }
 
 impl Finalizable for VectorRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
         self.finalizers.take_finalizers()
+    }
+}
+
+impl MetaDescriptive for VectorRequest {
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
     }
 }
 
@@ -98,26 +107,20 @@ impl Service<VectorRequest> for VectorService {
     // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, list: VectorRequest) -> Self::Future {
         let mut service = self.clone();
-        let events_count = list.events.len();
-        let events_byte_size = list.events_byte_size;
 
-        let request = proto_vector::PushEventsRequest {
-            events: list.events,
-        };
-        let byte_size = request.encoded_len();
         let future = async move {
             service
                 .client
-                .push_events(request.into_request())
+                .push_events(list.request.into_request())
                 .map_ok(|_response| {
                     emit!(EndpointBytesSent {
-                        byte_size,
+                        byte_size: list.request.encoded_len(),
                         protocol: &service.protocol,
                         endpoint: &service.endpoint,
                     });
                     VectorResponse {
-                        events_count,
-                        events_byte_size,
+                        events_count: list.metadata.event_count(),
+                        events_byte_size: list.metadata.events_byte_size(),
                     }
                 })
                 .map_err(|source| VectorSinkError::Request { source }.into())

@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, num::NonZeroUsize};
 
 use async_trait::async_trait;
 use futures::{stream::BoxStream, StreamExt};
@@ -12,6 +12,7 @@ use vector_core::{
 use super::service::VectorRequest;
 use crate::{
     event::{proto::EventWrapper, Event, EventFinalizers, Finalizable},
+    proto::vector as proto_vector,
     sinks::util::{SinkBuilderExt, StreamSink},
 };
 
@@ -43,9 +44,20 @@ where
             .batched(self.batch_settings.into_reducer_config(
                 |data: &EventData| data.wrapper.encoded_len(),
                 |req: &mut VectorRequest, item: EventData| {
-                    req.events_byte_size += item.byte_size;
                     req.finalizers.merge(item.finalizers);
                     req.events.push(item.wrapper);
+
+                    req.builder.event_count += 1;
+                    req.builder.events_byte_size += item.byte_size;
+
+                    let events = req.events.clone();
+                    req.request = proto_vector::PushEventsRequest { events };
+
+                    let byte_size = req.request.encoded_len();
+                    let bytes_len =
+                        NonZeroUsize::new(byte_size).expect("payload should never be zero length");
+
+                    req.metadata = req.builder.with_request_size(bytes_len);
                 },
             ))
             .into_driver(self.service)

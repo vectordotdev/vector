@@ -4,7 +4,7 @@ use futures::{poll, FutureExt, Stream, StreamExt, TryFutureExt};
 use tokio::{pin, select};
 use tower::Service;
 use tracing::Instrument;
-use vector_common::internal_event::{BytesSent, CountByteSize PollReadyError, ServiceCallError};
+use vector_common::internal_event::{BytesSent, CountByteSize, PollReadyError, ServiceCallError};
 use vector_common::metadata::{MetaDescriptive, RequestMetadata};
 
 use super::FuturesUnorderedCount;

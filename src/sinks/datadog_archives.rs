@@ -597,7 +597,7 @@ impl DatadogS3RequestBuilder {
 }
 
 impl RequestBuilder<(String, Vec<Event>)> for DatadogS3RequestBuilder {
-    type Metadata = S3Metadata;
+    type Metadata = (S3Metadata, RequestMetadataBuilder);
     type Events = Vec<Event>;
     type Encoder = DatadogArchivesEncoding;
     type Payload = Bytes;
@@ -615,14 +615,15 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogS3RequestBuilder {
     fn split_input(&self, input: (String, Vec<Event>)) -> (Self::Metadata, Self::Events) {
         let (partition_key, mut events) = input;
         let finalizers = events.take_finalizers();
+
+        let builder = RequestMetadataBuilder::from_events(&events);
+
         let metadata = S3Metadata {
             partition_key,
-            count: events.len(),
-            byte_size: events.size_of(),
             finalizers,
         };
 
-        (metadata, events)
+        ((metadata, builder), events)
     }
 
     fn build_request(
@@ -630,23 +631,27 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogS3RequestBuilder {
         mut metadata: Self::Metadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        metadata.partition_key =
-            generate_object_key(self.key_prefix.clone(), metadata.partition_key);
+        let (s3metadata, metadata_builder) = metadata;
+        s3metadata.partition_key =
+            generate_object_key(self.key_prefix.clone(), s3metadata.partition_key);
+
+        let request_metadata = metadata_builder.build(&payload);
 
         let body = payload.into_payload();
         trace!(
             message = "Sending events.",
             bytes = ?body.len(),
-            events_len = ?metadata.byte_size,
+            events_len = ?request_metadata.events_byte_size(),
             bucket = ?self.bucket,
-            key = ?metadata.partition_key
+            key = ?s3metadata.partition_key
         );
 
         let s3_options = self.config.options.clone();
         S3Request {
             body,
             bucket: self.bucket.clone(),
-            metadata,
+            metadata: s3metadata,
+            request_metadata,
             content_encoding: DEFAULT_COMPRESSION.content_encoding(),
             options: s3_common::config::S3Options {
                 acl: s3_options.acl,

@@ -6,6 +6,7 @@ use http::StatusCode;
 use snafu::Snafu;
 use tower::Service;
 use tracing::Instrument;
+use vector_common::metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::{
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_event::CountByteSize,
@@ -15,7 +16,7 @@ use vector_core::{
 use crate::sinks::loki::config::{CompressionConfigAdapter, ExtendedCompression};
 use crate::{
     http::{get_http_scheme_from_uri, Auth, HttpClient},
-    sinks::util::{metadata::RequestMetadata, retries::RetryLogic, UriSerde},
+    sinks::util::{retries::RetryLogic, UriSerde},
 };
 
 #[derive(Clone)]
@@ -81,6 +82,12 @@ pub struct LokiRequest {
 impl Finalizable for LokiRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
         self.finalizers.take_finalizers()
+    }
+}
+
+impl MetaDescriptive for LokiRequest {
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
     }
 }
 
