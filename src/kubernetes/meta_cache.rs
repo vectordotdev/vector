@@ -16,8 +16,8 @@ impl MetaCache {
     pub fn store(&mut self, meta_desc: MetaDescribe) {
         self.cache.insert(meta_desc);
     }
-    pub fn delete(&mut self, meta_desc: MetaDescribe) {
-        self.cache.retain(|x| *x != meta_desc);
+    pub fn delete(&mut self, meta_desc: &MetaDescribe) {
+        self.cache.remove(meta_desc);
     }
     pub fn contains(&self, meta_desc: &MetaDescribe) -> bool {
         self.cache.contains(meta_desc)
@@ -35,9 +35,9 @@ pub struct MetaDescribe {
 
 impl MetaDescribe {
     pub fn from_meta(meta: &ObjectMeta) -> Self {
-        let meta = meta.clone();
-        let name = meta.name.unwrap_or_default();
-        let namespace = meta.namespace.unwrap_or_default();
+        let name = meta.name.clone().unwrap_or_default();
+        let namespace = meta.namespace.clone().unwrap_or_default();
+
         Self { name, namespace }
     }
 }
@@ -76,7 +76,7 @@ mod tests {
 
         meta_cache.store(meta_desc.clone());
         assert_eq!(1, meta_cache.cache.len());
-        meta_cache.delete(meta_desc);
+        meta_cache.delete(&meta_desc);
         assert_eq!(0, meta_cache.cache.len());
     }
 
