@@ -58,8 +58,8 @@ mod heartbeat;
 mod host_metrics;
 mod http;
 pub mod http_client;
-#[cfg(feature = "sources-utils-http-scrape")]
-mod http_scrape;
+#[cfg(feature = "sources-utils-http-client")]
+mod http_client_source;
 #[cfg(feature = "sinks-influxdb")]
 mod influxdb;
 #[cfg(feature = "sources-internal_logs")]
@@ -198,8 +198,8 @@ pub(crate) use self::host_metrics::*;
     feature = "sources-splunk_hec",
 ))]
 pub(crate) use self::http::*;
-#[cfg(feature = "sources-utils-http-scrape")]
-pub(crate) use self::http_scrape::*;
+#[cfg(feature = "sources-utils-http-client")]
+pub(crate) use self::http_client_source::*;
 #[cfg(feature = "sinks-influxdb")]
 pub(crate) use self::influxdb::*;
 #[cfg(feature = "sources-internal_logs")]
