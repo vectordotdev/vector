@@ -1,8 +1,10 @@
 use std::collections::BTreeMap;
 
-use aws_sdk_s3::error::PutObjectError;
-use aws_sdk_s3::model::{ObjectCannedAcl, ServerSideEncryption, StorageClass};
-use aws_sdk_s3::Client as S3Client;
+use aws_sdk_s3::{
+    error::PutObjectError,
+    model::{ObjectCannedAcl, ServerSideEncryption, StorageClass},
+    Client as S3Client,
+};
 use aws_smithy_client::SdkError;
 use futures::FutureExt;
 use http::StatusCode;
@@ -10,13 +12,12 @@ use snafu::Snafu;
 use vector_config::configurable_component;
 
 use super::service::{S3Response, S3Service};
-use crate::aws::{create_client, is_retriable_error};
-use crate::aws::{AwsAuthentication, RegionOrEndpoint};
-use crate::common::s3::S3ClientBuilder;
-use crate::tls::TlsConfig;
 use crate::{
+    aws::{create_client, is_retriable_error, AwsAuthentication, RegionOrEndpoint},
+    common::s3::S3ClientBuilder,
     config::ProxyConfig,
     sinks::{util::retries::RetryLogic, Healthcheck},
+    tls::TlsConfig,
 };
 
 /// Per-operation configuration when writing objects to S3.

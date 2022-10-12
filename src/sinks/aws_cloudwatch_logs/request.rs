@@ -1,7 +1,7 @@
 use std::{
     future::Future,
     pin::Pin,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
 };
 
 use aws_sdk_cloudwatchlogs::error::{
@@ -15,7 +15,7 @@ use aws_sdk_cloudwatchlogs::output::{DescribeLogStreamsOutput, PutLogEventsOutpu
 use aws_sdk_cloudwatchlogs::types::SdkError;
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
 use aws_smithy_http::operation::{Operation, Request};
-use futures::{future::BoxFuture, ready, FutureExt};
+use futures::{future::BoxFuture, FutureExt};
 use indexmap::IndexMap;
 use tokio::sync::oneshot;
 
@@ -148,12 +148,10 @@ impl Future for CloudwatchFuture {
                         Ok(_) => {}
                         Err(err) => {
                             let resource_already_exists = match &err {
-                                SdkError::ServiceError { err, raw: _ } => match err.kind {
-                                    CreateLogGroupErrorKind::ResourceAlreadyExistsException(_) => {
-                                        true
-                                    }
-                                    _ => false,
-                                },
+                                SdkError::ServiceError { err, raw: _ } => matches!(
+                                    err.kind,
+                                    CreateLogGroupErrorKind::ResourceAlreadyExistsException(_)
+                                ),
                                 _ => false,
                             };
                             if !resource_already_exists {
@@ -175,12 +173,10 @@ impl Future for CloudwatchFuture {
                         Ok(_) => {}
                         Err(err) => {
                             let resource_already_exists = match &err {
-                                SdkError::ServiceError { err, raw: _ } => match err.kind {
-                                    CreateLogStreamErrorKind::ResourceAlreadyExistsException(_) => {
-                                        true
-                                    }
-                                    _ => false,
-                                },
+                                SdkError::ServiceError { err, raw: _ } => matches!(
+                                    err.kind,
+                                    CreateLogStreamErrorKind::ResourceAlreadyExistsException(_)
+                                ),
                                 _ => false,
                             };
                             if !resource_already_exists {
@@ -241,12 +237,10 @@ impl Client {
                 .log_group_name(group_name)
                 .log_stream_name(stream_name)
                 .build()
-                .map_err(|err| aws_smithy_http::result::SdkError::ConstructionFailure(err.into()))?
+                .map_err(|err| SdkError::ConstructionFailure(err.into()))?
                 .make_operation(cw_client.conf())
                 .await
-                .map_err(|err| {
-                    aws_smithy_http::result::SdkError::ConstructionFailure(err.into())
-                })?;
+                .map_err(|err| SdkError::ConstructionFailure(err.into()))?;
 
             let (req, parts) = op.into_request_response();
             let (mut body, props) = req.into_parts();
@@ -254,12 +248,10 @@ impl Client {
                 let owned_header = header.clone();
                 let owned_value = value.clone();
                 body.headers_mut().insert(
-                    http::header::HeaderName::from_bytes(owned_header.as_bytes()).map_err(
-                        |err| aws_smithy_http::result::SdkError::ConstructionFailure(err.into()),
-                    )?,
-                    http::HeaderValue::from_str(owned_value.as_str()).map_err(|err| {
-                        aws_smithy_http::result::SdkError::ConstructionFailure(err.into())
-                    })?,
+                    http::header::HeaderName::from_bytes(owned_header.as_bytes())
+                        .map_err(|err| SdkError::ConstructionFailure(err.into()))?,
+                    http::HeaderValue::from_str(owned_value.as_str())
+                        .map_err(|err| SdkError::ConstructionFailure(err.into()))?,
                 );
             }
             client

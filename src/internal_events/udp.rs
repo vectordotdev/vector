@@ -1,7 +1,8 @@
 use metrics::counter;
+use vector_common::internal_event::{error_stage, error_type};
 use vector_core::internal_event::InternalEvent;
 
-use vector_common::internal_event::{error_stage, error_type};
+use crate::{emit, internal_events::SocketOutgoingConnectionError};
 
 #[derive(Debug)]
 pub struct UdpSocketConnectionEstablished;
@@ -14,25 +15,15 @@ impl InternalEvent for UdpSocketConnectionEstablished {
 }
 
 #[derive(Debug)]
-pub struct UdpSocketConnectionError<E> {
+pub struct UdpSocketOutgoingConnectionError<E> {
     pub error: E,
 }
 
-impl<E: std::error::Error> InternalEvent for UdpSocketConnectionError<E> {
+impl<E: std::error::Error> InternalEvent for UdpSocketOutgoingConnectionError<E> {
     fn emit(self) {
-        error!(
-            message = "Unable to connect.",
-            error = %self.error,
-            error_code = "connection",
-            error_type = error_type::READER_FAILED,
-            stage = error_stage::PROCESSING,
-        );
-        counter!(
-            "component_errors_total", 1,
-            "error_code" => "connection",
-            "error_type" => error_type::READER_FAILED,
-            "stage" => error_stage::PROCESSING,
-        );
+        // ## skip check-duplicate-events ##
+        // ## skip check-validity-events ##
+        emit!(SocketOutgoingConnectionError { error: self.error });
         // deprecated
         counter!("connection_failed_total", 1, "mode" => "udp");
     }
@@ -50,6 +41,7 @@ impl InternalEvent for UdpSocketError {
             error = %self.error,
             error_type = error_type::READER_FAILED,
             stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -74,9 +66,9 @@ impl InternalEvent for UdpSendIncompleteError {
             data_size = self.data_size,
             sent = self.sent,
             dropped = self.data_size - self.sent,
-            internal_log_rate_secs = 30,
             error_type = error_type::WRITER_FAILED,
             stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,

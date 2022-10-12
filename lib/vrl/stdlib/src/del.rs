@@ -3,13 +3,13 @@ use vrl::prelude::*;
 use vrl::state::TypeInfo;
 
 #[inline]
-fn del(query: &expression::Query, ctx: &mut Context) -> Resolved {
+fn del(query: &expression::Query, compact: bool, ctx: &mut Context) -> Resolved {
     let path = query.path();
 
     if let Some(target_path) = query.external_path() {
         Ok(ctx
             .target_mut()
-            .target_remove(&target_path, false)
+            .target_remove(&target_path, compact)
             .ok()
             .flatten()
             .unwrap_or(Value::Null))
@@ -17,7 +17,7 @@ fn del(query: &expression::Query, ctx: &mut Context) -> Resolved {
         match ctx.state_mut().variable_mut(ident) {
             Some(value) => {
                 let new_value = value.get(path).cloned();
-                value.remove(path, false);
+                value.remove(path, compact);
                 Ok(new_value.unwrap_or(Value::Null))
             }
             None => Ok(Value::Null),
@@ -42,11 +42,18 @@ impl Function for Del {
     }
 
     fn parameters(&self) -> &'static [Parameter] {
-        &[Parameter {
-            keyword: "target",
-            kind: kind::ANY,
-            required: true,
-        }]
+        &[
+            Parameter {
+                keyword: "target",
+                kind: kind::ANY,
+                required: true,
+            },
+            Parameter {
+                keyword: "compact",
+                kind: kind::BOOLEAN,
+                required: false,
+            },
+        ]
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -79,6 +86,24 @@ impl Function for Del {
                 "#},
                 result: Ok(r#"{ "bar": 10 }"#),
             },
+            Example {
+                title: "delete object field",
+                source: indoc! {r#"
+                    var = { "foo": {"nested": true}, "bar": 10 }
+                    del(var.foo.nested, false)
+                    var
+                "#},
+                result: Ok(r#"{ "foo": {}, "bar": 10 }"#),
+            },
+            Example {
+                title: "compact object field",
+                source: indoc! {r#"
+                    var = { "foo": {"nested": true}, "bar": 10 }
+                    del(var.foo.nested, true)
+                    var
+                "#},
+                result: Ok(r#"{ "bar": 10 }"#),
+            },
         ]
     }
 
@@ -89,6 +114,7 @@ impl Function for Del {
         arguments: ArgumentList,
     ) -> Compiled {
         let query = arguments.required_query("target")?;
+        let compact = arguments.optional("compact");
 
         if let Some(target_path) = query.external_path() {
             if ctx.is_read_only_path(&target_path) {
@@ -99,13 +125,14 @@ impl Function for Del {
             }
         }
 
-        Ok(Box::new(DelFn { query }))
+        Ok(Box::new(DelFn { query, compact }))
     }
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct DelFn {
     query: expression::Query,
+    compact: Option<Box<dyn Expression>>,
 }
 
 impl DelFn {
@@ -118,6 +145,7 @@ impl DelFn {
                 expression::Target::External(PathPrefix::Event),
                 parse_value_path(path),
             ),
+            compact: None,
         }
     }
 }
@@ -138,7 +166,11 @@ impl Expression for DelFn {
     //
     // see tracking issue: https://github.com/vectordotdev/vector/issues/5887
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        del(&self.query, ctx)
+        let compact = match &self.compact {
+            Some(compact) => compact.resolve(ctx)?.try_boolean()?,
+            None => false,
+        };
+        del(&self.query, compact, ctx)
     }
 
     fn type_info(&self, state: &state::TypeState) -> TypeInfo {

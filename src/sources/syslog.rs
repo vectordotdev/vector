@@ -15,12 +15,13 @@ use tokio_util::udp::UdpFramed;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 
-use crate::codecs::Decoder;
 #[cfg(unix)]
 use crate::sources::util::build_unix_stream_source;
 use crate::{
+    codecs::Decoder,
     config::{log_schema, DataType, GenerateConfig, Output, Resource, SourceConfig, SourceContext},
     event::Event,
+    internal_events::StreamClosedError,
     internal_events::SyslogUdpReadError,
     shutdown::ShutdownSignal,
     sources::util::{SocketListenAddr, TcpNullAcker, TcpSource},
@@ -307,7 +308,8 @@ pub fn udp(
                 Ok(())
             }
             Err(error) => {
-                error!(message = "Error sending line.", %error);
+                let (count, _) = stream.size_hint();
+                emit!(StreamClosedError { error, count });
                 Err(())
             }
         }
@@ -822,7 +824,7 @@ mod test {
             send_lines(in_addr, input_lines).await.unwrap();
 
             // Wait a short period of time to ensure the messages get sent.
-            sleep(Duration::from_secs(1)).await;
+            sleep(Duration::from_secs(2)).await;
 
             // Shutdown the source, and make sure we've got all the messages we sent in.
             shutdown
@@ -976,7 +978,7 @@ mod test {
             send_encodable(in_addr, codec, input_lines).await.unwrap();
 
             // Wait a short period of time to ensure the messages get sent.
-            sleep(Duration::from_secs(1)).await;
+            sleep(Duration::from_secs(2)).await;
 
             // Shutdown the source, and make sure we've got all the messages we sent in.
             shutdown

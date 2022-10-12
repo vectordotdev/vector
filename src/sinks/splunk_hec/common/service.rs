@@ -1,11 +1,11 @@
 use std::{
     fmt,
     sync::Arc,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
 };
 
 use bytes::Bytes;
-use futures_util::{future::BoxFuture, ready};
+use futures_util::future::BoxFuture;
 use http::Request;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
@@ -261,6 +261,7 @@ impl HttpRequestBuilder {
 mod tests {
     use std::{
         collections::HashMap,
+        future::poll_fn,
         num::{NonZeroU64, NonZeroU8},
         sync::{
             atomic::{AtomicU64, Ordering},
@@ -270,7 +271,7 @@ mod tests {
     };
 
     use bytes::Bytes;
-    use futures_util::{future::poll_fn, poll, stream::FuturesUnordered, StreamExt};
+    use futures_util::{poll, stream::FuturesUnordered, StreamExt};
     use tower::{util::BoxService, Service, ServiceExt};
     use vector_core::{
         config::proxy::ProxyConfig,

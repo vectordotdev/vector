@@ -11,7 +11,7 @@ use rdkafka::{
 use tower::Service;
 use vector_core::{
     internal_event::{
-        ByteSize, BytesSent, EventsSent, InternalEventHandle as _, Protocol, Registered,
+        ByteSize, BytesSent, CountByteSize, InternalEventHandle as _, Protocol, Registered,
     },
     stream::DriverResponse,
 };
@@ -44,12 +44,8 @@ impl DriverResponse for KafkaResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> EventsSent {
-        EventsSent {
-            count: 1,
-            byte_size: self.event_byte_size,
-            output: None,
-        }
+    fn events_sent(&self) -> CountByteSize {
+        CountByteSize(1, self.event_byte_size)
     }
 }
 

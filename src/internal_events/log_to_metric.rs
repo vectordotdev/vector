@@ -3,6 +3,8 @@ use std::num::ParseFloatError;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
+use crate::emit;
+use crate::internal_events::{ComponentEventsDropped, UNINTENTIONAL};
 use crate::template::TemplateParseError;
 use vector_common::internal_event::{error_stage, error_type};
 
@@ -12,13 +14,14 @@ pub struct LogToMetricFieldNullError<'a> {
 
 impl<'a> InternalEvent for LogToMetricFieldNullError<'a> {
     fn emit(self) {
+        let reason = "Unable to convert null field.";
         error!(
-            message = "Unable to convert null field.",
+            message = reason,
             error_code = "field_null",
             error_type = error_type::CONDITION_FAILED,
             stage = error_stage::PROCESSING,
             null_field = %self.field,
-            internal_log_rate_secs = 30
+            internal_log_rate_limit = true
         );
         counter!(
             "component_errors_total", 1,
@@ -32,6 +35,8 @@ impl<'a> InternalEvent for LogToMetricFieldNullError<'a> {
             "processing_errors_total", 1,
             "error_type" => "field_null",
         );
+
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason })
     }
 }
 
@@ -42,14 +47,15 @@ pub struct LogToMetricParseFloatError<'a> {
 
 impl<'a> InternalEvent for LogToMetricParseFloatError<'a> {
     fn emit(self) {
+        let reason = "Failed to parse field as float.";
         error!(
-            message = "Failed to parse field as float.",
+            message = reason,
             error = ?self.error,
             field = %self.field,
             error_code = "failed_parsing_float",
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_secs = 30
+            internal_log_rate_limit = true
         );
         counter!(
             "component_errors_total", 1,
@@ -63,6 +69,8 @@ impl<'a> InternalEvent for LogToMetricParseFloatError<'a> {
             "processing_errors_total", 1,
             "error_type" => "parse_error",
         );
+
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason })
     }
 }
 
@@ -72,13 +80,14 @@ pub struct LogToMetricTemplateParseError {
 
 impl InternalEvent for LogToMetricTemplateParseError {
     fn emit(self) {
+        let reason = "Failed to parse template.";
         error!(
-            message = "Failed to parse template.",
+            message = reason,
             error = ?self.error,
             error_code = "failed_parsing_template",
             error_type = error_type::TEMPLATE_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_secs = 30,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -91,5 +100,7 @@ impl InternalEvent for LogToMetricTemplateParseError {
             "processing_errors_total", 1,
             "error_type" => "template_error",
         );
+
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason })
     }
 }

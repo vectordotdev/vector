@@ -1,9 +1,9 @@
 //! Loki sink
 //!
 //! This sink provides downstream support for `Loki` via
-//! the v1 http json endpoint.
+//! the `/loki/api/v1/push` endpoint.
 //!
-//! <https://github.com/grafana/loki/tree/v1.6.1/docs>
+//! <https://grafana.com/docs/loki/v2.6.x/api/>
 //!
 //! This sink uses `PartitionBatching` to partition events
 //! by streams. There must be at least one valid set of labels.

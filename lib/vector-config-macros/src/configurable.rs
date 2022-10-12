@@ -141,7 +141,7 @@ fn build_enum_generate_schema_fn(variants: &[Variant<'_>]) -> proc_macro2::Token
             let schema_metadata = <Self as ::vector_config::Configurable>::metadata();
             #(#mapped_variants)*
 
-            let mut schema = ::vector_config::schema::generate_composite_schema(&subschemas);
+            let mut schema = ::vector_config::schema::generate_one_of_schema(&subschemas);
             ::vector_config::schema::apply_metadata(&mut schema, schema_metadata);
 
             Ok(schema)
@@ -402,6 +402,20 @@ fn generate_variant_metadata(
         get_metadata_transparent(meta_ident, variant.tagging() == &Tagging::None);
     let maybe_custom_attributes = get_metadata_custom_attributes(meta_ident, variant.metadata());
 
+    // We add a special metadata key (`logical_name`) that informs consumers of the schema what the
+    // variant name is for this variant's subschema. While the doc comments being coerced into title
+    // and/or description are typically good enough, sometimes we need a more mechanical mapping of
+    // the variant's name since shoving it into the title would mean doc comments with redundant
+    // information.
+    //
+    // You can think of this as an enum-specific additional title.
+    let logical_name_attrs = vec![CustomAttribute::KeyValue {
+        key: "logical_name".to_string(),
+        value: variant.ident().to_string(),
+    }];
+    let variant_logical_name =
+        get_metadata_custom_attributes(meta_ident, logical_name_attrs.into_iter());
+
     // We specifically use `()` as the type here because we need to generate the metadata for this
     // variant, but there's no unique concrete type for a variant, only the type of the enum
     // container it exists within. We also don't want to use the metadata of the enum container, as
@@ -413,6 +427,7 @@ fn generate_variant_metadata(
         #maybe_deprecated
         #maybe_transparent
         #maybe_custom_attributes
+        #variant_logical_name
     }
 }
 

@@ -12,7 +12,7 @@ use crate::{
 
 #[test]
 fn generate_config() {
-    crate::test_util::test_generate_config::<LokiConfig>();
+    test_util::test_generate_config::<LokiConfig>();
 }
 
 #[tokio::test]

@@ -159,7 +159,7 @@ impl InfluxDbSvc {
 
         let uri = settings.write_uri(endpoint)?;
 
-        let http_service = HttpBatchService::new(client, create_build_request(uri, token));
+        let http_service = HttpBatchService::new(client, create_build_request(uri, token.inner()));
 
         let influxdb_http_service = InfluxDbSvc {
             config,
@@ -194,12 +194,10 @@ impl Service<Vec<Metric>> for InfluxDbSvc {
     type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
-    // Emission of Error internal event is handled upstream by the caller
     fn poll_ready(&mut self, cx: &mut std::task::Context) -> Poll<Result<(), Self::Error>> {
         self.inner.poll_ready(cx)
     }
 
-    // Emission of Error internal event is handled upstream by the caller
     fn call(&mut self, items: Vec<Metric>) -> Self::Future {
         let input = encode_events(
             self.protocol_version,
@@ -216,7 +214,7 @@ impl Service<Vec<Metric>> for InfluxDbSvc {
 
 fn create_build_request(
     uri: http::Uri,
-    token: String,
+    token: &str,
 ) -> impl Fn(Bytes) -> BoxFuture<'static, crate::Result<hyper::Request<Bytes>>> + Sync + Send + 'static
 {
     let auth = format!("Token {}", token);
@@ -1090,7 +1088,7 @@ mod integration_tests {
             influxdb2_settings: Some(InfluxDb2Settings {
                 org: ORG.to_string(),
                 bucket: BUCKET.to_string(),
-                token: TOKEN.to_string(),
+                token: TOKEN.to_string().into(),
             }),
             quantiles: default_summary_quantiles(),
             batch: Default::default(),

@@ -1,13 +1,18 @@
-use aws_sdk_firehose::error::{
-    DescribeDeliveryStreamError, PutRecordBatchError, PutRecordBatchErrorKind,
+use aws_sdk_firehose::{
+    error::{DescribeDeliveryStreamError, PutRecordBatchError, PutRecordBatchErrorKind},
+    types::SdkError,
+    Client as KinesisFirehoseClient,
 };
-use aws_sdk_firehose::types::SdkError;
-use aws_sdk_firehose::Client as KinesisFirehoseClient;
 use futures::FutureExt;
 use snafu::Snafu;
 use tower::ServiceBuilder;
 use vector_config::configurable_component;
 
+use super::{
+    request_builder::KinesisRequestBuilder,
+    service::{KinesisResponse, KinesisService},
+    sink::KinesisSink,
+};
 use crate::{
     aws::{create_client, is_retriable_error, AwsAuthentication, ClientBuilder, RegionOrEndpoint},
     codecs::{Encoder, EncodingConfig},
@@ -16,11 +21,6 @@ use crate::{
         SinkContext,
     },
     sinks::{
-        aws_kinesis_firehose::{
-            request_builder::KinesisRequestBuilder,
-            service::{KinesisResponse, KinesisService},
-            sink::KinesisSink,
-        },
         util::{
             retries::RetryLogic, BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings,
             TowerRequestConfig,
@@ -175,7 +175,6 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
 
         let sink = KinesisSink {
             batch_settings,
-
             service,
             request_builder,
         };

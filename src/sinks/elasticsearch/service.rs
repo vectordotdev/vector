@@ -12,18 +12,21 @@ use http::{Response, Uri};
 use hyper::{service::Service, Body, Request};
 use tower::ServiceExt;
 use vector_common::metadata::{MetaDescriptive, RequestMetadata};
-use vector_core::{internal_event::EventsSent, stream::DriverResponse, ByteSizeOf};
+use vector_core::{
+    internal_event::CountByteSize, internal_event::EventsSent, stream::DriverResponse, ByteSizeOf,
+};
 
 use crate::sinks::elasticsearch::sign_request;
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
     http::{Auth, HttpClient},
-    internal_events::ElasticsearchResponseError,
     sinks::util::{
         http::{HttpBatchService, RequestConfig},
         Compression, ElementCount,
     },
 };
+
+use super::{ElasticsearchCommon, ElasticsearchConfig};
 
 #[derive(Clone)]
 pub struct ElasticsearchRequest {
@@ -93,6 +96,18 @@ pub struct HttpRequestBuilder {
 }
 
 impl HttpRequestBuilder {
+    pub fn new(common: &ElasticsearchCommon, config: &ElasticsearchConfig) -> HttpRequestBuilder {
+        HttpRequestBuilder {
+            bulk_uri: common.bulk_uri.clone(),
+            http_request_config: config.request.clone(),
+            http_auth: common.http_auth.clone(),
+            query_params: common.query_params.clone(),
+            region: common.region.clone(),
+            compression: config.compression,
+            credentials_provider: common.aws_auth.clone(),
+        }
+    }
+
     pub async fn build_request(
         &self,
         es_req: ElasticsearchRequest,
@@ -137,12 +152,8 @@ impl DriverResponse for ElasticsearchResponse {
         self.event_status
     }
 
-    fn events_sent(&self) -> EventsSent {
-        EventsSent {
-            count: self.batch_size,
-            byte_size: self.events_byte_size,
-            output: None,
-        }
+    fn events_sent(&self) -> CountByteSize {
+        CountByteSize(self.batch_size, self.events_byte_size)
     }
 }
 
@@ -151,10 +162,12 @@ impl Service<ElasticsearchRequest> for ElasticsearchService {
     type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
+    // Emission of an internal event in case of errors is handled upstream by the caller.
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
+    // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, req: ElasticsearchRequest) -> Self::Future {
         let mut http_service = self.batch_service.clone();
         Box::pin(async move {
@@ -178,25 +191,13 @@ fn get_event_status(response: &Response<Bytes>) -> EventStatus {
     if status.is_success() {
         let body = String::from_utf8_lossy(response.body());
         if body.contains("\"errors\":true") {
-            emit!(ElasticsearchResponseError::new(
-                "Response contained errors.",
-                response
-            ));
             EventStatus::Rejected
         } else {
             EventStatus::Delivered
         }
     } else if status.is_server_error() {
-        emit!(ElasticsearchResponseError::new(
-            "Response wasn't successful.",
-            response,
-        ));
         EventStatus::Errored
     } else {
-        emit!(ElasticsearchResponseError::new(
-            "Response failed.",
-            response,
-        ));
         EventStatus::Rejected
     }
 }
