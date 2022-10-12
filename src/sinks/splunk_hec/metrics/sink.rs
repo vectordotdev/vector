@@ -199,4 +199,3 @@ impl EventCount for HecProcessedEvent {
         1
     }
 }
-

@@ -8,7 +8,7 @@ use http::{
 };
 use hyper::Body;
 use tower::Service;
-use vector_common::metadata::RequestMetadata;
+use vector_common::metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
 
 use crate::{
@@ -46,6 +46,12 @@ pub struct GcsRequest {
 impl Finalizable for GcsRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
         std::mem::take(&mut self.finalizers)
+    }
+}
+
+impl MetaDescriptive for GcsRequest {
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
     }
 }
 

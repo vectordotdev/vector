@@ -12,7 +12,7 @@ use snafu::Snafu;
 use std::io;
 use tokio_util::codec::Encoder as _;
 use tower::{Service, ServiceBuilder};
-use vector_common::metadata::RequestMetadata;
+use vector_common::metadata::{MetaDescriptive, RequestMetadata};
 use vector_config::configurable_component;
 use vector_core::{
     config::{AcknowledgementsConfig, Input},
@@ -266,6 +266,12 @@ pub struct ChronicleRequest {
 impl Finalizable for ChronicleRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
         std::mem::take(&mut self.finalizers)
+    }
+}
+
+impl MetaDescriptive for ChronicleRequest {
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
     }
 }
 
