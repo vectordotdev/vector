@@ -400,9 +400,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-warp"
-version = "4.0.14"
+version = "4.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c70c3a982a8583ba63390d797385cfd9683390ad50348b8f868f112e7019018"
+checksum = "e12cfa94e15af5a0f9a1beb66c4c143ef44df7c48c2eb9ef3872dbe81e926008"
 dependencies = [
  "async-graphql",
  "futures-util",
@@ -1097,7 +1097,7 @@ dependencies = [
  "serde_json",
  "time",
  "url",
- "uuid 1.1.2",
+ "uuid 1.2.1",
 ]
 
 [[package]]
@@ -1117,7 +1117,7 @@ dependencies = [
  "serde_json",
  "time",
  "url",
- "uuid 1.1.2",
+ "uuid 1.2.1",
 ]
 
 [[package]]
@@ -1141,7 +1141,7 @@ dependencies = [
  "sha2 0.10.6",
  "time",
  "url",
- "uuid 1.1.2",
+ "uuid 1.2.1",
 ]
 
 [[package]]
@@ -1163,7 +1163,7 @@ dependencies = [
  "serde_json",
  "time",
  "url",
- "uuid 1.1.2",
+ "uuid 1.2.1",
 ]
 
 [[package]]
@@ -1636,9 +1636,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.0.10"
+version = "4.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3b1a0a4208c6c483b952ad35c6eed505fc13b46f08f631b81e828084a9318d74"
+checksum = "385007cbbed899260395a4107435fead4cad80684461b3cc78238bdcb0bad58f"
 dependencies = [
  "atty",
  "bitflags",
@@ -4200,9 +4200,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.134"
+version = "0.2.135"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "329c933548736bc49fd575ee68c89e8be4d260064184389a5b77517cddd99ffb"
+checksum = "68783febc7782c6c5cb401fbda4de5a9898be1762314da0bb2c10ced61f18b0c"
 
 [[package]]
 name = "libflate"
@@ -4276,7 +4276,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "14e4fcc00ff6731d94b70e16e71f43bda62883461f31230742e3bc6dddf12988"
 dependencies = [
  "libc",
- "uuid 1.1.2",
+ "uuid 1.2.1",
  "winapi",
 ]
 
@@ -4599,9 +4599,9 @@ dependencies = [
 
 [[package]]
 name = "mlua"
-version = "0.8.3"
+version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10277581090f5cb7ecf814bc611152ce4db6dc8deffcaa08e24ed4c5197d9186"
+checksum = "86b8fdab73969938b10159fb7e4fee45e96f386baadd8eaa6150e3161f28dfe2"
 dependencies = [
  "bstr 0.2.17",
  "cc",
@@ -5494,9 +5494,9 @@ dependencies = [
 
 [[package]]
 name = "pest_derive"
-version = "2.3.1"
+version = "2.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "502b62a6d0245378b04ffe0a7fb4f4419a4815fce813bd8a0ec89a56e07d67b1"
+checksum = "60b75706b9642ebcb34dab3bc7750f811609a0eb1dd8b88c2d15bf628c1c65b2"
 dependencies = [
  "pest",
  "pest_generator",
@@ -5504,9 +5504,9 @@ dependencies = [
 
 [[package]]
 name = "pest_generator"
-version = "2.3.1"
+version = "2.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "451e629bf49b750254da26132f1a5a9d11fd8a95a3df51d15c4abd1ba154cb6c"
+checksum = "f4f9272122f5979a6511a749af9db9bfc810393f63119970d7085fed1c4ea0db"
 dependencies = [
  "pest",
  "pest_meta",
@@ -5517,9 +5517,9 @@ dependencies = [
 
 [[package]]
 name = "pest_meta"
-version = "2.3.1"
+version = "2.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bcec162c71c45e269dfc3fc2916eaeb97feab22993a21bcce4721d08cd7801a6"
+checksum = "4c8717927f9b79515e565a64fe46c38b8cd0427e64c40680b14a7365ab09ac8d"
 dependencies = [
  "once_cell",
  "pest",
@@ -6104,7 +6104,7 @@ dependencies = [
  "tokio-native-tls",
  "tokio-util",
  "url",
- "uuid 1.1.2",
+ "uuid 1.2.1",
 ]
 
 [[package]]
@@ -7071,9 +7071,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.85"
+version = "1.0.86"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e55a28e3aaef9d5ce0506d0a14dbba8054ddc7e499ef522dd8b26859ec9d4a44"
+checksum = "41feea4228a6f1cd09ec7a3593a682276702cd67b5273544757dae23c096f074"
 dependencies = [
  "indexmap",
  "itoa 1.0.1",
@@ -7397,9 +7397,9 @@ dependencies = [
 
 [[package]]
 name = "snafu"
-version = "0.7.1"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5177903bf45656592d9eb5c0e22f408fc023aae51dbe2088889b71633ba451f2"
+checksum = "dd726aec4ebad65756394ff89a9b9598793d4e30121cd71690244c1e497b3aee"
 dependencies = [
  "doc-comment",
  "futures-core",
@@ -7409,9 +7409,9 @@ dependencies = [
 
 [[package]]
 name = "snafu-derive"
-version = "0.7.1"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "410b26ed97440d90ced3e2488c868d56a86e2064f5d7d6f417909b286afe25e5"
+checksum = "712529e9b0b014eabaa345b38e06032767e3dc393e8b017e853b1d7247094e74"
 dependencies = [
  "heck 0.4.0",
  "proc-macro2",
@@ -8699,9 +8699,9 @@ dependencies = [
 
 [[package]]
 name = "uuid"
-version = "1.1.2"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd6469f4314d5f1ffec476e05f17cc9a78bc7a27a6a857842170bdf8d6f98d2f"
+checksum = "feb41e78f93363bb2df8b0e86a2ca30eed7806ea16ea0c790d757cf93f79be83"
 dependencies = [
  "getrandom 0.2.6",
  "rand 0.8.5",
@@ -8787,7 +8787,7 @@ dependencies = [
  "bytesize",
  "chrono",
  "cidr-utils",
- "clap 4.0.10",
+ "clap 4.0.12",
  "codecs",
  "colored",
  "console-subscriber",
@@ -8920,7 +8920,7 @@ dependencies = [
  "tui",
  "typetag",
  "url",
- "uuid 1.1.2",
+ "uuid 1.2.1",
  "value",
  "vector-api-client",
  "vector-buffers",
@@ -8946,7 +8946,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
- "clap 4.0.10",
+ "clap 4.0.12",
  "futures 0.3.24",
  "graphql_client",
  "indoc",
@@ -8957,7 +8957,7 @@ dependencies = [
  "tokio-stream",
  "tokio-tungstenite",
  "url",
- "uuid 1.1.2",
+ "uuid 1.2.1",
 ]
 
 [[package]]
@@ -8969,7 +8969,7 @@ dependencies = [
  "async-trait",
  "bytecheck",
  "bytes 1.2.1",
- "clap 4.0.10",
+ "clap 4.0.12",
  "crc32fast",
  "criterion",
  "crossbeam-queue",
@@ -9205,7 +9205,7 @@ dependencies = [
 name = "vrl-cli"
 version = "0.1.0"
 dependencies = [
- "clap 4.0.10",
+ "clap 4.0.12",
  "exitcode",
  "indoc",
  "lookup",
@@ -9329,7 +9329,7 @@ dependencies = [
  "uaparser",
  "url",
  "utf8-width",
- "uuid 1.1.2",
+ "uuid 1.2.1",
  "value",
  "vector-common",
  "vrl",
@@ -9344,7 +9344,7 @@ dependencies = [
  "ansi_term",
  "chrono",
  "chrono-tz",
- "clap 4.0.10",
+ "clap 4.0.12",
  "enrichment",
  "glob",
  "lookup",
@@ -9830,9 +9830,9 @@ dependencies = [
 
 [[package]]
 name = "wiremock"
-version = "0.5.14"
+version = "0.5.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc3c7b7557dbfdad6431b5a51196c9110cef9d83f6a9b26699f35cdc0ae113ec"
+checksum = "249dc68542861d17eae4b4e5e8fb381c2f9e8f255a84f6771d5fdf8b6c03ce3c"
 dependencies = [
  "assert-json-diff",
  "async-trait",

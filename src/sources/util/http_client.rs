@@ -1,11 +1,11 @@
-//! Common logic for sources that are HTTP scrapers.
+//! Common logic for sources that are HTTP clients.
 //!
-//! Specific HTTP scraping sources will:
-//!   - Call build_url() to build the URL(s) to scrape.
-//!   - Implmement a specific context struct which:
+//! Specific HTTP client sources will:
+//!   - Call build_url() to build the URL(s) to call.
+//!   - Implement a specific context struct which:
 //!       - Contains the data that source needs in order to process the HTTP responses into internal_events
-//!       - Implements the HttpScraper trait
-//!   - Call http_scrape() supplying the generic inputs for scraping and the source-specific
+//!       - Implements the HttpClient trait
+//!   - Call call() supplying the generic inputs for calling and the source-specific
 //!     context.
 
 use bytes::Bytes;
@@ -19,8 +19,8 @@ use tokio_stream::wrappers::IntervalStream;
 use crate::{
     http::{Auth, HttpClient},
     internal_events::{
-        EndpointBytesReceived, HttpScrapeEventsReceived, HttpScrapeHttpError,
-        HttpScrapeHttpResponseError, RequestCompleted, StreamClosedError,
+        EndpointBytesReceived, HttpClientEventsReceived, HttpClientHttpError,
+        HttpClientHttpResponseError, RequestCompleted, StreamClosedError,
     },
     sources::util::http::HttpMethod,
     tls::TlsSettings,
@@ -29,11 +29,11 @@ use crate::{
 use vector_common::shutdown::ShutdownSignal;
 use vector_core::{config::proxy::ProxyConfig, event::Event, ByteSizeOf};
 
-/// Contains the inputs generic to any http scrape.
-pub(crate) struct GenericHttpScrapeInputs {
-    /// Array of URLs to scrape
+/// Contains the inputs generic to any http client.
+pub(crate) struct GenericHttpClientInputs {
+    /// Array of URLs to call
     pub urls: Vec<Uri>,
-    /// Interval to scrape on in seconds
+    /// Interval to call on in seconds
     pub interval_secs: u64,
     /// Map of Header+Value to apply to HTTP request
     pub headers: HashMap<String, Vec<String>>,
@@ -45,22 +45,22 @@ pub(crate) struct GenericHttpScrapeInputs {
     pub shutdown: ShutdownSignal,
 }
 
-/// The default interval to scrape the http endpoint if none is configured.
+/// The default interval to call the http endpoint if none is configured.
 pub(crate) const fn default_scrape_interval_secs() -> u64 {
     15
 }
 
 /// Builds the context, allowing the source-specific implementation to leverage data from the
 /// config and the current HTTP request.
-pub(crate) trait HttpScraperBuilder {
-    type Context: HttpScraperContext;
+pub(crate) trait HttpClientBuilder {
+    type Context: HttpClientContext;
 
     /// Called before the HTTP request is made to build out the context.
     fn build(&self, url: &Uri) -> Self::Context;
 }
 
 /// Methods that allow context-specific behavior during the scraping procedure.
-pub(crate) trait HttpScraperContext {
+pub(crate) trait HttpClientContext {
     /// Called after the HTTP request succeeds and returns the decoded/parsed Event array.
     fn on_response(&mut self, url: &Uri, header: &Parts, body: &Bytes) -> Option<Vec<Event>>;
 
@@ -95,15 +95,15 @@ pub(crate) fn build_url(uri: &Uri, query: &HashMap<String, Vec<String>>) -> Uri 
         .expect("Failed to build URI from parsed arguments")
 }
 
-/// Scrapes one or more urls at an interval.
+/// Calls one or more urls at an interval.
 ///   - The HTTP request is built per the options in provided generic inputs.
 ///   - The HTTP response is decoded/parsed into events by the specific context.
 ///   - The events are then sent to the output stream.
-pub(crate) async fn http_scrape<
-    B: HttpScraperBuilder<Context = C> + std::marker::Send + Clone,
-    C: HttpScraperContext + std::marker::Send,
+pub(crate) async fn call<
+    B: HttpClientBuilder<Context = C> + Send + Clone,
+    C: HttpClientContext + Send,
 >(
-    inputs: GenericHttpScrapeInputs,
+    inputs: GenericHttpClientInputs,
     context_builder: B,
     mut out: SourceSender,
     http_method: HttpMethod,
@@ -175,7 +175,7 @@ pub(crate) async fn http_scrape<
                             end: Instant::now()
                         });
                         context.on_response(&url, &header, &body).map(|events| {
-                            emit!(HttpScrapeEventsReceived {
+                            emit!(HttpClientEventsReceived {
                                 byte_size: events.size_of(),
                                 count: events.len(),
                                 url: url.to_string()
@@ -185,14 +185,14 @@ pub(crate) async fn http_scrape<
                     }
                     Ok((header, _)) => {
                         context.on_http_response_error(&url, &header);
-                        emit!(HttpScrapeHttpResponseError {
+                        emit!(HttpClientHttpResponseError {
                             code: header.status,
                             url: url.to_string(),
                         });
                         None
                     }
                     Err(error) => {
-                        emit!(HttpScrapeHttpError {
+                        emit!(HttpClientHttpError {
                             error,
                             url: url.to_string()
                         });
