@@ -282,6 +282,7 @@ mod test {
         event::{Event, LogEvent},
         shutdown::{ShutdownSignal, SourceShutdownCoordinator},
         sinks::util::tcp::TcpSinkConfig,
+        sources::util::net::SocketListenAddr,
         test_util::{
             collect_n, collect_n_limited,
             components::{assert_source_compliance, SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS},
@@ -661,7 +662,10 @@ mod test {
         config: Option<UdpConfig>,
     ) -> (SocketAddr, JoinHandle<Result<(), ()>>) {
         let (address, config) = match config {
-            Some(config) => (config.address().into_socket_addr(), config),
+            Some(config) => match config.address() {
+                SocketListenAddr::SocketAddr(addr) => (addr, config),
+                _ => panic!("listen address should not be systemd FD offset in tests"),
+            },
             None => {
                 let address = next_addr();
                 (address, UdpConfig::from_address(address.into()))

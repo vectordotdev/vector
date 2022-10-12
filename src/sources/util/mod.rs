@@ -18,7 +18,7 @@ pub mod http_scrape;
 #[cfg(any(feature = "sources-aws_sqs", feature = "sources-gcp_pubsub"))]
 mod message_decoding;
 pub mod multiline_config;
-#[cfg(feature = "listenfd")]
+#[cfg(any(feature = "net-utils-tcp", feature = "net-utils-udp"))]
 pub mod net;
 #[cfg(all(unix, any(feature = "sources-socket", feature = "sources-utils-unix",)))]
 mod unix;

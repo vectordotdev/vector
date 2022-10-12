@@ -33,7 +33,6 @@ impl<T, F> AfterRead<T, F> {
         Self { inner, after_read }
     }
 
-    #[cfg(feature = "listenfd")]
     pub const fn get_ref(&self) -> &T {
         &self.inner
     }
