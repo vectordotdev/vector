@@ -3,7 +3,7 @@ package metadata
 remap: functions: decode_q: {
 	category:    "Codec"
 	description: """
-		Replaces in the `value` q-encoded or base64-encoded [encoded-word](\(urls.encoded_word)) string with their original string.
+		Replaces q-encoded or base64-encoded [encoded-word](\(urls.encoded_word)) substrings in the `value` with their original string.
 		"""
 
 	arguments: [
