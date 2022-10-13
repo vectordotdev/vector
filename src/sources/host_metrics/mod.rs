@@ -594,7 +594,7 @@ pub(self) mod tests {
             .expect("Missing tags")
             .get("host")
             .expect("Missing \"host\" tag")
-            != &hostname));
+            != hostname));
     }
 
     #[tokio::test]
@@ -696,7 +696,7 @@ pub(self) mod tests {
     fn collect_tag_values(metrics: &[Metric], tag: &str) -> HashSet<String> {
         metrics
             .iter()
-            .filter_map(|metric| metric.tags().unwrap().get(tag).cloned())
+            .filter_map(|metric| metric.tags().unwrap().get(tag).map(ToOwned::to_owned))
             .collect::<HashSet<_>>()
     }
 

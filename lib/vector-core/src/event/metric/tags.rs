@@ -40,8 +40,8 @@ impl MetricTags {
         self.0.contains_key(name)
     }
 
-    pub fn get(&self, name: &str) -> Option<&String> {
-        self.0.get(name)
+    pub fn get(&self, name: &str) -> Option<&str> {
+        self.0.get(name).map(String::as_str)
     }
 
     pub fn entry(&mut self, name: String) -> btree_map::Entry<String, String> {
@@ -56,12 +56,16 @@ impl MetricTags {
         self.0.remove(name)
     }
 
-    pub fn keys(&self) -> impl Iterator<Item = &String> {
-        self.0.keys()
+    pub fn keys(&self) -> impl Iterator<Item = &str> {
+        self.0.keys().map(String::as_str)
     }
 
     pub fn extend(&mut self, tags: impl Iterator<Item = (String, String)>) {
         self.0.extend(tags);
+    }
+
+    pub fn retain(&mut self, mut f: impl FnMut(&str, &str) -> bool) {
+        self.0.retain(|k, v| f(k, v));
     }
 }
 
@@ -82,12 +86,22 @@ impl IntoIterator for MetricTags {
 }
 
 impl<'a> IntoIterator for &'a MetricTags {
-    type Item = (&'a String, &'a String);
+    type Item = (&'a str, &'a str);
 
-    type IntoIter = btree_map::Iter<'a, String, String>;
+    type IntoIter = Iter<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.0.iter()
+        Iter(self.0.iter())
+    }
+}
+
+pub struct Iter<'a>(btree_map::Iter<'a, String, String>);
+
+impl<'a> Iterator for Iter<'a> {
+    type Item = (&'a str, &'a str);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next().map(|(k, v)| (k.as_str(), v.as_str()))
     }
 }
 

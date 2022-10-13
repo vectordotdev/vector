@@ -211,9 +211,9 @@ fn render_metric_field(key: &str, metric: &Metric) -> Option<String> {
     match key {
         "name" => Some(metric.name().into()),
         "namespace" => metric.namespace().map(Into::into),
-        _ if key.starts_with("tags.") => {
-            metric.tags().and_then(|tags| tags.get(&key[5..]).cloned())
-        }
+        _ if key.starts_with("tags.") => metric
+            .tags()
+            .and_then(|tags| tags.get(&key[5..]).map(ToOwned::to_owned)),
         _ => None,
     }
 }
@@ -242,7 +242,7 @@ mod tests {
     use chrono::TimeZone;
 
     use super::*;
-    use crate::event::{MetricTags, Event, LogEvent, MetricKind, MetricValue};
+    use crate::event::{Event, LogEvent, MetricKind, MetricTags, MetricValue};
     use lookup::metadata_path;
 
     #[test]

@@ -170,9 +170,9 @@ impl TagValueSet {
         }
     }
 
-    fn contains(&self, value: Cow<'_, String>) -> bool {
+    fn contains(&self, value: Cow<'_, str>) -> bool {
         match &self.storage {
-            TagValueSetStorage::Set(set) => set.contains(value.borrow() as &String),
+            TagValueSetStorage::Set(set) => set.contains(value.borrow() as &str),
             TagValueSetStorage::Bloom(bloom) => bloom.contains(&value),
         }
     }
@@ -181,7 +181,7 @@ impl TagValueSet {
         self.num_elements
     }
 
-    fn insert(&mut self, value: Cow<'_, String>) -> bool {
+    fn insert(&mut self, value: Cow<'_, str>) -> bool {
         let inserted = match &mut self.storage {
             TagValueSetStorage::Set(set) => set.insert(value.into_owned()),
             TagValueSetStorage::Bloom(bloom) => bloom.insert(&value),
@@ -209,7 +209,7 @@ impl TagCardinalityLimit {
     /// for the key and returns true, otherwise returns false.  A false return
     /// value indicates to the caller that the value is not accepted for this
     /// key, and the configured limit_exceeded_action should be taken.
-    fn try_accept_tag(&mut self, key: &str, value: Cow<'_, String>) -> bool {
+    fn try_accept_tag(&mut self, key: &str, value: Cow<'_, str>) -> bool {
         if !self.accepted_tags.contains_key(key) {
             self.accepted_tags.insert(
                 key.to_string(),
@@ -241,10 +241,10 @@ impl TagCardinalityLimit {
 
     fn transform_one(&mut self, mut event: Event) -> Option<Event> {
         let metric = event.as_mut_metric();
-        if let Some(tags_map) = metric.tags() {
+        if let Some(tags_map) = metric.tags_mut() {
             match self.config.limit_exceeded_action {
                 LimitExceededAction::DropEvent => {
-                    for (key, value) in tags_map {
+                    for (key, value) in &*tags_map {
                         if !self.try_accept_tag(key, Cow::Borrowed(value)) {
                             emit!(TagCardinalityLimitRejectingEvent {
                                 tag_key: key,
@@ -255,19 +255,17 @@ impl TagCardinalityLimit {
                     }
                 }
                 LimitExceededAction::DropTag => {
-                    let mut to_delete = Vec::new();
-                    for (key, value) in tags_map {
-                        if !self.try_accept_tag(key, Cow::Borrowed(value)) {
+                    tags_map.retain(|key, value| {
+                        if self.try_accept_tag(key, Cow::Borrowed(value)) {
+                            true
+                        } else {
                             emit!(TagCardinalityLimitRejectingTag {
                                 tag_key: key,
                                 tag_value: value,
                             });
-                            to_delete.push(key.clone());
+                            false
                         }
-                    }
-                    for key in to_delete {
-                        metric.remove_tag(&key);
-                    }
+                    });
                 }
             }
         }

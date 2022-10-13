@@ -62,7 +62,7 @@ fn get_key(event: &Event, key_field: &Option<String>) -> Option<Bytes> {
         Event::Metric(metric) => metric
             .tags()
             .and_then(|tags| tags.get(key_field))
-            .map(|value| value.clone().into()),
+            .map(|value| value.to_owned().into()),
         _ => None,
     })
 }

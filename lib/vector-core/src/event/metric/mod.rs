@@ -202,6 +202,12 @@ impl Metric {
         self.series.tags.as_ref()
     }
 
+    /// Gets a mutable reference to the tags of this metric, if they exist.
+    #[inline]
+    pub fn tags_mut(&mut self) -> Option<&mut MetricTags> {
+        self.series.tags.as_mut()
+    }
+
     /// Gets a reference to the timestamp of this metric, if it exists.
     #[inline]
     pub fn timestamp(&self) -> Option<DateTime<Utc>> {
@@ -315,7 +321,7 @@ impl Metric {
 
     /// Returns the string value of a tag, if it exists
     pub fn tag_value(&self, name: &str) -> Option<String> {
-        self.tags().and_then(|t| t.get(name).cloned())
+        self.tags().and_then(|t| t.get(name)).map(ToOwned::to_owned)
     }
 
     /// Inserts a tag into this metric.
