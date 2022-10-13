@@ -1,16 +1,17 @@
 use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     pin::Pin,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
     time::Duration,
 };
 
 use async_trait::async_trait;
 use bytes::BytesMut;
-use futures::{future::BoxFuture, ready, stream::BoxStream, FutureExt, StreamExt};
+use futures::{future::BoxFuture, stream::BoxStream, FutureExt, StreamExt};
 use snafu::{ResultExt, Snafu};
 use tokio::{net::UdpSocket, sync::oneshot, time::sleep};
 use tokio_util::codec::Encoder;
+use tower::Service;
 use vector_common::internal_event::{
     ByteSize, BytesSent, InternalEventHandle, Protocol, Registered,
 };
@@ -23,8 +24,8 @@ use crate::{
     dns,
     event::{Event, EventStatus, Finalizable},
     internal_events::{
-        SocketEventsSent, SocketMode, SocketSendConnectionError, UdpSendIncompleteError,
-        UdpSocketConnectionEstablished, UdpSocketSendError,
+        SocketEventsSent, SocketMode, SocketSendError, UdpSendIncompleteError,
+        UdpSocketConnectionEstablished, UdpSocketOutgoingConnectionError,
     },
     sinks::{
         util::{retries::ExponentialBackoff, StreamSink},
@@ -157,10 +158,8 @@ impl UdpConnector {
                     return socket;
                 }
                 Err(error) => {
-                    emit!(SocketSendConnectionError {
-                        error,
-                        socket_mode: "udp"
-                    });
+                    emit!(UdpSocketOutgoingConnectionError { error });
+
                     sleep(backoff.next().unwrap()).await;
                 }
             }
@@ -195,14 +194,13 @@ impl UdpService {
     }
 }
 
-impl tower::Service<BytesMut> for UdpService {
+impl Service<BytesMut> for UdpService {
     type Response = ();
     type Error = UdpError;
     type Future = BoxFuture<'static, Result<(), Self::Error>>;
 
+    // Emission of an internal event in case of errors is handled upstream by the caller.
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        // Emission of Error internal event is handled upstream by the caller
-
         loop {
             self.state = match &mut self.state {
                 UdpServiceState::Disconnected => {
@@ -228,9 +226,8 @@ impl tower::Service<BytesMut> for UdpService {
         Poll::Ready(Ok(()))
     }
 
+    // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, msg: BytesMut) -> Self::Future {
-        // Emission of Error internal event is handled upstream by the caller
-
         let (sender, receiver) = oneshot::channel();
         let byte_size = msg.len();
         let bytes_sent = self.bytes_sent.clone();
@@ -320,7 +317,11 @@ where
                         finalizers.update_status(EventStatus::Delivered);
                     }
                     Err(error) => {
-                        emit!(UdpSocketSendError { error });
+                        emit!(SocketSendError {
+                            mode: SocketMode::Udp,
+                            error
+                        });
+
                         finalizers.update_status(EventStatus::Errored);
                         break;
                     }

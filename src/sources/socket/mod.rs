@@ -1,5 +1,5 @@
 pub mod tcp;
-mod udp;
+pub mod udp;
 #[cfg(unix)]
 mod unix;
 
@@ -12,7 +12,7 @@ use crate::serde::default_framing_message_based;
 use crate::{
     codecs::DecodingConfig,
     config::{log_schema, DataType, GenerateConfig, Output, Resource, SourceConfig, SourceContext},
-    sources::util::TcpSource,
+    sources::util::net::TcpSource,
     tls::MaybeTlsSettings,
 };
 
@@ -223,8 +223,8 @@ impl SourceConfig for SocketConfig {
 
     fn resources(&self) -> Vec<Resource> {
         match self.mode.clone() {
-            Mode::Tcp(tcp) => vec![tcp.address().into()],
-            Mode::Udp(udp) => vec![Resource::udp(udp.address())],
+            Mode::Tcp(tcp) => vec![tcp.address().as_tcp_resource()],
+            Mode::Udp(udp) => vec![udp.address().as_udp_resource()],
             #[cfg(unix)]
             Mode::UnixDatagram(_) => vec![],
             #[cfg(unix)]
@@ -282,6 +282,7 @@ mod test {
         event::{Event, LogEvent},
         shutdown::{ShutdownSignal, SourceShutdownCoordinator},
         sinks::util::tcp::TcpSinkConfig,
+        sources::util::net::SocketListenAddr,
         test_util::{
             collect_n, collect_n_limited,
             components::{assert_source_compliance, SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS},
@@ -661,10 +662,13 @@ mod test {
         config: Option<UdpConfig>,
     ) -> (SocketAddr, JoinHandle<Result<(), ()>>) {
         let (address, config) = match config {
-            Some(config) => (config.address(), config),
+            Some(config) => match config.address() {
+                SocketListenAddr::SocketAddr(addr) => (addr, config),
+                _ => panic!("listen address should not be systemd FD offset in tests"),
+            },
             None => {
                 let address = next_addr();
-                (address, UdpConfig::from_address(address))
+                (address, UdpConfig::from_address(address.into()))
             }
         };
 
@@ -749,7 +753,7 @@ mod test {
         assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
             let (tx, rx) = SourceSender::new_test();
             let address = next_addr();
-            let mut config = UdpConfig::from_address(address);
+            let mut config = UdpConfig::from_address(address.into());
             config.max_length = 11;
             let address = init_udp_with_config(tx, config).await;
 
@@ -785,7 +789,7 @@ mod test {
         assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
             let (tx, rx) = SourceSender::new_test();
             let address = next_addr();
-            let mut config = UdpConfig::from_address(address);
+            let mut config = UdpConfig::from_address(address.into());
             config.max_length = 10;
             config.framing = CharacterDelimitedDecoderConfig {
                 character_delimited: CharacterDelimitedDecoderOptions::new(b',', None),

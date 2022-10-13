@@ -57,7 +57,7 @@ components: sources: datadog_agent: {
 
 	configuration: {
 		acknowledgements: configuration._source_acknowledgements
-		address:          sources.http.configuration.address
+		address:          sources.http_server.configuration.address
 		multiple_outputs: {
 			common: false
 			description: """

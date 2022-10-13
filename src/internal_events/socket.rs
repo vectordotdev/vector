@@ -1,7 +1,11 @@
 use metrics::counter;
+use vector_common::internal_event::{error_stage, error_type};
 use vector_core::internal_event::InternalEvent;
 
-use vector_common::internal_event::{error_stage, error_type};
+use crate::{
+    emit,
+    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
+};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 #[allow(dead_code)] // some features only use some variants
@@ -101,27 +105,27 @@ impl InternalEvent for SocketEventsSent {
 }
 
 #[derive(Debug)]
-pub struct SocketReceiveError<'a> {
+pub struct SocketBindError<E> {
     pub mode: SocketMode,
-    pub error: &'a codecs::decoding::Error,
+    pub error: E,
 }
 
-impl<'a> InternalEvent for SocketReceiveError<'a> {
+impl<E: std::fmt::Display> InternalEvent for SocketBindError<E> {
     fn emit(self) {
         let mode = self.mode.as_str();
         error!(
-            message = "Error receiving data.",
+            message = "Error binding socket.",
             error = %self.error,
-            error_code = "receiving_data",
-            error_type = error_type::CONNECTION_FAILED,
+            error_code = "socket_bind",
+            error_type = error_type::IO_FAILED,
             stage = error_stage::RECEIVING,
             %mode,
             internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
-            "error_code" => "receiving_data",
-            "error_type" => error_type::CONNECTION_FAILED,
+            "error_code" => "socket_bind",
+            "error_type" => error_type::IO_FAILED,
             "stage" => error_stage::RECEIVING,
             "mode" => mode,
         );
@@ -131,28 +135,64 @@ impl<'a> InternalEvent for SocketReceiveError<'a> {
 }
 
 #[derive(Debug)]
-pub struct SocketSendConnectionError<E> {
+pub struct SocketReceiveError<E> {
+    pub mode: SocketMode,
     pub error: E,
-    pub socket_mode: &'static str,
 }
 
-impl<E: std::error::Error> InternalEvent for SocketSendConnectionError<E> {
+impl<E: std::fmt::Display> InternalEvent for SocketReceiveError<E> {
     fn emit(self) {
+        let mode = self.mode.as_str();
         error!(
-            message = "Unable to connect.",
+            message = "Error receiving data.",
             error = %self.error,
-            error_code = "connection",
-            error_type = error_type::CONNECTION_FAILED,
-            stage = error_stage::SENDING,
+            error_code = "socket_receive",
+            error_type = error_type::READER_FAILED,
+            stage = error_stage::RECEIVING,
+            %mode,
             internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
-            "error_code" => "connection",
-            "error_type" => error_type::CONNECTION_FAILED,
-            "stage" => error_stage::SENDING,
+            "error_code" => "socket_receive",
+            "error_type" => error_type::READER_FAILED,
+            "stage" => error_stage::RECEIVING,
+            "mode" => mode,
         );
         // deprecated
-        counter!("connection_failed_total", 1, "mode" => self.socket_mode);
+        counter!("connection_errors_total", 1, "mode" => mode);
+    }
+}
+
+#[derive(Debug)]
+pub struct SocketSendError<E> {
+    pub mode: SocketMode,
+    pub error: E,
+}
+
+impl<E: std::fmt::Display> InternalEvent for SocketSendError<E> {
+    fn emit(self) {
+        let mode = self.mode.as_str();
+        let reason = "Error sending data.";
+        error!(
+            message = reason,
+            error = %self.error,
+            error_code = "socket_send",
+            error_type = error_type::WRITER_FAILED,
+            stage = error_stage::SENDING,
+            %mode,
+            internal_log_rate_limit = true,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "socket_send",
+            "error_type" => error_type::WRITER_FAILED,
+            "stage" => error_stage::SENDING,
+            "mode" => mode,
+        );
+        // deprecated
+        counter!("connection_errors_total", 1, "mode" => mode);
+
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }

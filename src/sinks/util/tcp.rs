@@ -25,8 +25,8 @@ use crate::{
     dns,
     event::Event,
     internal_events::{
-        ConnectionOpen, OpenGauge, SocketMode, SocketSendConnectionError,
-        TcpSocketConnectionEstablished, TcpSocketConnectionShutdown, TcpSocketSendError,
+        ConnectionOpen, OpenGauge, SocketMode, SocketSendError, TcpSocketConnectionEstablished,
+        TcpSocketConnectionShutdown, TcpSocketOutgoingConnectionError,
     },
     sinks::{
         util::{
@@ -195,10 +195,7 @@ impl TcpConnector {
                     return socket;
                 }
                 Err(error) => {
-                    emit!(SocketSendConnectionError {
-                        error,
-                        socket_mode: "tcp"
-                    });
+                    emit!(TcpSocketOutgoingConnectionError { error });
                     sleep(backoff.next().unwrap()).await;
                 }
             }
@@ -304,7 +301,10 @@ where
                 if error.kind() == ErrorKind::Other && error.to_string() == "ShutdownCheck::Close" {
                     emit!(TcpSocketConnectionShutdown {});
                 } else {
-                    emit!(TcpSocketSendError { error });
+                    emit!(SocketSendError {
+                        mode: SocketMode::Tcp,
+                        error
+                    });
                 }
             }
         }

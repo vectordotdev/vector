@@ -1,5 +1,4 @@
-use std::time::{Duration, Instant};
-
+use vector_common::internal_event::{Count, InternalEventHandle as _, Registered};
 use vector_config::configurable_component;
 
 use crate::{
@@ -57,23 +56,17 @@ impl TransformConfig for FilterConfig {
     }
 }
 
-#[derive(Derivative, Clone)]
-#[derivative(Debug)]
+#[derive(Clone)]
 pub struct Filter {
-    #[derivative(Debug = "ignore")]
     condition: Condition,
-    last_emission: Instant,
-    emissions_max_delay: Duration,
-    emissions_deferred: u64,
+    events_dropped: Registered<FilterEventsDropped>,
 }
 
 impl Filter {
     pub fn new(condition: Condition) -> Self {
         Self {
             condition,
-            last_emission: Instant::now(),
-            emissions_max_delay: Duration::new(2, 0),
-            emissions_deferred: 0,
+            events_dropped: register!(FilterEventsDropped),
         }
     }
 }
@@ -83,14 +76,8 @@ impl FunctionTransform for Filter {
         let (result, event) = self.condition.check(event);
         if result {
             output.push(event);
-        } else if self.last_emission.elapsed() >= self.emissions_max_delay {
-            emit!(FilterEventsDropped {
-                total: self.emissions_deferred,
-            });
-            self.emissions_deferred = 0;
-            self.last_emission = Instant::now();
         } else {
-            self.emissions_deferred += 1;
+            self.events_dropped.emit(Count(1));
         }
     }
 }

@@ -34,10 +34,10 @@ impl InternalEvent for HerokuLogplexRequestReadError {
         error!(
             message = "Error reading request body.",
             error = ?self.error,
-            internal_log_rate_limit = true,
             error_type = error_type::READER_FAILED,
             error_code = io_error_code(&self.error),
             stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,

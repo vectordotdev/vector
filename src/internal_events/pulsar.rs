@@ -10,7 +10,7 @@ use vector_common::internal_event::{error_stage, error_type};
 #[derive(Debug)]
 pub struct PulsarSendingError {
     pub count: u64,
-    pub error: vector_core::Error,
+    pub error: vector_common::Error,
 }
 
 impl InternalEvent for PulsarSendingError {
@@ -21,6 +21,7 @@ impl InternalEvent for PulsarSendingError {
             error = %self.error,
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::SENDING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,

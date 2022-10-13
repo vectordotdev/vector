@@ -47,24 +47,23 @@ impl<'a> Builder<'a> {
         let (ident_span, ident) = ident.take();
 
         // Check if function exists.
-        let (function_id, function) = match funcs
+        let (function_id, function) = if let Some(function) = funcs
             .iter()
             .enumerate()
             .find(|(_pos, f)| f.identifier() == ident.as_ref())
         {
-            Some(function) => function,
-            None => {
-                let idents = funcs
-                    .iter()
-                    .map(|func| func.identifier())
-                    .collect::<Vec<_>>();
+            function
+        } else {
+            let idents = funcs
+                .iter()
+                .map(|func| func.identifier())
+                .collect::<Vec<_>>();
 
-                return Err(Error::Undefined {
-                    ident_span,
-                    ident: ident.clone(),
-                    idents,
-                });
-            }
+            return Err(Error::Undefined {
+                ident_span,
+                ident: ident.clone(),
+                idents,
+            });
         };
 
         // Check function arity.
@@ -250,7 +249,7 @@ impl<'a> Builder<'a> {
                                 continue;
                             }
 
-                            matched = Some((input.clone(), expr));
+                            matched = Some((input, expr));
                             break;
                         }
                     };
@@ -510,7 +509,6 @@ impl<'a> Builder<'a> {
 
             // Check the type definition of the resulting block.This needs to match
             // whatever is configured by the closure input type.
-            let block_type_def = block.type_info(state).result;
             let expected_kind = input.output.into_kind();
             if !expected_kind.is_superset(block_type_def.kind()) {
                 return Err(Error::ReturnTypeMismatch {

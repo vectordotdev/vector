@@ -1,12 +1,14 @@
 use metrics::counter;
+use vector_common::internal_event::{error_stage, error_type};
 use vector_core::internal_event::InternalEvent;
 
 use crate::{
     emit,
-    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
+    internal_events::{ComponentEventsDropped, SocketOutgoingConnectionError, UNINTENTIONAL},
 };
-use vector_common::internal_event::{error_stage, error_type};
 
+// TODO: Get rid of this. UDP is connectionless, so there's no "successful" connect event, only
+// successfully binding a socket that can be used for receiving.
 #[derive(Debug)]
 pub struct UdpSocketConnectionEstablished;
 
@@ -17,30 +19,19 @@ impl InternalEvent for UdpSocketConnectionEstablished {
     }
 }
 
-#[derive(Debug)]
-pub struct UdpSocketSendError {
-    pub error: std::io::Error,
+// TODO: Get rid of this. UDP is connectionless, so there's no "unsuccessful" connect event, only
+// unsuccessfully binding a socket that can be used for receiving.
+pub struct UdpSocketOutgoingConnectionError<E> {
+    pub error: E,
 }
 
-impl InternalEvent for UdpSocketSendError {
+impl<E: std::error::Error> InternalEvent for UdpSocketOutgoingConnectionError<E> {
     fn emit(self) {
-        let reason = "UDP socket send error.";
-        error!(
-            message = reason,
-            error = %self.error,
-            error_type = error_type::WRITER_FAILED,
-            stage = error_stage::SENDING,
-            internal_log_rate_limit = true,
-        );
-        counter!(
-            "component_errors_total", 1,
-            "error_type" => error_type::WRITER_FAILED,
-            "stage" => error_stage::SENDING,
-        );
+        // ## skip check-duplicate-events ##
+        // ## skip check-validity-events ##
+        emit!(SocketOutgoingConnectionError { error: self.error });
         // deprecated
-        counter!("connection_errors_total", 1, "mode" => "udp");
-
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
+        counter!("connection_failed_total", 1, "mode" => "udp");
     }
 }
 

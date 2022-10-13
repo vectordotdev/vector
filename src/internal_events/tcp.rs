@@ -1,14 +1,10 @@
 use std::net::SocketAddr;
 
 use metrics::counter;
+use vector_common::internal_event::{error_stage, error_type};
 use vector_core::internal_event::InternalEvent;
 
-use crate::{
-    emit,
-    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
-    tls::TlsError,
-};
-use vector_common::internal_event::{error_stage, error_type};
+use crate::{emit, internal_events::SocketOutgoingConnectionError, tls::TlsError};
 
 #[derive(Debug)]
 pub struct TcpSocketConnectionEstablished {
@@ -23,6 +19,21 @@ impl InternalEvent for TcpSocketConnectionEstablished {
             debug!(message = "Connected.", peer_addr = "unknown");
         }
         counter!("connection_established_total", 1, "mode" => "tcp");
+    }
+}
+
+#[derive(Debug)]
+pub struct TcpSocketOutgoingConnectionError<E> {
+    pub error: E,
+}
+
+impl<E: std::error::Error> InternalEvent for TcpSocketOutgoingConnectionError<E> {
+    fn emit(self) {
+        // ## skip check-duplicate-events ##
+        // ## skip check-validity-events ##
+        emit!(SocketOutgoingConnectionError { error: self.error });
+        // deprecated
+        counter!("connection_failed_total", 1, "mode" => "tcp");
     }
 }
 
@@ -84,39 +95,6 @@ impl InternalEvent for TcpSocketTlsConnectionError {
 }
 
 #[derive(Debug)]
-pub struct TcpSocketSendError {
-    pub error: std::io::Error,
-}
-
-impl InternalEvent for TcpSocketSendError {
-    fn emit(self) {
-        let reason = "TCP socket send error.";
-        error!(
-            message = reason,
-            error = %self.error,
-            error_code = "socket_failed",
-            error_type = error_type::WRITER_FAILED,
-            stage = error_stage::SENDING,
-            internal_log_rate_limit = true,
-        );
-        counter!(
-            "component_errors_total", 1,
-            "error_code" => "socket_failed",
-            "error_type" => error_type::WRITER_FAILED,
-            "stage" => error_stage::SENDING,
-            "mode" => "tcp",
-        );
-        // deprecated
-        counter!(
-            "connection_errors_total", 1,
-            "mode" => "tcp",
-        );
-
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
-    }
-}
-
-#[derive(Debug)]
 pub struct TcpSendAckError {
     pub error: std::io::Error,
 }
@@ -168,35 +146,6 @@ impl InternalEvent for TcpBytesReceived {
             "component_received_bytes_total", self.byte_size as u64,
             "protocol" => "tcp",
             "peer_addr" => self.peer_addr.to_string()
-        );
-    }
-}
-
-pub struct TcpSocketReceiveError<E> {
-    pub error: E,
-}
-
-impl<E: std::fmt::Display> InternalEvent for TcpSocketReceiveError<E> {
-    fn emit(self) {
-        error!(
-            message = "TCP socket receive error.",
-            error = %self.error,
-            error_code = "socket_failed",
-            error_type = error_type::READER_FAILED,
-            stage = error_stage::RECEIVING,
-            internal_log_rate_limit = true,
-        );
-        counter!(
-            "component_errors_total", 1,
-            "error_code" => "socket_failed",
-            "error_type" => error_type::READER_FAILED,
-            "stage" => error_stage::RECEIVING,
-            "mode" => "tcp",
-        );
-        // deprecated
-        counter!(
-            "connection_errors_total", 1,
-            "mode" => "tcp",
         );
     }
 }

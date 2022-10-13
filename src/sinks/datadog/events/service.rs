@@ -8,7 +8,7 @@ use futures::{
 use http::Request;
 use hyper::Body;
 use tower::{Service, ServiceExt};
-use vector_core::{internal_event::EventsSent, stream::DriverResponse};
+use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
 
 use crate::{
     event::EventStatus,
@@ -30,12 +30,8 @@ impl DriverResponse for DatadogEventsResponse {
         self.event_status
     }
 
-    fn events_sent(&self) -> EventsSent {
-        EventsSent {
-            count: 1,
-            byte_size: self.event_byte_size,
-            output: None,
-        }
+    fn events_sent(&self) -> CountByteSize {
+        CountByteSize(1, self.event_byte_size)
     }
 
     fn bytes_sent(&self) -> Option<(usize, &str)> {
