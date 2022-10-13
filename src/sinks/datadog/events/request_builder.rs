@@ -86,12 +86,14 @@ impl RequestBuilder<Event> for DatadogEventsRequestBuilder {
     }
 
     fn split_input(&self, event: Event) -> (Self::Metadata, Self::Events) {
+        let builder = RequestMetadataBuilder::from_events(&event);
+
         let mut log = event.into_log();
         let metadata = Metadata {
             finalizers: log.take_finalizers(),
             api_key: log.metadata_mut().datadog_api_key(),
         };
-        let builder = RequestMetadataBuilder::from_events(&event);
+
         ((metadata, builder), Event::from(log))
     }
 
@@ -101,10 +103,11 @@ impl RequestBuilder<Event> for DatadogEventsRequestBuilder {
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
         let (metadata, builder) = metadata;
+        let request_metadata = builder.build(&payload);
         DatadogEventsRequest {
             body: payload.into_payload(),
             metadata,
-            request_metadata: builder.build(&payload),
+            request_metadata,
         }
     }
 }

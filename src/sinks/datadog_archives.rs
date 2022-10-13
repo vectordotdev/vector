@@ -628,10 +628,10 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogS3RequestBuilder {
 
     fn build_request(
         &self,
-        mut metadata: Self::Metadata,
+        metadata: Self::Metadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (s3metadata, metadata_builder) = metadata;
+        let (mut s3metadata, metadata_builder) = metadata;
         s3metadata.partition_key =
             generate_object_key(self.key_prefix.clone(), s3metadata.partition_key);
 
@@ -798,14 +798,15 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogAzureRequestBuilder {
 
     fn build_request(
         &self,
-        mut metadata: Self::Metadata,
+        metadata: Self::Metadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (azure_metadata, builder) = metadata;
+        let (mut azure_metadata, builder) = metadata;
 
         azure_metadata.partition_key =
             generate_object_key(self.blob_prefix.clone(), azure_metadata.partition_key);
 
+        let request_metadata = builder.build(&payload);
         let blob_data = payload.into_payload();
 
         trace!(
@@ -821,7 +822,7 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogAzureRequestBuilder {
             content_encoding: DEFAULT_COMPRESSION.content_encoding(),
             content_type: "application/gzip",
             metadata: azure_metadata,
-            request_metadata: builder.build(&payload),
+            request_metadata,
         }
     }
 }

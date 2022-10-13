@@ -17,13 +17,7 @@ pub struct HecMetricsRequestBuilder {
 }
 
 impl RequestBuilder<(Option<Arc<str>>, Vec<HecProcessedEvent>)> for HecMetricsRequestBuilder {
-    type Metadata = (
-        usize,
-        usize,
-        EventFinalizers,
-        Option<Arc<str>>,
-        RequestMetadataBuilder,
-    );
+    type Metadata = (EventFinalizers, Option<Arc<str>>, RequestMetadataBuilder);
     type Events = Vec<HecProcessedEvent>;
     type Encoder = HecMetricsEncoder;
     type Payload = Bytes;
@@ -44,20 +38,10 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<HecProcessedEvent>)> for HecMetricsRe
     ) -> (Self::Metadata, Self::Events) {
         let (passthrough_token, mut events) = input;
         let finalizers = events.take_finalizers();
-        let events_byte_size: usize = events.iter().map(|e| e.metadata.event_byte_size).sum();
 
         let metadata_builder = RequestMetadataBuilder::from_events(&events);
 
-        (
-            (
-                events.len(),
-                events_byte_size,
-                finalizers,
-                passthrough_token,
-                metadata_builder,
-            ),
-            events,
-        )
+        ((finalizers, passthrough_token, metadata_builder), events)
     }
 
     fn build_request(
@@ -65,8 +49,8 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<HecProcessedEvent>)> for HecMetricsRe
         metadata: Self::Metadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (events_count, events_byte_size, finalizers, passthrough_token, metadata_builder) =
-            metadata;
+        let (finalizers, passthrough_token, metadata_builder) = metadata;
+        let metadata = metadata_builder.build(&payload);
         HecRequest {
             body: payload.into_payload(),
             finalizers,
@@ -75,7 +59,7 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<HecProcessedEvent>)> for HecMetricsRe
             source: None,
             sourcetype: None,
             host: None,
-            metadata: metadata_builder.build(&payload),
+            metadata,
         }
     }
 }

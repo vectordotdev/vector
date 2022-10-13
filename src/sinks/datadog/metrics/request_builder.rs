@@ -311,14 +311,14 @@ fn encode_now_or_never(
     endpoint: DatadogMetricsEndpoint,
     metrics: Vec<Metric>,
 ) -> Result<((DDMetricsMetadata, RequestMetadata), Bytes), RequestBuilderError> {
-    let metrics_len = metrics.len() as u64;
+    let metrics_len = metrics.len();
 
-    let n = metrics
+    metrics
         .into_iter()
         .try_fold(0, |n, metric| match encoder.try_encode(metric) {
             Ok(None) => Ok(n + 1),
             _ => Err(RequestBuilderError::FailedToSplit {
-                dropped_events: metrics_len,
+                dropped_events: metrics_len as u64,
             }),
         })?;
 
@@ -332,7 +332,7 @@ fn encode_now_or_never(
                 finalizers,
                 raw_bytes: raw_bytes_written,
             };
-            let builder = RequestMetadataBuilder::new(metrics.len(), raw_bytes_written);
+            let builder = RequestMetadataBuilder::new(metrics_len, raw_bytes_written);
             let bytes_len =
                 NonZeroUsize::new(payload.len()).expect("payload should never be zero length");
             let request_metadata = builder.with_request_size(bytes_len);
@@ -340,6 +340,6 @@ fn encode_now_or_never(
             ((ddmetrics_metadata, request_metadata), payload)
         })
         .map_err(|_| RequestBuilderError::FailedToSplit {
-            dropped_events: metrics_len,
+            dropped_events: metrics_len as u64,
         })
 }

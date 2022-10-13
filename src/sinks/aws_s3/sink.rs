@@ -50,9 +50,10 @@ impl RequestBuilder<(String, Vec<Event>)> for S3RequestOptions {
 
     fn split_input(&self, input: (String, Vec<Event>)) -> (Self::Metadata, Self::Events) {
         let (partition_key, mut events) = input;
+        let builder = RequestMetadataBuilder::from_events(&events);
+
         let finalizers = events.take_finalizers();
 
-        let builder = RequestMetadataBuilder::from_events(events);
         let metadata = S3Metadata {
             partition_key,
             finalizers,
@@ -63,10 +64,10 @@ impl RequestBuilder<(String, Vec<Event>)> for S3RequestOptions {
 
     fn build_request(
         &self,
-        mut metadata: Self::Metadata,
+        metadata: Self::Metadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (s3metadata, builder) = metadata;
+        let (mut s3metadata, builder) = metadata;
 
         let filename = {
             let formatted_ts = Utc::now().format(self.filename_time_format.as_str());
@@ -84,11 +85,13 @@ impl RequestBuilder<(String, Vec<Event>)> for S3RequestOptions {
         s3metadata.partition_key =
             format!("{}{}.{}", s3metadata.partition_key, filename, extension);
 
+        let request_metadata = builder.build(&payload);
+
         S3Request {
             body: payload.into_payload(),
             bucket: self.bucket.clone(),
             metadata: s3metadata,
-            request_metadata: builder.build(&payload),
+            request_metadata,
             content_encoding: self.compression.content_encoding(),
             options: self.api_options.clone(),
         }

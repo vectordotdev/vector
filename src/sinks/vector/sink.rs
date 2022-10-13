@@ -47,8 +47,7 @@ where
                     req.finalizers.merge(item.finalizers);
                     req.events.push(item.wrapper);
 
-                    req.builder.event_count += 1;
-                    req.builder.events_byte_size += item.byte_size;
+                    req.builder.increment(1, item.byte_size);
 
                     let events = req.events.clone();
                     req.request = proto_vector::PushEventsRequest { events };

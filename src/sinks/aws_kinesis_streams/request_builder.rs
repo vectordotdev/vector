@@ -23,7 +23,6 @@ pub struct KinesisRequestBuilder {
 pub struct KinesisMetadata {
     pub finalizers: EventFinalizers,
     pub partition_key: String,
-    pub event_byte_size: usize,
 }
 
 #[derive(Clone)]
@@ -31,7 +30,6 @@ pub struct KinesisRequest {
     pub key: KinesisKey,
     pub put_records_request: PutRecordsRequestEntry,
     pub finalizers: EventFinalizers,
-    pub event_byte_size: usize,
     pub metadata: RequestMetadata,
 }
 
@@ -102,7 +100,6 @@ impl RequestBuilder<KinesisProcessedEvent> for KinesisRequestBuilder {
         let metadata = KinesisMetadata {
             finalizers: event.event.take_finalizers(),
             partition_key: event.metadata.partition_key,
-            event_byte_size: event.event.size_of(),
         };
         let event = Event::from(event.event);
         let builder = RequestMetadataBuilder::from_events(&event);
@@ -116,19 +113,19 @@ impl RequestBuilder<KinesisProcessedEvent> for KinesisRequestBuilder {
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
         let (kinesis_metadata, builder) = metadata;
+        let metadata = builder.build(&payload);
         let payload_bytes = payload.into_payload();
 
         KinesisRequest {
             key: KinesisKey {
-                partition_key: kinesis_metadata.partition_key,
+                partition_key: kinesis_metadata.partition_key.clone(),
             },
             put_records_request: PutRecordsRequestEntry::builder()
                 .data(Blob::new(&payload_bytes[..]))
                 .partition_key(kinesis_metadata.partition_key)
                 .build(),
             finalizers: kinesis_metadata.finalizers,
-            event_byte_size: kinesis_metadata.event_byte_size,
-            metadata: builder.build(&payload),
+            metadata,
         }
     }
 }

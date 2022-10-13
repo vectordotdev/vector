@@ -84,7 +84,6 @@ impl DatadogTracesRequestBuilder {
 
 pub struct DDTracesMetadata {
     api_key: Arc<str>,
-    batch_size: usize,
     endpoint: DatadogTracesEndpoint,
     finalizers: EventFinalizers,
     uncompressed_size: usize,
@@ -128,7 +127,6 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
                             .api_key
                             .clone()
                             .unwrap_or_else(|| Arc::clone(&self.api_key)),
-                        batch_size: n,
                         endpoint: DatadogTracesEndpoint::Traces,
                         finalizers: processed.take_finalizers(),
                         uncompressed_size,
@@ -455,7 +453,6 @@ fn build_apm_stats_request(
             .api_key
             .clone()
             .unwrap_or_else(|| Arc::clone(default_api_key)),
-        batch_size: 0,
         endpoint: DatadogTracesEndpoint::APMStats,
         finalizers: EventFinalizers::default(),
         uncompressed_size,

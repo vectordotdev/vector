@@ -262,14 +262,16 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
         let (api_key, finalizers, builder) = metadata;
+        let metadata = builder.build(&payload);
         let uncompressed_size = payload.uncompressed_byte_size;
+
         LogApiRequest {
             api_key,
             compression: self.compression,
             body: payload.into_payload(),
             finalizers,
             uncompressed_size,
-            metadata: builder.build(&payload),
+            metadata,
         }
     }
 }
@@ -349,13 +351,15 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for SemanticLogRequestBuilde
     ) -> Self::Request {
         let (api_key, finalizers, builder) = metadata;
         let uncompressed_size = payload.uncompressed_byte_size;
+        let metadata = builder.build(&payload);
+
         LogApiRequest {
             api_key,
             compression: self.compression,
             body: payload.into_payload(),
             finalizers,
             uncompressed_size,
-            metadata: builder.build(&payload),
+            metadata,
         }
     }
 }

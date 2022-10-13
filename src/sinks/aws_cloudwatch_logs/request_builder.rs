@@ -81,9 +81,11 @@ impl CloudwatchRequestBuilder {
         };
 
         let finalizers = event.take_finalizers();
-        let event_byte_size = event.size_of();
         self.transformer.transform(&mut event);
         let mut message_bytes = BytesMut::new();
+
+        let builder = RequestMetadataBuilder::from_events(&event);
+
         if self.encoder.encode(event, &mut message_bytes).is_err() {
             // The encoder handles internal event emission for Error and EventsDropped.
             return None;
@@ -98,7 +100,6 @@ impl CloudwatchRequestBuilder {
             return None;
         }
 
-        let builder = RequestMetadataBuilder::from_events(&event);
         let bytes_len =
             NonZeroUsize::new(message_bytes.len()).expect("payload should never be zero length");
         let metadata = builder.with_request_size(bytes_len);

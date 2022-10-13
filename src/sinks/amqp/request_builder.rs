@@ -44,12 +44,13 @@ impl RequestBuilder<AmqpEvent> for AmqpRequestBuilder {
     }
 
     fn split_input(&self, mut input: AmqpEvent) -> (Self::Metadata, Self::Events) {
+        let builder = RequestMetadataBuilder::from_events(&input);
+
         let metadata = AmqpMetadata {
             exchange: input.exchange,
             routing_key: input.routing_key,
             finalizers: input.event.take_finalizers(),
         };
-        let builder = RequestMetadataBuilder::from_events(&input);
 
         ((metadata, builder), input.event)
     }
@@ -60,13 +61,14 @@ impl RequestBuilder<AmqpEvent> for AmqpRequestBuilder {
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
         let (amqp_metadata, builder) = metadata;
+        let metadata = builder.build(&payload);
         let body = payload.into_payload();
         AmqpRequest::new(
             body,
             amqp_metadata.exchange,
             amqp_metadata.routing_key,
             amqp_metadata.finalizers,
-            builder.build(&payload),
+            metadata,
         )
     }
 }

@@ -7,11 +7,11 @@ use vector_common::internal_event::{error_stage, error_type};
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct AwsKinesisStreamNoPartitionKeyError {
-    pub partition_key_field: &'static str,
+pub struct AwsKinesisStreamNoPartitionKeyError<'a> {
+    pub partition_key_field: &'a str,
 }
 
-impl InternalEvent for AwsKinesisStreamNoPartitionKeyError {
+impl InternalEvent for AwsKinesisStreamNoPartitionKeyError<'_> {
     fn emit(self) {
         let reason = "Partition key does not exist.";
 

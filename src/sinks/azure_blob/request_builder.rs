@@ -58,10 +58,10 @@ impl RequestBuilder<(String, Vec<Event>)> for AzureBlobRequestOptions {
 
     fn build_request(
         &self,
-        mut metadata: Self::Metadata,
+        metadata: Self::Metadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (azure_metadata, builder) = metadata;
+        let (mut azure_metadata, builder) = metadata;
 
         let blob_name = {
             let formatted_ts = Utc::now().format(self.blob_time_format.as_str());
@@ -77,6 +77,7 @@ impl RequestBuilder<(String, Vec<Event>)> for AzureBlobRequestOptions {
             azure_metadata.partition_key, blob_name, extension
         );
 
+        let request_metadata = builder.build(&payload);
         let payload_bytes = payload.into_payload();
 
         debug!(
@@ -92,7 +93,7 @@ impl RequestBuilder<(String, Vec<Event>)> for AzureBlobRequestOptions {
             content_encoding: self.compression.content_encoding(),
             content_type: self.compression.content_type(),
             metadata: azure_metadata,
-            request_metadata: builder.build(&payload),
+            request_metadata,
         }
     }
 }

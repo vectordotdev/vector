@@ -8,8 +8,8 @@ use super::request_builder::EncodeResult;
 
 #[derive(Clone, Default, Debug)]
 pub struct RequestMetadataBuilder {
-    pub event_count: usize,
-    pub events_byte_size: usize,
+    event_count: usize,
+    events_byte_size: usize,
 }
 
 impl RequestMetadataBuilder {
@@ -30,23 +30,25 @@ impl RequestMetadataBuilder {
         }
     }
 
-    pub const fn with_request_size(&self, size: NonZeroUsize) -> RequestMetadata {
-        RequestMetadata {
-            event_count: self.event_count,
-            events_byte_size: self.events_byte_size,
-            request_encoded_size: size.get(),
-            request_wire_size: size.get(),
-        }
+    pub fn increment(&mut self, event_count: usize, events_byte_size: usize) {
+        self.event_count += event_count;
+        self.events_byte_size += events_byte_size;
+    }
+
+    pub fn with_request_size(&self, size: NonZeroUsize) -> RequestMetadata {
+        let size = size.get();
+
+        RequestMetadata::new(self.event_count, self.events_byte_size, size, size)
     }
 
     pub fn build<T>(&self, result: &EncodeResult<T>) -> RequestMetadata {
-        RequestMetadata {
-            event_count: self.event_count,
-            events_byte_size: self.events_byte_size,
-            request_encoded_size: result.uncompressed_byte_size,
-            request_wire_size: result
+        RequestMetadata::new(
+            self.event_count,
+            self.events_byte_size,
+            result.uncompressed_byte_size,
+            result
                 .compressed_byte_size
                 .unwrap_or(result.uncompressed_byte_size),
-        }
+        )
     }
 }

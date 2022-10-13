@@ -61,8 +61,6 @@ impl RequestBuilder<Event> for SqsRequestBuilder {
     }
 
     fn split_input(&self, mut event: Event) -> (Self::Metadata, Self::Events) {
-        let event_byte_size = event.size_of();
-
         let message_group_id = match self.message_group_id {
             Some(ref tpl) => match tpl.render_string(&event) {
                 Ok(value) => Some(value),
@@ -107,10 +105,11 @@ impl RequestBuilder<Event> for SqsRequestBuilder {
         metadata: Self::Metadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
+        let (sqs_metadata, builder) = metadata;
+        let metadata = builder.build(&payload);
+
         let payload_bytes = payload.into_payload();
         let message_body = String::from(std::str::from_utf8(&payload_bytes).unwrap());
-
-        let (sqs_metadata, builder) = metadata;
 
         SendMessageEntry {
             message_body,
@@ -118,7 +117,7 @@ impl RequestBuilder<Event> for SqsRequestBuilder {
             message_deduplication_id: sqs_metadata.message_deduplication_id,
             queue_url: self.queue_url.clone(),
             finalizers: sqs_metadata.finalizers,
-            metadata: builder.build(&payload),
+            metadata,
         }
     }
 }

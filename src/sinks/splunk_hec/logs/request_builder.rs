@@ -21,18 +21,17 @@ pub struct HecLogsRequestBuilder {
 }
 
 #[derive(Debug, Clone)]
-pub struct RequestMetadata {
+pub struct HecRequestMetadata {
     finalizers: EventFinalizers,
     partition: Option<Arc<str>>,
     source: Option<String>,
     sourcetype: Option<String>,
     index: Option<String>,
     host: Option<String>,
-    builder: RequestMetadataBuilder,
 }
 
 impl RequestBuilder<(Option<Partitioned>, Vec<HecProcessedEvent>)> for HecLogsRequestBuilder {
-    type Metadata = RequestMetadata;
+    type Metadata = (HecRequestMetadata, RequestMetadataBuilder);
     type Events = Vec<HecProcessedEvent>;
     type Encoder = HecLogsEncoder;
     type Payload = Bytes;
@@ -58,15 +57,17 @@ impl RequestBuilder<(Option<Partitioned>, Vec<HecProcessedEvent>)> for HecLogsRe
         let builder = RequestMetadataBuilder::from_events(&events);
 
         (
-            RequestMetadata {
-                finalizers,
-                partition: partition.as_ref().and_then(|p| p.token.clone()),
-                source: partition.as_mut().and_then(|p| p.source.take()),
-                sourcetype: partition.as_mut().and_then(|p| p.sourcetype.take()),
-                index: partition.as_mut().and_then(|p| p.index.take()),
-                host: partition.as_mut().and_then(|p| p.host.take()),
+            (
+                HecRequestMetadata {
+                    finalizers,
+                    partition: partition.as_ref().and_then(|p| p.token.clone()),
+                    source: partition.as_mut().and_then(|p| p.source.take()),
+                    sourcetype: partition.as_mut().and_then(|p| p.sourcetype.take()),
+                    index: partition.as_mut().and_then(|p| p.index.take()),
+                    host: partition.as_mut().and_then(|p| p.host.take()),
+                },
                 builder,
-            },
+            ),
             events,
         )
     }
@@ -76,15 +77,18 @@ impl RequestBuilder<(Option<Partitioned>, Vec<HecProcessedEvent>)> for HecLogsRe
         metadata: Self::Metadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
+        let (hec_metadata, builder) = metadata;
+        let metadata = builder.build(&payload);
+
         HecRequest {
             body: payload.into_payload(),
-            finalizers: metadata.finalizers,
-            passthrough_token: metadata.partition,
-            source: metadata.source,
-            sourcetype: metadata.sourcetype,
-            index: metadata.index,
-            host: metadata.host,
-            metadata: metadata.builder.build(&payload),
+            finalizers: hec_metadata.finalizers,
+            passthrough_token: hec_metadata.partition,
+            source: hec_metadata.source,
+            sourcetype: hec_metadata.sourcetype,
+            index: hec_metadata.index,
+            host: hec_metadata.host,
+            metadata,
         }
     }
 }

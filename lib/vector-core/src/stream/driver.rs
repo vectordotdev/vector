@@ -229,7 +229,7 @@ mod tests {
         finalization::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus, Finalizable},
         metadata::RequestMetadata,
     };
-    use vector_common::{internal_event::EventsSent, metadata::MetaDescriptive, CountByteSize};
+    use vector_common::{internal_event::CountByteSize, metadata::MetaDescriptive};
 
     use super::{Driver, DriverResponse};
 
@@ -249,7 +249,7 @@ mod tests {
             Self(
                 value,
                 EventFinalizers::new(EventFinalizer::new(batch)),
-                RequestMetadata::new(),
+                RequestMetadata::default(),
             )
         }
     }

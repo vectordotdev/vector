@@ -65,13 +65,15 @@ impl RequestBuilder<Vec<ProcessedEvent>> for ElasticsearchRequestBuilder {
         metadata: Self::Metadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (metadata, metadata_builder) = metadata;
+        let (es_metadata, metadata_builder) = metadata;
+        let metadata = metadata_builder.build(&payload);
+
         ElasticsearchRequest {
             payload: payload.into_payload(),
-            finalizers: metadata.finalizers,
-            batch_size: metadata.batch_size,
-            events_byte_size: metadata.events_byte_size,
-            metadata: metadata_builder.build(&payload),
+            finalizers: es_metadata.finalizers,
+            batch_size: es_metadata.batch_size,
+            events_byte_size: es_metadata.events_byte_size,
+            metadata,
         }
     }
 }

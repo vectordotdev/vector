@@ -107,6 +107,7 @@ impl Service<VectorRequest> for VectorService {
     // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, list: VectorRequest) -> Self::Future {
         let mut service = self.clone();
+        let byte_size = list.request.encoded_len();
 
         let future = async move {
             service
@@ -114,7 +115,7 @@ impl Service<VectorRequest> for VectorService {
                 .push_events(list.request.into_request())
                 .map_ok(|_response| {
                     emit!(EndpointBytesSent {
-                        byte_size: list.request.encoded_len(),
+                        byte_size,
                         protocol: &service.protocol,
                         endpoint: &service.endpoint,
                     });

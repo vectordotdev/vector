@@ -15,8 +15,18 @@ pub struct RequestMetadata {
 
 // TODO: Make this struct the object which emits the actual internal telemetry i.e. events sent, bytes sent, etc.
 impl RequestMetadata {
-    pub fn new() -> Self {
-        RequestMetadata::default()
+    pub fn new(
+        event_count: usize,
+        events_byte_size: usize,
+        request_encoded_size: usize,
+        request_wire_size: usize,
+    ) -> Self {
+        Self {
+            event_count,
+            events_byte_size,
+            request_encoded_size,
+            request_wire_size,
+        }
     }
 
     pub const fn event_count(&self) -> usize {
