@@ -450,7 +450,8 @@ impl Aggregator {
 
         // update the oldest_timestamp allowed, to prevent having stats for an already flushed
         // bucket
-        self.oldest_timestamp = align_timestamp(now);
+        self.oldest_timestamp =
+            align_timestamp(now) - ((BUCKET_WINDOW_LEN - 1) * BUCKET_DURATION_NANOSECONDS);
     }
 }
 
