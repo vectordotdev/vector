@@ -80,7 +80,7 @@ impl FunctionExpression for SortFn {
         let mut collection = type_def.kind().as_array().unwrap().clone();
         let reduced_kind = collection.reduced_kind();
 
-        for (_, kind) in collection.known_mut() {
+        for kind in collection.known_mut().values_mut() {
             *kind = reduced_kind.clone();
         }
 

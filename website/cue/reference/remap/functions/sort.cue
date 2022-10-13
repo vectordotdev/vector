@@ -33,21 +33,21 @@ remap: functions: sort: {
 		{
 			title: "sort an array"
 			source: """
-				append([2, 1, 3])
+				sort([2, 1, 3])
 				"""
 			return: [1, 2, 3]
 		},
 		{
 			title: "reverse sort an array"
 			source: """
-				append([2, 1, 3])
+				sort([2, 1, 3])
 				"""
 			return: [3, 2, 1]
 		},
 		{
 			title: "sort mixed array"
 			source: """
-				append([2, null, "foo"])
+				sort([2, null, "foo"])
 				"""
 			return: ["foo", 2, null]
 		},
