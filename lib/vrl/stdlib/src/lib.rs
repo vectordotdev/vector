@@ -262,6 +262,8 @@ mod sha2;
 mod sha3;
 #[cfg(feature = "slice")]
 mod slice;
+#[cfg(feature = "sort")]
+mod sort;
 #[cfg(feature = "split")]
 mod split;
 #[cfg(feature = "starts_with")]
@@ -541,6 +543,8 @@ pub use sha2::Sha2;
 pub use sha3::Sha3;
 #[cfg(feature = "slice")]
 pub use slice::Slice;
+#[cfg(feature = "sort")]
+pub use sort::Sort;
 #[cfg(feature = "split")]
 pub use split::Split;
 #[cfg(feature = "starts_with")]
@@ -836,6 +840,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Sha3),
         #[cfg(feature = "slice")]
         Box::new(Slice),
+        #[cfg(feature = "sort")]
+        Box::new(Sort),
         #[cfg(feature = "split")]
         Box::new(Split),
         #[cfg(feature = "starts_with")]

@@ -183,6 +183,7 @@ default = [
     "sha2",
     "sha3",
     "slice",
+    "sort",
     "split",
     "starts_with",
     "string",
@@ -327,6 +328,7 @@ sha1 = ["dep:sha-1", "dep:hex"]
 sha2 = ["dep:sha-2", "dep:hex"]
 sha3 = ["dep:sha-3", "dep:hex"]
 slice = []
+sort = []
 split = ["dep:regex"]
 starts_with = ["dep:utf8-width"]
 string = []
