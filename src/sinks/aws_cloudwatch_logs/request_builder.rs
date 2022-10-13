@@ -3,7 +3,7 @@ use std::num::NonZeroUsize;
 use bytes::BytesMut;
 use chrono::Utc;
 use tokio_util::codec::Encoder as _;
-use vector_common::metadata::RequestMetadata;
+use vector_common::metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::{
     event::{EventFinalizers, Finalizable},
     ByteSizeOf,
@@ -28,15 +28,20 @@ const MAX_MESSAGE_SIZE: usize = MAX_EVENT_SIZE - EVENT_SIZE_OVERHEAD;
 pub struct CloudwatchRequest {
     pub key: CloudwatchKey,
     pub(super) message: String,
-    //pub event_byte_size: usize,
     pub timestamp: i64,
     pub finalizers: EventFinalizers,
-    pub metadata: RequestMetadata,
+    metadata: RequestMetadata,
 }
 
 impl Finalizable for CloudwatchRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
         self.finalizers.take_finalizers()
+    }
+}
+
+impl MetaDescriptive for CloudwatchRequest {
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
     }
 }
 

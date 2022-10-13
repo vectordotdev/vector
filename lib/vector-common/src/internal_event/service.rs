@@ -37,7 +37,7 @@ pub struct ServiceCallError<E> {
 
 impl<E: std::fmt::Debug> InternalEvent for ServiceCallError<E> {
     fn emit(self) {
-        let reason = "Service call failed. No retries or retries exhausted";
+        let reason = "Service call failed. No retries or retries exhausted.";
         error!(
             message = reason,
             error = ?self.error,

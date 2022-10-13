@@ -19,7 +19,7 @@ use crate::{
 pub struct DatadogEventsRequest {
     pub body: Bytes,
     pub metadata: Metadata,
-    pub request_metadata: RequestMetadata,
+    request_metadata: RequestMetadata,
 }
 
 impl Finalizable for DatadogEventsRequest {

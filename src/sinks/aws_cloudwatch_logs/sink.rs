@@ -53,7 +53,7 @@ where
             .map(|(key, events)| {
                 let mut metadata_vec = vec![];
                 for req in &events {
-                    metadata_vec.push(req.metadata.clone());
+                    metadata_vec.push(req.get_metadata().clone());
                 }
                 let metadata = RequestMetadata::from_batch(&metadata_vec);
                 BatchCloudwatchRequest {
@@ -72,7 +72,7 @@ where
 pub struct BatchCloudwatchRequest {
     pub key: CloudwatchKey,
     pub events: Vec<CloudwatchRequest>,
-    pub metadata: RequestMetadata,
+    metadata: RequestMetadata,
 }
 
 impl Finalizable for BatchCloudwatchRequest {

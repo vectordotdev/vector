@@ -2,7 +2,7 @@ use std::io;
 
 use aws_sdk_firehose::{model::Record, types::Blob};
 use bytes::Bytes;
-use vector_common::metadata::RequestMetadata;
+use vector_common::metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -31,12 +31,18 @@ pub struct KinesisRequest {
     pub key: KinesisKey,
     pub record: Record,
     pub finalizers: EventFinalizers,
-    pub metadata: RequestMetadata,
+    metadata: RequestMetadata,
 }
 
 impl Finalizable for KinesisRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
         std::mem::take(&mut self.finalizers)
+    }
+}
+
+impl MetaDescriptive for KinesisRequest {
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
     }
 }
 

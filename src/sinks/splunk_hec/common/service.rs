@@ -13,6 +13,7 @@ use tokio::sync::{mpsc, oneshot, OwnedSemaphorePermit, Semaphore};
 use tokio_util::sync::PollSemaphore;
 use tower::Service;
 use uuid::Uuid;
+use vector_common::metadata::MetaDescriptive;
 use vector_core::event::EventStatus;
 
 use super::{
@@ -112,8 +113,8 @@ where
         let ack_finalizer_tx = self.ack_finalizer_tx.clone();
         let ack_slot = self.current_ack_slot.take();
 
-        let events_count = req.metadata.event_count();
-        let events_byte_size = req.metadata.events_byte_size();
+        let events_count = req.get_metadata().event_count();
+        let events_byte_size = req.get_metadata().events_byte_size();
         let response = self.inner.call(req);
 
         Box::pin(async move {

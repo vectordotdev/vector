@@ -108,6 +108,8 @@ impl Service<VectorRequest> for VectorService {
     fn call(&mut self, list: VectorRequest) -> Self::Future {
         let mut service = self.clone();
         let byte_size = list.request.encoded_len();
+        let events_count = list.get_metadata().event_count();
+        let events_byte_size = list.get_metadata().events_byte_size();
 
         let future = async move {
             service
@@ -120,8 +122,8 @@ impl Service<VectorRequest> for VectorService {
                         endpoint: &service.endpoint,
                     });
                     VectorResponse {
-                        events_count: list.metadata.event_count(),
-                        events_byte_size: list.metadata.events_byte_size(),
+                        events_count,
+                        events_byte_size,
                     }
                 })
                 .map_err(|source| VectorSinkError::Request { source }.into())

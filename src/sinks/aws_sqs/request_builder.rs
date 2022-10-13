@@ -129,7 +129,7 @@ pub(crate) struct SendMessageEntry {
     pub message_deduplication_id: Option<String>,
     pub queue_url: String,
     finalizers: EventFinalizers,
-    pub metadata: RequestMetadata,
+    metadata: RequestMetadata,
 }
 
 impl ByteSizeOf for SendMessageEntry {

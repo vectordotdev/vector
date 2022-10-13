@@ -146,8 +146,8 @@ impl Service<TraceApiRequest> for TraceApiService {
         let protocol = request.uri.scheme_str().unwrap_or("http").to_string();
 
         Box::pin(async move {
-            let byte_size = request.metadata.events_byte_size();
-            let batch_size = request.metadata.event_count();
+            let byte_size = request.get_metadata().events_byte_size();
+            let batch_size = request.get_metadata().event_count();
             let uncompressed_size = request.uncompressed_size;
             let http_request = request.into_http_request().context(BuildRequestSnafu)?;
 

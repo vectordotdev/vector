@@ -124,6 +124,8 @@ impl Service<LokiRequest> for LokiService {
         let mut req = http::Request::post(&self.endpoint.uri).header("Content-Type", content_type);
         let protocol = get_http_scheme_from_uri(&self.endpoint.uri);
 
+        let metadata = request.get_metadata().clone();
+
         if let Some(tenant_id) = request.tenant_id {
             req = req.header("X-Scope-OrgID", tenant_id);
         }
@@ -141,7 +143,6 @@ impl Service<LokiRequest> for LokiService {
 
         let mut client = self.client.clone();
 
-        let metadata = request.metadata;
         Box::pin(async move {
             match client.call(req).in_current_span().await {
                 Ok(response) => {

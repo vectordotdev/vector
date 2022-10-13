@@ -90,6 +90,8 @@ impl Service<KafkaRequest> for KafkaService {
         let this = self.clone();
 
         Box::pin(async move {
+            let event_byte_size = request.get_metadata().events_byte_size();
+
             let mut record =
                 FutureRecord::to(&request.metadata.topic).payload(request.body.as_ref());
             if let Some(key) = &request.metadata.key {
@@ -108,9 +110,7 @@ impl Service<KafkaRequest> for KafkaService {
                     this.bytes_sent.emit(ByteSize(
                         request.body.len() + request.metadata.key.map(|x| x.len()).unwrap_or(0),
                     ));
-                    Ok(KafkaResponse {
-                        event_byte_size: request.request_metadata.events_byte_size(),
-                    })
+                    Ok(KafkaResponse { event_byte_size })
                 }
                 Err((kafka_err, _original_record)) => Err(kafka_err),
             }

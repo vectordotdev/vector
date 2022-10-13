@@ -102,7 +102,7 @@ impl Service<NewRelicApiRequest> for NewRelicApiService {
         };
 
         let payload_len = request.payload.len();
-        let metadata = request.metadata;
+        let metadata = request.get_metadata().clone();
         let http_request = http_request
             .header(CONTENT_LENGTH, payload_len)
             .body(Body::from(request.payload))

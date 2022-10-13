@@ -12,8 +12,6 @@ use crate::sinks::util::ElementCount;
 #[derive(Clone, Debug)]
 pub struct HecRequest {
     pub body: Bytes,
-    //pub events_count: usize,
-    //pub events_byte_size: usize,
     pub metadata: RequestMetadata,
     pub finalizers: EventFinalizers,
     pub passthrough_token: Option<Arc<str>>,

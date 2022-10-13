@@ -2,7 +2,7 @@ use std::io;
 
 use aws_sdk_kinesis::{model::PutRecordsRequestEntry, types::Blob};
 use bytes::Bytes;
-use vector_common::metadata::RequestMetadata;
+use vector_common::metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::ByteSizeOf;
 
 use super::sink::{KinesisKey, KinesisProcessedEvent};
@@ -30,12 +30,18 @@ pub struct KinesisRequest {
     pub key: KinesisKey,
     pub put_records_request: PutRecordsRequestEntry,
     pub finalizers: EventFinalizers,
-    pub metadata: RequestMetadata,
+    metadata: RequestMetadata,
 }
 
 impl Finalizable for KinesisRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
         std::mem::take(&mut self.finalizers)
+    }
+}
+
+impl MetaDescriptive for KinesisRequest {
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
     }
 }
 

@@ -260,7 +260,7 @@ impl ChronicleUnstructuredConfig {
 pub struct ChronicleRequest {
     pub body: Bytes,
     pub finalizers: EventFinalizers,
-    pub metadata: RequestMetadata,
+    metadata: RequestMetadata,
 }
 
 impl Finalizable for ChronicleRequest {
@@ -459,6 +459,7 @@ impl Service<ChronicleRequest> for ChronicleService {
             HeaderValue::from_str(&request.body.len().to_string()).unwrap(),
         );
 
+        let metadata = request.get_metadata().clone();
         let mut http_request = builder.body(Body::from(request.body)).unwrap();
         self.creds.apply(&mut http_request);
 
@@ -467,12 +468,11 @@ impl Service<ChronicleRequest> for ChronicleService {
             match client.call(http_request).await {
                 Ok(response) => {
                     let status = response.status();
-
                     if status.is_success() {
                         Ok(GcsResponse {
                             inner: response,
                             protocol: "http",
-                            metadata: request.metadata,
+                            metadata,
                         })
                     } else {
                         Err(ChronicleResponseError::ServerError { code: status })

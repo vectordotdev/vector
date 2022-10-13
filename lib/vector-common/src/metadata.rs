@@ -67,7 +67,8 @@ impl RequestMetadata {
     }
 }
 
-///
+/// Objects implementing this trait have metadata that describes the request.
 pub trait MetaDescriptive {
+    /// Returns the RequestMetadata associated with this object.
     fn get_metadata(&self) -> &RequestMetadata;
 }
