@@ -159,7 +159,6 @@ impl UdpConnector {
                 }
                 Err(error) => {
                     emit!(UdpSocketOutgoingConnectionError { error });
-
                     sleep(backoff.next().unwrap()).await;
                 }
             }
@@ -321,7 +320,6 @@ where
                             mode: SocketMode::Udp,
                             error
                         });
-
                         finalizers.update_status(EventStatus::Errored);
                         break;
                     }

@@ -103,15 +103,13 @@ impl Service<LogApiRequest> for LogApiService {
     type Error = DatadogApiError;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
+    // Emission of Error internal event is handled upstream by the caller
     fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
-        // Emission of Error internal event is handled upstream by the caller
-
         Poll::Ready(Ok(()))
     }
 
+    // Emission of Error internal event is handled upstream by the caller
     fn call(&mut self, request: LogApiRequest) -> Self::Future {
-        // Emission of Error internal event is handled upstream by the caller
-
         let mut client = self.client.clone();
         let http_request = Request::post(&self.uri)
             .header(CONTENT_TYPE, "application/json")
