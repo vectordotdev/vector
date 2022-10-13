@@ -27,7 +27,7 @@ use vector_common::{
     internal_event::{
         ByteSize, BytesSent, EventsSent, InternalEventHandle as _, Protocol, Registered,
     },
-    metadata::RequestMetadata,
+    request_metadata::RequestMetadata,
     sensitive_string::SensitiveString,
 };
 use vector_config::configurable_component;

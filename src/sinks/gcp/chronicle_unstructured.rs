@@ -12,7 +12,7 @@ use snafu::Snafu;
 use std::io;
 use tokio_util::codec::Encoder as _;
 use tower::{Service, ServiceBuilder};
-use vector_common::metadata::{MetaDescriptive, RequestMetadata};
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_config::configurable_component;
 use vector_core::{
     config::{AcknowledgementsConfig, Input},

@@ -6,7 +6,7 @@ use rand::random;
 use tower::Service;
 use vector_common::{
     finalization::{EventFinalizers, Finalizable},
-    metadata::{MetaDescriptive, RequestMetadata},
+    request_metadata::{MetaDescriptive, RequestMetadata},
 };
 use vector_core::{
     event::LogEvent,

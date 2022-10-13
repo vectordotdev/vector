@@ -3,7 +3,7 @@ use std::{io, sync::Arc};
 use bytes::Bytes;
 use codecs::JsonSerializer;
 use lookup::lookup_v2::OwnedSegment;
-use vector_common::metadata::{MetaDescriptive, RequestMetadata};
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::ByteSizeOf;
 
 use crate::{

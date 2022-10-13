@@ -9,7 +9,7 @@ use prost::Message;
 use proto_event::EventWrapper;
 use tonic::{body::BoxBody, IntoRequest};
 use tower::Service;
-use vector_common::metadata::{MetaDescriptive, RequestMetadata};
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::{
     event::proto as proto_event, internal_event::CountByteSize, stream::DriverResponse,
 };

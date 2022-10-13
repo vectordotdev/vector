@@ -2,7 +2,7 @@ use std::io;
 
 use aws_sdk_kinesis::{model::PutRecordsRequestEntry, types::Blob};
 use bytes::Bytes;
-use vector_common::metadata::{MetaDescriptive, RequestMetadata};
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::ByteSizeOf;
 
 use super::sink::{KinesisKey, KinesisProcessedEvent};

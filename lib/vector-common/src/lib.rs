@@ -47,7 +47,7 @@ pub use finalizer::EmptyStream;
 
 pub mod internal_event;
 
-pub mod metadata;
+pub mod request_metadata;
 
 pub mod shutdown;
 

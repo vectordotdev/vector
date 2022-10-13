@@ -29,13 +29,13 @@ impl<E: std::fmt::Debug> InternalEvent for PollReadyError<E> {
 }
 
 #[derive(Debug)]
-pub struct ServiceCallError<E> {
+pub struct CallError<E> {
     pub error: E,
     pub request_id: usize,
     pub count: u64,
 }
 
-impl<E: std::fmt::Debug> InternalEvent for ServiceCallError<E> {
+impl<E: std::fmt::Debug> InternalEvent for CallError<E> {
     fn emit(self) {
         let reason = "Service call failed. No retries or retries exhausted.";
         error!(

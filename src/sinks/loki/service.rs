@@ -6,7 +6,7 @@ use http::StatusCode;
 use snafu::Snafu;
 use tower::Service;
 use tracing::Instrument;
-use vector_common::metadata::{MetaDescriptive, RequestMetadata};
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::{
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_event::CountByteSize,

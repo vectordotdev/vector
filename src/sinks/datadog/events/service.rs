@@ -8,7 +8,7 @@ use futures::{
 use http::Request;
 use hyper::Body;
 use tower::{Service, ServiceExt};
-use vector_common::metadata::MetaDescriptive;
+use vector_common::request_metadata::MetaDescriptive;
 use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
 
 use crate::{

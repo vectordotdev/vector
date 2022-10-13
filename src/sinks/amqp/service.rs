@@ -13,7 +13,7 @@ use tower::Service;
 use vector_common::{
     finalization::{EventFinalizers, EventStatus, Finalizable},
     internal_event::CountByteSize,
-    metadata::{MetaDescriptive, RequestMetadata},
+    request_metadata::{MetaDescriptive, RequestMetadata},
 };
 use vector_core::stream::DriverResponse;
 

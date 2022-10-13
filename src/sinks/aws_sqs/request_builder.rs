@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use vector_common::metadata::{MetaDescriptive, RequestMetadata};
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::ByteSizeOf;
 
 use super::config::SqsSinkConfig;

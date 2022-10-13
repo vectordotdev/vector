@@ -13,7 +13,7 @@ use tokio::sync::{mpsc, oneshot, OwnedSemaphorePermit, Semaphore};
 use tokio_util::sync::PollSemaphore;
 use tower::Service;
 use uuid::Uuid;
-use vector_common::metadata::MetaDescriptive;
+use vector_common::request_metadata::MetaDescriptive;
 use vector_core::event::EventStatus;
 
 use super::{

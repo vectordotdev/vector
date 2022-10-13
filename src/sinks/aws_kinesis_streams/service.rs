@@ -8,7 +8,7 @@ use aws_types::region::Region;
 use futures::future::BoxFuture;
 use tower::Service;
 use tracing::Instrument;
-use vector_common::metadata::MetaDescriptive;
+use vector_common::request_metadata::MetaDescriptive;
 use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
 
 use super::sink::BatchKinesisRequest;

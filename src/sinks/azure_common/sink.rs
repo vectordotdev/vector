@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use futures::stream::BoxStream;
 use futures_util::StreamExt;
 use tower::Service;
-use vector_common::metadata::MetaDescriptive;
+use vector_common::request_metadata::MetaDescriptive;
 use vector_core::{
     event::Finalizable,
     sink::StreamSink,

@@ -10,7 +10,7 @@ use http::{
 use hyper::Body;
 use snafu::ResultExt;
 use tower::Service;
-use vector_common::metadata::{MetaDescriptive, RequestMetadata};
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::{
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_event::CountByteSize,

@@ -4,8 +4,8 @@ use futures::{poll, FutureExt, Stream, StreamExt, TryFutureExt};
 use tokio::{pin, select};
 use tower::Service;
 use tracing::Instrument;
-use vector_common::internal_event::{BytesSent, CountByteSize, PollReadyError, ServiceCallError};
-use vector_common::metadata::{MetaDescriptive, RequestMetadata};
+use vector_common::internal_event::{BytesSent, CallError, CountByteSize, PollReadyError};
+use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 
 use super::FuturesUnorderedCount;
 use crate::{
@@ -147,7 +147,7 @@ where
 
                         let fut = svc.call(req)
                             .err_into()
-                            .map(move |result| Self::handle_response(result, request_id, finalizers, metadata))
+                            .map(move |result| Self::handle_response(result, request_id, finalizers, &metadata))
                             .instrument(info_span!("request", request_id).or_current());
 
                         in_flight.push(fut);
@@ -170,12 +170,12 @@ where
         result: Result<Svc::Response, Svc::Error>,
         request_id: usize,
         finalizers: EventFinalizers,
-        metadata: RequestMetadata,
+        metadata: &RequestMetadata,
     ) {
         match result {
             Err(error) => {
                 // emit the internal events: `Error` and `EventsDropped`.
-                emit(ServiceCallError {
+                emit(CallError {
                     error,
                     request_id,
                     count: metadata.event_count() as u64,
@@ -227,9 +227,9 @@ mod tests {
     use tower::Service;
     use vector_common::{
         finalization::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus, Finalizable},
-        metadata::RequestMetadata,
+        request_metadata::RequestMetadata,
     };
-    use vector_common::{internal_event::CountByteSize, metadata::MetaDescriptive};
+    use vector_common::{internal_event::CountByteSize, request_metadata::MetaDescriptive};
 
     use super::{Driver, DriverResponse};
 

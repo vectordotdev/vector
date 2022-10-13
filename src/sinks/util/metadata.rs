@@ -1,7 +1,7 @@
 use std::num::NonZeroUsize;
 
 use vector_buffers::EventCount;
-use vector_common::metadata::RequestMetadata;
+use vector_common::request_metadata::RequestMetadata;
 use vector_core::ByteSizeOf;
 
 use super::request_builder::EncodeResult;
@@ -23,7 +23,7 @@ impl RequestMetadataBuilder {
         }
     }
 
-    pub fn new(event_count: usize, events_byte_size: usize) -> Self {
+    pub const fn new(event_count: usize, events_byte_size: usize) -> Self {
         Self {
             event_count,
             events_byte_size,

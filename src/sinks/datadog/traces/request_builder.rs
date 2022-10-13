@@ -9,7 +9,7 @@ use bytes::Bytes;
 use prost::Message;
 use rmp_serde;
 use snafu::Snafu;
-use vector_common::metadata::RequestMetadata;
+use vector_common::request_metadata::RequestMetadata;
 use vector_core::event::{EventFinalizers, Finalizable};
 
 use super::{

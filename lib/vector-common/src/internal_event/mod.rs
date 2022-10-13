@@ -14,7 +14,7 @@ pub use component_events_dropped::{ComponentEventsDropped, INTENTIONAL, UNINTENT
 pub use events_received::EventsReceived;
 pub use events_sent::{EventsSent, DEFAULT_OUTPUT};
 pub use prelude::{error_stage, error_type};
-pub use service::{PollReadyError, ServiceCallError};
+pub use service::{CallError, PollReadyError};
 
 pub trait InternalEvent: Sized {
     fn emit(self);

@@ -15,6 +15,7 @@ pub struct RequestMetadata {
 
 // TODO: Make this struct the object which emits the actual internal telemetry i.e. events sent, bytes sent, etc.
 impl RequestMetadata {
+    #[must_use]
     pub fn new(
         event_count: usize,
         events_byte_size: usize,
@@ -29,22 +30,27 @@ impl RequestMetadata {
         }
     }
 
+    #[must_use]
     pub const fn event_count(&self) -> usize {
         self.event_count
     }
 
+    #[must_use]
     pub const fn events_byte_size(&self) -> usize {
         self.events_byte_size
     }
 
+    #[must_use]
     pub const fn request_encoded_size(&self) -> usize {
         self.request_encoded_size
     }
 
+    #[must_use]
     pub const fn request_wire_size(&self) -> usize {
         self.request_wire_size
     }
 
+    #[must_use]
     pub fn from_batch(metadata_vec: &Vec<RequestMetadata>) -> Self {
         let mut event_count = 0;
         let mut events_byte_size = 0;
@@ -69,6 +75,6 @@ impl RequestMetadata {
 
 /// Objects implementing this trait have metadata that describes the request.
 pub trait MetaDescriptive {
-    /// Returns the RequestMetadata associated with this object.
+    /// Returns the `RequestMetadata` associated with this object.
     fn get_metadata(&self) -> &RequestMetadata;
 }
