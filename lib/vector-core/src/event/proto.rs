@@ -2,7 +2,7 @@ use chrono::TimeZone;
 use ordered_float::NotNan;
 
 use crate::{
-    event::{self, MetricTags, BTreeMap, WithMetadata},
+    event::{self, BTreeMap, MetricTags, WithMetadata},
     metrics::AgentDDSketch,
 };
 

@@ -161,7 +161,7 @@ impl Conditional for Vrl {
 mod test {
     use super::*;
     use crate::{
-        event::{MetricTags, Metric, MetricKind, MetricValue},
+        event::{Metric, MetricKind, MetricTags, MetricValue},
         log_event,
     };
 
