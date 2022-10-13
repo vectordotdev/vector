@@ -110,11 +110,16 @@ configuration: {
 				"""
 			required:    false
 			type: object: options: {
-				type: string: {
-					default: null
-					enum: {
-						"file":  "Enrich data from a CSV file."
-						"geoip": "Enrich data from a [MaxMind](\(urls.maxmind)) database."
+				type: {
+					description: """
+						Determines the type of enrichment data that is to be loaded.
+						"""
+					required: true
+					type: string: {
+						enum: {
+							"file":  "Enrich data from a CSV file."
+							"geoip": "Enrich data from a [MaxMind](\(urls.maxmind)) database."
+						}
 					}
 				}
 				file: {
