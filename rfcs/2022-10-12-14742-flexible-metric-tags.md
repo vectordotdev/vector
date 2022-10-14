@@ -37,16 +37,25 @@ multiple tags with the same name, which will now have all the tags reproduced wh
 ### Implementation
 
 Simply put, the tags representation will change from an alias into a newtype wrapper using an
-`indexmap` set to store the tag values:
+`indexmap` set to store the tag values. This newtype will hide the implementation details of the
+underlying storage from the callers. It will also add separate methods for inserting a new tag and
+replacing a tag set with a single value. The callers of the existing `insert` function will need to
+be audited to determine which use is intended at each call site.
 
 ```rust
-struct MetricTags(BTreeMap<String, indexmap::IndexSet<Option<String>>>);
-```
+type TagValue = Option<String>;
 
-This newtype will hide the implementation details of the underlying storage from the callers. It
-will also add separate methods for inserting a new tag and replacing a tag set with a single
-value. The callers of the existing `insert` function will need to be audited to determine which use
-is intended at each call site.
+struct MetricTags(BTreeMap<String, indexmap::IndexSet<TagValue>>);
+
+impl MetricTags {
+    // Insert returns the value unchanged if the exact (tag,value) pair already exists,
+    // otherwise it inserts a new value for the named tag.
+    fn insert(&mut self, name: String, value: TagValue) -> Option<TagValue>;
+
+    // Replace returns all the existing values when overwriting a tag.
+    fn replace(&mut self, name: String, value: Option<TagValue>) -> Option<IndexSet<TagValue>>;
+}
+```
 
 ## Rationale
 
@@ -59,10 +68,6 @@ The use of an `IndexSet` for the tag value provides us with two useful invariant
    the output.
 1. The values can be retrieved in the order they first appeared, which allows us to trivially
    retrieve either the first or last stored value.
-
-- Why is this change worth it?
-- What is the impact of not doing this?
-- How does this position us for success in the future?
 
 ## Drawbacks
 
