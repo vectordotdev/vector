@@ -105,7 +105,7 @@ you can use the [`remap` transform][remap] to set a default value:
 ### Missing fields
 
 If a field is missing, an error is logged and Vector drops the event. The `component_errors_total` internal
-metric is incremented with a `error_type` tag of `template_failed`.
+metric is incremented with an `error_type` tag of `template_failed`.
 
 [1692]: https://github.com/vectordotdev/vector/issues/1692
 [aws_s3]: /docs/reference/configuration/sinks/aws_s3
