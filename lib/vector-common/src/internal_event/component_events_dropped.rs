@@ -37,4 +37,8 @@ impl<const INTENTIONAL: bool> InternalEvent for ComponentEventsDropped<INTENTION
             "intentional" => if INTENTIONAL { "true" } else { "false" },
         );
     }
+
+    fn name(&self) -> Option<&'static str> {
+        Some("ComponentEventsDropped")
+    }
 }

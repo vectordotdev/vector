@@ -57,4 +57,8 @@ impl<E: std::fmt::Debug> InternalEvent for CallError<E> {
             count: self.count,
         });
     }
+
+    fn name(&self) -> Option<&'static str> {
+        Some("ServiceCallError")
+    }
 }
