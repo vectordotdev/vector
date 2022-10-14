@@ -14,7 +14,7 @@ use codecs::{
 use futures::{Stream, StreamExt};
 use rdkafka::{
     config::ClientConfig,
-    consumer::{Consumer, StreamConsumer, CommitMode},
+    consumer::{CommitMode, Consumer, StreamConsumer},
     error::KafkaError,
     message::{BorrowedMessage, Headers, Message},
     types::RDKafkaErrorCode,
@@ -32,8 +32,8 @@ use crate::{
     config::{log_schema, AcknowledgementsConfig, LogSchema, Output, SourceConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, Event, Value},
     internal_events::{
-        KafkaBytesReceived, KafkaEventsReceived, KafkaOffsetUpdateError, KafkaReadError,
-        StreamClosedError,
+        KafkaBytesReceived, KafkaEventsReceived, KafkaOffsetUpdateError, KafkaPauseResumeError,
+        KafkaReadError, StreamClosedError,
     },
     kafka::{KafkaAuthConfig, KafkaStatisticsContext},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
@@ -249,15 +249,14 @@ async fn kafka_source(
             _ = &mut shutdown => {
                 if let Ok(topics) = consumer.subscription() {
                     if let Err(error) = consumer.pause(&topics) {
-                        // Might not be the best error type for this :/
-                        emit!(KafkaReadError { error });
+                        emit!(KafkaPauseResumeError { error });
                     }
                 }
                 shutting_down = true;
 
                 // If we have an ack stream, drop the sender end and allow acks to drain
-                match finalizer {
-                    Some(_) => drop(finalizer.take()),
+                match finalizer.take() {
+                    Some(finalizer) => drop(finalizer),
                     _ => break
                 }
             },
@@ -294,10 +293,10 @@ async fn kafka_source(
         Ok(_) => (),
         Err(KafkaError::ConsumerCommit(RDKafkaErrorCode::NoOffset)) => {
             debug!("No offsets to store");
-        },
+        }
         Err(error) => {
             emit!(KafkaOffsetUpdateError { error });
-        },
+        }
     }
 
     Ok(())
