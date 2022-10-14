@@ -348,12 +348,6 @@ in isolation.
 - Do we want to automate the process of rewriting configurations that have missing output handlers,
   or is it adequate to just have a configuration validator?
 
-- Should the option for turning unhandled output enforcement into a hard error be written as a more
-  generic switch to turn _all_ deprecations into errors?
-
-- Do we want to have a third value for `output.X.disposition` to allow for marking events as either
-  permanently failed (ie rejected) vs temporarily failed (ie errored)?
-
 - What should be done with the existing discarded event metrics? Should they always be emitted, or
   only when the output isn't consumed by another component? Do we need another disposition marker to
   indicate discards are not to be counted as errors?
@@ -384,3 +378,8 @@ Incremental steps to execute this change. These will be converted to issues afte
 We could potentially create a custom lint using [the dylint
 framework](https://www.trailofbits.com/post/write-rust-lints-without-forking-clippy) to prevent code
 that drops events in sources and transforms (and indirectly elsewhere) from compiling.
+
+We may want to consider lifing the option for turning unhandled output enforcement into a hard error
+into a more generic switch to turn all deprecations into errors. This is beyond the scope of this
+proposal, as the mechanism for doing so will vary greatly across the different locations where
+deprecations are present.
