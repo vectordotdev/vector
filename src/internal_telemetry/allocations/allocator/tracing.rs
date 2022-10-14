@@ -3,20 +3,20 @@ use std::{any::TypeId, marker::PhantomData, ptr::addr_of};
 use tracing::{Dispatch, Id, Subscriber};
 use tracing_subscriber::{layer::Context, registry::LookupSpan, Layer};
 
-use super::token::AllocationGroupToken;
+use super::token::UnsafeAllocationGroupToken;
 
-pub(super) struct WithAllocationGroup {
-    with_allocation_group: fn(&Dispatch, &Id, AllocationGroupToken),
+pub(crate) struct WithAllocationGroup {
+    with_allocation_group: fn(&Dispatch, &Id, UnsafeAllocationGroupToken),
 }
 
 impl WithAllocationGroup {
-    pub(super) fn with_allocation_group(
+    pub fn with_allocation_group(
         &self,
         dispatch: &Dispatch,
         id: &Id,
-        group_token: AllocationGroupToken,
+        unsafe_token: UnsafeAllocationGroupToken,
     ) {
-        (self.with_allocation_group)(dispatch, id, group_token);
+        (self.with_allocation_group)(dispatch, id, unsafe_token);
     }
 }
 
@@ -48,7 +48,11 @@ where
         }
     }
 
-    fn with_allocation_group(dispatch: &Dispatch, id: &Id, group_token: AllocationGroupToken) {
+    fn with_allocation_group(
+        dispatch: &Dispatch,
+        id: &Id,
+        unsafe_token: UnsafeAllocationGroupToken,
+    ) {
         let subscriber = dispatch
             .downcast_ref::<S>()
             .expect("subscriber should downcast to expected type; this is a bug!");
@@ -56,7 +60,7 @@ where
             .span(id)
             .expect("registry should have a span for the current ID");
 
-        span.extensions_mut().insert(group_token);
+        span.extensions_mut().insert(unsafe_token);
     }
 }
 
@@ -66,7 +70,10 @@ where
 {
     fn on_enter(&self, id: &Id, ctx: Context<'_, S>) {
         if let Some(span_ref) = ctx.span(id) {
-            if let Some(token) = span_ref.extensions_mut().get_mut::<AllocationGroupToken>() {
+            if let Some(token) = span_ref
+                .extensions_mut()
+                .get_mut::<UnsafeAllocationGroupToken>()
+            {
                 token.enter();
             }
         }
@@ -74,7 +81,10 @@ where
 
     fn on_exit(&self, id: &Id, ctx: Context<'_, S>) {
         if let Some(span_ref) = ctx.span(id) {
-            if let Some(token) = span_ref.extensions_mut().get_mut::<AllocationGroupToken>() {
+            if let Some(token) = span_ref
+                .extensions_mut()
+                .get_mut::<UnsafeAllocationGroupToken>()
+            {
                 token.exit();
             }
         }
@@ -88,5 +98,14 @@ where
             }
             _ => None,
         }
+    }
+}
+
+impl<S> Default for AllocationLayer<S>
+where
+    S: Subscriber + for<'span> LookupSpan<'span>,
+{
+    fn default() -> Self {
+        AllocationLayer::new()
     }
 }

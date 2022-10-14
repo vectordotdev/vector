@@ -58,7 +58,9 @@ use self::{
     channel::{create_channel, Consumer, Producer},
 };
 
-pub(crate) use self::allocator::{AllocationGroupId, AllocationLayer, GroupedTraceableAllocator};
+pub(crate) use self::allocator::{
+    AllocationGroupId, AllocationGroupToken, AllocationLayer, GroupedTraceableAllocator,
+};
 
 pub type Allocator<A> = GroupedTraceableAllocator<A, LocalProducerTracer>;
 
@@ -304,9 +306,9 @@ pub fn init_allocation_tracing() {
 /// the traditional `metrics`/`tracing` are collected, as the metrics are updated directly rather than emitted via the
 /// traditional `metrics` macros, so the given tags should match the span fields that would traditionally be set for a
 /// given span in order to ensure that they match.
-pub fn acquire_allocation_group_id(_tags: Vec<(String, String)>) -> AllocationGroupId {
+pub fn acquire_allocation_group_id(_tags: Vec<(String, String)>) -> AllocationGroupToken {
     // TODO: register the allocation group token with its tags via `Collector`: we can't do it via `Registrations`
     // because that gets checked lazily/periodically, and we need to be able to associate a group ID with its tags
     // immediately so that we don't misassociate events
-    AllocationGroupId::register().expect("failed to register allocation group token")
+    AllocationGroupToken::register().expect("failed to register allocation group token")
 }
