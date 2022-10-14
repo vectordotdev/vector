@@ -5,13 +5,13 @@ use vector_core::internal_event::InternalEvent;
 use super::prelude::http_error_code;
 
 #[derive(Debug)]
-pub struct HttpScrapeEventsReceived {
+pub struct HttpClientEventsReceived {
     pub byte_size: usize,
     pub count: usize,
     pub url: String,
 }
 
-impl InternalEvent for HttpScrapeEventsReceived {
+impl InternalEvent for HttpClientEventsReceived {
     fn emit(self) {
         trace!(
             message = "Events received.",
@@ -36,12 +36,12 @@ impl InternalEvent for HttpScrapeEventsReceived {
 }
 
 #[derive(Debug)]
-pub struct HttpScrapeHttpResponseError {
+pub struct HttpClientHttpResponseError {
     pub code: hyper::StatusCode,
     pub url: String,
 }
 
-impl InternalEvent for HttpScrapeHttpResponseError {
+impl InternalEvent for HttpClientHttpResponseError {
     fn emit(self) {
         error!(
             message = "HTTP error response.",
@@ -64,12 +64,12 @@ impl InternalEvent for HttpScrapeHttpResponseError {
 }
 
 #[derive(Debug)]
-pub struct HttpScrapeHttpError {
+pub struct HttpClientHttpError {
     pub error: crate::Error,
     pub url: String,
 }
 
-impl InternalEvent for HttpScrapeHttpError {
+impl InternalEvent for HttpClientHttpError {
     fn emit(self) {
         error!(
             message = "HTTP request processing error.",

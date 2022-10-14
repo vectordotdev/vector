@@ -1,5 +1,5 @@
-//! Generalized HTTP scrape source.
-//! Scrapes an endpoint at an interval, decoding the HTTP responses into events.
+//! Generalized HTTP client source.
+//! Calls an endpoint at an interval, decoding the HTTP responses into events.
 
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
@@ -9,6 +9,7 @@ use snafu::ResultExt;
 use std::collections::HashMap;
 use tokio_util::codec::Decoder as _;
 
+use crate::sources::util::http_client;
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{SourceConfig, SourceContext},
@@ -18,9 +19,9 @@ use crate::{
     sources,
     sources::util::{
         http::HttpMethod,
-        http_scrape::{
-            build_url, default_scrape_interval_secs, http_scrape, GenericHttpScrapeInputs,
-            HttpScraperBuilder, HttpScraperContext,
+        http_client::{
+            build_url, call, default_scrape_interval_secs, GenericHttpClientInputs,
+            HttpClientBuilder,
         },
     },
     tls::{TlsConfig, TlsSettings},
@@ -36,19 +37,19 @@ use vector_core::{
     event::Event,
 };
 
-/// Configuration for the `http_scrape` source.
-#[configurable_component(source("http_scrape"))]
+/// Configuration for the `http_client` source.
+#[configurable_component(source("http_client"))]
 #[derive(Clone, Debug)]
-pub struct HttpScrapeConfig {
-    /// Endpoint to scrape events from. The full path must be specified.
+pub struct HttpClientConfig {
+    /// Endpoint to collect events from. The full path must be specified.
     /// Example: "http://127.0.0.1:9898/logs"
     pub endpoint: String,
 
-    /// The interval between scrapes, in seconds.
+    /// The interval between calls, in seconds.
     #[serde(default = "default_scrape_interval_secs")]
     pub scrape_interval_secs: u64,
 
-    /// Custom parameters for the scrape request query string.
+    /// Custom parameters for the HTTP request query string.
     ///
     /// One or more values for the same parameter key can be provided. The parameters provided in this option are
     /// appended to any parameters manually provided in the `endpoint` option.
@@ -91,7 +92,7 @@ const fn default_http_method() -> HttpMethod {
     HttpMethod::Get
 }
 
-impl Default for HttpScrapeConfig {
+impl Default for HttpClientConfig {
     fn default() -> Self {
         Self {
             endpoint: "http://localhost:9898/logs".to_string(),
@@ -108,10 +109,10 @@ impl Default for HttpScrapeConfig {
     }
 }
 
-impl_generate_config_from_default!(HttpScrapeConfig);
+impl_generate_config_from_default!(HttpClientConfig);
 
 #[async_trait::async_trait]
-impl SourceConfig for HttpScrapeConfig {
+impl SourceConfig for HttpClientConfig {
     async fn build(&self, cx: SourceContext) -> Result<sources::Source> {
         // build the url
         let endpoints = vec![self.endpoint.clone()];
@@ -132,12 +133,12 @@ impl SourceConfig for HttpScrapeConfig {
         let content_type = self.decoding.content_type(&self.framing).to_string();
 
         // the only specific context needed is the codec decoding
-        let context = HttpScrapeContext {
+        let context = HttpClientContext {
             decoder,
             log_namespace,
         };
 
-        let inputs = GenericHttpScrapeInputs {
+        let inputs = GenericHttpClientInputs {
             urls,
             interval_secs: self.scrape_interval_secs,
             headers: self.headers.clone(),
@@ -148,7 +149,7 @@ impl SourceConfig for HttpScrapeConfig {
             shutdown: cx.shutdown,
         };
 
-        Ok(http_scrape(inputs, context, cx.out, self.method).boxed())
+        Ok(call(inputs, context, cx.out, self.method).boxed())
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
@@ -171,12 +172,12 @@ impl SourceConfig for HttpScrapeConfig {
 
 /// Captures the configuration options required to decode the incoming requests into events.
 #[derive(Clone)]
-struct HttpScrapeContext {
+struct HttpClientContext {
     decoder: Decoder,
     log_namespace: LogNamespace,
 }
 
-impl HttpScrapeContext {
+impl HttpClientContext {
     /// Decode the events from the byte buffer
     fn decode_events(&mut self, buf: &mut BytesMut) -> Vec<Event> {
         let mut events = Vec::new();
@@ -208,7 +209,7 @@ impl HttpScrapeContext {
                         log,
                         log_schema().source_type_key(),
                         "source_type",
-                        HttpScrapeConfig::NAME,
+                        HttpClientConfig::NAME,
                     );
                     self.log_namespace.insert_vector_metadata(
                         log,
@@ -220,13 +221,13 @@ impl HttpScrapeContext {
                 Event::Metric(ref mut metric) => {
                     metric.insert_tag(
                         log_schema().source_type_key().to_string(),
-                        HttpScrapeConfig::NAME.to_string(),
+                        HttpClientConfig::NAME.to_string(),
                     );
                 }
                 Event::Trace(ref mut trace) => {
                     trace.insert(
                         log_schema().source_type_key(),
-                        Bytes::from(HttpScrapeConfig::NAME),
+                        Bytes::from(HttpClientConfig::NAME),
                     );
                 }
             }
@@ -234,16 +235,16 @@ impl HttpScrapeContext {
     }
 }
 
-impl HttpScraperBuilder for HttpScrapeContext {
-    type Context = HttpScrapeContext;
+impl HttpClientBuilder for HttpClientContext {
+    type Context = HttpClientContext;
 
-    /// No additional context from request data is needed from this particular scraper.
+    /// No additional context from request data is needed from this particular client.
     fn build(&self, _uri: &Uri) -> Self::Context {
         self.clone()
     }
 }
 
-impl HttpScraperContext for HttpScrapeContext {
+impl http_client::HttpClientContext for HttpClientContext {
     /// Decodes the HTTP response body into events per the decoder configured.
     fn on_response(
         &mut self,

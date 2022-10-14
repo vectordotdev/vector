@@ -449,36 +449,50 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 
 impl FunctionTransform for LogToMetric {
     fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
+        // Metrics are "all or none" for a specific log. If a single fails, none are produced.
+        let mut buffer = Vec::with_capacity(self.config.metrics.len());
+
         for config in self.config.metrics.iter() {
             match to_metric(config, &event) {
                 Ok(metric) => {
-                    output.push(Event::Metric(metric));
+                    buffer.push(Event::Metric(metric));
                 }
-                Err(TransformError::FieldNull { field }) => emit!(LogToMetricFieldNullError {
-                    field: field.as_ref()
-                }),
-                Err(TransformError::FieldNotFound { field }) => {
-                    emit!(ParserMissingFieldError::<DROP_EVENT> {
-                        field: field.as_ref()
-                    })
-                }
-                Err(TransformError::ParseFloatError { field, error }) => {
-                    emit!(LogToMetricParseFloatError {
-                        field: field.as_ref(),
-                        error
-                    })
-                }
-                Err(TransformError::TemplateRenderingError(error)) => {
-                    emit!(crate::internal_events::TemplateRenderingError {
-                        error,
-                        drop_event: false,
-                        field: None,
-                    })
-                }
-                Err(TransformError::TemplateParseError(error)) => {
-                    emit!(LogToMetricTemplateParseError { error })
+                Err(err) => {
+                    match err {
+                        TransformError::FieldNull { field } => emit!(LogToMetricFieldNullError {
+                            field: field.as_ref()
+                        }),
+                        TransformError::FieldNotFound { field } => {
+                            emit!(ParserMissingFieldError::<DROP_EVENT> {
+                                field: field.as_ref()
+                            })
+                        }
+                        TransformError::ParseFloatError { field, error } => {
+                            emit!(LogToMetricParseFloatError {
+                                field: field.as_ref(),
+                                error
+                            })
+                        }
+                        TransformError::TemplateRenderingError(error) => {
+                            emit!(crate::internal_events::TemplateRenderingError {
+                                error,
+                                drop_event: true,
+                                field: None,
+                            })
+                        }
+                        TransformError::TemplateParseError(error) => {
+                            emit!(LogToMetricTemplateParseError { error })
+                        }
+                    };
+                    // early return to prevent the partial buffer from being sent
+                    return;
                 }
             }
+        }
+
+        // Metric generation was successful, publish them all.
+        for event in buffer {
+            output.push(event);
         }
     }
 }
@@ -486,15 +500,19 @@ impl FunctionTransform for LogToMetric {
 #[cfg(test)]
 mod tests {
     use chrono::{offset::TimeZone, DateTime, Utc};
+    use std::time::Duration;
+    use tokio::sync::mpsc;
+    use tokio_stream::wrappers::ReceiverStream;
 
     use super::*;
+    use crate::test_util::components::assert_transform_compliance;
+    use crate::transforms::test::create_topology;
     use crate::{
         config::log_schema,
         event::{
             metric::{Metric, MetricKind, MetricValue, StatisticKind},
             Event, LogEvent,
         },
-        transforms::test::transform_one,
     };
 
     #[test]
@@ -517,8 +535,52 @@ mod tests {
         log
     }
 
-    #[test]
-    fn count_http_status_codes() {
+    async fn do_transform(config: LogToMetricConfig, event: Event) -> Option<Event> {
+        assert_transform_compliance(async move {
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
+            tx.send(event).await.unwrap();
+            let result = tokio::time::timeout(Duration::from_secs(5), out.recv())
+                .await
+                .unwrap_or(None);
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+            result
+        })
+        .await
+    }
+
+    async fn do_transform_multiple_events(
+        config: LogToMetricConfig,
+        event: Event,
+        count: usize,
+    ) -> Vec<Event> {
+        assert_transform_compliance(async move {
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
+            tx.send(event).await.unwrap();
+
+            let mut results = vec![];
+            for _ in 0..count {
+                let result = tokio::time::timeout(Duration::from_secs(5), out.recv())
+                    .await
+                    .unwrap_or(None);
+                if let Some(event) = result {
+                    results.push(event);
+                }
+            }
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+            results
+        })
+        .await
+    }
+
+    #[tokio::test]
+    async fn count_http_status_codes() {
         let config = parse_config(
             r#"
             [[metrics]]
@@ -529,8 +591,7 @@ mod tests {
 
         let event = create_event("status", "42");
         let metadata = event.metadata().clone();
-        let mut transform = LogToMetric::new(config);
-        let metric = transform_one(&mut transform, event).unwrap();
+        let metric = do_transform(config, event).await.unwrap();
 
         assert_eq!(
             metric.into_metric(),
@@ -544,8 +605,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn count_http_requests_with_tags() {
+    #[tokio::test]
+    async fn count_http_requests_with_tags() {
         let config = parse_config(
             r#"
             [[metrics]]
@@ -562,8 +623,7 @@ mod tests {
         event.as_mut_log().insert("code", "200");
         let metadata = event.metadata().clone();
 
-        let mut transform = LogToMetric::new(config);
-        let metric = transform_one(&mut transform, event).unwrap();
+        let metric = do_transform(config, event).await.unwrap();
 
         assert_eq!(
             metric.into_metric(),
@@ -587,8 +647,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn count_exceptions() {
+    #[tokio::test]
+    async fn count_exceptions() {
         let config = parse_config(
             r#"
             [[metrics]]
@@ -600,8 +660,7 @@ mod tests {
 
         let event = create_event("backtrace", "message");
         let metadata = event.metadata().clone();
-        let mut transform = LogToMetric::new(config);
-        let metric = transform_one(&mut transform, event).unwrap();
+        let metric = do_transform(config, event).await.unwrap();
 
         assert_eq!(
             metric.into_metric(),
@@ -615,8 +674,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn count_exceptions_no_match() {
+    #[tokio::test]
+    async fn count_exceptions_no_match() {
         let config = parse_config(
             r#"
             [[metrics]]
@@ -627,13 +686,11 @@ mod tests {
         );
 
         let event = create_event("success", "42");
-        let mut transform = LogToMetric::new(config);
-
-        assert_eq!(transform_one(&mut transform, event), None);
+        assert_eq!(do_transform(config, event).await, None);
     }
 
-    #[test]
-    fn sum_order_amounts() {
+    #[tokio::test]
+    async fn sum_order_amounts() {
         let config = parse_config(
             r#"
             [[metrics]]
@@ -646,8 +703,7 @@ mod tests {
 
         let event = create_event("amount", "33.99");
         let metadata = event.metadata().clone();
-        let mut transform = LogToMetric::new(config);
-        let metric = transform_one(&mut transform, event).unwrap();
+        let metric = do_transform(config, event).await.unwrap();
 
         assert_eq!(
             metric.into_metric(),
@@ -661,8 +717,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn count_absolute() {
+    #[tokio::test]
+    async fn count_absolute() {
         let config = parse_config(
             r#"
             [[metrics]]
@@ -676,8 +732,7 @@ mod tests {
 
         let event = create_event("amount", "33.99");
         let metadata = event.metadata().clone();
-        let mut transform = LogToMetric::new(config);
-        let metric = transform_one(&mut transform, event).unwrap();
+        let metric = do_transform(config, event).await.unwrap();
 
         assert_eq!(
             metric.into_metric(),
@@ -691,8 +746,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn memory_usage_gauge() {
+    #[tokio::test]
+    async fn memory_usage_gauge() {
         let config = parse_config(
             r#"
             [[metrics]]
@@ -704,8 +759,7 @@ mod tests {
 
         let event = create_event("memory_rss", "123");
         let metadata = event.metadata().clone();
-        let mut transform = LogToMetric::new(config);
-        let metric = transform_one(&mut transform, event).unwrap();
+        let metric = do_transform(config, event).await.unwrap();
 
         assert_eq!(
             metric.into_metric(),
@@ -719,8 +773,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn parse_failure() {
+    #[tokio::test]
+    async fn parse_failure() {
         let config = parse_config(
             r#"
             [[metrics]]
@@ -732,13 +786,11 @@ mod tests {
         );
 
         let event = create_event("status", "not a number");
-        let mut transform = LogToMetric::new(config);
-
-        assert_eq!(transform_one(&mut transform, event), None);
+        assert_eq!(do_transform(config, event).await, None);
     }
 
-    #[test]
-    fn missing_field() {
+    #[tokio::test]
+    async fn missing_field() {
         let config = parse_config(
             r#"
             [[metrics]]
@@ -749,13 +801,11 @@ mod tests {
         );
 
         let event = create_event("not foo", "not a number");
-        let mut transform = LogToMetric::new(config);
-
-        assert_eq!(transform_one(&mut transform, event), None);
+        assert_eq!(do_transform(config, event).await, None);
     }
 
-    #[test]
-    fn null_field() {
+    #[tokio::test]
+    async fn null_field() {
         let config = parse_config(
             r#"
             [[metrics]]
@@ -766,13 +816,11 @@ mod tests {
         );
 
         let event = create_event("status", Value::Null);
-        let mut transform = LogToMetric::new(config);
-
-        assert_eq!(transform_one(&mut transform, event), None);
+        assert_eq!(do_transform(config, event).await, None);
     }
 
-    #[test]
-    fn multiple_metrics() {
+    #[tokio::test]
+    async fn multiple_metrics() {
         let config = parse_config(
             r#"
             [[metrics]]
@@ -793,15 +841,11 @@ mod tests {
         event.as_mut_log().insert("status", "42");
         event.as_mut_log().insert("backtrace", "message");
         let metadata = event.metadata().clone();
+        let output = do_transform_multiple_events(config, event, 2).await;
 
-        let mut transform = LogToMetric::new(config);
-
-        let mut output = OutputBuffer::default();
-        transform.transform(&mut output, event);
         assert_eq!(2, output.len());
-        let mut output = output.into_events();
         assert_eq!(
-            output.next().unwrap().into_metric(),
+            output[0].clone().into_metric(),
             Metric::new_with_metadata(
                 "status",
                 MetricKind::Incremental,
@@ -811,7 +855,7 @@ mod tests {
             .with_timestamp(Some(ts()))
         );
         assert_eq!(
-            output.next().unwrap().into_metric(),
+            output[1].clone().into_metric(),
             Metric::new_with_metadata(
                 "exception_total",
                 MetricKind::Incremental,
@@ -822,8 +866,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn multiple_metrics_with_multiple_templates() {
+    #[tokio::test]
+    async fn multiple_metrics_with_multiple_templates() {
         let config = parse_config(
             r#"
             [[metrics]]
@@ -850,11 +894,8 @@ mod tests {
         event.as_mut_log().insert("service", "xyz");
         let metadata = event.metadata().clone();
 
-        let mut transform = LogToMetric::new(config);
+        let output = do_transform_multiple_events(config, event, 2).await;
 
-        let mut output = OutputBuffer::default();
-        transform.transform(&mut output, event);
-        let output: Vec<_> = output.into_events().collect();
         assert_eq!(2, output.len());
         assert_eq!(
             output[0].as_metric(),
@@ -881,8 +922,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn user_ip_set() {
+    #[tokio::test]
+    async fn user_ip_set() {
         let config = parse_config(
             r#"
             [[metrics]]
@@ -894,8 +935,7 @@ mod tests {
 
         let event = create_event("user_ip", "1.2.3.4");
         let metadata = event.metadata().clone();
-        let mut transform = LogToMetric::new(config);
-        let metric = transform_one(&mut transform, event).unwrap();
+        let metric = do_transform(config, event).await.unwrap();
 
         assert_eq!(
             metric.into_metric(),
@@ -911,8 +951,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn response_time_histogram() {
+    #[tokio::test]
+    async fn response_time_histogram() {
         let config = parse_config(
             r#"
             [[metrics]]
@@ -923,8 +963,7 @@ mod tests {
 
         let event = create_event("response_time", "2.5");
         let metadata = event.metadata().clone();
-        let mut transform = LogToMetric::new(config);
-        let metric = transform_one(&mut transform, event).unwrap();
+        let metric = do_transform(config, event).await.unwrap();
 
         assert_eq!(
             metric.into_metric(),
@@ -941,8 +980,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn response_time_summary() {
+    #[tokio::test]
+    async fn response_time_summary() {
         let config = parse_config(
             r#"
             [[metrics]]
@@ -953,8 +992,7 @@ mod tests {
 
         let event = create_event("response_time", "2.5");
         let metadata = event.metadata().clone();
-        let mut transform = LogToMetric::new(config);
-        let metric = transform_one(&mut transform, event).unwrap();
+        let metric = do_transform(config, event).await.unwrap();
 
         assert_eq!(
             metric.into_metric(),
