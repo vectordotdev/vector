@@ -4,7 +4,7 @@ use std::marker::{PhantomData, Unpin};
 use std::{fmt::Debug, future::Future, pin::Pin, task::Context, task::Poll};
 
 use futures::stream::{BoxStream, FuturesOrdered, FuturesUnordered};
-use futures::{FutureExt, future::{OptionFuture}, Stream, StreamExt};
+use futures::{future::OptionFuture, FutureExt, Stream, StreamExt};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 
 use crate::finalization::{BatchStatus, BatchStatusReceiver};
@@ -42,22 +42,18 @@ where
     S: FuturesSet<FinalizerFuture<T>> + Default + Send + Unpin + 'static,
 {
     /// Produce a finalizer set along with the output stream of
-    /// received acknowledged batch identifiers. The output stream will end immediately when
-    /// a shutdown signal is received, or when the sender is dropped
+    /// received acknowledged batch identifiers.
+    ///
+    /// The output stream will end when the sender channel is closed and drained.
+    ///
+    /// If the optional shutdown signal is provided, the output stream will end immediately when a
+    /// shutdown signal is received. This can cause some message acknowledgements to go
+    /// unprocessed, so those messages may be processed again.
+    ///
+    /// If no shutdown signal is provided, the source must be sure to close the sender channel when
+    /// it is ready to shut down.
     #[must_use]
-    pub fn new(shutdown: ShutdownSignal) -> (Self, BoxStream<'static, (BatchStatus, T)>) {
-        FinalizerSet::with_maybe_shutdown(Some(shutdown))
-    }
-
-    /// Produce a finalizer set along with the output stream of
-    /// received acknowledged batch identifiers. The output stream will close after the sender is
-    /// dropped and the stream is drained
-    #[must_use]
-    pub fn new_without_shutdown() -> (Self, BoxStream<'static, (BatchStatus, T)>) {
-        FinalizerSet::with_maybe_shutdown(None)
-    }
-
-    fn with_maybe_shutdown(shutdown: Option<ShutdownSignal>) -> (Self, BoxStream<'static, (BatchStatus, T)>) {
+    pub fn new(shutdown: Option<ShutdownSignal>) -> (Self, BoxStream<'static, (BatchStatus, T)>) {
         let (todo_tx, todo_rx) = mpsc::unbounded_channel();
         (
             Self {
@@ -75,20 +71,10 @@ where
     #[must_use]
     pub fn maybe_new(
         maybe: bool,
-        shutdown: ShutdownSignal,
+        shutdown: Option<ShutdownSignal>,
     ) -> (Option<Self>, BoxStream<'static, (BatchStatus, T)>) {
         if maybe {
             let (finalizer, stream) = Self::new(shutdown);
-            (Some(finalizer), stream)
-        } else {
-            (None, EmptyStream::default().boxed())
-        }
-    }
-
-    /// Returns an optional finalizer set without a shutdown signal. See `maybe_new` for details
-    pub fn maybe_new_without_shutdown(maybe: bool) -> (Option<Self>, BoxStream<'static, (BatchStatus, T)>) {
-        if maybe {
-            let (finalizer, stream) = Self::new_without_shutdown();
             (Some(finalizer), stream)
         } else {
             (None, EmptyStream::default().boxed())

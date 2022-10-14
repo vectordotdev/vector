@@ -239,7 +239,7 @@ async fn kafka_source(
 ) -> Result<(), ()> {
     let consumer = Arc::new(consumer);
     let (mut finalizer, mut ack_stream) =
-        OrderedFinalizer::<FinalizerEntry>::maybe_new_without_shutdown(acknowledgements);
+        OrderedFinalizer::<FinalizerEntry>::maybe_new(acknowledgements, None);
     let mut stream = consumer.stream();
     let keys = Keys::from(log_schema(), &config);
 

@@ -388,7 +388,7 @@ fn build<T: Bufferable>(
     let read_waker = Arc::new(Notify::new());
     let write_waker = Arc::new(Notify::new());
     let ack_counter = Arc::new(AtomicUsize::new(0));
-    let (finalizer, mut stream) = OrderedFinalizer::<u64>::new(ShutdownSignal::noop());
+    let (finalizer, mut stream) = OrderedFinalizer::<u64>::new(Some(ShutdownSignal::noop()));
     {
         let ack_counter = Arc::clone(&ack_counter);
         let read_waker = Arc::clone(&read_waker);

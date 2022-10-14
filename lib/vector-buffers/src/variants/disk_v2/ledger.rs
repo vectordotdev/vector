@@ -705,7 +705,7 @@ where
 
     #[must_use]
     pub(super) fn spawn_finalizer(self: Arc<Self>) -> OrderedFinalizer<u64> {
-        let (finalizer, mut stream) = OrderedFinalizer::new(ShutdownSignal::noop());
+        let (finalizer, mut stream) = OrderedFinalizer::new(Some(ShutdownSignal::noop()));
         tokio::spawn(async move {
             while let Some((_status, amount)) = stream.next().await {
                 self.increment_pending_acks(amount);

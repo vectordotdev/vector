@@ -429,15 +429,13 @@ pub fn file_source(
     let multi_line_timeout = config.multi_line_timeout;
 
     let (finalizer, shutdown_checkpointer) = if acknowledgements {
-        // The shutdown sent in to the finalizer is the global
-        // shutdown handle used to tell it to stop accepting new batch
-        // statuses and just wait for the remaining acks to come in.
-        let (finalizer, mut ack_stream) = OrderedFinalizer::<FinalizerEntry>::new_without_shutdown();
-        // We set up a separate shutdown signal to tie together the
+        let (finalizer, mut ack_stream) = OrderedFinalizer::<FinalizerEntry>::new(None);
+
+        // We set up a separate signal to tie together the
         // finalizer and the checkpoint writer task in the file
         // server, to make it continue to write out updated
         // checkpoints until all the acks have come in.
-        let (send_shutdown, shutdown2) = oneshot::channel::<()>();
+        let (tx_checkpoints_done, rx_checkpoints_done) = oneshot::channel::<()>();
         let checkpoints = checkpointer.view();
         tokio::spawn(async move {
             while let Some((status, entry)) = ack_stream.next().await {
@@ -445,9 +443,9 @@ pub fn file_source(
                     checkpoints.update(entry.file_id, entry.offset);
                 }
             }
-            send_shutdown.send(())
+            tx_checkpoints_done.send(())
         });
-        (Some(finalizer), shutdown2.map(|_| ()).boxed())
+        (Some(finalizer), rx_checkpoints_done.map(|_| ()).boxed())
     } else {
         // When not dealing with end-to-end acknowledgements, just
         // clone the global shutdown to stop the checkpoint writer.

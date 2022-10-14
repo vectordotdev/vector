@@ -343,7 +343,9 @@ where
             match self.handle.block_on(select(shutdown_data, sleep)) {
                 Either::Left((_, _)) => {
                     debug!("Closing data stream and draining checkpointer");
-                    self.handle.block_on(chans.close()).expect("Error closing file_server data channel");
+                    self.handle
+                        .block_on(chans.close())
+                        .expect("Error closing file_server data channel");
                     let checkpointer = self
                         .handle
                         .block_on(checkpoint_task_handle)
