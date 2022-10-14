@@ -43,7 +43,7 @@ enables dynamic partitioning, something fundamental to storing log data in files
 
 ### Event fields
 
-Individual [log event][log] fields can be accessed using `{{ ... }}` to wrap a VRL [path expression][path_expressions]:
+Individual [log event][log] fields can be accessed using `{{ ... }}` to wrap a VRL [path expression][path_expression]:
 
 ```toml
 option = "{{ .parent.child }}"
@@ -84,7 +84,7 @@ Each of the values above would be treated literally.
 ### Accessing fields
 
 You can find additional examples for accessing fields in the
-[path expression reference](docs/reference/vrl/expressions/#path-examples) documentation.
+[path expression reference][path_expression_examples] documentation.
 
 ### Fallback values
 
@@ -110,6 +110,7 @@ metric is incremented with a `error_type` tag of `template_failed`.
 [1692]: https://github.com/vectordotdev/vector/issues/1692
 [aws_s3]: /docs/reference/configuration/sinks/aws_s3
 [log]: /docs/about/under-the-hood/architecture/data-model/log
-[path_expressions]: /docs/reference/vrl/expressions/#path
+[path_expression]: /docs/reference/vrl/expressions/#path
+[path_expression_examples]: /docs/reference/vrl/expressions/#path-examples
 [remap]: /docs/reference/configuration/transforms/remap
 [strftime]: https://docs.rs/chrono/0.4.19/chrono/format/strftime/index.html#specifiers
