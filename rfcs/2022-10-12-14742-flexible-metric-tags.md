@@ -64,6 +64,7 @@ compatibility for existing uses while controlling the methods for uses that need
 values.
 
 The use of an `IndexSet` for the tag value provides us with two useful invariants:
+
 1. Only unique values for each tag will be stored, which prevents repeated values from showing up in
    the output.
 1. The values can be retrieved in the order they first appeared, which allows us to trivially
@@ -128,9 +129,9 @@ type MetricTags = MultiIndexTagMap;
 
 ## Outstanding Questions
 
-- VRL doesn't have any way of _adding_ a tag to a metric, only replacing or deleting, nor does it
-  really have support for creating bare tags. Does it need additional functions to match this
-  support?
+- VRL doesn't have any way of _adding_ a tag to a metric when a tag with the same name already
+  exists, only replacing or deleting, nor does it really have support for creating bare tags nor
+  retrieving all the values of a tag name. Does it need additional functions to match this support?
 
 ## Plan Of Attack
 
