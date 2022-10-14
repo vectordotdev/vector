@@ -1,5 +1,3 @@
-use std::net::SocketAddr;
-
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
 use codecs::{
@@ -7,7 +5,7 @@ use codecs::{
     StreamDecodingError,
 };
 use futures::StreamExt;
-use tokio::net::UdpSocket;
+use listenfd::ListenFd;
 use tokio_util::codec::FramedRead;
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::configurable_component;
@@ -17,10 +15,15 @@ use crate::{
     codecs::Decoder,
     config::log_schema,
     event::Event,
-    internal_events::{SocketEventsReceived, SocketMode, SocketReceiveError, StreamClosedError},
+    internal_events::{
+        SocketBindError, SocketEventsReceived, SocketMode, SocketReceiveError, StreamClosedError,
+    },
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
-    sources::Source,
+    sources::{
+        util::net::{try_bind_udp_socket, SocketListenAddr},
+        Source,
+    },
     udp, SourceSender,
 };
 
@@ -30,7 +33,7 @@ use crate::{
 #[serde(deny_unknown_fields)]
 pub struct UdpConfig {
     /// The address to listen for messages on.
-    address: SocketAddr,
+    address: SocketListenAddr,
 
     /// The maximum buffer size, in bytes, of incoming messages.
     ///
@@ -81,11 +84,11 @@ impl UdpConfig {
         &self.decoding
     }
 
-    pub(super) const fn address(&self) -> SocketAddr {
+    pub(super) const fn address(&self) -> SocketListenAddr {
         self.address
     }
 
-    pub fn from_address(address: SocketAddr) -> Self {
+    pub fn from_address(address: SocketListenAddr) -> Self {
         Self {
             address,
             max_length: crate::serde::default_max_length(),
@@ -106,9 +109,15 @@ pub(super) fn udp(
     mut out: SourceSender,
 ) -> Source {
     Box::pin(async move {
-        let socket = UdpSocket::bind(&config.address)
+        let listenfd = ListenFd::from_env();
+        let socket = try_bind_udp_socket(config.address, listenfd)
             .await
-            .expect("Failed to bind to udp listener socket");
+            .map_err(|error| {
+                emit!(SocketBindError {
+                    mode: SocketMode::Udp,
+                    error,
+                })
+            })?;
 
         if let Some(receive_buffer_bytes) = config.receive_buffer_bytes {
             if let Err(error) = udp::set_receive_buffer_size(&socket, receive_buffer_bytes) {
@@ -147,10 +156,9 @@ pub(super) fn udp(
                                 }
                             }
 
-                            let error = codecs::decoding::Error::FramingError(error.into());
                             return Err(emit!(SocketReceiveError {
                                 mode: SocketMode::Udp,
-                                error: &error
+                                error
                             }));
                        }
                     };

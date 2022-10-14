@@ -9,8 +9,8 @@ use codecs::{
     BytesDecoder, OctetCountingDecoder, SyslogDeserializer,
 };
 use futures::StreamExt;
+use listenfd::ListenFd;
 use smallvec::SmallVec;
-use tokio::net::UdpSocket;
 use tokio_util::udp::UdpFramed;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
@@ -22,9 +22,9 @@ use crate::{
     config::{log_schema, DataType, GenerateConfig, Output, Resource, SourceConfig, SourceContext},
     event::Event,
     internal_events::StreamClosedError,
-    internal_events::SyslogUdpReadError,
+    internal_events::{SocketBindError, SocketMode, SocketReceiveError},
     shutdown::ShutdownSignal,
-    sources::util::{SocketListenAddr, TcpNullAcker, TcpSource},
+    sources::util::net::{try_bind_udp_socket, SocketListenAddr, TcpNullAcker, TcpSource},
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsSourceConfig},
     udp, SourceSender,
@@ -82,7 +82,7 @@ pub enum Mode {
     /// Listen on UDP.
     Udp {
         /// The address to listen for messages on.
-        address: SocketAddr,
+        address: SocketListenAddr,
 
         /// The size, in bytes, of the receive buffer used for the listening socket.
         ///
@@ -211,8 +211,8 @@ impl SourceConfig for SyslogConfig {
 
     fn resources(&self) -> Vec<Resource> {
         match self.mode.clone() {
-            Mode::Tcp { address, .. } => vec![address.into()],
-            Mode::Udp { address, .. } => vec![Resource::udp(address)],
+            Mode::Tcp { address, .. } => vec![address.as_tcp_resource()],
+            Mode::Udp { address, .. } => vec![address.as_udp_resource()],
             #[cfg(unix)]
             Mode::Unix { .. } => vec![],
         }
@@ -252,7 +252,7 @@ impl TcpSource for SyslogTcpSource {
 }
 
 pub fn udp(
-    addr: SocketAddr,
+    addr: SocketListenAddr,
     _max_length: usize,
     host_key: String,
     receive_buffer_bytes: Option<usize>,
@@ -260,9 +260,13 @@ pub fn udp(
     mut out: SourceSender,
 ) -> super::Source {
     Box::pin(async move {
-        let socket = UdpSocket::bind(&addr)
-            .await
-            .expect("Failed to bind to UDP listener socket");
+        let listenfd = ListenFd::from_env();
+        let socket = try_bind_udp_socket(addr, listenfd).await.map_err(|error| {
+            emit!(SocketBindError {
+                mode: SocketMode::Udp,
+                error: &error,
+            })
+        })?;
 
         if let Some(receive_buffer_bytes) = receive_buffer_bytes {
             if let Err(error) = udp::set_receive_buffer_size(&socket, receive_buffer_bytes) {
@@ -294,7 +298,10 @@ pub fn udp(
                         Some(events.remove(0))
                     }
                     Err(error) => {
-                        emit!(SyslogUdpReadError { error });
+                        emit!(SocketReceiveError {
+                            mode: SocketMode::Udp,
+                            error: &error,
+                        });
                         None
                     }
                 }

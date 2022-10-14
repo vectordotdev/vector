@@ -130,12 +130,7 @@ pub fn trace_init() {
     trace::init(color, false, &levels, 10);
 
     // Initialize metrics as well
-    if let Err(error) = vector_core::metrics::init_test() {
-        // Handle multiple initializations.
-        if error != vector_core::metrics::Error::AlreadyInitialized {
-            panic!("Failed to initialize metrics recorder: {:?}", error);
-        }
-    }
+    vector_core::metrics::init_test();
 }
 
 pub async fn send_lines(

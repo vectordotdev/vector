@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-20.04
     timeout-minutes: 3
     steps:
-      - uses: styfle/cancel-workflow-action@0.10.1
+      - uses: styfle/cancel-workflow-action@0.11.0
         with:
           access_token: ${{ secrets.GITHUB_TOKEN }}
           all_but_latest: true # can cancel workflows scheduled later
@@ -184,7 +184,7 @@ jobs:
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v2.0.0
+        uses: docker/setup-buildx-action@v2.1.0
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
@@ -198,7 +198,7 @@ jobs:
           tags: type=raw, value=${{ needs.compute-soak-meta.outputs.baseline-tag }}
 
       - name: Build and push 'soak-vector' image
-        uses: docker/build-push-action@v3.1.1
+        uses: docker/build-push-action@v3.2.0
         with:
           context: baseline-vector/
           file: soaks/Dockerfile
@@ -229,7 +229,7 @@ jobs:
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v2.0.0
+        uses: docker/setup-buildx-action@v2.1.0
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
@@ -243,7 +243,7 @@ jobs:
           tags: type=raw, value=${{ needs.compute-soak-meta.outputs.comparison-tag }}
 
       - name: Build 'soak-vector' image
-        uses: docker/build-push-action@v3.1.1
+        uses: docker/build-push-action@v3.2.0
         with:
           context: comparison-vector/
           file: soaks/Dockerfile

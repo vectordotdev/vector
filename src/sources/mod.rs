@@ -40,10 +40,10 @@ pub mod gcp_pubsub;
 pub mod heroku_logs;
 #[cfg(feature = "sources-host_metrics")]
 pub mod host_metrics;
-#[cfg(feature = "sources-http")]
-pub mod http;
-#[cfg(feature = "sources-http_scrape")]
-pub mod http_scrape;
+#[cfg(feature = "sources-http_client")]
+pub mod http_client;
+#[cfg(feature = "sources-http_server")]
+pub mod http_server;
 #[cfg(feature = "sources-internal_logs")]
 pub mod internal_logs;
 #[cfg(feature = "sources-internal_metrics")]
@@ -181,12 +181,16 @@ pub enum Sources {
     HostMetrics(#[configurable(derived)] host_metrics::HostMetricsConfig),
 
     /// HTTP.
-    #[cfg(feature = "sources-http")]
-    Http(#[configurable(derived)] http::SimpleHttpConfig),
+    #[cfg(feature = "sources-http_server")]
+    Http(#[configurable(derived)] http_server::HttpConfig),
 
-    /// HTTP Scrape.
-    #[cfg(feature = "sources-http_scrape")]
-    HttpScrape(#[configurable(derived)] http_scrape::HttpScrapeConfig),
+    /// HTTP Client.
+    #[cfg(feature = "sources-http_client")]
+    HttpClient(#[configurable(derived)] http_client::HttpClientConfig),
+
+    /// HTTP Server.
+    #[cfg(feature = "sources-http_server")]
+    HttpServer(#[configurable(derived)] http_server::SimpleHttpConfig),
 
     /// Internal Logs.
     #[cfg(feature = "sources-internal_logs")]
@@ -339,10 +343,12 @@ impl NamedComponent for Sources {
             Self::HerokuLogs(config) => config.get_component_name(),
             #[cfg(feature = "sources-host_metrics")]
             Self::HostMetrics(config) => config.get_component_name(),
-            #[cfg(feature = "sources-http")]
+            #[cfg(feature = "sources-http_server")]
             Self::Http(config) => config.get_component_name(),
-            #[cfg(feature = "sources-http_scrape")]
-            Self::HttpScrape(config) => config.get_component_name(),
+            #[cfg(feature = "sources-http_client")]
+            Self::HttpClient(config) => config.get_component_name(),
+            #[cfg(feature = "sources-http_server")]
+            Self::HttpServer(config) => config.get_component_name(),
             #[cfg(feature = "sources-internal_logs")]
             Self::InternalLogs(config) => config.get_component_name(),
             #[cfg(feature = "sources-internal_metrics")]
