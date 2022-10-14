@@ -32,7 +32,6 @@ the operator's control:
 - Sink encoding failure
 - Sink partitioning failure
 - Failure to write to disk buffer
-- Failure to send to next component
 
 This leads to the potential for lost events and even silently dropped events. Users want to be able
 to capture discarded events at various points in the topology in order to forward them to fail-safe
