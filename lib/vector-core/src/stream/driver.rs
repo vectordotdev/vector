@@ -174,7 +174,8 @@ where
     ) {
         match result {
             Err(error) => {
-                // emit the internal events: `Error` and `EventsDropped`.
+                // Emit the `Error` and `EventsDropped` internal events.
+                // This scenario occurs after retries have been attempted.
                 emit(CallError {
                     error,
                     request_id,
