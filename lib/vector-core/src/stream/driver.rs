@@ -174,14 +174,7 @@ where
     ) {
         match result {
             Err(error) => {
-                // Emit the `Error` and `EventsDropped` internal events.
-                // This scenario occurs after retries have been attempted.
-                emit(CallError {
-                    error,
-                    request_id,
-                    count: metadata.event_count() as u64,
-                });
-
+                Self::emit_call_error(Some(error), request_id, metadata.event_count());
                 finalizers.update_status(EventStatus::Rejected);
             }
             Ok(response) => {
@@ -200,10 +193,25 @@ where
                         byte_size: cbs.1,
                         output: None,
                     });
+
+                // This condition occurs specifically when the `HttpBatchService::call()` is called *within* the `Service::call()`
+                } else if response.event_status() == EventStatus::Rejected {
+                    Self::emit_call_error(None, request_id, metadata.event_count());
+                    finalizers.update_status(EventStatus::Rejected);
                 }
             }
         };
         drop(finalizers); // suppress "argument not consumed" warning
+    }
+
+    /// Emit the `Error` and `EventsDropped` internal events.
+    /// This scenario occurs after retries have been attempted.
+    fn emit_call_error(error: Option<Svc::Error>, request_id: usize, count: usize) {
+        emit(CallError {
+            error,
+            request_id,
+            count: count as u64,
+        });
     }
 }
 
