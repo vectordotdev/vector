@@ -14,8 +14,10 @@ use codecs::{
 use futures::{Stream, StreamExt};
 use rdkafka::{
     config::ClientConfig,
-    consumer::{Consumer, StreamConsumer},
+    consumer::{Consumer, StreamConsumer, CommitMode},
+    error::KafkaError,
     message::{BorrowedMessage, Headers, Message},
+    types::RDKafkaErrorCode,
 };
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
@@ -236,25 +238,43 @@ async fn kafka_source(
     acknowledgements: bool,
 ) -> Result<(), ()> {
     let consumer = Arc::new(consumer);
-    let (finalizer, mut ack_stream) =
-        OrderedFinalizer::<FinalizerEntry>::maybe_new(acknowledgements, shutdown.clone());
+    let (mut finalizer, mut ack_stream) =
+        OrderedFinalizer::<FinalizerEntry>::maybe_new_without_shutdown(acknowledgements);
     let mut stream = consumer.stream();
     let keys = Keys::from(log_schema(), &config);
 
+    let mut shutting_down = false;
     loop {
         tokio::select! {
-            _ = &mut shutdown => break,
-            entry = ack_stream.next() => if let Some((status, entry)) = entry {
-                if status == BatchStatus::Delivered {
-                    if let Err(error) =
-                        consumer.store_offset(&entry.topic, entry.partition, entry.offset)
-                    {
-                        emit!(KafkaOffsetUpdateError { error });
+            _ = &mut shutdown => {
+                if let Ok(topics) = consumer.subscription() {
+                    if let Err(error) = consumer.pause(&topics) {
+                        // Might not be the best error type for this :/
+                        emit!(KafkaReadError { error });
                     }
                 }
+                shutting_down = true;
+
+                // If we have an ack stream, drop the sender end and allow acks to drain
+                match finalizer {
+                    Some(_) => drop(finalizer.take()),
+                    _ => break
+                }
             },
-            message = stream.next() => match message {
-                None => break,  // WHY?
+            entry = ack_stream.next() => match entry {
+                Some((status, entry)) => {
+                    if status == BatchStatus::Delivered {
+                        if let Err(error) =
+                            consumer.store_offset(&entry.topic, entry.partition, entry.offset)
+                            {
+                                emit!(KafkaOffsetUpdateError { error });
+                            }
+                    }
+                },
+                None => break,
+            },
+            message = stream.next(), if !shutting_down => match message {
+                None => break,  // No more messages...but is this the correct way to handle it?
                 Some(Err(error)) => emit!(KafkaReadError { error }),
                 Some(Ok(msg)) => {
                     emit!(KafkaBytesReceived {
@@ -268,6 +288,16 @@ async fn kafka_source(
                 }
             },
         }
+    }
+
+    match consumer.commit_consumer_state(CommitMode::Sync) {
+        Ok(_) => (),
+        Err(KafkaError::ConsumerCommit(RDKafkaErrorCode::NoOffset)) => {
+            debug!("No offsets to store");
+        },
+        Err(error) => {
+            emit!(KafkaOffsetUpdateError { error });
+        },
     }
 
     Ok(())

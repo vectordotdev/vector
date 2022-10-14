@@ -4,7 +4,7 @@ use std::marker::{PhantomData, Unpin};
 use std::{fmt::Debug, future::Future, pin::Pin, task::Context, task::Poll};
 
 use futures::stream::{BoxStream, FuturesOrdered, FuturesUnordered};
-use futures::{FutureExt, Stream, StreamExt};
+use futures::{FutureExt, future::{OptionFuture}, Stream, StreamExt};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 
 use crate::finalization::{BatchStatus, BatchStatusReceiver};
@@ -42,9 +42,22 @@ where
     S: FuturesSet<FinalizerFuture<T>> + Default + Send + Unpin + 'static,
 {
     /// Produce a finalizer set along with the output stream of
-    /// received acknowledged batch identifiers.
+    /// received acknowledged batch identifiers. The output stream will end immediately when
+    /// a shutdown signal is received, or when the sender is dropped
     #[must_use]
     pub fn new(shutdown: ShutdownSignal) -> (Self, BoxStream<'static, (BatchStatus, T)>) {
+        FinalizerSet::with_maybe_shutdown(Some(shutdown))
+    }
+
+    /// Produce a finalizer set along with the output stream of
+    /// received acknowledged batch identifiers. The output stream will close after the sender is
+    /// dropped and the stream is drained
+    #[must_use]
+    pub fn new_without_shutdown() -> (Self, BoxStream<'static, (BatchStatus, T)>) {
+        FinalizerSet::with_maybe_shutdown(None)
+    }
+
+    fn with_maybe_shutdown(shutdown: Option<ShutdownSignal>) -> (Self, BoxStream<'static, (BatchStatus, T)>) {
         let (todo_tx, todo_rx) = mpsc::unbounded_channel();
         (
             Self {
@@ -72,6 +85,16 @@ where
         }
     }
 
+    /// Returns an optional finalizer set without a shutdown signal. See `maybe_new` for details
+    pub fn maybe_new_without_shutdown(maybe: bool) -> (Option<Self>, BoxStream<'static, (BatchStatus, T)>) {
+        if maybe {
+            let (finalizer, stream) = Self::new_without_shutdown();
+            (Some(finalizer), stream)
+        } else {
+            (None, EmptyStream::default().boxed())
+        }
+    }
+
     pub fn add(&self, entry: T, receiver: BatchStatusReceiver) {
         if let Some(sender) = &self.sender {
             if let Err(error) = sender.send((receiver, entry)) {
@@ -82,7 +105,7 @@ where
 }
 
 fn finalizer_stream<T, S>(
-    mut shutdown: ShutdownSignal,
+    shutdown: Option<ShutdownSignal>,
     mut new_entries: UnboundedReceiver<(BatchStatusReceiver, T)>,
     mut status_receivers: S,
 ) -> impl Stream<Item = (BatchStatus, T)>
@@ -90,11 +113,14 @@ where
     S: FuturesSet<FinalizerFuture<T>> + Unpin,
     T: Debug,
 {
+    let handle_shutdown = shutdown.is_some();
+    let mut shutdown = OptionFuture::from(shutdown);
+
     async_stream::stream! {
         loop {
             tokio::select! {
                 biased;
-                _ = &mut shutdown => break,
+                _ = &mut shutdown, if handle_shutdown => break,
                 // Only poll for new entries until shutdown is flagged.
                 new_entry = new_entries.recv() => match new_entry {
                     Some((receiver, entry)) => {
@@ -103,7 +129,7 @@ where
                             entry: Some(entry),
                         });
                     }
-                    // The new entry sender went away before shutdown, count it as a shutdown too.
+                    // The end of the new entry stream signals shutdown
                     None => break,
                 },
                 finished = status_receivers.next(), if !status_receivers.is_empty() => match finished {
