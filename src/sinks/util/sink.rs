@@ -457,7 +457,7 @@ where
                 // Emit the `Error` and `EventsDropped` internal events.
                 // This scenario occurs after retries have been attempted.
                 if status == EventStatus::Rejected {
-                    let error = result.err().unwrap_or("Response failed.".into());
+                    let error = result.err().unwrap_or_else(|| "Response failed.".into());
                     emit!(CallError {
                         error,
                         request_id,
