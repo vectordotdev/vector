@@ -36,6 +36,8 @@ multiple tags with the same name, which will now have all the tags reproduced wh
 
 ### Implementation
 
+#### Internal Representation
+
 Simply put, the tags representation will change from an alias into a newtype wrapper using an
 `indexmap` set to store the tag values. This newtype will hide the implementation details of the
 underlying storage from the callers. It will also add separate methods for inserting a new tag and
@@ -57,6 +59,27 @@ impl MetricTags {
 }
 ```
 
+#### External Representation
+
+The existing Protobuf representation of metric tags has a map of string-to-string pairs of
+tags. A new tags map will be added where the values are lists of optional strings, matching the
+semantics given above.
+
+```protobuf
+message Metric {
+  …
+  map<string, string> tags_v1 = 3;
+  message Values {
+    message Value {
+      optional string value = 1;
+    }
+    repeated Value values = 1;
+  }
+  map<string, Values> tags_v2 = 20;
+  …
+}
+```
+
 ## Rationale
 
 Changing the `MetricTags` type from an alias to a newtype wrapper allows us to provide better
@@ -69,6 +92,10 @@ The use of an `IndexSet` for the tag value provides us with two useful invariant
    the output.
 1. The values can be retrieved in the order they first appeared, which allows us to trivially
    retrieve either the first or last stored value.
+
+The proposed Protobuf representation allows all possible combination of values for a tag set, and
+minimizes the encoded size in the presence of repeated tag names. It also requires no further
+parsing to separate out tag names from values.
 
 ## Drawbacks
 
@@ -84,6 +111,8 @@ doesn't do anything more interesting with the tags than adding and removing whol
 does not cover all our use cases.
 
 ## Alternatives
+
+### Internal Representation
 
 The Datadog agent represents the tags as a simple set of strings, ie `HashSet<String>` or
 `BTreeSet<String>`, where the key/value implications are just an interpretation detail for
@@ -126,6 +155,15 @@ struct Tag {
 
 type MetricTags = MultiIndexTagMap;
 ```
+
+### External Representation
+
+Similar to the above alternatives, we could represent the tags in the Vector Protobuf definition as
+a simple array of strings, matching the source Datadog agent data. Where there are no repeated tag
+names, this is also the most size efficient representation. This, however, embeds the assumption
+that the separator is a particular character (an ASCII colon in this case) that cannot be
+represented in the tag name. It also requires parsing after the data is received to split the values
+into name-value pairs.
 
 ## Outstanding Questions
 
