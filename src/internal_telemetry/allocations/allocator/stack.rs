@@ -11,7 +11,7 @@ use super::token::AllocationGroupId;
 /// never be a pop without a corresponding push, and so on.
 #[derive(Copy, Clone)]
 pub(crate) struct GroupStack {
-    slots: [AllocationGroupId; 256],
+    slots: [AllocationGroupId; 128],
     current_val: usize,
 }
 
@@ -20,7 +20,7 @@ impl GroupStack {
     pub const fn new() -> Self {
         Self {
             current_val: 0,
-            slots: [AllocationGroupId::from_raw_unchecked(1); 256],
+            slots: [AllocationGroupId::from_raw_unchecked(1); 128],
         }
     }
 
