@@ -1,7 +1,7 @@
 package metadata
 
-components: sources: http_scrape: {
-	title: "HTTP Scrape"
+components: sources: http_client: {
+	title: "HTTP Client"
 
 	classes: {
 		commonly_used: false
@@ -57,7 +57,7 @@ components: sources: http_scrape: {
 			username_example: "${USERNAME}"
 		}}
 		endpoint: {
-			description: "Endpoint to scrape observability data from."
+			description: "Endpoint to collect observability data from."
 			required:    true
 			warnings: ["You must explicitly add the path to your endpoint."]
 			type: string: {
@@ -91,7 +91,7 @@ components: sources: http_scrape: {
 		query: {
 			common: false
 			description: """
-				Custom parameters for the scrape request query string.
+				Custom parameters for the HTTP request query string.
 				One or more values for the same parameter key can be provided.
 				The parameters provided in this option are appended to the `endpoint` option.
 				"""
@@ -121,7 +121,7 @@ components: sources: http_scrape: {
 		}
 		scrape_interval_secs: {
 			common:      true
-			description: "The interval between scrapes, in seconds."
+			description: "The interval between calls, in seconds."
 			required:    false
 			type: uint: {
 				default: 15
@@ -147,7 +147,7 @@ components: sources: http_scrape: {
 						description: "The name of the source type."
 						required:    true
 						type: string: {
-							examples: ["http_scrape"]
+							examples: ["http_client"]
 						}
 					}
 					timestamp: fields._current_timestamp
@@ -167,7 +167,7 @@ components: sources: http_scrape: {
 						description: "The name of the source type."
 						required:    true
 						type: string: {
-							examples: ["http_scrape"]
+							examples: ["http_client"]
 						}
 					}
 					timestamp: fields._current_timestamp
@@ -178,7 +178,7 @@ components: sources: http_scrape: {
 			_extra_tags: {
 				"source_type": {
 					description: "The name of the source type."
-					examples: ["http_scrape"]
+					examples: ["http_client"]
 					required: true
 				}
 			}
@@ -205,7 +205,7 @@ components: sources: http_scrape: {
 					description: "The name of the source type."
 					required:    true
 					type: string: {
-						examples: ["http_scrape"]
+						examples: ["http_client"]
 					}
 				}
 			}

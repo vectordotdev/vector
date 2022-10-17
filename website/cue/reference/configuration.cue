@@ -40,8 +40,6 @@ configuration: {
 		expire_metrics: {
 			common: false
 			description: """
-				Deprecated, please use `expire_metric_secs` instead.
-
 				If set, Vector will configure the internal metrics system to automatically
 				remove all metrics that have not been updated in the given time.
 				This value must be positive.
@@ -110,6 +108,18 @@ configuration: {
 				"""
 			required:    false
 			type: object: options: {
+				type: {
+					description: """
+						Determines the type of enrichment data that is to be loaded.
+						"""
+					required: true
+					type: string: {
+						enum: {
+							"file":  "Enrich data from a CSV file."
+							"geoip": "Enrich data from a [MaxMind](\(urls.maxmind)) database."
+						}
+					}
+				}
 				file: {
 					required:    true
 					description: "Configuration options for the file that provides the enrichment table."

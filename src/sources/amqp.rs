@@ -28,6 +28,7 @@ use vector_config::configurable_component;
 use vector_core::{
     config::{AcknowledgementsConfig, LogNamespace},
     event::Event,
+    ByteSizeOf,
 };
 
 #[derive(Debug, Snafu)]
@@ -269,7 +270,7 @@ async fn receive_event(
                     });
 
                     emit!(EventsReceived {
-                        byte_size: byte_size,
+                        byte_size: events.size_of(),
                         count: events.len(),
                     });
 

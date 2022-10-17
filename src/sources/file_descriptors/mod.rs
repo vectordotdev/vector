@@ -12,6 +12,7 @@ use tokio_util::{codec::FramedRead, io::StreamReader};
 use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::NamedComponent;
 use vector_core::config::LogNamespace;
+use vector_core::event::Event;
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -135,16 +136,23 @@ async fn process_stream(
                     let now = Utc::now();
 
                     for mut event in events {
-                        let log = event.as_mut_log();
+                        match event{
+                            Event::Log(_) => {
+                              let log = event.as_mut_log();
 
-                        log.try_insert(log_schema().source_type_key(), source_type.clone());
-                        log.try_insert(log_schema().timestamp_key(), now);
+                              log.try_insert(log_schema().source_type_key(), source_type.clone());
+                              log.try_insert(log_schema().timestamp_key(), now);
 
-                        if let Some(hostname) = &hostname {
-                            log.try_insert(host_key.as_str(), hostname.clone());
+                              if let Some(hostname) = &hostname {
+                                  log.try_insert(host_key.as_str(), hostname.clone());
+                              }
+
+                              yield event;
+                            },
+                            _ => {
+                                yield event;
+                            }
                         }
-
-                        yield event;
                     }
                 }
                 Err(error) => {

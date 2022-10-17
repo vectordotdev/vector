@@ -60,8 +60,8 @@ mod heartbeat;
 mod host_metrics;
 mod http;
 pub mod http_client;
-#[cfg(feature = "sources-utils-http-scrape")]
-mod http_scrape;
+#[cfg(feature = "sources-utils-http-client")]
+mod http_client_source;
 #[cfg(feature = "sinks-influxdb")]
 mod influxdb;
 #[cfg(feature = "sources-internal_logs")]
@@ -110,10 +110,6 @@ mod socket;
 mod splunk_hec;
 #[cfg(feature = "sinks-statsd")]
 mod statsd_sink;
-#[cfg(feature = "sources-statsd")]
-mod statsd_source;
-#[cfg(feature = "sources-syslog")]
-mod syslog;
 #[cfg(feature = "transforms-tag_cardinality_limit")]
 mod tag_cardinality_limit;
 mod tcp;
@@ -202,8 +198,8 @@ pub(crate) use self::host_metrics::*;
     feature = "sources-splunk_hec",
 ))]
 pub(crate) use self::http::*;
-#[cfg(feature = "sources-utils-http-scrape")]
-pub(crate) use self::http_scrape::*;
+#[cfg(feature = "sources-utils-http-client")]
+pub(crate) use self::http_client_source::*;
 #[cfg(feature = "sinks-influxdb")]
 pub(crate) use self::influxdb::*;
 #[cfg(feature = "sources-internal_logs")]
@@ -250,10 +246,6 @@ pub(crate) use self::sematext_metrics::*;
 pub(crate) use self::splunk_hec::*;
 #[cfg(feature = "sinks-statsd")]
 pub(crate) use self::statsd_sink::*;
-#[cfg(feature = "sources-statsd")]
-pub(crate) use self::statsd_source::*;
-#[cfg(feature = "sources-syslog")]
-pub(crate) use self::syslog::*;
 #[cfg(feature = "transforms-tag_cardinality_limit")]
 pub(crate) use self::tag_cardinality_limit::*;
 #[cfg(feature = "transforms-throttle")]

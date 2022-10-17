@@ -261,9 +261,9 @@ dependencies = [
 
 [[package]]
 name = "async-compression"
-version = "0.3.12"
+version = "0.3.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2bf394cfbbe876f0ac67b13b6ca819f9c9f2fb9ec67223cceb1555fbab1c31a"
+checksum = "345fd392ab01f746c717b1357165b76f0b67a60192007b234058c9045fdcf695"
 dependencies = [
  "flate2",
  "futures-core",
@@ -1636,9 +1636,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.0.12"
+version = "4.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "385007cbbed899260395a4107435fead4cad80684461b3cc78238bdcb0bad58f"
+checksum = "6bf8832993da70a4c6d13c581f4463c2bdda27b9bf1c5498dc4365543abe6d6f"
 dependencies = [
  "atty",
  "bitflags",
@@ -1652,9 +1652,9 @@ dependencies = [
 
 [[package]]
 name = "clap_derive"
-version = "4.0.10"
+version = "4.0.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db342ce9fda24fb191e2ed4e102055a4d381c1086a06630174cd8da8d5d917ce"
+checksum = "c42f169caba89a7d512b5418b09864543eeb4d497416c917d7137863bd2076ad"
 dependencies = [
  "heck 0.4.0",
  "proc-macro-error",
@@ -2823,9 +2823,9 @@ dependencies = [
 
 [[package]]
 name = "float_eq"
-version = "1.0.0"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b59b6469c35ab601d6487d28879bccfbe8c896c33a3fe699c4d29817e552cc58"
+checksum = "28a80e3145d8ad11ba0995949bbcf48b9df2be62772b3d351ef017dff6ecb853"
 
 [[package]]
 name = "flume"
@@ -6306,10 +6306,10 @@ dependencies = [
 [[package]]
 name = "rdkafka"
 version = "0.28.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1de127f294f2dba488ed46760b129d5ecbeabbd337ccbf3739cb29d50db2161c"
+source = "git+https://github.com/fede1024/rust-rdkafka?tag=v0.29.0#fe99e1fb18433debc5ba6ca811de983c535e1804"
 dependencies = [
- "futures 0.3.24",
+ "futures-channel",
+ "futures-util",
  "libc",
  "log",
  "rdkafka-sys",
@@ -6323,8 +6323,7 @@ dependencies = [
 [[package]]
 name = "rdkafka-sys"
 version = "4.2.0+1.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e542c6863b04ce0fa0c5719bc6b7b348cf8dd21af1bb03c9db5f9805b2a6473"
+source = "git+https://github.com/fede1024/rust-rdkafka?tag=v0.29.0#fe99e1fb18433debc5ba6ca811de983c535e1804"
 dependencies = [
  "cmake",
  "libc",
@@ -7971,9 +7970,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-stream"
-version = "0.1.10"
+version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6edf2d6bc038a43d31353570e27270603f4648d18f5ed10c0e179abe43255af"
+checksum = "d660770404473ccd7bc9f8b28494a811bc18542b915c0855c51e8f419d5223ce"
 dependencies = [
  "futures-core",
  "pin-project-lite",
@@ -8787,7 +8786,7 @@ dependencies = [
  "bytesize",
  "chrono",
  "cidr-utils",
- "clap 4.0.12",
+ "clap 4.0.15",
  "codecs",
  "colored",
  "console-subscriber",
@@ -8946,7 +8945,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
- "clap 4.0.12",
+ "clap 4.0.15",
  "futures 0.3.24",
  "graphql_client",
  "indoc",
@@ -8969,7 +8968,7 @@ dependencies = [
  "async-trait",
  "bytecheck",
  "bytes 1.2.1",
- "clap 4.0.12",
+ "clap 4.0.15",
  "crc32fast",
  "criterion",
  "crossbeam-queue",
@@ -9205,7 +9204,7 @@ dependencies = [
 name = "vrl-cli"
 version = "0.1.0"
 dependencies = [
- "clap 4.0.12",
+ "clap 4.0.15",
  "exitcode",
  "indoc",
  "lookup",
@@ -9344,7 +9343,7 @@ dependencies = [
  "ansi_term",
  "chrono",
  "chrono-tz",
- "clap 4.0.12",
+ "clap 4.0.15",
  "enrichment",
  "glob",
  "lookup",
@@ -9931,18 +9930,18 @@ dependencies = [
 
 [[package]]
 name = "zstd"
-version = "0.10.2+zstd.1.5.2"
+version = "0.11.2+zstd.1.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f4a6bd64f22b5e3e94b4e238669ff9f10815c27a5180108b849d24174a83847"
+checksum = "20cc960326ece64f010d2d2107537f26dc589a6573a316bd5b1dba685fa5fde4"
 dependencies = [
  "zstd-safe",
 ]
 
 [[package]]
 name = "zstd-safe"
-version = "4.1.6+zstd.1.5.2"
+version = "5.0.2+zstd.1.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "94b61c51bb270702d6167b8ce67340d2754b088d0c091b06e593aa772c3ee9bb"
+checksum = "1d2a5585e04f9eea4b2a3d1eca508c4dee9592a89ef6f450c11719da0726f4db"
 dependencies = [
  "libc",
  "zstd-sys",
@@ -9950,9 +9949,9 @@ dependencies = [
 
 [[package]]
 name = "zstd-sys"
-version = "1.6.3+zstd.1.5.2"
+version = "2.0.1+zstd.1.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fc49afa5c8d634e75761feda8c592051e7eeb4683ba827211eb0d731d3402ea8"
+checksum = "9fd07cbbc53846d9145dbffdf6dd09a7a0aa52be46741825f5c97bdd4f73f12b"
 dependencies = [
  "cc",
  "libc",

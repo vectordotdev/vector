@@ -2,13 +2,12 @@ mod request_limiter;
 
 use std::collections::BTreeMap;
 use std::net::SocketAddr;
-use std::{fmt, io, mem::drop, time::Duration};
+use std::{io, mem::drop, time::Duration};
 
 use bytes::Bytes;
 use codecs::StreamDecodingError;
 use futures::{future::BoxFuture, FutureExt, StreamExt};
 use listenfd::ListenFd;
-use serde::{de, Deserialize, Deserializer};
 use smallvec::SmallVec;
 use socket2::SockRef;
 use tokio::{
@@ -19,21 +18,21 @@ use tokio::{
 use tokio_util::codec::{Decoder, FramedRead};
 use tracing::Instrument;
 use vector_common::finalization::AddBatchNotifier;
-use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
-use super::AfterReadExt as _;
-use crate::sources::util::tcp::request_limiter::RequestLimiter;
+use self::request_limiter::RequestLimiter;
+use super::SocketListenAddr;
 use crate::{
     codecs::ReadyFrames,
-    config::{AcknowledgementsConfig, Resource, SourceContext},
+    config::{AcknowledgementsConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, Event},
     internal_events::{
-        ConnectionOpen, DecoderFramingError, OpenGauge, SocketEventsReceived, SocketMode,
-        StreamClosedError, TcpBytesReceived, TcpSendAckError, TcpSocketReceiveError,
+        ConnectionOpen, DecoderFramingError, OpenGauge, SocketBindError, SocketEventsReceived,
+        SocketMode, SocketReceiveError, StreamClosedError, TcpBytesReceived, TcpSendAckError,
         TcpSocketTlsConnectionError,
     },
     shutdown::ShutdownSignal,
+    sources::util::AfterReadExt,
     tcp::TcpKeepaliveConfig,
     tls::{CertificateMetadata, MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
     SourceSender,
@@ -41,34 +40,19 @@ use crate::{
 
 const MAX_IN_FLIGHT_EVENTS_TARGET: usize = 100_000;
 
-async fn make_listener(
+async fn try_bind_tcp_listener(
     addr: SocketListenAddr,
     mut listenfd: ListenFd,
     tls: &MaybeTlsSettings,
-) -> Option<MaybeTlsListener> {
+) -> crate::Result<MaybeTlsListener> {
     match addr {
-        SocketListenAddr::SocketAddr(addr) => match tls.bind(&addr).await {
-            Ok(listener) => Some(listener),
-            Err(error) => {
-                error!(message = "Failed to bind to listener socket.", %error);
-                None
-            }
-        },
-        SocketListenAddr::SystemdFd(offset) => match listenfd.take_tcp_listener(offset) {
-            Ok(Some(listener)) => match TcpListener::from_std(listener) {
-                Ok(listener) => Some(listener.into()),
-                Err(error) => {
-                    error!(message = "Failed to bind to listener socket.", %error);
-                    None
-                }
-            },
-            Ok(None) => {
-                error!("Failed to take listen FD, not open or already taken.");
-                None
-            }
-            Err(error) => {
-                error!(message = "Failed to take listen FD.", %error);
-                None
+        SocketListenAddr::SocketAddr(addr) => tls.bind(&addr).await.map_err(Into::into),
+        SocketListenAddr::SystemdFd(offset) => match listenfd.take_tcp_listener(offset)? {
+            Some(listener) => TcpListener::from_std(listener)
+                .map(Into::into)
+                .map_err(Into::into),
+            None => {
+                Err(io::Error::new(io::ErrorKind::AddrInUse, "systemd fd already consumed").into())
             }
         },
     }
@@ -132,13 +116,16 @@ where
     ) -> crate::Result<crate::sources::Source> {
         let acknowledgements = cx.do_acknowledgements(&acknowledgements);
 
-        let listenfd = ListenFd::from_env();
-
         Ok(Box::pin(async move {
-            let listener = match make_listener(addr, listenfd, &tls).await {
-                None => return Err(()),
-                Some(listener) => listener,
-            };
+            let listenfd = ListenFd::from_env();
+            let listener = try_bind_tcp_listener(addr, listenfd, &tls)
+                .await
+                .map_err(|error| {
+                    emit!(SocketBindError {
+                        mode: SocketMode::Tcp,
+                        error: &error,
+                    })
+                })?;
 
             info!(
                 message = "Listening.",
@@ -177,7 +164,10 @@ where
                         let socket = match connection {
                             Ok(socket) => socket,
                             Err(error) => {
-                                emit!(TcpSocketReceiveError { error });
+                                emit!(SocketReceiveError {
+                                    mode: SocketMode::Tcp,
+                                    error: &error
+                                });
                                 return;
                             }
                         };
@@ -423,88 +413,5 @@ fn close_socket(socket: &MaybeTlsIncomingStream<TcpStream>) -> bool {
         // Connection hasn't yet been established so we are done here.
         debug!("Closing connection that hasn't yet been fully established.");
         true
-    }
-}
-
-/// A listening address that can be given directly or be managed via `systemd` socket activation.
-#[configurable_component]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[serde(untagged)]
-pub enum SocketListenAddr {
-    /// An IPv4/IPv6 address and port.
-    SocketAddr(#[configurable(derived)] SocketAddr),
-
-    /// A file descriptor identifier that is given from, and managed by, the socket activation feature of `systemd`.
-    #[serde(deserialize_with = "parse_systemd_fd")]
-    SystemdFd(#[configurable(transparent)] usize),
-}
-
-impl fmt::Display for SocketListenAddr {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Self::SocketAddr(ref addr) => addr.fmt(f),
-            Self::SystemdFd(offset) => write!(f, "systemd socket #{}", offset),
-        }
-    }
-}
-
-impl From<SocketAddr> for SocketListenAddr {
-    fn from(addr: SocketAddr) -> Self {
-        Self::SocketAddr(addr)
-    }
-}
-
-impl From<SocketListenAddr> for Resource {
-    fn from(addr: SocketListenAddr) -> Resource {
-        match addr {
-            SocketListenAddr::SocketAddr(addr) => Resource::tcp(addr),
-            SocketListenAddr::SystemdFd(offset) => Self::SystemFdOffset(offset),
-        }
-    }
-}
-
-fn parse_systemd_fd<'de, D>(des: D) -> Result<usize, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s: &'de str = Deserialize::deserialize(des)?;
-    match s {
-        "systemd" => Ok(0),
-        s if s.starts_with("systemd#") => s[8..]
-            .parse::<usize>()
-            .map_err(de::Error::custom)?
-            .checked_sub(1)
-            .ok_or_else(|| de::Error::custom("systemd indices start from 1, found 0")),
-        _ => Err(de::Error::custom("must start with \"systemd\"")),
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
-
-    use serde::Deserialize;
-
-    use super::*;
-
-    #[derive(Debug, Deserialize)]
-    struct Config {
-        addr: SocketListenAddr,
-    }
-
-    #[test]
-    fn parse_socket_listen_addr() {
-        let test: Config = toml::from_str(r#"addr="127.1.2.3:1234""#).unwrap();
-        assert_eq!(
-            test.addr,
-            SocketListenAddr::SocketAddr(SocketAddr::V4(SocketAddrV4::new(
-                Ipv4Addr::new(127, 1, 2, 3),
-                1234,
-            )))
-        );
-        let test: Config = toml::from_str(r#"addr="systemd""#).unwrap();
-        assert_eq!(test.addr, SocketListenAddr::SystemdFd(0));
-        let test: Config = toml::from_str(r#"addr="systemd#3""#).unwrap();
-        assert_eq!(test.addr, SocketListenAddr::SystemdFd(2));
     }
 }

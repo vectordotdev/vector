@@ -95,36 +95,6 @@ impl InternalEvent for TcpSocketTlsConnectionError {
 }
 
 #[derive(Debug)]
-pub struct TcpSocketError {
-    pub error: std::io::Error,
-}
-
-impl InternalEvent for TcpSocketError {
-    fn emit(self) {
-        error!(
-            message = "TCP socket error.",
-            error = %self.error,
-            error_code = "socket_failed",
-            error_type = error_type::WRITER_FAILED,
-            stage = error_stage::SENDING,
-            internal_log_rate_limit = true,
-        );
-        counter!(
-            "component_errors_total", 1,
-            "error_code" => "socket_failed",
-            "error_type" => error_type::WRITER_FAILED,
-            "stage" => error_stage::SENDING,
-            "mode" => "tcp",
-        );
-        // deprecated
-        counter!(
-            "connection_errors_total", 1,
-            "mode" => "tcp",
-        );
-    }
-}
-
-#[derive(Debug)]
 pub struct TcpSendAckError {
     pub error: std::io::Error,
 }
@@ -176,35 +146,6 @@ impl InternalEvent for TcpBytesReceived {
             "component_received_bytes_total", self.byte_size as u64,
             "protocol" => "tcp",
             "peer_addr" => self.peer_addr.to_string()
-        );
-    }
-}
-
-pub struct TcpSocketReceiveError<E> {
-    pub error: E,
-}
-
-impl<E: std::fmt::Display> InternalEvent for TcpSocketReceiveError<E> {
-    fn emit(self) {
-        error!(
-            message = "TCP socket receive error.",
-            error = %self.error,
-            error_code = "socket_failed",
-            error_type = error_type::READER_FAILED,
-            stage = error_stage::RECEIVING,
-            internal_log_rate_limit = true,
-        );
-        counter!(
-            "component_errors_total", 1,
-            "error_code" => "socket_failed",
-            "error_type" => error_type::READER_FAILED,
-            "stage" => error_stage::RECEIVING,
-            "mode" => "tcp",
-        );
-        // deprecated
-        counter!(
-            "connection_errors_total", 1,
-            "mode" => "tcp",
         );
     }
 }

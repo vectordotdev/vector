@@ -24,8 +24,8 @@ use crate::{
     dns,
     event::{Event, EventStatus, Finalizable},
     internal_events::{
-        SocketEventsSent, SocketMode, UdpSendIncompleteError, UdpSocketConnectionEstablished,
-        UdpSocketError, UdpSocketOutgoingConnectionError,
+        SocketEventsSent, SocketMode, SocketSendError, UdpSendIncompleteError,
+        UdpSocketConnectionEstablished, UdpSocketOutgoingConnectionError,
     },
     sinks::{
         util::{retries::ExponentialBackoff, StreamSink},
@@ -314,7 +314,10 @@ where
                         finalizers.update_status(EventStatus::Delivered);
                     }
                     Err(error) => {
-                        emit!(UdpSocketError { error });
+                        emit!(SocketSendError {
+                            mode: SocketMode::Udp,
+                            error
+                        });
                         finalizers.update_status(EventStatus::Errored);
                         break;
                     }
