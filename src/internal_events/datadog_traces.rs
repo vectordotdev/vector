@@ -40,26 +40,29 @@ impl InternalEvent for DatadogTracesEncodingError {
     }
 }
 
-#[derive(Debug)]
-pub struct DatadogTracesStatsError {
-    pub error_message: &'static str,
-    pub trace_id: Option<usize>,
-}
+// TODO enable when this GH issue is fixed:
+// https://github.com/vectordotdev/vector/issues/14859
 
-impl InternalEvent for DatadogTracesStatsError {
-    fn emit(self) {
-        error!(
-            message = "Trace stats calculation error.",
-            trace_id = ?self.trace_id,
-            error = %self.error_message,
-            error_type = error_type::PARSER_FAILED,
-            stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
-        );
-        counter!(
-            "component_errors_total", 1,
-            "error_type" => error_type::PARSER_FAILED,
-            "stage" => error_stage::PROCESSING,
-        );
-    }
-}
+// #[derive(Debug)]
+// pub struct DatadogTracesStatsError {
+//     pub error_message: &'static str,
+//     pub trace_id: Option<usize>,
+// }
+//
+// impl InternalEvent for DatadogTracesStatsError {
+//     fn emit(self) {
+//         error!(
+//             message = "Trace stats calculation error.",
+//             trace_id = ?self.trace_id,
+//             error = %self.error_message,
+//             error_type = error_type::PARSER_FAILED,
+//             stage = error_stage::PROCESSING,
+//             internal_log_rate_limit = true,
+//         );
+//         counter!(
+//             "component_errors_total", 1,
+//             "error_type" => error_type::PARSER_FAILED,
+//             "stage" => error_stage::PROCESSING,
+//         );
+//     }
+// }
