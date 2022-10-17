@@ -1,5 +1,5 @@
 use bytes::{Bytes, BytesMut};
-use rdkafka::message::OwnedHeaders;
+use rdkafka::message::{Header, OwnedHeaders};
 use tokio_util::codec::Encoder as _;
 use vector_core::{config::LogSchema, ByteSizeOf};
 
@@ -88,7 +88,10 @@ fn get_headers(event: &Event, headers_key: &Option<String>) -> Option<OwnedHeade
                         let mut owned_headers = OwnedHeaders::new_with_capacity(headers_map.len());
                         for (key, value) in headers_map {
                             if let Value::Bytes(value_bytes) = value {
-                                owned_headers = owned_headers.add(key, value_bytes.as_ref());
+                                owned_headers = owned_headers.insert(Header {
+                                    key,
+                                    value: Some(value_bytes.as_ref()),
+                                });
                             } else {
                                 emit!(KafkaHeaderExtractionError {
                                     header_field: headers_key
@@ -130,9 +133,9 @@ mod tests {
         event.as_mut_log().insert(headers_key, header_values);
 
         let headers = get_headers(&event, &Some(headers_key.to_string())).unwrap();
-        assert_eq!(headers.get(0).unwrap().0, "a-key");
-        assert_eq!(headers.get(0).unwrap().1, "a-value".as_bytes());
-        assert_eq!(headers.get(1).unwrap().0, "b-key");
-        assert_eq!(headers.get(1).unwrap().1, "b-value".as_bytes());
+        assert_eq!(headers.get(0).key, "a-key");
+        assert_eq!(headers.get(0).value.unwrap(), "a-value".as_bytes());
+        assert_eq!(headers.get(1).key, "b-key");
+        assert_eq!(headers.get(1).value.unwrap(), "b-value".as_bytes());
     }
 }
