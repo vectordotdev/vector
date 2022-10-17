@@ -485,7 +485,6 @@ def resolve_enum_schema(root_schema, schema)
         resolved_subschema = resolve_schema(root_schema, subschemas[single_idx])
 
         @logger.debug "Resolved as 'X or array of X' enum schema."
-        # @logger.debug "Original schema: #{schema}"
 
         return { '_resolved' => resolved_subschema, 'annotations' => 'single_or_array' }
       end
@@ -626,7 +625,6 @@ def resolve_enum_schema(root_schema, schema)
       }
 
       @logger.debug "Resolved as 'internally-tagged with named fields' enum schema."
-      # @logger.debug "Original schema: #{schema}"
 
       return { '_resolved' => { 'type' => { 'object' => { 'options' => unique_resolved_properties } } } }
     end

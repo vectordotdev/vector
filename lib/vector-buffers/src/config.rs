@@ -194,7 +194,7 @@ impl DiskUsage {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case", tag = "type")]
 pub enum BufferType {
-    /// A buffer stage backed by an in-memory channel provided by `tokio``g.
+    /// A buffer stage backed by an in-memory channel provided by `tokio`.
     ///
     /// This is more performant, but less durable. Data will be lost if Vector is restarted
     /// forcefully or crashes.
