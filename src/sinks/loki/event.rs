@@ -23,12 +23,8 @@ pub enum LokiBatchEncoding {
 #[derive(Clone)]
 pub struct LokiBatchEncoder(pub LokiBatchEncoding);
 
-impl Encoder<Vec<LokiRecord>> for LokiBatchEncoder {
-    fn encode_input(
-        &self,
-        input: Vec<LokiRecord>,
-        writer: &mut dyn io::Write,
-    ) -> io::Result<usize> {
+impl Encoder<LokiRecords> for LokiBatchEncoder {
+    fn encode_input(&self, input: LokiRecords, writer: &mut dyn io::Write) -> io::Result<usize> {
         let count = input.len();
         let batch = LokiBatch::from(input);
         let body = match self.0 {
