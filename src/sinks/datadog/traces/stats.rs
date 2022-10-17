@@ -438,7 +438,7 @@ impl Aggregator {
         // input to the sink.
         // If this becomes problematic for users, we will have to spin up a separate thread that
         // flushes on a specific time interval.
-        // In theory this approach should work, and would just manifest as overall more stats payloads
+        // In theory the existing approach should work, and would just manifest as overall more stats payloads
         // being output by Vector, but the payloads themselves should be correct.
         // https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/stats/concentrator.go#L83-L108
 
@@ -590,33 +590,24 @@ fn extract_weight_from_root_span(spans: &[&BTreeMap<String, Value>]) -> f64 {
 
     // There should be only one value remaining, the weight from the root span
     if parent_id_to_child_weight.len() != 1 {
-        // TODO remove the debug print and uncomment the Error emit when this GH issue is
-        // fixed: https://github.com/vectordotdev/vector/issues/14859
+        // TODO remove the debug print and emit the Error event as outlined in
+        // https://github.com/vectordotdev/vector/issues/14859
         debug!(
             "Didn't reliably find the root span for weight calculation of trace_id {:?}.",
             trace_id
         );
-        //     trace_id,
-        // emit!(DatadogTracesStatsError {
-        //     error_message: "Didn't reliably find the root span for weight calculation.",
-        //     trace_id,
-        // });
     }
 
     *parent_id_to_child_weight
         .values()
         .next()
         .unwrap_or_else(|| {
-            // TODO remove the debug print and uncomment the Error emit when this GH issue is
-            // fixed: https://github.com/vectordotdev/vector/issues/14859
+            // TODO remove the debug print and emit the Error event as outlined in
+            // https://github.com/vectordotdev/vector/issues/14859
             debug!(
                 "Root span was not found. Defaulting to weight of 1.0 for trace_id {:?}.",
                 trace_id
             );
-            // emit!(DatadogTracesStatsError {
-            //     error_message: "Root span was not found. Defaulting to weight of 1.0.",
-            //     trace_id,
-            // });
             &1.0
         })
 }
