@@ -1,6 +1,6 @@
 # RFC 14742 - Support for Duplicate and Bare Tags on Metrics
 
-Vector's current metric model supports only a single value for each tag. The `datadog_agent` source,
+Vector's current metric model supports only a single value for each tag. Several sources, however,
 however, may send metrics that contain multiple values for a given tag name, or bare tags with no
 value. Vectors tag support should be enhanced to handle this data.
 
@@ -14,8 +14,8 @@ value. Vectors tag support should be enhanced to handle this data.
 
 ### In scope
 
-- Changes to the existing metric tag internal and external representation to support multiple values
-  and bare tags.
+- Changes to the existing metric tag internal and external representations to support multiple
+  values and bare tags.
 
 ### Out of scope
 
@@ -23,9 +23,17 @@ value. Vectors tag support should be enhanced to handle this data.
 
 ## Pain
 
-When ingesting data from a Datadog agent, the metric tags provided by that source may contain data
-that Vector's data model cannot represent. This is causing problems for prospective users that want
-to add Vector to their observability pipelines but cannot do so because it would cause data loss.
+When ingesting data from certain metric sources, the tags provided by that source may contain data
+that Vector's data model cannot currently represent. This is causing problems for prospective users
+that want to add Vector to their observability pipelines but cannot do so because it would cause
+data loss. Those sources include:
+
+* `datadog_agent` natively stores tags as bare strings, with optional values separated from the name
+  by a colon.
+* The Prometheus text encoding used by the `prometheus_scrape` source and `prometheus_exporter` sink
+  can support both repeated tag names and bare tags (without a value).
+* The Prometheus `remote_write` encoding similarly supports repeated tag names.
+* OpenTelemetry attributes support keys having arrays of values, which corresponds to repeated tags.
 
 ## Proposal
 
