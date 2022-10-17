@@ -89,6 +89,21 @@ message Metric {
 }
 ```
 
+Similarly, the native JSON encoding for tags is a simple JSON object containing string-to-string
+pairs. This will be enhanced to also allow the `null` value for bare tags, and arrays of either
+strings or `null` for tags with more than one value.
+
+```json
+{
+  "tags": {
+    "single_value":"value",
+    "bare_tag":null,
+    "multi_valued_tag":["value1","value2"],
+    "complex_tag":["value3",null]
+  }
+}
+```
+
 ## Rationale
 
 Changing the `MetricTags` type from an alias to a newtype wrapper allows us to provide better
@@ -106,6 +121,10 @@ The proposed Protobuf representation allows all possible combination of values f
 minimizes the encoded size in the presence of repeated tag names. It also requires no further
 parsing to separate out tag names from values.
 
+Similarly, the proposed native JSON encoding adds the necessary support while preserving backwards
+compatibility for existing data and minimizes the overhead when multiple tag values are not
+required.
+
 ## Drawbacks
 
 Metrics sinks that only support a single value per tag will need to be reworked accordingly for the
@@ -115,9 +134,9 @@ producing multiple tag values.
 ## Prior Art
 
 The Datadog agent stores metric tags as a simple set of strings, equivalent to `HashSet<String>`. It
-does some clever hashing and deduplication internally to make this work efficiently. However, it
-doesn't do anything more interesting with the tags than adding and removing whole strings, which
-does not cover all our use cases.
+also does some clever hashing and deduplication internally to make this work efficiently. However,
+the agent doesn't do anything more interesting with the tags than adding and removing whole strings,
+which does not cover all our use cases.
 
 ## Alternatives
 
@@ -173,6 +192,10 @@ names, this is also the most size efficient representation. This, however, embed
 that the separator is a particular character (an ASCII colon in this case) that cannot be
 represented in the tag name. It also requires parsing after the data is received to split the values
 into name-value pairs.
+
+We could also change the native JSON encoding to unconditionally output arrays for all tag values in
+order to simplify the encoding algorithm. However, given that we have to retain decoding for tags
+without the array values, we can make use of this form to reduce the complexity of the encoded data.
 
 ## Outstanding Questions
 
