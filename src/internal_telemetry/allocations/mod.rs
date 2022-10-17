@@ -35,28 +35,8 @@
 // all... then we're back in "tracked a bunch of events but never sent them" territory... but... there might be
 // something we could do here *shrug*
 
-use std::{
-    cell::UnsafeCell,
-    sync::{
-        atomic::{AtomicBool, AtomicUsize, Ordering},
-        Arc,
-    },
-    thread,
-    time::Duration,
-};
-
-use crossbeam_queue::ArrayQueue;
-use crossbeam_utils::Backoff;
-use once_cell::sync::OnceCell;
-use slab::Slab;
-
 mod allocator;
-
-mod channel;
-use self::{
-    allocator::{enable_allocation_tracing, without_allocation_tracing, Tracer},
-    channel::{create_channel, Consumer, Producer},
-};
+use self::allocator::{enable_allocation_tracing, Tracer};
 
 pub(crate) use self::allocator::{
     AllocationGroupId, AllocationGroupToken, AllocationLayer, GroupedTraceableAllocator,
@@ -64,231 +44,20 @@ pub(crate) use self::allocator::{
 
 pub type Allocator<A> = GroupedTraceableAllocator<A, LocalProducerTracer>;
 
-const BATCH_SIZE: usize = 256;
-const BATCHES: usize = 256;
-
-static REGISTRATIONS: OnceCell<Registrations> = OnceCell::new();
-
-thread_local! {
-    static LOCAL_PRODUCER: UnsafeCell<Option<Producer<BATCH_SIZE, BATCHES, AllocatorEvent>>> = UnsafeCell::new(None);
-}
-
-fn get_registrations() -> &'static Registrations {
-    REGISTRATIONS.get_or_init(Registrations::new)
-}
-
-fn with_local_event_producer<F>(mut f: F)
-where
-    F: FnMut(&mut Producer<BATCH_SIZE, BATCHES, AllocatorEvent>),
-{
-    let _result = LOCAL_PRODUCER.try_with(|maybe_producer| {
-        // SAFETY: The producer lives in a thread local, so we have guaranteed exclusive access to it, which
-        // ensures our creation of a mutable reference is safe within the closure given to `LocalKey::try_with`.
-        //
-        // Additionally, we know the pointer-to-reference cast is safe/always valid because we just got it from `UnsafeCell`.
-        let producer = unsafe {
-            maybe_producer
-                .get()
-                .as_mut()
-                .expect("producer pointer should always be valid")
-                .get_or_insert_with(register_event_channel)
-        };
-
-        f(producer);
-    });
-}
-
-fn register_event_channel() -> Producer<BATCH_SIZE, BATCHES, AllocatorEvent> {
-    let (producer, consumer) = create_channel();
-    let registrations = get_registrations();
-    registrations.register(consumer);
-
-    producer
-}
-
 pub const fn get_grouped_tracing_allocator<A>(allocator: A) -> Allocator<A> {
     GroupedTraceableAllocator::new(allocator, LocalProducerTracer)
-}
-
-#[derive(Clone, Copy)]
-enum AllocatorEvent {
-    Allocation,
-    Deallocation,
-}
-
-struct Registrations {
-    pending: ArrayQueue<Consumer<BATCH_SIZE, BATCHES, AllocatorEvent>>,
-    has_pending: AtomicBool,
-}
-
-impl Registrations {
-    fn new() -> Self {
-        Self {
-            pending: ArrayQueue::new(1024),
-            has_pending: AtomicBool::new(false),
-        }
-    }
-
-    fn register(&self, mut consumer: Consumer<BATCH_SIZE, BATCHES, AllocatorEvent>) {
-        // Try sending the consumer to the collector until we succeed, as it should be checking
-        // `has_pending_registrations` to see if there's anything to process and then following up quickly... so if
-        // we're waiting here for a slot to open, all we can really do is wait out the blockade.
-        let backoff = Backoff::new();
-        while let Err(old_consumer) = self.pending.push(consumer) {
-            backoff.snooze();
-            consumer = old_consumer;
-        }
-
-        // Once we add it to the pending queue, we now mark `has_pending` for real.
-        self.has_pending.store(true, Ordering::Release);
-    }
-
-    fn has_pending_registrations(&self) -> bool {
-        self.has_pending.load(Ordering::Relaxed)
-    }
-
-    fn get_pending_registration(&self) -> Option<Consumer<BATCH_SIZE, BATCHES, AllocatorEvent>> {
-        let result = self.pending.pop();
-        if result.is_none() {
-            self.has_pending.store(false, Ordering::Release);
-        }
-
-        result
-    }
-}
-
-struct Collector {
-    consumers: Slab<Consumer<BATCH_SIZE, BATCHES, AllocatorEvent>>,
-    registrations: &'static Registrations,
-}
-
-impl Collector {
-    fn new() -> Self {
-        let registrations = get_registrations();
-
-        Self {
-            consumers: Slab::new(),
-            registrations,
-        }
-    }
-
-    fn run(&mut self) {
-        // Create two simple atomics for tracking the number of allocations and deallocations, and spawn a separate
-        // thread to print out those values on an interval.
-        let allocs = Arc::new(AtomicUsize::new(0));
-        let deallocs = Arc::new(AtomicUsize::new(0));
-
-        // Run the allocation reporter in the background.
-        //run_allocation_reporter(Arc::clone(&allocs), Arc::clone(&deallocs));
-
-        // We don't want to track allocator events here, because speed is the name of the game, and also, things could
-        // potentially get into a not-so-great feedback loop.
-        without_allocation_tracing(|| {
-            loop {
-                // Check if any consumers are pending registration.
-                if self.registrations.has_pending_registrations() {
-                    while let Some(consumer) = self.registrations.get_pending_registration() {
-                        self.consumers.insert(consumer);
-                    }
-                }
-
-                // Process all consumers, getting all outstanding events. We loop through every consumer at least once, and
-                // for any consumer that we get events back from, we'll try to immediately consume from it again. We don't
-                // consume until nothing is left, because we might otherwise get bottlenecked on a super busy consumer. We
-                // want to make sure that we service registrations in a timely fashion, because while we don't need to
-                // register a consumer before anything can be produced, the clock is one as soon as the registration is
-                // pending, and we need to register and start consuming before the channel fills up, which would then really
-                // screw things up for that thread. All allocations would be blocked, which is not good.
-                let mut local_allocs = 0;
-                let mut local_deallocs = 0;
-
-                let mut processor = |events: &[AllocatorEvent]| {
-                    for event in events {
-                        match event {
-                            AllocatorEvent::Allocation { .. } => local_allocs += 1,
-                            AllocatorEvent::Deallocation { .. } => local_deallocs += 1,
-                        }
-                    }
-                };
-
-                let mut loops = 0;
-                let mut should_sleep = false;
-                loop {
-                    // We need to force ourselves to yield temporarily so that we can check registrations, but we make
-                    // sure that we don't bother sleeping because we know if we looped this much, there's a lot of
-                    // allocator activity and we don't want to starve producers for writable chunks.
-                    if loops > 1000 {
-                        break;
-                    }
-
-                    // Loop over every consumer, trying to consume a readable chunk if one is available.
-                    let mut consumed = false;
-                    for (_, consumer) in self.consumers.iter_mut() {
-                        if consumer.try_consume(&mut processor).is_some() {
-                            consumed = true;
-                        }
-                    }
-
-                    // If we didn't get anything at all, break out early and briefly sleep.
-                    if !consumed {
-                        should_sleep = true;
-                        break;
-                    }
-
-                    loops += 1;
-                }
-
-                allocs.fetch_add(local_allocs, Ordering::Relaxed);
-                deallocs.fetch_add(local_deallocs, Ordering::Relaxed);
-
-                if should_sleep {
-                    // Sleep for a brief period.
-                    thread::sleep(Duration::from_millis(10));
-                }
-            }
-        });
-    }
-}
-
-#[allow(dead_code)]
-fn run_allocation_reporter(allocs: Arc<AtomicUsize>, deallocs: Arc<AtomicUsize>) {
-    let alloc_reporter = thread::Builder::new().name("vector-alloc-reporter".to_string());
-    alloc_reporter
-        .spawn(move || loop {
-            thread::sleep(Duration::from_secs(1));
-
-            info!(
-                total_allocations = allocs.load(Ordering::Relaxed),
-                total_deallocations = deallocs.load(Ordering::Relaxed),
-                "Allocator activity.",
-            );
-        })
-        .unwrap();
 }
 
 pub struct LocalProducerTracer;
 
 impl Tracer for LocalProducerTracer {
-    fn trace_allocation(&self, _wrapped_size: usize, _group_id: AllocationGroupId) {
-        with_local_event_producer(|producer| {
-            producer.write(AllocatorEvent::Allocation);
-        });
-    }
+    fn trace_allocation(&self, _wrapped_size: usize, _group_id: AllocationGroupId) {}
 
-    fn trace_deallocation(&self, _wrapped_size: usize, _source_group_id: AllocationGroupId) {
-        with_local_event_producer(|producer| {
-            producer.write(AllocatorEvent::Deallocation);
-        });
-    }
+    fn trace_deallocation(&self, _wrapped_size: usize, _source_group_id: AllocationGroupId) {}
 }
 
 /// Initializes allocation tracing.
 pub fn init_allocation_tracing() {
-    let mut collector = Collector::new();
-
-    let alloc_processor = thread::Builder::new().name("vector-alloc-processor".to_string());
-    alloc_processor.spawn(move || collector.run()).unwrap();
-
     enable_allocation_tracing();
 }
 

@@ -1,4 +1,4 @@
-use std::alloc::{handle_alloc_error, GlobalAlloc, Layout};
+use std::{alloc::{handle_alloc_error, GlobalAlloc, Layout}};
 
 use super::{
     is_allocation_tracing_enabled,
@@ -68,6 +68,11 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
                     // and that includes even if we just used the rule of "always attribute allocations to the root
                     // allocation group by default".
                     group_id_ptr.write(group_id.as_usize().get());
+                    let raw_group_id = group_id.as_usize().get();
+                    if raw_group_id > 1 {
+                        #[allow(clippy::print_stdout)]
+                        println!("Allocation group id: {}, size: {}",raw_group_id, wrapped_size);
+                    }
                     self.tracer.trace_allocation(wrapped_size, group_id);
                 },
             );
@@ -103,6 +108,10 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
                 try_with_suspended_allocation_group(
                     #[inline(always)]
                     |_| {
+                        if raw_group_id > 1 {
+                            #[allow(clippy::print_stdout)]
+                            println!("Deallocation group id: {} , size {}",raw_group_id, wrapped_size);
+                        }
                         self.tracer
                             .trace_deallocation(wrapped_size, source_group_id)
                     },
