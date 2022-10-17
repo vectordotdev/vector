@@ -1,4 +1,4 @@
-use std::{alloc::{handle_alloc_error, GlobalAlloc, Layout}};
+use std::alloc::{handle_alloc_error, GlobalAlloc, Layout};
 
 use super::{
     is_allocation_tracing_enabled,
@@ -71,7 +71,12 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
                     let raw_group_id = group_id.as_usize().get();
                     if raw_group_id > 1 {
                         #[allow(clippy::print_stdout)]
-                        println!("Allocation group id: {}, size: {}",raw_group_id, wrapped_size);
+                        {
+                            println!(
+                                "Allocation group id: {}, size: {}",
+                                raw_group_id, wrapped_size
+                            );
+                        }
                     }
                     self.tracer.trace_allocation(wrapped_size, group_id);
                 },
@@ -110,7 +115,12 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
                     |_| {
                         if raw_group_id > 1 {
                             #[allow(clippy::print_stdout)]
-                            println!("Deallocation group id: {} , size {}",raw_group_id, wrapped_size);
+                            {
+                                println!(
+                                    "Deallocation group id: {} , size {}",
+                                    raw_group_id, wrapped_size
+                                );
+                            }
                         }
                         self.tracer
                             .trace_deallocation(wrapped_size, source_group_id)
