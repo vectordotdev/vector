@@ -1,9 +1,10 @@
 use vector_config_common::attributes::CustomAttribute;
 
 use crate::{
+    num::NumberClass,
     schema::generate_number_schema,
     schemars::{gen::SchemaGenerator, schema::SchemaObject},
-    Configurable, GenerateError, Metadata, num::NumberClass,
+    Configurable, GenerateError, Metadata,
 };
 
 // Blanket implementation of `Configurable` for any `serde_with` helper that is also `Configurable`.
@@ -98,7 +99,10 @@ impl Configurable for serde_with::DurationSeconds<f64, serde_with::formats::Stri
             metadata.set_description(description);
         }
 
-        metadata.add_custom_attribute(CustomAttribute::kv("numeric_type", NumberClass::FloatingPoint));
+        metadata.add_custom_attribute(CustomAttribute::kv(
+            "numeric_type",
+            NumberClass::FloatingPoint,
+        ));
 
         metadata
     }

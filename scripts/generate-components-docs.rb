@@ -840,7 +840,7 @@ component_bases = root_schema['definitions'].filter_map do |key, definition|
   component_base_type = get_schema_metadata(definition, 'component_base_type')
   { component_base_type => key } if component_types.include? component_base_type
 end
-                                            .reduce { |acc, item| nested_merge(acc, item) }
+.reduce { |acc, item| nested_merge(acc, item) }
 
 component_bases.each do |component_type, schema_name|
   render_and_import_base_component_schema(root_schema, schema_name, component_type)
@@ -852,7 +852,7 @@ all_components = root_schema['definitions'].filter_map do |key, definition|
   component_name = get_schema_metadata(definition, 'component_name')
   { component_type => { component_name => key } } if component_types.include? component_type
 end
-                                           .reduce { |acc, item| nested_merge(acc, item) }
+.reduce { |acc, item| nested_merge(acc, item) }
 
 all_components.each do |component_type, components|
   components.each do |component_name, schema_name|
