@@ -14,7 +14,7 @@ impl InternalEvent for ThrottleEventDiscarded {
         counter!(
             "events_discarded_total", 1,
             "key" => self.key,
-        );
+        ); // Deprecated.
 
         emit!(ComponentEventsDropped::<INTENTIONAL> {
             count: 1,
