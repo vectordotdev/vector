@@ -826,8 +826,7 @@ if ARGV.empty?
 end
 
 schema_path = ARGV[0]
-schema_file = File.open schema_path
-root_schema = JSON.parse schema_file
+root_schema = JSON.load_file schema_path
 
 component_types = %w[source transform sink]
 
