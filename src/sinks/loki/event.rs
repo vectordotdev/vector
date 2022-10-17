@@ -25,7 +25,7 @@ pub struct LokiBatchEncoder(pub LokiBatchEncoding);
 
 impl Encoder<LokiRecords> for LokiBatchEncoder {
     fn encode_input(&self, input: LokiRecords, writer: &mut dyn io::Write) -> io::Result<usize> {
-        let count = input.len();
+        let count = input.0.len();
         let batch = LokiBatch::from(input);
         let body = match self.0 {
             LokiBatchEncoding::Json => {
