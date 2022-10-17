@@ -42,7 +42,8 @@ Simply put, the tags representation will change from an alias into a newtype wra
 `indexmap` set to store the tag values. This newtype will hide the implementation details of the
 underlying storage from the callers. It will also add separate methods for inserting a new tag and
 replacing a tag set with a single value. The callers of the existing `insert` function will need to
-be audited to determine which use is intended at each call site.
+be audited to determine which use is intended at each call site. The tag values themselves are
+stored as optional strings, in which the `None` value represents a bare tag.
 
 ```rust
 type TagValue = Option<String>;
