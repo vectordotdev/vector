@@ -40,8 +40,6 @@ configuration: {
 		expire_metrics: {
 			common: false
 			description: """
-				Deprecated, please use `expire_metric_secs` instead.
-
 				If set, Vector will configure the internal metrics system to automatically
 				remove all metrics that have not been updated in the given time.
 				This value must be positive.
