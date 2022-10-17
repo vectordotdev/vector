@@ -25,7 +25,7 @@ impl<const INTENTIONAL: bool> InternalEvent for ComponentEventsDropped<INTENTION
         } else {
             error!(
                 message,
-                intentional = INTENTIONAL,
+                intentional = UNINTENTIONAL,
                 reason = self.reason,
                 count = self.count,
                 internal_log_rate_secs = true,
