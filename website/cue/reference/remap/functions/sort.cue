@@ -40,7 +40,7 @@ remap: functions: sort: {
 		{
 			title: "reverse sort an array"
 			source: """
-				sort([2, 1, 3])
+				sort([2, 1, 3], reverse: true)
 				"""
 			return: [3, 2, 1]
 		},
