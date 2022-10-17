@@ -229,7 +229,7 @@ impl<T: Ord + Clone> Collection<T> {
                 }
             } else if !overwrite {
                 // other is missing this field, which returns null
-                self_kind.add_null();
+                self_kind.add_undefined();
             }
         }
 
@@ -246,7 +246,7 @@ impl<T: Ord + Clone> Collection<T> {
         } else {
             for (key, other_kind) in other.known {
                 // self is missing this field, which returns null
-                self.known.insert(key, other_kind.or_null());
+                self.known.insert(key, other_kind.or_undefined());
             }
         }
         self.unknown.merge(other.unknown, overwrite);
@@ -530,8 +530,8 @@ mod tests {
                     other: Collection::from(BTreeMap::from([("bar", Kind::bytes())])),
                     overwrite: false,
                     want: Collection::from(BTreeMap::from([
-                        ("foo", Kind::integer().or_null()),
-                        ("bar", Kind::bytes().or_null()),
+                        ("foo", Kind::integer().or_undefined()),
+                        ("bar", Kind::bytes().or_undefined()),
                     ])),
                 },
             ),
@@ -558,7 +558,7 @@ mod tests {
                     overwrite: false,
                     want: Collection::from(BTreeMap::from([
                         ("foo", Kind::integer().or_bytes()),
-                        ("bar", Kind::boolean().or_null()),
+                        ("bar", Kind::boolean().or_undefined()),
                     ])),
                 },
             ),

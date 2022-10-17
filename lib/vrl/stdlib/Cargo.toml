@@ -39,7 +39,7 @@ sha-1 = { version = "0.10", optional = true }
 sha-2 = { package = "sha2", version = "0.10", optional = true }
 sha-3 = { package = "sha3", version = "0.10", optional = true }
 strip-ansi-escapes = { version = "0.1", optional = true }
-syslog_loose = { version = "0.17", optional = true }
+syslog_loose = { version = "0.18", optional = true }
 tracing = { version = "0.1", optional = true }
 url = { version = "2", optional = true }
 uuid = { version = "1", features = ["v4"], optional = true }
@@ -147,6 +147,7 @@ default = [
     "parse_aws_cloudwatch_log_subscription_message",
     "parse_aws_vpc_flow_log",
     "parse_apache_log",
+    "parse_cef",
     "parse_common_log",
     "parse_csv",
     "parse_duration",
@@ -291,6 +292,7 @@ parse_aws_alb_log = ["dep:nom"]
 parse_aws_cloudwatch_log_subscription_message = ["dep:serde_json", "vector-common/aws_cloudwatch_logs_subscription", "dep:chrono"]
 parse_aws_vpc_flow_log = []
 parse_common_log = ["dep:chrono", "dep:once_cell", "dep:regex", "vector-common/conversion"]
+parse_cef = ["parse_key_value"]
 parse_csv = ["dep:csv"]
 parse_duration = ["dep:rust_decimal", "dep:once_cell", "dep:regex"]
 parse_glog = ["dep:chrono", "dep:once_cell", "dep:regex"]

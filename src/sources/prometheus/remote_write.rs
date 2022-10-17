@@ -15,8 +15,7 @@ use crate::{
     serde::bool_or_struct,
     sources::{
         self,
-        http::HttpMethod,
-        util::{decode, ErrorMessage, HttpSource, HttpSourceAuthConfig},
+        util::{decode, http::HttpMethod, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     },
     tls::TlsEnableableConfig,
 };

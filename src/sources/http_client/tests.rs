@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use tokio::time::Duration;
 use warp::{http::HeaderMap, Filter};
 
+use crate::sources::util::http::HttpMethod;
 use crate::{serde::default_decoding, serde::default_framing_message_based};
 use codecs::decoding::{
     CharacterDelimitedDecoderOptions, DeserializerConfig, FramingConfig,
@@ -9,7 +10,7 @@ use codecs::decoding::{
 };
 use vector_core::event::Event;
 
-use super::HttpScrapeConfig;
+use super::HttpClientConfig;
 use crate::test_util::{
     components::{run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS},
     next_addr, test_generate_config, wait_for_tcp,
@@ -18,7 +19,7 @@ use crate::test_util::{
 pub(crate) const INTERVAL_SECS: u64 = 1;
 
 /// The happy path should yield at least one event and must emit the required internal events for sources.
-pub(crate) async fn run_compliance(config: HttpScrapeConfig) -> Vec<Event> {
+pub(crate) async fn run_compliance(config: HttpClientConfig) -> Vec<Event> {
     let events =
         run_and_assert_source_compliance(config, Duration::from_secs(3), &HTTP_PULL_SOURCE_TAGS)
             .await;
@@ -29,8 +30,8 @@ pub(crate) async fn run_compliance(config: HttpScrapeConfig) -> Vec<Event> {
 }
 
 #[test]
-fn http_scrape_generate_config() {
-    test_generate_config::<HttpScrapeConfig>();
+fn http_client_generate_config() {
+    test_generate_config::<HttpClientConfig>();
 }
 
 /// Bytes should be decoded and HTTP header set to text/plain.
@@ -45,13 +46,14 @@ async fn bytes_decoding() {
 
     tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
 
-    run_compliance(HttpScrapeConfig {
+    run_compliance(HttpClientConfig {
         endpoint: format!("http://{}/endpoint", in_addr),
         scrape_interval_secs: INTERVAL_SECS,
         query: HashMap::new(),
         decoding: default_decoding(),
         framing: default_framing_message_based(),
         headers: HashMap::new(),
+        method: HttpMethod::Get,
         tls: None,
         auth: None,
         log_namespace: None,
@@ -72,7 +74,7 @@ async fn json_decoding_newline_delimited() {
     tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
     wait_for_tcp(in_addr).await;
 
-    run_compliance(HttpScrapeConfig {
+    run_compliance(HttpClientConfig {
         endpoint: format!("http://{}/endpoint", in_addr),
         scrape_interval_secs: INTERVAL_SECS,
         query: HashMap::new(),
@@ -81,6 +83,7 @@ async fn json_decoding_newline_delimited() {
             newline_delimited: NewlineDelimitedDecoderOptions::default(),
         },
         headers: HashMap::new(),
+        method: HttpMethod::Get,
         tls: None,
         auth: None,
         log_namespace: None,
@@ -101,7 +104,7 @@ async fn json_decoding_character_delimited() {
     tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
     wait_for_tcp(in_addr).await;
 
-    run_compliance(HttpScrapeConfig {
+    run_compliance(HttpClientConfig {
         endpoint: format!("http://{}/endpoint", in_addr),
         scrape_interval_secs: INTERVAL_SECS,
         query: HashMap::new(),
@@ -113,6 +116,7 @@ async fn json_decoding_character_delimited() {
             },
         },
         headers: HashMap::new(),
+        method: HttpMethod::Get,
         tls: None,
         auth: None,
         log_namespace: None,
@@ -132,7 +136,7 @@ async fn request_query_applied() {
     tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
     wait_for_tcp(in_addr).await;
 
-    let events = run_compliance(HttpScrapeConfig {
+    let events = run_compliance(HttpClientConfig {
         endpoint: format!("http://{}/endpoint?key1=val1", in_addr),
         scrape_interval_secs: INTERVAL_SECS,
         query: HashMap::from([
@@ -145,6 +149,7 @@ async fn request_query_applied() {
         decoding: DeserializerConfig::Json,
         framing: default_framing_message_based(),
         headers: HashMap::new(),
+        method: HttpMethod::Get,
         tls: None,
         auth: None,
         log_namespace: None,
@@ -199,7 +204,7 @@ async fn headers_applied() {
     tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
     wait_for_tcp(in_addr).await;
 
-    run_compliance(HttpScrapeConfig {
+    run_compliance(HttpClientConfig {
         endpoint: format!("http://{}/endpoint", in_addr),
         scrape_interval_secs: INTERVAL_SECS,
         query: HashMap::new(),
@@ -209,6 +214,7 @@ async fn headers_applied() {
             "f00".to_string(),
             vec!["bazz".to_string(), "bizz".to_string()],
         )]),
+        method: HttpMethod::Get,
         auth: None,
         tls: None,
         log_namespace: None,
@@ -229,13 +235,14 @@ async fn accept_header_override() {
     tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
     wait_for_tcp(in_addr).await;
 
-    run_compliance(HttpScrapeConfig {
+    run_compliance(HttpClientConfig {
         endpoint: format!("http://{}/endpoint", in_addr),
         scrape_interval_secs: INTERVAL_SECS,
         query: HashMap::new(),
         decoding: DeserializerConfig::Bytes,
         framing: default_framing_message_based(),
         headers: HashMap::from([("ACCEPT".to_string(), vec!["application/json".to_string()])]),
+        method: HttpMethod::Get,
         auth: None,
         tls: None,
         log_namespace: None,

@@ -1,7 +1,7 @@
 # result: {
 #    "object": {
-#       "x": { "boolean": true, "null": true },
-#       "y": { "bytes": true, "null": true }
+#       "x": { "boolean": true, "undefined": true },
+#       "y": { "bytes": true, "undefined": true }
 #    }
 # }
 
