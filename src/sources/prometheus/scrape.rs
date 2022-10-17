@@ -16,9 +16,9 @@ use crate::{
     internal_events::PrometheusParseError,
     sources::{
         self,
-        util::http_scrape::{
-            build_url, default_scrape_interval_secs, http_scrape, GenericHttpScrapeInputs,
-            HttpScraperBuilder, HttpScraperContext,
+        util::http_client::{
+            build_url, call, default_scrape_interval_secs, GenericHttpClientInputs,
+            HttpClientBuilder, HttpClientContext,
         },
     },
     tls::{TlsConfig, TlsSettings},
@@ -122,7 +122,7 @@ impl SourceConfig for PrometheusScrapeConfig {
             endpoint_tag: self.endpoint_tag.clone(),
         };
 
-        let inputs = GenericHttpScrapeInputs {
+        let inputs = GenericHttpClientInputs {
             urls,
             interval_secs: self.scrape_interval_secs,
             headers: HashMap::new(),
@@ -133,7 +133,7 @@ impl SourceConfig for PrometheusScrapeConfig {
             shutdown: cx.shutdown,
         };
 
-        Ok(http_scrape(inputs, builder, cx.out, HttpMethod::Get).boxed())
+        Ok(call(inputs, builder, cx.out, HttpMethod::Get).boxed())
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
@@ -173,7 +173,7 @@ struct PrometheusScrapeBuilder {
     endpoint_tag: Option<String>,
 }
 
-impl HttpScraperBuilder for PrometheusScrapeBuilder {
+impl HttpClientBuilder for PrometheusScrapeBuilder {
     type Context = PrometheusScrapeContext;
 
     /// Expands the context with the instance info and endpoint info for the current request.
@@ -212,7 +212,7 @@ struct PrometheusScrapeContext {
     endpoint_info: Option<EndpointInfo>,
 }
 
-impl HttpScraperContext for PrometheusScrapeContext {
+impl HttpClientContext for PrometheusScrapeContext {
     /// Parses the Prometheus HTTP response into metric events
     fn on_response(&mut self, url: &Uri, _header: &Parts, body: &Bytes) -> Option<Vec<Event>> {
         let body = String::from_utf8_lossy(body);

@@ -27,7 +27,7 @@ lookup = { path = "../lookup", features = ["arbitrary"] }
 metrics = "0.20.1"
 metrics-tracing-context = { version = "0.12.0", default-features = false }
 metrics-util = { version = "0.14.0", default-features = false, features = ["registry"] }
-mlua = { version = "0.8.3", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
+mlua = { version = "0.8.4", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 no-proxy = { version  = "0.3.2", default-features = false, features = ["serialize"] }
 once_cell = { version = "1.15", default-features = false }
 openssl = { version = "0.10.42", default-features = false, features = ["vendored"] }
@@ -40,9 +40,9 @@ prost = { version = "0.11.0", default-features = false, features = ["std"] }
 quanta = { version = "0.10.1", default-features = false }
 regex = { version = "1.6.0", default-features = false, features = ["std", "perf"] }
 serde = { version = "1.0.145", default-features = false, features = ["derive", "rc"] }
-serde_json = { version = "1.0.85", default-features = false }
+serde_json = { version = "1.0.86", default-features = false }
 serde_with = { version = "2.0.1", default-features = false, features = ["std", "macros"] }
-snafu = { version = "0.7.1", default-features = false }
+snafu = { version = "0.7.2", default-features = false }
 socket2 = { version = "0.4.7", default-features = false }
 tokio = { version = "1.21.2", default-features = false, features = ["net"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
