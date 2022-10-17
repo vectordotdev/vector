@@ -234,7 +234,7 @@ impl MetricMetadata {
 
     /// Whether or not the referenced metric has expired yet.
     pub fn has_expired(&self, now: Instant) -> bool {
-        self.expires_at >= now
+        now >= self.expires_at
     }
 }
 
