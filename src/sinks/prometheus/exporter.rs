@@ -14,7 +14,7 @@ use hyper::{
     service::{make_service_fn, service_fn},
     Body, Method, Request, Response, Server, StatusCode,
 };
-use indexmap::IndexMap;
+use indexmap::{map::Entry, IndexMap};
 use serde_with::serde_as;
 use snafu::Snafu;
 use stream_cancel::{Trigger, Tripwire};
@@ -234,7 +234,7 @@ impl MetricMetadata {
 
     /// Whether or not the referenced metric has expired yet.
     pub fn has_expired(&self, now: Instant) -> bool {
-        self.expires_at >= now
+        now >= self.expires_at
     }
 }
 
@@ -540,16 +540,15 @@ impl StreamSink<Event> for PrometheusExporter {
 
                 let mut metrics = self.metrics.write().unwrap();
 
-                let metrics_to_expire = metrics
-                    .iter()
-                    .filter(|(_, (_, metadata))| !metadata.has_expired(last_flush))
-                    .map(|(metric_ref, _)| metric_ref.clone())
-                    .collect::<Vec<_>>();
-
-                for metric_ref in metrics_to_expire {
-                    metrics.remove(&metric_ref);
-                    normalizer.get_state_mut().remove(&metric_ref.series);
-                }
+                let normalizer_mut = normalizer.get_state_mut();
+                metrics.retain(|metric_ref, (_, metadata)| {
+                    if metadata.has_expired(last_flush) {
+                        normalizer_mut.remove(&metric_ref.series);
+                        false
+                    } else {
+                        true
+                    }
+                });
             }
 
             // Now process the metric we got.
@@ -567,14 +566,14 @@ impl StreamSink<Event> for PrometheusExporter {
                 // metric, update its expiration deadline, otherwise, start tracking it.
                 let mut metrics = self.metrics.write().unwrap();
 
-                let metric_ref = MetricRef::from_metric(&normalized);
-                match metrics.get_mut(&metric_ref) {
-                    Some((data, metadata)) => {
+                match metrics.entry(MetricRef::from_metric(&normalized)) {
+                    Entry::Occupied(mut entry) => {
+                        let (data, metadata) = entry.get_mut();
                         *data = normalized;
                         metadata.refresh();
                     }
-                    None => {
-                        metrics.insert(metric_ref, (normalized, MetricMetadata::new(flush_period)));
+                    Entry::Vacant(entry) => {
+                        entry.insert((normalized, MetricMetadata::new(flush_period)));
                     }
                 }
                 finalizers.update_status(EventStatus::Delivered);
