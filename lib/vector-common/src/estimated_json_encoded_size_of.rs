@@ -127,6 +127,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 ///
 /// Additionally, the serializer assumes the type is serialized to a JSON-encoded string using the
 /// `serde_json` crate, which internally uses the `ryu` crate to encode floating point types.
+#[derive(Default)]
 pub struct Serializer {
     bytes: usize,
     start_collection: bool,
@@ -143,11 +144,7 @@ pub fn estimated_size_of<T>(value: &T) -> usize
 where
     T: Serialize,
 {
-    let mut serializer = Serializer {
-        bytes: 0,
-        start_collection: false,
-    };
-
+    let mut serializer = Serializer::default();
     _ = value.serialize(&mut serializer);
     serializer.bytes
 }
