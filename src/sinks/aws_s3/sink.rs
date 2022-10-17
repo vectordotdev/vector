@@ -12,6 +12,7 @@ use crate::{
     sinks::{
         s3_common::{
             config::S3Options,
+            partitioner::S3PartitionKey,
             service::{S3Metadata, S3Request},
         },
         util::{request_builder::EncodeResult, Compression, RequestBuilder},
@@ -29,7 +30,7 @@ pub struct S3RequestOptions {
     pub compression: Compression,
 }
 
-impl RequestBuilder<(String, Vec<Event>)> for S3RequestOptions {
+impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for S3RequestOptions {
     type Metadata = S3Metadata;
     type Events = Vec<Event>;
     type Encoder = (Transformer, Encoder<Framer>);
@@ -45,11 +46,14 @@ impl RequestBuilder<(String, Vec<Event>)> for S3RequestOptions {
         &self.encoder
     }
 
-    fn split_input(&self, input: (String, Vec<Event>)) -> (Self::Metadata, Self::Events) {
+    fn split_input(&self, input: (S3PartitionKey, Vec<Event>)) -> (Self::Metadata, Self::Events) {
         let (partition_key, mut events) = input;
         let finalizers = events.take_finalizers();
+        let s3_key_prefix = partition_key.key_prefix.clone();
+
         let metadata = S3Metadata {
             partition_key,
+            s3_key: s3_key_prefix,
             count: events.len(),
             byte_size: events.size_of(),
             finalizers,
@@ -71,19 +75,24 @@ impl RequestBuilder<(String, Vec<Event>)> for S3RequestOptions {
                 .unwrap_or_else(|| formatted_ts.to_string())
         };
 
+        let ssekms_key_id = metadata.partition_key.ssekms_key_id.clone();
+        let mut s3_options = self.api_options.clone();
+        s3_options.ssekms_key_id = ssekms_key_id;
+
         let extension = self
             .filename_extension
             .as_ref()
             .cloned()
             .unwrap_or_else(|| self.compression.extension().into());
-        metadata.partition_key = format!("{}{}.{}", metadata.partition_key, filename, extension);
+
+        metadata.s3_key = format!("{}{}.{}", metadata.s3_key, filename, extension);
 
         S3Request {
             body: payload.into_payload(),
             bucket: self.bucket.clone(),
             metadata,
             content_encoding: self.compression.content_encoding(),
-            options: self.api_options.clone(),
+            options: s3_options,
         }
     }
 }

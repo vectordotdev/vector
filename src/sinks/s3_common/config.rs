@@ -69,6 +69,7 @@ pub struct S3Options {
     /// Only applies when `server_side_encryption` is configured to use KMS.
     ///
     /// If not specified, Amazon S3 uses the AWS managed CMK in AWS to protect the data.
+    #[configurable(metadata(templateable))]
     pub ssekms_key_id: Option<String>,
 
     /// The storage class for the created objects.
