@@ -237,7 +237,7 @@ impl<'a> Container<'a> {
                     default_value,
                     data,
                     virtual_newtype,
-                    tagging: is_enum.then(move || tagging),
+                    tagging: is_enum.then_some(tagging),
                     attrs,
                 };
 
