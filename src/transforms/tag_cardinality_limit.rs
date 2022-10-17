@@ -320,7 +320,7 @@ mod tests {
         )
     }
 
-    fn make_transform_hashset(
+    const fn make_transform_hashset(
         value_limit: u32,
         limit_exceeded_action: LimitExceededAction,
     ) -> TagCardinalityLimitConfig {
@@ -331,7 +331,7 @@ mod tests {
         }
     }
 
-    fn make_transform_bloom(
+    const fn make_transform_bloom(
         value_limit: u32,
         limit_exceeded_action: LimitExceededAction,
     ) -> TagCardinalityLimitConfig {
@@ -371,9 +371,9 @@ mod tests {
             let (tx, rx) = mpsc::channel(1);
             let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
 
-            tx.send(event1.clone().into()).await.unwrap();
-            tx.send(event2.clone().into()).await.unwrap();
-            tx.send(event3.clone().into()).await.unwrap();
+            tx.send(event1.clone()).await.unwrap();
+            tx.send(event2.clone()).await.unwrap();
+            tx.send(event3.clone()).await.unwrap();
 
             let new_event1 = out.recv().await;
             let new_event2 = out.recv().await;
@@ -430,9 +430,9 @@ mod tests {
             let (tx, rx) = mpsc::channel(1);
             let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
 
-            tx.send(event1.clone().into()).await.unwrap();
-            tx.send(event2.clone().into()).await.unwrap();
-            tx.send(event3.clone().into()).await.unwrap();
+            tx.send(event1.clone()).await.unwrap();
+            tx.send(event2.clone()).await.unwrap();
+            tx.send(event3.clone()).await.unwrap();
 
             let new_event1 = out.recv().await;
             let new_event2 = out.recv().await;
@@ -499,9 +499,9 @@ mod tests {
             let (tx, rx) = mpsc::channel(1);
             let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
 
-            tx.send(event1.clone().into()).await.unwrap();
-            tx.send(event2.clone().into()).await.unwrap();
-            tx.send(event3.clone().into()).await.unwrap();
+            tx.send(event1.clone()).await.unwrap();
+            tx.send(event2.clone()).await.unwrap();
+            tx.send(event3.clone()).await.unwrap();
 
             let new_event1 = out.recv().await;
             let new_event2 = out.recv().await;
