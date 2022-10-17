@@ -35,7 +35,7 @@ impl Collection<Index> {
             .max()
     }
 
-    /// Converts a negative index to a positive index (only if the exact positive index is known)
+    /// Converts a negative index to a positive index (only if the exact positive index is known).
     #[must_use]
     pub fn get_positive_index(&self, index: isize) -> Option<usize> {
         if self.unknown_kind().contains_any_defined() {
@@ -72,7 +72,7 @@ impl Collection<Index> {
     }
 
     /// Removes the known value at the given index and shifts the
-    /// elements to the left
+    /// elements to the left.
     pub fn remove_shift(&mut self, index: usize) {
         let min_length = self.min_length();
         self.known_mut().remove(&index.into());

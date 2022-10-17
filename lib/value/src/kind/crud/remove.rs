@@ -239,7 +239,7 @@ impl CompactOptions {
         )
     }
 
-    /// If the value is true, the `should_compact` option is set to false
+    /// If the value is true, the `should_compact` option is set to false.
     fn disable_should_compact(self, value: bool) -> Self {
         if value {
             Self::Never

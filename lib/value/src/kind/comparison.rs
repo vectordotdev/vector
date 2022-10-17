@@ -400,7 +400,7 @@ impl Kind {
         self.object.is_some() || self.is_never()
     }
 
-    /// Returns `true` if the type contains _at least_ one non-collection type
+    /// Returns `true` if the type contains _at least_ one non-collection type.
     #[must_use]
     pub const fn contains_primitive(&self) -> bool {
         self.bytes.is_some()
