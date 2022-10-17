@@ -16,6 +16,43 @@ use crate::{
     tls::{TlsConfig, TlsSettings},
 };
 
+/// Loki-specific compression.
+#[configurable_component]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum ExtendedCompression {
+    /// Snappy compression.
+    ///
+    /// This implies sending push requests as Protocol Buffers.
+    #[serde(rename = "snappy")]
+    Snappy,
+}
+
+/// Compose with basic compression and Loki-specific compression.
+#[configurable_component]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[serde(untagged)]
+pub enum CompressionConfigAdapter {
+    /// Basic compression.
+    Original(#[configurable(derived)] Compression),
+    /// Loki-specific compression.
+    Extended(#[configurable(derived)] ExtendedCompression),
+}
+
+impl CompressionConfigAdapter {
+    pub const fn content_encoding(self) -> Option<&'static str> {
+        match self {
+            CompressionConfigAdapter::Original(compression) => compression.content_encoding(),
+            CompressionConfigAdapter::Extended(_) => Some("snappy"),
+        }
+    }
+}
+
+impl Default for CompressionConfigAdapter {
+    fn default() -> Self {
+        CompressionConfigAdapter::Extended(ExtendedCompression::Snappy)
+    }
+}
+
 /// Configuration for the `loki` sink.
 #[configurable_component(sink("loki"))]
 #[derive(Clone, Debug)]
@@ -61,7 +98,7 @@ pub struct LokiConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub compression: Compression,
+    pub compression: CompressionConfigAdapter,
 
     #[configurable(derived)]
     #[serde(default)]

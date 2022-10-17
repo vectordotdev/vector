@@ -27,19 +27,19 @@ impl Service<AzureBlobRequest> for AzureBlobService {
     type Error = Box<dyn std::error::Error + std::marker::Send + std::marker::Sync>;
     type Future = BoxFuture<'static, StdResult<Self::Response, Self::Error>>;
 
+    // Emission of an internal event in case of errors is handled upstream by the caller.
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<StdResult<(), Self::Error>> {
-        // Emission of Error internal event is handled upstream by the caller
         Poll::Ready(Ok(()))
     }
 
+    // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, request: AzureBlobRequest) -> Self::Future {
-        // Emission of Error internal event is handled upstream by the caller
         let this = self.clone();
 
         Box::pin(async move {
             let client = this
                 .client
-                .as_blob_client(request.metadata.partition_key.as_str());
+                .blob_client(request.metadata.partition_key.as_str());
             let byte_size = request.blob_data.len();
             let blob = client
                 .put_block_blob(request.blob_data)
@@ -50,9 +50,10 @@ impl Service<AzureBlobRequest> for AzureBlobService {
             };
 
             let result = blob
-                .execute()
+                .into_future()
                 .instrument(info_span!("request").or_current())
-                .await;
+                .await
+                .map_err(|err| err.into());
 
             result.map(|inner| AzureBlobResponse {
                 inner,

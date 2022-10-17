@@ -72,7 +72,7 @@ jobs:
           - test: 'fluent'
           - test: 'gcp'
           - test: 'humio'
-          - test: 'http-scrape'
+          - test: 'http-client'
           - test: 'influxdb'
           - test: 'kafka'
           - test: 'logstash'

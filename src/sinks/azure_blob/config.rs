@@ -48,7 +48,7 @@ pub struct AzureBlobSinkConfig {
     /// [env_cred_docs]: https://docs.rs/azure_identity/latest/azure_identity/struct.EnvironmentCredential.html
     /// [managed_ident_docs]: https://docs.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/overview
     /// [az_cli_docs]: https://docs.microsoft.com/en-us/cli/azure/account?view=azure-cli-latest#az-account-get-access-token
-    pub storage_account: Option<SensitiveString>,
+    pub storage_account: Option<String>,
 
     /// The Azure Blob Storage Account container name.
     pub(super) container_name: String,
@@ -117,7 +117,7 @@ impl GenerateConfig for AzureBlobSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             connection_string: Some(String::from("DefaultEndpointsProtocol=https;AccountName=some-account-name;AccountKey=some-account-key;").into()),
-            storage_account: Some(String::from("some-account-name").into()),
+            storage_account: Some(String::from("some-account-name")),
             container_name: String::from("logs"),
             blob_prefix: Some(String::from("blob")),
             blob_time_format: Some(String::from("%s")),

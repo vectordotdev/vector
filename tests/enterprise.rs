@@ -1,6 +1,6 @@
 #![cfg(feature = "enterprise-tests")]
 
-use std::{env, path::PathBuf, str::FromStr, thread};
+use std::{env, path::PathBuf, thread};
 
 use http::StatusCode;
 
@@ -46,8 +46,8 @@ fn get_root_opts(config_path: PathBuf) -> RootOpts {
         verbose: 0,
         quiet: 3,
         internal_log_rate_limit: 10,
-        log_format: LogFormat::from_str("text").unwrap(),
-        color: Color::from_str("auto").unwrap(),
+        log_format: LogFormat::Text,
+        color: Color::Auto,
         watch_config: false,
     }
 }
@@ -60,7 +60,7 @@ fn get_root_opts(config_path: PathBuf) -> RootOpts {
 /// without prior approval.
 #[tokio::test]
 async fn vector_continues_on_reporting_error() {
-    let _ = vector::metrics::init_test();
+    vector::metrics::init_test();
 
     let server = build_test_server_error_and_recover(StatusCode::NOT_IMPLEMENTED).await;
     let endpoint = server.uri();
@@ -99,7 +99,7 @@ async fn vector_continues_on_reporting_error() {
 
 #[tokio::test]
 async fn vector_does_not_start_with_enterprise_misconfigured() {
-    let _ = vector::metrics::init_test();
+    vector::metrics::init_test();
 
     let server = build_test_server_error_and_recover(StatusCode::NOT_IMPLEMENTED).await;
     let endpoint = server.uri();

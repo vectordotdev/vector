@@ -591,9 +591,14 @@ mod tests {
             LogEvent, Metric, Value,
         },
         schema,
-        test_util::components::{init_test, COMPONENT_MULTIPLE_OUTPUTS_TESTS},
+        test_util::components::{
+            assert_transform_compliance, init_test, COMPONENT_MULTIPLE_OUTPUTS_TESTS,
+        },
+        transforms::test::create_topology,
         transforms::OutputBuffer,
     };
+    use tokio::sync::mpsc;
+    use tokio_stream::wrappers::ReceiverStream;
 
     fn test_default_schema_definition() -> schema::Definition {
         schema::Definition::empty_legacy_namespace().with_field(
@@ -1398,5 +1403,27 @@ mod tests {
             (None, Some(bad)) => Err(bad),
             (a, b) => panic!("expected output xor error output, got {:?} and {:?}", a, b),
         }
+    }
+
+    #[tokio::test]
+    async fn emits_internal_events() {
+        assert_transform_compliance(async move {
+            let config = RemapConfig {
+                source: Some("abort".to_owned()),
+                drop_on_abort: true,
+                ..Default::default()
+            };
+
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
+
+            let log = LogEvent::from("hello world");
+            tx.send(log.into()).await.unwrap();
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await
     }
 }

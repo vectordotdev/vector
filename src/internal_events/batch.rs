@@ -19,9 +19,9 @@ impl InternalEvent for LargeEventDroppedError {
             message = "Event larger than batch max_bytes.",
             batch_max_bytes = %self.max_length,
             length = %self.length,
-            internal_log_rate_limit = true,
             error_type = error_type::CONDITION_FAILED,
             stage = error_stage::SENDING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
