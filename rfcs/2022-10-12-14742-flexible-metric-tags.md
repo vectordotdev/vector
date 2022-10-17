@@ -28,12 +28,12 @@ that Vector's data model cannot currently represent. This is causing problems fo
 that want to add Vector to their observability pipelines but cannot do so because it would cause
 data loss. Those sources include:
 
-* `datadog_agent` natively stores tags as bare strings, with optional values separated from the name
+- `datadog_agent` natively stores tags as bare strings, with optional values separated from the name
   by a colon.
-* The Prometheus text encoding used by the `prometheus_scrape` source and `prometheus_exporter` sink
+- The Prometheus text encoding used by the `prometheus_scrape` source and `prometheus_exporter` sink
   can support both repeated tag names and bare tags (without a value).
-* The Prometheus `remote_write` encoding similarly supports repeated tag names.
-* OpenTelemetry attributes support keys having arrays of values, which corresponds to repeated tags.
+- The Prometheus `remote_write` encoding similarly supports repeated tag names.
+- OpenTelemetry attributes support keys having arrays of values, which corresponds to repeated tags.
 
 ## Proposal
 
