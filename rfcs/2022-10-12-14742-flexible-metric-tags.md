@@ -42,32 +42,6 @@ data loss. Those sources include:
 This change should be effectively invisible to users of Vector, except for incoming data with
 multiple tags with the same name, which will now have all the tags reproduced when it reaches sinks.
 
-### Implementation
-
-#### Internal Representation
-
-Simply put, the tags representation will change from an alias into a newtype wrapper using an
-`indexmap` set to store the tag values. This newtype will hide the implementation details of the
-underlying storage from the callers. It will also add separate methods for inserting a new tag and
-replacing a tag set with a single value. The callers of the existing `insert` function will need to
-be audited to determine which use is intended at each call site. The tag values themselves are
-stored as optional strings, in which the `None` value represents a bare tag.
-
-```rust
-type TagValue = Option<String>;
-
-struct MetricTags(BTreeMap<String, indexmap::IndexSet<TagValue>>);
-
-impl MetricTags {
-    // Insert returns the value unchanged if the exact (tag,value) pair already exists,
-    // otherwise it inserts a new value for the named tag.
-    fn insert(&mut self, name: String, value: TagValue) -> Option<TagValue>;
-
-    // Replace returns all the existing values when overwriting a tag.
-    fn replace(&mut self, name: String, value: Option<TagValue>) -> Option<IndexSet<TagValue>>;
-}
-```
-
 #### External Representation
 
 The existing Protobuf representation of metric tags has a map of string-to-string pairs of
@@ -104,7 +78,45 @@ strings or `null` for tags with more than one value.
 }
 ```
 
+### Implementation
+
+Simply put, the tags representation will change from an alias into a newtype wrapper using an
+`indexmap` set to store the tag values. This newtype will hide the implementation details of the
+underlying storage from the callers. It will also add separate methods for inserting a new tag and
+replacing a tag set with a single value. The callers of the existing `insert` function will need to
+be audited to determine which use is intended at each call site. The tag values themselves are
+stored as optional strings, in which the `None` value represents a bare tag.
+
+```rust
+type TagValue = Option<String>;
+
+struct MetricTags(BTreeMap<String, indexmap::IndexSet<TagValue>>);
+
+impl MetricTags {
+    // Insert returns the value unchanged if the exact (tag,value) pair already exists,
+    // otherwise it inserts a new value for the named tag.
+    fn insert(&mut self, name: String, value: TagValue) -> Option<TagValue>;
+
+    // Replace returns all the existing values when overwriting a tag.
+    fn replace(&mut self, name: String, value: Option<TagValue>) -> Option<IndexSet<TagValue>>;
+}
+```
+
 ## Rationale
+
+The guiding rationale for all of the external changes is to maximize backwards compatibility while
+adding support for the new functionality. This means that, where possible, Vector should accept all
+existing input data as-is using current formats, understanding that output representations will have
+to change to accomodate the new capabilities of the data set.
+
+The proposed Protobuf representation allows all possible combination of values for a tag set, and
+minimizes the encoded size in the presence of repeated tag names. It also requires no further
+parsing to separate out tag names from values. Since the existing `tags` element is a strict
+string-to-string map, we cannot enhance the value part of the map and so a new element is required.
+
+Similarly, the proposed native JSON encoding adds the necessary support while preserving backwards
+compatibility for existing data and minimizes the overhead when multiple tag values are not
+required.
 
 Changing the `MetricTags` type from an alias to a newtype wrapper allows us to provide better
 compatibility for existing uses while controlling the methods for uses that need to access all the
@@ -116,14 +128,6 @@ The use of an `IndexSet` for the tag value provides us with two useful invariant
    the output.
 1. The values can be retrieved in the order they first appeared, which allows us to trivially
    retrieve either the first or last stored value.
-
-The proposed Protobuf representation allows all possible combination of values for a tag set, and
-minimizes the encoded size in the presence of repeated tag names. It also requires no further
-parsing to separate out tag names from values.
-
-Similarly, the proposed native JSON encoding adds the necessary support while preserving backwards
-compatibility for existing data and minimizes the overhead when multiple tag values are not
-required.
 
 ## Drawbacks
 
@@ -139,6 +143,18 @@ the agent doesn't do anything more interesting with the tags than adding and rem
 which does not cover all our use cases.
 
 ## Alternatives
+
+### External Representation
+
+We could represent the tags in the Vector Protobuf definition as a simple array of strings, matching
+the source Datadog agent data. Where there are no repeated tag names, this is also the most size
+efficient representation. This, however, embeds the assumption that the separator is a particular
+character (an ASCII colon in this case) that cannot be represented in the tag name. It also requires
+parsing after the data is received to split the values into name-value pairs.
+
+We could also change the native JSON encoding to unconditionally output arrays for all tag values in
+order to simplify the encoding algorithm. However, given that we have to retain decoding for tags
+without the array values, we can make use of this form to reduce the complexity of the encoded data.
 
 ### Internal Representation
 
@@ -183,19 +199,6 @@ struct Tag {
 
 type MetricTags = MultiIndexTagMap;
 ```
-
-### External Representation
-
-Similar to the above alternatives, we could represent the tags in the Vector Protobuf definition as
-a simple array of strings, matching the source Datadog agent data. Where there are no repeated tag
-names, this is also the most size efficient representation. This, however, embeds the assumption
-that the separator is a particular character (an ASCII colon in this case) that cannot be
-represented in the tag name. It also requires parsing after the data is received to split the values
-into name-value pairs.
-
-We could also change the native JSON encoding to unconditionally output arrays for all tag values in
-order to simplify the encoding algorithm. However, given that we have to retain decoding for tags
-without the array values, we can make use of this form to reduce the complexity of the encoded data.
 
 ## Outstanding Questions
 
