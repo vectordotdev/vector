@@ -194,10 +194,12 @@ impl Service<Vec<Metric>> for InfluxDbSvc {
     type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
+    // Emission of Error internal event is handled upstream by the caller
     fn poll_ready(&mut self, cx: &mut std::task::Context) -> Poll<Result<(), Self::Error>> {
         self.inner.poll_ready(cx)
     }
 
+    // Emission of Error internal event is handled upstream by the caller
     fn call(&mut self, items: Vec<Metric>) -> Self::Future {
         let input = encode_events(
             self.protocol_version,
