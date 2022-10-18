@@ -37,10 +37,6 @@ impl VrlCompileResult {
     }
 }
 
-// TODO: return a diagnostic result if the user passed in vrl fails.
-// This will require us to create a struct that will mirror the json object the
-// function will receive upon executing failing code.
-
 #[derive(Deserialize, Serialize, Default)]
 pub struct VrlDiagnosticResult {
     pub list: Vec<String>,
@@ -64,6 +60,7 @@ impl VrlDiagnosticResult {
     }
 }
 
+// TODO: return diagnostic if fails upon compilation, currently being ignored
 fn compile(mut input: Input) -> Result<VrlCompileResult, VrlDiagnosticResult> {
     let event = &mut input.event;
     let functions = stdlib::all();
