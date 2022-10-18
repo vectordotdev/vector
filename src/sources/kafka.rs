@@ -14,7 +14,6 @@ use codecs::{
 use futures::{Stream, StreamExt};
 use once_cell::sync::OnceCell;
 
-
 use rdkafka::{
     consumer::{CommitMode, Consumer, ConsumerContext, Rebalance, StreamConsumer},
     error::KafkaError,
@@ -24,6 +23,7 @@ use rdkafka::{
 };
 
 use snafu::{ResultExt, Snafu};
+use tokio::sync::mpsc::{self, UnboundedSender};
 use tokio_util::codec::FramedRead;
 
 use vector_config::configurable_component;
@@ -242,15 +242,17 @@ async fn kafka_source(
     acknowledgements: bool,
 ) -> Result<(), ()> {
     let consumer = Arc::new(consumer);
-    let (finalizer, mut ack_stream) =
+    let (mut finalizer, mut ack_stream) =
         OrderedFinalizer::<FinalizerEntry>::maybe_new(acknowledgements, None);
-    let mut finalizer = finalizer.map(Arc::new);
-    if let Some(finalizer) = &finalizer {
+
+    let (tx_callbacks, mut rx_callbacks) = mpsc::unbounded_channel();
+
+    if let Some(_) = &finalizer {
         consumer
             .context()
-            .finalizer
-            .set(Arc::clone(finalizer))
-            .expect("Finalizer is only set once");
+            .callback_channel
+            .set(tx_callbacks)
+            .expect("callback_channel is only set once");
     }
 
     let mut stream = consumer.stream();
@@ -273,6 +275,12 @@ async fn kafka_source(
                     _ => break
                 }
             },
+            callback = rx_callbacks.recv() => match (callback, &finalizer) {
+                (Some(KafkaCallback::PartitionRevoked), Some(finalizer)) => {
+                    finalizer.flush();
+                },
+                _ => { /* noop */ }
+            },
             entry = ack_stream.next() => match entry {
                 Some((status, entry)) => {
                     if status == BatchStatus::Delivered {
@@ -286,7 +294,7 @@ async fn kafka_source(
                 None => break,
             },
             message = stream.next(), if !shutting_down => match message {
-                None => break,  // No more messages...but is this the correct way to handle it?
+                None => unreachable!("MessageStream never returns Ready(None)"),
                 Some(Err(error)) => emit!(KafkaReadError { error }),
                 Some(Ok(msg)) => {
                     emit!(KafkaBytesReceived {
@@ -319,7 +327,7 @@ async fn parse_message(
     msg: BorrowedMessage<'_>,
     decoder: Decoder,
     keys: Keys<'_>,
-    finalizer: &Option<Arc<OrderedFinalizer<FinalizerEntry>>>,
+    finalizer: &Option<OrderedFinalizer<FinalizerEntry>>,
     out: &mut SourceSender,
     consumer: &Arc<StreamConsumer<CustomContext>>,
 ) {
@@ -535,10 +543,15 @@ fn create_consumer(config: &KafkaSourceConfig) -> crate::Result<StreamConsumer<C
     Ok(consumer)
 }
 
+#[derive(Debug)]
+enum KafkaCallback {
+    PartitionRevoked,
+}
+
 #[derive(Default)]
 struct CustomContext {
     stats: kafka::KafkaStatisticsContext,
-    finalizer: OnceCell<Arc<OrderedFinalizer<FinalizerEntry>>>,
+    callback_channel: OnceCell<UnboundedSender<KafkaCallback>>,
 }
 
 impl ClientContext for CustomContext {
@@ -549,9 +562,13 @@ impl ClientContext for CustomContext {
 
 impl ConsumerContext for CustomContext {
     fn post_rebalance(&self, rebalance: &Rebalance) {
+        debug!("post_rebalance: {:#?}", rebalance);
         if matches!(rebalance, Rebalance::Revoke(_)) {
-            if let Some(finalizer) = self.finalizer.get() {
-                finalizer.flush();
+            if let Some(tx) = self.callback_channel.get() {
+                if let Err(error) = tx.send(KafkaCallback::PartitionRevoked) {
+                    // If the receiver has been dropped, we're shutting down already
+                    debug!("callback_channel sender error: {}", error);
+                }
             }
         }
     }
