@@ -295,8 +295,14 @@ mod tests {
     use super::*;
     use crate::{
         event::{metric, Event, Metric},
-        transforms::tag_cardinality_limit::{default_cache_size, BloomFilterConfig, Mode},
+        test_util::components::assert_transform_compliance,
+        transforms::{
+            tag_cardinality_limit::{default_cache_size, BloomFilterConfig, Mode},
+            test::create_topology,
+        },
     };
+    use tokio::sync::mpsc;
+    use tokio_stream::wrappers::ReceiverStream;
 
     #[test]
     fn generate_config() {
@@ -314,157 +320,200 @@ mod tests {
         )
     }
 
-    fn make_transform_hashset(
+    const fn make_transform_hashset(
         value_limit: u32,
         limit_exceeded_action: LimitExceededAction,
-    ) -> TagCardinalityLimit {
-        TagCardinalityLimit::new(TagCardinalityLimitConfig {
+    ) -> TagCardinalityLimitConfig {
+        TagCardinalityLimitConfig {
             value_limit,
             limit_exceeded_action,
             mode: Mode::Exact,
-        })
+        }
     }
 
-    fn make_transform_bloom(
+    const fn make_transform_bloom(
         value_limit: u32,
         limit_exceeded_action: LimitExceededAction,
-    ) -> TagCardinalityLimit {
-        TagCardinalityLimit::new(TagCardinalityLimitConfig {
+    ) -> TagCardinalityLimitConfig {
+        TagCardinalityLimitConfig {
             value_limit,
             limit_exceeded_action,
             mode: Mode::Probabilistic(BloomFilterConfig {
                 cache_size_per_key: default_cache_size(),
             }),
+        }
+    }
+
+    #[tokio::test]
+    async fn tag_cardinality_limit_drop_event_hashset() {
+        drop_event(make_transform_hashset(2, LimitExceededAction::DropEvent)).await;
+    }
+
+    #[tokio::test]
+    async fn tag_cardinality_limit_drop_event_bloom() {
+        drop_event(make_transform_bloom(2, LimitExceededAction::DropEvent)).await;
+    }
+
+    async fn drop_event(config: TagCardinalityLimitConfig) {
+        assert_transform_compliance(async move {
+            let tags1: BTreeMap<String, String> =
+                vec![("tag1".into(), "val1".into())].into_iter().collect();
+            let event1 = make_metric(tags1);
+
+            let tags2: BTreeMap<String, String> =
+                vec![("tag1".into(), "val2".into())].into_iter().collect();
+            let event2 = make_metric(tags2);
+
+            let tags3: BTreeMap<String, String> =
+                vec![("tag1".into(), "val3".into())].into_iter().collect();
+            let event3 = make_metric(tags3);
+
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
+
+            tx.send(event1.clone()).await.unwrap();
+            tx.send(event2.clone()).await.unwrap();
+            tx.send(event3.clone()).await.unwrap();
+
+            let new_event1 = out.recv().await;
+            let new_event2 = out.recv().await;
+
+            drop(tx);
+            topology.stop().await;
+
+            let new_event3 = out.recv().await;
+
+            assert_eq!(new_event1, Some(event1));
+            assert_eq!(new_event2, Some(event2));
+            // Third value rejected since value_limit is 2.
+            assert_eq!(None, new_event3);
         })
+        .await;
     }
 
-    #[test]
-    fn tag_cardinality_limit_drop_event_hashset() {
-        drop_event(make_transform_hashset(2, LimitExceededAction::DropEvent));
+    #[tokio::test]
+    async fn tag_cardinality_limit_drop_tag_hashset() {
+        drop_tag(make_transform_hashset(2, LimitExceededAction::DropTag)).await;
     }
 
-    #[test]
-    fn tag_cardinality_limit_drop_event_bloom() {
-        drop_event(make_transform_bloom(2, LimitExceededAction::DropEvent));
+    #[tokio::test]
+    async fn tag_cardinality_limit_drop_tag_bloom() {
+        drop_tag(make_transform_bloom(2, LimitExceededAction::DropTag)).await;
     }
 
-    fn drop_event(mut transform: TagCardinalityLimit) {
-        let tags1: BTreeMap<String, String> =
-            vec![("tag1".into(), "val1".into())].into_iter().collect();
-        let event1 = make_metric(tags1);
+    async fn drop_tag(config: TagCardinalityLimitConfig) {
+        assert_transform_compliance(async move {
+            let tags1: BTreeMap<String, String> = vec![
+                ("tag1".into(), "val1".into()),
+                ("tag2".into(), "val1".into()),
+            ]
+            .into_iter()
+            .collect();
+            let event1 = make_metric(tags1);
 
-        let tags2: BTreeMap<String, String> =
-            vec![("tag1".into(), "val2".into())].into_iter().collect();
-        let event2 = make_metric(tags2);
+            let tags2: BTreeMap<String, String> = vec![
+                ("tag1".into(), "val2".into()),
+                ("tag2".into(), "val1".into()),
+            ]
+            .into_iter()
+            .collect();
+            let event2 = make_metric(tags2);
 
-        let tags3: BTreeMap<String, String> =
-            vec![("tag1".into(), "val3".into())].into_iter().collect();
-        let event3 = make_metric(tags3);
+            let tags3: BTreeMap<String, String> = vec![
+                ("tag1".into(), "val3".into()),
+                ("tag2".into(), "val1".into()),
+            ]
+            .into_iter()
+            .collect();
+            let event3 = make_metric(tags3);
 
-        let new_event1 = transform.transform_one(event1.clone()).unwrap();
-        let new_event2 = transform.transform_one(event2.clone()).unwrap();
-        let new_event3 = transform.transform_one(event3);
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
 
-        assert_eq!(new_event1, event1);
-        assert_eq!(new_event2, event2);
-        // Third value rejected since value_limit is 2.
-        assert_eq!(None, new_event3);
+            tx.send(event1.clone()).await.unwrap();
+            tx.send(event2.clone()).await.unwrap();
+            tx.send(event3.clone()).await.unwrap();
+
+            let new_event1 = out.recv().await;
+            let new_event2 = out.recv().await;
+            let new_event3 = out.recv().await;
+
+            drop(tx);
+            topology.stop().await;
+
+            assert_eq!(new_event1, Some(event1));
+            assert_eq!(new_event2, Some(event2));
+            // The third event should have been modified to remove "tag1"
+            assert_ne!(new_event3, Some(event3));
+
+            let new_event3 = new_event3.unwrap();
+            assert!(!new_event3.as_metric().tags().unwrap().contains_key("tag1"));
+            assert_eq!(
+                "val1",
+                new_event3.as_metric().tags().unwrap().get("tag2").unwrap()
+            );
+        })
+        .await;
     }
 
-    #[test]
-    fn tag_cardinality_limit_drop_tag_hashset() {
-        drop_tag(make_transform_hashset(2, LimitExceededAction::DropTag));
+    #[tokio::test]
+    async fn tag_cardinality_limit_separate_value_limit_per_tag_hashset() {
+        separate_value_limit_per_tag(make_transform_hashset(2, LimitExceededAction::DropEvent))
+            .await;
     }
 
-    #[test]
-    fn tag_cardinality_limit_drop_tag_bloom() {
-        drop_tag(make_transform_bloom(2, LimitExceededAction::DropTag));
-    }
-
-    fn drop_tag(mut transform: TagCardinalityLimit) {
-        let tags1: BTreeMap<String, String> = vec![
-            ("tag1".into(), "val1".into()),
-            ("tag2".into(), "val1".into()),
-        ]
-        .into_iter()
-        .collect();
-        let event1 = make_metric(tags1);
-
-        let tags2: BTreeMap<String, String> = vec![
-            ("tag1".into(), "val2".into()),
-            ("tag2".into(), "val1".into()),
-        ]
-        .into_iter()
-        .collect();
-        let event2 = make_metric(tags2);
-
-        let tags3: BTreeMap<String, String> = vec![
-            ("tag1".into(), "val3".into()),
-            ("tag2".into(), "val1".into()),
-        ]
-        .into_iter()
-        .collect();
-        let event3 = make_metric(tags3);
-
-        let new_event1 = transform.transform_one(event1.clone()).unwrap();
-        let new_event2 = transform.transform_one(event2.clone()).unwrap();
-        let new_event3 = transform.transform_one(event3.clone()).unwrap();
-
-        assert_eq!(new_event1, event1);
-        assert_eq!(new_event2, event2);
-        // The third event should have been modified to remove "tag1"
-        assert_ne!(new_event3, event3);
-        assert!(!new_event3.as_metric().tags().unwrap().contains_key("tag1"));
-        assert_eq!(
-            "val1",
-            new_event3.as_metric().tags().unwrap().get("tag2").unwrap()
-        );
-    }
-
-    #[test]
-    fn tag_cardinality_limit_separate_value_limit_per_tag_hashset() {
-        separate_value_limit_per_tag(make_transform_hashset(2, LimitExceededAction::DropEvent));
-    }
-
-    #[test]
-    fn tag_cardinality_limit_separate_value_limit_per_tag_bloom() {
-        separate_value_limit_per_tag(make_transform_bloom(2, LimitExceededAction::DropEvent));
+    #[tokio::test]
+    async fn tag_cardinality_limit_separate_value_limit_per_tag_bloom() {
+        separate_value_limit_per_tag(make_transform_bloom(2, LimitExceededAction::DropEvent)).await;
     }
 
     /// Test that hitting the value limit on one tag does not affect the ability to take new
     /// values for other tags.
-    fn separate_value_limit_per_tag(mut transform: TagCardinalityLimit) {
-        let tags1: BTreeMap<String, String> = vec![
-            ("tag1".into(), "val1".into()),
-            ("tag2".into(), "val1".into()),
-        ]
-        .into_iter()
-        .collect();
-        let event1 = make_metric(tags1);
+    async fn separate_value_limit_per_tag(config: TagCardinalityLimitConfig) {
+        assert_transform_compliance(async move {
+            let tags1: BTreeMap<String, String> = vec![
+                ("tag1".into(), "val1".into()),
+                ("tag2".into(), "val1".into()),
+            ]
+            .into_iter()
+            .collect();
+            let event1 = make_metric(tags1);
 
-        let tags2: BTreeMap<String, String> = vec![
-            ("tag1".into(), "val2".into()),
-            ("tag2".into(), "val1".into()),
-        ]
-        .into_iter()
-        .collect();
-        let event2 = make_metric(tags2);
+            let tags2: BTreeMap<String, String> = vec![
+                ("tag1".into(), "val2".into()),
+                ("tag2".into(), "val1".into()),
+            ]
+            .into_iter()
+            .collect();
+            let event2 = make_metric(tags2);
 
-        // Now value limit is reached for "tag1", but "tag2" still has values available.
-        let tags3: BTreeMap<String, String> = vec![
-            ("tag1".into(), "val1".into()),
-            ("tag1".into(), "val2".into()),
-        ]
-        .into_iter()
-        .collect();
-        let event3 = make_metric(tags3);
+            // Now value limit is reached for "tag1", but "tag2" still has values available.
+            let tags3: BTreeMap<String, String> = vec![
+                ("tag1".into(), "val1".into()),
+                ("tag1".into(), "val2".into()),
+            ]
+            .into_iter()
+            .collect();
+            let event3 = make_metric(tags3);
 
-        let new_event1 = transform.transform_one(event1.clone()).unwrap();
-        let new_event2 = transform.transform_one(event2.clone()).unwrap();
-        let new_event3 = transform.transform_one(event3.clone()).unwrap();
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
 
-        assert_eq!(new_event1, event1);
-        assert_eq!(new_event2, event2);
-        assert_eq!(new_event3, event3);
+            tx.send(event1.clone()).await.unwrap();
+            tx.send(event2.clone()).await.unwrap();
+            tx.send(event3.clone()).await.unwrap();
+
+            let new_event1 = out.recv().await;
+            let new_event2 = out.recv().await;
+            let new_event3 = out.recv().await;
+
+            drop(tx);
+            topology.stop().await;
+
+            assert_eq!(new_event1, Some(event1));
+            assert_eq!(new_event2, Some(event2));
+            assert_eq!(new_event3, Some(event3));
+        })
+        .await;
     }
 }

@@ -1,3 +1,5 @@
+use crate::emit;
+use crate::internal_events::{ComponentEventsDropped, INTENTIONAL};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -15,6 +17,11 @@ impl<'a> InternalEvent for TagCardinalityLimitRejectingEvent<'a> {
             internal_log_rate_limit = true,
         );
         counter!("tag_value_limit_exceeded_total", 1);
+
+        emit!(ComponentEventsDropped::<INTENTIONAL> {
+            count: 1,
+            reason: "Tag value limit exceeded."
+        })
     }
 }
 
