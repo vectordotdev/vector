@@ -1,5 +1,5 @@
+use self::token::with_suspended_allocation_group;
 use std::sync::atomic::{AtomicBool, Ordering};
-
 mod stack;
 mod token;
 mod tracer;
@@ -24,4 +24,17 @@ pub fn enable_allocation_tracing() {
 /// Returns `true` if allocation tracing is enabled.
 pub fn is_allocation_tracing_enabled() -> bool {
     TRACING_ENABLED.load(Ordering::Relaxed)
+}
+
+/// Runs the given closure without tracing allocations or deallocations.
+///
+/// Inevitably, memory may need to be allocated and deallocated in the area of the program that's
+/// aggregating and processing the allocator events. While `GroupedTraceableAllocator` already
+/// avoids reentrantly tracing (de)allocations, this method provides a way to do so from _outside_
+/// of the `GlobalAlloc` codepath.
+pub fn without_allocation_tracing<F>(f: F)
+where
+    F: FnOnce(),
+{
+    with_suspended_allocation_group(f)
 }

@@ -44,7 +44,7 @@ use std::{
 
 use arr_macro::arr;
 
-use self::allocator::{enable_allocation_tracing, Tracer};
+use self::allocator::{enable_allocation_tracing, without_allocation_tracing, Tracer};
 
 pub(crate) use self::allocator::{
     AllocationGroupId, AllocationGroupToken, AllocationLayer, GroupedTraceableAllocator,
@@ -76,19 +76,23 @@ impl Tracer for LocalProducerTracer {
 pub fn init_allocation_tracing() {
     let alloc_processor = thread::Builder::new().name("vector-alloc-processor".to_string());
     alloc_processor
-        .spawn(move || loop {
-            for idx in 0..GROUP_MEM_METRICS.len() {
-                let atomic_ref = GROUP_MEM_METRICS.get(idx).unwrap();
-                let mem_used = atomic_ref.load(Ordering::Relaxed);
-                if mem_used == 0 {
-                    continue;
+        .spawn(move || {
+            without_allocation_tracing(move || loop {
+                for idx in 0..GROUP_MEM_METRICS.len() {
+                    let atomic_ref = GROUP_MEM_METRICS.get(idx).unwrap();
+                    let mem_used = atomic_ref.load(Ordering::Relaxed);
+                    if mem_used == 0 {
+                        continue;
+                    }
+
+                    info!(
+                        message = "group memory usage",
+                        group_id = idx,
+                        current_memory_allocated_in_bytes = mem_used
+                    );
                 }
-                #[allow(clippy::print_stdout)]
-                {
-                    println!("Group {} used {} bytes", idx, mem_used);
-                };
-            }
-            thread::sleep(Duration::from_millis(5000));
+                thread::sleep(Duration::from_millis(5000));
+            })
         })
         .unwrap();
     enable_allocation_tracing();

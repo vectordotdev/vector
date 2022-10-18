@@ -270,3 +270,26 @@ where
         },
     );
 }
+
+/// Calls `f` after suspending the active allocation group.
+///
+/// In constrast to `try_with_suspended_allocation_group`, this method will always call `f` after attempting to suspend
+/// the active allocation group, even if it was already suspended.
+///
+/// In practice, this method is primarily useful for "run this function and don't trace any (de)allocations at all" while
+/// `try_with_suspended_allocation_group` is primarily useful for "run this function if nobody else is tracing
+/// an (de)allocation right now".
+pub(super) fn with_suspended_allocation_group<F>(f: F)
+where
+    F: FnOnce(),
+{
+    let _result = LOCAL_ALLOCATION_GROUP_STACK.try_with(|stack| {
+        // The crux of avoiding reentrancy is `RefCell:try_borrow_mut`, as `try_borrow_mut` will only let one
+        // mutable borrow happen at a time. As we simply want to ensure that the allocation group is suspended, we
+        // don't care what the return value is: calling `try_borrow_mut` and holding on to the result until the end
+        // of the scope is sufficient to either suspend the allocation group or know that it's already suspended and
+        // will stay that way until we're done in this method.
+        let _result = stack.try_borrow_mut();
+        f();
+    });
+}
