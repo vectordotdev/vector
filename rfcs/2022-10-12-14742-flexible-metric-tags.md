@@ -106,6 +106,27 @@ script is under complete control of the data between starting the script and emi
 cannot issue warnings about how assignments to the tags are made. Instead, the resulting tags data
 will be parsed using the same algorithm as the native JSON encoding above.
 
+#### `log_to_metric` Transform
+
+The `log_to_metric` transform is configured with a set of tags for the output metrics. Existing
+configurations with single value assignments will continue to work as they are currently
+written. Support will be added for assignments of arrays to produce multi-valued tags and null
+values to produce bare tags. As TOML does not support null values, the latter will be only be
+supported in YAML and JSON configuration.
+
+#### `tag_cardinality_limit` Transform
+
+The `tag_cardinality_limit` transform tracks all values of tags, dropping either individual tags or
+whole events when the cardinality exceeds a configured limit. There are three ways this will be
+supported in the presence of multi-valued tags, which will be selectable with configuration options:
+
+1. The individual values are tracked as before. Events are dropped when any one tag's cardinality
+   exceeds the limit, but only the tags that would exceed the limit are dropped.
+1. The individual values are tracked as before. Events are dropped when any one tag's cardinality
+   exceeds the limit, and all values of tags that would exceed the limit are dropped.
+1. Values of multi-valued tags are combined before tracking. Events are dropped as before and all
+   values of tags that would exceed the limit are dropped.
+
 ### Implementation
 
 Simply put, the tags representation will change from an alias into a newtype wrapper using an
