@@ -36,11 +36,21 @@
 // something we could do here *shrug*
 
 mod allocator;
+use std::{
+    sync::atomic::{AtomicU64, Ordering},
+    thread,
+    time::Duration,
+};
+
+use arr_macro::arr;
+
 use self::allocator::{enable_allocation_tracing, Tracer};
 
 pub(crate) use self::allocator::{
     AllocationGroupId, AllocationGroupToken, AllocationLayer, GroupedTraceableAllocator,
 };
+
+static GROUP_MEM_METRICS: [AtomicU64; 1024] = arr![AtomicU64::new(0); 1024];
 
 pub type Allocator<A> = GroupedTraceableAllocator<A, LocalProducerTracer>;
 
@@ -51,13 +61,35 @@ pub const fn get_grouped_tracing_allocator<A>(allocator: A) -> Allocator<A> {
 pub struct LocalProducerTracer;
 
 impl Tracer for LocalProducerTracer {
-    fn trace_allocation(&self, _wrapped_size: usize, _group_id: AllocationGroupId) {}
+    fn trace_allocation(&self, wrapped_size: usize, group_id: AllocationGroupId) {
+        GROUP_MEM_METRICS[group_id.as_usize().get()]
+            .fetch_add(wrapped_size as u64, Ordering::SeqCst);
+    }
 
-    fn trace_deallocation(&self, _wrapped_size: usize, _source_group_id: AllocationGroupId) {}
+    fn trace_deallocation(&self, wrapped_size: usize, source_group_id: AllocationGroupId) {
+        GROUP_MEM_METRICS[source_group_id.as_usize().get()]
+            .fetch_sub(wrapped_size as u64, Ordering::SeqCst);
+    }
 }
 
 /// Initializes allocation tracing.
 pub fn init_allocation_tracing() {
+    let alloc_processor = thread::Builder::new().name("vector-alloc-processor".to_string());
+    alloc_processor
+        .spawn(move || {
+            loop {
+                for idx in 0..GROUP_MEM_METRICS.len() {
+                    let atomic_ref = GROUP_MEM_METRICS.get(idx).unwrap();
+                    let mem_used = atomic_ref.fetch_add(0, Ordering::Relaxed);
+                    #[allow(clippy::print_stdout)]
+                    {
+                        println!("Group {} used {} bytes", idx, mem_used);
+                    };
+                }
+                thread::sleep(Duration::from_millis(1000));
+            }
+        })
+        .unwrap();
     enable_allocation_tracing();
 }
 
