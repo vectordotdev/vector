@@ -2,7 +2,7 @@
 
 Vector's current metric model supports only a single value for each tag. Several sources, however,
 however, may send metrics that contain multiple values for a given tag name, or bare tags with no
-value. Vectors tag support should be enhanced to handle this data.
+value. Vector's tag support should be enhanced to handle this data.
 
 ## Context
 
@@ -91,9 +91,9 @@ duplicate values will also cause the duplicate to be dropped and a warning issue
 
 Examples:
 
-```vrl
-.tags.single_value = "value"
-.tags.bare_tag = null
+```coffee
+.tags.single_value = "value" # Same as ["value"], will produce a deprecation warning.
+.tags.bare_tag = null        # Same as [null],  will produce a deprecation warning.
 .tags.multi_valued_tag = ["value1", "value2"]
 .tags.complex_tag = ["value3", null]
 .tags.modified = push(.tags.modified, "value4")
