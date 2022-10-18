@@ -198,6 +198,10 @@ impl LogEvent {
             LogNamespace::Legacy
         }
     }
+
+    pub fn estimated_json_encoded_size_of(&self) -> usize {
+        self.inner.estimated_json_encoded_size_of()
+    }
 }
 
 impl ByteSizeOf for LogEvent {

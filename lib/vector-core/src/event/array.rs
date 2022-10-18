@@ -9,7 +9,7 @@ use futures::{stream, Stream};
 use quickcheck::{Arbitrary, Gen};
 use vector_buffers::EventCount;
 use vector_common::{
-    estimated_json_encoded_size_of::{EstimatedJsonEncodedSizeOf, JsonEncodedByteCountingValue},
+    estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf,
     finalization::{AddBatchNotifier, BatchNotifier, EventFinalizers, Finalizable},
 };
 
@@ -236,14 +236,11 @@ impl ByteSizeOf for EventArray {
 impl EstimatedJsonEncodedSizeOf for EventArray {
     fn estimated_json_encoded_size_of(&self) -> usize {
         match self {
-            Self::Logs(a) => a
-                .iter()
-                .map(|v| JsonEncodedByteCountingValue(v.value()).estimated_json_encoded_size_of())
-                .sum(),
+            Self::Logs(a) => a.iter().map(LogEvent::estimated_json_encoded_size_of).sum(),
 
             Self::Traces(a) => a
                 .iter()
-                .map(|v| JsonEncodedByteCountingValue(v.value()).estimated_json_encoded_size_of())
+                .map(TraceEvent::estimated_json_encoded_size_of)
                 .sum(),
 
             Self::Metrics(a) => a
