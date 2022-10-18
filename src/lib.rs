@@ -22,7 +22,10 @@ extern crate tracing;
 #[macro_use]
 extern crate derivative;
 
-#[cfg(any(target_os = "macos",all(feature = "tikv-jemallocator", not(feature = "allocation-tracing"))))]
+#[cfg(any(
+    target_os = "macos",
+    all(feature = "tikv-jemallocator", not(feature = "allocation-tracing"))
+))]
 #[global_allocator]
 static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
