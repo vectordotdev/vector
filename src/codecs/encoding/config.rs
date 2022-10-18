@@ -143,7 +143,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use lookup::lookup_v2::parse_value_path;
+    use lookup::lookup_v2::parse_value_path_old;
 
     use super::*;
     use crate::codecs::encoding::TimestampFormat;
@@ -168,7 +168,7 @@ mod test {
 
         assert_eq!(
             transformer.only_fields(),
-            &Some(vec![parse_value_path("a.b[0]")])
+            &Some(vec![parse_value_path_old("a.b[0]")])
         );
         assert_eq!(
             transformer.except_fields(),
@@ -203,7 +203,7 @@ mod test {
 
         assert_eq!(
             transformer.only_fields(),
-            &Some(vec![parse_value_path("a.b[0]")])
+            &Some(vec![parse_value_path_old("a.b[0]")])
         );
         assert_eq!(
             transformer.except_fields(),
@@ -235,7 +235,7 @@ mod test {
 
         assert_eq!(
             transformer.only_fields(),
-            &Some(vec![parse_value_path("a.b[0]")])
+            &Some(vec![parse_value_path_old("a.b[0]")])
         );
         assert_eq!(
             transformer.except_fields(),

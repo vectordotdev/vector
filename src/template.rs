@@ -5,6 +5,7 @@ use chrono::{
     format::{strftime::StrftimeItems, Item},
     Utc,
 };
+use lookup::lookup_v2::parse_target_path;
 use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
 use snafu::Snafu;
@@ -17,10 +18,12 @@ use crate::{
 
 static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\{\{(?P<key>[^\}]+)\}\}").unwrap());
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Snafu)]
+#[derive(Clone, Debug, Eq, PartialEq, Snafu)]
 pub enum TemplateParseError {
     #[snafu(display("Invalid strftime item"))]
     StrftimeError,
+    #[snafu(display("Invalid field path in template {:?} (see https://vector.dev/docs/reference/configuration/template-syntax/)", path))]
+    InvalidPathSyntax { path: String },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Snafu)]
@@ -58,6 +61,33 @@ impl Template {
     pub fn is_empty(&self) -> bool {
         self.src.is_empty()
     }
+
+    pub fn new(src: &str) -> Result<Self, TemplateParseError> {
+        let (has_error, is_dynamic) = StrftimeItems::new(&src)
+            .fold((false, false), |(error, dynamic), item| {
+                (error || is_error(&item), dynamic || is_dynamic(&item))
+            });
+
+        let fields = get_fields(src);
+
+        for field in &fields {
+            if parse_target_path(field).is_err() {
+                return Err(TemplateParseError::InvalidPathSyntax {
+                    path: field.to_owned(),
+                });
+            }
+        }
+
+        if has_error {
+            Err(TemplateParseError::StrftimeError)
+        } else {
+            Ok(Template {
+                has_fields: !fields.is_empty(),
+                src: src.to_owned(),
+                has_ts: is_dynamic,
+            })
+        }
+    }
 }
 
 impl TryFrom<&str> for Template {
@@ -88,19 +118,11 @@ impl TryFrom<Cow<'_, str>> for Template {
     type Error = TemplateParseError;
 
     fn try_from(src: Cow<'_, str>) -> Result<Self, Self::Error> {
-        let (has_error, is_dynamic) = StrftimeItems::new(&src)
-            .fold((false, false), |(error, dynamic), item| {
-                (error || is_error(&item), dynamic || is_dynamic(&item))
-            });
-        if has_error {
-            Err(TemplateParseError::StrftimeError)
-        } else {
-            Ok(Template {
-                has_fields: RE.is_match(&src),
-                src: src.into_owned(),
-                has_ts: is_dynamic,
-            })
-        }
+        // if src.as_ref() == "{{bad-template-path}}" {
+        //     // TODO: just testing
+        //     return Err(TemplateParseError::InvalidPathSyntax);
+        // }
+        Self::new(src.as_ref())
     }
 }
 
@@ -159,14 +181,7 @@ impl Template {
 
     pub fn get_fields(&self) -> Option<Vec<String>> {
         if self.has_fields {
-            RE.captures_iter(&self.src)
-                .map(|c| {
-                    c.get(1)
-                        .map(|s| s.as_str().trim().to_string())
-                        .expect("src should match regex")
-                })
-                .collect::<Vec<_>>()
-                .into()
+            Some(get_fields(&self.src))
         } else {
             None
         }
@@ -179,6 +194,16 @@ impl Template {
     pub fn get_ref(&self) -> &str {
         &self.src
     }
+}
+
+fn get_fields(src: &str) -> Vec<String> {
+    RE.captures_iter(src)
+        .map(|c| {
+            c.get(1)
+                .map(|s| s.as_str().trim().to_string())
+                .expect("src should match regex")
+        })
+        .collect::<Vec<_>>()
 }
 
 fn render_fields(src: &str, event: EventRef<'_>) -> Result<String, TemplateRenderingError> {

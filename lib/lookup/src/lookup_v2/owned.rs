@@ -1,4 +1,4 @@
-use crate::lookup_v2::{parse_value_path, BorrowedSegment, ValuePath};
+use crate::lookup_v2::{parse_value_path_old, BorrowedSegment, ValuePath};
 use std::fmt::{Display, Formatter};
 use vector_config::configurable_component;
 
@@ -13,6 +13,14 @@ pub struct OwnedValuePath {
 impl OwnedValuePath {
     pub fn is_root(&self) -> bool {
         self.segments.is_empty()
+    }
+
+    pub fn is_valid(&self) -> bool {
+        !self
+            .segments
+            .iter()
+            .find(|segment| segment.is_invalid())
+            .is_some()
     }
 
     pub fn root() -> Self {
@@ -106,7 +114,7 @@ impl Display for OwnedValuePath {
 
 impl From<String> for OwnedValuePath {
     fn from(raw_path: String) -> Self {
-        parse_value_path(raw_path.as_str())
+        parse_value_path_old(raw_path.as_str())
     }
 }
 
@@ -328,7 +336,7 @@ impl<'a> Iterator for OwnedSegmentSliceIter<'a> {
 
 #[cfg(test)]
 mod test {
-    use crate::lookup_v2::parse_value_path;
+    use crate::lookup_v2::parse_value_path_old;
 
     #[test]
     fn owned_path_serialize() {
@@ -373,7 +381,7 @@ mod test {
         ];
 
         for (path, expected) in test_cases {
-            let path = parse_value_path(path);
+            let path = parse_value_path_old(path);
             let path = serde_json::to_string(&path).unwrap();
             let path = serde_json::from_str::<serde_json::Value>(&path).unwrap();
             assert_eq!(path, expected);

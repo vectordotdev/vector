@@ -138,12 +138,12 @@ pub(crate) struct DelFn {
 impl DelFn {
     #[cfg(test)]
     fn new(path: &str) -> Self {
-        use lookup_lib::{lookup_v2::parse_value_path, PathPrefix};
+        use lookup_lib::{lookup_v2::parse_value_path_old, PathPrefix};
 
         Self {
             query: expression::Query::new(
                 expression::Target::External(PathPrefix::Event),
-                parse_value_path(path),
+                parse_value_path_old(path),
             ),
             compact: None,
         }
