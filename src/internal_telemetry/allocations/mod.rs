@@ -52,15 +52,15 @@ pub(crate) use self::allocator::{
 
 static GROUP_MEM_METRICS: [AtomicU64; 1024] = arr![AtomicU64::new(0); 1024];
 
-pub type Allocator<A> = GroupedTraceableAllocator<A, LocalProducerTracer>;
+pub type Allocator<A> = GroupedTraceableAllocator<A, MainTracer>;
 
 pub const fn get_grouped_tracing_allocator<A>(allocator: A) -> Allocator<A> {
-    GroupedTraceableAllocator::new(allocator, LocalProducerTracer)
+    GroupedTraceableAllocator::new(allocator, MainTracer)
 }
 
-pub struct LocalProducerTracer;
+pub struct MainTracer;
 
-impl Tracer for LocalProducerTracer {
+impl Tracer for MainTracer {
     fn trace_allocation(&self, wrapped_size: usize, group_id: AllocationGroupId) {
         GROUP_MEM_METRICS[group_id.as_usize().get()]
             .fetch_add(wrapped_size as u64, Ordering::SeqCst);
