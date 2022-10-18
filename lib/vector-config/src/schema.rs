@@ -246,6 +246,7 @@ pub fn generate_struct_schema(
     }
 }
 
+#[allow(dead_code)]
 pub fn generate_optional_schema<T>(
     gen: &mut SchemaGenerator,
     metadata: Metadata<T>,

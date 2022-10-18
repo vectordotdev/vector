@@ -1,4 +1,7 @@
+use vector_config_common::attributes::CustomAttribute;
+
 use crate::{
+    num::NumberClass,
     schema::generate_number_schema,
     schemars::{gen::SchemaGenerator, schema::SchemaObject},
     Configurable, GenerateError, Metadata,
@@ -60,6 +63,17 @@ impl Configurable for serde_with::DurationSeconds<u64, serde_with::formats::Stri
         Some("A span of time, in whole seconds.")
     }
 
+    fn metadata() -> Metadata<Self> {
+        let mut metadata = Metadata::default();
+        if let Some(description) = Self::description() {
+            metadata.set_description(description);
+        }
+
+        metadata.add_custom_attribute(CustomAttribute::kv("numeric_type", NumberClass::Unsigned));
+
+        metadata
+    }
+
     fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
         // This boils down to a number schema, but we just need to shuttle around the metadata so
         // that we can call the relevant schema generation function.
@@ -77,6 +91,20 @@ impl Configurable for serde_with::DurationSeconds<f64, serde_with::formats::Stri
 
     fn description() -> Option<&'static str> {
         Some("A span of time, in whole seconds.")
+    }
+
+    fn metadata() -> Metadata<Self> {
+        let mut metadata = Metadata::default();
+        if let Some(description) = Self::description() {
+            metadata.set_description(description);
+        }
+
+        metadata.add_custom_attribute(CustomAttribute::kv(
+            "numeric_type",
+            NumberClass::FloatingPoint,
+        ));
+
+        metadata
     }
 
     fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
