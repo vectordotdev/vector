@@ -327,25 +327,28 @@ mod test {
 
     #[tokio::test]
     async fn tcp_splits_on_newline() {
-        let (tx, rx) = SourceSender::new_test();
-        let addr = next_addr();
+        assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
+            let (tx, rx) = SourceSender::new_test();
+            let addr = next_addr();
 
-        let server = SocketConfig::from(TcpConfig::from_address(addr.into()))
-            .build(SourceContext::new_test(tx, None))
-            .await
-            .unwrap();
-        tokio::spawn(server);
+            let server = SocketConfig::from(TcpConfig::from_address(addr.into()))
+                .build(SourceContext::new_test(tx, None))
+                .await
+                .unwrap();
+            tokio::spawn(server);
 
-        wait_for_tcp(addr).await;
-        send_lines(addr, vec!["foo\nbar".to_owned()].into_iter())
-            .await
-            .unwrap();
+            wait_for_tcp(addr).await;
+            send_lines(addr, vec!["foo\nbar".to_owned()].into_iter())
+                .await
+                .unwrap();
 
-        let events = collect_n(rx, 2).await;
+            let events = collect_n(rx, 2).await;
 
-        assert_eq!(events.len(), 2);
-        assert_eq!(events[0].as_log()[log_schema().message_key()], "foo".into());
-        assert_eq!(events[1].as_log()[log_schema().message_key()], "bar".into());
+            assert_eq!(events.len(), 2);
+            assert_eq!(events[0].as_log()[log_schema().message_key()], "foo".into());
+            assert_eq!(events[1].as_log()[log_schema().message_key()], "bar".into());
+        })
+        .await;
     }
 
     #[tokio::test]
@@ -1030,18 +1033,21 @@ mod test {
     #[cfg(unix)]
     #[tokio::test]
     async fn unix_datagram_message() {
-        let rx = unix_message("test", false).await;
-        let events = collect_n(rx, 1).await;
+        assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
+            let rx = unix_message("test", false).await;
+            let events = collect_n(rx, 1).await;
 
-        assert_eq!(events.len(), 1);
-        assert_eq!(
-            events[0].as_log()[log_schema().message_key()],
-            "test".into()
-        );
-        assert_eq!(
-            events[0].as_log()[log_schema().source_type_key()],
-            "socket".into()
-        );
+            assert_eq!(events.len(), 1);
+            assert_eq!(
+                events[0].as_log()[log_schema().message_key()],
+                "test".into()
+            );
+            assert_eq!(
+                events[0].as_log()[log_schema().source_type_key()],
+                "socket".into()
+            );
+        })
+        .await;
     }
 
     #[cfg(unix)]

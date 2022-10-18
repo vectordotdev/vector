@@ -13,13 +13,21 @@ use crate::sinks::{util::UriSerde, Healthcheck, Sinks};
 
 /// Fully resolved sink component.
 #[configurable_component]
+#[configurable(metadata(component_base_type = "sink"))]
 #[derive(Clone, Debug)]
 pub struct SinkOuter<T>
 where
     T: Configurable + Serialize,
 {
-    /// Inputs to the sinks.
-    #[serde(default = "Default::default")] // https://github.com/serde-rs/serde/issues/1541
+    /// A list of upstream [source][sources] or [transform][transforms] IDs.
+    ///
+    /// Wildcards (`*`) are supported.
+    ///
+    /// See [configuration][configuration] for more info.
+    ///
+    /// [sources]: https://vector.dev/docs/reference/configuration/sources/
+    /// [transforms]: https://vector.dev/docs/reference/configuration/transforms/
+    /// [configuration]: https://vector.dev/docs/reference/configuration/
     pub inputs: Vec<T>,
 
     /// The full URI to make HTTP healthcheck requests to.
@@ -27,6 +35,7 @@ where
     /// This must be a valid URI, which requires at least the scheme and host. All other
     /// components -- port, path, etc -- are allowed as well.
     #[configurable(deprecated)]
+    #[configurable(metadata(hidden))]
     #[configurable(validation(format = "uri"))]
     healthcheck_uri: Option<UriSerde>,
 
@@ -49,6 +58,7 @@ where
     proxy: ProxyConfig,
 
     #[serde(flatten)]
+    #[configurable(metadata(hidden))]
     pub inner: Sinks,
 }
 

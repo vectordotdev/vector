@@ -337,7 +337,7 @@ pub fn random_maps(
 
 pub async fn collect_n<S>(rx: S, n: usize) -> Vec<S::Item>
 where
-    S: Stream + Unpin,
+    S: Stream,
 {
     rx.take(n).collect().await
 }
@@ -696,7 +696,7 @@ pub async fn start_topology(
 pub async fn spawn_collect_n<F, S>(future: F, stream: S, n: usize) -> Vec<Event>
 where
     F: Future<Output = ()> + Send + 'static,
-    S: Stream<Item = Event> + Unpin,
+    S: Stream<Item = Event>,
 {
     // TODO: Switch to using `select!` so that we can drive `future` to completion while also driving `collect_n`,
     // such that if `future` panics, we break out and don't continue driving `collect_n`. In most cases, `future`

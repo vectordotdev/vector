@@ -75,6 +75,29 @@ pub enum Tagging {
     None,
 }
 
+impl Tagging {
+    /// Generates custom attributes that describe the tagging mode.
+    ///
+    /// This is typically added to the metadata for an enum's overall schema to better describe how
+    /// the various subschemas relate to each other and how they're used on the Rust side, for the
+    /// purpose of generating usable documentation from the schema.
+    pub fn as_enum_metadata(&self) -> Vec<CustomAttribute> {
+        match self {
+            Self::External => vec![CustomAttribute::kv("enum_tagging", "external")],
+            Self::Internal { tag } => vec![
+                CustomAttribute::kv("enum_tagging", "internal"),
+                CustomAttribute::kv("enum_tag_field", tag),
+            ],
+            Self::Adjacent { tag, content } => vec![
+                CustomAttribute::kv("enum_tagging", "adjacent"),
+                CustomAttribute::kv("enum_tag_field", tag),
+                CustomAttribute::kv("enum_content_field", content),
+            ],
+            Self::None => vec![CustomAttribute::kv("enum_tagging", "untagged")],
+        }
+    }
+}
+
 impl From<&serde_attr::TagType> for Tagging {
     fn from(tag: &serde_attr::TagType) -> Self {
         match tag {

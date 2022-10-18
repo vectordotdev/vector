@@ -138,11 +138,11 @@ fn build_enum_generate_schema_fn(variants: &[Variant<'_>]) -> proc_macro2::Token
         fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator) -> std::result::Result<::vector_config::schemars::schema::SchemaObject, ::vector_config::GenerateError> {
             let mut subschemas = ::std::vec::Vec::new();
 
-            let schema_metadata = <Self as ::vector_config::Configurable>::metadata();
+            let enum_metadata = <Self as ::vector_config::Configurable>::metadata();
             #(#mapped_variants)*
 
             let mut schema = ::vector_config::schema::generate_one_of_schema(&subschemas);
-            ::vector_config::schema::apply_metadata(&mut schema, schema_metadata);
+            ::vector_config::schema::apply_metadata(&mut schema, enum_metadata);
 
             Ok(schema)
         }
@@ -268,6 +268,8 @@ fn build_named_struct_generate_schema_fn(
             let metadata = <Self as ::vector_config::Configurable>::metadata();
             #(#mapped_fields)*
 
+            let had_unflatted_properties = !properties.is_empty();
+
             let additional_properties = None;
             let mut schema = ::vector_config::schema::generate_struct_schema(
                 properties,
@@ -277,6 +279,16 @@ fn build_named_struct_generate_schema_fn(
 
             // If we have any flattened subschemas, deal with them now.
             if !flattened_subschemas.is_empty() {
+                // A niche case here is if all fields were flattened, which would leave our main
+                // schema as simply validating that the value is an object, and _nothing_ else.
+                //
+                // That's kind of useless, and ends up as noise in the schema, so if we didn't have
+                // any of our own unflattened properties, then steal the first flattened subschema
+                // and swap our main schema for it before flattening things overall.
+                if !had_unflatted_properties {
+                    schema = flattened_subschemas.remove(0);
+                }
+
                 ::vector_config::schema::convert_to_flattened_schema(&mut schema, flattened_subschemas);
             }
 
@@ -346,6 +358,21 @@ fn generate_container_metadata(
     let maybe_deprecated = get_metadata_deprecated(meta_ident, container.deprecated());
     let maybe_custom_attributes = get_metadata_custom_attributes(meta_ident, container.metadata());
 
+    // We add a special metadata that informs consumers of the schema what the "tagging mode" of
+    // this enum is. This is important because when we're using the schema to generate
+    // documentation, it can be hard to generate something that is as succinct as how you might
+    // otherwise describe the configuration behavior using natural language. Additionally, we
+    // typically allow deserialization such that fields are overlapped, and if variants had, for
+    // example, 3 shared fields between all variants, and each variant only had 1 unique field, we
+    // wouldn't want to relist all the shared fields per variant.... we just want to be able to
+    // describe which variant has to be used for its unique (variant specific) fields to be
+    // relevant.
+    let enum_metadata_attrs = container
+        .tagging()
+        .map(|tagging| tagging.as_enum_metadata());
+    let enum_metadata =
+        get_metadata_custom_attributes(meta_ident, enum_metadata_attrs.into_iter().flatten());
+
     quote! {
         let mut #meta_ident = ::vector_config::Metadata::default();
         #maybe_title
@@ -353,6 +380,7 @@ fn generate_container_metadata(
         #maybe_default_value
         #maybe_deprecated
         #maybe_custom_attributes
+        #enum_metadata
     }
 }
 
@@ -409,10 +437,7 @@ fn generate_variant_metadata(
     // information.
     //
     // You can think of this as an enum-specific additional title.
-    let logical_name_attrs = vec![CustomAttribute::KeyValue {
-        key: "logical_name".to_string(),
-        value: variant.ident().to_string(),
-    }];
+    let logical_name_attrs = vec![CustomAttribute::kv("logical_name", variant.ident())];
     let variant_logical_name =
         get_metadata_custom_attributes(meta_ident, logical_name_attrs.into_iter());
 

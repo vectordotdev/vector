@@ -56,6 +56,7 @@ use crate::{
             config::{
                 create_service, S3CannedAcl, S3RetryLogic, S3ServerSideEncryption, S3StorageClass,
             },
+            partitioner::{S3KeyPartitioner, S3PartitionKey},
             service::{S3Metadata, S3Request, S3Service},
             sink::S3Sink,
         },
@@ -369,7 +370,10 @@ impl DatadogArchivesSinkConfig {
             .into_batcher_settings()
             .expect("invalid batch settings");
 
-        let partitioner = DatadogArchivesSinkConfig::build_partitioner();
+        let partitioner = S3KeyPartitioner::new(
+            Template::try_from(KEY_TEMPLATE).expect("invalid object key format"),
+            None,
+        );
 
         let s3_config = self
             .aws_s3
@@ -598,7 +602,7 @@ impl DatadogS3RequestBuilder {
     }
 }
 
-impl RequestBuilder<(String, Vec<Event>)> for DatadogS3RequestBuilder {
+impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for DatadogS3RequestBuilder {
     type Metadata = S3Metadata;
     type Events = Vec<Event>;
     type Encoder = DatadogArchivesEncoding;
@@ -614,11 +618,13 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogS3RequestBuilder {
         &self.encoding
     }
 
-    fn split_input(&self, input: (String, Vec<Event>)) -> (Self::Metadata, Self::Events) {
+    fn split_input(&self, input: (S3PartitionKey, Vec<Event>)) -> (Self::Metadata, Self::Events) {
         let (partition_key, mut events) = input;
         let finalizers = events.take_finalizers();
+        let s3_key_prefix = partition_key.key_prefix.clone();
         let metadata = S3Metadata {
             partition_key,
+            s3_key: s3_key_prefix,
             count: events.len(),
             byte_size: events.size_of(),
             finalizers,
@@ -632,9 +638,7 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogS3RequestBuilder {
         mut metadata: Self::Metadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        metadata.partition_key =
-            generate_object_key(self.key_prefix.clone(), metadata.partition_key);
-
+        metadata.s3_key = generate_object_key(self.key_prefix.clone(), metadata.s3_key);
         let body = payload.into_payload();
         trace!(
             message = "Sending events.",
@@ -1045,7 +1049,10 @@ mod tests {
             .expect("invalid test case")
             .with_timezone(&Utc);
         log.as_mut_log().insert("timestamp", timestamp);
-        let partitioner = DatadogArchivesSinkConfig::build_partitioner();
+        let partitioner = S3KeyPartitioner::new(
+            Template::try_from(KEY_TEMPLATE).expect("invalid object key format"),
+            None,
+        );
         let key = partitioner.partition(&log).expect("key wasn't provided");
 
         let request_builder = DatadogS3RequestBuilder::new(
@@ -1060,11 +1067,11 @@ mod tests {
             request_builder.build_request(metadata, EncodeResult::uncompressed(fake_buf.clone()));
         let expected_key_prefix = "audit/dt=20210823/hour=16/";
         let expected_key_ext = ".json.gz";
-        println!("{}", req.metadata.partition_key);
-        assert!(req.metadata.partition_key.starts_with(expected_key_prefix));
-        assert!(req.metadata.partition_key.ends_with(expected_key_ext));
-        let uuid1 = &req.metadata.partition_key
-            [expected_key_prefix.len()..req.metadata.partition_key.len() - expected_key_ext.len()];
+        println!("{}", req.metadata.s3_key);
+        assert!(req.metadata.s3_key.starts_with(expected_key_prefix));
+        assert!(req.metadata.s3_key.ends_with(expected_key_ext));
+        let uuid1 = &req.metadata.s3_key
+            [expected_key_prefix.len()..req.metadata.s3_key.len() - expected_key_ext.len()];
         assert_eq!(uuid1.len(), 36);
 
         // check that the second batch has a different UUID
@@ -1073,8 +1080,8 @@ mod tests {
         let key = partitioner.partition(&log2).expect("key wasn't provided");
         let (metadata, _events) = request_builder.split_input((key, vec![log2]));
         let req = request_builder.build_request(metadata, EncodeResult::uncompressed(fake_buf));
-        let uuid2 = &req.metadata.partition_key
-            [expected_key_prefix.len()..req.metadata.partition_key.len() - expected_key_ext.len()];
+        let uuid2 = &req.metadata.s3_key
+            [expected_key_prefix.len()..req.metadata.s3_key.len() - expected_key_ext.len()];
 
         assert_ne!(uuid1, uuid2);
     }

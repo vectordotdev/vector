@@ -125,6 +125,11 @@ impl TypedComponent {
             })
     }
 
+    /// Gets the component name, if one was specified.
+    fn get_component_name(&self) -> Option<String> {
+        self.component_name.as_ref().map(|s| s.value())
+    }
+
     /// Creates the component description registration code based on the original derive input.
     ///
     /// If this typed component does not have a name, `None` will be returned, as only named
@@ -316,10 +321,19 @@ pub fn configurable_component_impl(args: TokenStream, item: TokenStream) -> Toke
     //   which powers the `vector generate` subcommand by maintaining a name -> config type map
     let component_type = options.typed_component().map(|tc| {
         let component_type = tc.component_type.as_str();
-        let maybe_component_name_registration = tc.get_component_name_registration();
-
         quote! {
             #[configurable(metadata(component_type = #component_type))]
+        }
+    });
+
+    let maybe_component_name = options.typed_component().map(|tc| {
+        let maybe_component_name_registration = tc.get_component_name_registration();
+        let maybe_component_name_metadata = tc
+            .get_component_name()
+            .map(|name| quote! { #[configurable(metadata(component_name = #name))] });
+
+        quote! {
+            #maybe_component_name_metadata
             #maybe_component_name_registration
         }
     });
@@ -350,6 +364,7 @@ pub fn configurable_component_impl(args: TokenStream, item: TokenStream) -> Toke
     let derived = quote! {
         #[derive(#derives)]
         #component_type
+        #maybe_component_name
         #input
         #maybe_component_desc
     };

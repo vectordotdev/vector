@@ -17,15 +17,24 @@ use super::ComponentKey;
 
 /// Fully resolved transform component.
 #[configurable_component]
+#[configurable(metadata(component_base_type = "transform"))]
 #[derive(Clone, Debug)]
 pub struct TransformOuter<T>
 where
     T: Configurable + Serialize,
 {
-    /// Inputs to the transforms.
-    #[serde(default = "Default::default")] // https://github.com/serde-rs/serde/issues/1541
+    /// A list of upstream [source][sources] or [transform][transforms] IDs.
+    ///
+    /// Wildcards (`*`) are supported.
+    ///
+    /// See [configuration][configuration] for more info.
+    ///
+    /// [sources]: https://vector.dev/docs/reference/configuration/sources/
+    /// [transforms]: https://vector.dev/docs/reference/configuration/transforms/
+    /// [configuration]: https://vector.dev/docs/reference/configuration/
     pub inputs: Vec<T>,
 
+    #[configurable(metadata(hidden))]
     #[serde(flatten)]
     pub inner: Transforms,
 }

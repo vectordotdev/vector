@@ -31,6 +31,7 @@ pub struct Container<'a> {
     name: String,
     default_value: Option<ExprPath>,
     data: Data<'a>,
+    tagging: Option<Tagging>,
     virtual_newtype: Option<Type>,
     attrs: Attributes,
 }
@@ -132,7 +133,7 @@ impl<'a> Container<'a> {
             .and_then(|attrs| {
                 let tagging: Tagging = serde.attrs.tag().into();
 
-                let data = match serde.data {
+                let (data, is_enum) = match serde.data {
                     serde_ast::Data::Enum(variants) => {
                         let variants = variants
                             .iter()
@@ -193,7 +194,7 @@ impl<'a> Container<'a> {
                             }
                         }
 
-                        Data::Enum(variants)
+                        (Data::Enum(variants), true)
                     }
                     serde_ast::Data::Struct(style, fields) => match style {
                         serde_ast::Style::Struct
@@ -204,7 +205,7 @@ impl<'a> Container<'a> {
                                 .map(|field| Field::from_ast(field, virtual_newtype.is_some()))
                                 .collect_darling_results(&mut accumulator);
 
-                            Data::Struct(style.into(), fields)
+                            (Data::Struct(style.into(), fields), false)
                         }
                         serde_ast::Style::Unit => {
                             // This is a little ugly but we can't drop the accumulator without finishing it, otherwise
@@ -212,7 +213,7 @@ impl<'a> Container<'a> {
                             // our error and just return a dummy value.
                             accumulator
                                 .push(darling::Error::custom(ERR_NO_UNIT_STRUCTS).with_span(input));
-                            Data::Struct(Style::Unit, Vec::new())
+                            (Data::Struct(Style::Unit, Vec::new()), false)
                         }
                     },
                 };
@@ -236,6 +237,7 @@ impl<'a> Container<'a> {
                     default_value,
                     data,
                     virtual_newtype,
+                    tagging: is_enum.then_some(tagging),
                     attrs,
                 };
 
@@ -331,6 +333,16 @@ impl<'a> Container<'a> {
     /// of schema generation, having the type specified by those helper attributes.
     pub fn virtual_newtype(&self) -> Option<Type> {
         self.virtual_newtype.clone()
+    }
+
+    /// Tagging mode of this container.
+    ///
+    /// When the container is an enum, `Some(..)` will be returned, where the value can be any of
+    /// the four modes supported by `serde`: external, internal, adjacent, or none (untagged).
+    ///
+    /// When the container is a struct, `None` is returned.
+    pub fn tagging(&self) -> Option<&Tagging> {
+        self.tagging.as_ref()
     }
 
     /// Path to a function to call to generate a default value for the container, if any.
