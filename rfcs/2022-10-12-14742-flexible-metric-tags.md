@@ -96,6 +96,8 @@ Examples:
 .tags.bare_tag = null
 .tags.multi_valued_tag = ["value1", "value2"]
 .tags.complex_tag = ["value3", null]
+.tags.modified = push(.tags.modified, "value4")
+.tags.modified = filter(.tags.modified) -> |_, v| { v != "remove" }
 ```
 
 ##### Lua
@@ -150,6 +152,9 @@ impl MetricTags {
 
     /// Replace returns all the existing values when overwriting a tag.
     fn replace(&mut self, name: String, value: Option<TagValue>) -> Option<TagValueSet>;
+
+    /// Replace an entire tag set with the given value set, returning existing values.
+    fn replace_all(&mut self, name: String, values: TagValueSet) -> Option<TagValueSet>;
 
     /// Remove a single value of a tag.
     fn remove(&mut self, name: &str, value: Option<&str>) -> Option<TagValue>;
