@@ -49,6 +49,8 @@ use crate::{
 
 const MIN_FLUSH_PERIOD_SECS: u64 = 1;
 
+const LOCK_FAILED: &str = "Prometheus exporter data lock is poisoned";
+
 #[derive(Debug, Snafu)]
 enum BuildError {
     #[snafu(display("Flush period for sets must be greater or equal to {} secs", min))]
@@ -389,7 +391,7 @@ fn handle(
         }
 
         (true, &Method::GET, "/metrics") => {
-            let metrics = metrics.read().unwrap();
+            let metrics = metrics.read().expect(LOCK_FAILED);
 
             let count = metrics.len();
             let byte_size = metrics
@@ -540,7 +542,7 @@ impl StreamSink<Event> for PrometheusExporter {
             if last_flush.elapsed() > self.config.flush_period_secs {
                 last_flush = Instant::now();
 
-                let mut metrics = self.metrics.write().unwrap();
+                let mut metrics = self.metrics.write().expect(LOCK_FAILED);
 
                 let normalizer_mut = normalizer.get_state_mut();
                 metrics.retain(|metric_ref, (_, metadata)| {
@@ -566,7 +568,7 @@ impl StreamSink<Event> for PrometheusExporter {
 
                 // We have a normalized metric, in absolute form.  If we're already aware of this
                 // metric, update its expiration deadline, otherwise, start tracking it.
-                let mut metrics = self.metrics.write().unwrap();
+                let mut metrics = self.metrics.write().expect(LOCK_FAILED);
 
                 match metrics.entry(MetricRef::from_metric(&normalized)) {
                     Entry::Occupied(mut entry) => {
