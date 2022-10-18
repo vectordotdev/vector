@@ -86,7 +86,7 @@ pub fn init_allocation_tracing() {
                     }
 
                     info!(
-                        message = "group memory usage",
+                        message = "Group memory usage.",
                         group_id = idx,
                         current_memory_allocated_in_bytes = mem_used
                     );
