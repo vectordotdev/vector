@@ -341,8 +341,7 @@ impl<'a> SendGroup<'a> {
     fn pause(&mut self, id: &ComponentKey) {
         match self.senders.get_mut(id) {
             Some(sender) => {
-                // A sink must be known and present to be replaced, otherwise an invalid sequence of
-                // control operations has been applied.
+                // A sink can be used in in-flight send, we need to detach such sends
                 if sender.take().is_none() {
                     self.try_detach_send(id);
                 }
