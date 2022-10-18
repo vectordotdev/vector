@@ -298,6 +298,8 @@ where
 
                 let finalizers = event.take_finalizers();
                 let mut bytes = BytesMut::new();
+
+                // Errors are handled by `Encoder`.
                 if encoder.encode(event, &mut bytes).is_err() {
                     continue;
                 }
