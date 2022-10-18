@@ -282,6 +282,12 @@ Incremental steps to execute this change. These will be converted to issues afte
 - [ ] Convert the `MetricTags` alias to a newtype wrapper
 - [ ] Convert the `MetricTags` type to new storage as above
 - [ ] Audit all uses of `MetricTags::insert` to see which should do a replace
+- [ ] Update the native protobuf encoding
+- [ ] Update the native JSON encoding
+- [ ] Update the `lua` transform to support multi-value tags
+- [ ] Update VRL to support multi-value tags
+- [ ] Add multi-value tag support to the `log_to_metric` transform
+- [ ] Update the `tag_cardinality_limit` transform for multi-valued tags
 
 ## Future Improvements
 
