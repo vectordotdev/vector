@@ -76,18 +76,19 @@ impl Tracer for LocalProducerTracer {
 pub fn init_allocation_tracing() {
     let alloc_processor = thread::Builder::new().name("vector-alloc-processor".to_string());
     alloc_processor
-        .spawn(move || {
-            loop {
-                for idx in 0..GROUP_MEM_METRICS.len() {
-                    let atomic_ref = GROUP_MEM_METRICS.get(idx).unwrap();
-                    let mem_used = atomic_ref.fetch_add(0, Ordering::Relaxed);
-                    #[allow(clippy::print_stdout)]
-                    {
-                        println!("Group {} used {} bytes", idx, mem_used);
-                    };
+        .spawn(move || loop {
+            for idx in 0..GROUP_MEM_METRICS.len() {
+                let atomic_ref = GROUP_MEM_METRICS.get(idx).unwrap();
+                let mem_used = atomic_ref.fetch_add(0, Ordering::Relaxed);
+                if mem_used == 0 {
+                    continue;
                 }
-                thread::sleep(Duration::from_millis(1000));
+                #[allow(clippy::print_stdout)]
+                {
+                    println!("Group {} used {} bytes", idx, mem_used);
+                };
             }
+            thread::sleep(Duration::from_millis(1000));
         })
         .unwrap();
     enable_allocation_tracing();
