@@ -50,7 +50,7 @@ pub(crate) use self::allocator::{
     AllocationGroupId, AllocationGroupToken, AllocationLayer, GroupedTraceableAllocator,
 };
 
-static GROUP_MEM_METRICS: [AtomicU64; 1024] = arr![AtomicU64::new(0); 1024];
+static GROUP_MEM_METRICS: [AtomicU64; 512] = arr![AtomicU64::new(0); 512];
 
 pub type Allocator<A> = GroupedTraceableAllocator<A, MainTracer>;
 
@@ -116,5 +116,12 @@ pub fn acquire_allocation_group_id(_tags: Vec<(String, String)>) -> AllocationGr
     // TODO: register the allocation group token with its tags via `Collector`: we can't do it via `Registrations`
     // because that gets checked lazily/periodically, and we need to be able to associate a group ID with its tags
     // immediately so that we don't misassociate events
-    AllocationGroupToken::register().expect("failed to register allocation group token")
+    let group_id =
+        AllocationGroupToken::register().expect("failed to register allocation group token");
+    // We default to the root group in case of overflow
+    if group_id.id().as_usize().get() >= GROUP_MEM_METRICS.len() {
+        AllocationGroupToken(AllocationGroupId::ROOT)
+    } else {
+        group_id
+    }
 }

@@ -86,7 +86,7 @@ impl AllocationGroupId {
 /// [`AllocationGuard`] also tracks if another allocation group was active prior to entering, and ensures it is set back
 /// as the active allocation group when the guard is dropped.  This allows allocation groups to be nested within each
 /// other.
-pub struct AllocationGroupToken(AllocationGroupId);
+pub struct AllocationGroupToken(pub AllocationGroupId);
 
 impl AllocationGroupToken {
     /// Registers an allocation group token.
