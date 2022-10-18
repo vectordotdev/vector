@@ -199,7 +199,12 @@ mod tests {
     use futures::SinkExt;
 
     use super::*;
-    use crate::event::LogEvent;
+    use crate::{
+        event::LogEvent, test_util::components::assert_transform_compliance,
+        transforms::test::create_topology,
+    };
+    use tokio::sync::mpsc;
+    use tokio_stream::wrappers::ReceiverStream;
 
     #[test]
     fn generate_config() {
@@ -393,5 +398,29 @@ key_field = "{{ bucket }}"
 
         // And still nothing there
         assert_eq!(Poll::Ready(None), futures::poll!(out_stream.next()));
+    }
+
+    #[tokio::test]
+    async fn emits_internal_events() {
+        assert_transform_compliance(async move {
+            let config = ThrottleConfig {
+                threshold: 1,
+                window_secs: 1.0,
+                key_field: None,
+                exclude: None,
+            };
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
+
+            let log = LogEvent::from("hello world");
+            tx.send(log.into()).await.unwrap();
+
+            _ = out.recv().await;
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await
     }
 }
