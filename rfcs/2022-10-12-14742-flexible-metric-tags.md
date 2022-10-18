@@ -118,15 +118,23 @@ stored as optional strings, in which the `None` value represents a bare tag.
 ```rust
 type TagValue = Option<String>;
 
-struct MetricTags(BTreeMap<String, indexmap::IndexSet<TagValue>>);
+struct TagValueSet(indexmap::IndexSet<TagValue>);
+
+struct MetricTags(BTreeMap<String, TagValueSet>);
 
 impl MetricTags {
-    // Insert returns the value unchanged if the exact (tag,value) pair already exists,
-    // otherwise it inserts a new value for the named tag.
+    /// Insert returns the value unchanged if the exact (tag,value) pair already exists,
+    /// otherwise it inserts a new value for the named tag.
     fn insert(&mut self, name: String, value: TagValue) -> Option<TagValue>;
 
-    // Replace returns all the existing values when overwriting a tag.
-    fn replace(&mut self, name: String, value: Option<TagValue>) -> Option<IndexSet<TagValue>>;
+    /// Replace returns all the existing values when overwriting a tag.
+    fn replace(&mut self, name: String, value: Option<TagValue>) -> Option<TagValueSet>;
+
+    /// Remove a single value of a tag.
+    fn remove(&mut self, name: &str, value: Option<&str>) -> Option<TagValue>;
+
+    /// Remove all values for a tag name.
+    fn remove_all(&mut self, name: &str) -> Option<TagValueSet>;
 }
 ```
 
