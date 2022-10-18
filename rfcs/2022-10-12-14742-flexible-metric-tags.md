@@ -39,9 +39,6 @@ data loss. Those sources include:
 
 ### User Experience
 
-This change should be effectively invisible to users of Vector, except for incoming data with
-multiple tags with the same name, which will now have all the tags reproduced when it reaches sinks.
-
 #### External Representation
 
 The existing Protobuf representation of metric tags has a map of string-to-string pairs of
@@ -78,6 +75,37 @@ strings or `null` for tags with more than one value.
 }
 ```
 
+#### Scripting
+
+##### VRL
+
+VRL exposes the tags as a simple map of string values in `.tags`. This will be changed to exposing
+the values as arrays containing either string values or `null`, with the latter representing a bare
+tag. Assignment of a single value to a tag will overwrite all other values for the tag and trigger a
+deprecation warning. Deleting a tag name will remove all tag values with that name. As the values
+will be arrays, these can be used to add or remove individual values. Any tag consisting of an empty
+list will be removed. Since VRL has a "compile" phase, where type information is determined
+statically, we will use this information to generate warnings and errors about obsolete assignments
+at start up time. Since tags cannot have multiple identical values, modifications that result in
+duplicate values will also cause the duplicate to be dropped and a warning issued.
+
+Examples:
+
+```vrl
+.tags.single_value = "value"
+.tags.bare_tag = null
+.tags.multi_valued_tag = ["value1", "value2"]
+.tags.complex_tag = ["value3", null]
+```
+
+##### Lua
+
+The Lua transform also exposes tags as a simple map of string values in `event.metric.tags`. Similar
+to VRL, this will be changed to have arrays containing either string values or `null`. Since the
+script is under complete control of the data between starting the script and emitting data, we
+cannot issue warnings about how assignments to the tags are made. Instead, the resulting tags data
+will be parsed using the same algorithm as the native JSON encoding above.
+
 ### Implementation
 
 Simply put, the tags representation will change from an alias into a newtype wrapper using an
@@ -106,8 +134,8 @@ impl MetricTags {
 
 The guiding rationale for all of the external changes is to maximize backwards compatibility while
 adding support for the new functionality. This means that, where possible, Vector should accept all
-existing input data as-is using current formats, understanding that output representations will have
-to change to accomodate the new capabilities of the data set.
+existing tag assignments as-is using current formats, understanding that output representations will
+have to change to accomodate the new capabilities of the data set.
 
 The proposed Protobuf representation allows all possible combination of values for a tag set, and
 minimizes the encoded size in the presence of repeated tag names. It also requires no further
@@ -156,6 +184,22 @@ We could also change the native JSON encoding to unconditionally output arrays f
 order to simplify the encoding algorithm. However, given that we have to retain decoding for tags
 without the array values, we can make use of this form to reduce the complexity of the encoded data.
 
+### Scripting
+
+There are a handful of alternative paths for adding support for our scripting languages, all of
+which will cause problems for users:
+
+1. Expose the tags as single values using the existing naming, picking some arbitrary value when a
+   tag has multiple values, and set up a secondary tags structure that exposes the arrays. This will
+   lead to all kinds of confusion and conflicts when the same tag is assigned through different
+   variables.
+1. Add functions specficially for manipulating tag sets. This continues to make metrics management
+   look like a second-class afterthought, and doesn't ease any compatibility problems for existing
+   scripts.
+1. For Lua, set up a new version 3 API that exposes the arrays, while leaving version 2 with single
+   values. This will result in metrics with multi-valued tags being reduced to a single value even
+   when there is no modifications to the tags.
+
 ### Internal Representation
 
 The Datadog agent represents the tags as a simple set of strings, ie `HashSet<String>` or
@@ -201,10 +245,6 @@ type MetricTags = MultiIndexTagMap;
 ```
 
 ## Outstanding Questions
-
-- VRL doesn't have any way of _adding_ a tag to a metric when a tag with the same name already
-  exists, only replacing or deleting, nor does it really have support for creating bare tags nor
-  retrieving all the values of a tag name. Does it need additional functions to match this support?
 
 ## Plan Of Attack
 
