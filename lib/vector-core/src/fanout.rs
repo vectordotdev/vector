@@ -343,10 +343,9 @@ impl<'a> SendGroup<'a> {
             Some(sender) => {
                 // A sink must be known and present to be replaced, otherwise an invalid sequence of
                 // control operations has been applied.
-                assert!(
-                    sender.take().is_some(),
-                    "Pausing non-existent sink is not valid: {id}"
-                );
+                if sender.take().is_none() {
+                    self.try_detach_send(id);
+                }
             }
             None => panic!("Pausing unknown sink from fanout: {id}"),
         }
