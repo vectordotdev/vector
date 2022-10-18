@@ -49,6 +49,8 @@ use crate::{
 
 const MIN_FLUSH_PERIOD_SECS: u64 = 1;
 
+const LOCK_FAILED: &str = "Prometheus exporter data lock is poisoned";
+
 #[derive(Debug, Snafu)]
 enum BuildError {
     #[snafu(display("Flush period for sets must be greater or equal to {} secs", min))]
@@ -374,27 +376,36 @@ fn handle(
     default_namespace: Option<&str>,
     buckets: &[f64],
     quantiles: &[f64],
-    metrics: &IndexMap<MetricRef, (Metric, MetricMetadata)>,
+    metrics: &RwLock<IndexMap<MetricRef, (Metric, MetricMetadata)>>,
     bytes_sent: &Registered<BytesSent>,
 ) -> Response<Body> {
     let mut response = Response::new(Body::empty());
 
-    if !authorized(&req, auth) {
-        *response.status_mut() = StatusCode::UNAUTHORIZED;
-        response.headers_mut().insert(
-            http::header::WWW_AUTHENTICATE,
-            HeaderValue::from_static("Basic, Bearer"),
-        );
-        return response;
-    }
+    match (authorized(&req, auth), req.method(), req.uri().path()) {
+        (false, _, _) => {
+            *response.status_mut() = StatusCode::UNAUTHORIZED;
+            response.headers_mut().insert(
+                http::header::WWW_AUTHENTICATE,
+                HeaderValue::from_static("Basic, Bearer"),
+            );
+        }
 
-    match (req.method(), req.uri().path()) {
-        (&Method::GET, "/metrics") => {
+        (true, &Method::GET, "/metrics") => {
+            let metrics = metrics.read().expect(LOCK_FAILED);
+
+            let count = metrics.len();
+            let byte_size = metrics
+                .iter()
+                .map(|(_, (metric, _))| metric.size_of())
+                .sum();
+
             let mut collector = StringCollector::new();
 
-            for (_, (metric, _)) in metrics {
+            for (_, (metric, _)) in metrics.iter() {
                 collector.encode_metric(default_namespace, buckets, quantiles, metric);
             }
+
+            drop(metrics);
 
             let body = collector.finish();
             let body_size = body.size_of();
@@ -407,8 +418,15 @@ fn handle(
             );
 
             bytes_sent.emit(ByteSize(body_size));
+
+            emit!(EventsSent {
+                count,
+                byte_size,
+                output: None
+            });
         }
-        _ => {
+
+        (true, _, _) => {
             *response.status_mut() = StatusCode::NOT_FOUND;
         }
     }
@@ -451,14 +469,6 @@ impl PrometheusExporter {
             async move {
                 Ok::<_, Infallible>(service_fn(move |req| {
                     span.in_scope(|| {
-                        let metrics = metrics.read().unwrap();
-
-                        let count = metrics.len();
-                        let byte_size = metrics
-                            .iter()
-                            .map(|(_, (metric, _))| metric.size_of())
-                            .sum();
-
                         let response = handle(
                             req,
                             &auth,
@@ -468,12 +478,6 @@ impl PrometheusExporter {
                             &metrics,
                             &bytes_sent,
                         );
-
-                        emit!(EventsSent {
-                            count,
-                            byte_size,
-                            output: None
-                        });
 
                         emit!(PrometheusServerRequestComplete {
                             status_code: response.status(),
@@ -538,7 +542,7 @@ impl StreamSink<Event> for PrometheusExporter {
             if last_flush.elapsed() > self.config.flush_period_secs {
                 last_flush = Instant::now();
 
-                let mut metrics = self.metrics.write().unwrap();
+                let mut metrics = self.metrics.write().expect(LOCK_FAILED);
 
                 let normalizer_mut = normalizer.get_state_mut();
                 metrics.retain(|metric_ref, (_, metadata)| {
@@ -564,7 +568,7 @@ impl StreamSink<Event> for PrometheusExporter {
 
                 // We have a normalized metric, in absolute form.  If we're already aware of this
                 // metric, update its expiration deadline, otherwise, start tracking it.
-                let mut metrics = self.metrics.write().unwrap();
+                let mut metrics = self.metrics.write().expect(LOCK_FAILED);
 
                 match metrics.entry(MetricRef::from_metric(&normalized)) {
                     Entry::Occupied(mut entry) => {
