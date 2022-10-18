@@ -114,12 +114,12 @@ struct UnnestFn {
 impl UnnestFn {
     #[cfg(test)]
     fn new(path: &str) -> Self {
-        use lookup_lib::{lookup_v2::parse_value_path_old, PathPrefix};
+        use lookup_lib::{lookup_v2::parse_value_path, PathPrefix};
 
         Self {
             path: expression::Query::new(
                 expression::Target::External(PathPrefix::Event),
-                parse_value_path_old(path),
+                parse_value_path(path).unwrap(),
             ),
         }
     }
@@ -187,7 +187,7 @@ pub(crate) fn invert_array_at_path(typedef: &TypeDef, path: &OwnedValuePath) -> 
 
 #[cfg(test)]
 mod tests {
-    use lookup_lib::lookup_v2::parse_value_path_old;
+    use lookup_lib::lookup_v2::parse_value_path;
     use vector_common::{btreemap, TimeZone};
     use vrl::state::TypeState;
 
@@ -398,7 +398,7 @@ mod tests {
         ];
 
         for case in cases {
-            let path = parse_value_path_old(case.path);
+            let path = parse_value_path(case.path).unwrap();
             let new = invert_array_at_path(&case.old, &path);
             assert_eq!(case.new, new, "{}", path);
         }

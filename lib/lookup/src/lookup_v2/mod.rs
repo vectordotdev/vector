@@ -5,11 +5,18 @@ mod jit;
 mod owned;
 
 use self::jit::{JitValuePath, JitValuePathIter};
-use std::fmt::{Debug, Display, Formatter};
+use snafu::Snafu;
+use std::fmt::Debug;
 
 pub use borrowed::BorrowedSegment;
 pub use concat::PathConcat;
-pub use owned::{OwnedSegment, OwnedValuePath};
+pub use owned::{OwnedSegment, OwnedTargetPath, OwnedValuePath};
+
+#[derive(Clone, Debug, Eq, PartialEq, Snafu)]
+pub enum PathParseError {
+    #[snafu(display("Invalid field path {:?}", path))]
+    InvalidPathSyntax { path: String },
+}
 
 /// Syntactic sugar for creating a pre-parsed path.
 ///
@@ -66,12 +73,14 @@ pub fn parse_value_path_old(path: &str) -> OwnedValuePath {
 /// This parses a value path, which is a path without a target prefix.
 ///
 /// See `parse_target_path` if the path contains a target prefix.
-pub fn parse_value_path(path: &str) -> Result<OwnedValuePath, ()> {
+pub fn parse_value_path(path: &str) -> Result<OwnedValuePath, PathParseError> {
     let owned_path = JitValuePath::new(path).to_owned_value_path();
     if owned_path.is_valid() {
         Ok(owned_path)
     } else {
-        Err(())
+        Err(PathParseError::InvalidPathSyntax {
+            path: path.to_owned(),
+        })
     }
 }
 
@@ -80,7 +89,7 @@ pub fn parse_value_path(path: &str) -> Result<OwnedValuePath, ()> {
 /// This parses a target path, which is a path that contains a target prefix.
 ///
 /// See `parse_value_path` if the path doesn't contain a prefix.
-pub fn parse_target_path(path: &str) -> Result<OwnedTargetPath, ()> {
+pub fn parse_target_path(path: &str) -> Result<OwnedTargetPath, PathParseError> {
     let prefix = TargetPath::prefix(&path);
     let value_path = parse_value_path(path)?;
 
@@ -209,62 +218,4 @@ fn get_target_prefix(path: &str) -> (PathPrefix, &str) {
 pub enum PathPrefix {
     Event,
     Metadata,
-}
-
-#[derive(Hash, Eq, PartialEq, Clone, PartialOrd, Ord)]
-pub struct OwnedTargetPath {
-    pub prefix: PathPrefix,
-    pub path: OwnedValuePath,
-}
-
-impl OwnedTargetPath {
-    pub fn event_root() -> Self {
-        Self::root(PathPrefix::Event)
-    }
-    pub fn metadata_root() -> Self {
-        Self::root(PathPrefix::Metadata)
-    }
-
-    pub fn root(prefix: PathPrefix) -> Self {
-        Self {
-            prefix,
-            path: OwnedValuePath::root(),
-        }
-    }
-
-    pub fn event(path: OwnedValuePath) -> Self {
-        Self {
-            prefix: PathPrefix::Event,
-            path,
-        }
-    }
-
-    pub fn metadata(path: OwnedValuePath) -> Self {
-        Self {
-            prefix: PathPrefix::Metadata,
-            path,
-        }
-    }
-
-    pub fn can_start_with(&self, prefix: &Self) -> bool {
-        if self.prefix != prefix.prefix {
-            return false;
-        }
-        (&self.path).can_start_with(&prefix.path)
-    }
-}
-
-impl Display for OwnedTargetPath {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self.prefix {
-            PathPrefix::Event => write!(f, ".{}", self.path),
-            PathPrefix::Metadata => write!(f, "%{}", self.path),
-        }
-    }
-}
-
-impl Debug for OwnedTargetPath {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        Display::fmt(self, f)
-    }
 }

@@ -1,11 +1,19 @@
-use crate::lookup_v2::{parse_value_path_old, BorrowedSegment, ValuePath};
-use std::fmt::{Display, Formatter};
+use crate::lookup_v2::{parse_target_path, parse_value_path, BorrowedSegment, ValuePath};
+use crate::PathPrefix;
+use snafu::Snafu;
+use std::fmt::{Debug, Display, Formatter};
 use vector_config::configurable_component;
+
+#[derive(Clone, Debug, Eq, PartialEq, Snafu)]
+pub enum OwnedPathParseError {
+    #[snafu(display("Invalid field path {:?}", path))]
+    InvalidPathSyntax { path: String },
+}
 
 /// A lookup path.
 #[configurable_component]
 #[derive(Debug, Clone, PartialEq, Eq, Default, Hash, PartialOrd, Ord)]
-#[serde(from = "String", into = "String")]
+#[serde(try_from = "String", into = "String")]
 pub struct OwnedValuePath {
     pub segments: Vec<OwnedSegment>,
 }
@@ -16,11 +24,7 @@ impl OwnedValuePath {
     }
 
     pub fn is_valid(&self) -> bool {
-        !self
-            .segments
-            .iter()
-            .find(|segment| segment.is_invalid())
-            .is_some()
+        self.segments.iter().any(|segment| segment.is_invalid())
     }
 
     pub fn root() -> Self {
@@ -106,17 +110,104 @@ impl OwnedValuePath {
     }
 }
 
+/// An owned path that contains a target (pointing to either an Event or Metadata)
+#[configurable_component]
+#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[serde(try_from = "String", into = "String")]
+pub struct OwnedTargetPath {
+    pub prefix: PathPrefix,
+    pub path: OwnedValuePath,
+}
+
+impl OwnedTargetPath {
+    pub fn event_root() -> Self {
+        Self::root(PathPrefix::Event)
+    }
+    pub fn metadata_root() -> Self {
+        Self::root(PathPrefix::Metadata)
+    }
+
+    pub fn root(prefix: PathPrefix) -> Self {
+        Self {
+            prefix,
+            path: OwnedValuePath::root(),
+        }
+    }
+
+    pub fn event(path: OwnedValuePath) -> Self {
+        Self {
+            prefix: PathPrefix::Event,
+            path,
+        }
+    }
+
+    pub fn metadata(path: OwnedValuePath) -> Self {
+        Self {
+            prefix: PathPrefix::Metadata,
+            path,
+        }
+    }
+
+    pub fn can_start_with(&self, prefix: &Self) -> bool {
+        if self.prefix != prefix.prefix {
+            return false;
+        }
+        (&self.path).can_start_with(&prefix.path)
+    }
+}
+
+impl Display for OwnedTargetPath {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", String::from(self.to_owned()))
+    }
+}
+
+impl Debug for OwnedTargetPath {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(self, f)
+    }
+}
+
+impl From<OwnedTargetPath> for String {
+    fn from(target_path: OwnedTargetPath) -> Self {
+        match target_path.prefix {
+            PathPrefix::Event => format!(".{}", target_path.path),
+            PathPrefix::Metadata => format!("%{}", target_path.path),
+        }
+    }
+}
+
 impl Display for OwnedValuePath {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", String::from(self.clone()))
     }
 }
 
-impl From<String> for OwnedValuePath {
-    fn from(raw_path: String) -> Self {
-        parse_value_path_old(raw_path.as_str())
+impl TryFrom<String> for OwnedValuePath {
+    type Error = OwnedPathParseError;
+
+    fn try_from(src: String) -> Result<Self, Self::Error> {
+        parse_value_path(&src).map_err(|_| OwnedPathParseError::InvalidPathSyntax {
+            path: src.to_owned(),
+        })
     }
 }
+
+impl TryFrom<String> for OwnedTargetPath {
+    type Error = OwnedPathParseError;
+
+    fn try_from(src: String) -> Result<Self, Self::Error> {
+        parse_target_path(&src).map_err(|_| OwnedPathParseError::InvalidPathSyntax {
+            path: src.to_owned(),
+        })
+    }
+}
+
+// impl From<String> for OwnedValuePath {
+//     fn from(raw_path: String) -> Self {
+//         parse_value_path_old(raw_path.as_str())
+//     }
+// }
 
 impl From<OwnedValuePath> for String {
     fn from(owned: OwnedValuePath) -> Self {
@@ -336,7 +427,7 @@ impl<'a> Iterator for OwnedSegmentSliceIter<'a> {
 
 #[cfg(test)]
 mod test {
-    use crate::lookup_v2::parse_value_path_old;
+    use crate::lookup_v2::parse_value_path;
 
     #[test]
     fn owned_path_serialize() {
@@ -381,7 +472,7 @@ mod test {
         ];
 
         for (path, expected) in test_cases {
-            let path = parse_value_path_old(path);
+            let path = parse_value_path(path).unwrap();
             let path = serde_json::to_string(&path).unwrap();
             let path = serde_json::from_str::<serde_json::Value>(&path).unwrap();
             assert_eq!(path, expected);

@@ -63,7 +63,7 @@ impl Template {
     }
 
     pub fn new(src: &str) -> Result<Self, TemplateParseError> {
-        let (has_error, is_dynamic) = StrftimeItems::new(&src)
+        let (has_error, is_dynamic) = StrftimeItems::new(src)
             .fold((false, false), |(error, dynamic), item| {
                 (error || is_error(&item), dynamic || is_dynamic(&item))
             });
