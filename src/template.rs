@@ -6,7 +6,7 @@ use chrono::{
     Utc,
 };
 use once_cell::sync::Lazy;
-use regex::{Captures, Regex};
+use regex::Regex;
 use snafu::Snafu;
 use vector_config::{configurable_component, ConfigurableString};
 
@@ -16,6 +16,15 @@ use crate::{
 };
 
 static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\{\{(?P<key>[^\}]+)\}\}").unwrap());
+
+/// One part of the template string after parsing.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+enum Part {
+    /// A literal piece of text to be copied verbatim into the output.
+    Literal(String),
+    /// A reference to the source event, to be copied from the relevant field or tag.
+    Reference(String),
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Snafu)]
 pub enum TemplateParseError {
@@ -46,6 +55,9 @@ pub enum TemplateRenderingError {
 #[serde(try_from = "String", into = "String")]
 pub struct Template {
     src: String,
+
+    #[serde(skip)]
+    parts: Vec<Part>,
 
     #[serde(skip)]
     has_ts: bool,
@@ -96,10 +108,13 @@ impl TryFrom<Cow<'_, str>> for Template {
         if has_error {
             Err(TemplateParseError::StrftimeError)
         } else {
+            let parts = parse_template(&src);
+            let has_fields = parts.iter().any(|part| matches!(part, Part::Reference(_)));
             Ok(Template {
-                has_fields: RE.is_match(&src),
+                parts,
                 src: src.into_owned(),
                 has_ts: is_dynamic,
+                has_fields,
             })
         }
     }
@@ -149,10 +164,10 @@ impl Template {
         let event = event.into();
         match (self.has_fields, self.has_ts) {
             (false, false) => Ok(self.src.clone()),
-            (true, false) => render_fields(&self.src, event),
+            (true, false) => render_fields(&self.parts, event),
             (false, true) => Ok(render_timestamp(&self.src, event)),
             (true, true) => {
-                let tmp = render_fields(&self.src, event)?;
+                let tmp = render_fields(&self.parts, event)?;
                 Ok(render_timestamp(&tmp, event))
             }
         }
@@ -182,25 +197,47 @@ impl Template {
     }
 }
 
-fn render_fields(src: &str, event: EventRef<'_>) -> Result<String, TemplateRenderingError> {
+// Pre-parse the template string into a series of parts to be filled in at render time.
+fn parse_template(src: &str) -> Vec<Part> {
+    let (last, mut parts) =
+        RE.captures_iter(src)
+            .fold((0, Vec::new()), |(last_end, mut parts), cap| {
+                let all = cap.get(0).expect("Capture 0 is always defined");
+                if all.start() > last_end {
+                    parts.push(Part::Literal(src[last_end..all.start()].to_string()));
+                }
+                parts.push(Part::Reference(cap[1].trim().to_owned()));
+                (all.end(), parts)
+            });
+    if src.len() > last {
+        parts.push(Part::Literal(src[last..].to_string()));
+    }
+    parts
+}
+
+fn render_fields(parts: &[Part], event: EventRef<'_>) -> Result<String, TemplateRenderingError> {
     let mut missing_keys = Vec::new();
-    let out = RE
-        .replace_all(src, |caps: &Captures<'_>| {
-            let key = caps
-                .get(1)
-                .map(|s| s.as_str().trim())
-                .expect("src should match regex");
-            match event {
-                EventRef::Log(log) => log.get(key).map(|val| val.to_string_lossy()),
-                EventRef::Metric(metric) => render_metric_field(key, metric).map(Into::into),
-                EventRef::Trace(trace) => trace.get(&key).map(|val| val.to_string_lossy()),
+    let mut out = String::new();
+    for part in parts {
+        match part {
+            Part::Literal(lit) => out.push_str(lit),
+            Part::Reference(key) => {
+                out.push_str(
+                    &match event {
+                        EventRef::Log(log) => log.get(&**key).map(Value::to_string_lossy),
+                        EventRef::Metric(metric) => {
+                            render_metric_field(key, metric).map(Cow::Borrowed)
+                        }
+                        EventRef::Trace(trace) => trace.get(&key).map(Value::to_string_lossy),
+                    }
+                    .unwrap_or_else(|| {
+                        missing_keys.push(key.to_owned());
+                        Cow::Borrowed("")
+                    }),
+                );
             }
-            .unwrap_or_else(|| {
-                missing_keys.push(key.to_owned());
-                "".into()
-            })
-        })
-        .into_owned();
+        }
+    }
     if missing_keys.is_empty() {
         Ok(out)
     } else {
@@ -208,13 +245,11 @@ fn render_fields(src: &str, event: EventRef<'_>) -> Result<String, TemplateRende
     }
 }
 
-fn render_metric_field(key: &str, metric: &Metric) -> Option<String> {
+fn render_metric_field<'a>(key: &str, metric: &'a Metric) -> Option<&'a str> {
     match key {
-        "name" => Some(metric.name().into()),
+        "name" => Some(metric.name()),
         "namespace" => metric.namespace().map(Into::into),
-        _ if key.starts_with("tags.") => metric
-            .tags()
-            .and_then(|tags| tags.get(&key[5..]).map(ToOwned::to_owned)),
+        _ if key.starts_with("tags.") => metric.tags().and_then(|tags| tags.get(&key[5..])),
         _ => None,
     }
 }
