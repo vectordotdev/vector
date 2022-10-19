@@ -575,7 +575,7 @@ enum Ec2MetadataError {
 #[cfg(feature = "aws-ec2-metadata-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use lookup::lookup_v2::{parse_value_path_old, OwnedSegment, OwnedValuePath};
+    use lookup::lookup_v2::{OwnedSegment, OwnedValuePath};
     use lookup::{event_path, PathPrefix};
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
@@ -636,7 +636,7 @@ mod integration_tests {
                 vec![OwnedSegment::field(SUBNET_ID_KEY)].into(),
                 "mock-subnet-id",
             ),
-            (parse_value_path_old("\"role-name\"[0]"), "mock-user"),
+            (owned_value_path!("role-name", 0), "mock-user"),
         ]
     }
 

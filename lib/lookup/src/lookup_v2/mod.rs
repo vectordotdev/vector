@@ -66,15 +66,6 @@ macro_rules! owned_value_path {
 /// This parses a value path, which is a path without a target prefix.
 ///
 /// See `parse_target_path` if the path contains a target prefix.
-pub fn parse_value_path_old(path: &str) -> OwnedValuePath {
-    JitValuePath::new(path).to_owned_value_path()
-}
-
-/// Use if you want to pre-parse a path.
-/// The return value (when borrowed) implements `Path` so it can be used directly.
-/// This parses a value path, which is a path without a target prefix.
-///
-/// See `parse_target_path` if the path contains a target prefix.
 pub fn parse_value_path(path: &str) -> Result<OwnedValuePath, PathParseError> {
     println!("Parse value path: {:?}", path);
     let owned_path = JitValuePath::new(path).to_owned_value_path();
