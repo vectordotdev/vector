@@ -410,6 +410,9 @@ components: sinks: elasticsearch: {
 				due to Elasticsearch index mapping errors, where data keys aren't consistently
 				typed. To change this behavior, refer to the Elasticsearch [`ignore_malformed`
 				setting](\(urls.elasticsearch_ignore_malformed)).
+
+				By default, partial failures are not retried. To enable retries, set `request_retry_partial`. Once enabled it will
+				retry whole partially failed requests as such it is advised to use `id_key` to avoid duplicates.
 				"""
 		}
 
