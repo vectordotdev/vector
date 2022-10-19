@@ -19,7 +19,7 @@ impl OwnedValuePath {
     }
 
     pub fn is_valid(&self) -> bool {
-        self.segments.iter().any(|segment| segment.is_invalid())
+        !self.segments.iter().any(|segment| segment.is_invalid())
     }
 
     pub fn root() -> Self {
@@ -148,6 +148,24 @@ impl OwnedTargetPath {
             return false;
         }
         (&self.path).can_start_with(&prefix.path)
+    }
+
+    pub fn with_field_appended(&self, field: &str) -> Self {
+        let mut new_path = self.path.clone();
+        new_path.push_field(field);
+        Self {
+            prefix: self.prefix,
+            path: new_path,
+        }
+    }
+
+    pub fn with_index_appended(&self, index: isize) -> Self {
+        let mut new_path = self.path.clone();
+        new_path.push_index(index);
+        Self {
+            prefix: self.prefix,
+            path: new_path,
+        }
     }
 }
 
@@ -421,50 +439,49 @@ mod test {
     #[test]
     fn owned_path_serialize() {
         let test_cases = [
-            (".", ""),
-            ("", "<invalid>"),
-            ("]", "<invalid>"),
-            ("]foo", "<invalid>"),
-            ("..", "<invalid>"),
-            ("...", "<invalid>"),
-            ("f", "f"),
-            ("foo", "foo"),
+            (".", Some("")),
+            ("", None),
+            ("]", None),
+            ("]foo", None),
+            ("..", None),
+            ("...", None),
+            ("f", Some("f")),
+            ("foo", Some("foo")),
             (
                 r#"ec2.metadata."availability-zone""#,
-                r#"ec2.metadata."availability-zone""#,
+                Some(r#"ec2.metadata."availability-zone""#),
             ),
-            ("@timestamp", "@timestamp"),
-            ("foo[", "<invalid>"),
-            ("foo$", "<invalid>"),
-            (r#""$peci@l chars""#, r#""$peci@l chars""#),
-            ("foo.foo bar", "<invalid>"),
-            (r#"foo."foo bar".bar"#, r#"foo."foo bar".bar"#),
-            ("[1]", "[1]"),
-            ("[42]", "[42]"),
-            ("foo.[42]", "<invalid>"),
-            ("[42].foo", "[42].foo"),
-            ("[-1]", "[-1]"),
-            ("[-42]", "[-42]"),
-            ("[-42].foo", "[-42].foo"),
-            ("[-42]foo", "[-42].foo"),
-            (r#""[42]. {}-_""#, r#""[42]. {}-_""#),
-            (r#""a\"a""#, r#""a\"a""#),
-            (r#"foo."a\"a"."b\\b".bar"#, r#"foo."a\"a"."b\\b".bar"#),
-            ("<invalid>", "<invalid>"),
-            (r#""🤖""#, r#""🤖""#),
-            (".(a|b)", "(a|b)"),
-            (".(a|b|c)", "(a|b|c)"),
-            ("foo.(a|b|c)", "foo.(a|b|c)"),
-            ("[0].(a|b|c)", "[0].(a|b|c)"),
-            (".(a|b|c).foo", "(a|b|c).foo"),
-            (".( a | b | c ).foo", "(a|b|c).foo"),
+            ("@timestamp", Some("@timestamp")),
+            ("foo[", None),
+            ("foo$", None),
+            (r#""$peci@l chars""#, Some(r#""$peci@l chars""#)),
+            ("foo.foo bar", None),
+            (r#"foo."foo bar".bar"#, Some(r#"foo."foo bar".bar"#)),
+            ("[1]", Some("[1]")),
+            ("[42]", Some("[42]")),
+            ("foo.[42]", None),
+            ("[42].foo", Some("[42].foo")),
+            ("[-1]", Some("[-1]")),
+            ("[-42]", Some("[-42]")),
+            ("[-42].foo", Some("[-42].foo")),
+            ("[-42]foo", Some("[-42].foo")),
+            (r#""[42]. {}-_""#, Some(r#""[42]. {}-_""#)),
+            (r#""a\"a""#, Some(r#""a\"a""#)),
+            (r#"foo."a\"a"."b\\b".bar"#, Some(r#"foo."a\"a"."b\\b".bar"#)),
+            ("<invalid>", None),
+            (r#""🤖""#, Some(r#""🤖""#)),
+            (".(a|b)", Some("(a|b)")),
+            (".(a|b|c)", Some("(a|b|c)")),
+            ("foo.(a|b|c)", Some("foo.(a|b|c)")),
+            ("[0].(a|b|c)", Some("[0].(a|b|c)")),
+            (".(a|b|c).foo", Some("(a|b|c).foo")),
+            (".( a | b | c ).foo", Some("(a|b|c).foo")),
         ];
 
         for (path, expected) in test_cases {
-            let path = parse_value_path(path).unwrap();
-            let path = serde_json::to_string(&path).unwrap();
-            let path = serde_json::from_str::<serde_json::Value>(&path).unwrap();
-            assert_eq!(path, expected);
+            let path = parse_value_path(path).map(|path| String::from(path)).ok();
+
+            assert_eq!(path, expected.map(|x| x.to_owned()));
         }
     }
 }

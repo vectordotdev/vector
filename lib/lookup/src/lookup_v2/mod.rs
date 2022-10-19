@@ -76,6 +76,7 @@ pub fn parse_value_path_old(path: &str) -> OwnedValuePath {
 ///
 /// See `parse_target_path` if the path contains a target prefix.
 pub fn parse_value_path(path: &str) -> Result<OwnedValuePath, PathParseError> {
+    println!("Parse value path: {:?}", path);
     let owned_path = JitValuePath::new(path).to_owned_value_path();
     if owned_path.is_valid() {
         Ok(owned_path)
@@ -93,7 +94,7 @@ pub fn parse_value_path(path: &str) -> Result<OwnedValuePath, PathParseError> {
 /// See `parse_value_path` if the path doesn't contain a prefix.
 pub fn parse_target_path(path: &str) -> Result<OwnedTargetPath, PathParseError> {
     let prefix = TargetPath::prefix(&path);
-    let value_path = parse_value_path(path)?;
+    let value_path = parse_value_path(TargetPath::value_path(&path))?;
 
     Ok(OwnedTargetPath {
         prefix,
@@ -232,4 +233,18 @@ fn get_target_prefix(path: &str) -> (PathPrefix, &str) {
 pub enum PathPrefix {
     Event,
     Metadata,
+}
+
+#[cfg(test)]
+mod test {
+    use crate::lookup_v2::parse_target_path;
+    use crate::OwnedTargetPath;
+
+    #[test]
+    fn test_parse_target_path() {
+        assert_eq!(
+            parse_target_path("i"),
+            Ok(OwnedTargetPath::event(owned_value_path!("i")))
+        );
+    }
 }
