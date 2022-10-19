@@ -1,10 +1,4 @@
-use std::{
-    borrow::{Borrow, Cow},
-    collections::HashSet,
-    fmt,
-    future::ready,
-    pin::Pin,
-};
+use std::{collections::HashSet, fmt, future::ready, pin::Pin};
 
 use bloom::{BloomFilter, ASMS};
 use futures::{Stream, StreamExt};
@@ -171,9 +165,9 @@ impl TagValueSet {
         }
     }
 
-    fn contains(&self, value: Cow<'_, str>) -> bool {
+    fn contains(&self, value: &str) -> bool {
         match &self.storage {
-            TagValueSetStorage::Set(set) => set.contains(value.borrow() as &str),
+            TagValueSetStorage::Set(set) => set.contains(value),
             TagValueSetStorage::Bloom(bloom) => bloom.contains(&value),
         }
     }
@@ -182,9 +176,9 @@ impl TagValueSet {
         self.num_elements
     }
 
-    fn insert(&mut self, value: Cow<'_, str>) -> bool {
+    fn insert(&mut self, value: &str) -> bool {
         let inserted = match &mut self.storage {
-            TagValueSetStorage::Set(set) => set.insert(value.into_owned()),
+            TagValueSetStorage::Set(set) => set.insert(value.to_string()),
             TagValueSetStorage::Bloom(bloom) => bloom.insert(&value),
         };
         if inserted {
@@ -216,7 +210,7 @@ impl TagCardinalityLimit {
             .entry_ref(key)
             .or_insert_with(|| TagValueSet::new(self.config.value_limit, &self.config.mode));
 
-        if tag_value_set.contains(Cow::Borrowed(value)) {
+        if tag_value_set.contains(value) {
             // Tag value has already been accepted, nothing more to do.
             return true;
         }
@@ -224,7 +218,7 @@ impl TagCardinalityLimit {
         // Tag value not yet part of the accepted set.
         if tag_value_set.len() < self.config.value_limit as usize {
             // accept the new value
-            tag_value_set.insert(Cow::Borrowed(value));
+            tag_value_set.insert(value);
 
             if tag_value_set.len() == self.config.value_limit as usize {
                 emit!(TagCardinalityValueLimitReached { key });
@@ -243,8 +237,7 @@ impl TagCardinalityLimit {
         self.accepted_tags
             .get(key)
             .map(|value_set| {
-                !value_set.contains(Cow::Borrowed(value))
-                    && value_set.len() >= self.config.value_limit as usize
+                !value_set.contains(value) && value_set.len() >= self.config.value_limit as usize
             })
             .unwrap_or(false)
     }
@@ -254,7 +247,7 @@ impl TagCardinalityLimit {
         self.accepted_tags
             .entry_ref(key)
             .or_insert_with(|| TagValueSet::new(self.config.value_limit, &self.config.mode))
-            .insert(Cow::Borrowed(value));
+            .insert(value);
     }
 
     fn transform_one(&mut self, mut event: Event) -> Option<Event> {
