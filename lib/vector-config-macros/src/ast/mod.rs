@@ -83,17 +83,17 @@ impl Tagging {
     /// purpose of generating usable documentation from the schema.
     pub fn as_enum_metadata(&self) -> Vec<CustomAttribute> {
         match self {
-            Self::External => vec![CustomAttribute::kv("enum_tagging", "external")],
+            Self::External => vec![CustomAttribute::kv("docs::enum_tagging", "external")],
             Self::Internal { tag } => vec![
-                CustomAttribute::kv("enum_tagging", "internal"),
-                CustomAttribute::kv("enum_tag_field", tag),
+                CustomAttribute::kv("docs::enum_tagging", "internal"),
+                CustomAttribute::kv("docs::enum_tag_field", tag),
             ],
             Self::Adjacent { tag, content } => vec![
-                CustomAttribute::kv("enum_tagging", "adjacent"),
-                CustomAttribute::kv("enum_tag_field", tag),
-                CustomAttribute::kv("enum_content_field", content),
+                CustomAttribute::kv("docs::enum_tagging", "adjacent"),
+                CustomAttribute::kv("docs::enum_tag_field", tag),
+                CustomAttribute::kv("docs::enum_content_field", content),
             ],
-            Self::None => vec![CustomAttribute::kv("enum_tagging", "untagged")],
+            Self::None => vec![CustomAttribute::kv("docs::enum_tagging", "untagged")],
         }
     }
 }

@@ -132,7 +132,7 @@ impl Configurable for Concurrency {
     fn metadata() -> Metadata<Self> {
         let mut metadata = Metadata::default();
         metadata.set_description("Configuration for outbound request concurrency.");
-        metadata.add_custom_attribute(CustomAttribute::kv("enum_tagging", "external"));
+        metadata.add_custom_attribute(CustomAttribute::kv("docs::enum_tagging", "external"));
         metadata
     }
 

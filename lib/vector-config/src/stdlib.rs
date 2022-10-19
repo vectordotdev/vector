@@ -97,7 +97,7 @@ macro_rules! impl_configuable_numeric {
                 fn metadata() -> Metadata<Self> {
                     let mut metadata = Metadata::default();
                     let numeric_type = <Self as ConfigurableNumber>::class();
-                    metadata.add_custom_attribute(CustomAttribute::kv("numeric_type", numeric_type));
+                    metadata.add_custom_attribute(CustomAttribute::kv("docs::numeric_type", numeric_type));
 
                     metadata
                 }

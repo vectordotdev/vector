@@ -207,7 +207,7 @@ impl Configurable for Compression {
     fn metadata() -> Metadata<Self> {
         let mut metadata = Metadata::default();
         metadata.set_description("Compression configuration.");
-        metadata.add_custom_attribute(CustomAttribute::kv("enum_tagging", "external"));
+        metadata.add_custom_attribute(CustomAttribute::kv("docs::enum_tagging", "external"));
         metadata
     }
 
