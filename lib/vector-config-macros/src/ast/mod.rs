@@ -148,13 +148,7 @@ impl FromMeta for Metadata {
             .iter()
             .filter_map(|nmeta| match nmeta {
                 NestedMeta::Meta(meta) => match meta {
-                    syn::Meta::Path(path) => match path.get_ident() {
-                        Some(ident) => Some(CustomAttribute::Flag(ident.to_string())),
-                        None => {
-                            errors.push(darling::Error::unknown_value("flag attributes must be simple strings i.e. `flag` or `my_flag`").with_span(nmeta));
-                            None
-                        },
-                    }
+                    syn::Meta::Path(path) => Some(CustomAttribute::Flag(path_to_string(path))),
                     syn::Meta::List(_) => {
                         errors.push(darling::Error::unexpected_type("list").with_span(nmeta));
                         None

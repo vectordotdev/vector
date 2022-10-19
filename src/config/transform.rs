@@ -34,7 +34,7 @@ where
     /// [configuration]: https://vector.dev/docs/reference/configuration/
     pub inputs: Vec<T>,
 
-    #[configurable(metadata(hidden))]
+    #[configurable(metadata(docs::hidden))]
     #[serde(flatten)]
     pub inner: Transforms,
 }

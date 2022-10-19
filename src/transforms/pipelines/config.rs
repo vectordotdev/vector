@@ -33,7 +33,7 @@ pub struct PipelineConfig {
 
     /// A list of sequential transforms that will process any event that is passed to the pipeline.
     #[serde(default)]
-    #[configurable(metadata(cycle_entrypoint))]
+    #[configurable(metadata(docs::cycle_entrypoint))]
     transforms: Vec<Transforms>,
 }
 

@@ -20,17 +20,6 @@ where
         None
     }
 
-    /// Gets the human-readable description of this value, if any.
-    ///
-    /// For standard types, this will be `None`. Commonly, custom types would implement this
-    /// directly, while fields using standard types would provide a field-specific description that
-    /// would be used instead of the default description.
-    // TODO: We should probably just remove this, because it's not always required and we don't use
-    // it directly when asserting if types have a description specified, we look in the metadata.
-    fn description() -> Option<&'static str> {
-        None
-    }
-
     /// Whether or not this value is optional.
     fn is_optional() -> bool {
         false
@@ -38,11 +27,7 @@ where
 
     /// Gets the metadata for this value.
     fn metadata() -> Metadata<Self> {
-        let mut metadata = Metadata::default();
-        if let Some(description) = Self::description() {
-            metadata.set_description(description);
-        }
-        metadata
+        Metadata::default()
     }
 
     fn validate_metadata(_metadata: &Metadata<Self>) -> Result<(), GenerateError> {

@@ -403,7 +403,7 @@ fn generate_field_metadata(meta_ident: &Ident, field: &Field<'_>) -> proc_macro2
     // - Scalars are also not "referenceable" which means their schema is used inline, not pointed
     //   to by a schema reference.
     // - All other types, whether they have a derive-based or hand-written implementation of
-    //   `Configurable` should have a referencable name.
+    //   `Configurable` should have a referenceable name.
     // - When using a referenceable type for a named field (struct or enum variant), it can be
     //   annotated with a derive helper attribute called `derived`, which informs the codegen that
     //   the title/description for that field should come from the field type's schema itself.
@@ -417,7 +417,7 @@ fn generate_field_metadata(meta_ident: &Ident, field: &Field<'_>) -> proc_macro2
     // For referenceable types, their schema will be referred to by an identifier, and the
     // definition attached to that identifier will carry the field type's metadata. Any metadata
     // specified on the field itself should live solely on the field's schema (which can exist
-    // alongside the schema reference) and vise versa.
+    // alongside the schema reference) and vice versa.
     //
     // Conflating factors: transparent fields, derived fields, and flattened fields.
     //

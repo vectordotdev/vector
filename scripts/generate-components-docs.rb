@@ -269,7 +269,7 @@ def resolve_schema_by_name(root_schema, schema_name)
     @logger.error "Cycle detected while resolving schema '#{schema_name}'. \
     \
     Cycles must be broken manually at the source code level by annotating fields that induce \
-    cycles with `#[configurable(metadata(cycle_entrypoint))]`. As such a field will have no type \
+    cycles with `#[configurable(metadata(docs::cycle_entrypoint))]`. As such a field will have no type \
     information rendered, it is advised to supply a sufficiently detailed field description that \
     describes the allowable values, etc."
     exit
@@ -300,7 +300,7 @@ def resolve_schema(root_schema, schema)
   # We mark that field hidden so that it's excluded when we resolve the schema for `SinkOuter`, etc,
   # and then we individually resolve the component schemas, and merge the two (outer + component
   # itself) schemas back together.
-  if get_schema_metadata(schema, 'hidden')
+  if get_schema_metadata(schema, 'docs::hidden')
     @logger.debug 'Instructed to skip resolution for the given schema.'
     return
   end
@@ -312,7 +312,7 @@ def resolve_schema(root_schema, schema)
   #
   # We have to return _something_, as it's a real part of the schema, so we just return a basic
   # schema with no type information but with any description that is specified, etc.
-  if get_schema_metadata(schema, 'cycle_entrypoint')
+  if get_schema_metadata(schema, 'docs::cycle_entrypoint')
     resolved = { 'type' => 'blank' }
     description = get_rendered_description_from_schema(schema)
     resolved['description'] = description unless description.empty?
@@ -423,7 +423,7 @@ def resolve_bare_schema(root_schema, schema)
     when 'number'
       @logger.debug 'Resolving number schema.'
 
-      numeric_type = get_schema_metadata(schema, 'numeric_type') || 'number'
+      numeric_type = get_schema_metadata(schema, 'docs::numeric_type') || 'number'
       number_def = {}
       number_def['default'] = schema['default'] unless schema['default'].nil?
 
@@ -466,20 +466,20 @@ def resolve_enum_schema(root_schema, schema)
   subschema_count = subschemas.count
 
   # Collect all of the tagging mode information upfront.
-  enum_tagging = get_schema_metadata(schema, 'enum_tagging')
+  enum_tagging = get_schema_metadata(schema, 'docs::enum_tagging')
   if enum_tagging.nil?
     @logger.error 'Enum schemas should never be missing the metadata for the enum tagging mode.'
     @logger.error "Schema: #{JSON.pretty_generate(schema)}"
     exit
   end
 
-  enum_tag_field = get_schema_metadata(schema, 'enum_tag_field')
+  enum_tag_field = get_schema_metadata(schema, 'docs::enum_tag_field')
 
   # Schema pattern: X or array of X.
   #
   # We employ this pattern on the Vector side to allow specifying a single instance of X -- object,
   # string, whatever -- or as an array of X. We just need to inspect both schemas to make sure one
-  # is an array of X and the other is the same as X, or vise versa.
+  # is an array of X and the other is the same as X, or vice versa.
   if subschema_count == 2
     array_idx = subschemas.index { |subschema| subschema['type'] == 'array' }
     unless array_idx.nil?
@@ -783,7 +783,7 @@ end
 def apply_schema_metadata!(source_schema, resolved_schema)
   # Handle marking string schemas as templateable, which shows a special blurb in the rendered
   # documentation HTML that explains what this means and links to the template syntax, etc.
-  is_templateable = get_schema_metadata(source_schema, 'templateable') == true
+  is_templateable = get_schema_metadata(source_schema, 'docs::templateable') == true
   string_type_def = resolved_schema.dig('type', 'string')
   if !string_type_def.nil? && is_templateable
     string_type_def['syntax'] = 'template'
@@ -798,7 +798,7 @@ def get_rendered_description_from_schema(schema)
   # existing title/description should not be rendered in the output. This is primarily to avoid
   # spitting out developer-oriented documentation into the user-facing documentation, when we're
   # providing the necessary description in another way.
-  if !get_schema_metadata(schema, 'no_description').nil?
+  if !get_schema_metadata(schema, 'docs::no_description').nil?
     return ''
   end
 
@@ -904,7 +904,7 @@ component_types = %w[source transform sink]
 # settings, and proxy settings... and then the configuration for a sink would be those, plus
 # whatever the sink itself defines.
 component_bases = root_schema['definitions'].filter_map do |key, definition|
-  component_base_type = get_schema_metadata(definition, 'component_base_type')
+  component_base_type = get_schema_metadata(definition, 'docs::component_base_type')
   { component_base_type => key } if component_types.include? component_base_type
 end
 .reduce { |acc, item| nested_merge(acc, item) }
@@ -915,8 +915,8 @@ end
 
 # Now we'll generate the base configuration for each component.
 all_components = root_schema['definitions'].filter_map do |key, definition|
-  component_type = get_schema_metadata(definition, 'component_type')
-  component_name = get_schema_metadata(definition, 'component_name')
+  component_type = get_schema_metadata(definition, 'docs::component_type')
+  component_name = get_schema_metadata(definition, 'docs::component_name')
   { component_type => { component_name => key } } if component_types.include? component_type
 end
 .reduce { |acc, item| nested_merge(acc, item) }

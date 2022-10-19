@@ -421,7 +421,7 @@ where
     T::validate_metadata(&overrides)?;
 
     let mut schema = match T::referenceable_name() {
-        // When `T` has a referencable name, try looking it up in the schema generator's definition
+        // When `T` has a referenceable name, try looking it up in the schema generator's definition
         // list, and if it exists, create a schema reference to it. Otherwise, generate it and
         // backfill it in the schema generator.
         Some(name) => {
@@ -452,7 +452,7 @@ where
 
             get_schema_ref(gen, name)
         }
-        // Always generate the schema directly if `T` is not referencable.
+        // Always generate the schema directly if `T` is not referenceable.
         None => T::generate_schema(gen)?,
     };
 

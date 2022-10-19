@@ -26,7 +26,7 @@ pub struct SourceOuter {
     #[serde(default, skip)]
     pub sink_acknowledgements: bool,
 
-    #[configurable(metadata(hidden))]
+    #[configurable(metadata(docs::hidden))]
     #[serde(flatten)]
     pub(crate) inner: Sources,
 }
