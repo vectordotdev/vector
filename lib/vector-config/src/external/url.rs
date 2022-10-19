@@ -9,7 +9,7 @@ use crate::{
 impl Configurable for url::Url {
     fn metadata() -> Metadata<Self> {
         let mut metadata = Metadata::default();
-        metadata.set_description("A uniform resource location. (URL)");
+        metadata.set_description("A uniform resource location (URL).");
         metadata.add_validation(Validation::KnownFormat(Format::Uri));
         metadata
     }
