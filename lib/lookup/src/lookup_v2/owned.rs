@@ -18,10 +18,6 @@ impl OwnedValuePath {
         self.segments.is_empty()
     }
 
-    pub fn is_valid(&self) -> bool {
-        !self.segments.iter().any(|segment| segment.is_invalid())
-    }
-
     pub fn root() -> Self {
         vec![].into()
     }
@@ -65,7 +61,6 @@ impl OwnedValuePath {
         let mut components = vec![vec![]];
         for segment in self.segments.iter().take(limit) {
             match segment {
-                OwnedSegment::Invalid => return vec![],
                 OwnedSegment::Field(field) => {
                     for component in &mut components {
                         component.push(field.as_str());
@@ -96,12 +91,6 @@ impl OwnedValuePath {
 
     pub fn push(&mut self, segment: OwnedSegment) {
         self.segments.push(segment);
-    }
-
-    pub fn invalid() -> Self {
-        Self {
-            segments: vec![OwnedSegment::Invalid],
-        }
     }
 }
 
@@ -228,9 +217,6 @@ impl From<OwnedValuePath> for String {
                     serialize_field(field.as_ref(), (i != 0).then_some("."))
                 }
                 OwnedSegment::Index(index) => format!("[{}]", index),
-                OwnedSegment::Invalid => {
-                    (if i == 0 { "<invalid>" } else { ".<invalid>" }).to_owned()
-                }
                 OwnedSegment::Coalesce(fields) => {
                     let mut output = String::new();
                     let (last, fields) = fields.split_last().expect("coalesce must not be empty");
@@ -300,7 +286,6 @@ pub enum OwnedSegment {
     Field(String),
     Index(isize),
     Coalesce(Vec<String>),
-    Invalid,
 }
 
 impl OwnedSegment {
@@ -321,13 +306,9 @@ impl OwnedSegment {
     pub fn is_index(&self) -> bool {
         matches!(self, OwnedSegment::Index(_))
     }
-    pub fn is_invalid(&self) -> bool {
-        matches!(self, OwnedSegment::Invalid)
-    }
 
     pub fn can_start_with(&self, prefix: &OwnedSegment) -> bool {
         match (self, prefix) {
-            (OwnedSegment::Invalid, _) | (_, OwnedSegment::Invalid) => false,
             (OwnedSegment::Index(a), OwnedSegment::Index(b)) => a == b,
             (OwnedSegment::Index(_), _) | (_, OwnedSegment::Index(_)) => false,
             (OwnedSegment::Field(a), OwnedSegment::Field(b)) => a == b,
@@ -409,7 +390,6 @@ impl<'a> Iterator for OwnedSegmentSliceIter<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         let output = self.segments.get(self.index).map(|segment| match segment {
             OwnedSegment::Field(field) => BorrowedSegment::Field(field.as_str().into()),
-            OwnedSegment::Invalid => BorrowedSegment::Invalid,
             OwnedSegment::Index(i) => BorrowedSegment::Index(*i),
             OwnedSegment::Coalesce(fields) => {
                 let coalesce_segment;

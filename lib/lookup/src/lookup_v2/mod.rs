@@ -67,15 +67,11 @@ macro_rules! owned_value_path {
 ///
 /// See `parse_target_path` if the path contains a target prefix.
 pub fn parse_value_path(path: &str) -> Result<OwnedValuePath, PathParseError> {
-    println!("Parse value path: {:?}", path);
-    let owned_path = JitValuePath::new(path).to_owned_value_path();
-    if owned_path.is_valid() {
-        Ok(owned_path)
-    } else {
-        Err(PathParseError::InvalidPathSyntax {
+    JitValuePath::new(path)
+        .to_owned_value_path()
+        .map_err(|_| PathParseError::InvalidPathSyntax {
             path: path.to_owned(),
         })
-    }
 }
 
 /// Use if you want to pre-parse a path.
@@ -120,26 +116,32 @@ pub trait ValuePath<'a>: Clone {
     }
 
     fn can_start_with(&self, prefix: impl ValuePath<'a>) -> bool {
-        let mut self_segments = self.to_owned_value_path().segments.into_iter();
-        for prefix_segment in prefix.to_owned_value_path().segments.iter() {
-            match self_segments.next() {
-                None => return false,
-                Some(self_segment) => {
-                    if !self_segment.can_start_with(prefix_segment) {
-                        return false;
+        if let (Ok(self_path), Ok(prefix_path)) =
+            (self.to_owned_value_path(), prefix.to_owned_value_path())
+        {
+            let mut self_segments = self_path.segments.into_iter();
+            for prefix_segment in prefix_path.segments.iter() {
+                match self_segments.next() {
+                    None => return false,
+                    Some(self_segment) => {
+                        if !self_segment.can_start_with(prefix_segment) {
+                            return false;
+                        }
                     }
                 }
             }
+            true
+        } else {
+            false
         }
-        true
     }
 
-    fn to_owned_value_path(&self) -> OwnedValuePath {
+    fn to_owned_value_path(&self) -> Result<OwnedValuePath, ()> {
         let mut owned_path = OwnedValuePath::root();
         let mut coalesce = vec![];
         for segment in self.segment_iter() {
             match segment {
-                BorrowedSegment::Invalid => return OwnedValuePath::invalid(),
+                BorrowedSegment::Invalid => return Err(()),
                 BorrowedSegment::Index(i) => owned_path.push(OwnedSegment::Index(i)),
                 BorrowedSegment::Field(field) => {
                     owned_path.push(OwnedSegment::Field(field.to_string()))
@@ -153,7 +155,7 @@ pub trait ValuePath<'a>: Clone {
                 }
             }
         }
-        owned_path
+        Ok(owned_path)
     }
 }
 
