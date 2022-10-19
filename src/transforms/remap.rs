@@ -662,7 +662,12 @@ mod tests {
     }
 
     fn get_field_string(event: &Event, field: &str) -> String {
-        event.as_log().get(field).unwrap().to_string_lossy()
+        event
+            .as_log()
+            .get(field)
+            .unwrap()
+            .to_string_lossy()
+            .into_owned()
     }
 
     #[test]

@@ -176,7 +176,7 @@ impl EventEncoder {
                         for (k, v) in output {
                             vec.push((
                                 slugify_text(format!("{}{}", opening_prefix, k)),
-                                Value::from(v).to_string_lossy(),
+                                Value::from(v).to_string_lossy().into_owned(),
                             ))
                         }
                     }

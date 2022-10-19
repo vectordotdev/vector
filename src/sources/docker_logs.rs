@@ -1772,6 +1772,7 @@ mod integration_tests {
                         .remove(crate::config::log_schema().message_key())
                         .unwrap()
                         .to_string_lossy()
+                        .into_owned()
                 })
                 .collect::<Vec<_>>();
             assert_eq!(actual_messages, expected_messages);
