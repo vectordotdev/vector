@@ -1843,7 +1843,7 @@ dependencies = [
  "prost-types 0.11.1",
  "serde",
  "serde_json",
- "thread_local 1.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "thread_local",
  "tokio",
  "tokio-stream",
  "tonic",
@@ -7757,14 +7757,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "thread_local"
-version = "1.1.4"
-source = "git+https://github.com/tobz/thread_local-rs.git?branch=fallible-accessors#7e69c6769e216a42cf946e2bb19bcced47cf48f9"
-dependencies = [
- "once_cell",
-]
-
-[[package]]
 name = "tikv-jemalloc-sys"
 version = "0.5.2+5.3.0-patched"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8268,7 +8260,7 @@ dependencies = [
  "serde_json",
  "sharded-slab",
  "smallvec",
- "thread_local 1.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "thread_local",
  "tracing 0.1.37",
  "tracing-core 0.1.30",
  "tracing-log",
@@ -8289,7 +8281,7 @@ dependencies = [
  "serde_json",
  "sharded-slab",
  "smallvec",
- "thread_local 1.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "thread_local",
  "tracing 0.1.37",
  "tracing-core 0.1.30",
  "tracing-log",
@@ -8891,7 +8883,6 @@ dependencies = [
  "strip-ansi-escapes",
  "syslog",
  "tempfile",
- "thread_local 1.1.4 (git+https://github.com/tobz/thread_local-rs.git?branch=fallible-accessors)",
  "tikv-jemallocator",
  "tokio",
  "tokio-openssl",

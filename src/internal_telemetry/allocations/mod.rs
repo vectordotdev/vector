@@ -63,12 +63,12 @@ pub struct MainTracer;
 impl Tracer for MainTracer {
     fn trace_allocation(&self, wrapped_size: usize, group_id: AllocationGroupId) {
         GROUP_MEM_METRICS[group_id.as_usize().get()]
-            .fetch_add(wrapped_size as u64, Ordering::SeqCst);
+            .fetch_add(wrapped_size as u64, Ordering::Relaxed);
     }
 
     fn trace_deallocation(&self, wrapped_size: usize, source_group_id: AllocationGroupId) {
         GROUP_MEM_METRICS[source_group_id.as_usize().get()]
-            .fetch_sub(wrapped_size as u64, Ordering::SeqCst);
+            .fetch_sub(wrapped_size as u64, Ordering::Relaxed);
     }
 }
 
