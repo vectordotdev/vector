@@ -404,7 +404,10 @@ impl SinkConfig for ElasticsearchConfig {
             .collect::<Vec<_>>();
 
         let service = request_limits.distributed_service(
-            ElasticsearchRetryLogic,
+            // TODO
+            ElasticsearchRetryLogic {
+                partial_retry: false,
+            },
             services,
             health_config,
             ElasticsearchHealthLogic,
