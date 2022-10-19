@@ -6,9 +6,7 @@ use super::token::AllocationGroupId;
 /// allocation group gets added to the stack when entered, and if another allocation group is entered before the
 /// previous is exited, the newer group is added to the stack above the previous one, and so on and so forth.
 ///
-/// This implementation is an incredibly thin wrapper around `Vec<T>` which already provides the necessary "push" and
-/// "pop" methods required for a stack. Our logic is slightly tweaked to account for the expectation that a there should
-/// never be a pop without a corresponding push, and so on.
+/// This implementation is uses an array to represent the stack to avoid thread local destructor registration issues.
 #[derive(Copy, Clone)]
 pub(crate) struct GroupStack {
     slots: [AllocationGroupId; 512],
@@ -37,6 +35,9 @@ impl GroupStack {
 
     /// Pushes an allocation group on to the stack, marking it as the active allocation group.
     pub fn push(&mut self, group: AllocationGroupId) {
+        if self.current_val >= self.slots.len() {
+            panic!("stack overflow");
+        }
         self.slots[self.current_val] = group;
         self.current_val += 1;
     }
@@ -44,6 +45,9 @@ impl GroupStack {
     /// Pops the currently active allocation group off the stack.
     pub fn pop(&mut self) -> AllocationGroupId {
         self.current_val -= 1;
+        if self.current_val < 0 {
+            panic!("Trying to pop an empty stack.");
+        }
         self.slots[self.current_val]
     }
 }

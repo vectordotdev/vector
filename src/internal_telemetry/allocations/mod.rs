@@ -86,7 +86,7 @@ pub fn init_allocation_tracing() {
                     }
 
                     info!(
-                        message = "Group memory usage.",
+                        message = "Allocation group memory usage.",
                         group_id = idx,
                         current_memory_allocated_in_bytes = mem_used
                     );
@@ -105,17 +105,7 @@ pub fn init_allocation_tracing() {
 /// a [`tracing::Span`] to achieve this" we utilize the logical invariants provided by spans --
 /// entering, exiting, and how spans exist as a stack -- in order to handle keeping the "current
 /// allocation group" accurate across all threads.
-///
-/// # Tags
-///
-/// The provided `tags` are used for the metrics that get registered and attached to the allocation group. No tags from
-/// the traditional `metrics`/`tracing` are collected, as the metrics are updated directly rather than emitted via the
-/// traditional `metrics` macros, so the given tags should match the span fields that would traditionally be set for a
-/// given span in order to ensure that they match.
-pub fn acquire_allocation_group_id(_tags: Vec<(String, String)>) -> AllocationGroupToken {
-    // TODO: register the allocation group token with its tags via `Collector`: we can't do it via `Registrations`
-    // because that gets checked lazily/periodically, and we need to be able to associate a group ID with its tags
-    // immediately so that we don't misassociate events
+pub fn acquire_allocation_group_id() -> AllocationGroupToken {
     let group_id =
         AllocationGroupToken::register().expect("failed to register allocation group token");
     // We default to the root group in case of overflow

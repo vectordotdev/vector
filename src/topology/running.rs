@@ -806,12 +806,14 @@ impl RunningTopology {
         let task_span = span.or_current();
         #[cfg(feature = "allocation-tracing")]
         {
-            let group_id =
-                crate::internal_telemetry::allocations::acquire_allocation_group_id(vec![
-                    (String::from("component_kind"), String::from("sink")),
-                    (String::from("component_type"), task.typetag().to_string()),
-                    (String::from("component_id"), task.id().to_string()),
-                ]);
+            let group_id = crate::internal_telemetry::allocations::acquire_allocation_group_id();
+            info!(
+                message = "New allocation group.",
+                component_kind = "sink",
+                component_type = task.typetag(),
+                component_id = task.id(),
+                group_id = group_id
+            );
             group_id.attach_to_span(&task_span);
         }
 
@@ -837,12 +839,14 @@ impl RunningTopology {
         let task_span = span.or_current();
         #[cfg(feature = "allocation-tracing")]
         {
-            let group_id =
-                crate::internal_telemetry::allocations::acquire_allocation_group_id(vec![
-                    (String::from("component_kind"), String::from("transform")),
-                    (String::from("component_type"), task.typetag().to_string()),
-                    (String::from("component_id"), task.id().to_string()),
-                ]);
+            let group_id = crate::internal_telemetry::allocations::acquire_allocation_group_id();
+            info!(
+                message = "New allocation group.",
+                component_kind = "transform",
+                component_type = task.typetag(),
+                component_id = task.id(),
+                group_id = group_id
+            );
             group_id.attach_to_span(&task_span);
         }
 
@@ -868,12 +872,14 @@ impl RunningTopology {
         let task_span = span.or_current();
         #[cfg(feature = "allocation-tracing")]
         {
-            let group_id =
-                crate::internal_telemetry::allocations::acquire_allocation_group_id(vec![
-                    (String::from("component_kind"), String::from("source")),
-                    (String::from("component_type"), task.typetag().to_string()),
-                    (String::from("component_id"), task.id().to_string()),
-                ]);
+            let group_id = crate::internal_telemetry::allocations::acquire_allocation_group_id();
+            info!(
+                message = "New allocation group.",
+                component_kind = "source",
+                component_type = task.typetag(),
+                component_id = task.id(),
+                group_id = group_id
+            );
             group_id.attach_to_span(&task_span);
         }
 
