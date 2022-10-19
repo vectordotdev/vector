@@ -77,9 +77,6 @@ impl Configurable for String {
 impl Configurable for char {
     fn metadata() -> Metadata<Self> {
         let mut metadata = Metadata::default();
-        if let Some(description) = Self::description() {
-            metadata.set_description(description);
-        }
         metadata.add_validation(Validation::Length {
             minimum: Some(1),
             maximum: Some(1),
@@ -99,10 +96,6 @@ macro_rules! impl_configuable_numeric {
 			impl Configurable for $ty {
                 fn metadata() -> Metadata<Self> {
                     let mut metadata = Metadata::default();
-                    if let Some(description) = Self::description() {
-                        metadata.set_description(description);
-                    }
-
                     let numeric_type = <Self as ConfigurableNumber>::class();
                     metadata.add_custom_attribute(CustomAttribute::kv("numeric_type", numeric_type));
 

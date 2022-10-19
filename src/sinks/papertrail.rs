@@ -37,7 +37,6 @@ pub struct PapertrailConfig {
     send_buffer_bytes: Option<usize>,
 
     /// The value to use as the `process` in Papertrail.
-    #[configurable(metadata(templateable))]
     process: Option<Template>,
 
     #[configurable(derived)]

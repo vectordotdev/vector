@@ -42,6 +42,8 @@ pub enum TemplateRenderingError {
 /// field of the event being processed would serve as the value when rendering the template into a string.
 #[configurable_component]
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+#[configurable(metadata(templateable))]
+#[configurable(metadata(no_description))]
 #[serde(try_from = "String", into = "String")]
 pub struct Template {
     src: String,

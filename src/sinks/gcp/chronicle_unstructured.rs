@@ -130,7 +130,6 @@ pub struct ChronicleUnstructuredConfig {
     /// Chronicle will reject the entry with an error.
     ///
     /// [unstructured_log_types_doc]: https://cloud.google.com/chronicle/docs/ingestion/parser-list/supported-default-parsers
-    #[configurable(metadata(templateable))]
     pub log_type: Template,
 
     #[configurable(derived)]

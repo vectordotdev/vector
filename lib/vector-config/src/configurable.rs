@@ -24,7 +24,9 @@ where
     ///
     /// For standard types, this will be `None`. Commonly, custom types would implement this
     /// directly, while fields using standard types would provide a field-specific description that
-    /// would be used instead of the default descrption.
+    /// would be used instead of the default description.
+    // TODO: We should probably just remove this, because it's not always required and we don't use
+    // it directly when asserting if types have a description specified, we look in the metadata.
     fn description() -> Option<&'static str> {
         None
     }

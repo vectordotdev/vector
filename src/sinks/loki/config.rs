@@ -83,7 +83,8 @@ pub struct LokiConfig {
     /// Note: If the set of labels has high cardinality, this can cause drastic performance issues
     /// with Loki. To prevent this from happening, reduce the number of unique label keys and
     /// values.
-    #[configurable(metadata(templateable))]
+    // TESTMARK: Make sure this has the `templateable` metadata flag even being used through
+    // `HashMap<Template, Template>`.
     pub labels: HashMap<Template, Template>,
 
     /// Whether or not to delete fields from the event when they are used as labels.

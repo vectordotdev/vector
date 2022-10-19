@@ -221,7 +221,6 @@ pub struct SimpleSinkConfig {
     encoding: Encoding,
 
     /// The filepath to write the events to.
-    #[configurable(metadata(templateable))]
     output_path: Template,
 
     /// The tags to apply to each event.
