@@ -45,9 +45,6 @@ impl GroupStack {
     /// Pops the currently active allocation group off the stack.
     pub fn pop(&mut self) -> AllocationGroupId {
         self.current_val -= 1;
-        if self.current_val < 0 {
-            panic!("Trying to pop an empty stack.");
-        }
         self.slots[self.current_val]
     }
 }
