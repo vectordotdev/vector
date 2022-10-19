@@ -128,9 +128,11 @@ const fn is_dynamic(item: &Item) -> bool {
     match item {
         Item::Fixed(_) => true,
         Item::Numeric(_, _) => true,
-        Item::Error => false,
-        Item::Space(_) | Item::OwnedSpace(_) => false,
-        Item::Literal(_) | Item::OwnedLiteral(_) => false,
+        Item::Error
+        | Item::Space(_)
+        | Item::OwnedSpace(_)
+        | Item::Literal(_)
+        | Item::OwnedLiteral(_) => false,
     }
 }
 
@@ -185,13 +187,10 @@ impl Template {
 // Pre-parse the template string into a series of parts to be filled in at render time.
 fn parse_template(src: &str) -> Result<Vec<Part>, TemplateParseError> {
     fn parse_literal(src: &str) -> Result<Part, TemplateParseError> {
-        let (has_error, is_dynamic) = StrftimeItems::new(src)
-            .fold((false, false), |(error, dynamic), item| {
-                (error || is_error(&item), dynamic || is_dynamic(&item))
-            });
-        if has_error {
+        let items: Vec<_> = StrftimeItems::new(src).collect();
+        if items.iter().any(is_error) {
             Err(TemplateParseError::StrftimeError)
-        } else if is_dynamic {
+        } else if items.iter().any(is_dynamic) {
             Ok(Part::Strftime(src.to_string()))
         } else {
             Ok(Part::Literal(src.to_string()))
