@@ -1,11 +1,12 @@
 #![allow(clippy::module_name_repetitions)]
 
 use std::marker::{PhantomData, Unpin};
-use std::{fmt::Debug, future::Future, pin::Pin, task::Context, task::Poll};
+use std::{fmt::Debug, future::Future, pin::Pin, sync::Arc, task::Context, task::Poll};
 
 use futures::stream::{BoxStream, FuturesOrdered, FuturesUnordered};
 use futures::{FutureExt, Stream, StreamExt};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
+use tokio::sync::Notify;
 
 use crate::finalization::{BatchStatus, BatchStatusReceiver};
 use crate::shutdown::ShutdownSignal;
@@ -33,6 +34,7 @@ pub type UnorderedFinalizer<T> = FinalizerSet<T, FuturesUnordered<FinalizerFutur
 #[derive(Debug)]
 pub struct FinalizerSet<T, S> {
     sender: Option<UnboundedSender<(BatchStatusReceiver, T)>>,
+    flush: Arc<Notify>,
     _phantom: PhantomData<S>,
 }
 
@@ -46,12 +48,15 @@ where
     #[must_use]
     pub fn new(shutdown: ShutdownSignal) -> (Self, BoxStream<'static, (BatchStatus, T)>) {
         let (todo_tx, todo_rx) = mpsc::unbounded_channel();
+        let flush1 = Arc::new(Notify::new());
+        let flush2 = Arc::clone(&flush1);
         (
             Self {
                 sender: Some(todo_tx),
+                flush: flush1,
                 _phantom: PhantomData::default(),
             },
-            finalizer_stream(shutdown, todo_rx, S::default()).boxed(),
+            finalizer_stream(shutdown, todo_rx, S::default(), flush2).boxed(),
         )
     }
 
@@ -79,22 +84,30 @@ where
             }
         }
     }
+
+    pub fn flush(&self) {
+        self.flush.notify_one();
+    }
 }
 
 fn finalizer_stream<T, S>(
     mut shutdown: ShutdownSignal,
     mut new_entries: UnboundedReceiver<(BatchStatusReceiver, T)>,
     mut status_receivers: S,
+    flush: Arc<Notify>,
 ) -> impl Stream<Item = (BatchStatus, T)>
 where
-    S: FuturesSet<FinalizerFuture<T>> + Unpin,
-    T: Debug,
+    S: Default + FuturesSet<FinalizerFuture<T>> + Unpin,
 {
     async_stream::stream! {
         loop {
             tokio::select! {
                 biased;
                 _ = &mut shutdown => break,
+                _ = flush.notified() => {
+                    // Drop all the existing status receivers and start over.
+                    status_receivers = S::default();
+                },
                 // Only poll for new entries until shutdown is flagged.
                 new_entry = new_entries.recv() => match new_entry {
                     Some((receiver, entry)) => {

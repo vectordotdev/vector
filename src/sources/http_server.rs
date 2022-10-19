@@ -31,6 +31,37 @@ use crate::{
 
 /// Configuration for the `http` source.
 #[configurable_component(source("http"))]
+#[configurable(metadata(deprecated))]
+#[derive(Clone, Debug)]
+pub struct HttpConfig(#[configurable(derived)] SimpleHttpConfig);
+
+impl GenerateConfig for HttpConfig {
+    fn generate_config() -> toml::Value {
+        <SimpleHttpConfig as GenerateConfig>::generate_config()
+    }
+}
+
+#[async_trait::async_trait]
+impl SourceConfig for HttpConfig {
+    async fn build(&self, cx: SourceContext) -> vector_common::Result<super::Source> {
+        self.0.build(cx).await
+    }
+
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        self.0.outputs(global_log_namespace)
+    }
+
+    fn resources(&self) -> Vec<Resource> {
+        self.0.resources()
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        self.0.can_acknowledge()
+    }
+}
+
+/// Configuration for the `http_server` source.
+#[configurable_component(source("http_server"))]
 #[derive(Clone, Debug)]
 pub struct SimpleHttpConfig {
     /// The address to listen for connections on.
@@ -292,7 +323,7 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     use super::SimpleHttpConfig;
-    use crate::sources::http::HttpMethod;
+    use crate::sources::http_server::HttpMethod;
     use crate::{
         config::{log_schema, SourceConfig, SourceContext},
         event::{Event, EventStatus, Value},

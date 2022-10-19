@@ -133,6 +133,15 @@ impl Configurable for Concurrency {
         Some("Configuration for outbound request concurrency.")
     }
 
+    fn metadata() -> Metadata<Self> {
+        let mut metadata = Metadata::default();
+        if let Some(description) = Self::description() {
+            metadata.set_description(description);
+        }
+        metadata.add_custom_attribute(CustomAttribute::kv("enum_tagging", "external"));
+        metadata
+    }
+
     fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
         let mut none_schema = generate_const_string_schema("none".to_string());
         let mut none_metadata = Metadata::<()>::with_title("A fixed concurrency of 1.");

@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use aws_sdk_s3::{
     error::PutObjectError,
     model::{ObjectCannedAcl, ServerSideEncryption, StorageClass},
@@ -10,6 +8,7 @@ use futures::FutureExt;
 use http::StatusCode;
 use snafu::Snafu;
 use vector_config::configurable_component;
+use vector_core::event::MetricTags;
 
 use super::service::{S3Response, S3Service};
 use crate::{
@@ -69,6 +68,7 @@ pub struct S3Options {
     /// Only applies when `server_side_encryption` is configured to use KMS.
     ///
     /// If not specified, Amazon S3 uses the AWS managed CMK in AWS to protect the data.
+    #[configurable(metadata(templateable))]
     pub ssekms_key_id: Option<String>,
 
     /// The storage class for the created objects.
@@ -79,7 +79,7 @@ pub struct S3Options {
     pub storage_class: Option<S3StorageClass>,
 
     /// The tag-set for the object.
-    pub tags: Option<BTreeMap<String, String>>,
+    pub tags: Option<MetricTags>,
 
     /// Specifies what content encoding has been applied to the object.
     ///

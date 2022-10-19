@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 
 use bytes::{Bytes, BytesMut};
 use futures::SinkExt;
@@ -9,7 +9,7 @@ use vector_config::configurable_component;
 use crate::{
     codecs::Transformer,
     config::{log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
-    event::{Event, Value},
+    event::{Event, MetricTags, Value},
     http::HttpClient,
     internal_events::InfluxdbEncodingError,
     sinks::{
@@ -200,7 +200,7 @@ impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
         });
 
         // Tags + Fields
-        let mut tags: BTreeMap<String, String> = BTreeMap::new();
+        let mut tags = MetricTags::default();
         let mut fields: HashMap<String, Field> = HashMap::new();
         log.convert_to_fields().for_each(|(key, value)| {
             if self.tags.contains(&key) {

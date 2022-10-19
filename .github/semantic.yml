@@ -139,8 +139,8 @@ scopes:
   - gcp_pubsub source # Anything `gcp_pubsub` source related
   - heroku_logs source # Anything `heroku_logs` source related
   - host_metrics source # Anything `host_metrics` source related
-  - http source # Anything `http` source related
-  - http_scrape source # Anything `http_scrape` source related
+  - http_client source # Anything `http_client` source related
+  - http_server source # Anything `http_server` source related
   - internal_logs source # Anything `internal_logs` source related
   - internal_metrics source # Anything `internal_metrics` source related
   - journald source # Anything `journald` source related
