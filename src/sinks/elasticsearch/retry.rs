@@ -78,7 +78,7 @@ struct EsErrorDetails {
 
 #[derive(Clone)]
 pub struct ElasticsearchRetryLogic {
-    pub partial_retry: bool,
+    pub retry_partial: bool,
 }
 
 impl RetryLogic for ElasticsearchRetryLogic {
@@ -115,7 +115,7 @@ impl RetryLogic for ElasticsearchRetryLogic {
                 if body.contains("\"errors\":true") {
                     match EsResultResponse::parse(&body) {
                         Ok(resp) => {
-                            if self.partial_retry {
+                            if self.retry_partial {
                                 if let Some((status, error)) =
                                     resp.iter_status().find(|(status, _)| {
                                         *status == StatusCode::TOO_MANY_REQUESTS
@@ -164,7 +164,7 @@ mod tests {
             .body(Bytes::from(json))
             .unwrap();
         let logic = ElasticsearchRetryLogic {
-            partial_retry: false,
+            retry_partial: false,
         };
         assert!(matches!(
             logic.should_retry_response(&ElasticsearchResponse {
@@ -185,7 +185,7 @@ mod tests {
             .body(Bytes::from(json))
             .unwrap();
         let logic = ElasticsearchRetryLogic {
-            partial_retry: true,
+            retry_partial: true,
         };
         assert!(matches!(
             logic.should_retry_response(&ElasticsearchResponse {

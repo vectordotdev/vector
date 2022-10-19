@@ -348,6 +348,16 @@ components: sinks: elasticsearch: {
 			required: false
 			type: bool: default: false
 		}
+		request_retry_partial: {
+			common: false
+			description: """
+				Whether or not to retry successful requests with partial failures.
+
+				To avoid duplicates in Elasticsearch, please use option `id_key`.
+				"""
+			required: false
+			type: bool: default: false
+		}
 	}
 
 	input: {
