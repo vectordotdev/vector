@@ -1,6 +1,6 @@
 use std::{
     borrow::{Borrow, Cow},
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     fmt,
     future::ready,
     pin::Pin,
@@ -8,6 +8,7 @@ use std::{
 
 use bloom::{BloomFilter, ASMS};
 use futures::{Stream, StreamExt};
+use hashbrown::HashMap;
 use vector_config::configurable_component;
 
 use crate::{
@@ -210,13 +211,10 @@ impl TagCardinalityLimit {
     /// value indicates to the caller that the value is not accepted for this
     /// key, and the configured limit_exceeded_action should be taken.
     fn try_accept_tag(&mut self, key: &str, value: &str) -> bool {
-        if !self.accepted_tags.contains_key(key) {
-            self.accepted_tags.insert(
-                key.to_string(),
-                TagValueSet::new(self.config.value_limit, &self.config.mode),
-            );
-        }
-        let tag_value_set = self.accepted_tags.get_mut(key).unwrap();
+        let tag_value_set = self
+            .accepted_tags
+            .entry_ref(key)
+            .or_insert_with(|| TagValueSet::new(self.config.value_limit, &self.config.mode));
 
         if tag_value_set.contains(Cow::Borrowed(value)) {
             // Tag value has already been accepted, nothing more to do.
@@ -253,15 +251,9 @@ impl TagCardinalityLimit {
 
     /// Record a key and value corresponding to a tag on an incoming Metric.
     fn record_tag_value(&mut self, key: &str, value: &str) {
-        if !self.accepted_tags.contains_key(key) {
-            self.accepted_tags.insert(
-                key.to_string(),
-                TagValueSet::new(self.config.value_limit, &self.config.mode),
-            );
-        }
         self.accepted_tags
-            .get_mut(key)
-            .unwrap()
+            .entry_ref(key)
+            .or_insert_with(|| TagValueSet::new(self.config.value_limit, &self.config.mode))
             .insert(Cow::Borrowed(value));
     }
 
