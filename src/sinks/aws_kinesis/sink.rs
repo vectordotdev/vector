@@ -19,7 +19,10 @@ use crate::{
     sinks::util::{processed_event::ProcessedEvent, SinkBuilderExt, StreamSink},
 };
 
-use super::request_builder::{KinesisRequest, KinesisRequestBuilder, Record};
+use super::{
+    request_builder::{KinesisRequest, KinesisRequestBuilder},
+    record::Record,
+};
 
 pub type KinesisProcessedEvent = ProcessedEvent<LogEvent, KinesisKey>;
 

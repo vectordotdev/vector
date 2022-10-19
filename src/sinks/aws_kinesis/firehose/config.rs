@@ -1,23 +1,14 @@
 use std::marker::PhantomData;
 
 use aws_sdk_firehose::{
-    error::{DescribeDeliveryStreamError, PutRecordBatchError, PutRecordBatchErrorKind},
-    model::Record as FRecord,
-    types::Blob,
+    error::{DescribeDeliveryStreamError, PutRecordBatchErrorKind},
     types::SdkError,
-    Client as KinesisFirehoseClient,
 };
-use bytes::Bytes;
 use futures::FutureExt;
 use snafu::Snafu;
 use tower::ServiceBuilder;
 use vector_config::configurable_component;
 
-use super::{
-    request_builder::{KinesisRequestBuilder, Record},
-    service::{KinesisResponse, KinesisService},
-    sink::{BatchKinesisRequest, KinesisSink},
-};
 use crate::{
     aws::{create_client, is_retriable_error, AwsAuthentication, ClientBuilder, RegionOrEndpoint},
     codecs::{Encoder, EncodingConfig},
@@ -33,6 +24,13 @@ use crate::{
         Healthcheck, VectorSink,
     },
     tls::TlsConfig,
+};
+
+use super::{
+    request_builder::KinesisRequestBuilder,
+    sink::{BatchKinesisRequest, KinesisSink},
+    KinesisClient, KinesisError, KinesisRecord, KinesisResponse, KinesisService,
+    record::{KinesisFirehoseRecord, KinesisFirehoseClient},
 };
 
 // AWS Kinesis Firehose API accepts payloads up to 4MB or 500 events
@@ -133,7 +131,7 @@ pub struct KinesisFirehoseClientBuilder;
 
 impl ClientBuilder for KinesisFirehoseClientBuilder {
     type Config = aws_sdk_firehose::config::Config;
-    type Client = aws_sdk_firehose::client::Client;
+    type Client = KinesisClient;
     type DefaultMiddleware = aws_sdk_firehose::middleware::DefaultMiddleware;
 
     fn default_middleware() -> Self::DefaultMiddleware {
@@ -141,39 +139,7 @@ impl ClientBuilder for KinesisFirehoseClientBuilder {
     }
 
     fn build(client: aws_smithy_client::Client, config: &aws_types::SdkConfig) -> Self::Client {
-        aws_sdk_firehose::client::Client::with_config(client, config.into())
-    }
-}
-
-#[derive(Clone)]
-struct KinesisFirehoseRecord {
-    pub record: FRecord,
-}
-
-impl Record for KinesisFirehoseRecord {
-    type T = FRecord;
-
-    fn new(payload_bytes: &Bytes, _partition_key: &str) -> Self {
-        Self {
-            record: FRecord::builder()
-                .data(Blob::new(&payload_bytes[..]))
-                .build(),
-        }
-    }
-
-    fn encoded_length(&self) -> usize {
-        let data_len = self
-            .record
-            .data
-            .as_ref()
-            .map(|x| x.as_ref().len())
-            .unwrap_or(0);
-        // data is simply base64 encoded, quoted, and comma separated
-        (data_len + 2) / 3 * 4 + 3
-    }
-
-    fn get(self) -> Self::T {
-        self.record
+        KinesisClient::with_config(client, config.into())
     }
 }
 
@@ -198,11 +164,15 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
                 request_limits,
                 KinesisRetryLogic,
             )
-            .service(KinesisService {
-                client,
-                region,
-                stream_name: self.stream_name.clone(),
-            });
+            .service(
+                KinesisService::<KinesisFirehoseClient, KinesisRecord, KinesisError> {
+                    client: KinesisFirehoseClient { client },
+                    stream_name: self.stream_name.clone(),
+                    region,
+                    _phantom_t: PhantomData,
+                    _phantom_e: PhantomData,
+                },
+            );
 
         let transformer = self.encoding.transformer();
         let serializer = self.encoding.build()?;
@@ -234,7 +204,7 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
 }
 
 impl KinesisFirehoseSinkConfig {
-    async fn healthcheck(self, client: KinesisFirehoseClient) -> crate::Result<()> {
+    async fn healthcheck(self, client: KinesisClient) -> crate::Result<()> {
         let stream_name = self.stream_name;
 
         let result = client
@@ -261,7 +231,7 @@ impl KinesisFirehoseSinkConfig {
         }
     }
 
-    pub async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<KinesisFirehoseClient> {
+    pub async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<KinesisClient> {
         create_client::<KinesisFirehoseClientBuilder>(
             &self.auth,
             self.region.region(),
@@ -275,10 +245,10 @@ impl KinesisFirehoseSinkConfig {
 }
 
 #[derive(Clone)]
-pub struct KinesisRetryLogic;
+struct KinesisRetryLogic;
 
 impl RetryLogic for KinesisRetryLogic {
-    type Error = SdkError<PutRecordBatchError>;
+    type Error = SdkError<KinesisError>;
     type Response = KinesisResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {

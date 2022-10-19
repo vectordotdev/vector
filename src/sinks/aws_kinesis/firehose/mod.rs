@@ -1,8 +1,19 @@
 mod config;
 mod integration_tests;
-mod service;
+mod record;
 mod tests;
 
+use aws_sdk_firehose::{error::PutRecordBatchError, model::Record as FRecord, Client};
+
+pub use super::{
+    record::{Record, SendRecord},
+    request_builder,
+    service::{KinesisResponse, KinesisService},
+    sink,
+};
+
 pub use self::config::KinesisFirehoseSinkConfig;
-pub use super::request_builder;
-pub use super::sink;
+
+pub type KinesisError = PutRecordBatchError;
+pub type KinesisRecord = FRecord;
+pub type KinesisClient = Client;

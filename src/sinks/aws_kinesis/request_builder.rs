@@ -1,11 +1,13 @@
 use std::{io, marker::PhantomData};
 
-//use aws_sdk_kinesis::{model::PutRecordsRequestEntry, types::Blob};
 use bytes::Bytes;
 use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::ByteSizeOf;
 
-use super::sink::{KinesisKey, KinesisProcessedEvent};
+use super::{
+    sink::{KinesisKey, KinesisProcessedEvent},
+    record::Record,
+};
 use crate::{
     codecs::{Encoder, Transformer},
     event::{Event, EventFinalizers, Finalizable},
@@ -33,7 +35,6 @@ where
     R: Record,
 {
     pub key: KinesisKey,
-    //pub put_records_request: PutRecordsRequestEntry,
     pub record: R,
     pub finalizers: EventFinalizers,
     metadata: RequestMetadata,
@@ -56,44 +57,6 @@ where
         &self.metadata
     }
 }
-
-pub trait Record {
-    type T;
-
-    fn new(payload_bytes: &Bytes, partition_key: &str) -> Self;
-
-    fn encoded_length(&self) -> usize;
-
-    fn get(self) -> Self::T;
-}
-
-//impl KinesisRequest {
-//    fn encoded_length(&self) -> usize {
-//        let hash_key_size = self
-//            .put_records_request
-//            .explicit_hash_key
-//            .as_ref()
-//            .map(|s| s.len())
-//            .unwrap_or_default();
-//
-//        // data is base64 encoded
-//        let data_len = self
-//            .put_records_request
-//            .data
-//            .as_ref()
-//            .map(|data| data.as_ref().len())
-//            .unwrap_or(0);
-//
-//        let key_len = self
-//            .put_records_request
-//            .partition_key
-//            .as_ref()
-//            .map(|key| key.len())
-//            .unwrap_or(0);
-//
-//        (data_len + 2) / 3 * 4 + hash_key_size + key_len + 10
-//    }
-//}
 
 impl<R> ByteSizeOf for KinesisRequest<R>
 where
@@ -150,7 +113,6 @@ where
         let metadata = builder.build(&payload);
         let payload_bytes = payload.into_payload();
 
-        //let record = self.record_builder(&payload_bytes[..], kinesis_metadata.partition_key);
         let record = R::new(&payload_bytes, &kinesis_metadata.partition_key);
 
         KinesisRequest {
@@ -158,10 +120,6 @@ where
                 partition_key: kinesis_metadata.partition_key.clone(),
             },
             record,
-            //put_records_request: PutRecordsRequestEntry::builder()
-            //    .data(Blob::new(&payload_bytes[..]))
-            //    .partition_key(kinesis_metadata.partition_key)
-            //    .build(),
             finalizers: kinesis_metadata.finalizers,
             metadata,
         }

@@ -1,23 +1,14 @@
 use std::marker::PhantomData;
 
 use aws_sdk_kinesis::{
-    error::{DescribeStreamError, PutRecordsError, PutRecordsErrorKind},
-    model::PutRecordsRequestEntry,
-    types::{Blob, SdkError},
-    Client as KinesisClient,
+    error::{DescribeStreamError, PutRecordsErrorKind},
+    types::SdkError,
 };
-use bytes::Bytes;
 use futures::FutureExt;
 use snafu::Snafu;
 use tower::ServiceBuilder;
 use vector_config::configurable_component;
 
-use super::{
-    request_builder::{KinesisRequestBuilder, Record},
-    service::KinesisResponse,
-    service::KinesisService,
-    sink::{BatchKinesisRequest, KinesisSink},
-};
 use crate::{
     aws::{create_client, is_retriable_error, AwsAuthentication, ClientBuilder, RegionOrEndpoint},
     codecs::{Encoder, EncodingConfig},
@@ -33,6 +24,13 @@ use crate::{
         Healthcheck, VectorSink,
     },
     tls::TlsConfig,
+};
+
+use super::{
+    record::{KinesisStreamClient, KinesisStreamRecord},
+    request_builder::KinesisRequestBuilder,
+    sink::{BatchKinesisRequest, KinesisSink},
+    KinesisClient, KinesisError, KinesisRecord, KinesisResponse, KinesisService,
 };
 
 #[allow(clippy::large_enum_variant)]
@@ -55,7 +53,7 @@ pub struct KinesisClientBuilder;
 
 impl ClientBuilder for KinesisClientBuilder {
     type Config = aws_sdk_kinesis::config::Config;
-    type Client = aws_sdk_kinesis::client::Client;
+    type Client = KinesisClient;
     type DefaultMiddleware = aws_sdk_kinesis::middleware::DefaultMiddleware;
 
     fn default_middleware() -> Self::DefaultMiddleware {
@@ -63,7 +61,7 @@ impl ClientBuilder for KinesisClientBuilder {
     }
 
     fn build(client: aws_smithy_client::Client, config: &aws_types::SdkConfig) -> Self::Client {
-        aws_sdk_kinesis::client::Client::with_config(client, config.into())
+        KinesisClient::with_config(client, config.into())
     }
 }
 
@@ -165,55 +163,6 @@ impl KinesisSinkConfig {
         .await
     }
 }
-
-#[derive(Clone)]
-struct KinesisStreamRecord {
-    pub record: PutRecordsRequestEntry,
-}
-
-impl Record for KinesisStreamRecord {
-    type T = PutRecordsRequestEntry;
-
-    fn new(payload_bytes: &Bytes, partition_key: &str) -> Self {
-        Self {
-            record: PutRecordsRequestEntry::builder()
-                .data(Blob::new(&payload_bytes[..]))
-                .partition_key(partition_key)
-                .build(),
-        }
-    }
-
-    fn encoded_length(&self) -> usize {
-        let hash_key_size = self
-            .record
-            .explicit_hash_key
-            .as_ref()
-            .map(|s| s.len())
-            .unwrap_or_default();
-
-        // data is base64 encoded
-        let data_len = self
-            .record
-            .data
-            .as_ref()
-            .map(|data| data.as_ref().len())
-            .unwrap_or(0);
-
-        let key_len = self
-            .record
-            .partition_key
-            .as_ref()
-            .map(|key| key.len())
-            .unwrap_or(0);
-
-        (data_len + 2) / 3 * 4 + hash_key_size + key_len + 10
-    }
-
-    fn get(self) -> Self::T {
-        self.record
-    }
-}
-
 #[async_trait::async_trait]
 impl SinkConfig for KinesisSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
@@ -230,11 +179,15 @@ impl SinkConfig for KinesisSinkConfig {
                 request_settings,
                 KinesisRetryLogic,
             )
-            .service(KinesisService {
-                client,
-                stream_name: self.stream_name.clone(),
-                region,
-            });
+            .service(
+                KinesisService::<KinesisStreamClient, KinesisRecord, KinesisError> {
+                    client: KinesisStreamClient { client },
+                    stream_name: self.stream_name.clone(),
+                    region,
+                    _phantom_t: PhantomData,
+                    _phantom_e: PhantomData,
+                },
+            );
 
         let transformer = self.encoding.transformer();
         let serializer = self.encoding.build()?;
@@ -280,7 +233,7 @@ impl GenerateConfig for KinesisSinkConfig {
 struct KinesisRetryLogic;
 
 impl RetryLogic for KinesisRetryLogic {
-    type Error = SdkError<PutRecordsError>;
+    type Error = SdkError<KinesisError>;
     type Response = KinesisResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
