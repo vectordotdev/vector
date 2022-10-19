@@ -7,7 +7,7 @@ use crate::{
     aws::RegionOrEndpoint,
     config::{SinkConfig, SinkContext},
     sinks::{
-        aws_kinesis_firehose::config::{
+        aws_kinesis::firehose::config::{
             KinesisFirehoseDefaultBatchSettings, MAX_PAYLOAD_EVENTS, MAX_PAYLOAD_SIZE,
         },
         util::{batch::BatchError, BatchConfig, Compression},

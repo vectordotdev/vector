@@ -1,17 +1,22 @@
+use std::marker::PhantomData;
+
 use aws_sdk_firehose::{
     error::{DescribeDeliveryStreamError, PutRecordBatchError, PutRecordBatchErrorKind},
+    model::Record as FRecord,
+    types::Blob,
     types::SdkError,
     Client as KinesisFirehoseClient,
 };
+use bytes::Bytes;
 use futures::FutureExt;
 use snafu::Snafu;
 use tower::ServiceBuilder;
 use vector_config::configurable_component;
 
 use super::{
-    request_builder::KinesisRequestBuilder,
+    request_builder::{KinesisRequestBuilder, Record},
     service::{KinesisResponse, KinesisService},
-    sink::KinesisSink,
+    sink::{BatchKinesisRequest, KinesisSink},
 };
 use crate::{
     aws::{create_client, is_retriable_error, AwsAuthentication, ClientBuilder, RegionOrEndpoint},
@@ -140,6 +145,38 @@ impl ClientBuilder for KinesisFirehoseClientBuilder {
     }
 }
 
+#[derive(Clone)]
+struct KinesisFirehoseRecord {
+    pub record: FRecord,
+}
+
+impl Record for KinesisFirehoseRecord {
+    type T = FRecord;
+
+    fn new(payload_bytes: &Bytes, _partition_key: &str) -> Self {
+        Self {
+            record: FRecord::builder()
+                .data(Blob::new(&payload_bytes[..]))
+                .build(),
+        }
+    }
+
+    fn encoded_length(&self) -> usize {
+        let data_len = self
+            .record
+            .data
+            .as_ref()
+            .map(|x| x.as_ref().len())
+            .unwrap_or(0);
+        // data is simply base64 encoded, quoted, and comma separated
+        (data_len + 2) / 3 * 4 + 3
+    }
+
+    fn get(self) -> Self::T {
+        self.record
+    }
+}
+
 #[async_trait::async_trait]
 impl SinkConfig for KinesisFirehoseSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
@@ -157,7 +194,10 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
 
         let region = self.region.region();
         let service = ServiceBuilder::new()
-            .settings(request_limits, KinesisRetryLogic)
+            .settings::<KinesisRetryLogic, BatchKinesisRequest<KinesisFirehoseRecord>>(
+                request_limits,
+                KinesisRetryLogic,
+            )
             .service(KinesisService {
                 client,
                 region,
@@ -168,15 +208,18 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
         let serializer = self.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
 
-        let request_builder = KinesisRequestBuilder {
+        let request_builder = KinesisRequestBuilder::<KinesisFirehoseRecord> {
             compression: self.compression,
             encoder: (transformer, encoder),
+            _phantom: PhantomData,
         };
 
         let sink = KinesisSink {
             batch_settings,
             service,
             request_builder,
+            partition_key_field: None,
+            _phantom: PhantomData,
         };
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }

@@ -1,7 +1,8 @@
 use std::task::{Context, Poll};
 
 use aws_sdk_firehose::{
-    error::PutRecordBatchError, types::SdkError, Client as KinesisFirehoseClient, Region,
+    error::PutRecordBatchError, model::Record as FRecord, types::SdkError,
+    Client as KinesisFirehoseClient, Region,
 };
 use futures::future::BoxFuture;
 use hyper::service::Service;
@@ -9,7 +10,7 @@ use tracing::Instrument;
 use vector_common::request_metadata::MetaDescriptive;
 use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
 
-use super::sink::BatchKinesisRequest;
+use super::{request_builder::Record, sink::BatchKinesisRequest};
 use crate::event::EventStatus;
 
 #[derive(Clone)]
@@ -34,7 +35,10 @@ impl DriverResponse for KinesisResponse {
     }
 }
 
-impl Service<BatchKinesisRequest> for KinesisService {
+impl<R> Service<BatchKinesisRequest<R>> for KinesisService
+where
+    R: Record<T = FRecord> + std::clone::Clone,
+{
     type Response = KinesisResponse;
     type Error = SdkError<PutRecordBatchError>;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
@@ -45,11 +49,15 @@ impl Service<BatchKinesisRequest> for KinesisService {
     }
 
     // Emission of internal events for errors and dropped events is handled upstream by the caller.
-    fn call(&mut self, requests: BatchKinesisRequest) -> Self::Future {
+    fn call(&mut self, requests: BatchKinesisRequest<R>) -> Self::Future {
         let events_byte_size = requests.get_metadata().events_byte_size();
         let count = requests.get_metadata().event_count();
 
-        let records = requests.events.into_iter().map(|req| req.record).collect();
+        let records = requests
+            .events
+            .into_iter()
+            .map(|req| req.record.get())
+            .collect();
 
         let client = self.client.clone();
 

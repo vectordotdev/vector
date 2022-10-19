@@ -1,16 +1,22 @@
+use std::marker::PhantomData;
+
 use aws_sdk_kinesis::{
     error::{DescribeStreamError, PutRecordsError, PutRecordsErrorKind},
-    types::SdkError,
+    model::PutRecordsRequestEntry,
+    types::{Blob, SdkError},
     Client as KinesisClient,
 };
+use bytes::Bytes;
 use futures::FutureExt;
 use snafu::Snafu;
 use tower::ServiceBuilder;
 use vector_config::configurable_component;
 
 use super::{
-    request_builder::KinesisRequestBuilder, service::KinesisResponse, service::KinesisService,
-    sink::KinesisSink,
+    request_builder::{KinesisRequestBuilder, Record},
+    service::KinesisResponse,
+    service::KinesisService,
+    sink::{BatchKinesisRequest, KinesisSink},
 };
 use crate::{
     aws::{create_client, is_retriable_error, AwsAuthentication, ClientBuilder, RegionOrEndpoint},
@@ -160,6 +166,54 @@ impl KinesisSinkConfig {
     }
 }
 
+#[derive(Clone)]
+struct KinesisStreamRecord {
+    pub record: PutRecordsRequestEntry,
+}
+
+impl Record for KinesisStreamRecord {
+    type T = PutRecordsRequestEntry;
+
+    fn new(payload_bytes: &Bytes, partition_key: &str) -> Self {
+        Self {
+            record: PutRecordsRequestEntry::builder()
+                .data(Blob::new(&payload_bytes[..]))
+                .partition_key(partition_key)
+                .build(),
+        }
+    }
+
+    fn encoded_length(&self) -> usize {
+        let hash_key_size = self
+            .record
+            .explicit_hash_key
+            .as_ref()
+            .map(|s| s.len())
+            .unwrap_or_default();
+
+        // data is base64 encoded
+        let data_len = self
+            .record
+            .data
+            .as_ref()
+            .map(|data| data.as_ref().len())
+            .unwrap_or(0);
+
+        let key_len = self
+            .record
+            .partition_key
+            .as_ref()
+            .map(|key| key.len())
+            .unwrap_or(0);
+
+        (data_len + 2) / 3 * 4 + hash_key_size + key_len + 10
+    }
+
+    fn get(self) -> Self::T {
+        self.record
+    }
+}
+
 #[async_trait::async_trait]
 impl SinkConfig for KinesisSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
@@ -172,7 +226,10 @@ impl SinkConfig for KinesisSinkConfig {
 
         let region = self.region.region();
         let service = ServiceBuilder::new()
-            .settings(request_settings, KinesisRetryLogic)
+            .settings::<KinesisRetryLogic, BatchKinesisRequest<KinesisStreamRecord>>(
+                request_settings,
+                KinesisRetryLogic,
+            )
             .service(KinesisService {
                 client,
                 stream_name: self.stream_name.clone(),
@@ -183,17 +240,18 @@ impl SinkConfig for KinesisSinkConfig {
         let serializer = self.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
 
-        let request_builder = KinesisRequestBuilder {
+        let request_builder = KinesisRequestBuilder::<KinesisStreamRecord> {
             compression: self.compression,
             encoder: (transformer, encoder),
+            _phantom: PhantomData,
         };
 
         let sink = KinesisSink {
             batch_settings,
-
             service,
             request_builder,
             partition_key_field: self.partition_key_field.clone(),
+            _phantom: PhantomData,
         };
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
@@ -237,7 +295,7 @@ impl RetryLogic for KinesisRetryLogic {
 
 #[cfg(test)]
 mod tests {
-    use crate::sinks::aws_kinesis_streams::config::KinesisSinkConfig;
+    use crate::sinks::aws_kinesis::streams::config::KinesisSinkConfig;
 
     #[test]
     fn generate_config() {

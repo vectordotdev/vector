@@ -1,5 +1,5 @@
 /// Metadata for batch requests.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct RequestMetadata {
     /// Number of events represented by this batch request.
     event_count: usize,

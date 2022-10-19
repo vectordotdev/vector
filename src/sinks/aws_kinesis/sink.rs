@@ -1,4 +1,4 @@
-use std::{fmt, num::NonZeroUsize};
+use std::{fmt, marker::PhantomData, num::NonZeroUsize};
 
 use async_trait::async_trait;
 use futures::{future, stream::BoxStream, StreamExt};
@@ -9,21 +9,17 @@ use vector_common::{
     request_metadata::{MetaDescriptive, RequestMetadata},
 };
 use vector_core::{
-    event::LogEvent,
     partition::Partitioner,
-    sink::StreamSink,
     stream::{BatcherSettings, DriverResponse},
 };
 
-use super::request_builder::{KinesisRequest, KinesisRequestBuilder};
 use crate::{
-    event::Event,
-    internal_events::SinkRequestBuildError,
-    sinks::util::{processed_event::ProcessedEvent, SinkBuilderExt},
+    event::{Event, LogEvent},
+    internal_events::{AwsKinesisStreamNoPartitionKeyError, SinkRequestBuildError},
+    sinks::util::{processed_event::ProcessedEvent, SinkBuilderExt, StreamSink},
 };
 
-#[derive(Debug, Clone)]
-struct KinesisFirehoseRetryLogic;
+use super::request_builder::{KinesisRequest, KinesisRequestBuilder, Record};
 
 pub type KinesisProcessedEvent = ProcessedEvent<LogEvent, KinesisKey>;
 
@@ -32,27 +28,34 @@ pub struct KinesisKey {
     pub partition_key: String,
 }
 
-pub struct KinesisSink<S> {
+#[derive(Clone)]
+pub struct KinesisSink<S, R> {
     pub batch_settings: BatcherSettings,
     pub service: S,
-    pub request_builder: KinesisRequestBuilder,
+    pub request_builder: KinesisRequestBuilder<R>,
+    pub partition_key_field: Option<String>,
+    pub _phantom: PhantomData<R>,
 }
 
-impl<S> KinesisSink<S>
+impl<S, R> KinesisSink<S, R>
 where
-    S: Service<BatchKinesisRequest> + Send + 'static,
+    S: Service<BatchKinesisRequest<R>> + Send + 'static,
     S::Future: Send + 'static,
     S::Response: DriverResponse + Send + 'static,
     S::Error: fmt::Debug + Into<crate::Error> + Send,
+    R: Record + Send + std::marker::Sync + std::marker::Unpin + std::clone::Clone + 'static,
 {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let request_builder_concurrency_limit = NonZeroUsize::new(50);
+
+        let partition_key_field = self.partition_key_field.clone();
 
         input
             .filter_map(|event| {
                 // Panic: This sink only accepts Logs, so this should never panic
                 let log = event.into_log();
-                let processed = process_log(log);
+                let processed = process_log(log, &partition_key_field);
+
                 future::ready(processed)
             })
             .request_builder(request_builder_concurrency_limit, self.request_builder)
@@ -65,7 +68,12 @@ where
                     Ok(req) => Some(req),
                 }
             })
-            .batched_partitioned(KinesisPartitioner, self.batch_settings)
+            .batched_partitioned(
+                KinesisPartitioner {
+                    _phantom: PhantomData,
+                },
+                self.batch_settings,
+            )
             .map(|(key, events)| {
                 let mut metadata_vec = vec![];
                 for req in &events {
@@ -85,21 +93,35 @@ where
 }
 
 #[async_trait]
-impl<S> StreamSink<Event> for KinesisSink<S>
+impl<S, R> StreamSink<Event> for KinesisSink<S, R>
 where
-    S: Service<BatchKinesisRequest> + Send + 'static,
+    S: Service<BatchKinesisRequest<R>> + Send + 'static,
     S::Future: Send + 'static,
     S::Response: DriverResponse + Send + 'static,
     S::Error: fmt::Debug + Into<crate::Error> + Send,
+    R: Record + Send + std::marker::Sync + std::marker::Unpin + std::clone::Clone + 'static,
 {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
     }
 }
 
-pub fn process_log(log: LogEvent) -> Option<KinesisProcessedEvent> {
-    let partition_key = gen_partition_key();
-
+pub fn process_log(
+    log: LogEvent,
+    partition_key_field: &Option<String>,
+) -> Option<KinesisProcessedEvent> {
+    let partition_key = if let Some(partition_key_field) = partition_key_field {
+        if let Some(v) = log.get(partition_key_field.as_str()) {
+            v.to_string_lossy()
+        } else {
+            emit!(AwsKinesisStreamNoPartitionKeyError {
+                partition_key_field
+            });
+            return None;
+        }
+    } else {
+        gen_partition_key()
+    };
     let partition_key = if partition_key.len() >= 256 {
         partition_key[..256].to_string()
     } else {
@@ -121,29 +143,64 @@ fn gen_partition_key() -> String {
         })
 }
 
-#[derive(Clone)]
-pub struct BatchKinesisRequest {
+//#[derive(Clone)]
+pub struct BatchKinesisRequest<R>
+where
+    R: Record + std::clone::Clone,
+{
     pub key: KinesisKey,
-    pub events: Vec<KinesisRequest>,
+    pub events: Vec<KinesisRequest<R>>,
     metadata: RequestMetadata,
 }
 
-impl Finalizable for BatchKinesisRequest {
+//impl<R> Copy for BatchKinesisRequest<R> {}
+
+impl<R> Clone for BatchKinesisRequest<R>
+where
+    R: Record + std::clone::Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            key: KinesisKey {
+                partition_key: self.key.partition_key.clone(),
+            },
+            events: self.events.to_vec(),
+            metadata: self.metadata,
+        }
+    }
+}
+
+impl<R> Finalizable for BatchKinesisRequest<R>
+where
+    R: Record + std::clone::Clone,
+{
     fn take_finalizers(&mut self) -> EventFinalizers {
         self.events.take_finalizers()
     }
 }
 
-impl MetaDescriptive for BatchKinesisRequest {
+impl<R> MetaDescriptive for BatchKinesisRequest<R>
+where
+    R: Record + std::clone::Clone,
+{
     fn get_metadata(&self) -> &RequestMetadata {
         &self.metadata
     }
 }
 
-struct KinesisPartitioner;
+//struct KinesisPartitioner<R> where R: Record;
+struct KinesisPartitioner<R>
+where
+    R: Record,
+{
+    _phantom: PhantomData<R>,
+}
 
-impl Partitioner for KinesisPartitioner {
-    type Item = KinesisRequest;
+impl<R> Partitioner for KinesisPartitioner<R>
+where
+    R: Record,
+{
+    type Item = KinesisRequest<R>;
     type Key = KinesisKey;
 
     fn partition(&self, item: &Self::Item) -> Self::Key {
