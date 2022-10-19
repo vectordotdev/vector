@@ -22,6 +22,8 @@ static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\{\{(?P<key>[^\}]+)\}\}").unw
 enum Part {
     /// A literal piece of text to be copied verbatim into the output.
     Literal(String),
+    /// A literal piece of text containing a time format string.
+    Strftime(String),
     /// A reference to the source event, to be copied from the relevant field or tag.
     Reference(String),
 }
@@ -60,17 +62,7 @@ pub struct Template {
     parts: Vec<Part>,
 
     #[serde(skip)]
-    has_ts: bool,
-
-    #[serde(skip)]
-    has_fields: bool,
-}
-
-impl Template {
-    /// Returns `true` if this template string has a length of zero, and `false` otherwise.
-    pub fn is_empty(&self) -> bool {
-        self.src.is_empty()
-    }
+    is_static: bool,
 }
 
 impl TryFrom<&str> for Template {
@@ -101,22 +93,15 @@ impl TryFrom<Cow<'_, str>> for Template {
     type Error = TemplateParseError;
 
     fn try_from(src: Cow<'_, str>) -> Result<Self, Self::Error> {
-        let (has_error, is_dynamic) = StrftimeItems::new(&src)
-            .fold((false, false), |(error, dynamic), item| {
-                (error || is_error(&item), dynamic || is_dynamic(&item))
-            });
-        if has_error {
-            Err(TemplateParseError::StrftimeError)
-        } else {
-            let parts = parse_template(&src);
-            let has_fields = parts.iter().any(|part| matches!(part, Part::Reference(_)));
-            Ok(Template {
+        parse_template(&src).map(|parts| {
+            let is_static =
+                parts.is_empty() || (parts.len() == 1 && matches!(parts[0], Part::Literal(..)));
+            Template {
                 parts,
                 src: src.into_owned(),
-                has_ts: is_dynamic,
-                has_fields,
-            })
-        }
+                is_static,
+            }
+        })
     }
 }
 
@@ -161,58 +146,73 @@ impl Template {
         &self,
         event: impl Into<EventRef<'a>>,
     ) -> Result<String, TemplateRenderingError> {
-        let event = event.into();
-        match (self.has_fields, self.has_ts) {
-            (false, false) => Ok(self.src.clone()),
-            (true, false) => render_fields(&self.parts, event),
-            (false, true) => Ok(render_timestamp(&self.src, event)),
-            (true, true) => {
-                let tmp = render_fields(&self.parts, event)?;
-                Ok(render_timestamp(&tmp, event))
-            }
+        if self.is_static {
+            Ok(self.src.clone())
+        } else {
+            render_fields(&self.parts, event.into())
         }
     }
 
     pub fn get_fields(&self) -> Option<Vec<String>> {
-        if self.has_fields {
-            RE.captures_iter(&self.src)
-                .map(|c| {
-                    c.get(1)
-                        .map(|s| s.as_str().trim().to_string())
-                        .expect("src should match regex")
-                })
-                .collect::<Vec<_>>()
-                .into()
-        } else {
-            None
-        }
-    }
-
-    pub const fn is_dynamic(&self) -> bool {
-        self.has_fields || self.has_ts
+        let parts: Vec<_> = self
+            .parts
+            .iter()
+            .filter_map(|part| {
+                if let Part::Reference(r) = part {
+                    Some(r.to_owned())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        (!parts.is_empty()).then_some(parts)
     }
 
     pub fn get_ref(&self) -> &str {
         &self.src
     }
+
+    /// Returns `true` if this template string has a length of zero, and `false` otherwise.
+    pub fn is_empty(&self) -> bool {
+        self.src.is_empty()
+    }
+
+    pub const fn is_dynamic(&self) -> bool {
+        !self.is_static
+    }
 }
 
 // Pre-parse the template string into a series of parts to be filled in at render time.
-fn parse_template(src: &str) -> Vec<Part> {
-    let (last, mut parts) =
-        RE.captures_iter(src)
-            .fold((0, Vec::new()), |(last_end, mut parts), cap| {
-                let all = cap.get(0).expect("Capture 0 is always defined");
-                if all.start() > last_end {
-                    parts.push(Part::Literal(src[last_end..all.start()].to_string()));
-                }
-                parts.push(Part::Reference(cap[1].trim().to_owned()));
-                (all.end(), parts)
+fn parse_template(src: &str) -> Result<Vec<Part>, TemplateParseError> {
+    fn parse_literal(src: &str) -> Result<Part, TemplateParseError> {
+        let (has_error, is_dynamic) = StrftimeItems::new(src)
+            .fold((false, false), |(error, dynamic), item| {
+                (error || is_error(&item), dynamic || is_dynamic(&item))
             });
-    if src.len() > last {
-        parts.push(Part::Literal(src[last..].to_string()));
+        if has_error {
+            Err(TemplateParseError::StrftimeError)
+        } else if is_dynamic {
+            Ok(Part::Strftime(src.to_string()))
+        } else {
+            Ok(Part::Literal(src.to_string()))
+        }
     }
-    parts
+
+    let mut last_end = 0;
+    let mut parts = Vec::new();
+    for cap in RE.captures_iter(src) {
+        let all = cap.get(0).expect("Capture 0 is always defined");
+        if all.start() > last_end {
+            parts.push(parse_literal(&src[last_end..all.start()])?);
+        }
+        parts.push(Part::Reference(cap[1].trim().to_owned()));
+        last_end = all.end();
+    }
+    if src.len() > last_end {
+        parts.push(parse_literal(&src[last_end..])?);
+    }
+
+    Ok(parts)
 }
 
 fn render_fields(parts: &[Part], event: EventRef<'_>) -> Result<String, TemplateRenderingError> {
@@ -221,6 +221,7 @@ fn render_fields(parts: &[Part], event: EventRef<'_>) -> Result<String, Template
     for part in parts {
         match part {
             Part::Literal(lit) => out.push_str(lit),
+            Part::Strftime(lit) => out.push_str(&render_timestamp(lit, event)),
             Part::Reference(key) => {
                 out.push_str(
                     &match event {
@@ -301,15 +302,19 @@ mod tests {
     }
 
     #[test]
-    fn is_dynamic() {
-        assert!(Template::try_from("/kube-demo/%F").unwrap().is_dynamic());
-        assert!(!Template::try_from("/kube-demo/echo").unwrap().is_dynamic());
-        assert!(Template::try_from("/kube-demo/{{ foo }}")
-            .unwrap()
-            .is_dynamic());
-        assert!(Template::try_from("/kube-demo/{{ foo }}/%F")
-            .unwrap()
-            .is_dynamic());
+    fn is_static() {
+        assert!(!Template::try_from("/kube-demo/%F").unwrap().is_static);
+        assert!(Template::try_from("/kube-demo/echo").unwrap().is_static);
+        assert!(
+            !Template::try_from("/kube-demo/{{ foo }}")
+                .unwrap()
+                .is_static
+        );
+        assert!(
+            !Template::try_from("/kube-demo/{{ foo }}/%F")
+                .unwrap()
+                .is_static
+        );
     }
 
     #[test]
@@ -451,7 +456,8 @@ mod tests {
         let template = Template::try_from("nested {{ format }} %T").unwrap();
 
         assert_eq!(
-            Ok(Bytes::from("nested 2001-02-03 04:05:06")),
+            // Old behavior: Ok(Bytes::from("nested 2001-02-03 04:05:06")),
+            Ok(Bytes::from("nested %F 04:05:06")),
             template.render(&event)
         )
     }
