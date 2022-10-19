@@ -1,4 +1,3 @@
-use lookup::lookup_v2::ValuePath;
 use std::{collections::BTreeMap, convert::TryFrom};
 
 use crate::{
@@ -13,7 +12,7 @@ use crate::{
     },
     template::Template,
 };
-use lookup::path;
+use lookup::owned_value_path;
 
 #[tokio::test]
 async fn sets_create_action_when_configured() {
@@ -318,8 +317,7 @@ async fn allows_using_only_fields() {
             action: None,
             index: Some(String::from("{{ idx }}")),
         }),
-        encoding: Transformer::new(Some(vec![path!("foo").to_owned_value_path()]), None, None)
-            .unwrap(),
+        encoding: Transformer::new(Some(vec![owned_value_path!("foo")]), None, None).unwrap(),
         endpoints: vec![String::from("https://example.com")],
         ..Default::default()
     };
