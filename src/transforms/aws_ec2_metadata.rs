@@ -5,7 +5,7 @@ use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use http::{uri::PathAndQuery, Request, StatusCode, Uri};
 use hyper::{body::to_bytes as body_to_bytes, Body};
-use lookup::lookup_v2::OptionalTargetPath;
+use lookup::lookup_v2::{OptionalTargetPath, OwnedSegment};
 use lookup::owned_value_path;
 use lookup::OwnedTargetPath;
 use once_cell::sync::Lazy;
@@ -512,11 +512,37 @@ impl MetadataClient {
     }
 }
 
+// This creates a simplified string from the namespace. Since the namespace is technically
+// a target path, it can contain syntax that is undesirable for a metric tag (such as prefix, quotes, etc)
+// This is mainly used for backwards compatibility.
+fn create_metric_namespace(namespace: &OwnedTargetPath) -> String {
+    let mut output = String::new();
+    for segment in &namespace.path.segments {
+        if !output.is_empty() {
+            output += ".";
+        }
+        match segment {
+            OwnedSegment::Field(field) => {
+                output += &field;
+            }
+            OwnedSegment::Index(i) => {
+                output += &i.to_string();
+            }
+            OwnedSegment::Coalesce(fields) => {
+                if let Some(first) = fields.first() {
+                    output += first;
+                }
+            }
+        }
+    }
+    output
+}
+
 fn create_key(namespace: &Option<OwnedTargetPath>, key: &str) -> MetadataKey {
     if let Some(namespace) = namespace {
         MetadataKey {
             log_path: namespace.with_field_appended(key),
-            metric_tag: format!("{}.{}", namespace.path, key),
+            metric_tag: format!("{}.{}", create_metric_namespace(namespace), key),
         }
     } else {
         MetadataKey {
