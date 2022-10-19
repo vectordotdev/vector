@@ -1,5 +1,4 @@
 use std::{
-    collections::BTreeMap,
     error, fmt,
     num::{ParseFloatError, ParseIntError},
     str::Utf8Error,
@@ -8,7 +7,7 @@ use std::{
 use once_cell::sync::Lazy;
 use regex::Regex;
 
-use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
+use crate::event::metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind};
 
 static WHITESPACE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\s+").unwrap());
 static NONALPHANUM: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^a-zA-Z_\-0-9\.]").unwrap());
@@ -48,11 +47,7 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
         parts.get(3)
     };
     let tags = tags.filter(|s| s.starts_with('#'));
-    let tags = if let Some(t) = tags {
-        Some(parse_tags(t)?)
-    } else {
-        None
-    };
+    let tags = tags.map(parse_tags).transpose()?;
 
     let metric = match metric_type {
         "c" => {
@@ -128,27 +123,25 @@ fn parse_sampling(input: &str) -> Result<f64, ParseError> {
     }
 }
 
-fn parse_tags(input: &str) -> Result<BTreeMap<String, String>, ParseError> {
+fn parse_tags(input: &&str) -> Result<MetricTags, ParseError> {
     if !input.starts_with('#') || input.len() < 2 {
         return Err(ParseError::Malformed(
             "expected non empty '#'-prefixed tags component",
         ));
     }
 
-    let mut result = BTreeMap::new();
-
-    let chunks = input[1..].split(',').collect::<Vec<_>>();
-    for chunk in chunks {
-        let pair: Vec<_> = chunk.split(':').collect();
-        let key = &pair[0];
-        // same as in telegraf plugin:
-        // if tag value is not provided, use "true"
-        // https://github.com/influxdata/telegraf/blob/master/plugins/inputs/statsd/datadog.go#L152
-        let value = pair.get(1).unwrap_or(&"true");
-        result.insert((*key).to_owned(), (*value).to_owned());
-    }
-
-    Ok(result)
+    Ok(input[1..]
+        .split(',')
+        .map(|chunk| {
+            let pair: Vec<_> = chunk.split(':').collect();
+            let key = &pair[0];
+            // same as in telegraf plugin:
+            // if tag value is not provided, use "true"
+            // https://github.com/influxdata/telegraf/blob/master/plugins/inputs/statsd/datadog.go#L152
+            let value = pair.get(1).unwrap_or(&"true");
+            ((*key).to_owned(), (*value).to_owned())
+        })
+        .collect())
 }
 
 fn parse_direction(input: &str) -> Result<Option<f64>, ParseError> {

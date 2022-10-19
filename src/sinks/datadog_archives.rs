@@ -27,7 +27,7 @@ use uuid::Uuid;
 use vector_config::{configurable_component, NamedComponent};
 use vector_core::{
     config::{log_schema, AcknowledgementsConfig, LogSchema},
-    event::{Event, EventFinalizers, Finalizable},
+    event::{Event, EventFinalizers, Finalizable, MetricTags},
     ByteSizeOf,
 };
 
@@ -217,7 +217,7 @@ pub struct S3Options {
     pub storage_class: Option<S3StorageClass>,
 
     /// The tag-set for the object.
-    pub tags: Option<BTreeMap<String, String>>,
+    pub tags: Option<MetricTags>,
 }
 
 /// ABS-specific configuration options.

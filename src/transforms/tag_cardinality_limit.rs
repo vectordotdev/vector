@@ -170,9 +170,9 @@ impl TagValueSet {
         }
     }
 
-    fn contains(&self, value: Cow<'_, String>) -> bool {
+    fn contains(&self, value: Cow<'_, str>) -> bool {
         match &self.storage {
-            TagValueSetStorage::Set(set) => set.contains(value.borrow() as &String),
+            TagValueSetStorage::Set(set) => set.contains(value.borrow() as &str),
             TagValueSetStorage::Bloom(bloom) => bloom.contains(&value),
         }
     }
@@ -181,7 +181,7 @@ impl TagValueSet {
         self.num_elements
     }
 
-    fn insert(&mut self, value: Cow<'_, String>) -> bool {
+    fn insert(&mut self, value: Cow<'_, str>) -> bool {
         let inserted = match &mut self.storage {
             TagValueSetStorage::Set(set) => set.insert(value.into_owned()),
             TagValueSetStorage::Bloom(bloom) => bloom.insert(&value),
@@ -209,7 +209,7 @@ impl TagCardinalityLimit {
     /// for the key and returns true, otherwise returns false.  A false return
     /// value indicates to the caller that the value is not accepted for this
     /// key, and the configured limit_exceeded_action should be taken.
-    fn try_accept_tag(&mut self, key: &str, value: Cow<'_, String>) -> bool {
+    fn try_accept_tag(&mut self, key: &str, value: Cow<'_, str>) -> bool {
         if !self.accepted_tags.contains_key(key) {
             self.accepted_tags.insert(
                 key.to_string(),
@@ -241,10 +241,10 @@ impl TagCardinalityLimit {
 
     fn transform_one(&mut self, mut event: Event) -> Option<Event> {
         let metric = event.as_mut_metric();
-        if let Some(tags_map) = metric.tags() {
+        if let Some(tags_map) = metric.tags_mut() {
             match self.config.limit_exceeded_action {
                 LimitExceededAction::DropEvent => {
-                    for (key, value) in tags_map {
+                    for (key, value) in &*tags_map {
                         if !self.try_accept_tag(key, Cow::Borrowed(value)) {
                             emit!(TagCardinalityLimitRejectingEvent {
                                 tag_key: key,
@@ -255,19 +255,17 @@ impl TagCardinalityLimit {
                     }
                 }
                 LimitExceededAction::DropTag => {
-                    let mut to_delete = Vec::new();
-                    for (key, value) in tags_map {
-                        if !self.try_accept_tag(key, Cow::Borrowed(value)) {
+                    tags_map.retain(|key, value| {
+                        if self.try_accept_tag(key, Cow::Borrowed(value)) {
+                            true
+                        } else {
                             emit!(TagCardinalityLimitRejectingTag {
                                 tag_key: key,
                                 tag_value: value,
                             });
-                            to_delete.push(key.clone());
+                            false
                         }
-                    }
-                    for key in to_delete {
-                        metric.remove_tag(&key);
-                    }
+                    });
                 }
             }
         }
@@ -290,11 +288,11 @@ impl TaskTransform<Event> for TagCardinalityLimit {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
+    use vector_core::metric_tags;
 
     use super::*;
     use crate::{
-        event::{metric, Event, Metric},
+        event::{metric, Event, Metric, MetricTags},
         test_util::components::assert_transform_compliance,
         transforms::{
             tag_cardinality_limit::{default_cache_size, BloomFilterConfig, Mode},
@@ -309,7 +307,7 @@ mod tests {
         crate::test_util::test_generate_config::<TagCardinalityLimitConfig>();
     }
 
-    fn make_metric(tags: BTreeMap<String, String>) -> Event {
+    fn make_metric(tags: MetricTags) -> Event {
         Event::Metric(
             Metric::new(
                 "event",
@@ -356,17 +354,9 @@ mod tests {
 
     async fn drop_event(config: TagCardinalityLimitConfig) {
         assert_transform_compliance(async move {
-            let tags1: BTreeMap<String, String> =
-                vec![("tag1".into(), "val1".into())].into_iter().collect();
-            let event1 = make_metric(tags1);
-
-            let tags2: BTreeMap<String, String> =
-                vec![("tag1".into(), "val2".into())].into_iter().collect();
-            let event2 = make_metric(tags2);
-
-            let tags3: BTreeMap<String, String> =
-                vec![("tag1".into(), "val3".into())].into_iter().collect();
-            let event3 = make_metric(tags3);
+            let event1 = make_metric(metric_tags!("tag1" => "val1"));
+            let event2 = make_metric(metric_tags!("tag1" => "val2"));
+            let event3 = make_metric(metric_tags!("tag1" => "val3"));
 
             let (tx, rx) = mpsc::channel(1);
             let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
@@ -403,28 +393,13 @@ mod tests {
 
     async fn drop_tag(config: TagCardinalityLimitConfig) {
         assert_transform_compliance(async move {
-            let tags1: BTreeMap<String, String> = vec![
-                ("tag1".into(), "val1".into()),
-                ("tag2".into(), "val1".into()),
-            ]
-            .into_iter()
-            .collect();
+            let tags1 = metric_tags!("tag1" => "val1", "tag2" => "val1");
             let event1 = make_metric(tags1);
 
-            let tags2: BTreeMap<String, String> = vec![
-                ("tag1".into(), "val2".into()),
-                ("tag2".into(), "val1".into()),
-            ]
-            .into_iter()
-            .collect();
+            let tags2 = metric_tags!("tag1" => "val2", "tag2" => "val1");
             let event2 = make_metric(tags2);
 
-            let tags3: BTreeMap<String, String> = vec![
-                ("tag1".into(), "val3".into()),
-                ("tag2".into(), "val1".into()),
-            ]
-            .into_iter()
-            .collect();
+            let tags3 = metric_tags!("tag1" => "val3", "tag2" => "val1");
             let event3 = make_metric(tags3);
 
             let (tx, rx) = mpsc::channel(1);
@@ -471,30 +446,12 @@ mod tests {
     /// values for other tags.
     async fn separate_value_limit_per_tag(config: TagCardinalityLimitConfig) {
         assert_transform_compliance(async move {
-            let tags1: BTreeMap<String, String> = vec![
-                ("tag1".into(), "val1".into()),
-                ("tag2".into(), "val1".into()),
-            ]
-            .into_iter()
-            .collect();
-            let event1 = make_metric(tags1);
+            let event1 = make_metric(metric_tags!("tag1" => "val1", "tag2" => "val1"));
 
-            let tags2: BTreeMap<String, String> = vec![
-                ("tag1".into(), "val2".into()),
-                ("tag2".into(), "val1".into()),
-            ]
-            .into_iter()
-            .collect();
-            let event2 = make_metric(tags2);
+            let event2 = make_metric(metric_tags!("tag1" => "val2", "tag2" => "val1"));
 
             // Now value limit is reached for "tag1", but "tag2" still has values available.
-            let tags3: BTreeMap<String, String> = vec![
-                ("tag1".into(), "val1".into()),
-                ("tag1".into(), "val2".into()),
-            ]
-            .into_iter()
-            .collect();
-            let event3 = make_metric(tags3);
+            let event3 = make_metric(metric_tags!("tag1" => "val1", "tag2" => "val2"));
 
             let (tx, rx) = mpsc::channel(1);
             let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;

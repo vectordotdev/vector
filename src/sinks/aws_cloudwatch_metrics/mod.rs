@@ -1,8 +1,6 @@
 mod integration_tests;
 mod tests;
 
-use std::collections::BTreeMap;
-
 use aws_sdk_cloudwatch::{
     error::PutMetricDataError,
     model::{Dimension, MetricDatum},
@@ -23,7 +21,7 @@ use crate::{
     },
     config::{AcknowledgementsConfig, Input, ProxyConfig, SinkConfig, SinkContext},
     event::{
-        metric::{Metric, MetricValue},
+        metric::{Metric, MetricTags, MetricValue},
         Event,
     },
     sinks::util::{
@@ -197,7 +195,7 @@ impl RetryLogic for CloudWatchMetricsRetryLogic {
     }
 }
 
-fn tags_to_dimensions(tags: &BTreeMap<String, String>) -> Vec<Dimension> {
+fn tags_to_dimensions(tags: &MetricTags) -> Vec<Dimension> {
     // according to the API, up to 10 dimensions per metric can be provided
     tags.iter()
         .take(10)

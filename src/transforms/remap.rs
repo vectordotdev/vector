@@ -577,11 +577,11 @@ pub enum BuildError {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::{BTreeMap, HashMap};
+    use std::collections::HashMap;
 
     use indoc::{formatdoc, indoc};
     use vector_common::btreemap;
-    use vector_core::event::EventMetadata;
+    use vector_core::{event::EventMetadata, metric_tags};
 
     use super::*;
     use crate::{
@@ -959,10 +959,8 @@ mod tests {
                     metadata.with_schema_definition(&Arc::new(test_default_schema_definition())),
                 )
                 .with_namespace(Some("zerk"))
-                .with_tags(Some({
-                    let mut tags = BTreeMap::new();
-                    tags.insert("host".into(), "zoobub".into());
-                    tags
+                .with_tags(Some(metric_tags! {
+                    "host" => "zoobub",
                 }))
             )
         );
@@ -1096,11 +1094,9 @@ mod tests {
                     EventMetadata::default()
                         .with_schema_definition(&Arc::new(test_default_schema_definition())),
                 )
-                .with_tags(Some({
-                    let mut tags = BTreeMap::new();
-                    tags.insert("hello".into(), "world".into());
-                    tags.insert("foo".into(), "bar".into());
-                    tags
+                .with_tags(Some(metric_tags! {
+                    "hello" => "world",
+                    "foo" => "bar",
                 }))
             )
         );
@@ -1116,14 +1112,12 @@ mod tests {
                     EventMetadata::default()
                         .with_schema_definition(&Arc::new(test_dropped_schema_definition())),
                 )
-                .with_tags(Some({
-                    let mut tags = BTreeMap::new();
-                    tags.insert("hello".into(), "goodbye".into());
-                    tags.insert("metadata.dropped.reason".into(), "abort".into());
-                    tags.insert("metadata.dropped.component_id".into(), "remapper".into());
-                    tags.insert("metadata.dropped.component_type".into(), "remap".into());
-                    tags.insert("metadata.dropped.component_kind".into(), "transform".into());
-                    tags
+                .with_tags(Some(metric_tags! {
+                    "hello" => "goodbye",
+                    "metadata.dropped.reason" => "abort",
+                    "metadata.dropped.component_id" => "remapper",
+                    "metadata.dropped.component_type" => "remap",
+                    "metadata.dropped.component_kind" => "transform",
                 }))
             )
         );
@@ -1139,14 +1133,12 @@ mod tests {
                     EventMetadata::default()
                         .with_schema_definition(&Arc::new(test_dropped_schema_definition())),
                 )
-                .with_tags(Some({
-                    let mut tags = BTreeMap::new();
-                    tags.insert("not_hello".into(), "oops".into());
-                    tags.insert("metadata.dropped.reason".into(), "error".into());
-                    tags.insert("metadata.dropped.component_id".into(), "remapper".into());
-                    tags.insert("metadata.dropped.component_type".into(), "remap".into());
-                    tags.insert("metadata.dropped.component_kind".into(), "transform".into());
-                    tags
+                .with_tags(Some(metric_tags! {
+                    "not_hello" => "oops",
+                    "metadata.dropped.reason" => "error",
+                    "metadata.dropped.component_id" => "remapper",
+                    "metadata.dropped.component_type" => "remap",
+                    "metadata.dropped.component_kind" => "transform",
                 }))
             )
         );

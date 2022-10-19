@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, convert::TryFrom, num::ParseFloatError};
+use std::{convert::TryFrom, num::ParseFloatError};
 
 use chrono::Utc;
 use indexmap::IndexMap;
@@ -9,7 +9,7 @@ use crate::{
         log_schema, DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
     },
     event::{
-        metric::{Metric, MetricKind, MetricValue, StatisticKind},
+        metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind},
         Event, Value,
     },
     internal_events::{
@@ -245,11 +245,11 @@ fn render_template(s: &str, event: &Event) -> Result<String, TransformError> {
 fn render_tags(
     tags: &Option<IndexMap<String, String>>,
     event: &Event,
-) -> Result<Option<BTreeMap<String, String>>, TransformError> {
+) -> Result<Option<MetricTags>, TransformError> {
     Ok(match tags {
         None => None,
         Some(tags) => {
-            let mut map = BTreeMap::new();
+            let mut map = MetricTags::default();
             for (name, value) in tags {
                 match render_template(value, event) {
                     Ok(tag) => {
@@ -265,11 +265,7 @@ fn render_tags(
                     Err(other) => return Err(other),
                 }
             }
-            if !map.is_empty() {
-                Some(map)
-            } else {
-                None
-            }
+            map.as_option()
         }
     })
 }

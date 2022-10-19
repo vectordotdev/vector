@@ -1,8 +1,4 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    future::ready,
-    task::Poll,
-};
+use std::{collections::HashMap, future::ready, task::Poll};
 
 use bytes::{Bytes, BytesMut};
 use futures::{future::BoxFuture, stream, SinkExt};
@@ -10,7 +6,7 @@ use serde::Serialize;
 use tower::Service;
 use vector_config::configurable_component;
 use vector_core::{
-    event::metric::{MetricSketch, Quantile},
+    event::metric::{MetricSketch, MetricTags, Quantile},
     ByteSizeOf,
 };
 
@@ -231,10 +227,7 @@ fn create_build_request(
     }
 }
 
-fn merge_tags(
-    event: &Metric,
-    tags: Option<&HashMap<String, String>>,
-) -> Option<BTreeMap<String, String>> {
+fn merge_tags(event: &Metric, tags: Option<&HashMap<String, String>>) -> Option<MetricTags> {
     match (event.tags().cloned(), tags) {
         (Some(mut event_tags), Some(config_tags)) => {
             event_tags.extend(config_tags.iter().map(|(k, v)| (k.clone(), v.clone())));
