@@ -516,7 +516,7 @@ fn create_key(namespace: &Option<OwnedTargetPath>, key: &str) -> MetadataKey {
     if let Some(namespace) = namespace {
         MetadataKey {
             log_path: namespace.with_field_appended(key),
-            metric_tag: format!("{}.{}", namespace, key),
+            metric_tag: format!("{}.{}", namespace.path, key),
         }
     } else {
         MetadataKey {
