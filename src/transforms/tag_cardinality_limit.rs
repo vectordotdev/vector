@@ -209,7 +209,7 @@ impl TagCardinalityLimit {
     /// for the key and returns true, otherwise returns false.  A false return
     /// value indicates to the caller that the value is not accepted for this
     /// key, and the configured limit_exceeded_action should be taken.
-    fn try_accept_tag(&mut self, key: &str, value: Cow<'_, str>) -> bool {
+    fn try_accept_tag(&mut self, key: &str, value: &str) -> bool {
         if !self.accepted_tags.contains_key(key) {
             self.accepted_tags.insert(
                 key.to_string(),
@@ -218,7 +218,7 @@ impl TagCardinalityLimit {
         }
         let tag_value_set = self.accepted_tags.get_mut(key).unwrap();
 
-        if tag_value_set.contains(value.clone()) {
+        if tag_value_set.contains(Cow::Borrowed(value)) {
             // Tag value has already been accepted, nothing more to do.
             return true;
         }
@@ -226,7 +226,7 @@ impl TagCardinalityLimit {
         // Tag value not yet part of the accepted set.
         if tag_value_set.len() < self.config.value_limit as usize {
             // accept the new value
-            tag_value_set.insert(value);
+            tag_value_set.insert(Cow::Borrowed(value));
 
             if tag_value_set.len() == self.config.value_limit as usize {
                 emit!(TagCardinalityValueLimitReached { key });
@@ -239,13 +239,41 @@ impl TagCardinalityLimit {
         }
     }
 
+    /// Checks if recording a key and value corresponding to a tag on an incoming Metric would
+    /// exceed the cardinality limit.
+    fn tag_limit_exceeded(&self, key: &str, value: &str) -> bool {
+        self.accepted_tags
+            .get(key)
+            .map(|value_set| {
+                !value_set.contains(Cow::Borrowed(value))
+                    && value_set.len() >= self.config.value_limit as usize
+            })
+            .unwrap_or(false)
+    }
+
+    /// Record a key and value corresponding to a tag on an incoming Metric.
+    fn record_tag_value(&mut self, key: &str, value: &str) {
+        if !self.accepted_tags.contains_key(key) {
+            self.accepted_tags.insert(
+                key.to_string(),
+                TagValueSet::new(self.config.value_limit, &self.config.mode),
+            );
+        }
+        self.accepted_tags
+            .get_mut(key)
+            .unwrap()
+            .insert(Cow::Borrowed(value));
+    }
+
     fn transform_one(&mut self, mut event: Event) -> Option<Event> {
         let metric = event.as_mut_metric();
         if let Some(tags_map) = metric.tags_mut() {
             match self.config.limit_exceeded_action {
                 LimitExceededAction::DropEvent => {
+                    // This needs to check all the tags, to ensure that the ordering of tag names
+                    // doesn't change the behavior of the check.
                     for (key, value) in &*tags_map {
-                        if !self.try_accept_tag(key, Cow::Borrowed(value)) {
+                        if self.tag_limit_exceeded(key, value) {
                             emit!(TagCardinalityLimitRejectingEvent {
                                 tag_key: key,
                                 tag_value: value,
@@ -253,10 +281,13 @@ impl TagCardinalityLimit {
                             return None;
                         }
                     }
+                    for (key, value) in &*tags_map {
+                        self.record_tag_value(key, value);
+                    }
                 }
                 LimitExceededAction::DropTag => {
                     tags_map.retain(|key, value| {
-                        if self.try_accept_tag(key, Cow::Borrowed(value)) {
+                        if self.try_accept_tag(key, value) {
                             true
                         } else {
                             emit!(TagCardinalityLimitRejectingTag {
@@ -472,5 +503,39 @@ mod tests {
             assert_eq!(new_event3, Some(event3));
         })
         .await;
+    }
+
+    /// Test that hitting the value limit on one tag does not affect checking the limit on other
+    /// tags that happen to be ordered later
+    #[test]
+    fn drop_event_checks_all_tags1() {
+        drop_event_checks_all_tags(|val1, val2| metric_tags!("tag1" => val1, "tag2" => val2));
+    }
+
+    #[test]
+    fn drop_event_checks_all_tags2() {
+        drop_event_checks_all_tags(|val1, val2| metric_tags!("tag1" => val2, "tag2" => val1));
+    }
+
+    fn drop_event_checks_all_tags(make_tags: impl Fn(&str, &str) -> MetricTags) {
+        let config = make_transform_hashset(2, LimitExceededAction::DropEvent);
+        let mut transform = TagCardinalityLimit::new(config);
+
+        let event1 = make_metric(make_tags("val1", "val1"));
+        let event2 = make_metric(make_tags("val2", "val1"));
+        // Next the limit is exceeded for the first tag.
+        let event3 = make_metric(make_tags("val3", "val2"));
+        // And then check if the new value for the second tag was not recorded by the above event.
+        let event4 = make_metric(make_tags("val1", "val3"));
+
+        let new_event1 = transform.transform_one(event1.clone());
+        let new_event2 = transform.transform_one(event2.clone());
+        let new_event3 = transform.transform_one(event3);
+        let new_event4 = transform.transform_one(event4.clone());
+
+        assert_eq!(new_event1, Some(event1));
+        assert_eq!(new_event2, Some(event2));
+        assert_eq!(new_event3, None);
+        assert_eq!(new_event4, Some(event4));
     }
 }
