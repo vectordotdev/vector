@@ -2,6 +2,7 @@ mod borrowed;
 mod compat;
 mod concat;
 mod jit;
+mod optional_path;
 mod owned;
 
 use self::jit::{JitValuePath, JitValuePathIter};
@@ -10,6 +11,7 @@ use std::fmt::Debug;
 
 pub use borrowed::BorrowedSegment;
 pub use concat::PathConcat;
+pub use optional_path::OptionalTargetPath;
 pub use owned::{OwnedSegment, OwnedTargetPath, OwnedValuePath};
 
 #[derive(Clone, Debug, Eq, PartialEq, Snafu)]
@@ -180,6 +182,18 @@ impl<'a> TargetPath<'a> for &'a str {
 
     fn value_path(&self) -> Self::ValuePath {
         get_target_prefix(self).1
+    }
+}
+
+impl<'a> TargetPath<'a> for &'a OwnedTargetPath {
+    type ValuePath = &'a OwnedValuePath;
+
+    fn prefix(&self) -> PathPrefix {
+        self.prefix
+    }
+
+    fn value_path(&self) -> Self::ValuePath {
+        &self.path
     }
 }
 

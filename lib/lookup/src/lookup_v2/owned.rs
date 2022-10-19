@@ -1,14 +1,9 @@
-use crate::lookup_v2::{parse_target_path, parse_value_path, BorrowedSegment, ValuePath};
+use crate::lookup_v2::{
+    parse_target_path, parse_value_path, BorrowedSegment, PathParseError, ValuePath,
+};
 use crate::PathPrefix;
-use snafu::Snafu;
 use std::fmt::{Debug, Display, Formatter};
 use vector_config::configurable_component;
-
-#[derive(Clone, Debug, Eq, PartialEq, Snafu)]
-pub enum OwnedPathParseError {
-    #[snafu(display("Invalid field path {:?}", path))]
-    InvalidPathSyntax { path: String },
-}
 
 /// A lookup path.
 #[configurable_component]
@@ -184,30 +179,24 @@ impl Display for OwnedValuePath {
 }
 
 impl TryFrom<String> for OwnedValuePath {
-    type Error = OwnedPathParseError;
+    type Error = PathParseError;
 
     fn try_from(src: String) -> Result<Self, Self::Error> {
-        parse_value_path(&src).map_err(|_| OwnedPathParseError::InvalidPathSyntax {
+        parse_value_path(&src).map_err(|_| PathParseError::InvalidPathSyntax {
             path: src.to_owned(),
         })
     }
 }
 
 impl TryFrom<String> for OwnedTargetPath {
-    type Error = OwnedPathParseError;
+    type Error = PathParseError;
 
     fn try_from(src: String) -> Result<Self, Self::Error> {
-        parse_target_path(&src).map_err(|_| OwnedPathParseError::InvalidPathSyntax {
+        parse_target_path(&src).map_err(|_| PathParseError::InvalidPathSyntax {
             path: src.to_owned(),
         })
     }
 }
-
-// impl From<String> for OwnedValuePath {
-//     fn from(raw_path: String) -> Self {
-//         parse_value_path_old(raw_path.as_str())
-//     }
-// }
 
 impl From<OwnedValuePath> for String {
     fn from(owned: OwnedValuePath) -> Self {
