@@ -16,7 +16,7 @@ struct EsResultResponse {
 
 impl EsResultResponse {
     fn parse(body: &str) -> Result<Self, String> {
-        serde_json::from_str::<EsResultResponse>(&body).map_err(|json_error| {
+        serde_json::from_str::<EsResultResponse>(body).map_err(|json_error| {
             format!(
                 "some messages failed, could not parse response, error: {}",
                 json_error
