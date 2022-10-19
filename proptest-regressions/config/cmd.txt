@@ -1,8 +1,0 @@
-# Seeds for failure cases proptest has generated in the past. It is
-# automatically read and these particular cases re-run before any
-# novel cases are generated.
-#
-# It is recommended to check this file in to source control so that
-# everyone who runs the test benefits from these saved cases.
-cc cfce5618fbc6bd603598e2d328c56f891dc50a430417acfd7fc3007e5931b7d5 # shrinks to sources = ["heroku_logs", "kubernetes_logs"], transforms = ["geoip", "remap"], sinks = ["influxdb_metrics", "websocket"]
-cc a30405878a78e0f2dd95f5b5f1ec553fff56249e9b9f1361c4552a70fc0a848f # shrinks to mut sources = ["kubernetes_logs", "nginx_metrics"], mut transforms = ["lua", "throttle"], mut sinks = ["apex", "test_panic"], seed = 0
