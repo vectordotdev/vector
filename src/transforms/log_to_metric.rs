@@ -46,18 +46,18 @@ pub struct CounterConfig {
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct MetricConfig {
-    /// Name of the field in the event to generate the counter.
+    /// Name of the field in the event to generate the metric.
     field: Template,
 
     /// Overrides the name of the counter.
     ///
-    /// If not specified, `field` is used as the name of the counter.
+    /// If not specified, `field` is used as the name of the metric.
     name: Option<Template>,
 
-    /// Sets the namespace for the counter.
+    /// Sets the namespace for the metric.
     namespace: Option<Template>,
 
-    /// Tags to apply to the counter.
+    /// Tags to apply to the metric.
     tags: Option<IndexMap<String, Template>>,
 
     #[configurable(derived)]
