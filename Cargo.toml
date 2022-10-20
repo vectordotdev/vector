@@ -361,7 +361,7 @@ zstd = { version = "0.11.2", default-features = false }
 leveldb-sys = { git = "https://github.com/vectordotdev/leveldb-sys.git", branch = "leveldb_mmap_limit" }
 # Removes dependency on `time` v0.1
 # https://github.com/chronotope/chrono/pull/578
-chrono = { git = "https://github.com/vectordotdev/chrono.git", branch = "no-default-time-v0.4.22" }
+chrono = { git = "https://github.com/vectordotdev/chrono.git", branch = "no-default-time-v0.4.22-1" }
 # Adds `Status::is_reset` test, remove after the next version is released.
 h2 = { git = "https://github.com/hyperium/h2.git", rev = "f6aa3be6719270cd7b4094ee1940751b5f4ec88e" }
 # Enables OpenSSL ENGINE support during cross compilation to musl

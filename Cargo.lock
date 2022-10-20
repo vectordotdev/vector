@@ -1523,7 +1523,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 [[package]]
 name = "chrono"
 version = "0.4.22"
-source = "git+https://github.com/vectordotdev/chrono.git?branch=no-default-time-v0.4.22#e76635fec0815d375daa919806786b8dd2e87acb"
+source = "git+https://github.com/vectordotdev/chrono.git?branch=no-default-time-v0.4.22-1#920ff24cabedcec0f8459b8d9681cbac186dfb58"
 dependencies = [
  "iana-time-zone",
  "js-sys",

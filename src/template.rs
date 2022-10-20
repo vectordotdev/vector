@@ -17,17 +17,6 @@ use crate::{
 
 static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\{\{(?P<key>[^\}]+)\}\}").unwrap());
 
-/// One part of the template string after parsing.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-enum Part {
-    /// A literal piece of text to be copied verbatim into the output.
-    Literal(String),
-    /// A literal piece of text containing a time format string.
-    Strftime(String),
-    /// A reference to the source event, to be copied from the relevant field or tag.
-    Reference(String),
-}
-
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Snafu)]
 pub enum TemplateParseError {
     #[snafu(display("Invalid strftime item"))]
@@ -52,8 +41,8 @@ pub enum TemplateRenderingError {
 /// look something like `my-file.log`, a template string could look something like `my-file-{{key}}.log`, and the `key`
 /// field of the event being processed would serve as the value when rendering the template into a string.
 #[configurable_component]
-#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 #[configurable(metadata(docs::templateable, docs::no_description))]
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 #[serde(try_from = "String", into = "String")]
 pub struct Template {
     src: String,
@@ -120,22 +109,6 @@ impl fmt::Display for Template {
 // This is safe because we literally defer to `String` for the schema of `Template`.
 impl ConfigurableString for Template {}
 
-const fn is_error(item: &Item) -> bool {
-    matches!(item, Item::Error)
-}
-
-const fn is_dynamic(item: &Item) -> bool {
-    match item {
-        Item::Fixed(_) => true,
-        Item::Numeric(_, _) => true,
-        Item::Error
-        | Item::Space(_)
-        | Item::OwnedSpace(_)
-        | Item::Literal(_)
-        | Item::OwnedLiteral(_) => false,
-    }
-}
-
 impl Template {
     pub fn render<'a>(
         &self,
@@ -184,19 +157,74 @@ impl Template {
     }
 }
 
-// Pre-parse the template string into a series of parts to be filled in at render time.
-fn parse_template(src: &str) -> Result<Vec<Part>, TemplateParseError> {
-    fn parse_literal(src: &str) -> Result<Part, TemplateParseError> {
-        let items: Vec<_> = StrftimeItems::new(src).collect();
-        if items.iter().any(is_error) {
-            Err(TemplateParseError::StrftimeError)
-        } else if items.iter().any(is_dynamic) {
-            Ok(Part::Strftime(src.to_string()))
-        } else {
-            Ok(Part::Literal(src.to_string()))
-        }
+/// One part of the template string after parsing.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+enum Part {
+    /// A literal piece of text to be copied verbatim into the output.
+    Literal(String),
+    /// A literal piece of text containing a time format string.
+    Strftime(ParsedStrftime),
+    /// A reference to the source event, to be copied from the relevant field or tag.
+    Reference(String),
+}
+
+// Wrap the parsed time formatter in order to provide `impl Hash` and some convenience functions.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct ParsedStrftime(Box<[Item<'static>]>);
+
+impl ParsedStrftime {
+    fn parse(fmt: &str) -> Result<Self, TemplateParseError> {
+        Ok(Self(
+            StrftimeItems::new(fmt)
+                .map(|item| match item {
+                    // Box the references so they outlive the reference
+                    Item::Space(space) => Item::OwnedSpace(space.into()),
+                    Item::Literal(lit) => Item::OwnedLiteral(lit.into()),
+                    // And copy all the others
+                    Item::Fixed(f) => Item::Fixed(f),
+                    Item::Numeric(num, pad) => Item::Numeric(num, pad),
+                    Item::Error => Item::Error,
+                    Item::OwnedSpace(space) => Item::OwnedSpace(space),
+                    Item::OwnedLiteral(lit) => Item::OwnedLiteral(lit),
+                })
+                .map(|item| {
+                    matches!(item, Item::Error)
+                        .then(|| Err(TemplateParseError::StrftimeError))
+                        .unwrap_or(Ok(item))
+                })
+                .collect::<Result<Vec<_>, _>>()?
+                .into(),
+        ))
     }
 
+    fn is_dynamic(&self) -> bool {
+        self.0.iter().any(|item| match item {
+            Item::Fixed(_) => true,
+            Item::Numeric(_, _) => true,
+            Item::Error
+            | Item::Space(_)
+            | Item::OwnedSpace(_)
+            | Item::Literal(_)
+            | Item::OwnedLiteral(_) => false,
+        })
+    }
+
+    fn as_items(&self) -> impl Iterator<Item = &Item<'static>> + Clone {
+        self.0.iter()
+    }
+}
+
+fn parse_literal(src: &str) -> Result<Part, TemplateParseError> {
+    let parsed = ParsedStrftime::parse(src)?;
+    Ok(if parsed.is_dynamic() {
+        Part::Strftime(parsed)
+    } else {
+        Part::Literal(src.to_string())
+    })
+}
+
+// Pre-parse the template string into a series of parts to be filled in at render time.
+fn parse_template(src: &str) -> Result<Vec<Part>, TemplateParseError> {
     let mut last_end = 0;
     let mut parts = Vec::new();
     for cap in RE.captures_iter(src) {
@@ -220,7 +248,7 @@ fn render_fields(parts: &[Part], event: EventRef<'_>) -> Result<String, Template
     for part in parts {
         match part {
             Part::Literal(lit) => out.push_str(lit),
-            Part::Strftime(lit) => out.push_str(&render_timestamp(lit, event)),
+            Part::Strftime(items) => out.push_str(&render_timestamp(items, event)),
             Part::Reference(key) => {
                 out.push_str(
                     &match event {
@@ -254,8 +282,8 @@ fn render_metric_field<'a>(key: &str, metric: &'a Metric) -> Option<&'a str> {
     }
 }
 
-fn render_timestamp(src: &str, event: EventRef<'_>) -> String {
-    let timestamp = match event {
+fn render_timestamp(items: &ParsedStrftime, event: EventRef<'_>) -> String {
+    match event {
         EventRef::Log(log) => log
             .get(log_schema().timestamp_key())
             .and_then(Value::as_timestamp)
@@ -265,12 +293,10 @@ fn render_timestamp(src: &str, event: EventRef<'_>) -> String {
             .get(log_schema().timestamp_key())
             .and_then(Value::as_timestamp)
             .copied(),
-    };
-    if let Some(ts) = timestamp {
-        ts.format(src).to_string()
-    } else {
-        Utc::now().format(src).to_string()
     }
+    .unwrap_or_else(Utc::now)
+    .format_with_items(items.as_items())
+    .to_string()
 }
 
 #[cfg(test)]
