@@ -27,10 +27,10 @@ use crate::{
 };
 
 use super::{
+    record::{KinesisFirehoseClient, KinesisFirehoseRecord},
     request_builder::KinesisRequestBuilder,
     sink::{BatchKinesisRequest, KinesisSink},
     KinesisClient, KinesisError, KinesisRecord, KinesisResponse, KinesisService,
-    record::{KinesisFirehoseRecord, KinesisFirehoseClient},
 };
 
 // AWS Kinesis Firehose API accepts payloads up to 4MB or 500 events
@@ -89,20 +89,6 @@ pub struct KinesisFirehoseSinkConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
-}
-
-#[derive(Debug, PartialEq, Eq, Snafu)]
-pub enum BuildError {
-    #[snafu(display(
-        "Batch max size is too high. The value must be {} bytes or less",
-        MAX_PAYLOAD_SIZE
-    ))]
-    BatchMaxSize,
-    #[snafu(display(
-        "Batch max events is too high. The value must be {} or less",
-        MAX_PAYLOAD_EVENTS
-    ))]
-    BatchMaxEvents,
 }
 
 #[allow(clippy::large_enum_variant)]

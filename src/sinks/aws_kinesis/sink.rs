@@ -20,8 +20,8 @@ use crate::{
 };
 
 use super::{
-    request_builder::{KinesisRequest, KinesisRequestBuilder},
     record::Record,
+    request_builder::{KinesisRequest, KinesisRequestBuilder},
 };
 
 pub type KinesisProcessedEvent = ProcessedEvent<LogEvent, KinesisKey>;
@@ -146,7 +146,6 @@ fn gen_partition_key() -> String {
         })
 }
 
-//#[derive(Clone)]
 pub struct BatchKinesisRequest<R>
 where
     R: Record + std::clone::Clone,
@@ -155,8 +154,6 @@ where
     pub events: Vec<KinesisRequest<R>>,
     metadata: RequestMetadata,
 }
-
-//impl<R> Copy for BatchKinesisRequest<R> {}
 
 impl<R> Clone for BatchKinesisRequest<R>
 where
@@ -191,7 +188,6 @@ where
     }
 }
 
-//struct KinesisPartitioner<R> where R: Record;
 struct KinesisPartitioner<R>
 where
     R: Record,
