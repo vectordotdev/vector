@@ -629,7 +629,7 @@ mod tests {
             &["in"],
             LogToMetricConfig {
                 metrics: vec![MetricConfig::Gauge(GaugeConfig {
-                    field: "message".to_string(),
+                    field: "message".try_into().expect("Fixed template string"),
                     name: None,
                     namespace: None,
                     tags: None,
