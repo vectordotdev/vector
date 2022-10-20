@@ -29,10 +29,23 @@ pub struct LogToMetricConfig {
     pub metrics: Vec<MetricConfig>,
 }
 
-/// Common configuration for all generated metrics
+/// Specification of a counter derived from a log event.
 #[configurable_component]
 #[derive(Clone, Debug)]
-pub struct CommonConfig {
+pub struct CounterConfig {
+    /// Increments the counter by the value in `field`, instead of only by `1`.
+    #[serde(default = "default_increment_by_value")]
+    increment_by_value: bool,
+
+    #[configurable(derived)]
+    #[serde(default = "default_kind")]
+    kind: MetricKind,
+}
+
+/// Specification of a metric derived from a log event.
+#[configurable_component]
+#[derive(Clone, Debug)]
+pub struct MetricConfig {
     /// Name of the field in the event to generate the counter.
     field: Template,
 
@@ -46,55 +59,36 @@ pub struct CommonConfig {
 
     /// Tags to apply to the counter.
     tags: Option<IndexMap<String, Template>>,
-}
 
-/// Specification of a counter derived from a log event.
-#[configurable_component]
-#[derive(Clone, Debug)]
-pub struct CounterConfig {
     #[configurable(derived)]
     #[serde(flatten)]
-    common: CommonConfig,
-
-    /// Increments the counter by the value in `field`, instead of only by `1`.
-    #[serde(default = "default_increment_by_value")]
-    increment_by_value: bool,
-
-    #[configurable(derived)]
-    #[serde(default = "default_kind")]
-    kind: MetricKind,
+    metric: MetricTypeConfig,
 }
 
-/// Specification of a metric derived from a log event.
+/// Specification of the type of an individual metric, and any associated data.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "type", rename_all = "snake_case")]
-pub enum MetricConfig {
+pub enum MetricTypeConfig {
     /// A counter.
     Counter(#[configurable(derived)] CounterConfig),
 
     /// A histogram.
-    Histogram(#[configurable(derived)] CommonConfig),
+    Histogram,
 
     /// A gauge.
-    Gauge(#[configurable(derived)] CommonConfig),
+    Gauge,
 
     /// A set.
-    Set(#[configurable(derived)] CommonConfig),
+    Set,
 
     /// A summary.
-    Summary(#[configurable(derived)] CommonConfig),
+    Summary,
 }
 
 impl MetricConfig {
     fn field(&self) -> &str {
-        match self {
-            MetricConfig::Counter(CounterConfig { common, .. }) => common.field.get_ref(),
-            MetricConfig::Histogram(CommonConfig { field, .. }) => field.get_ref(),
-            MetricConfig::Gauge(CommonConfig { field, .. }) => field.get_ref(),
-            MetricConfig::Set(CommonConfig { field, .. }) => field.get_ref(),
-            MetricConfig::Summary(CommonConfig { field, .. }) => field.get_ref(),
-        }
+        self.field.get_ref()
     }
 }
 
@@ -114,16 +108,16 @@ pub struct LogToMetric {
 impl GenerateConfig for LogToMetricConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            metrics: vec![MetricConfig::Counter(CounterConfig {
-                common: CommonConfig {
-                    field: "field_name".try_into().expect("Fixed template"),
-                    name: None,
-                    namespace: None,
-                    tags: None,
-                },
-                increment_by_value: false,
-                kind: MetricKind::Incremental,
-            })],
+            metrics: vec![MetricConfig {
+                field: "field_name".try_into().expect("Fixed template"),
+                name: None,
+                namespace: None,
+                tags: None,
+                metric: MetricTypeConfig::Counter(CounterConfig {
+                    increment_by_value: false,
+                    kind: MetricKind::Incremental,
+                }),
+            }],
         })
         .unwrap()
     }
@@ -224,32 +218,28 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
         Some(value) => Ok(value),
     }?;
 
-    match config {
-        MetricConfig::Counter(counter) => {
+    let name = config.name.as_ref().unwrap_or(&config.field);
+    let name = render_template(name, event)?;
+
+    let namespace = config.namespace.as_ref();
+    let namespace = namespace
+        .map(|namespace| render_template(namespace, event))
+        .transpose()?;
+
+    let tags = render_tags(&config.tags, event)?;
+
+    match &config.metric {
+        MetricTypeConfig::Counter(counter) => {
             let value = if counter.increment_by_value {
                 value.to_string_lossy().parse().map_err(|error| {
                     TransformError::ParseFloatError {
-                        field: counter.common.field.get_ref().to_owned(),
+                        field: config.field.get_ref().to_owned(),
                         error,
                     }
                 })?
             } else {
                 1.0
             };
-
-            let name = counter
-                .common
-                .name
-                .as_ref()
-                .unwrap_or(&counter.common.field);
-            let name = render_template(name, event)?;
-
-            let namespace = counter.common.namespace.as_ref();
-            let namespace = namespace
-                .map(|namespace| render_template(namespace, event))
-                .transpose()?;
-
-            let tags = render_tags(&counter.common.tags, event)?;
 
             Ok(Metric::new_with_metadata(
                 name,
@@ -261,23 +251,13 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             .with_tags(tags)
             .with_timestamp(timestamp))
         }
-        MetricConfig::Histogram(hist) => {
+        MetricTypeConfig::Histogram => {
             let value = value.to_string_lossy().parse().map_err(|error| {
                 TransformError::ParseFloatError {
                     field: field.to_string(),
                     error,
                 }
             })?;
-
-            let name = hist.name.as_ref().unwrap_or(&hist.field);
-            let name = render_template(name, event)?;
-
-            let namespace = hist.namespace.as_ref();
-            let namespace = namespace
-                .map(|namespace| render_template(namespace, event))
-                .transpose()?;
-
-            let tags = render_tags(&hist.tags, event)?;
 
             Ok(Metric::new_with_metadata(
                 name,
@@ -292,23 +272,13 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             .with_tags(tags)
             .with_timestamp(timestamp))
         }
-        MetricConfig::Summary(summary) => {
+        MetricTypeConfig::Summary => {
             let value = value.to_string_lossy().parse().map_err(|error| {
                 TransformError::ParseFloatError {
                     field: field.to_string(),
                     error,
                 }
             })?;
-
-            let name = summary.name.as_ref().unwrap_or(&summary.field);
-            let name = render_template(name, event)?;
-
-            let namespace = summary.namespace.as_ref();
-            let namespace = namespace
-                .map(|namespace| render_template(namespace, event))
-                .transpose()?;
-
-            let tags = render_tags(&summary.tags, event)?;
 
             Ok(Metric::new_with_metadata(
                 name,
@@ -323,23 +293,13 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             .with_tags(tags)
             .with_timestamp(timestamp))
         }
-        MetricConfig::Gauge(gauge) => {
+        MetricTypeConfig::Gauge => {
             let value = value.to_string_lossy().parse().map_err(|error| {
                 TransformError::ParseFloatError {
                     field: field.to_string(),
                     error,
                 }
             })?;
-
-            let name = gauge.name.as_ref().unwrap_or(&gauge.field);
-            let name = render_template(name, event)?;
-
-            let namespace = gauge.namespace.as_ref();
-            let namespace = namespace
-                .map(|namespace| render_template(namespace, event))
-                .transpose()?;
-
-            let tags = render_tags(&gauge.tags, event)?;
 
             Ok(Metric::new_with_metadata(
                 name,
@@ -351,18 +311,8 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             .with_tags(tags)
             .with_timestamp(timestamp))
         }
-        MetricConfig::Set(set) => {
+        MetricTypeConfig::Set => {
             let value = value.to_string_lossy().into_owned();
-
-            let name = set.name.as_ref().unwrap_or(&set.field);
-            let name = render_template(name, event)?;
-
-            let namespace = set.namespace.as_ref();
-            let namespace = namespace
-                .map(|namespace| render_template(namespace, event))
-                .transpose()?;
-
-            let tags = render_tags(&set.tags, event)?;
 
             Ok(Metric::new_with_metadata(
                 name,
