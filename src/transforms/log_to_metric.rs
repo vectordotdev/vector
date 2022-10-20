@@ -228,7 +228,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 
     let tags = render_tags(&config.tags, event)?;
 
-    match &config.metric {
+    let (kind, value) = match &config.metric {
         MetricTypeConfig::Counter(counter) => {
             let value = if counter.increment_by_value {
                 value.to_string_lossy().parse().map_err(|error| {
@@ -241,15 +241,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                 1.0
             };
 
-            Ok(Metric::new_with_metadata(
-                name,
-                counter.kind,
-                MetricValue::Counter { value },
-                metadata,
-            )
-            .with_namespace(namespace)
-            .with_tags(tags)
-            .with_timestamp(timestamp))
+            (counter.kind, MetricValue::Counter { value })
         }
         MetricTypeConfig::Histogram => {
             let value = value.to_string_lossy().parse().map_err(|error| {
@@ -259,18 +251,13 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                 }
             })?;
 
-            Ok(Metric::new_with_metadata(
-                name,
+            (
                 MetricKind::Incremental,
                 MetricValue::Distribution {
                     samples: vector_core::samples![value => 1],
                     statistic: StatisticKind::Histogram,
                 },
-                metadata,
             )
-            .with_namespace(namespace)
-            .with_tags(tags)
-            .with_timestamp(timestamp))
         }
         MetricTypeConfig::Summary => {
             let value = value.to_string_lossy().parse().map_err(|error| {
@@ -280,18 +267,13 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                 }
             })?;
 
-            Ok(Metric::new_with_metadata(
-                name,
+            (
                 MetricKind::Incremental,
                 MetricValue::Distribution {
                     samples: vector_core::samples![value => 1],
                     statistic: StatisticKind::Summary,
                 },
-                metadata,
             )
-            .with_namespace(namespace)
-            .with_tags(tags)
-            .with_timestamp(timestamp))
         }
         MetricTypeConfig::Gauge => {
             let value = value.to_string_lossy().parse().map_err(|error| {
@@ -301,32 +283,23 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                 }
             })?;
 
-            Ok(Metric::new_with_metadata(
-                name,
-                MetricKind::Absolute,
-                MetricValue::Gauge { value },
-                metadata,
-            )
-            .with_namespace(namespace)
-            .with_tags(tags)
-            .with_timestamp(timestamp))
+            (MetricKind::Absolute, MetricValue::Gauge { value })
         }
         MetricTypeConfig::Set => {
             let value = value.to_string_lossy().into_owned();
 
-            Ok(Metric::new_with_metadata(
-                name,
+            (
                 MetricKind::Incremental,
                 MetricValue::Set {
                     values: std::iter::once(value).collect(),
                 },
-                metadata,
             )
-            .with_namespace(namespace)
-            .with_tags(tags)
-            .with_timestamp(timestamp))
         }
-    }
+    };
+    Ok(Metric::new_with_metadata(name, kind, value, metadata)
+        .with_namespace(namespace)
+        .with_tags(tags)
+        .with_timestamp(timestamp))
 }
 
 impl FunctionTransform for LogToMetric {
