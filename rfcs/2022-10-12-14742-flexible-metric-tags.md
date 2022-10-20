@@ -291,15 +291,20 @@ type MetricTags = MultiIndexTagMap;
 
 Incremental steps to execute this change. These will be converted to issues after the RFC is approved:
 
-- [ ] Convert the `MetricTags` alias to a newtype wrapper
-- [ ] Convert the `MetricTags` type to new storage as above
-- [ ] Audit all uses of `MetricTags::insert` to see which should do a replace
+- [X] Convert the `MetricTags` alias to a newtype wrapper
+- [ ] Convert the `MetricTags` type to new storage as above but expose as single tags
+- [ ] Introduce insert/replace distinction and audit all uses
 - [ ] Update the native protobuf encoding
 - [ ] Update the native JSON encoding
-- [ ] Update the `lua` transform to support multi-value tags
-- [ ] Update VRL to support multi-value tags
-- [ ] Add multi-value tag support to the `log_to_metric` transform
+- [ ] Update the `lua` transform to support multi-valued tags
+- [ ] Update VRL to support multi-valued tags
+- [ ] Update metric sources that could receive multi-valued tags
+- [ ] Update metric sinks to emit multi-valued tags
+- [ ] Add multi-valued tag support to the `log_to_metric` transform
 - [ ] Update the `tag_cardinality_limit` transform for multi-valued tags
+- [ ] Add deprecation warnings for single-valued tags behavior (Lua and VRL)
+- [ ] Change optional behavior to multi-valued tags (Lua and VRL)
+- [ ] Drop single-valued tags support (Lua and VRL)
 
 ## Future Improvements
 
