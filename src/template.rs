@@ -124,7 +124,7 @@ impl Template {
         if self.is_static {
             Ok(self.src.clone())
         } else {
-            render_fields(&self.parts, event.into())
+            render_parts(&self.parts, event.into())
         }
     }
 
@@ -242,7 +242,7 @@ fn parse_template(src: &str) -> Result<Vec<Part>, TemplateParseError> {
     Ok(parts)
 }
 
-fn render_fields(parts: &[Part], event: EventRef<'_>) -> Result<String, TemplateRenderingError> {
+fn render_parts(parts: &[Part], event: EventRef<'_>) -> Result<String, TemplateRenderingError> {
     let mut missing_keys = Vec::new();
     let mut out = String::new();
     for part in parts {
