@@ -124,7 +124,38 @@ impl Template {
         if self.is_static {
             Ok(self.src.clone())
         } else {
-            render_parts(&self.parts, event.into())
+            self.render_event(event.into())
+        }
+    }
+
+    fn render_event(&self, event: EventRef<'_>) -> Result<String, TemplateRenderingError> {
+        let mut missing_keys = Vec::new();
+        let mut out = String::new();
+        for part in &self.parts {
+            match part {
+                Part::Literal(lit) => out.push_str(lit),
+                Part::Strftime(items) => out.push_str(&render_timestamp(items, event)),
+                Part::Reference(key) => {
+                    out.push_str(
+                        &match event {
+                            EventRef::Log(log) => log.get(&**key).map(Value::to_string_lossy),
+                            EventRef::Metric(metric) => {
+                                render_metric_field(key, metric).map(Cow::Borrowed)
+                            }
+                            EventRef::Trace(trace) => trace.get(&key).map(Value::to_string_lossy),
+                        }
+                        .unwrap_or_else(|| {
+                            missing_keys.push(key.to_owned());
+                            Cow::Borrowed("")
+                        }),
+                    );
+                }
+            }
+        }
+        if missing_keys.is_empty() {
+            Ok(out)
+        } else {
+            Err(TemplateRenderingError::MissingKeys { missing_keys })
         }
     }
 
@@ -240,37 +271,6 @@ fn parse_template(src: &str) -> Result<Vec<Part>, TemplateParseError> {
     }
 
     Ok(parts)
-}
-
-fn render_parts(parts: &[Part], event: EventRef<'_>) -> Result<String, TemplateRenderingError> {
-    let mut missing_keys = Vec::new();
-    let mut out = String::new();
-    for part in parts {
-        match part {
-            Part::Literal(lit) => out.push_str(lit),
-            Part::Strftime(items) => out.push_str(&render_timestamp(items, event)),
-            Part::Reference(key) => {
-                out.push_str(
-                    &match event {
-                        EventRef::Log(log) => log.get(&**key).map(Value::to_string_lossy),
-                        EventRef::Metric(metric) => {
-                            render_metric_field(key, metric).map(Cow::Borrowed)
-                        }
-                        EventRef::Trace(trace) => trace.get(&key).map(Value::to_string_lossy),
-                    }
-                    .unwrap_or_else(|| {
-                        missing_keys.push(key.to_owned());
-                        Cow::Borrowed("")
-                    }),
-                );
-            }
-        }
-    }
-    if missing_keys.is_empty() {
-        Ok(out)
-    } else {
-        Err(TemplateRenderingError::MissingKeys { missing_keys })
-    }
 }
 
 fn render_metric_field<'a>(key: &str, metric: &'a Metric) -> Option<&'a str> {
