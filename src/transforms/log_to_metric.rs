@@ -416,7 +416,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             .with_timestamp(timestamp))
         }
         MetricConfig::Set(set) => {
-            let value = value.to_string_lossy();
+            let value = value.to_string_lossy().into_owned();
 
             let name = set.name.as_ref().unwrap_or(&set.field);
             let name = render_template(name, event)?;

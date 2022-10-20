@@ -200,17 +200,14 @@ impl BulkConfig {
 #[serde(rename_all = "snake_case")]
 pub struct DataStreamConfig {
     /// The data stream type used to construct the data stream at index time.
-    #[configurable(metadata(templateable))]
     #[serde(rename = "type", default = "DataStreamConfig::default_type")]
     pub dtype: Template,
 
     /// The data stream dataset used to construct the data stream at index time.
-    #[configurable(metadata(templateable))]
     #[serde(default = "DataStreamConfig::default_dataset")]
     pub dataset: Template,
 
     /// The data stream namespace used to construct the data stream at index time.
-    #[configurable(metadata(templateable))]
     #[serde(default = "DataStreamConfig::default_namespace")]
     pub namespace: Template,
 
@@ -359,15 +356,15 @@ impl DataStreamConfig {
             let data_stream = log.get("data_stream").and_then(|ds| ds.as_object());
             let dtype = data_stream
                 .and_then(|ds| ds.get("type"))
-                .map(|value| value.to_string_lossy())
+                .map(|value| value.to_string_lossy().into_owned())
                 .or_else(|| self.dtype(log))?;
             let dataset = data_stream
                 .and_then(|ds| ds.get("dataset"))
-                .map(|value| value.to_string_lossy())
+                .map(|value| value.to_string_lossy().into_owned())
                 .or_else(|| self.dataset(log))?;
             let namespace = data_stream
                 .and_then(|ds| ds.get("namespace"))
-                .map(|value| value.to_string_lossy())
+                .map(|value| value.to_string_lossy().into_owned())
                 .or_else(|| self.namespace(log))?;
             (dtype, dataset, namespace)
         };

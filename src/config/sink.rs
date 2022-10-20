@@ -13,7 +13,7 @@ use crate::sinks::{util::UriSerde, Healthcheck, Sinks};
 
 /// Fully resolved sink component.
 #[configurable_component]
-#[configurable(metadata(component_base_type = "sink"))]
+#[configurable(metadata(docs::component_base_type = "sink"))]
 #[derive(Clone, Debug)]
 pub struct SinkOuter<T>
 where
@@ -35,7 +35,7 @@ where
     /// This must be a valid URI, which requires at least the scheme and host. All other
     /// components -- port, path, etc -- are allowed as well.
     #[configurable(deprecated)]
-    #[configurable(metadata(hidden))]
+    #[configurable(metadata(docs::hidden))]
     #[configurable(validation(format = "uri"))]
     healthcheck_uri: Option<UriSerde>,
 
@@ -58,7 +58,7 @@ where
     proxy: ProxyConfig,
 
     #[serde(flatten)]
-    #[configurable(metadata(hidden))]
+    #[configurable(metadata(docs::hidden))]
     pub inner: Sinks,
 }
 

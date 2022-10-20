@@ -75,7 +75,7 @@ pub struct LokiConfig {
 
     /// A set of labels that are attached to each batch of events.
     ///
-    /// Both keys and values are templatable, which enables you to attach dynamic labels to events
+    /// Both keys and values are templateable, which enables you to attach dynamic labels to events.
     ///
     /// Labels can be suffixed with a “*” to allow the expansion of objects into multiple labels,
     /// see “How it works” for more information.
@@ -83,7 +83,6 @@ pub struct LokiConfig {
     /// Note: If the set of labels has high cardinality, this can cause drastic performance issues
     /// with Loki. To prevent this from happening, reduce the number of unique label keys and
     /// values.
-    #[configurable(metadata(templateable))]
     pub labels: HashMap<Template, Template>,
 
     /// Whether or not to delete fields from the event when they are used as labels.

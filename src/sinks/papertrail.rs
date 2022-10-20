@@ -37,7 +37,6 @@ pub struct PapertrailConfig {
     send_buffer_bytes: Option<usize>,
 
     /// The value to use as the `process` in Papertrail.
-    #[configurable(metadata(templateable))]
     process: Option<Template>,
 
     #[configurable(derived)]
@@ -132,7 +131,7 @@ impl tokio_util::codec::Encoder<Event> for PapertrailEncoder {
         let host = event
             .as_mut_log()
             .remove(log_schema().host_key())
-            .map(|host| host.to_string_lossy());
+            .map(|host| host.to_string_lossy().into_owned());
 
         let process = self
             .process

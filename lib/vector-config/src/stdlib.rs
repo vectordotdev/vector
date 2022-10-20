@@ -77,9 +77,6 @@ impl Configurable for String {
 impl Configurable for char {
     fn metadata() -> Metadata<Self> {
         let mut metadata = Metadata::default();
-        if let Some(description) = Self::description() {
-            metadata.set_description(description);
-        }
         metadata.add_validation(Validation::Length {
             minimum: Some(1),
             maximum: Some(1),
@@ -99,12 +96,8 @@ macro_rules! impl_configuable_numeric {
 			impl Configurable for $ty {
                 fn metadata() -> Metadata<Self> {
                     let mut metadata = Metadata::default();
-                    if let Some(description) = Self::description() {
-                        metadata.set_description(description);
-                    }
-
                     let numeric_type = <Self as ConfigurableNumber>::class();
-                    metadata.add_custom_attribute(CustomAttribute::kv("numeric_type", numeric_type));
+                    metadata.add_custom_attribute(CustomAttribute::kv("docs::numeric_type", numeric_type));
 
                     metadata
                 }
@@ -217,8 +210,10 @@ impl Configurable for SocketAddr {
         Some("stdlib::SocketAddr")
     }
 
-    fn description() -> Option<&'static str> {
-        Some("An internet socket address, either IPv4 or IPv6.")
+    fn metadata() -> Metadata<Self> {
+        let mut metadata = Metadata::default();
+        metadata.set_description("An internet socket address, either IPv4 or IPv6.");
+        metadata
     }
 
     fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {
@@ -234,15 +229,9 @@ impl Configurable for PathBuf {
         Some("stdlib::PathBuf")
     }
 
-    fn description() -> Option<&'static str> {
-        Some("A file path.")
-    }
-
     fn metadata() -> Metadata<Self> {
         let mut metadata = Metadata::default();
-        if let Some(description) = Self::description() {
-            metadata.set_description(description);
-        }
+        metadata.set_description("A file path.");
 
         // Taken from
         // https://stackoverflow.com/questions/44289075/regular-expression-to-validate-windows-and-linux-path-with-extension
@@ -265,8 +254,10 @@ impl Configurable for Duration {
         Some("stdlib::Duration")
     }
 
-    fn description() -> Option<&'static str> {
-        Some("An duration of time.")
+    fn metadata() -> Metadata<Self> {
+        let mut metadata = Metadata::default();
+        metadata.set_description("An duration of time.");
+        metadata
     }
 
     fn generate_schema(_: &mut SchemaGenerator) -> Result<SchemaObject, GenerateError> {

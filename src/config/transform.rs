@@ -17,7 +17,7 @@ use super::ComponentKey;
 
 /// Fully resolved transform component.
 #[configurable_component]
-#[configurable(metadata(component_base_type = "transform"))]
+#[configurable(metadata(docs::component_base_type = "transform"))]
 #[derive(Clone, Debug)]
 pub struct TransformOuter<T>
 where
@@ -34,7 +34,7 @@ where
     /// [configuration]: https://vector.dev/docs/reference/configuration/
     pub inputs: Vec<T>,
 
-    #[configurable(metadata(hidden))]
+    #[configurable(metadata(docs::hidden))]
     #[serde(flatten)]
     pub inner: Transforms,
 }

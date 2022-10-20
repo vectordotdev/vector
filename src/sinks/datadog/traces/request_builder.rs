@@ -249,7 +249,7 @@ impl DatadogTracesEncoder {
             .and_then(|m| m.as_object())
             .map(|m| {
                 m.iter()
-                    .map(|(k, v)| (k.clone(), v.to_string_lossy()))
+                    .map(|(k, v)| (k.clone(), v.to_string_lossy().into_owned()))
                     .collect::<BTreeMap<String, String>>()
             })
             .unwrap_or_default();
@@ -273,7 +273,7 @@ impl DatadogTracesEncoder {
                 .unwrap_or(1i32),
             origin: trace
                 .get("origin")
-                .map(|v| v.to_string_lossy())
+                .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_default(),
             dropped_trace: trace
                 .get("dropped")
@@ -286,37 +286,37 @@ impl DatadogTracesEncoder {
         dd_proto::TracerPayload {
             container_id: trace
                 .get("container_id")
-                .map(|v| v.to_string_lossy())
+                .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_default(),
             language_name: trace
                 .get("language_name")
-                .map(|v| v.to_string_lossy())
+                .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_default(),
             language_version: trace
                 .get("language_version")
-                .map(|v| v.to_string_lossy())
+                .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_default(),
             tracer_version: trace
                 .get("tracer_version")
-                .map(|v| v.to_string_lossy())
+                .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_default(),
             runtime_id: trace
                 .get("runtime_id")
-                .map(|v| v.to_string_lossy())
+                .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_default(),
             chunks: vec![chunk],
             tags,
             env: trace
                 .get("env")
-                .map(|v| v.to_string_lossy())
+                .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_default(),
             hostname: trace
                 .get("hostname")
-                .map(|v| v.to_string_lossy())
+                .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_default(),
             app_version: trace
                 .get("app_version")
-                .map(|v| v.to_string_lossy())
+                .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_default(),
         }
     }
@@ -352,7 +352,7 @@ impl DatadogTracesEncoder {
             .and_then(|m| m.as_object())
             .map(|m| {
                 m.iter()
-                    .map(|(k, v)| (k.clone(), v.to_string_lossy()))
+                    .map(|(k, v)| (k.clone(), v.to_string_lossy().into_owned()))
                     .collect::<BTreeMap<String, String>>()
             })
             .unwrap_or_default();
@@ -386,19 +386,19 @@ impl DatadogTracesEncoder {
         dd_proto::Span {
             service: span
                 .get("service")
-                .map(|v| v.to_string_lossy())
+                .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_default(),
             name: span
                 .get("name")
-                .map(|v| v.to_string_lossy())
+                .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_default(),
             resource: span
                 .get("resource")
-                .map(|v| v.to_string_lossy())
+                .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_default(),
             r#type: span
                 .get("type")
-                .map(|v| v.to_string_lossy())
+                .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_default(),
             trace_id: trace_id as u64,
             span_id: span_id as u64,

@@ -141,7 +141,12 @@ ts, err = parse_timestamp(.timestamp, format: "%s")
       let res = window.run_vrl(input);
 
       console.log(res);
-      window.outputEditor.setValue(JSON.stringify(res["result"], null, "\t"));
+      if (res.output) {
+        window.outputEditor.setValue(JSON.stringify(res["result"], null, "\t"));
+      } else if (res.msg) {
+        window.outputEditor.setValue(res["msg"]);
+      }
+      
 
     }
 

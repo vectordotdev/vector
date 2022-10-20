@@ -322,7 +322,7 @@ pub fn configurable_component_impl(args: TokenStream, item: TokenStream) -> Toke
     let component_type = options.typed_component().map(|tc| {
         let component_type = tc.component_type.as_str();
         quote! {
-            #[configurable(metadata(component_type = #component_type))]
+            #[configurable(metadata(docs::component_type = #component_type))]
         }
     });
 
@@ -330,7 +330,7 @@ pub fn configurable_component_impl(args: TokenStream, item: TokenStream) -> Toke
         let maybe_component_name_registration = tc.get_component_name_registration();
         let maybe_component_name_metadata = tc
             .get_component_name()
-            .map(|name| quote! { #[configurable(metadata(component_name = #name))] });
+            .map(|name| quote! { #[configurable(metadata(docs::component_name = #name))] });
 
         quote! {
             #maybe_component_name_metadata

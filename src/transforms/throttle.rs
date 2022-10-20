@@ -35,7 +35,6 @@ pub struct ThrottleConfig {
     /// Each unique key will create a bucket of related events to be rate limited separately. If
     /// left unspecified, or if the event doesn’t have `key_field`, the event be will not be rate
     /// limited separately.
-    #[configurable(metadata(templatable))]
     key_field: Option<Template>,
 
     /// A logical condition used to exclude events from sampling.
