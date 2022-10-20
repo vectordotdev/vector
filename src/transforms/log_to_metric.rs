@@ -29,10 +29,10 @@ pub struct LogToMetricConfig {
     pub metrics: Vec<MetricConfig>,
 }
 
-/// Specification of a counter derived from a log event.
+/// Common configuration for all generated metrics
 #[configurable_component]
 #[derive(Clone, Debug)]
-pub struct CounterConfig {
+pub struct CommonConfig {
     /// Name of the field in the event to generate the counter.
     field: Template,
 
@@ -44,6 +44,18 @@ pub struct CounterConfig {
     /// Sets the namespace for the counter.
     namespace: Option<Template>,
 
+    /// Tags to apply to the counter.
+    tags: Option<IndexMap<String, Template>>,
+}
+
+/// Specification of a counter derived from a log event.
+#[configurable_component]
+#[derive(Clone, Debug)]
+pub struct CounterConfig {
+    #[configurable(derived)]
+    #[serde(flatten)]
+    common: CommonConfig,
+
     /// Increments the counter by the value in `field`, instead of only by `1`.
     #[serde(default = "default_increment_by_value")]
     increment_by_value: bool,
@@ -51,85 +63,6 @@ pub struct CounterConfig {
     #[configurable(derived)]
     #[serde(default = "default_kind")]
     kind: MetricKind,
-
-    /// Tags to apply to the counter.
-    tags: Option<IndexMap<String, Template>>,
-}
-
-/// Specification of a gauge derived from a log event.
-#[configurable_component]
-#[derive(Clone, Debug)]
-pub struct GaugeConfig {
-    /// Name of the field in the event to generate the gauge from.
-    pub field: Template,
-
-    /// Overrides the name of the gauge.
-    ///
-    /// If not specified, `field` is used as the name of the gauge.
-    pub name: Option<Template>,
-
-    /// Sets the namespace for the gauge.
-    pub namespace: Option<Template>,
-
-    /// Tags to apply to the gauge.
-    pub tags: Option<IndexMap<String, Template>>,
-}
-
-/// Specification of a set derived from a log event.
-#[configurable_component]
-#[derive(Clone, Debug)]
-pub struct SetConfig {
-    /// Name of the field in the event to generate the set from.
-    field: Template,
-
-    /// Overrides the name of the set.
-    ///
-    /// If not specified, `field` is used as the name of the set.
-    name: Option<Template>,
-
-    /// Sets the namespace for the set.
-    namespace: Option<Template>,
-
-    /// Tags to apply to the set.
-    tags: Option<IndexMap<String, Template>>,
-}
-
-/// Specification of a histogram derived from a log event.
-#[configurable_component]
-#[derive(Clone, Debug)]
-pub struct HistogramConfig {
-    /// Name of the field in the event to generate the histogram from.
-    field: Template,
-
-    /// Overrides the name of the histogram.
-    ///
-    /// If not specified, `field` is used as the name of the histogram.
-    name: Option<Template>,
-
-    /// Sets the namespace for the histogram.
-    namespace: Option<Template>,
-
-    /// Tags to apply to the histogram.
-    tags: Option<IndexMap<String, Template>>,
-}
-
-/// Specification of a summary derived from a log event.
-#[configurable_component]
-#[derive(Clone, Debug)]
-pub struct SummaryConfig {
-    /// Name of the field in the event to generate the summary from.
-    field: Template,
-
-    /// Overrides the name of the summary.
-    ///
-    /// If not specified, `field` is used as the name of the summary.
-    name: Option<Template>,
-
-    /// Sets the namespace for the summary.
-    namespace: Option<Template>,
-
-    /// Tags to apply to the summary.
-    tags: Option<IndexMap<String, Template>>,
 }
 
 /// Specification of a metric derived from a log event.
@@ -141,26 +74,26 @@ pub enum MetricConfig {
     Counter(#[configurable(derived)] CounterConfig),
 
     /// A histogram.
-    Histogram(#[configurable(derived)] HistogramConfig),
+    Histogram(#[configurable(derived)] CommonConfig),
 
     /// A gauge.
-    Gauge(#[configurable(derived)] GaugeConfig),
+    Gauge(#[configurable(derived)] CommonConfig),
 
     /// A set.
-    Set(#[configurable(derived)] SetConfig),
+    Set(#[configurable(derived)] CommonConfig),
 
     /// A summary.
-    Summary(#[configurable(derived)] SummaryConfig),
+    Summary(#[configurable(derived)] CommonConfig),
 }
 
 impl MetricConfig {
     fn field(&self) -> &str {
         match self {
-            MetricConfig::Counter(CounterConfig { field, .. }) => field.get_ref(),
-            MetricConfig::Histogram(HistogramConfig { field, .. }) => field.get_ref(),
-            MetricConfig::Gauge(GaugeConfig { field, .. }) => field.get_ref(),
-            MetricConfig::Set(SetConfig { field, .. }) => field.get_ref(),
-            MetricConfig::Summary(SummaryConfig { field, .. }) => field.get_ref(),
+            MetricConfig::Counter(CounterConfig { common, .. }) => common.field.get_ref(),
+            MetricConfig::Histogram(CommonConfig { field, .. }) => field.get_ref(),
+            MetricConfig::Gauge(CommonConfig { field, .. }) => field.get_ref(),
+            MetricConfig::Set(CommonConfig { field, .. }) => field.get_ref(),
+            MetricConfig::Summary(CommonConfig { field, .. }) => field.get_ref(),
         }
     }
 }
@@ -182,12 +115,14 @@ impl GenerateConfig for LogToMetricConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             metrics: vec![MetricConfig::Counter(CounterConfig {
-                field: "field_name".try_into().expect("Fixed template"),
-                name: None,
-                namespace: None,
+                common: CommonConfig {
+                    field: "field_name".try_into().expect("Fixed template"),
+                    name: None,
+                    namespace: None,
+                    tags: None,
+                },
                 increment_by_value: false,
                 kind: MetricKind::Incremental,
-                tags: None,
             })],
         })
         .unwrap()
@@ -294,7 +229,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             let value = if counter.increment_by_value {
                 value.to_string_lossy().parse().map_err(|error| {
                     TransformError::ParseFloatError {
-                        field: counter.field.get_ref().to_owned(),
+                        field: counter.common.field.get_ref().to_owned(),
                         error,
                     }
                 })?
@@ -302,15 +237,19 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                 1.0
             };
 
-            let name = counter.name.as_ref().unwrap_or(&counter.field);
+            let name = counter
+                .common
+                .name
+                .as_ref()
+                .unwrap_or(&counter.common.field);
             let name = render_template(name, event)?;
 
-            let namespace = counter.namespace.as_ref();
+            let namespace = counter.common.namespace.as_ref();
             let namespace = namespace
                 .map(|namespace| render_template(namespace, event))
                 .transpose()?;
 
-            let tags = render_tags(&counter.tags, event)?;
+            let tags = render_tags(&counter.common.tags, event)?;
 
             Ok(Metric::new_with_metadata(
                 name,
