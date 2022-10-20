@@ -81,7 +81,7 @@ Both the Lua and VRL scripting languages will be given a new configuration optio
 `metric_tags_values` that controls how tag values are exposed to scripts. This may take two values,
 `"single"` or `"full"`. When set to the former, tag values will be exposed as single strings, the
 same as they are now. Tags with multiple values will show the last assigned value, and null values
-will be ignored. When set to the later, all tags will be exposed as arrays of either string or null
+will be ignored. When set to the latter, all tags will be exposed as arrays of either string or null
 values.  This control will initially default to the former setting, providing for backwards
 compatibility, but that default will later be deprecated and change to the latter. In both cases,
 assignment to a tag will overwrite all other values for the tag, and deleting a tag name or
@@ -127,6 +127,13 @@ supported in the presence of multi-valued tags, which will be selectable with co
    exceeds the limit, and all values of tags that would exceed the limit are dropped.
 1. Values of multi-valued tags are combined before tracking. Events are dropped as before and all
    values of tags that would exceed the limit are dropped.
+
+#### Sinks
+
+Vector has a number of sinks that can encode metrics. These will need to be audited to determine
+which sinks are limited to single-valued tags and which can accept the full multi-valued tags. The
+former will receive only the last value of any multi-valued tag, and will emit a new rate-limited
+warning when doing so. The latter will be upgraded to encode multi-valued tags appropriately.
 
 ### Implementation
 
