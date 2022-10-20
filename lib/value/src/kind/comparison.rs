@@ -399,6 +399,19 @@ impl Kind {
     pub const fn contains_object(&self) -> bool {
         self.object.is_some() || self.is_never()
     }
+
+    /// Returns `true` if the type contains _at least_ one non-collection type.
+    #[must_use]
+    pub const fn contains_primitive(&self) -> bool {
+        self.bytes.is_some()
+            || self.null.is_some()
+            || self.boolean.is_some()
+            || self.float.is_some()
+            || self.integer.is_some()
+            || self.regex.is_some()
+            || self.timestamp.is_some()
+            || self.undefined.is_some()
+    }
 }
 
 #[cfg(test)]
