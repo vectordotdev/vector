@@ -471,7 +471,7 @@ mod test {
         ];
 
         for (path, expected) in test_cases {
-            let path = parse_value_path(path).map(|path| String::from(path)).ok();
+            let path = parse_value_path(path).map(String::from).ok();
 
             assert_eq!(path, expected.map(|x| x.to_owned()));
         }

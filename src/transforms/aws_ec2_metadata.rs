@@ -523,7 +523,7 @@ fn create_metric_namespace(namespace: &OwnedTargetPath) -> String {
         }
         match segment {
             OwnedSegment::Field(field) => {
-                output += &field;
+                output += field;
             }
             OwnedSegment::Index(i) => {
                 output += &i.to_string();

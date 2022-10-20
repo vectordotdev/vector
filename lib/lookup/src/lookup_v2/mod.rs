@@ -136,6 +136,7 @@ pub trait ValuePath<'a>: Clone {
         }
     }
 
+    #[allow(clippy::result_unit_err)]
     fn to_owned_value_path(&self) -> Result<OwnedValuePath, ()> {
         let mut owned_path = OwnedValuePath::root();
         let mut coalesce = vec![];
