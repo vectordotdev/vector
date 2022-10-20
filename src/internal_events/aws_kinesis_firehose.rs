@@ -3,11 +3,7 @@ use vector_common::internal_event::{error_stage, error_type};
 use vector_core::internal_event::InternalEvent;
 
 use super::prelude::{http_error_code, io_error_code};
-use crate::{
-    emit,
-    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
-    sources::aws_kinesis_firehose::Compression,
-};
+use crate::sources::aws_kinesis_firehose::Compression;
 
 #[derive(Debug)]
 pub struct AwsKinesisFirehoseRequestReceived<'a> {
