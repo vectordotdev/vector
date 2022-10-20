@@ -49,7 +49,7 @@ impl InternalEvent for ApacheMetricsParseError<'_> {
         debug!(
             message = %format!("Parse error:\n\n{}\n\n", self.error),
             endpoint = %self.endpoint,
-            internal_log_rate_secs = 10
+            internal_log_rate_limit = true
         );
         counter!("parse_errors_total", 1);
         counter!(
@@ -75,7 +75,7 @@ impl InternalEvent for ApacheMetricsResponseError<'_> {
             error_type = error_type::REQUEST_FAILED,
             error_code = %http_error_code(self.code.as_u16()),
             endpoint = %self.endpoint,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!("http_error_response_total", 1);
         counter!(

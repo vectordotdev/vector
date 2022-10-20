@@ -293,6 +293,18 @@ where
         .await
 }
 
+/// Runs and returns a future and asserts that the provided test specification passes.
+#[track_caller]
+pub async fn assert_source_error<T>(tags: &[&str], f: impl Future<Output = T>) -> T {
+    init_test();
+
+    let result = f.await;
+
+    COMPONENT_TESTS_ERROR.assert(tags);
+
+    result
+}
+
 /// Runs source tests with timeout and asserts error path compliance.
 #[track_caller]
 pub async fn run_and_assert_source_error<SC>(

@@ -21,7 +21,7 @@ impl<'a> InternalEvent for StatsdInvalidRecordError<'a> {
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
             bytes = %String::from_utf8_lossy(&self.bytes),
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -83,7 +83,7 @@ impl<T: std::fmt::Debug + std::fmt::Display> InternalEvent for StatsdSocketError
             error_code = %error_code,
             error_type = error_type::CONNECTION_FAILED,
             stage = error_stage::RECEIVING,
-            internal_log_rate_secs = 10,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,

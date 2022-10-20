@@ -59,6 +59,7 @@ pub struct AzureBlobResponse {
     pub inner: PutBlockBlobResponse,
     pub count: usize,
     pub events_byte_size: usize,
+    pub byte_size: usize,
 }
 
 impl DriverResponse for AzureBlobResponse {
@@ -72,6 +73,10 @@ impl DriverResponse for AzureBlobResponse {
             byte_size: self.events_byte_size,
             output: None,
         }
+    }
+
+    fn bytes_sent(&self) -> Option<(usize, &str)> {
+        Some((self.byte_size, "https"))
     }
 }
 

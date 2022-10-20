@@ -229,7 +229,7 @@ class Event
         # Make sure EventsDropped events contain the required parameters
         handle.logs.each do |type, message, parameters|
           if type == 'error'
-            ['intentional', 'reason'].each do |parameter|
+            ['count', 'intentional', 'reason'].each do |parameter|
               unless parameters.include? parameter
                 append("Error log for EventsDropped event MUST include parameter \"#{parameter}\".")
               end
@@ -330,6 +330,7 @@ Find.find('.') do |path|
         reports.append('Message must start with a capital.') unless message.match(/^[[:upper:]]/)
         reports.append('Message must end with a period.') unless message.match(/\.$/)
         unless reports.empty?
+          puts "Error(s) in file #{path}"
           reports.each { |report| puts "  #{report}" }
           error_count += 1
         end

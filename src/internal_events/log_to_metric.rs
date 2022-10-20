@@ -18,7 +18,7 @@ impl<'a> InternalEvent for LogToMetricFieldNullError<'a> {
             error_type = error_type::CONDITION_FAILED,
             stage = error_stage::PROCESSING,
             null_field = %self.field,
-            internal_log_rate_secs = 30
+            internal_log_rate_limit = true
         );
         counter!(
             "component_errors_total", 1,
@@ -49,7 +49,7 @@ impl<'a> InternalEvent for LogToMetricParseFloatError<'a> {
             error_code = "failed_parsing_float",
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_secs = 30
+            internal_log_rate_limit = true
         );
         counter!(
             "component_errors_total", 1,
@@ -78,7 +78,7 @@ impl InternalEvent for LogToMetricTemplateParseError {
             error_code = "failed_parsing_template",
             error_type = error_type::TEMPLATE_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_secs = 30,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,

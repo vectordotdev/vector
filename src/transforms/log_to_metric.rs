@@ -14,7 +14,7 @@ use crate::{
     },
     internal_events::{
         LogToMetricFieldNullError, LogToMetricParseFloatError, LogToMetricTemplateParseError,
-        ParserMissingFieldError,
+        ParserMissingFieldError, DROP_EVENT,
     },
     schema,
     template::{Template, TemplateParseError, TemplateRenderingError},
@@ -457,9 +457,11 @@ impl FunctionTransform for LogToMetric {
                 Err(TransformError::FieldNull { field }) => emit!(LogToMetricFieldNullError {
                     field: field.as_ref()
                 }),
-                Err(TransformError::FieldNotFound { field }) => emit!(ParserMissingFieldError {
-                    field: field.as_ref()
-                }),
+                Err(TransformError::FieldNotFound { field }) => {
+                    emit!(ParserMissingFieldError::<DROP_EVENT> {
+                        field: field.as_ref()
+                    })
+                }
                 Err(TransformError::ParseFloatError { field, error }) => {
                     emit!(LogToMetricParseFloatError {
                         field: field.as_ref(),

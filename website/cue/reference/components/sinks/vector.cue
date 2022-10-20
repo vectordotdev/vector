@@ -42,7 +42,7 @@ components: sinks: vector: {
 				can_verify_certificate: true
 				can_verify_hostname:    true
 				enabled_default:        false
-				enabled_by_scheme:      true
+				enabled_by_scheme:      false // sink allows both scheme or `enabled` to be used
 			}
 			to: {
 				service: services.vector

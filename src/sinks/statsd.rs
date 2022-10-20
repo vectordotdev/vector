@@ -142,6 +142,8 @@ impl SinkConfig for StatsdSinkConfig {
                     stream::iter({
                         let byte_size = event.size_of();
                         let mut bytes = BytesMut::new();
+
+                        // Errors are handled by `Encoder`.
                         encoder
                             .encode(event, &mut bytes)
                             .map(|_| Ok(EncodedEvent::new(bytes, byte_size)))

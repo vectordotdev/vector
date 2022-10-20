@@ -1,14 +1,14 @@
 use std::{
     fmt,
     num::{NonZeroU64, NonZeroUsize},
-    path::PathBuf,
+    path::{Path, PathBuf},
     slice,
 };
 
 use serde::{de, Deserialize, Deserializer, Serialize};
 use snafu::{ResultExt, Snafu};
 use tracing::Span;
-use vector_common::finalization::Finalizable;
+use vector_common::{config::ComponentKey, finalization::Finalizable};
 use vector_config::configurable_component;
 
 use crate::{
@@ -155,6 +155,40 @@ pub const fn memory_buffer_default_max_events() -> NonZeroUsize {
     unsafe { NonZeroUsize::new_unchecked(500) }
 }
 
+/// Disk usage configurtion for disk-backed buffers.
+#[derive(Debug)]
+pub struct DiskUsage {
+    id: ComponentKey,
+    data_dir: PathBuf,
+    max_size: NonZeroU64,
+}
+
+impl DiskUsage {
+    /// Creates a new `DiskUsage` with the given usage configuration.
+    pub fn new(id: ComponentKey, data_dir: PathBuf, max_size: NonZeroU64) -> Self {
+        Self {
+            id,
+            data_dir,
+            max_size,
+        }
+    }
+
+    /// Gets the component key for the component this buffer is attached to.
+    pub fn id(&self) -> &ComponentKey {
+        &self.id
+    }
+
+    /// Gets the maximum size, in bytes, that this buffer can consume on disk.
+    pub fn max_size(&self) -> u64 {
+        self.max_size.get()
+    }
+
+    /// Gets the data directory path that this buffer will store its files on disk.
+    pub fn data_dir(&self) -> &Path {
+        self.data_dir.as_path()
+    }
+}
+
 /// A specific type of buffer stage.
 #[configurable_component(no_deser)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -201,6 +235,53 @@ pub enum BufferType {
 }
 
 impl BufferType {
+    /// Gets the metadata around disk usage by the buffer, if supported.
+    ///
+    /// For buffer types that write to disk, `Some(value)` is returned with their usage metadata,
+    /// such as maximum size and data directory path.
+    ///
+    /// Otherwise, `None` is returned.
+    pub fn disk_usage(
+        &self,
+        global_data_dir: Option<PathBuf>,
+        id: &ComponentKey,
+    ) -> Option<DiskUsage> {
+        // All disk-backed buffers require the global data directory to be specified, and
+        // non-disk-backed buffers do not require it to be set... so if it's not set here, we ignore
+        // it because either:
+        // - it's a non-disk-backed buffer, in which case we can just ignore, or
+        // - this method is being called at a point before we actually check that a global data
+        //   directory is specified because we have a disk buffer present
+        //
+        // Since we're not able to emit/surface errors about a lack of a global data directory from
+        // where this method is called, we simply return `None` to let it reach the code that _does_
+        // emit/surface those errors... and once those errors are fixed, this code can return valid
+        // disk usage information, which will then be validated and emit any errors for _that_
+        // aspect.
+        match global_data_dir {
+            None => None,
+            Some(global_data_dir) => match self {
+                Self::Memory { .. } => None,
+                Self::DiskV1 { max_size, .. } => {
+                    let data_dir = crate::variants::disk_v1::get_new_style_buffer_dir_path(
+                        &global_data_dir,
+                        id.id(),
+                    );
+
+                    Some(DiskUsage::new(id.clone(), data_dir, *max_size))
+                }
+                Self::DiskV2 { max_size, .. } => {
+                    let data_dir = crate::variants::disk_v2::get_disk_v2_data_dir_path(
+                        &global_data_dir,
+                        id.id(),
+                    );
+
+                    Some(DiskUsage::new(id.clone(), data_dir, *max_size))
+                }
+            },
+        }
+    }
+
     /// Adds this buffer type as a stage to an existing [`TopologyBuilder`].
     ///
     /// # Errors

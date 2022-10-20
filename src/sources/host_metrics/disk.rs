@@ -28,7 +28,7 @@ impl HostMetrics {
                             .disk
                             .devices
                             .contains_path(Some(counter.device_name().as_ref()))
-                            .then(|| counter)
+                            .then_some(counter)
                     })
                     .filter_map(|counter| async { counter })
                     .collect::<Vec<_>>()

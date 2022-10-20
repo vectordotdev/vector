@@ -443,22 +443,21 @@ impl PrometheusExporter {
         let address = self.config.address;
 
         tokio::spawn(async move {
-            #[allow(clippy::print_stderr)]
             let tls = MaybeTlsSettings::from_config(&tls, true)
-                .map_err(|error| eprintln!("Server TLS error: {}", error))?;
-            #[allow(clippy::print_stderr)]
+                .map_err(|error| error!("Server TLS error: {}.", error))?;
             let listener = tls
                 .bind(&address)
                 .await
-                .map_err(|error| eprintln!("Server bind error: {}", error))?;
+                .map_err(|error| error!("Server bind error: {}.", error))?;
 
-            #[allow(clippy::print_stderr)]
+            info!(message = "Building HTTP server.", address = %address);
+
             Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
                 .serve(new_service)
                 .with_graceful_shutdown(tripwire.then(crate::shutdown::tripwire_handler))
                 .instrument(span)
                 .await
-                .map_err(|error| eprintln!("Server error: {}", error))?;
+                .map_err(|error| error!("Server error: {}.", error))?;
 
             Ok::<(), ()>(())
         });

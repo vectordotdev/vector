@@ -256,7 +256,7 @@ mod test {
                                 let buf = parse_artifact(&path).unwrap();
 
                                 let serde_value: serde_json::Value =
-                                    serde_json::from_slice(&*buf).unwrap();
+                                    serde_json::from_slice(&buf).unwrap();
                                 let vector_value = Value::from(serde_value);
 
                                 // Validate type
