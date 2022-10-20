@@ -327,19 +327,15 @@ mod tests {
     }
 
     #[test]
-    fn is_static() {
-        assert!(!Template::try_from("/kube-demo/%F").unwrap().is_static);
-        assert!(Template::try_from("/kube-demo/echo").unwrap().is_static);
-        assert!(
-            !Template::try_from("/kube-demo/{{ foo }}")
-                .unwrap()
-                .is_static
-        );
-        assert!(
-            !Template::try_from("/kube-demo/{{ foo }}/%F")
-                .unwrap()
-                .is_static
-        );
+    fn is_dynamic() {
+        assert!(Template::try_from("/kube-demo/%F").unwrap().is_dynamic());
+        assert!(!Template::try_from("/kube-demo/echo").unwrap().is_dynamic());
+        assert!(Template::try_from("/kube-demo/{{ foo }}")
+            .unwrap()
+            .is_dynamic());
+        assert!(Template::try_from("/kube-demo/{{ foo }}/%F")
+            .unwrap()
+            .is_dynamic());
     }
 
     #[test]
@@ -481,7 +477,6 @@ mod tests {
         let template = Template::try_from("nested {{ format }} %T").unwrap();
 
         assert_eq!(
-            // Old behavior: Ok(Bytes::from("nested 2001-02-03 04:05:06")),
             Ok(Bytes::from("nested %F 04:05:06")),
             template.render(&event)
         )
