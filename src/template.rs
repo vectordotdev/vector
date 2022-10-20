@@ -52,6 +52,9 @@ pub struct Template {
 
     #[serde(skip)]
     is_static: bool,
+
+    #[serde(skip)]
+    reserve_size: usize,
 }
 
 impl TryFrom<&str> for Template {
@@ -85,10 +88,26 @@ impl TryFrom<Cow<'_, str>> for Template {
         parse_template(&src).map(|parts| {
             let is_static =
                 parts.is_empty() || (parts.len() == 1 && matches!(parts[0], Part::Literal(..)));
+
+            // Calculate a minimum size to reserve for rendered string. This doesn't have to be
+            // exact, and can't be because of references and time format specifiers. We just want a
+            // better starting number than 0 to avoid the first reallocations if possible.
+            let reserve_size = parts
+                .iter()
+                .map(|part| match part {
+                    Part::Literal(lit) => lit.len(),
+                    // We can't really put a useful number here, assume at least one byte will come
+                    // from the input event.
+                    Part::Reference(_path) => 1,
+                    Part::Strftime(parsed) => parsed.reserve_size(),
+                })
+                .sum();
+
             Template {
                 parts,
                 src: src.into_owned(),
                 is_static,
+                reserve_size,
             }
         })
     }
@@ -130,7 +149,7 @@ impl Template {
 
     fn render_event(&self, event: EventRef<'_>) -> Result<String, TemplateRenderingError> {
         let mut missing_keys = Vec::new();
-        let mut out = String::new();
+        let mut out = String::with_capacity(self.reserve_size);
         for part in &self.parts {
             match part {
                 Part::Literal(lit) => out.push_str(lit),
@@ -242,6 +261,21 @@ impl ParsedStrftime {
 
     fn as_items(&self) -> impl Iterator<Item = &Item<'static>> + Clone {
         self.0.iter()
+    }
+
+    fn reserve_size(&self) -> usize {
+        self.0
+            .iter()
+            .map(|item| match item {
+                Item::Literal(lit) => lit.len(),
+                Item::OwnedLiteral(lit) => lit.len(),
+                Item::Space(space) => space.len(),
+                Item::OwnedSpace(space) => space.len(),
+                Item::Error => 0,
+                Item::Numeric(_, _) => 2,
+                Item::Fixed(_) => 2,
+            })
+            .sum()
     }
 }
 
