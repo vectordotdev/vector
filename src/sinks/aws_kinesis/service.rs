@@ -33,8 +33,8 @@ where
             client: self.client.clone(),
             stream_name: self.stream_name.clone(),
             region: self.region.clone(),
-            _phantom_e: self._phantom_e.clone(),
-            _phantom_t: self._phantom_t.clone(),
+            _phantom_e: self._phantom_e,
+            _phantom_t: self._phantom_t,
         }
     }
 }

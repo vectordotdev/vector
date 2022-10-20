@@ -143,7 +143,7 @@ where
                         );
                         let finalizers = req.take_finalizers();
 
-                        let metadata = req.get_metadata().clone();
+                        let metadata = *req.get_metadata();
 
                         let fut = svc.call(req)
                             .err_into()
