@@ -169,10 +169,15 @@ impl Kind {
     }
 }
 
+/// A type definition might not know for sure if compaction will occur or not, so this
+/// keeps track of the current state
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum CompactOptions {
+    /// Compaction will always happen.
     Always,
+    /// Compaction may or may not happen. Both possibilites should be merged together.
     Maybe,
+    /// Compaction will never happen.
     Never,
 }
 
