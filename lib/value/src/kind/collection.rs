@@ -293,7 +293,7 @@ pub enum EmptyState {
     // The collection is guaranteed to be empty.
     Always,
     // The collection may or may not actually be empty. There is not enough type information to
-    // determine. (There are unknown fields/indices that may exist, but there are no known values)
+    // determine. (There are unknown fields/indices that may exist, but there are no known values.)
     Maybe,
     // The collection is guaranteed to NOT be empty.
     Never,
