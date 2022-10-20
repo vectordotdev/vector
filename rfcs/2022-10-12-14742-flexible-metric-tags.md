@@ -77,36 +77,35 @@ strings or `null` for tags with more than one value.
 
 #### Scripting
 
-##### VRL
+Both the Lua and VRL scripting languages will be given a new configuration option named
+`metric_tags_values` that controls how tag values are exposed to scripts. This may take two values,
+`"single"` or `"full"`. When set to the former, tag values will be exposed as single strings, the
+same as they are now. Tags with multiple values will show the last assigned value, and null values
+will be ignored. When set to the later, all tags will be exposed as arrays of either string or null
+values.  This control will initially default to the former setting, providing for backwards
+compatibility, but that default will later be deprecated and change to the latter. In both cases,
+assignment to a tag will overwrite all other values for the tag, and deleting a tag name or
+assigning an empty array will remove all tag values with that name.
 
-VRL exposes the tags as a simple map of string values in `.tags`. This will be changed to exposing
-the values as arrays containing either string values or `null`, with the latter representing a bare
-tag. Assignment of a single value to a tag will overwrite all other values for the tag and trigger a
-deprecation warning. Deleting a tag name will remove all tag values with that name. As the values
-will be arrays, these can be used to add or remove individual values. Any tag consisting of an empty
-list will be removed. Since VRL has a "compile" phase, where type information is determined
-statically, we will use this information to generate warnings and errors about obsolete assignments
-at start up time. Since tags cannot have multiple identical values, modifications that result in
-duplicate values will also cause the duplicate to be dropped and a warning issued.
+Assignments to tags will follow the data schema outlined above for the native JSON codec, without
+regard to how the values are exposed. When the `"single"` setting is deprecated, single value
+assignments will also produce a deprecation warning. Since tags cannot have multiple identical
+values, and both scripting languages lack first-class support for sets, assignments and
+modifications that result in duplicate values will cause the duplicates to be dropped and a warning
+issued.
 
-Examples:
+VRL assignment example:
 
 ```coffee
-.tags.single_value = "value" # Same as ["value"], will produce a deprecation warning.
-.tags.bare_tag = null        # Same as [null],  will produce a deprecation warning.
+.tags.single_value = "value" # Replace the tag with a single value
+.tags.bare_tag = null        # Replace the tag with a bare tag
 .tags.multi_valued_tag = ["value1", "value2"]
 .tags.complex_tag = ["value3", null]
+
+# With metric_tag_values = "full":
 .tags.modified = push(.tags.modified, "value4")
 .tags.modified = filter(.tags.modified) -> |_, v| { v != "remove" }
 ```
-
-##### Lua
-
-The Lua transform also exposes tags as a simple map of string values in `event.metric.tags`. Similar
-to VRL, this will be changed to have arrays containing either string values or `null`. Since the
-script is under complete control of the data between starting the script and emitting data, we
-cannot issue warnings about how assignments to the tags are made. Instead, the resulting tags data
-will be parsed using the same algorithm as the native JSON encoding above.
 
 #### `log_to_metric` Transform
 
@@ -180,6 +179,11 @@ Similarly, the proposed native JSON encoding adds the necessary support while pr
 compatibility for existing data and minimizes the overhead when multiple tag values are not
 required.
 
+The multi-stage introduction of tag array values to the scripting environment follows the standard
+Vector practice for introduction of breaking behavior changes: add the new behavior as an option but
+default to the existing behavior, later add a deprecation warning; then change the default behavior
+option, and finally remove the old behavior.
+
 Changing the `MetricTags` type from an alias to a newtype wrapper allows us to provide better
 compatibility for existing uses while controlling the methods for uses that need to access all the
 values.
@@ -223,6 +227,9 @@ without the array values, we can make use of this form to reduce the complexity 
 There are a handful of alternative paths for adding support for our scripting languages, all of
 which will cause problems for users:
 
+1. Unconditionally expose the tags as arrays of values using the existing naming, but still accept
+   assignments using either single values or arrays of values. This will cause breakage to existing
+   scripts that relies on the existing single value tag values.
 1. Expose the tags as single values using the existing naming, picking some arbitrary value when a
    tag has multiple values, and set up a secondary tags structure that exposes the arrays. This will
    lead to all kinds of confusion and conflicts when the same tag is assigned through different
