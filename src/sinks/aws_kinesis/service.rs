@@ -3,7 +3,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use aws_sdk_kinesis::types::SdkError;
+use aws_smithy_client::SdkError;
 use aws_types::region::Region;
 use futures::future::BoxFuture;
 use tower::Service;

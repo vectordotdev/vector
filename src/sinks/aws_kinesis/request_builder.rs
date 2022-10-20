@@ -5,8 +5,8 @@ use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_core::ByteSizeOf;
 
 use super::{
-    sink::{KinesisKey, KinesisProcessedEvent},
     record::Record,
+    sink::{KinesisKey, KinesisProcessedEvent},
 };
 use crate::{
     codecs::{Encoder, Transformer},
