@@ -200,17 +200,14 @@ impl BulkConfig {
 #[serde(rename_all = "snake_case")]
 pub struct DataStreamConfig {
     /// The data stream type used to construct the data stream at index time.
-    #[configurable(metadata(templateable))]
     #[serde(rename = "type", default = "DataStreamConfig::default_type")]
     pub dtype: Template,
 
     /// The data stream dataset used to construct the data stream at index time.
-    #[configurable(metadata(templateable))]
     #[serde(default = "DataStreamConfig::default_dataset")]
     pub dataset: Template,
 
     /// The data stream namespace used to construct the data stream at index time.
-    #[configurable(metadata(templateable))]
     #[serde(default = "DataStreamConfig::default_namespace")]
     pub namespace: Template,
 

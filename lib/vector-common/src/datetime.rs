@@ -104,7 +104,7 @@ impl Configurable for TimeZone {
         metadata.set_description(r#"This can refer to any valid timezone as defined in the [TZ database][tzdb], or "local" which refers to the system local timezone.
 
 [tzdb]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones"#);
-        metadata.add_custom_attribute(CustomAttribute::kv("enum_tagging", "untagged"));
+        metadata.add_custom_attribute(CustomAttribute::kv("docs::enum_tagging", "untagged"));
         metadata
     }
 

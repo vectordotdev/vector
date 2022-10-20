@@ -12,13 +12,29 @@ end
 
 @logger = Logging.logger['default']
 @logger.add_appenders(Logging.appenders.stdout(
-                        'stdout',
-                        layout: Logging.layouts.pattern(
-                          pattern: '[%d] %l %m\n',
-                          color_scheme: 'default'
-                        )
-                      ))
+  'stdout',
+  layout: Logging.layouts.pattern(
+    pattern: '[%d] %l %m\n',
+    color_scheme: 'default'
+  )
+))
 @logger.level = ENV['LOG_LEVEL'] || 'info'
+
+# Cross-platform friendly method of finding if command exists on the current path.
+#
+# If the command is found, the full path to it is returned. Otherwise, `nil` is returned.
+def find_command_on_path(command)
+  exts = ENV['PATHEXT'] ? ENV['PATHEXT'].split(';') : ['']
+  ENV['PATH'].split(File::PATH_SEPARATOR).each do |path|
+    exts.each do |ext|
+      maybe_command_path = File.join(path, "#{command}#{ext}")
+      return maybe_command_path if File.executable?(maybe_command_path) && !File.directory?(maybe_command_path)
+    end
+  end
+  nil
+end
+
+@cue_binary_path = find_command_on_path('cue')
 
 # Helpers for caching resolved schemas and detecting schema resolution cycles.
 @resolved_schema_cache = {}
@@ -75,10 +91,10 @@ end
 def sort_hash_nested(input)
   input.keys.sort.each_with_object({}) do |key, acc|
     acc[key] = if input[key].is_a?(Hash)
-                 sort_hash_nested(input[key])
-               else
-                 input[key]
-               end
+      sort_hash_nested(input[key])
+    else
+      input[key]
+    end
   end
 end
 
@@ -253,7 +269,7 @@ def resolve_schema_by_name(root_schema, schema_name)
     @logger.error "Cycle detected while resolving schema '#{schema_name}'. \
     \
     Cycles must be broken manually at the source code level by annotating fields that induce \
-    cycles with `#[configurable(metadata(cycle_entrypoint))]`. As such a field will have no type \
+    cycles with `#[configurable(metadata(docs::cycle_entrypoint))]`. As such a field will have no type \
     information rendered, it is advised to supply a sufficiently detailed field description that \
     describes the allowable values, etc."
     exit
@@ -265,7 +281,7 @@ def resolve_schema_by_name(root_schema, schema_name)
   resolved = resolve_schema(root_schema, schema)
   remove_from_schema_resolution_stack(schema_name)
   @resolved_schema_cache[schema_name] = resolved
-  resolved
+  deep_copy(resolved)
 end
 
 # Fully resolves the schema.
@@ -284,7 +300,7 @@ def resolve_schema(root_schema, schema)
   # We mark that field hidden so that it's excluded when we resolve the schema for `SinkOuter`, etc,
   # and then we individually resolve the component schemas, and merge the two (outer + component
   # itself) schemas back together.
-  if get_schema_metadata(schema, 'hidden')
+  if get_schema_metadata(schema, 'docs::hidden')
     @logger.debug 'Instructed to skip resolution for the given schema.'
     return
   end
@@ -296,7 +312,7 @@ def resolve_schema(root_schema, schema)
   #
   # We have to return _something_, as it's a real part of the schema, so we just return a basic
   # schema with no type information but with any description that is specified, etc.
-  if get_schema_metadata(schema, 'cycle_entrypoint')
+  if get_schema_metadata(schema, 'docs::cycle_entrypoint')
     resolved = { 'type' => 'blank' }
     description = get_rendered_description_from_schema(schema)
     resolved['description'] = description unless description.empty?
@@ -312,15 +328,18 @@ def resolve_schema(root_schema, schema)
   # Otherwise, we simply resolve the schema as it exists.
   referenced_schema_name = get_schema_ref(schema)
   resolved = if !referenced_schema_name.nil?
-               resolve_schema_by_name(root_schema, referenced_schema_name)
-             else
-               resolve_bare_schema(root_schema, schema)
-             end
+    resolve_schema_by_name(root_schema, referenced_schema_name)
+  else
+    resolve_bare_schema(root_schema, schema)
+  end
 
   # Apply any necessary defaults, descriptions, etc, to the resolved schema. This must happen here
   # because there could be callsite-specific overrides to defaults, descriptions, etc, for a given
   # schema definition that have to be layered.
   apply_schema_default_value!(schema, resolved)
+  apply_schema_metadata!(schema, resolved)
+
+  @logger.debug "About to resolve original schema: #{schema}"
 
   description = get_rendered_description_from_schema(schema)
   resolved['description'] = description unless description.empty?
@@ -332,104 +351,112 @@ end
 # A bare schema is one that has no references to another schema, etc.
 def resolve_bare_schema(root_schema, schema)
   resolved = case get_schema_type(schema)
-             when 'all-of'
-               @logger.debug 'Resolving composite schema.'
+    when 'all-of'
+      @logger.debug 'Resolving composite schema.'
 
-               # Composite schemas are indeed the sum of all of their parts, so resolve each subschema and
-               # merge their resolved state together.
-               reduced = schema['allOf'].filter_map { |subschema| resolve_schema(root_schema, subschema) }
-                                        .reduce { |acc, item| nested_merge(acc, item) }
-               reduced['type']
-             when 'one-of'
-               @logger.debug 'Resolving enum schema.'
+      # Composite schemas are indeed the sum of all of their parts, so resolve each subschema and
+      # merge their resolved state together.
+      reduced = schema['allOf'].filter_map { |subschema| resolve_schema(root_schema, subschema) }
+                              .reduce { |acc, item| nested_merge(acc, item) }
+      reduced['type']
+    when 'one-of'
+      @logger.debug 'Resolving enum schema.'
 
-               # We completely defer resolution of enum schemas to `resolve_enum_schema` because there's a
-               # lot of tricks and matching we need to do to suss out patterns that can be represented in more
-               # condensed resolved forms.
-               wrapped = resolve_enum_schema(root_schema, schema)
+      # We completely defer resolution of enum schemas to `resolve_enum_schema` because there's a
+      # lot of tricks and matching we need to do to suss out patterns that can be represented in more
+      # condensed resolved forms.
+      wrapped = resolve_enum_schema(root_schema, schema)
 
-               # `resolve_enum_schema` always hands back the resolved schema under the key `_resolved`, so
-               # that we can add extra details about the resolved schema (anything that will help us render
-               # it better in the docs output) on the side. That's why we have to unwrap the resolved schema
-               # like this.
+      # `resolve_enum_schema` always hands back the resolved schema under the key `_resolved`, so
+      # that we can add extra details about the resolved schema (anything that will help us render
+      # it better in the docs output) on the side. That's why we have to unwrap the resolved schema
+      # like this.
 
-               # TODO: Do something with the extra detail (`annotations`).
+      # TODO: Do something with the extra detail (`annotations`).
 
-               wrapped.dig('_resolved', 'type')
-             when 'array'
-               @logger.debug 'Resolving array schema.'
+      wrapped.dig('_resolved', 'type')
+    when 'array'
+      @logger.debug 'Resolving array schema.'
 
-               { 'array' => { 'items' => resolve_schema(root_schema, schema['items']) } }
-             when 'object'
-               @logger.debug 'Resolving object schema.'
+      { 'array' => { 'items' => resolve_schema(root_schema, schema['items']) } }
+    when 'object'
+      @logger.debug 'Resolving object schema.'
 
-               # TODO: Not all objects have an actual set of properties, such as anything using
-               # `additionalProperties` to allow for arbitrary key/values to be set, which is why we're
-               # handling the case of nothing in `properties`... but we probably want to be able to better
-               # handle expressing this in the output.. or maybe it doesn't matter, dunno!
-               properties = schema['properties'] || {}
+      # TODO: Not all objects have an actual set of properties, such as anything using
+      # `additionalProperties` to allow for arbitrary key/values to be set, which is why we're
+      # handling the case of nothing in `properties`... but we probably want to be able to better
+      # handle expressing this in the output.. or maybe it doesn't matter, dunno!
+      properties = schema['properties'] || {}
 
-               options = properties.filter_map do |property_name, property_schema|
-                 @logger.debug "Resolving object property '#{property_name}'..."
-                 resolved_property = resolve_schema(root_schema, property_schema)
-                 if !resolved_property.nil?
-                   apply_object_property_fields!(schema, property_schema, property_name, resolved_property)
+      options = properties.filter_map do |property_name, property_schema|
+        @logger.debug "Resolving object property '#{property_name}'..."
+        resolved_property = resolve_schema(root_schema, property_schema)
+        if !resolved_property.nil?
+          apply_object_property_fields!(schema, property_schema, property_name, resolved_property)
 
-                   @logger.debug "Resolved object property '#{property_name}'."
+          @logger.debug "Resolved object property '#{property_name}'."
 
-                   [property_name, resolved_property]
-                 else
-                   @logger.debug "Resolution failed for '#{property_name}'."
+          [property_name, resolved_property]
+        else
+          @logger.debug "Resolution failed for '#{property_name}'."
 
-                   nil
-                 end
-               end
+          nil
+        end
+      end
 
-               { 'object' => { 'options' => options.to_h } }
-             when 'string'
-               @logger.debug 'Resolving string schema.'
+      # If the object schema has `additionalProperties` set, we add an additional field
+      # (`*`) which uses the specified schema for that field.
+      additional_properties = schema['additionalProperties']
+      if !additional_properties.nil?
+        resolved_additional_properties = resolve_schema(root_schema, additional_properties)
+        options.push(['*', resolved_additional_properties])
+      end
 
-               string_def = {}
-               string_def['default'] = schema['default'] unless schema['default'].nil?
+      { 'object' => { 'options' => options.to_h } }
+    when 'string'
+      @logger.debug 'Resolving string schema.'
 
-               { 'string' => string_def }
-             when 'number'
-               @logger.debug 'Resolving number schema.'
+      string_def = { 'syntax' => 'literal' }
+      string_def['default'] = schema['default'] unless schema['default'].nil?
 
-               numeric_type = get_schema_metadata(schema, 'numeric_type') || 'number'
-               number_def = {}
-               number_def['default'] = schema['default'] unless schema['default'].nil?
+      { 'string' => string_def }
+    when 'number'
+      @logger.debug 'Resolving number schema.'
 
-               { numeric_type => number_def }
-             when 'boolean'
-               @logger.debug 'Resolving boolean schema.'
+      numeric_type = get_schema_metadata(schema, 'docs::numeric_type') || 'number'
+      number_def = {}
+      number_def['default'] = schema['default'] unless schema['default'].nil?
 
-               bool_def = {}
-               bool_def['default'] = schema['default'] unless schema['default'].nil?
+      { numeric_type => number_def }
+    when 'boolean'
+      @logger.debug 'Resolving boolean schema.'
 
-               { 'bool' => bool_def }
-             when 'const'
-               @logger.debug 'Resolving const schema.'
+      bool_def = {}
+      bool_def['default'] = schema['default'] unless schema['default'].nil?
 
-               # For `const` schemas, just figure out the type of the constant value so we can generate the
-               # resolved output.
-               const_value = schema['const']
-               const_type = docs_type_str(const_value)
-               { const_type => { 'const' => const_value } }
-             when 'enum'
-               @logger.debug 'Resolving enum const schema.'
+      { 'bool' => bool_def }
+    when 'const'
+      @logger.debug 'Resolving const schema.'
 
-               # Similarly to `const` schemas, `enum` schemas are merely multiple possible constant values. Given
-               # that JSON Schema does allow for the constant values to differ in type, we group them all by
-               # type to get the resolved output.
-               enum_values = schema['enum']
-               grouped = enum_values.group_by { |value| docs_type_str(value) }
-               grouped.transform_values! { |values| { 'enum' => values } }
-               grouped
-             else
-               @logger.error "Failed to resolve the schema. Schema: #{schema}"
-               exit
-             end
+      # For `const` schemas, just figure out the type of the constant value so we can generate the
+      # resolved output.
+      const_value = schema['const']
+      const_type = docs_type_str(const_value)
+      { const_type => { 'const' => const_value } }
+    when 'enum'
+      @logger.debug 'Resolving enum const schema.'
+
+      # Similarly to `const` schemas, `enum` schemas are merely multiple possible constant values. Given
+      # that JSON Schema does allow for the constant values to differ in type, we group them all by
+      # type to get the resolved output.
+      enum_values = schema['enum']
+      grouped = enum_values.group_by { |value| docs_type_str(value) }
+      grouped.transform_values! { |values| { 'enum' => values } }
+      grouped
+    else
+      @logger.error "Failed to resolve the schema. Schema: #{schema}"
+      exit
+    end
 
   { 'type' => resolved }
 end
@@ -439,20 +466,20 @@ def resolve_enum_schema(root_schema, schema)
   subschema_count = subschemas.count
 
   # Collect all of the tagging mode information upfront.
-  enum_tagging = get_schema_metadata(schema, 'enum_tagging')
+  enum_tagging = get_schema_metadata(schema, 'docs::enum_tagging')
   if enum_tagging.nil?
     @logger.error 'Enum schemas should never be missing the metadata for the enum tagging mode.'
     @logger.error "Schema: #{JSON.pretty_generate(schema)}"
     exit
   end
 
-  enum_tag_field = get_schema_metadata(schema, 'enum_tag_field')
+  enum_tag_field = get_schema_metadata(schema, 'docs::enum_tag_field')
 
   # Schema pattern: X or array of X.
   #
   # We employ this pattern on the Vector side to allow specifying a single instance of X -- object,
   # string, whatever -- or as an array of X. We just need to inspect both schemas to make sure one
-  # is an array of X and the other is the same as X, or vise versa.
+  # is an array of X and the other is the same as X, or vice versa.
   if subschema_count == 2
     array_idx = subschemas.index { |subschema| subschema['type'] == 'array' }
     unless array_idx.nil?
@@ -522,9 +549,7 @@ def resolve_enum_schema(root_schema, schema)
       unique_tag_values = {}
 
       resolved_subschemas.each do |resolved_subschema|
-        # Unwrap the resolved subschema since we only want to interact with the definition, not the
-        # wrapper boilerplate.
-        resolved_subschema = resolved_subschema.dig('type', 'object', 'options')
+        resolved_subschema_properties = resolved_subschema.dig('type', 'object', 'options')
 
         # Extract the tag property and figure out any necessary intersections, etc.
         #
@@ -532,7 +557,13 @@ def resolve_enum_schema(root_schema, schema)
         # only ever use `const` for describing enum variants and what not, so this is my middle-ground
         # approach to also allow for other constant-y types, but not objects/arrays which would
         # just... not make sense.
-        tag_subschema = resolved_subschema.delete(enum_tag_field)
+        #
+        # We also steal the title and/or description from the variant subschema and apply it to the
+        # tag's subschema, as we don't curry the title/description for a variant itself to the
+        # respective tag field used to indicate which variant is specified.
+        tag_subschema = resolved_subschema_properties.delete(enum_tag_field)
+        tag_subschema['title'] = resolved_subschema['title'] if !resolved_subschema['title'].nil?
+        tag_subschema['description'] = resolved_subschema['description'] if !resolved_subschema['description'].nil?
         tag_value = nil
 
         %w[string number boolean].each do |allowed_type|
@@ -542,6 +573,8 @@ def resolve_enum_schema(root_schema, schema)
             break
           end
         end
+
+        @logger.debug "Tag value of #{tag_value}, with original resolved schema: #{resolved_subschema}"
 
         if tag_value.nil?
           @logger.error 'All enum subschemas representing an internally-tagged enum must have the tag field use a const value.'
@@ -558,29 +591,29 @@ def resolve_enum_schema(root_schema, schema)
 
         # Now merge all of the properties from the given subschema, so long as the overlapping
         # properties have the same schema.
-        resolved_subschema.each do |property_name, property_schema|
+        resolved_subschema_properties.each do |property_name, property_schema|
           existing_property = unique_resolved_properties[property_name]
           resolved_property = if !existing_property.nil?
-                                # The property is already being tracked, so just do a check to make sure the property from our
-                                # current subschema matches the existing property, schema-wise, before we update it.
-                                reduced_existing_property = get_reduced_schema(existing_property)
-                                reduced_new_property = get_reduced_schema(property_schema)
+            # The property is already being tracked, so just do a check to make sure the property from our
+            # current subschema matches the existing property, schema-wise, before we update it.
+            reduced_existing_property = get_reduced_schema(existing_property)
+            reduced_new_property = get_reduced_schema(property_schema)
 
-                                if reduced_existing_property != reduced_new_property
-                                  @logger.error "Had overlapping property '#{property_name}' from resolved enum subschema, but schemas differed: \
-                                  Existing property schema (reduced): #{reduced_existing_property} \
-                                  New property schema (reduced): #{reduced_new_property}"
-                                  exit
-                                end
+            if reduced_existing_property != reduced_new_property
+              @logger.error "Had overlapping property '#{property_name}' from resolved enum subschema, but schemas differed: \
+              Existing property schema (reduced): #{reduced_existing_property} \
+              New property schema (reduced): #{reduced_new_property}"
+              exit
+            end
 
-                                # The schemas match, so just update the list of "relevant when" values.
-                                existing_property['relevant_when'].push(tag_value)
-                                existing_property
-                              else
-                                # First time seeing this particular property.
-                                property_schema['relevant_when'] = [tag_value]
-                                property_schema
-                              end
+            # The schemas match, so just update the list of "relevant when" values.
+            existing_property['relevant_when'].push(tag_value)
+            existing_property
+          else
+            # First time seeing this particular property.
+            property_schema['relevant_when'] = [tag_value]
+            property_schema
+          end
 
           unique_resolved_properties[property_name] = resolved_property
         end
@@ -615,16 +648,19 @@ def resolve_enum_schema(root_schema, schema)
       # Now we build our property for the tag field itself, and add that in before returning all of
       # the unique resolved properties.
       unique_resolved_properties[enum_tag_field] = {
+        'required' => true,
         'type' => {
           'string' => {
             'enum' => unique_tag_values.transform_values do |tag_schema|
-                        get_rendered_description_from_schema(tag_schema)
-                      end
+              @logger.debug "Tag schema: #{tag_schema}"
+              get_rendered_description_from_schema(tag_schema)
+            end
           }
         }
       }
 
       @logger.debug "Resolved as 'internally-tagged with named fields' enum schema."
+      @logger.debug "Resolved properties for ITNF enum schema: #{unique_resolved_properties}"
 
       return { '_resolved' => { 'type' => { 'object' => { 'options' => unique_resolved_properties } } } }
     end
@@ -675,6 +711,10 @@ def resolve_enum_schema(root_schema, schema)
 end
 
 def apply_schema_default_value!(source_schema, resolved_schema)
+  @logger.debug "Apply defaults to schema."
+  @logger.debug "Source schema: #{source_schema}"
+  @logger.debug "Resolved schema: #{resolved_schema}"
+
   default_value = source_schema['default']
   unless default_value.nil?
     # Make sure that the resolved schema actually has a type definition that matches the type of the
@@ -733,12 +773,35 @@ def apply_schema_default_value!(source_schema, resolved_schema)
       end
     else
       # We're dealing with a normal scalar or whatever, so just apply the default directly.
+      @logger.debug "Resolved schema type field: #{resolved_schema_type_field}"
+      @logger.debug "Default value on fallback path: #{default_value}"
       resolved_schema_type_field['default'] = default_value
     end
   end
 end
 
+def apply_schema_metadata!(source_schema, resolved_schema)
+  # Handle marking string schemas as templateable, which shows a special blurb in the rendered
+  # documentation HTML that explains what this means and links to the template syntax, etc.
+  is_templateable = get_schema_metadata(source_schema, 'docs::templateable') == true
+  string_type_def = resolved_schema.dig('type', 'string')
+  if !string_type_def.nil? && is_templateable
+    string_type_def['syntax'] = 'template'
+  end
+
+  # Handle the niche case where we have an object schema without any of its own fields -- aka a map
+  # of optional key/value pairs i.e. tags -- and it allows templateable values.
+end
+
 def get_rendered_description_from_schema(schema)
+  # If the schema is marked as `no_description`, we're being told -- for whatever reason -- that the
+  # existing title/description should not be rendered in the output. This is primarily to avoid
+  # spitting out developer-oriented documentation into the user-facing documentation, when we're
+  # providing the necessary description in another way.
+  if !get_schema_metadata(schema, 'docs::no_description').nil?
+    return ''
+  end
+
   # Grab both the raw description and raw title, and if the title is empty, just use the
   # description, otherwise concatenate the title and description with newlines so that there's a
   # whitespace break between the title and description.
@@ -791,11 +854,11 @@ def render_and_import_schema(root_schema, schema_name, friendly_name, config_map
   # Try importing it as Cue.
   @logger.info "[*] Importing #{friendly_name} schema as Cue file..."
   cue_output_file = "website/cue/reference/components/#{cue_relative_path}"
-  unless system('cue', 'import', '-f', '-o', cue_output_file, '-p', 'metadata', json_output_file)
+  unless system(@cue_binary_path, 'import', '-f', '-o', cue_output_file, '-p', 'metadata', json_output_file)
     @logger.error "[!]   Failed to import #{friendly_name} schema as valid Cue."
     exit
   end
-  @logger.info "[✓]   Imported #{friendly_name} schema as Cue."
+  @logger.info "[✓]   Imported #{friendly_name} schema to '#{cue_output_file}'."
 end
 
 def render_and_import_base_component_schema(root_schema, schema_name, component_type)
@@ -823,6 +886,12 @@ if ARGV.empty?
   exit
 end
 
+# Ensure that Cue is present since we need it to import our intermediate JSON representation.
+if @cue_binary_path.nil?
+  puts 'Failed to find \'cue\' binary on the current path. Install \'cue\' (or make it available on the current path) and try again.'
+  exit
+end
+
 schema_path = ARGV[0]
 root_schema = JSON.load_file schema_path
 
@@ -835,7 +904,7 @@ component_types = %w[source transform sink]
 # settings, and proxy settings... and then the configuration for a sink would be those, plus
 # whatever the sink itself defines.
 component_bases = root_schema['definitions'].filter_map do |key, definition|
-  component_base_type = get_schema_metadata(definition, 'component_base_type')
+  component_base_type = get_schema_metadata(definition, 'docs::component_base_type')
   { component_base_type => key } if component_types.include? component_base_type
 end
 .reduce { |acc, item| nested_merge(acc, item) }
@@ -846,8 +915,8 @@ end
 
 # Now we'll generate the base configuration for each component.
 all_components = root_schema['definitions'].filter_map do |key, definition|
-  component_type = get_schema_metadata(definition, 'component_type')
-  component_name = get_schema_metadata(definition, 'component_name')
+  component_type = get_schema_metadata(definition, 'docs::component_type')
+  component_name = get_schema_metadata(definition, 'docs::component_name')
   { component_type => { component_name => key } } if component_types.include? component_type
 end
 .reduce { |acc, item| nested_merge(acc, item) }

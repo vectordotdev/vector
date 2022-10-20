@@ -17,11 +17,6 @@ where
         T::referenceable_name()
     }
 
-    fn description() -> Option<&'static str> {
-        // Forward to the underlying `T`.
-        T::description()
-    }
-
     fn metadata() -> Metadata<Self> {
         // Forward to the underlying `T`.
         //
@@ -59,18 +54,13 @@ impl Configurable for serde_with::DurationSeconds<u64, serde_with::formats::Stri
         Some("serde_with::DurationSeconds")
     }
 
-    fn description() -> Option<&'static str> {
-        Some("A span of time, in whole seconds.")
-    }
-
     fn metadata() -> Metadata<Self> {
         let mut metadata = Metadata::default();
-        if let Some(description) = Self::description() {
-            metadata.set_description(description);
-        }
-
-        metadata.add_custom_attribute(CustomAttribute::kv("numeric_type", NumberClass::Unsigned));
-
+        metadata.set_description("A span of time, in whole seconds.");
+        metadata.add_custom_attribute(CustomAttribute::kv(
+            "docs::numeric_type",
+            NumberClass::Unsigned,
+        ));
         metadata
     }
 
@@ -89,21 +79,13 @@ impl Configurable for serde_with::DurationSeconds<f64, serde_with::formats::Stri
         Some("serde_with::DurationFractionalSeconds")
     }
 
-    fn description() -> Option<&'static str> {
-        Some("A span of time, in whole seconds.")
-    }
-
     fn metadata() -> Metadata<Self> {
         let mut metadata = Metadata::default();
-        if let Some(description) = Self::description() {
-            metadata.set_description(description);
-        }
-
+        metadata.set_description("A span of time, in fractional seconds.");
         metadata.add_custom_attribute(CustomAttribute::kv(
-            "numeric_type",
+            "docs::numeric_type",
             NumberClass::FloatingPoint,
         ));
-
         metadata
     }
 

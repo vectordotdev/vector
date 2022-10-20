@@ -82,7 +82,7 @@ pub struct GcsSinkConfig {
     /// Prefixes are useful for partitioning objects, such as by creating an object key that
     /// stores objects under a particular "directory". If using a prefix for this purpose, it must end
     /// in `/` in order to act as a directory path: Vector will **not** add a trailing `/` automatically.
-    #[configurable(metadata(templateable))]
+    #[configurable(metadata(docs::templateable))]
     key_prefix: Option<String>,
 
     /// The timestamp format for the time component of the object key.

@@ -49,13 +49,11 @@ pub struct HumioMetricsConfig {
     /// The source of events sent to this sink.
     ///
     /// Typically the filename the metrics originated from. Maps to `@source` in Humio.
-    #[configurable(metadata(templateable))]
     source: Option<Template>,
 
     /// The type of events sent to this sink. Humio uses this as the name of the parser to use to ingest the data.
     ///
     /// If unset, Humio will default it to none.
-    #[configurable(metadata(templateable))]
     event_type: Option<Template>,
 
     /// Overrides the name of the log field used to grab the hostname to send to Humio.
@@ -85,7 +83,6 @@ pub struct HumioMetricsConfig {
     /// For more information, see [Humio’s Format of Data][humio_data_format].
     ///
     /// [humio_data_format]: https://docs.humio.com/integrations/data-shippers/hec/#format-of-data
-    #[configurable(metadata(templateable))]
     #[serde(default)]
     index: Option<Template>,
 

@@ -388,12 +388,92 @@ fn generate_field_metadata(meta_ident: &Ident, field: &Field<'_>) -> proc_macro2
     let field_ty = field.ty();
     let field_schema_ty = get_field_schema_ty(field);
 
+    // Our rules around how we generate this metadata are slightly complex, but here it goes:
+    //
+    // - All `Configurable` types define their own metadata, which at a minimum is their
+    //   description. It can optionally include things like validation rules, and custom attributes,
+    //   of which we use to better document types for downstream consumption. An example would be
+    //   specifying the integer type (signed vs unsigned vs floating point) as JSON Schema does not
+    //   differentiate between the three.
+    // - Building on that, there are types like `bool` or `u64` (scalars, essentially) where having
+    //   a description for the `Configurable` implementation on `bool` or `u64` makes no sense,
+    //   because the type name is self-describing. These types set the "transparent" flag in their
+    //   metadata to indicate that they intentionally have no description and that it's fine to not
+    //   emit a description in the schema for this type.
+    // - Scalars are also not "referenceable" which means their schema is used inline, not pointed
+    //   to by a schema reference.
+    // - All other types, whether they have a derive-based or hand-written implementation of
+    //   `Configurable` should have a referenceable name.
+    // - When using a referenceable type for a named field (struct or enum variant), it can be
+    //   annotated with a derive helper attribute called `derived`, which informs the codegen that
+    //   the title/description for that field should come from the field type's schema itself.
+    //
+    // Now that we've laid out the rules and invariants, let's talk about this code below.
+    //
+    // For non-referenceable types, their schema -- and thus their metadata -- will be used inline
+    // as the schema for the field, so we want to simply _merge_ our field's metadata into the field
+    // type's metadata.
+    //
+    // For referenceable types, their schema will be referred to by an identifier, and the
+    // definition attached to that identifier will carry the field type's metadata. Any metadata
+    // specified on the field itself should live solely on the field's schema (which can exist
+    // alongside the schema reference) and vice versa.
+    //
+    // Conflating factors: transparent fields, derived fields, and flattened fields.
+    //
+    // For transparent fields -- where we're _explicitly_ opting out of requiring a
+    // title/description -- there's nothing to do except set the transparent flag on the field
+    // metadata, so that the schema generation code doesn't panic and yell at us about a missing
+    // description.
+    //
+    // For derived fields -- where we're _explictly_ stating that our title/description should come
+    // from the field type itself -- we don't necessarily need to have a title/description on the
+    // field's schema, because it can come from the referenced schema as part of schema processing.
+    // What we do need to do, however, is make sure the schema generation code, similar to
+    // `transparent`, doesn't yell at us that our field is missing a title/description. Thus, we
+    // also set the transparent flag on the field metadata.
+    //
+    // For flattened fields -- where we're taking a schema for a struct, etc, and replacing a single
+    // field with all of the fields in the struct itself -- we're in a similar situation as we are
+    // with derived fields. The struct we're flattening will by definition have to have a
+    // description present, but because we generate the schema on a per-field basis, and then
+    // flatten (merge) the schemas at the end of the schema generation step, we also hit the same
+    // logic/checks that yell at us if no description is present... unless the transparent flag is
+    // set, so we also set the transparent flag on the field metadata.
+    //
+    // We now come to the required logic:
+    //
+    // - if the field's type is referenceable, we start with an empty `Metadata` object, otherwise we
+    //   start with the output from `<T as Configurable>::metadata()`
+    // - if this field is transparent, we set the transparent flag
+    // - if this field is derived or flattened, we don't set the transparent flag, as when we
+    //   generate the schema for the field type, we'll check _then_ to see if the field type's
+    //   schema has a description defined... if it doesn't, and the field schema doesn't have a
+    //   description defined, _then_ we'll panic
     let spanned_metadata = quote_spanned! {field.span()=>
-        <#field_schema_ty as ::vector_config::Configurable>::metadata()
+        if <#field_schema_ty as ::vector_config::Configurable>::referenceable_name().is_none() {
+            <#field_schema_ty as ::vector_config::Configurable>::metadata()
+        } else {
+            ::vector_config::Metadata::default()
+        }
     };
 
     let maybe_title = get_metadata_title(meta_ident, field.title());
     let maybe_description = get_metadata_description(meta_ident, field.description());
+    let maybe_clear_title_description = field
+        .title()
+        .or_else(|| field.description())
+        .is_some()
+        .then(|| {
+            quote! {
+                // Fields with a title/description of their own cannot merge with the title/description
+                // of the field type itself, as this will generally lead to confusing output, so we
+                // explicitly clear the title/description first if we're about to set our own
+                // title/description.
+                #meta_ident.clear_title();
+                #meta_ident.clear_description();
+            }
+        });
     let maybe_default_value = if field_ty != field_schema_ty {
         get_metadata_default_value_delegated(meta_ident, field_schema_ty, field.default_value())
     } else {
@@ -406,6 +486,7 @@ fn generate_field_metadata(meta_ident: &Ident, field: &Field<'_>) -> proc_macro2
 
     quote! {
         let mut #meta_ident = #spanned_metadata;
+        #maybe_clear_title_description
         #maybe_title
         #maybe_description
         #maybe_default_value
