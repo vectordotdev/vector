@@ -210,7 +210,9 @@ impl NewRelicCredentials {
             },
             NewRelicApi::Metrics => match self.region {
                 NewRelicRegion::Us => Uri::from_static("https://metric-api.newrelic.com/metric/v1"),
-                NewRelicRegion::Eu => Uri::from_static("https://metric-api.eu.newrelic.com/metric/v1"),
+                NewRelicRegion::Eu => {
+                    Uri::from_static("https://metric-api.eu.newrelic.com/metric/v1")
+                }
             },
             NewRelicApi::Logs => match self.region {
                 NewRelicRegion::Us => Uri::from_static("https://log-api.newrelic.com/log/v1"),

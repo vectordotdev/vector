@@ -100,8 +100,12 @@ impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
         let finalizers = input.take_finalizers();
         let api_model = || -> Result<NewRelicApiModel, Self::Error> {
             match self.credentials.api {
-                NewRelicApi::Events => Ok(NewRelicApiModel::Events(EventsApiModel::try_from(input)?)),
-                NewRelicApi::Metrics => Ok(NewRelicApiModel::Metrics(MetricsApiModel::try_from(input)?)),
+                NewRelicApi::Events => {
+                    Ok(NewRelicApiModel::Events(EventsApiModel::try_from(input)?))
+                }
+                NewRelicApi::Metrics => {
+                    Ok(NewRelicApiModel::Metrics(MetricsApiModel::try_from(input)?))
+                }
                 NewRelicApi::Logs => Ok(NewRelicApiModel::Logs(LogsApiModel::try_from(input)?)),
             }
         }();

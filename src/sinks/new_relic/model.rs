@@ -1,11 +1,16 @@
-use std::{collections::{HashMap, BTreeMap}, convert::TryFrom, fmt::Debug, time::SystemTime};
+use std::{
+    collections::{BTreeMap, HashMap},
+    convert::TryFrom,
+    fmt::Debug,
+    time::SystemTime,
+};
 
 use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};
 
 use super::NewRelicSinkError;
-use crate::event::{Event, MetricValue, Value, MetricKind};
+use crate::event::{Event, MetricKind, MetricValue, Value};
 
 #[derive(Debug)]
 pub enum NewRelicApiModel {
@@ -44,8 +49,7 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
                         bt.insert(key, Value::from(value));
                     }
                     Some(Value::from(bt))
-                }
-                else {
+                } else {
                     None
                 };
 
@@ -53,18 +57,20 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
 
                 if let MetricValue::Gauge { value } | MetricValue::Counter { value } = data.value {
                     metric_data.insert("name".to_owned(), Value::from(series.name.name));
-                    metric_data.insert("value".to_owned(), Value::from(
-                        NotNan::new(value).map_err(|_| {
-                            NewRelicSinkError::new("NaN value not supported")
-                        })?,
-                    ));
-                    metric_data.insert("timestamp".to_owned(),
+                    metric_data.insert(
+                        "value".to_owned(),
+                        Value::from(
+                            NotNan::new(value)
+                                .map_err(|_| NewRelicSinkError::new("NaN value not supported"))?,
+                        ),
+                    );
+                    metric_data.insert(
+                        "timestamp".to_owned(),
                         if let Some(ts) = data.time.timestamp {
                             Value::from(ts.timestamp())
-                        }
-                        else {
+                        } else {
                             Value::from(DateTime::<Utc>::from(SystemTime::now()).timestamp())
-                        }
+                        },
                     );
                     if let Some(attr) = attr {
                         metric_data.insert("attributes".to_owned(), attr);
@@ -74,17 +80,22 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
                 match (data.value, data.kind) {
                     (MetricValue::Counter { .. }, MetricKind::Incremental) => {
                         if let Some(interval_ms) = data.time.interval_ms {
-                            metric_data.insert("interval.ms".to_owned(), Value::from(interval_ms.get() as i64));
-                        }
-                        else {
+                            metric_data.insert(
+                                "interval.ms".to_owned(),
+                                Value::from(interval_ms.get() as i64),
+                            );
+                        } else {
                             // Incremental counter without an interval is worthless, skip this metric
                             continue;
                         }
                         metric_data.insert("type".to_owned(), Value::from("count"));
-                    },
-                    (MetricValue::Gauge { .. } | MetricValue::Counter { .. }, MetricKind::Absolute) => {
+                    }
+                    (
+                        MetricValue::Gauge { .. } | MetricValue::Counter { .. },
+                        MetricKind::Absolute,
+                    ) => {
                         metric_data.insert("type".to_owned(), Value::from("gauge"));
-                    },
+                    }
                     _ => {}
                 }
 
