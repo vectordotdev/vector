@@ -1,7 +1,6 @@
 use std::alloc::{handle_alloc_error, GlobalAlloc, Layout};
 
 use super::{
-    is_allocation_tracing_enabled,
     token::{try_with_suspended_allocation_group, AllocationGroupId},
     tracer::Tracer,
 };
@@ -56,22 +55,20 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
         let (group_id_ptr, object_ptr, wrapped_layout) = self.get_wrapped_allocation(object_layout);
         let wrapped_size = wrapped_layout.size();
 
-        if is_allocation_tracing_enabled() {
-            try_with_suspended_allocation_group(
-                #[inline(always)]
-                |group_id| {
-                    // We only set the group ID in the wrapper header if we're tracing an allocation, because when it
-                    // comes back to us during deallocation, we want to skip doing any checks at all if it's already
-                    // zero.
-                    //
-                    // If we never trace the allocation, tracing the deallocation will only produce incorrect numbers,
-                    // and that includes even if we just used the rule of "always attribute allocations to the root
-                    // allocation group by default".
-                    group_id_ptr.write(group_id.as_usize().get());
-                    self.tracer.trace_allocation(wrapped_size, group_id);
-                },
-            );
-        }
+        try_with_suspended_allocation_group(
+            #[inline(always)]
+            |group_id| {
+                // We only set the group ID in the wrapper header if we're tracing an allocation, because when it
+                // comes back to us during deallocation, we want to skip doing any checks at all if it's already
+                // zero.
+                //
+                // If we never trace the allocation, tracing the deallocation will only produce incorrect numbers,
+                // and that includes even if we just used the rule of "always attribute allocations to the root
+                // allocation group by default".
+                group_id_ptr.write(group_id.as_usize().get());
+                self.tracer.trace_allocation(wrapped_size, group_id);
+            },
+        );
 
         object_ptr
     }
@@ -98,16 +95,14 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
 
         let wrapped_size = wrapped_layout.size();
 
-        if is_allocation_tracing_enabled() {
-            if let Some(source_group_id) = AllocationGroupId::from_raw(raw_group_id) {
-                try_with_suspended_allocation_group(
-                    #[inline(always)]
-                    |_| {
-                        self.tracer
-                            .trace_deallocation(wrapped_size, source_group_id)
-                    },
-                );
-            }
+        if let Some(source_group_id) = AllocationGroupId::from_raw(raw_group_id) {
+            try_with_suspended_allocation_group(
+                #[inline(always)]
+                |_| {
+                    self.tracer
+                        .trace_deallocation(wrapped_size, source_group_id)
+                },
+            );
         }
     }
 }

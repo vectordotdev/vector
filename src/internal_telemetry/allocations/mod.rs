@@ -44,7 +44,7 @@ use std::{
 
 use arr_macro::arr;
 
-use self::allocator::{enable_allocation_tracing, without_allocation_tracing, Tracer};
+use self::allocator::{without_allocation_tracing, Tracer};
 
 pub(crate) use self::allocator::{
     AllocationGroupId, AllocationGroupToken, AllocationLayer, GroupedTraceableAllocator,
@@ -95,7 +95,6 @@ pub fn init_allocation_tracing() {
             })
         })
         .unwrap();
-    enable_allocation_tracing();
 }
 
 /// Acquires an allocation group ID.
