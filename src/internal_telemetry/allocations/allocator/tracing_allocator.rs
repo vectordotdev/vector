@@ -94,16 +94,15 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
         self.allocator.dealloc(actual_ptr, wrapped_layout);
 
         let wrapped_size = wrapped_layout.size();
+        let source_group_id = AllocationGroupId::from_raw_unchecked(raw_group_id);
 
-        if let Some(source_group_id) = AllocationGroupId::from_raw(raw_group_id) {
-            try_with_suspended_allocation_group(
-                #[inline(always)]
-                |_| {
-                    self.tracer
-                        .trace_deallocation(wrapped_size, source_group_id)
-                },
-            );
-        }
+        try_with_suspended_allocation_group(
+            #[inline(always)]
+            |_| {
+                self.tracer
+                    .trace_deallocation(wrapped_size, source_group_id)
+            },
+        );
     }
 }
 

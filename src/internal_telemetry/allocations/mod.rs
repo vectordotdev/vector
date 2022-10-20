@@ -37,7 +37,7 @@
 
 mod allocator;
 use std::{
-    sync::atomic::{AtomicU64, Ordering},
+    sync::atomic::{AtomicUsize, Ordering},
     thread,
     time::Duration,
 };
@@ -50,7 +50,7 @@ pub(crate) use self::allocator::{
     AllocationGroupId, AllocationGroupToken, AllocationLayer, GroupedTraceableAllocator,
 };
 
-static GROUP_MEM_METRICS: [AtomicU64; 512] = arr![AtomicU64::new(0); 512];
+static GROUP_MEM_METRICS: [AtomicUsize; 512] = arr![AtomicUsize::new(0); 512];
 
 pub type Allocator<A> = GroupedTraceableAllocator<A, MainTracer>;
 
@@ -62,13 +62,12 @@ pub struct MainTracer;
 
 impl Tracer for MainTracer {
     fn trace_allocation(&self, wrapped_size: usize, group_id: AllocationGroupId) {
-        GROUP_MEM_METRICS[group_id.as_usize().get()]
-            .fetch_add(wrapped_size as u64, Ordering::Relaxed);
+        GROUP_MEM_METRICS[group_id.as_usize().get()].fetch_add(wrapped_size, Ordering::Relaxed);
     }
 
     fn trace_deallocation(&self, wrapped_size: usize, source_group_id: AllocationGroupId) {
         GROUP_MEM_METRICS[source_group_id.as_usize().get()]
-            .fetch_sub(wrapped_size as u64, Ordering::Relaxed);
+            .fetch_sub(wrapped_size, Ordering::Relaxed);
     }
 }
 

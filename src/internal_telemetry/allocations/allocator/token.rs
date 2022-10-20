@@ -33,6 +33,7 @@ impl AllocationGroupId {
     /// Attempts to create an `AllocationGroupId` from a raw `usize`.
     ///
     /// If the raw value is zero, `None` is returned.
+    #[allow(dead_code)]
     pub(crate) fn from_raw(id: usize) -> Option<Self> {
         NonZeroUsize::new(id).map(Self)
     }
