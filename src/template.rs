@@ -192,12 +192,12 @@ fn render_fields(src: &str, event: EventRef<'_>) -> Result<String, TemplateRende
                 .expect("src should match regex");
             match event {
                 EventRef::Log(log) => log.get(key).map(|val| val.to_string_lossy()),
-                EventRef::Metric(metric) => render_metric_field(key, metric),
+                EventRef::Metric(metric) => render_metric_field(key, metric).map(Into::into),
                 EventRef::Trace(trace) => trace.get(&key).map(|val| val.to_string_lossy()),
             }
             .unwrap_or_else(|| {
                 missing_keys.push(key.to_owned());
-                String::new()
+                "".into()
             })
         })
         .into_owned();

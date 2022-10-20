@@ -41,19 +41,19 @@ impl AggregationKey {
             bucket_key: BucketAggregationKey {
                 service: span
                     .get("service")
-                    .map(|v| v.to_string_lossy())
+                    .map(|v| v.to_string_lossy().into_owned())
                     .unwrap_or_default(),
                 name: span
                     .get("name")
-                    .map(|v| v.to_string_lossy())
+                    .map(|v| v.to_string_lossy().into_owned())
                     .unwrap_or_default(),
                 resource: span
                     .get("resource")
-                    .map(|v| v.to_string_lossy())
+                    .map(|v| v.to_string_lossy().into_owned())
                     .unwrap_or_default(),
                 ty: span
                     .get("type")
-                    .map(|v| v.to_string_lossy())
+                    .map(|v| v.to_string_lossy().into_owned())
                     .unwrap_or_default(),
                 status_code: span
                     .get("meta")
@@ -83,7 +83,7 @@ impl PayloadAggregationKey {
                 .get("meta")
                 .and_then(|m| m.as_object())
                 .and_then(|m| m.get("env"))
-                .map(|s| s.to_string_lossy())
+                .map(|s| s.to_string_lossy().into_owned())
                 .unwrap_or(self.env),
             hostname: self.hostname,
             version: self.version,
@@ -311,11 +311,11 @@ impl Aggregator {
             hostname: partition_key.hostname.clone().unwrap_or_default(),
             version: trace
                 .get("app_version")
-                .map(|v| v.to_string_lossy())
+                .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_default(),
             container_id: trace
                 .get("container_id")
-                .map(|v| v.to_string_lossy())
+                .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_default(),
         };
         let synthetics = trace

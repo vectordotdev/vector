@@ -356,15 +356,15 @@ impl DataStreamConfig {
             let data_stream = log.get("data_stream").and_then(|ds| ds.as_object());
             let dtype = data_stream
                 .and_then(|ds| ds.get("type"))
-                .map(|value| value.to_string_lossy())
+                .map(|value| value.to_string_lossy().into_owned())
                 .or_else(|| self.dtype(log))?;
             let dataset = data_stream
                 .and_then(|ds| ds.get("dataset"))
-                .map(|value| value.to_string_lossy())
+                .map(|value| value.to_string_lossy().into_owned())
                 .or_else(|| self.dataset(log))?;
             let namespace = data_stream
                 .and_then(|ds| ds.get("namespace"))
-                .map(|value| value.to_string_lossy())
+                .map(|value| value.to_string_lossy().into_owned())
                 .or_else(|| self.namespace(log))?;
             (dtype, dataset, namespace)
         };

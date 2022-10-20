@@ -68,6 +68,7 @@ fn into_message(event: Event) -> String {
         .get(crate::config::log_schema().message_key())
         .unwrap()
         .to_string_lossy()
+        .into_owned()
 }
 
 fn into_message_stream(array: EventArray) -> impl futures::Stream<Item = String> {
