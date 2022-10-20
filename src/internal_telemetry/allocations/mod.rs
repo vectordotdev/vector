@@ -36,13 +36,7 @@
 // something we could do here *shrug*
 
 mod allocator;
-use std::{
-    sync::atomic::{AtomicUsize, Ordering},
-    thread,
-    time::Duration,
-};
-
-use arr_macro::arr;
+use std::{thread, time::Duration};
 
 use self::allocator::{without_allocation_tracing, Tracer};
 
@@ -50,7 +44,7 @@ pub(crate) use self::allocator::{
     AllocationGroupId, AllocationGroupToken, AllocationLayer, GroupedTraceableAllocator,
 };
 
-static GROUP_MEM_METRICS: [AtomicUsize; 512] = arr![AtomicUsize::new(0); 512];
+static mut GROUP_MEM_METRICS: [usize; 512] = [0; 512];
 
 pub type Allocator<A> = GroupedTraceableAllocator<A, MainTracer>;
 
@@ -62,12 +56,15 @@ pub struct MainTracer;
 
 impl Tracer for MainTracer {
     fn trace_allocation(&self, wrapped_size: usize, group_id: AllocationGroupId) {
-        GROUP_MEM_METRICS[group_id.as_usize().get()].fetch_add(wrapped_size, Ordering::Relaxed);
+        unsafe {
+            GROUP_MEM_METRICS[group_id.as_usize().get()] += wrapped_size;
+        }
     }
 
     fn trace_deallocation(&self, wrapped_size: usize, source_group_id: AllocationGroupId) {
-        GROUP_MEM_METRICS[source_group_id.as_usize().get()]
-            .fetch_sub(wrapped_size, Ordering::Relaxed);
+        unsafe {
+            GROUP_MEM_METRICS[source_group_id.as_usize().get()] -= wrapped_size;
+        }
     }
 }
 
@@ -77,9 +74,9 @@ pub fn init_allocation_tracing() {
     alloc_processor
         .spawn(move || {
             without_allocation_tracing(move || loop {
-                for idx in 0..GROUP_MEM_METRICS.len() {
-                    let atomic_ref = GROUP_MEM_METRICS.get(idx).unwrap();
-                    let mem_used = atomic_ref.load(Ordering::Relaxed);
+                for idx in unsafe { 0..GROUP_MEM_METRICS.len() } {
+                    let mem_used = unsafe { *GROUP_MEM_METRICS.get(idx).unwrap() };
+
                     if mem_used == 0 {
                         continue;
                     }
@@ -107,7 +104,7 @@ pub fn acquire_allocation_group_id() -> AllocationGroupToken {
     let group_id =
         AllocationGroupToken::register().expect("failed to register allocation group token");
     // We default to the root group in case of overflow
-    if group_id.id().as_usize().get() >= GROUP_MEM_METRICS.len() {
+    if group_id.id().as_usize().get() >= unsafe { GROUP_MEM_METRICS.len() } {
         AllocationGroupToken(AllocationGroupId::ROOT)
     } else {
         group_id
