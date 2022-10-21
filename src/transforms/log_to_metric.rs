@@ -1,4 +1,4 @@
-use std::num::ParseFloatError;
+use std::{convert::TryFrom, num::ParseFloatError};
 
 use chrono::Utc;
 use indexmap::IndexMap;
@@ -13,10 +13,11 @@ use crate::{
         Event, Value,
     },
     internal_events::{
-        LogToMetricFieldNullError, LogToMetricParseFloatError, ParserMissingFieldError, DROP_EVENT,
+        LogToMetricFieldNullError, LogToMetricParseFloatError, LogToMetricTemplateParseError,
+        ParserMissingFieldError, DROP_EVENT,
     },
     schema,
-    template::{Template, TemplateRenderingError},
+    template::{Template, TemplateParseError, TemplateRenderingError},
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
@@ -34,15 +35,15 @@ pub struct LogToMetricConfig {
 #[derive(Clone, Debug)]
 pub struct CounterConfig {
     /// Name of the field in the event to generate the counter.
-    field: Template,
+    field: String,
 
     /// Overrides the name of the counter.
     ///
     /// If not specified, `field` is used as the name of the counter.
-    name: Option<Template>,
+    name: Option<String>,
 
     /// Sets the namespace for the counter.
-    namespace: Option<Template>,
+    namespace: Option<String>,
 
     /// Increments the counter by the value in `field`, instead of only by `1`.
     #[serde(default = "default_increment_by_value")]
@@ -53,7 +54,7 @@ pub struct CounterConfig {
     kind: MetricKind,
 
     /// Tags to apply to the counter.
-    tags: Option<IndexMap<String, Template>>,
+    tags: Option<IndexMap<String, String>>,
 }
 
 /// Specification of a gauge derived from a log event.
@@ -61,18 +62,18 @@ pub struct CounterConfig {
 #[derive(Clone, Debug)]
 pub struct GaugeConfig {
     /// Name of the field in the event to generate the gauge from.
-    pub field: Template,
+    pub field: String,
 
     /// Overrides the name of the gauge.
     ///
     /// If not specified, `field` is used as the name of the gauge.
-    pub name: Option<Template>,
+    pub name: Option<String>,
 
     /// Sets the namespace for the gauge.
-    pub namespace: Option<Template>,
+    pub namespace: Option<String>,
 
     /// Tags to apply to the gauge.
-    pub tags: Option<IndexMap<String, Template>>,
+    pub tags: Option<IndexMap<String, String>>,
 }
 
 /// Specification of a set derived from a log event.
@@ -80,18 +81,18 @@ pub struct GaugeConfig {
 #[derive(Clone, Debug)]
 pub struct SetConfig {
     /// Name of the field in the event to generate the set from.
-    field: Template,
+    field: String,
 
     /// Overrides the name of the set.
     ///
     /// If not specified, `field` is used as the name of the set.
-    name: Option<Template>,
+    name: Option<String>,
 
     /// Sets the namespace for the set.
-    namespace: Option<Template>,
+    namespace: Option<String>,
 
     /// Tags to apply to the set.
-    tags: Option<IndexMap<String, Template>>,
+    tags: Option<IndexMap<String, String>>,
 }
 
 /// Specification of a histogram derived from a log event.
@@ -99,18 +100,18 @@ pub struct SetConfig {
 #[derive(Clone, Debug)]
 pub struct HistogramConfig {
     /// Name of the field in the event to generate the histogram from.
-    field: Template,
+    field: String,
 
     /// Overrides the name of the histogram.
     ///
     /// If not specified, `field` is used as the name of the histogram.
-    name: Option<Template>,
+    name: Option<String>,
 
     /// Sets the namespace for the histogram.
-    namespace: Option<Template>,
+    namespace: Option<String>,
 
     /// Tags to apply to the histogram.
-    tags: Option<IndexMap<String, Template>>,
+    tags: Option<IndexMap<String, String>>,
 }
 
 /// Specification of a summary derived from a log event.
@@ -118,18 +119,18 @@ pub struct HistogramConfig {
 #[derive(Clone, Debug)]
 pub struct SummaryConfig {
     /// Name of the field in the event to generate the summary from.
-    field: Template,
+    field: String,
 
     /// Overrides the name of the summary.
     ///
     /// If not specified, `field` is used as the name of the summary.
-    name: Option<Template>,
+    name: Option<String>,
 
     /// Sets the namespace for the summary.
-    namespace: Option<Template>,
+    namespace: Option<String>,
 
     /// Tags to apply to the summary.
-    tags: Option<IndexMap<String, Template>>,
+    tags: Option<IndexMap<String, String>>,
 }
 
 /// Specification of a metric derived from a log event.
@@ -156,11 +157,11 @@ pub enum MetricConfig {
 impl MetricConfig {
     fn field(&self) -> &str {
         match self {
-            MetricConfig::Counter(CounterConfig { field, .. }) => field.get_ref(),
-            MetricConfig::Histogram(HistogramConfig { field, .. }) => field.get_ref(),
-            MetricConfig::Gauge(GaugeConfig { field, .. }) => field.get_ref(),
-            MetricConfig::Set(SetConfig { field, .. }) => field.get_ref(),
-            MetricConfig::Summary(SummaryConfig { field, .. }) => field.get_ref(),
+            MetricConfig::Counter(CounterConfig { field, .. }) => field,
+            MetricConfig::Histogram(HistogramConfig { field, .. }) => field,
+            MetricConfig::Gauge(GaugeConfig { field, .. }) => field,
+            MetricConfig::Set(SetConfig { field, .. }) => field,
+            MetricConfig::Summary(SummaryConfig { field, .. }) => field,
         }
     }
 }
@@ -182,7 +183,7 @@ impl GenerateConfig for LogToMetricConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             metrics: vec![MetricConfig::Counter(CounterConfig {
-                field: "field_name".try_into().expect("Fixed template"),
+                field: "field_name".to_string(),
                 name: None,
                 namespace: None,
                 increment_by_value: false,
@@ -226,6 +227,7 @@ enum TransformError {
     FieldNull {
         field: String,
     },
+    TemplateParseError(TemplateParseError),
     TemplateRenderingError(TemplateRenderingError),
     ParseFloatError {
         field: String,
@@ -233,22 +235,23 @@ enum TransformError {
     },
 }
 
-fn render_template(template: &Template, event: &Event) -> Result<String, TransformError> {
+fn render_template(s: &str, event: &Event) -> Result<String, TransformError> {
+    let template = Template::try_from(s).map_err(TransformError::TemplateParseError)?;
     template
         .render_string(event)
         .map_err(TransformError::TemplateRenderingError)
 }
 
 fn render_tags(
-    tags: &Option<IndexMap<String, Template>>,
+    tags: &Option<IndexMap<String, String>>,
     event: &Event,
 ) -> Result<Option<MetricTags>, TransformError> {
     Ok(match tags {
         None => None,
         Some(tags) => {
             let mut map = MetricTags::default();
-            for (name, template) in tags {
-                match render_template(template, event) {
+            for (name, value) in tags {
+                match render_template(value, event) {
                     Ok(tag) => {
                         map.insert(name.to_string(), tag);
                     }
@@ -294,7 +297,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             let value = if counter.increment_by_value {
                 value.to_string_lossy().parse().map_err(|error| {
                     TransformError::ParseFloatError {
-                        field: counter.field.get_ref().to_owned(),
+                        field: counter.field.clone(),
                         error,
                     }
                 })?
@@ -472,6 +475,9 @@ impl FunctionTransform for LogToMetric {
                                 drop_event: true,
                                 field: None,
                             })
+                        }
+                        TransformError::TemplateParseError(error) => {
+                            emit!(LogToMetricTemplateParseError { error })
                         }
                     };
                     // early return to prevent the partial buffer from being sent
