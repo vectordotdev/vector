@@ -6,6 +6,7 @@ use parser::ast::Ident;
 use std::{
     collections::{BTreeMap, HashMap},
     fmt,
+    path::PathBuf,
 };
 use value::{kind::Collection, Value};
 
@@ -519,13 +520,16 @@ pub enum Error {
 
     #[error(r#"mutation of read-only value"#)]
     ReadOnlyMutation { context: String },
+
+    #[error(r#"invalid alias source"#)]
+    InvalidAliasSource { path: PathBuf },
 }
 
 impl diagnostic::DiagnosticMessage for Error {
     fn code(&self) -> usize {
         use Error::{
             ExpectedFunctionClosure, ExpectedStaticExpression, InvalidArgument, InvalidEnumVariant,
-            ReadOnlyMutation, UnexpectedExpression,
+            ReadOnlyMutation, UnexpectedExpression, InvalidAliasSource,
         };
 
         match self {
@@ -535,13 +539,14 @@ impl diagnostic::DiagnosticMessage for Error {
             InvalidArgument { .. } => 403,
             ExpectedFunctionClosure => 420,
             ReadOnlyMutation { .. } => 315,
+            InvalidAliasSource { .. } => 401,
         }
     }
 
     fn labels(&self) -> Vec<Label> {
         use Error::{
             ExpectedFunctionClosure, ExpectedStaticExpression, InvalidArgument, InvalidEnumVariant,
-            ReadOnlyMutation, UnexpectedExpression,
+            ReadOnlyMutation, UnexpectedExpression, InvalidAliasSource,
         };
 
         match self {
@@ -607,6 +612,14 @@ impl diagnostic::DiagnosticMessage for Error {
                 Label::primary(r#"mutation of read-only value"#, Span::default()),
                 Label::context(context, Span::default()),
             ],
+            InvalidAliasSource {
+                path
+            } => vec![
+                Label::primary(
+                    format!(r#"invalid source at "{}""#, path.display()),
+                    Span::default(),
+                ),
+            ]
         }
     }
 

@@ -2,7 +2,7 @@ use datadog_grok::{
     parse_grok,
     parse_grok_rules::{self, GrokRule},
 };
-use std::{collections::BTreeMap, fmt};
+use std::{collections::BTreeMap, fmt, fs::File, io::BufReader, path::Path};
 use vrl::{
     diagnostic::{Label, Span},
     prelude::*,
@@ -65,6 +65,11 @@ impl Function for ParseGroks {
                 kind: kind::OBJECT,
                 required: false,
             },
+            Parameter {
+                keyword: "alias_sources",
+                kind: kind::ARRAY,
+                required: false,
+            }
         ]
     }
 
@@ -121,7 +126,7 @@ impl Function for ParseGroks {
             })
             .collect::<std::result::Result<Vec<String>, vrl::function::Error>>()?;
 
-        let aliases = arguments
+        let mut aliases = arguments
             .optional_object("aliases")?
             .unwrap_or_default()
             .into_iter()
@@ -140,6 +145,33 @@ impl Function for ParseGroks {
                 Ok((key, alias))
             })
             .collect::<std::result::Result<BTreeMap<String, String>, vrl::function::Error>>()?;
+
+        let alias_sources = arguments
+            .optional_array("alias_sources")?
+            .unwrap_or_default()
+            .into_iter()
+            .map(|expr| {
+                let path = expr
+                    .as_value()
+                    .ok_or(vrl::function::Error::ExpectedStaticExpression {
+                        keyword: "alias_sources",
+                        expr,
+                    })?
+                    .try_bytes_utf8_lossy()
+                    .expect("filename not bytes")
+                    .into_owned();
+                Ok(path)
+            })
+            .collect::<std::result::Result<Vec<String>, vrl::function::Error>>()?;
+
+        for src in alias_sources {
+            let path = Path::new(&src);
+            let file = File::open(&path).unwrap();
+            let reader = BufReader::new(file);
+            let mut src_aliases = serde_json::from_reader(reader).unwrap();
+
+            aliases.append(&mut src_aliases);
+        }
 
         // we use a datadog library here because it is a superset of grok
         let grok_rules = parse_grok_rules::parse_grok_rules(&patterns, aliases)
