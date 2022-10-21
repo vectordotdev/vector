@@ -21,9 +21,12 @@ mode = "tcp"
 type = "log_to_metric"
 inputs = ["syslog"]
 
-    [[transforms.log2metric.metrics]]
-    type = "gauge"
-    field = "procid"
+  [[transforms.log2metric.metrics]]
+  type = "gauge"
+  field = "procid"
+  tags.hostname = "{{ hostname }}"
+  tags.facility = "{{ facility }}"
+  tags.severity = "{{ severity }}"
 
 ##
 ## Sinks
