@@ -36,7 +36,11 @@
 // something we could do here *shrug*
 
 mod allocator;
-use std::{sync::atomic::AtomicUsize, thread};
+use std::{
+    sync::atomic::{AtomicUsize, Ordering},
+    thread,
+    time::Duration,
+};
 
 use arr_macro::arr;
 
@@ -66,7 +70,24 @@ impl Tracer for MainTracer {
 pub fn init_allocation_tracing() {
     let alloc_processor = thread::Builder::new().name("vector-alloc-processor".to_string());
     alloc_processor
-        .spawn(move || without_allocation_tracing(|| {}))
+        .spawn(move || {
+            without_allocation_tracing(move || loop {
+                for idx in 0..GROUP_MEM_METRICS.len() {
+                    let atomic_ref = GROUP_MEM_METRICS.get(idx).unwrap();
+                    let mem_used = atomic_ref.load(Ordering::Relaxed);
+                    if mem_used == 0 {
+                        continue;
+                    }
+
+                    info!(
+                        message = "Allocation group memory usage.",
+                        group_id = idx,
+                        current_memory_allocated_in_bytes = mem_used
+                    );
+                }
+                thread::sleep(Duration::from_millis(5000));
+            })
+        })
         .unwrap();
 }
 
