@@ -35,11 +35,11 @@ pub struct LogToMetricConfig {
 pub struct CounterConfig {
     /// Increments the counter by the value in `field`, instead of only by `1`.
     #[serde(default = "default_increment_by_value")]
-    increment_by_value: bool,
+    pub increment_by_value: bool,
 
     #[configurable(derived)]
     #[serde(default = "default_kind")]
-    kind: MetricKind,
+    pub kind: MetricKind,
 }
 
 /// Specification of a metric derived from a log event.
@@ -47,22 +47,22 @@ pub struct CounterConfig {
 #[derive(Clone, Debug)]
 pub struct MetricConfig {
     /// Name of the field in the event to generate the metric.
-    field: Template,
+    pub field: Template,
 
     /// Overrides the name of the counter.
     ///
     /// If not specified, `field` is used as the name of the metric.
-    name: Option<Template>,
+    pub name: Option<Template>,
 
     /// Sets the namespace for the metric.
-    namespace: Option<Template>,
+    pub namespace: Option<Template>,
 
     /// Tags to apply to the metric.
-    tags: Option<IndexMap<String, Template>>,
+    pub tags: Option<IndexMap<String, Template>>,
 
     #[configurable(derived)]
     #[serde(flatten)]
-    metric: MetricTypeConfig,
+    pub metric: MetricTypeConfig,
 }
 
 /// Specification of the type of an individual metric, and any associated data.
