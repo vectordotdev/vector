@@ -30,6 +30,9 @@ fn pop_group_from_stack() -> AllocationGroupId {
 pub struct AllocationGroupId(NonZeroUsize);
 
 impl AllocationGroupId {
+    /// The group ID used for allocations which are not made within a registered allocation group.
+    pub const ROOT: Self = Self(unsafe { NonZeroUsize::new_unchecked(1) });
+
     /// Attempts to create an `AllocationGroupId` from a raw `usize`.
     ///
     /// If the raw value is zero, `None` is returned.
@@ -42,11 +45,6 @@ impl AllocationGroupId {
     pub const fn from_raw_unchecked(id: usize) -> Self {
         unsafe { AllocationGroupId(NonZeroUsize::new_unchecked(id)) }
     }
-}
-
-impl AllocationGroupId {
-    /// The group ID used for allocations which are not made within a registered allocation group.
-    pub const ROOT: Self = Self(unsafe { NonZeroUsize::new_unchecked(1) });
 
     /// Gets the integer representation of this group ID.
     #[must_use]
@@ -120,9 +118,7 @@ impl AllocationGroupToken {
     pub fn enter(&mut self) -> AllocationGuard<'_> {
         AllocationGuard::enter(self)
     }
-}
 
-impl AllocationGroupToken {
     /// Attaches this allocation group to a tracing [`Span`][tracing::Span].
     ///
     /// When the span is entered or exited, the allocation group will also transition from inactive to active, and vise

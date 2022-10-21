@@ -10,15 +10,15 @@ use super::token::AllocationGroupId;
 #[derive(Copy, Clone)]
 pub(crate) struct GroupStack {
     slots: [AllocationGroupId; 512],
-    current_val: usize,
+    current_top: usize,
 }
 
 impl GroupStack {
     /// Creates an empty [`GroupStack`].
     pub const fn new() -> Self {
         Self {
-            current_val: 0,
-            slots: [AllocationGroupId::from_raw_unchecked(1); 512],
+            current_top: 0,
+            slots: [AllocationGroupId::ROOT; 512],
         }
     }
 
@@ -26,25 +26,28 @@ impl GroupStack {
     ///
     /// If the stack is empty, then the root allocation group is the defacto active allocation group, and is returned as such.
     pub const fn current(&self) -> AllocationGroupId {
-        if self.current_val == 0 {
+        if self.current_top == 0 {
             AllocationGroupId::ROOT
         } else {
-            self.slots[self.current_val - 1]
+            self.slots[self.current_top - 1]
         }
     }
 
     /// Pushes an allocation group on to the stack, marking it as the active allocation group.
     pub fn push(&mut self, group: AllocationGroupId) {
-        if self.current_val >= self.slots.len() {
+        if self.current_top >= self.slots.len() {
             panic!("stack overflow");
         }
-        self.slots[self.current_val] = group;
-        self.current_val += 1;
+        self.slots[self.current_top] = group;
+        self.current_top += 1;
     }
 
     /// Pops the currently active allocation group off the stack.
     pub fn pop(&mut self) -> AllocationGroupId {
-        self.current_val -= 1;
-        self.slots[self.current_val]
+        if self.current_top == 0 {
+            panic!("stack underflow!");
+        }
+        self.current_top -= 1;
+        self.slots[self.current_top]
     }
 }
