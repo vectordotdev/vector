@@ -307,8 +307,7 @@ jobs:
                                   --warmup-seconds ${{ needs.compute-soak-meta.outputs.warmup-seconds }} \
                                   --total-samples ${{ needs.compute-soak-meta.outputs.total-samples }} \
                                   --replicas ${{ needs.compute-soak-meta.outputs.runner-node-replicas }} \
-                                  --capture-dir /tmp/${{ github.run_id }}-${{ github.run_attempt }} &;
-
+                                  --capture-dir /tmp/${{ github.run_id }}-${{ github.run_attempt }} &
           ./soaks/bin/soak_one.sh --soak ${{ matrix.target }} \
                                   --build-image "false" \
                                   --variant "baseline" \
@@ -319,7 +318,7 @@ jobs:
                                   --warmup-seconds ${{ needs.compute-soak-meta.outputs.warmup-seconds }} \
                                   --total-samples ${{ needs.compute-soak-meta.outputs.total-samples }} \
                                   --replicas ${{ needs.compute-soak-meta.outputs.runner-node-replicas }} \
-                                  --capture-dir /tmp/${{ github.run_id }}-${{ github.run_attempt }} &;
+                                  --capture-dir /tmp/${{ github.run_id }}-${{ github.run_attempt }} &
           wait
 
       - name: Upload timing captures
