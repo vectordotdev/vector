@@ -156,7 +156,7 @@ pub enum Sinks {
     AwsKinesisFirehose(#[configurable(derived)] aws_kinesis::firehose::KinesisFirehoseSinkConfig),
     /// AWS Kinesis Streams.
     #[cfg(feature = "sinks-aws_kinesis_streams")]
-    AwsKinesisStreams(#[configurable(derived)] aws_kinesis::streams::KinesisSinkConfig),
+    AwsKinesisStreams(#[configurable(derived)] aws_kinesis::streams::KinesisStreamsSinkConfig),
 
     /// AWS S3.
     #[cfg(feature = "sinks-aws_s3")]

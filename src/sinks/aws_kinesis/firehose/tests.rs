@@ -25,17 +25,18 @@ async fn check_batch_size() {
     let mut batch = BatchConfig::<KinesisFirehoseDefaultBatchSettings>::default();
     batch.max_bytes = Some(MAX_PAYLOAD_SIZE + 1);
 
-    let config = KinesisFirehoseSinkConfig {
+    let base = KinesisSinkBaseConfig {
         stream_name: String::from("test"),
         region: RegionOrEndpoint::with_both("local", "http://localhost:4566"),
         encoding: JsonSerializerConfig::new().into(),
         compression: Compression::None,
-        batch,
         request: Default::default(),
         tls: None,
         auth: Default::default(),
         acknowledgements: Default::default(),
     };
+
+    let config = KinesisFirehoseSinkConfig { batch, base };
 
     let cx = SinkContext::new_test();
     let res = config.build(cx).await;
@@ -53,17 +54,18 @@ async fn check_batch_events() {
     let mut batch = BatchConfig::<KinesisFirehoseDefaultBatchSettings>::default();
     batch.max_events = Some(MAX_PAYLOAD_EVENTS + 1);
 
-    let config = KinesisFirehoseSinkConfig {
+    let base = KinesisSinkBaseConfig {
         stream_name: String::from("test"),
         region: RegionOrEndpoint::with_both("local", "http://localhost:4566"),
         encoding: JsonSerializerConfig::new().into(),
         compression: Compression::None,
-        batch,
         request: Default::default(),
         tls: None,
         auth: Default::default(),
         acknowledgements: Default::default(),
     };
+
+    let config = KinesisFirehoseSinkConfig { batch, base };
 
     let cx = SinkContext::new_test();
     let res = config.build(cx).await;

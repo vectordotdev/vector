@@ -32,17 +32,21 @@ async fn kinesis_put_records() {
     let mut batch = BatchConfig::default();
     batch.max_events = Some(2);
 
-    let config = KinesisSinkConfig {
+    let base = KinesisSinkBaseConfig {
         stream_name: stream.clone(),
-        partition_key_field: None,
         region: RegionOrEndpoint::with_both("localstack", kinesis_address().as_str()),
         encoding: TextSerializerConfig::new().into(),
         compression: Compression::None,
-        batch,
         request: Default::default(),
         tls: Default::default(),
         auth: Default::default(),
         acknowledgements: Default::default(),
+    };
+
+    let config = KinesisStreamsSinkConfig {
+        partition_key_field: None,
+        batch,
+        base,
     };
 
     let cx = SinkContext::new_test();
