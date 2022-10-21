@@ -61,9 +61,16 @@ pub const fn get_grouped_tracing_allocator<A>(allocator: A) -> Allocator<A> {
 pub struct MainTracer;
 
 impl Tracer for MainTracer {
-    fn trace_allocation(&self, _wrapped_size: usize, _group_id: AllocationGroupId) {}
+    #[inline(always)]
+    fn trace_allocation(&self, wrapped_size: usize, group_id: AllocationGroupId) {
+        GROUP_MEM_METRICS[group_id.as_usize().get()].fetch_add(wrapped_size, Ordering::Relaxed);
+    }
 
-    fn trace_deallocation(&self, _wrapped_size: usize, _source_group_id: AllocationGroupId) {}
+    #[inline(always)]
+    fn trace_deallocation(&self, wrapped_size: usize, source_group_id: AllocationGroupId) {
+        GROUP_MEM_METRICS[source_group_id.as_usize().get()]
+            .fetch_sub(wrapped_size, Ordering::Relaxed);
+    }
 }
 
 /// Initializes allocation tracing.
@@ -85,7 +92,7 @@ pub fn init_allocation_tracing() {
                         current_memory_allocated_in_bytes = mem_used
                     );
                 }
-                thread::sleep(Duration::from_millis(5000));
+                thread::sleep(Duration::from_millis(10000));
             })
         })
         .unwrap();
