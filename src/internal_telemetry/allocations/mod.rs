@@ -36,7 +36,9 @@
 // something we could do here *shrug*
 
 mod allocator;
-use std::{thread, time::Duration};
+use std::{sync::atomic::AtomicUsize, thread};
+
+use arr_macro::arr;
 
 use self::allocator::{without_allocation_tracing, Tracer};
 
@@ -44,7 +46,7 @@ pub(crate) use self::allocator::{
     AllocationGroupId, AllocationGroupToken, AllocationLayer, GroupedTraceableAllocator,
 };
 
-static mut GROUP_MEM_METRICS: [usize; 512] = [0; 512];
+static GROUP_MEM_METRICS: [AtomicUsize; 512] = arr![AtomicUsize::new(0); 512];
 
 pub type Allocator<A> = GroupedTraceableAllocator<A, MainTracer>;
 
@@ -55,41 +57,16 @@ pub const fn get_grouped_tracing_allocator<A>(allocator: A) -> Allocator<A> {
 pub struct MainTracer;
 
 impl Tracer for MainTracer {
-    fn trace_allocation(&self, wrapped_size: usize, group_id: AllocationGroupId) {
-        unsafe {
-            GROUP_MEM_METRICS[group_id.as_usize().get()] += wrapped_size;
-        }
-    }
+    fn trace_allocation(&self, _wrapped_size: usize, _group_id: AllocationGroupId) {}
 
-    fn trace_deallocation(&self, wrapped_size: usize, source_group_id: AllocationGroupId) {
-        unsafe {
-            GROUP_MEM_METRICS[source_group_id.as_usize().get()] -= wrapped_size;
-        }
-    }
+    fn trace_deallocation(&self, _wrapped_size: usize, _source_group_id: AllocationGroupId) {}
 }
 
 /// Initializes allocation tracing.
 pub fn init_allocation_tracing() {
     let alloc_processor = thread::Builder::new().name("vector-alloc-processor".to_string());
     alloc_processor
-        .spawn(move || {
-            without_allocation_tracing(move || loop {
-                for idx in unsafe { 0..GROUP_MEM_METRICS.len() } {
-                    let mem_used = unsafe { *GROUP_MEM_METRICS.get(idx).unwrap() };
-
-                    if mem_used == 0 {
-                        continue;
-                    }
-
-                    info!(
-                        message = "Allocation group memory usage.",
-                        group_id = idx,
-                        current_memory_allocated_in_bytes = mem_used
-                    );
-                }
-                thread::sleep(Duration::from_millis(5000));
-            })
-        })
+        .spawn(move || without_allocation_tracing(|| {}))
         .unwrap();
 }
 
@@ -104,7 +81,7 @@ pub fn acquire_allocation_group_id() -> AllocationGroupToken {
     let group_id =
         AllocationGroupToken::register().expect("failed to register allocation group token");
     // We default to the root group in case of overflow
-    if group_id.id().as_usize().get() >= unsafe { GROUP_MEM_METRICS.len() } {
+    if group_id.id().as_usize().get() >= GROUP_MEM_METRICS.len() {
         AllocationGroupToken(AllocationGroupId::ROOT)
     } else {
         group_id
