@@ -7,7 +7,6 @@ use futures_util::{
 };
 use tower::Service;
 use vector_core::{
-    buffers::Acker,
     config::log_schema,
     event::Event,
     partition::Partitioner,
@@ -17,7 +16,6 @@ use vector_core::{
 
 use super::service::TraceApiRequest;
 use crate::{
-    config::SinkContext,
     internal_events::DatadogTracesEncodingError,
     sinks::{datadog::traces::request_builder::DatadogTracesRequestBuilder, util::SinkBuilderExt},
 };
@@ -51,11 +49,19 @@ impl Partitioner for EventPartitioner {
             }
             Event::Trace(t) => PartitionKey {
                 api_key: item.metadata().datadog_api_key(),
-                env: t.get("env").map(|s| s.to_string_lossy()),
-                hostname: t.get(log_schema().host_key()).map(|s| s.to_string_lossy()),
-                agent_version: t.get("agent_version").map(|s| s.to_string_lossy()),
-                target_tps: t.get("target_tps").and_then(|tps| tps.as_integer()),
-                error_tps: t.get("error_tps").and_then(|tps| tps.as_integer()),
+                env: t.get("env").map(|s| s.to_string_lossy().into_owned()),
+                hostname: t
+                    .get(log_schema().host_key())
+                    .map(|s| s.to_string_lossy().into_owned()),
+                agent_version: t
+                    .get("agent_version")
+                    .map(|s| s.to_string_lossy().into_owned()),
+                target_tps: t
+                    .get("target_tps")
+                    .and_then(|tps| tps.as_integer().map(Into::into)),
+                error_tps: t
+                    .get("error_tps")
+                    .and_then(|tps| tps.as_integer().map(Into::into)),
             },
         }
     }
@@ -63,7 +69,6 @@ impl Partitioner for EventPartitioner {
 
 pub struct TracesSink<S> {
     service: S,
-    acker: Acker,
     request_builder: DatadogTracesRequestBuilder,
     batch_settings: BatcherSettings,
 }
@@ -75,15 +80,13 @@ where
     S::Future: Send + 'static,
     S::Response: DriverResponse,
 {
-    pub fn new(
-        cx: SinkContext,
+    pub const fn new(
         service: S,
         request_builder: DatadogTracesRequestBuilder,
         batch_settings: BatcherSettings,
     ) -> Self {
         TracesSink {
             service,
-            acker: cx.acker(),
             request_builder,
             batch_settings,
         }
@@ -97,18 +100,18 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {
-                        let (message, reason, dropped_events) = e.into_parts();
+                        let (error_message, error_reason, dropped_events) = e.into_parts();
                         emit!(DatadogTracesEncodingError {
-                            message,
+                            error_message,
+                            error_reason,
                             dropped_events,
-                            reason,
                         });
                         None
                     }
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(self.service, self.acker);
+            .into_driver(self.service);
 
         sink.run().await
     }

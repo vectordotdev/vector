@@ -8,11 +8,11 @@ use std::{
 use async_stream::stream;
 use futures::{stream, Stream, StreamExt};
 use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, Input, Output, TransformConfig, TransformContext},
     event::{discriminant::Discriminant, Event, EventMetadata, LogEvent},
     internal_events::ReduceStaleEventFlushed,
     schema,
@@ -22,39 +22,61 @@ use crate::{
 mod merge_strategy;
 
 use crate::event::Value;
-use merge_strategy::*;
+pub use merge_strategy::*;
 
-//------------------------------------------------------------------------------
-
-#[derive(Deserialize, Serialize, Debug, Default, Clone)]
+/// Configuration for the `reduce` transform.
+#[configurable_component(transform("reduce"))]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields, default)]
 pub struct ReduceConfig {
+    /// The maximum period of time to wait after the last event is received, in milliseconds, before
+    /// a combined event should be considered complete.
     pub expire_after_ms: Option<u64>,
 
+    /// The interval to check for and flush any expired events, in milliseconds.
     pub flush_period_ms: Option<u64>,
 
-    /// An ordered list of fields to distinguish reduces by. Each
-    /// reduce has a separate event merging state.
+    /// An ordered list of fields by which to group events.
+    ///
+    /// Each group with matching values for the specified keys is reduced independently, allowing
+    /// you to keep independent event streams separate. When no fields are specified, all events
+    /// will be combined in a single group.
+    ///
+    /// For example, if `group_by = ["host", "region"]`, then all incoming events that have the same
+    /// host and region will be grouped together before being reduced.
     #[serde(default)]
     pub group_by: Vec<String>,
 
+    /// A map of field names to custom merge strategies.
+    ///
+    /// For each field specified, the given strategy will be used for combining events rather than
+    /// the default behavior.
+    ///
+    /// The default behavior is as follows:
+    ///
+    /// - The first value of a string field is kept, subsequent values are discarded.
+    /// - For timestamp fields the first is kept and a new field `[field-name]_end` is added with
+    ///   the last received timestamp value.
+    /// - Numeric values are summed.
     #[serde(default)]
     pub merge_strategies: IndexMap<String, MergeStrategy>,
 
-    /// An optional condition that determines when an event is the end of a
-    /// reduce.
+    /// A condition used to distinguish the final event of a transaction.
+    ///
+    /// If this condition resolves to `true` for an event, the current transaction is immediately
+    /// flushed with this event.
     pub ends_when: Option<AnyCondition>,
-    pub starts_when: Option<AnyCondition>,
-}
 
-inventory::submit! {
-    TransformDescription::new::<ReduceConfig>("reduce")
+    /// A condition used to distinguish the first event of a transaction.
+    ///
+    /// If this condition resolves to `true` for an event, the previous transaction is flushed
+    /// (without this event) and a new transaction is started.
+    pub starts_when: Option<AnyCondition>,
 }
 
 impl_generate_config_from_default!(ReduceConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "reduce")]
 impl TransformConfig for ReduceConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         Reduce::new(self, &context.enrichment_tables).map(Transform::event_task)
@@ -66,10 +88,6 @@ impl TransformConfig for ReduceConfig {
 
     fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
-    }
-
-    fn transform_type(&self) -> &'static str {
-        "reduce"
     }
 }
 
@@ -159,8 +177,6 @@ impl ReduceState {
         event
     }
 }
-
-//------------------------------------------------------------------------------
 
 pub struct Reduce {
     expire_after: Duration,
@@ -322,12 +338,13 @@ impl TaskTransform<Event> for Reduce {
 #[cfg(test)]
 mod test {
     use serde_json::json;
+    use tokio::sync::mpsc;
+    use tokio_stream::wrappers::ReceiverStream;
 
     use super::*;
-    use crate::{
-        config::TransformConfig,
-        event::{LogEvent, Value},
-    };
+    use crate::event::{LogEvent, Value};
+    use crate::test_util::components::assert_transform_compliance;
+    use crate::transforms::test::create_topology;
 
     #[test]
     fn generate_config() {
@@ -336,65 +353,71 @@ mod test {
 
     #[tokio::test]
     async fn reduce_from_condition() {
-        let reduce = toml::from_str::<ReduceConfig>(
+        let reduce_config = toml::from_str::<ReduceConfig>(
             r#"
 group_by = [ "request_id" ]
 
 [ends_when]
-  type = "check_fields"
-  "test_end.exists" = true
+  type = "vrl"
+  source = "exists(.test_end)"
 "#,
         )
-        .unwrap()
-        .build(&TransformContext::default())
-        .await
         .unwrap();
-        let reduce = reduce.into_task();
 
-        let mut e_1 = LogEvent::from("test message 1");
-        e_1.insert("counter", 1);
-        e_1.insert("request_id", "1");
-        let metadata_1 = e_1.metadata().clone();
+        assert_transform_compliance(async move {
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
 
-        let mut e_2 = LogEvent::from("test message 2");
-        e_2.insert("counter", 2);
-        e_2.insert("request_id", "2");
-        let metadata_2 = e_2.metadata().clone();
+            let mut e_1 = LogEvent::from("test message 1");
+            e_1.insert("counter", 1);
+            e_1.insert("request_id", "1");
+            let metadata_1 = e_1.metadata().clone();
 
-        let mut e_3 = LogEvent::from("test message 3");
-        e_3.insert("counter", 3);
-        e_3.insert("request_id", "1");
+            let mut e_2 = LogEvent::from("test message 2");
+            e_2.insert("counter", 2);
+            e_2.insert("request_id", "2");
+            let metadata_2 = e_2.metadata().clone();
 
-        let mut e_4 = LogEvent::from("test message 4");
-        e_4.insert("counter", 4);
-        e_4.insert("request_id", "1");
-        e_4.insert("test_end", "yep");
+            let mut e_3 = LogEvent::from("test message 3");
+            e_3.insert("counter", 3);
+            e_3.insert("request_id", "1");
 
-        let mut e_5 = LogEvent::from("test message 5");
-        e_5.insert("counter", 5);
-        e_5.insert("request_id", "2");
-        e_5.insert("extra_field", "value1");
-        e_5.insert("test_end", "yep");
+            let mut e_4 = LogEvent::from("test message 4");
+            e_4.insert("counter", 4);
+            e_4.insert("request_id", "1");
+            e_4.insert("test_end", "yep");
 
-        let inputs = vec![e_1.into(), e_2.into(), e_3.into(), e_4.into(), e_5.into()];
-        let in_stream = Box::pin(stream::iter(inputs));
-        let mut out_stream = reduce.transform_events(in_stream);
+            let mut e_5 = LogEvent::from("test message 5");
+            e_5.insert("counter", 5);
+            e_5.insert("request_id", "2");
+            e_5.insert("extra_field", "value1");
+            e_5.insert("test_end", "yep");
 
-        let output_1 = out_stream.next().await.unwrap().into_log();
-        assert_eq!(output_1["message"], "test message 1".into());
-        assert_eq!(output_1["counter"], Value::from(8));
-        assert_eq!(output_1.metadata(), &metadata_1);
+            for event in vec![e_1.into(), e_2.into(), e_3.into(), e_4.into(), e_5.into()] {
+                tx.send(event).await.unwrap();
+            }
 
-        let output_2 = out_stream.next().await.unwrap().into_log();
-        assert_eq!(output_2["message"], "test message 2".into());
-        assert_eq!(output_2["extra_field"], "value1".into());
-        assert_eq!(output_2["counter"], Value::from(7));
-        assert_eq!(output_2.metadata(), &metadata_2);
+            let output_1 = out.recv().await.unwrap().into_log();
+            assert_eq!(output_1["message"], "test message 1".into());
+            assert_eq!(output_1["counter"], Value::from(8));
+            assert_eq!(output_1.metadata(), &metadata_1);
+
+            let output_2 = out.recv().await.unwrap().into_log();
+            assert_eq!(output_2["message"], "test message 2".into());
+            assert_eq!(output_2["extra_field"], "value1".into());
+            assert_eq!(output_2["counter"], Value::from(7));
+            assert_eq!(output_2.metadata(), &metadata_2);
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await;
     }
 
     #[tokio::test]
     async fn reduce_merge_strategies() {
-        let reduce = toml::from_str::<ReduceConfig>(
+        let reduce_config = toml::from_str::<ReduceConfig>(
             r#"
 group_by = [ "request_id" ]
 
@@ -403,110 +426,122 @@ merge_strategies.bar = "array"
 merge_strategies.baz = "max"
 
 [ends_when]
-  type = "check_fields"
-  "test_end.exists" = true
+  type = "vrl"
+  source = "exists(.test_end)"
 "#,
         )
-        .unwrap()
-        .build(&TransformContext::default())
-        .await
         .unwrap();
-        let reduce = reduce.into_task();
 
-        let mut e_1 = LogEvent::from("test message 1");
-        e_1.insert("foo", "first foo");
-        e_1.insert("bar", "first bar");
-        e_1.insert("baz", 2);
-        e_1.insert("request_id", "1");
-        let metadata = e_1.metadata().clone();
+        assert_transform_compliance(async move {
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
 
-        let mut e_2 = LogEvent::from("test message 2");
-        e_2.insert("foo", "second foo");
-        e_2.insert("bar", 2);
-        e_2.insert("baz", "not number");
-        e_2.insert("request_id", "1");
+            let mut e_1 = LogEvent::from("test message 1");
+            e_1.insert("foo", "first foo");
+            e_1.insert("bar", "first bar");
+            e_1.insert("baz", 2);
+            e_1.insert("request_id", "1");
+            let metadata = e_1.metadata().clone();
+            tx.send(e_1.into()).await.unwrap();
 
-        let mut e_3 = LogEvent::from("test message 3");
-        e_3.insert("foo", 10);
-        e_3.insert("bar", "third bar");
-        e_3.insert("baz", 3);
-        e_3.insert("request_id", "1");
-        e_3.insert("test_end", "yep");
+            let mut e_2 = LogEvent::from("test message 2");
+            e_2.insert("foo", "second foo");
+            e_2.insert("bar", 2);
+            e_2.insert("baz", "not number");
+            e_2.insert("request_id", "1");
+            tx.send(e_2.into()).await.unwrap();
 
-        let inputs = vec![e_1.into(), e_2.into(), e_3.into()];
-        let in_stream = Box::pin(stream::iter(inputs));
-        let mut out_stream = reduce.transform_events(in_stream);
+            let mut e_3 = LogEvent::from("test message 3");
+            e_3.insert("foo", 10);
+            e_3.insert("bar", "third bar");
+            e_3.insert("baz", 3);
+            e_3.insert("request_id", "1");
+            e_3.insert("test_end", "yep");
+            tx.send(e_3.into()).await.unwrap();
 
-        let output_1 = out_stream.next().await.unwrap().into_log();
-        assert_eq!(output_1["message"], "test message 1".into());
-        assert_eq!(output_1["foo"], "first foo second foo".into());
-        assert_eq!(
-            output_1["bar"],
-            Value::Array(vec!["first bar".into(), 2.into(), "third bar".into()]),
-        );
-        assert_eq!(output_1["baz"], 3.into());
-        assert_eq!(output_1.metadata(), &metadata);
+            let output_1 = out.recv().await.unwrap().into_log();
+            assert_eq!(output_1["message"], "test message 1".into());
+            assert_eq!(output_1["foo"], "first foo second foo".into());
+            assert_eq!(
+                output_1["bar"],
+                Value::Array(vec!["first bar".into(), 2.into(), "third bar".into()]),
+            );
+            assert_eq!(output_1["baz"], 3.into());
+            assert_eq!(output_1.metadata(), &metadata);
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await;
     }
 
     #[tokio::test]
     async fn missing_group_by() {
-        let reduce = toml::from_str::<ReduceConfig>(
+        let reduce_config = toml::from_str::<ReduceConfig>(
             r#"
 group_by = [ "request_id" ]
 
 [ends_when]
-  type = "check_fields"
-  "test_end.exists" = true
+  type = "vrl"
+  source = "exists(.test_end)"
 "#,
         )
-        .unwrap()
-        .build(&TransformContext::default())
-        .await
         .unwrap();
-        let reduce = reduce.into_task();
 
-        let mut e_1 = LogEvent::from("test message 1");
-        e_1.insert("counter", 1);
-        e_1.insert("request_id", "1");
-        let metadata_1 = e_1.metadata().clone();
+        assert_transform_compliance(async move {
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
 
-        let mut e_2 = LogEvent::from("test message 2");
-        e_2.insert("counter", 2);
-        let metadata_2 = e_2.metadata().clone();
+            let mut e_1 = LogEvent::from("test message 1");
+            e_1.insert("counter", 1);
+            e_1.insert("request_id", "1");
+            let metadata_1 = e_1.metadata().clone();
+            tx.send(e_1.into()).await.unwrap();
 
-        let mut e_3 = LogEvent::from("test message 3");
-        e_3.insert("counter", 3);
-        e_3.insert("request_id", "1");
+            let mut e_2 = LogEvent::from("test message 2");
+            e_2.insert("counter", 2);
+            let metadata_2 = e_2.metadata().clone();
+            tx.send(e_2.into()).await.unwrap();
 
-        let mut e_4 = LogEvent::from("test message 4");
-        e_4.insert("counter", 4);
-        e_4.insert("request_id", "1");
-        e_4.insert("test_end", "yep");
+            let mut e_3 = LogEvent::from("test message 3");
+            e_3.insert("counter", 3);
+            e_3.insert("request_id", "1");
+            tx.send(e_3.into()).await.unwrap();
 
-        let mut e_5 = LogEvent::from("test message 5");
-        e_5.insert("counter", 5);
-        e_5.insert("extra_field", "value1");
-        e_5.insert("test_end", "yep");
+            let mut e_4 = LogEvent::from("test message 4");
+            e_4.insert("counter", 4);
+            e_4.insert("request_id", "1");
+            e_4.insert("test_end", "yep");
+            tx.send(e_4.into()).await.unwrap();
 
-        let inputs = vec![e_1.into(), e_2.into(), e_3.into(), e_4.into(), e_5.into()];
-        let in_stream = Box::pin(stream::iter(inputs));
-        let mut out_stream = reduce.transform_events(in_stream);
+            let mut e_5 = LogEvent::from("test message 5");
+            e_5.insert("counter", 5);
+            e_5.insert("extra_field", "value1");
+            e_5.insert("test_end", "yep");
+            tx.send(e_5.into()).await.unwrap();
 
-        let output_1 = out_stream.next().await.unwrap().into_log();
-        assert_eq!(output_1["message"], "test message 1".into());
-        assert_eq!(output_1["counter"], Value::from(8));
-        assert_eq!(output_1.metadata(), &metadata_1);
+            let output_1 = out.recv().await.unwrap().into_log();
+            assert_eq!(output_1["message"], "test message 1".into());
+            assert_eq!(output_1["counter"], Value::from(8));
+            assert_eq!(output_1.metadata(), &metadata_1);
 
-        let output_2 = out_stream.next().await.unwrap().into_log();
-        assert_eq!(output_2["message"], "test message 2".into());
-        assert_eq!(output_2["extra_field"], "value1".into());
-        assert_eq!(output_2["counter"], Value::from(7));
-        assert_eq!(output_2.metadata(), &metadata_2);
+            let output_2 = out.recv().await.unwrap().into_log();
+            assert_eq!(output_2["message"], "test message 2".into());
+            assert_eq!(output_2["extra_field"], "value1".into());
+            assert_eq!(output_2["counter"], Value::from(7));
+            assert_eq!(output_2.metadata(), &metadata_2);
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await;
     }
 
     #[tokio::test]
     async fn arrays() {
-        let reduce = toml::from_str::<ReduceConfig>(
+        let reduce_config = toml::from_str::<ReduceConfig>(
             r#"
 group_by = [ "request_id" ]
 
@@ -514,69 +549,70 @@ merge_strategies.foo = "array"
 merge_strategies.bar = "concat"
 
 [ends_when]
-  type = "check_fields"
-  "test_end.exists" = true
+  type = "vrl"
+  source = "exists(.test_end)"
 "#,
         )
-        .unwrap()
-        .build(&TransformContext::default())
-        .await
         .unwrap();
-        let reduce = reduce.into_task();
 
-        let mut e_1 = LogEvent::from("test message 1");
-        e_1.insert("foo", json!([1, 3]));
-        e_1.insert("bar", json!([1, 3]));
-        e_1.insert("request_id", "1");
-        let metadata_1 = e_1.metadata().clone();
+        assert_transform_compliance(async move {
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
 
-        let mut e_2 = LogEvent::from("test message 2");
-        e_2.insert("foo", json!([2, 4]));
-        e_2.insert("bar", json!([2, 4]));
-        e_2.insert("request_id", "2");
-        let metadata_2 = e_2.metadata().clone();
+            let mut e_1 = LogEvent::from("test message 1");
+            e_1.insert("foo", json!([1, 3]));
+            e_1.insert("bar", json!([1, 3]));
+            e_1.insert("request_id", "1");
+            let metadata_1 = e_1.metadata().clone();
+            tx.send(e_1.into()).await.unwrap();
 
-        let mut e_3 = LogEvent::from("test message 3");
-        e_3.insert("foo", json!([5, 7]));
-        e_3.insert("bar", json!([5, 7]));
-        e_3.insert("request_id", "1");
+            let mut e_2 = LogEvent::from("test message 2");
+            e_2.insert("foo", json!([2, 4]));
+            e_2.insert("bar", json!([2, 4]));
+            e_2.insert("request_id", "2");
+            let metadata_2 = e_2.metadata().clone();
+            tx.send(e_2.into()).await.unwrap();
 
-        let mut e_4 = LogEvent::from("test message 4");
-        e_4.insert("foo", json!("done"));
-        e_4.insert("bar", json!("done"));
-        e_4.insert("request_id", "1");
-        e_4.insert("test_end", "yep");
+            let mut e_3 = LogEvent::from("test message 3");
+            e_3.insert("foo", json!([5, 7]));
+            e_3.insert("bar", json!([5, 7]));
+            e_3.insert("request_id", "1");
+            tx.send(e_3.into()).await.unwrap();
 
-        let mut e_5 = LogEvent::from("test message 5");
-        e_5.insert("foo", json!([6, 8]));
-        e_5.insert("bar", json!([6, 8]));
-        e_5.insert("request_id", "2");
+            let mut e_4 = LogEvent::from("test message 4");
+            e_4.insert("foo", json!("done"));
+            e_4.insert("bar", json!("done"));
+            e_4.insert("request_id", "1");
+            e_4.insert("test_end", "yep");
+            tx.send(e_4.into()).await.unwrap();
 
-        let mut e_6 = LogEvent::from("test message 6");
-        e_6.insert("foo", json!("done"));
-        e_6.insert("bar", json!("done"));
-        e_6.insert("request_id", "2");
-        e_6.insert("test_end", "yep");
+            let mut e_5 = LogEvent::from("test message 5");
+            e_5.insert("foo", json!([6, 8]));
+            e_5.insert("bar", json!([6, 8]));
+            e_5.insert("request_id", "2");
+            tx.send(e_5.into()).await.unwrap();
 
-        let inputs = vec![
-            e_1.into(),
-            e_2.into(),
-            e_3.into(),
-            e_4.into(),
-            e_5.into(),
-            e_6.into(),
-        ];
-        let in_stream = Box::pin(stream::iter(inputs));
-        let mut out_stream = reduce.transform_events(in_stream);
+            let mut e_6 = LogEvent::from("test message 6");
+            e_6.insert("foo", json!("done"));
+            e_6.insert("bar", json!("done"));
+            e_6.insert("request_id", "2");
+            e_6.insert("test_end", "yep");
+            tx.send(e_6.into()).await.unwrap();
 
-        let output_1 = out_stream.next().await.unwrap().into_log();
-        assert_eq!(output_1["foo"], json!([[1, 3], [5, 7], "done"]).into());
-        assert_eq!(output_1["bar"], json!([1, 3, 5, 7, "done"]).into());
-        assert_eq!(output_1.metadata(), &metadata_1);
+            let output_1 = out.recv().await.unwrap().into_log();
+            assert_eq!(output_1["foo"], json!([[1, 3], [5, 7], "done"]).into());
+            assert_eq!(output_1["bar"], json!([1, 3, 5, 7, "done"]).into());
+            assert_eq!(output_1.metadata(), &metadata_1);
 
-        let output_2 = out_stream.next().await.unwrap().into_log();
-        assert_eq!(output_2["foo"], json!([[2, 4], [6, 8], "done"]).into());
-        assert_eq!(output_2["bar"], json!([2, 4, 6, 8, "done"]).into());
-        assert_eq!(output_2.metadata(), &metadata_2);
+            let output_2 = out.recv().await.unwrap().into_log();
+            assert_eq!(output_2["foo"], json!([[2, 4], [6, 8], "done"]).into());
+            assert_eq!(output_2["bar"], json!([2, 4, 6, 8, "done"]).into());
+            assert_eq!(output_2.metadata(), &metadata_2);
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await;
     }
 }

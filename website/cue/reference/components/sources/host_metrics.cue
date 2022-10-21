@@ -430,9 +430,17 @@ components: sources: host_metrics: {
 				mode: {
 					description: "Which mode the CPU was running in during the given time."
 					required:    true
-					examples: ["idle", "system", "user", "nice"]
+					examples: ["idle", "system", "user", "nice", "io_wait"]
 				}
 			}
+		}
+		host_logical_cpus: _host & {
+			description: "The number of logical CPUs."
+			type:        "gauge"
+		}
+		host_physical_cpus: _host & {
+			description: "The number of physical CPUs."
+			type:        "gauge"
 		}
 
 		// Host cgroups
@@ -456,9 +464,9 @@ components: sources: host_metrics: {
 		filesystem_used_ratio:  _host & _filesystem_bytes & {description: "The ratio between used and total bytes on the named filesystem."}
 
 		// Host load
-		load1:  _host & _loadavg & {description: "System load averaged over the last 1 second."}
-		load5:  _host & _loadavg & {description: "System load averaged over the last 5 seconds."}
-		load15: _host & _loadavg & {description: "System load averaged over the last 15 seconds."}
+		load1:  _host & _loadavg & {description: "System load averaged over the last 1 minute."}
+		load5:  _host & _loadavg & {description: "System load averaged over the last 5 minutes."}
+		load15: _host & _loadavg & {description: "System load averaged over the last 15 minutes."}
 
 		// Host time
 		uptime:    _host & _host_metric & {description: "The number of seconds since the last boot."}

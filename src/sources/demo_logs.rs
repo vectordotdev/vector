@@ -1,6 +1,3 @@
-use std::task::Poll;
-
-use bytes::Bytes;
 use chrono::Utc;
 use codecs::{
     decoding::{DeserializerConfig, FramingConfig},
@@ -10,22 +7,25 @@ use fakedata::logs::*;
 use futures::StreamExt;
 use rand::seq::SliceRandom;
 use snafu::Snafu;
+use std::task::Poll;
 use tokio::time::{self, Duration};
 use tokio_util::codec::FramedRead;
+use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{log_schema, Output, SourceConfig, SourceContext, SourceDescription},
-    internal_events::{BytesReceived, DemoLogsEventProcessed, EventsReceived, StreamClosedError},
+    config::{log_schema, Output, SourceConfig, SourceContext},
+    internal_events::{DemoLogsEventProcessed, EventsReceived, StreamClosedError},
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     SourceSender,
 };
 
 /// Configuration for the `demo_logs` source.
-#[configurable_component(source)]
+#[configurable_component(source("demo_logs"))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(default)]
@@ -54,6 +54,10 @@ pub struct DemoLogsConfig {
     #[configurable(derived)]
     #[derivative(Default(value = "default_decoding()"))]
     pub decoding: DeserializerConfig,
+
+    /// The namespace to use for logs. This overrides the global setting
+    #[serde(default)]
+    pub log_namespace: Option<bool>,
 }
 
 const fn default_interval() -> f64 {
@@ -64,7 +68,7 @@ const fn default_count() -> usize {
     isize::MAX as usize
 }
 
-#[derive(Debug, PartialEq, Snafu)]
+#[derive(Debug, PartialEq, Eq, Snafu)]
 pub enum DemoLogsConfigError {
     #[snafu(display("A non-empty list of lines is required for the shuffle format"))]
     ShuffleDemoLogsItemsEmpty,
@@ -148,8 +152,13 @@ impl OutputFormat {
 }
 
 impl DemoLogsConfig {
-    #[allow(dead_code)] // to make check-component-features pass
-    pub fn repeat(lines: Vec<String>, count: usize, interval: f64) -> Self {
+    #[cfg(test)]
+    pub fn repeat(
+        lines: Vec<String>,
+        count: usize,
+        interval: f64,
+        log_namespace: Option<bool>,
+    ) -> Self {
         Self {
             count,
             interval,
@@ -159,6 +168,7 @@ impl DemoLogsConfig {
             },
             framing: default_framing_message_based(),
             decoding: default_decoding(),
+            log_namespace,
         }
     }
 }
@@ -170,10 +180,13 @@ async fn demo_logs_source(
     decoder: Decoder,
     mut shutdown: ShutdownSignal,
     mut out: SourceSender,
+    log_namespace: LogNamespace,
 ) -> Result<(), ()> {
-    let maybe_interval: Option<f64> = (interval != 0.0).then(|| interval);
+    let maybe_interval: Option<f64> = (interval != 0.0).then_some(interval);
 
     let mut interval = maybe_interval.map(|i| time::interval(Duration::from_secs_f64(i)));
+
+    let bytes_received = register!(BytesReceived::from(Protocol::NONE));
 
     for n in 0..count {
         if matches!(futures::poll!(&mut shutdown), Poll::Ready(_)) {
@@ -183,10 +196,7 @@ async fn demo_logs_source(
         if let Some(interval) = &mut interval {
             interval.tick().await;
         }
-        emit!(BytesReceived {
-            byte_size: 0,
-            protocol: "none",
-        });
+        bytes_received.emit(ByteSize(0));
 
         let line = format.generate_line(n);
 
@@ -203,9 +213,18 @@ async fn demo_logs_source(
 
                     let events = events.into_iter().map(|mut event| {
                         let log = event.as_mut_log();
-
-                        log.try_insert(log_schema().source_type_key(), Bytes::from("demo_logs"));
-                        log.try_insert(log_schema().timestamp_key(), now);
+                        log_namespace.insert_vector_metadata(
+                            log,
+                            log_schema().source_type_key(),
+                            "source_type",
+                            "demo_logs",
+                        );
+                        log_namespace.insert_vector_metadata(
+                            log,
+                            log_schema().timestamp_key(),
+                            "ingest_timestamp",
+                            now,
+                        );
 
                         event
                     });
@@ -227,22 +246,16 @@ async fn demo_logs_source(
     Ok(())
 }
 
-inventory::submit! {
-    SourceDescription::new::<DemoLogsConfig>("demo_logs")
-}
-
-inventory::submit! {
-    SourceDescription::new::<DemoLogsConfig>("generator")
-}
-
 impl_generate_config_from_default!(DemoLogsConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "demo_logs")]
 impl SourceConfig for DemoLogsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        let log_namespace = cx.log_namespace(self.log_namespace);
+
         self.format.validate()?;
-        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
+        let decoder =
+            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
         Ok(Box::pin(demo_logs_source(
             self.interval,
             self.count,
@@ -250,43 +263,21 @@ impl SourceConfig for DemoLogsConfig {
             decoder,
             cx.shutdown,
             cx.out,
+            log_namespace,
         )))
     }
 
-    fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(self.decoding.output_type())]
-    }
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        // There is a global and per-source `log_namespace` config. The source config overrides the global setting,
+        // and is merged here.
+        let log_namespace = global_log_namespace.merge(self.log_namespace);
 
-    fn source_type(&self) -> &'static str {
-        "demo_logs"
-    }
+        let schema_definition = self
+            .decoding
+            .schema_definition(log_namespace)
+            .with_standard_vector_source_metadata();
 
-    fn can_acknowledge(&self) -> bool {
-        false
-    }
-}
-
-/// Configuration for the `generator` source.
-// Add a compatibility alias to avoid breaking existing configs
-//
-// TODO: Is this old enough now that we could actually remove it?
-#[configurable_component(source)]
-#[derive(Clone, Debug)]
-pub struct DemoLogsCompatConfig(#[configurable(transparent)] DemoLogsConfig);
-
-#[async_trait::async_trait]
-#[typetag::serde(name = "generator")]
-impl SourceConfig for DemoLogsCompatConfig {
-    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        self.0.build(cx).await
-    }
-
-    fn outputs(&self) -> Vec<Output> {
-        self.0.outputs()
-    }
-
-    fn source_type(&self) -> &'static str {
-        self.0.source_type()
+        vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -301,7 +292,13 @@ mod tests {
     use futures::{poll, Stream, StreamExt};
 
     use super::*;
-    use crate::{config::log_schema, event::Event, shutdown::ShutdownSignal, SourceSender};
+    use crate::{
+        config::log_schema,
+        event::Event,
+        shutdown::ShutdownSignal,
+        test_util::components::{assert_source_compliance, SOURCE_TAGS},
+        SourceSender,
+    };
 
     #[test]
     fn generate_config() {
@@ -311,18 +308,27 @@ mod tests {
     async fn runit(config: &str) -> impl Stream<Item = Event> {
         let (tx, rx) = SourceSender::new_test();
         let config: DemoLogsConfig = toml::from_str(config).unwrap();
-        let decoder =
-            DecodingConfig::new(default_framing_message_based(), default_decoding()).build();
-        demo_logs_source(
-            config.interval,
-            config.count,
-            config.format,
-            decoder,
-            ShutdownSignal::noop(),
-            tx,
+        let decoder = DecodingConfig::new(
+            default_framing_message_based(),
+            default_decoding(),
+            LogNamespace::Legacy,
         )
-        .await
-        .unwrap();
+        .build();
+
+        assert_source_compliance(&SOURCE_TAGS, async {
+            demo_logs_source(
+                config.interval,
+                config.count,
+                config.format,
+                decoder,
+                ShutdownSignal::noop(),
+                tx,
+                LogNamespace::Legacy,
+            )
+            .await
+            .unwrap();
+        })
+        .await;
         rx
     }
 

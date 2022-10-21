@@ -1,5 +1,6 @@
 use ::value::Value;
 use percent_encoding::{utf8_percent_encode, AsciiSet};
+use vrl::prelude::expression::FunctionExpression;
 use vrl::prelude::*;
 
 fn encode_percent(value: Value, ascii_set: &Bytes) -> Resolved {
@@ -101,9 +102,9 @@ impl Function for EncodePercent {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let ascii_set = arguments
@@ -112,7 +113,7 @@ impl Function for EncodePercent {
             .try_bytes()
             .expect("ascii_set not bytes");
 
-        Ok(Box::new(EncodePercentFn { value, ascii_set }))
+        Ok(EncodePercentFn { value, ascii_set }.as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -129,26 +130,6 @@ impl Function for EncodePercent {
             },
         ]
     }
-
-    fn compile_argument(
-        &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        match (name, expr) {
-            ("ascii_set", Some(expr)) => {
-                let set = expr
-                    .as_enum("ascii_set", ascii_sets())?
-                    .try_bytes()
-                    .expect("ascii set not bytes");
-                Ok(Some(Box::new(set) as _))
-            }
-            ("ascii_set", None) => Ok(Some(Box::new(Bytes::from("NON_ALPHANUMERIC")) as _)),
-            _ => Ok(None),
-        }
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -157,13 +138,13 @@ struct EncodePercentFn {
     ascii_set: Bytes,
 }
 
-impl Expression for EncodePercentFn {
+impl FunctionExpression for EncodePercentFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         encode_percent(value, &self.ascii_set)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::bytes()
     }
 }

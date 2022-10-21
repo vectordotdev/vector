@@ -4,19 +4,19 @@ use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{Request, Uri};
 use hyper::Body;
-use serde::{Deserialize, Serialize};
 use serde_json::{json, map};
 use snafu::Snafu;
+use vector_config::configurable_component;
 
 use crate::{
-    config::{log_schema, AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    codecs::Transformer,
+    config::{log_schema, AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     event::{Event, Value},
-    gcp::{GcpAuthConfig, GcpCredentials, Scope},
+    gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
     http::HttpClient,
     sinks::{
         gcs_common::config::healthcheck_response,
         util::{
-            encoding::Transformer,
             http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
             BatchConfig, BoxedRawValue, JsonArrayBuffer, RealtimeSizeBasedDefaultBatchSettings,
             TowerRequestConfig,
@@ -33,7 +33,9 @@ enum HealthcheckError {
     NotFound,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+/// Configuration for the `gcp_stackdriver_logs` sink.
+#[configurable_component(sink("gcp_stackdriver_logs"))]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct StackdriverConfig {
     #[serde(skip, default = "default_endpoint")]
@@ -41,26 +43,52 @@ pub struct StackdriverConfig {
 
     #[serde(flatten)]
     pub log_name: StackdriverLogName,
+
+    /// The log ID to which to publish logs.
+    ///
+    /// This is a name you create to identify this log stream.
     pub log_id: Template,
 
+    /// The monitored resource to associate the logs with.
     pub resource: StackdriverResource,
+
+    /// The field of the log event from which to take the outgoing log’s `severity` field.
+    ///
+    /// The named field is removed from the log event if present, and must be either an integer
+    /// between 0 and 800 or a string containing one of the [severity level names][sev_names] (case
+    /// is ignored) or a common prefix such as `err`.
+    ///
+    /// If no severity key is specified, the severity of outgoing records is set to 0 (`DEFAULT`).
+    ///
+    /// See the [GCP Stackdriver Logging LogSeverity description][logsev_docs] for more details on
+    /// the value of the `severity` field.
+    ///
+    /// [sev_names]: https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#logseverity
+    /// [logsev_docs]: https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#logseverity
     pub severity_key: Option<String>,
 
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
+
+    #[configurable(derived)]
     #[serde(
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub encoding: Transformer,
 
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
+    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -76,7 +104,7 @@ fn default_endpoint() -> String {
 #[derive(Clone, Debug)]
 struct StackdriverSink {
     config: StackdriverConfig,
-    creds: Option<GcpCredentials>,
+    auth: GcpAuthenticator,
     severity_key: Option<String>,
     uri: Uri,
 }
@@ -84,39 +112,71 @@ struct StackdriverSink {
 // 10MB limit for entries.write: https://cloud.google.com/logging/quotas#api-limits
 const MAX_BATCH_PAYLOAD_SIZE: usize = 10_000_000;
 
-#[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
+/// Logging locations.
+#[configurable_component]
+#[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 pub enum StackdriverLogName {
+    /// The billing account ID to which to publish logs.
     #[serde(rename = "billing_account_id")]
-    BillingAccount(String),
+    BillingAccount(#[configurable(transparent)] String),
+
+    /// The folder ID to which to publish logs.
+    ///
+    /// See the [Google Cloud Platform folder documentation][folder_docs] for more details.
+    ///
+    /// [folder_docs]: https://cloud.google.com/resource-manager/docs/creating-managing-folders
     #[serde(rename = "folder_id")]
-    Folder(String),
+    Folder(#[configurable(transparent)] String),
+
+    /// The organization ID to which to publish logs.
+    ///
+    /// This would be the identifier assigned to your organization on Google Cloud Platform.
     #[serde(rename = "organization_id")]
-    Organization(String),
+    Organization(#[configurable(transparent)] String),
+
+    /// The project ID to which to publish logs.
+    ///
+    /// See the [Google Cloud Platform project management documentation][project_docs] for more details.
+    ///
+    /// [project_docs]: https://cloud.google.com/resource-manager/docs/creating-managing-projects
     #[derivative(Default)]
     #[serde(rename = "project_id")]
-    Project(String),
+    Project(#[configurable(transparent)] String),
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+/// A monitored resource.
+///
+/// Monitored resources in GCP allow associating logs and metrics specifically with native resources
+/// within Google Cloud Platform. This takes the form of a "type" field which identifies the
+/// resource, and a set of type-specific labels to uniquely identify a resource of that type.
+///
+/// See [Monitored resource types][mon_docs] for more information.
+///
+/// [mon_docs]: https://cloud.google.com/monitoring/api/resources
+// TODO: this type is specific to the stackdrivers log sink because it allows for template-able
+// label values, but we should consider replacing `sinks::gcp::GcpTypedResource` with this so both
+// the stackdriver metrics _and_ logs sink can have template-able label values, and less duplication
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
 pub struct StackdriverResource {
+    /// The monitored resource type.
+    ///
+    /// For example, the type of a Compute Engine VM instance is `gce_instance`.
     #[serde(rename = "type")]
     pub type_: String,
+
+    /// Type-specific labels.
     #[serde(flatten)]
     pub labels: HashMap<String, Template>,
-}
-
-inventory::submit! {
-    SinkDescription::new::<StackdriverConfig>("gcp_stackdriver_logs")
 }
 
 impl_generate_config_from_default!(StackdriverConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "gcp_stackdriver_logs")]
 impl SinkConfig for StackdriverConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let creds = self.auth.make_credentials(Scope::LoggingWrite).await?;
+        let auth = self.auth.build(Scope::LoggingWrite).await?;
 
         let batch = self
             .batch
@@ -133,7 +193,7 @@ impl SinkConfig for StackdriverConfig {
 
         let sink = StackdriverSink {
             config: self.clone(),
-            creds,
+            auth,
             severity_key: self.severity_key.clone(),
             uri: self.endpoint.parse().unwrap(),
         };
@@ -146,7 +206,6 @@ impl SinkConfig for StackdriverConfig {
             request,
             batch.timeout,
             client,
-            cx.acker(),
         )
         .sink_map_err(|error| error!(message = "Fatal gcp_stackdriver_logs sink error.", %error));
 
@@ -157,12 +216,8 @@ impl SinkConfig for StackdriverConfig {
         Input::log()
     }
 
-    fn sink_type(&self) -> &'static str {
-        "gcp_stackdriver_logs"
-    }
-
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
@@ -255,10 +310,7 @@ impl HttpSink for StackdriverSink {
             .header("Content-Type", "application/json")
             .body(body)
             .unwrap();
-
-        if let Some(creds) = &self.creds {
-            creds.apply(&mut request);
-        }
+        self.auth.apply(&mut request);
 
         Ok(request)
     }
@@ -285,7 +337,7 @@ fn remap_severity(severity: Value) -> Value {
                         warn!(
                             message = "Unknown severity value string, using DEFAULT.",
                             value = %s,
-                            internal_log_rate_secs = 10
+                            internal_log_rate_limit = true
                         );
                         0
                     }
@@ -296,7 +348,7 @@ fn remap_severity(severity: Value) -> Value {
             warn!(
                 message = "Unknown severity value type, using DEFAULT.",
                 ?value,
-                internal_log_rate_secs = 10
+                internal_log_rate_limit = true
             );
             0
         }
@@ -310,7 +362,7 @@ async fn healthcheck(client: HttpClient, sink: StackdriverSink) -> crate::Result
     let response = client.send(request).await?;
     healthcheck_response(
         response,
-        sink.creds.clone(),
+        sink.auth.clone(),
         HealthcheckError::NotFound.into(),
     )
 }
@@ -363,13 +415,13 @@ mod tests {
         // If we don't override the credentials path/API key, it tries to directly call out to the Google Instance
         // Metadata API, which we clearly don't have in unit tests. :)
         config.auth.credentials_path = None;
-        config.auth.api_key = Some("fake".to_string());
+        config.auth.api_key = Some("fake".to_string().into());
         config.endpoint = mock_endpoint.to_string();
 
         let context = SinkContext::new_test();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
 
-        let event = Event::from("simple message");
+        let event = Event::Log(LogEvent::from("simple message"));
         run_and_assert_sink_compliance(sink, stream::once(ready(event)), &SINK_TAGS).await;
     }
 
@@ -387,7 +439,7 @@ mod tests {
 
         let sink = StackdriverSink {
             config,
-            creds: None,
+            auth: GcpAuthenticator::None,
             severity_key: Some("anumber".into()),
             uri: default_endpoint().parse().unwrap(),
         };
@@ -429,7 +481,7 @@ mod tests {
 
         let sink = StackdriverSink {
             config,
-            creds: None,
+            auth: GcpAuthenticator::None,
             severity_key: Some("anumber".into()),
             uri: default_endpoint().parse().unwrap(),
         };
@@ -498,7 +550,7 @@ mod tests {
 
         let sink = StackdriverSink {
             config,
-            creds: None,
+            auth: GcpAuthenticator::None,
             severity_key: None,
             uri: default_endpoint().parse().unwrap(),
         };

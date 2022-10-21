@@ -33,12 +33,12 @@ impl<T, F> AfterRead<T, F> {
         Self { inner, after_read }
     }
 
-    #[cfg(all(feature = "sources-utils-tls", feature = "listenfd"))]
+    #[cfg(feature = "listenfd")]
     pub const fn get_ref(&self) -> &T {
         &self.inner
     }
 
-    #[cfg(all(unix, feature = "sources-utils-unix"))]
+    #[cfg(all(unix, feature = "sources-utils-net-unix"))]
     pub fn get_mut_ref(&mut self) -> &mut T {
         &mut self.inner
     }

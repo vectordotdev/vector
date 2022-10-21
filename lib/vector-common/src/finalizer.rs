@@ -1,11 +1,12 @@
 #![allow(clippy::module_name_repetitions)]
 
 use std::marker::{PhantomData, Unpin};
-use std::{fmt::Debug, future::Future, pin::Pin, task::Context, task::Poll};
+use std::{fmt::Debug, future::Future, pin::Pin, sync::Arc, task::Context, task::Poll};
 
 use futures::stream::{BoxStream, FuturesOrdered, FuturesUnordered};
 use futures::{FutureExt, Stream, StreamExt};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
+use tokio::sync::Notify;
 
 use crate::finalization::{BatchStatus, BatchStatusReceiver};
 use crate::shutdown::ShutdownSignal;
@@ -30,8 +31,10 @@ pub type UnorderedFinalizer<T> = FinalizerSet<T, FuturesUnordered<FinalizerFutur
 /// stream of acknowledgements that comes out, extracting just the
 /// identifier and sending that into the returned stream. The type `T`
 /// is the source-specific data associated with each entry.
+#[derive(Debug)]
 pub struct FinalizerSet<T, S> {
     sender: Option<UnboundedSender<(BatchStatusReceiver, T)>>,
+    flush: Arc<Notify>,
     _phantom: PhantomData<S>,
 }
 
@@ -42,19 +45,18 @@ where
 {
     /// Produce a finalizer set along with the output stream of
     /// received acknowledged batch identifiers.
-    pub fn new(shutdown: ShutdownSignal) -> (Self, impl Stream<Item = (BatchStatus, T)>) {
+    #[must_use]
+    pub fn new(shutdown: ShutdownSignal) -> (Self, BoxStream<'static, (BatchStatus, T)>) {
         let (todo_tx, todo_rx) = mpsc::unbounded_channel();
+        let flush1 = Arc::new(Notify::new());
+        let flush2 = Arc::clone(&flush1);
         (
             Self {
                 sender: Some(todo_tx),
+                flush: flush1,
                 _phantom: PhantomData::default(),
             },
-            FinalizerStream {
-                shutdown,
-                new_entries: todo_rx,
-                status_receivers: S::default(),
-                is_shutdown: false,
-            },
+            finalizer_stream(shutdown, todo_rx, S::default(), flush2).boxed(),
         )
     }
 
@@ -69,7 +71,7 @@ where
     ) -> (Option<Self>, BoxStream<'static, (BatchStatus, T)>) {
         if maybe {
             let (finalizer, stream) = Self::new(shutdown);
-            (Some(finalizer), stream.boxed())
+            (Some(finalizer), stream)
         } else {
             (None, EmptyStream::default().boxed())
         }
@@ -82,63 +84,59 @@ where
             }
         }
     }
+
+    pub fn flush(&self) {
+        self.flush.notify_one();
+    }
 }
 
-#[pin_project::pin_project]
-#[derive(Debug)]
-struct FinalizerStream<T, S> {
-    shutdown: ShutdownSignal,
-    new_entries: UnboundedReceiver<(BatchStatusReceiver, T)>,
-    status_receivers: S,
-    is_shutdown: bool,
-}
-
-impl<T, S> Stream for FinalizerStream<T, S>
+fn finalizer_stream<T, S>(
+    mut shutdown: ShutdownSignal,
+    mut new_entries: UnboundedReceiver<(BatchStatusReceiver, T)>,
+    mut status_receivers: S,
+    flush: Arc<Notify>,
+) -> impl Stream<Item = (BatchStatus, T)>
 where
-    S: FuturesSet<FinalizerFuture<T>> + Unpin,
-    T: Debug,
+    S: Default + FuturesSet<FinalizerFuture<T>> + Unpin,
 {
-    type Item = (BatchStatus, T);
-
-    fn poll_next(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let this = self.project();
-        if !*this.is_shutdown {
-            if this.shutdown.poll_unpin(ctx).is_ready() {
-                *this.is_shutdown = true;
-            }
-            // Only poll for new entries until shutdown is flagged.
-            // Loop over all the ready new entries at once.
-            loop {
-                match this.new_entries.poll_recv(ctx) {
-                    Poll::Pending => break,
-                    Poll::Ready(Some((receiver, entry))) => {
-                        let entry = Some(entry);
-                        this.status_receivers
-                            .push(FinalizerFuture { receiver, entry });
+    async_stream::stream! {
+        loop {
+            tokio::select! {
+                biased;
+                _ = &mut shutdown => break,
+                _ = flush.notified() => {
+                    // Drop all the existing status receivers and start over.
+                    status_receivers = S::default();
+                },
+                // Only poll for new entries until shutdown is flagged.
+                new_entry = new_entries.recv() => match new_entry {
+                    Some((receiver, entry)) => {
+                        status_receivers.push(FinalizerFuture {
+                            receiver,
+                            entry: Some(entry),
+                        });
                     }
-                    // The sender went away before shutdown, count it as a shutdown too.
-                    Poll::Ready(None) => {
-                        *this.is_shutdown = true;
-                        break;
-                    }
-                }
+                    // The new entry sender went away before shutdown, count it as a shutdown too.
+                    None => break,
+                },
+                finished = status_receivers.next(), if !status_receivers.is_empty() => match finished {
+                    Some((status, entry)) => yield (status, entry),
+                    // The `is_empty` guard above prevents this from being reachable.
+                    None => unreachable!(),
+                },
             }
         }
 
-        match this.status_receivers.poll_next_unpin(ctx) {
-            Poll::Pending => Poll::Pending,
-            // The futures set report `None` ready when there are no
-            // entries present, but we want it to report pending
-            // instead.
-            Poll::Ready(None) => {
-                if *this.is_shutdown {
-                    Poll::Ready(None)
-                } else {
-                    Poll::Pending
-                }
-            }
-            Poll::Ready(Some((status, entry))) => Poll::Ready(Some((status, entry))),
+        // We've either seen a shutdown signal or the new entry sender
+        // was closed. Wait for the last statuses to come in before
+        // indicating we are done.
+        while let Some((status, entry)) = status_receivers.next().await {
+            yield (status, entry);
         }
+
+        // Hold on to the shutdown signal until here to prevent
+        // notification of completion before this stream is done.
+        drop(shutdown);
     }
 }
 
@@ -153,7 +151,7 @@ impl<Fut: Future> FuturesSet<Fut> for FuturesOrdered<Fut> {
     }
 
     fn push(&mut self, future: Fut) {
-        Self::push(self, future);
+        Self::push_back(self, future);
     }
 }
 
@@ -176,7 +174,7 @@ pub struct FinalizerFuture<T> {
 impl<T> Future for FinalizerFuture<T> {
     type Output = (<BatchStatusReceiver as Future>::Output, T);
     fn poll(mut self: Pin<&mut Self>, ctx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
-        let status = futures::ready!(self.receiver.poll_unpin(ctx));
+        let status = std::task::ready!(self.receiver.poll_unpin(ctx));
         // The use of this above in a `Futures{Ordered|Unordered|`
         // will only take this once before dropping the future.
         Poll::Ready((status, self.entry.take().unwrap_or_else(|| unreachable!())))

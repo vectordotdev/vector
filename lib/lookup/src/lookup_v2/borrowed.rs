@@ -1,4 +1,4 @@
-use crate::lookup_v2::{OwnedSegment, Path};
+use crate::lookup_v2::ValuePath;
 use std::borrow::Cow;
 use std::iter::Cloned;
 use std::slice::Iter;
@@ -7,11 +7,13 @@ use std::slice::Iter;
 pub enum BorrowedSegment<'a> {
     Field(Cow<'a, str>),
     Index(isize),
+    CoalesceField(Cow<'a, str>),
+    CoalesceEnd(Cow<'a, str>),
     Invalid,
 }
 
 impl BorrowedSegment<'_> {
-    pub fn field(value: &str) -> BorrowedSegment {
+    pub const fn field(value: &str) -> BorrowedSegment {
         BorrowedSegment::Field(Cow::Borrowed(value))
     }
     pub fn index(value: isize) -> BorrowedSegment<'static> {
@@ -46,17 +48,7 @@ impl From<isize> for BorrowedSegment<'_> {
     }
 }
 
-impl<'a, 'b: 'a> From<&'b OwnedSegment> for BorrowedSegment<'a> {
-    fn from(segment: &'b OwnedSegment) -> Self {
-        match segment {
-            OwnedSegment::Field(value) => BorrowedSegment::Field(value.as_str().into()),
-            OwnedSegment::Index(value) => BorrowedSegment::Index(*value),
-            OwnedSegment::Invalid => BorrowedSegment::Invalid,
-        }
-    }
-}
-
-impl<'a, 'b> Path<'a> for &'b Vec<BorrowedSegment<'a>> {
+impl<'a, 'b> ValuePath<'a> for &'b Vec<BorrowedSegment<'a>> {
     type Iter = Cloned<Iter<'b, BorrowedSegment<'a>>>;
 
     fn segment_iter(&self) -> Self::Iter {
@@ -64,7 +56,7 @@ impl<'a, 'b> Path<'a> for &'b Vec<BorrowedSegment<'a>> {
     }
 }
 
-impl<'a, 'b> Path<'a> for &'b [BorrowedSegment<'a>] {
+impl<'a, 'b> ValuePath<'a> for &'b [BorrowedSegment<'a>] {
     type Iter = Cloned<Iter<'b, BorrowedSegment<'a>>>;
 
     fn segment_iter(&self) -> Self::Iter {
@@ -72,7 +64,7 @@ impl<'a, 'b> Path<'a> for &'b [BorrowedSegment<'a>] {
     }
 }
 
-impl<'a, 'b, const A: usize> Path<'a> for &'b [BorrowedSegment<'a>; A] {
+impl<'a, 'b, const A: usize> ValuePath<'a> for &'b [BorrowedSegment<'a>; A] {
     type Iter = Cloned<Iter<'b, BorrowedSegment<'a>>>;
 
     fn segment_iter(&self) -> Self::Iter {
@@ -99,6 +91,18 @@ impl quickcheck::Arbitrary for BorrowedSegment<'static> {
             BorrowedSegment::Invalid => Box::new(std::iter::empty()),
             BorrowedSegment::Index(index) => Box::new(index.shrink().map(BorrowedSegment::Index)),
             BorrowedSegment::Field(field) => Box::new(
+                field
+                    .to_string()
+                    .shrink()
+                    .map(|f| BorrowedSegment::Field(f.into())),
+            ),
+            BorrowedSegment::CoalesceField(field) => Box::new(
+                field
+                    .to_string()
+                    .shrink()
+                    .map(|f| BorrowedSegment::Field(f.into())),
+            ),
+            BorrowedSegment::CoalesceEnd(field) => Box::new(
                 field
                     .to_string()
                     .shrink()

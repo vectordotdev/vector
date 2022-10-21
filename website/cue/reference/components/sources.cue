@@ -86,7 +86,7 @@ components: sources: [Name=string]: {
 								enum: {
 									bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (e.g. split between messages or stream segments)."
 									character_delimited: "Byte frames which are delimited by a chosen character."
-									length_delimited:    "Byte frames whose length is encoded in a header."
+									length_delimited:    "Byte frames which are prefixed by an unsigned big-endian 32-bit integer indicating the length."
 									newline_delimited:   "Byte frames which are delimited by a newline character."
 									octet_counting:      "Byte frames according to the [octet counting](\(urls.rfc_6587_3_4_1)) format."
 								}
@@ -168,6 +168,7 @@ components: sources: [Name=string]: {
 								enum: {
 									bytes:       "Events containing the byte frame as-is."
 									json:        "Events being parsed from a JSON string."
+									gelf:        "Events being parsed from a [GELF](https://docs.graylog.org/docs/gelf) message."
 									syslog:      "Events being parsed from a Syslog message."
 									native:      "Events being parsed from Vector's [native protobuf format](\(urls.native_proto_schema)) ([EXPERIMENTAL](/highlights/2022-03-31-native-event-codecs))."
 									native_json: "Events being parsed from Vector's [native JSON format](\(urls.native_json_schema)) ([EXPERIMENTAL](/highlights/2022-03-31-native-event-codecs))."
@@ -213,6 +214,7 @@ components: sources: [Name=string]: {
 						can_verify_certificate: features.collect.tls.can_verify_certificate
 						can_verify_hostname:    features.collect.tls.can_verify_hostname
 						enabled_default:        features.collect.tls.enabled_default
+						enabled_by_scheme:      features.collect.tls.enabled_by_scheme
 					}}
 				}
 			}
@@ -259,8 +261,10 @@ components: sources: [Name=string]: {
 
 			if features.receive.tls.enabled {
 				tls: configuration._tls_accept & {_args: {
-					can_verify_certificate: features.receive.tls.can_verify_certificate
-					enabled_default:        features.receive.tls.enabled_default
+					can_verify_certificate:  features.receive.tls.can_verify_certificate
+					can_add_client_metadata: features.receive.tls.can_add_client_metadata
+					enabled_default:         features.receive.tls.enabled_default
+					enabled_by_scheme:       false
 				}}
 			}
 		}
@@ -365,5 +369,6 @@ components: sources: [Name=string]: {
 		events_out_total:                 components.sources.internal_metrics.output.metrics.events_out_total
 		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
 		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
+		source_lag_time_seconds:          components.sources.internal_metrics.output.metrics.source_lag_time_seconds
 	}
 }

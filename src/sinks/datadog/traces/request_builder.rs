@@ -1,4 +1,8 @@
-use std::{collections::BTreeMap, io::Write, sync::Arc};
+use std::{
+    collections::BTreeMap,
+    io::Write,
+    sync::{Arc, Mutex},
+};
 
 use bytes::Bytes;
 use prost::Message;
@@ -53,6 +57,8 @@ pub struct DatadogTracesRequestBuilder {
     endpoint_configuration: DatadogTracesEndpointConfiguration,
     compression: Compression,
     trace_encoder: DatadogTracesEncoder,
+    /// Contains the Aggregated stats across a time window.
+    stats_aggregator: Arc<Mutex<stats::Aggregator>>,
 }
 
 impl DatadogTracesRequestBuilder {
@@ -67,6 +73,7 @@ impl DatadogTracesRequestBuilder {
             endpoint_configuration,
             compression,
             trace_encoder: DatadogTracesEncoder { max_size },
+            stats_aggregator: Arc::new(Mutex::new(stats::Aggregator::new())),
         })
     }
 }
@@ -103,6 +110,7 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
             &traces_event,
             self.compression,
             &self.api_key,
+            &self.stats_aggregator,
         ));
 
         self.trace_encoder
@@ -241,7 +249,7 @@ impl DatadogTracesEncoder {
             .and_then(|m| m.as_object())
             .map(|m| {
                 m.iter()
-                    .map(|(k, v)| (k.clone(), v.to_string_lossy()))
+                    .map(|(k, v)| (k.clone(), v.to_string_lossy().into_owned()))
                     .collect::<BTreeMap<String, String>>()
             })
             .unwrap_or_default();
@@ -265,41 +273,50 @@ impl DatadogTracesEncoder {
                 .unwrap_or(1i32),
             origin: trace
                 .get("origin")
-                .map(|v| v.to_string_lossy())
+                .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_default(),
             dropped_trace: trace
                 .get("dropped")
                 .and_then(|v| v.as_boolean())
                 .unwrap_or(false),
             spans,
-            tags,
+            tags: tags.clone(),
         };
 
         dd_proto::TracerPayload {
             container_id: trace
                 .get("container_id")
-                .map(|v| v.to_string_lossy())
+                .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_default(),
             language_name: trace
                 .get("language_name")
-                .map(|v| v.to_string_lossy())
+                .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_default(),
             language_version: trace
                 .get("language_version")
-                .map(|v| v.to_string_lossy())
+                .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_default(),
             tracer_version: trace
                 .get("tracer_version")
-                .map(|v| v.to_string_lossy())
+                .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_default(),
             runtime_id: trace
                 .get("runtime_id")
-                .map(|v| v.to_string_lossy())
+                .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_default(),
             chunks: vec![chunk],
+            tags,
+            env: trace
+                .get("env")
+                .map(|v| v.to_string_lossy().into_owned())
+                .unwrap_or_default(),
+            hostname: trace
+                .get("hostname")
+                .map(|v| v.to_string_lossy().into_owned())
+                .unwrap_or_default(),
             app_version: trace
                 .get("app_version")
-                .map(|v| v.to_string_lossy())
+                .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_default(),
         }
     }
@@ -335,7 +352,7 @@ impl DatadogTracesEncoder {
             .and_then(|m| m.as_object())
             .map(|m| {
                 m.iter()
-                    .map(|(k, v)| (k.clone(), v.to_string_lossy()))
+                    .map(|(k, v)| (k.clone(), v.to_string_lossy().into_owned()))
                     .collect::<BTreeMap<String, String>>()
             })
             .unwrap_or_default();
@@ -369,19 +386,19 @@ impl DatadogTracesEncoder {
         dd_proto::Span {
             service: span
                 .get("service")
-                .map(|v| v.to_string_lossy())
+                .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_default(),
             name: span
                 .get("name")
-                .map(|v| v.to_string_lossy())
+                .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_default(),
             resource: span
                 .get("resource")
-                .map(|v| v.to_string_lossy())
+                .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_default(),
             r#type: span
                 .get("type")
-                .map(|v| v.to_string_lossy())
+                .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_default(),
             trace_id: trace_id as u64,
             span_id: span_id as u64,
@@ -401,8 +418,12 @@ fn build_apm_stats_request(
     events: &[TraceEvent],
     compression: Compression,
     default_api_key: &Arc<str>,
+    aggregator: &Arc<Mutex<stats::Aggregator>>,
 ) -> Result<(RequestMetadata, Bytes), RequestBuilderError> {
-    let payload = stats::compute_apm_stats(key, events);
+    let aggregator = Arc::clone(aggregator);
+    let mut aggregator = aggregator.lock().unwrap();
+    let payload = stats::compute_apm_stats(key, &mut aggregator, events);
+
     let encoded_payload =
         rmp_serde::to_vec_named(&payload).map_err(|e| RequestBuilderError::FailedToEncode {
             message: "APM stats encoding failed.",

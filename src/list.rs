@@ -1,39 +1,21 @@
-use std::collections::HashSet;
-
 use clap::Parser;
 use serde::Serialize;
 
-use crate::config::{SinkDescription, SourceDescription, TransformDescription};
+use vector_config::component::{SinkDescription, SourceDescription, TransformDescription};
 
 #[derive(Parser, Debug)]
-#[clap(rename_all = "kebab-case")]
+#[command(rename_all = "kebab-case")]
 pub struct Opts {
     /// Format the list in an encoding scheme.
-    #[clap(long, default_value = "text", possible_values = &["text", "json", "avro"])]
+    #[arg(long, default_value = "text")]
     format: Format,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(clap::ValueEnum, Debug, Clone, PartialEq)]
 enum Format {
     Text,
     Json,
     Avro,
-}
-
-impl std::str::FromStr for Format {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "text" => Ok(Format::Text),
-            "json" => Ok(Format::Json),
-            "avro" => Ok(Format::Avro),
-            s => Err(format!(
-                "{} is not a valid option, expected `text` or `json`",
-                s
-            )),
-        }
-    }
 }
 
 #[derive(Serialize)]
@@ -44,15 +26,9 @@ pub struct EncodedList {
 }
 
 pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
-    let mut sources = SourceDescription::types();
-    let mut transforms = TransformDescription::types();
-    let mut sinks = SinkDescription::types();
-
-    // Remove deprecated components from list
-    let deprecated = deprecated_components();
-    sources.retain(|name| !deprecated.contains(name));
-    transforms.retain(|name| !deprecated.contains(name));
-    sinks.retain(|name| !deprecated.contains(name));
+    let sources = SourceDescription::types();
+    let transforms = TransformDescription::types();
+    let sinks = SinkDescription::types();
 
     #[allow(clippy::print_stdout)]
     match opts.format {
@@ -91,9 +67,4 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     }
 
     exitcode::OK
-}
-
-/// Returns names of all deprecated components.
-fn deprecated_components() -> HashSet<&'static str> {
-    vec!["field_filter"].into_iter().collect()
 }

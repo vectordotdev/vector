@@ -1,5 +1,6 @@
 use crate::{get_metadata_key, MetadataKey};
 use ::value::Value;
+use vrl::prelude::state::TypeState;
 use vrl::prelude::*;
 
 fn remove_metadata_field(
@@ -11,8 +12,8 @@ fn remove_metadata_field(
             ctx.target_mut().remove_secret(key);
             Value::Null
         }
-        MetadataKey::Query(query) => {
-            ctx.target_mut().remove_metadata(query.path())?;
+        MetadataKey::Query(target_path) => {
+            ctx.target_mut().target_remove(target_path, false)?;
             Value::Null
         }
     })
@@ -44,14 +45,14 @@ impl Function for RemoveMetadataField {
 
     fn compile(
         &self,
-        (_, external): (&mut state::LocalEnv, &mut state::ExternalEnv),
-        _ctx: &mut FunctionCompileContext,
+        _state: &TypeState,
+        ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let key = get_metadata_key(&mut arguments)?;
 
         if let MetadataKey::Query(query) = &key {
-            if external.is_read_only_metadata_path(query.path()) {
+            if ctx.is_read_only_path(query) {
                 return Err(vrl::function::Error::ReadOnlyMutation {
                     context: format!("{} is read-only, and cannot be removed", query),
                 }
@@ -73,7 +74,14 @@ impl Expression for RemoveMetadataFieldFn {
         remove_metadata_field(ctx, &self.key)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
-        TypeDef::null().infallible()
+    fn type_info(&self, state: &TypeState) -> TypeInfo {
+        let state = state.clone();
+
+        if let MetadataKey::Query(query) = &self.key {
+            let mut new_kind = state.external.metadata_kind().clone();
+            new_kind.remove(&query.path, false);
+        }
+
+        TypeInfo::new(state, TypeDef::null())
     }
 }

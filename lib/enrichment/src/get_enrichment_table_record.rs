@@ -1,20 +1,17 @@
 use std::collections::BTreeMap;
 
 use value::{kind::Collection, Kind, Value};
+use vrl::prelude::FunctionExpression;
+use vrl::state::TypeState;
 use vrl::{
-    function::{
-        ArgumentList, Compiled, CompiledArgument, Example, FunctionCompileContext, Parameter,
-    },
-    prelude::{
-        expression, DiagnosticMessage, FunctionArgument, Resolved, Result, TypeDef, VrlValueConvert,
-    },
-    state,
+    function::{ArgumentList, Compiled, Example, FunctionCompileContext, Parameter},
+    prelude::{expression, DiagnosticMessage, Resolved, Result, TypeDef, VrlValueConvert},
     value::kind,
     Context, Expression, Function,
 };
 
 use crate::{
-    vrl_util::{self, add_index, evaluate_condition, index_from_args},
+    vrl_util::{self, add_index, evaluate_condition},
     Case, Condition, IndexHandle, TableRegistry, TableSearch,
 };
 
@@ -91,9 +88,9 @@ impl Function for GetEnrichmentTableRecord {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &TypeState,
         ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let registry = ctx
             .get_external_context_mut::<TableRegistry>()
@@ -134,48 +131,15 @@ impl Function for GetEnrichmentTableRecord {
                 .map_err(|err| Box::new(err) as Box<_>)?,
         );
 
-        Ok(Box::new(GetEnrichmentTableRecordFn {
+        Ok(GetEnrichmentTableRecordFn {
             table,
             condition,
             index,
             select,
             case_sensitive,
             enrichment_tables: registry.as_readonly(),
-        }))
-    }
-
-    fn compile_argument(
-        &self,
-        args: &[(&'static str, Option<FunctionArgument>)],
-        ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        match (name, expr) {
-            ("table", Some(expr)) => {
-                let registry =
-                    ctx.get_external_context_mut::<TableRegistry>()
-                        .ok_or(Box::new(vrl_util::Error::TablesNotLoaded)
-                            as Box<dyn DiagnosticMessage>)?;
-
-                let tables = registry
-                    .table_ids()
-                    .into_iter()
-                    .map(Value::from)
-                    .collect::<Vec<_>>();
-
-                let table = expr
-                    .as_enum("table", tables)?
-                    .try_bytes_utf8_lossy()
-                    .expect("table is not bytes")
-                    .into_owned();
-
-                let record = index_from_args(table, registry, args)?;
-
-                Ok(Some(Box::new(record) as _))
-            }
-            _ => Ok(None),
         }
+        .as_expr())
     }
 }
 
@@ -189,7 +153,7 @@ pub struct GetEnrichmentTableRecordFn {
     enrichment_tables: TableSearch,
 }
 
-impl Expression for GetEnrichmentTableRecordFn {
+impl FunctionExpression for GetEnrichmentTableRecordFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let condition = self
             .condition
@@ -221,7 +185,7 @@ impl Expression for GetEnrichmentTableRecordFn {
         )
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &TypeState) -> TypeDef {
         TypeDef::object(Collection::any()).fallible()
     }
 }

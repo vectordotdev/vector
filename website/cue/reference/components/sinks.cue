@@ -36,7 +36,7 @@ components: sinks: [Name=string]: {
 						options: {
 							max_bytes: {
 								common:      true
-								description: "The maximum size of a batch, in bytes, before it is flushed."
+								description: "The maximum size of a batch that will be processed by a sink. This is based on the uncompressed size of the batched events, before they are serialized / compressed."
 								required:    false
 								type: uint: {
 									default: features.send.batch.max_bytes | *null
@@ -69,7 +69,11 @@ components: sinks: [Name=string]: {
 
 		buffer: {
 			common:      false
-			description: "Configures the sink specific buffer behavior."
+			description: """
+				Configures the sink specific buffer behavior.
+
+				More information about the individual buffer types, and buffer behavior, can be found in the [Buffering Model](\(urls.vector_buffering_model)) section.
+				"""
 			required:    false
 			type: object: {
 				examples: []
@@ -85,28 +89,34 @@ components: sinks: [Name=string]: {
 						}
 					}
 					max_size: {
-						description:   "The maximum size of the buffer on the disk."
+						description: """
+							The maximum size of the buffer on the disk. Must be at least ~256 megabytes (268435488 bytes).
+							"""
 						required:      true
 						relevant_when: "type = \"disk\""
 						type: uint: {
-							examples: [104900000]
+							examples: [268435488]
 							unit: "bytes"
 						}
 					}
 					type: {
 						common:      true
-						description: "The buffer's type and storage mechanism."
+						description: "The type of buffer to use."
 						required:    false
 						type: string: {
 							default: "memory"
 							enum: {
-								memory: "Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully."
+								memory: """
+									Events are buffered in memory.
+
+									This is more performant, but less durable. Data will be lost if Vector is restarted forcefully or crashes.
+									"""
 								disk: """
-									Stores the sink's buffer on disk. This is less performant, but durable.
-									Data will not be lost between restarts.
-									Will also hold data in memory to enhance performance.
-									WARNING: This may stall the sink if disk performance isn't on par with the throughput.
-									For comparison, AWS gp2 volumes are usually too slow for common cases.
+									Events are buffered on disk.
+
+									This is less performant, but more durable. Data that has been synchronized to disk will not be lost if Vector is restarted forcefully or crashes.
+
+									Data is synchronized to disk every 500ms.
 									"""
 							}
 						}
@@ -118,8 +128,16 @@ components: sinks: [Name=string]: {
 						type: string: {
 							default: "block"
 							enum: {
-								block:       "Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge."
-								drop_newest: "Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."
+								block: """
+									Waits for capacity in the buffer.
+
+									This will cause backpressure to propagate to upstream components, which can cause data to pile up on the edge.
+									"""
+								drop_newest: """
+									Drops the event without waiting for capacity in the buffer.
+
+									The data is lost. This should only be used when performance is the highest priority.
+									"""
 							}
 						}
 					}
@@ -134,6 +152,7 @@ components: sinks: [Name=string]: {
 					description: """
 						The compression strategy used to compress the encoded event data before transmission.
 
+						The default compression level of the chosen algorithm is used.
 						Some cloud storage API clients and browsers will handle decompression transparently,
 						so files may not always appear to be compressed depending how they are accessed.
 						"""
@@ -146,7 +165,7 @@ components: sinks: [Name=string]: {
 									none: "No compression."
 								}
 								if algo == "gzip" {
-									gzip: "[Gzip](\(urls.gzip)) standard DEFLATE compression."
+									gzip: "[Gzip](\(urls.gzip)) standard DEFLATE compression. Compression level is `6` unless otherwise specified."
 								}
 								if algo == "snappy" {
 									snappy: "[Snappy](\(urls.snappy)) compression."
@@ -155,7 +174,7 @@ components: sinks: [Name=string]: {
 									lz4: "[lz4](\(urls.lz4)) compression."
 								}
 								if algo == "zstd" {
-									zstd: "[zstd](\(urls.zstd)) compression."
+									zstd: "[zstd](\(urls.zstd)) compression. Compression level is `3` unless otherwise specified. Dictionaries are not supported."
 								}
 							}
 						}
@@ -169,10 +188,8 @@ components: sinks: [Name=string]: {
 				encoding: {
 					description: """
 						Configures the encoding specific sink behavior.
-
-						Note: When data in `encoding` is malformed, currently only a very generic error "data did not match any variant of untagged enum EncodingConfig" is reported. Follow this [issue](\(urls.vector_encoding_config_improve_error_message)) to track progress on improving these error messages.
 						"""
-					required:    features.send.encoding.codec.enabled
+					required: features.send.encoding.codec.enabled
 					if !features.send.encoding.codec.enabled {common: true}
 					type: object: {
 						if features.send.encoding.codec.enabled {
@@ -182,35 +199,19 @@ components: sinks: [Name=string]: {
 								required:    true
 								type: string: {
 									examples: features.send.encoding.codec.enum
-									let batched = features.send.encoding.codec.batched
 									enum: {
 										for codec in features.send.encoding.codec.enum {
 											if codec == "text" {
-												if batched {
-													text: "Newline delimited list of messages generated from the message key from each event."
-												}
-												if !batched {
-													text: "The message field from the event."
-												}
+												text: "The message field from the event."
 											}
 											if codec == "logfmt" {
-												if batched {
-													logfmt: "Newline delimited list of events encoded by [logfmt](\(urls.logfmt))."
-												}
-												if !batched {
-													logfmt: "[logfmt](\(urls.logfmt)) encoded event."
-												}
+												logfmt: "[logfmt](\(urls.logfmt)) encoded event."
 											}
 											if codec == "json" {
-												if batched {
-													json: "Array of JSON encoded events, each element representing one event."
-												}
-												if !batched {
-													json: "JSON encoded event."
-												}
+												json: "JSON encoded event."
 											}
-											if codec == "ndjson" {
-												ndjson: "Newline delimited list of JSON encoded events."
+											if codec == "gelf" {
+												gelf: "[GELF](https://docs.graylog.org/docs/gelf) encoded event."
 											}
 											if codec == "avro" {
 												avro: "Avro encoded event with a given schema."
@@ -221,6 +222,31 @@ components: sinks: [Name=string]: {
 							}
 						}
 						options: {
+							if features.send.encoding.codec.enabled {
+								for codec in features.send.encoding.codec.enum {
+									if codec == "avro" {
+										avro: {
+											description:   "Options for the `avro` codec."
+											required:      true
+											relevant_when: "codec = `avro`"
+											type: object: options: {
+												schema: {
+													description: "The Avro schema declaration."
+													required:    true
+													type: string: {
+														examples: [
+															"""
+															["{ "type": "record", "name": "log", "fields": [{ "name": "message", "type": "string" }] }"]
+															""",
+														]
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+
 							except_fields: {
 								common:      false
 								description: "Prevent the sink from encoding the specified fields."
@@ -256,6 +282,46 @@ components: sinks: [Name=string]: {
 									enum: {
 										rfc3339: "Formats as a RFC3339 string"
 										unix:    "Formats as a unix timestamp"
+									}
+								}
+							}
+						}
+					}
+				}
+
+				if features.send.encoding.codec.enabled {
+					if features.send.encoding.codec.framing {
+						framing: {
+							common:      false
+							description: "Configures in which way events encoded as byte frames should be separated in a payload."
+							required:    false
+							type: object: options: {
+								method: {
+									description: "The framing method."
+									required:    false
+									common:      true
+									type: string: {
+										default: "A suitable default is chosen depending on the sink type and the selected codec."
+										enum: {
+											bytes:               "Byte frames are concatenated."
+											character_delimited: "Byte frames are delimited by a chosen character."
+											length_delimited:    "Byte frames are prefixed by an unsigned big-endian 32-bit integer indicating the length."
+											newline_delimited:   "Byte frames are delimited by a newline character."
+										}
+									}
+								}
+								character_delimited: {
+									description:   "Options for `character_delimited` framing."
+									required:      true
+									relevant_when: "method = `character_delimited`"
+									type: object: options: {
+										delimiter: {
+											description: "The character used to separate frames."
+											required:    true
+											type: ascii_char: {
+												examples: ["\n", "\t"]
+											}
+										}
 									}
 								}
 							}
@@ -469,6 +535,7 @@ components: sinks: [Name=string]: {
 					can_verify_certificate: features.send.tls.can_verify_certificate
 					can_verify_hostname:    features.send.tls.can_verify_hostname
 					enabled_default:        features.send.tls.enabled_default
+					enabled_by_scheme:      features.send.tls.enabled_by_scheme
 				}}
 			}
 		}

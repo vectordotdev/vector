@@ -89,7 +89,8 @@ impl Arbitrary for FieldBuf {
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
 pub enum SegmentBuf {
     Field(FieldBuf),
-    Index(isize), // Indexes can be negative.
+    Index(isize),
+    // Indexes can be negative.
     // Coalesces hold multiple possible fields.
     Coalesce(Vec<FieldBuf>),
 }

@@ -13,11 +13,9 @@ use http::{
 use hyper::Body;
 use tower::Service;
 use tracing::Instrument;
-use vector_common::internal_event::BytesSent;
 use vector_core::{
-    buffers::Ackable,
     event::{EventFinalizers, EventStatus, Finalizable},
-    internal_event::EventsSent,
+    internal_event::CountByteSize,
     stream::DriverResponse,
 };
 
@@ -34,12 +32,6 @@ pub struct NewRelicApiRequest {
     pub credentials: Arc<NewRelicCredentials>,
     pub payload: Bytes,
     pub compression: Compression,
-}
-
-impl Ackable for NewRelicApiRequest {
-    fn ack_size(&self) -> usize {
-        self.metadata.event_count()
-    }
 }
 
 impl Finalizable for NewRelicApiRequest {
@@ -60,19 +52,15 @@ impl DriverResponse for NewRelicApiResponse {
         self.event_status
     }
 
-    fn events_sent(&self) -> EventsSent {
-        EventsSent {
-            count: self.metadata.event_count(),
-            byte_size: self.metadata.events_byte_size(),
-            output: None,
-        }
+    fn events_sent(&self) -> CountByteSize {
+        CountByteSize(
+            self.metadata.event_count(),
+            self.metadata.events_byte_size(),
+        )
     }
 
-    fn bytes_sent(&self) -> Option<BytesSent> {
-        Some(BytesSent {
-            byte_size: self.metadata.request_encoded_size(),
-            protocol: self.protocol,
-        })
+    fn bytes_sent(&self) -> Option<(usize, &str)> {
+        Some((self.metadata.request_encoded_size(), self.protocol))
     }
 }
 

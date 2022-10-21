@@ -1,5 +1,3 @@
-use std::net::SocketAddr;
-
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
 use codecs::{
@@ -7,8 +5,9 @@ use codecs::{
     StreamDecodingError,
 };
 use futures::StreamExt;
-use tokio::net::UdpSocket;
+use listenfd::ListenFd;
 use tokio_util::codec::FramedRead;
+use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
@@ -17,11 +16,14 @@ use crate::{
     config::log_schema,
     event::Event,
     internal_events::{
-        BytesReceived, SocketEventsReceived, SocketMode, SocketReceiveError, StreamClosedError,
+        SocketBindError, SocketEventsReceived, SocketMode, SocketReceiveError, StreamClosedError,
     },
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
-    sources::Source,
+    sources::{
+        util::net::{try_bind_udp_socket, SocketListenAddr},
+        Source,
+    },
     udp, SourceSender,
 };
 
@@ -31,7 +33,7 @@ use crate::{
 #[serde(deny_unknown_fields)]
 pub struct UdpConfig {
     /// The address to listen for messages on.
-    address: SocketAddr,
+    address: SocketListenAddr,
 
     /// The maximum buffer size, in bytes, of incoming messages.
     ///
@@ -43,7 +45,9 @@ pub struct UdpConfig {
     ///
     /// The value will be the peer host's address, including the port i.e. `1.2.3.4:9000`.
     ///
-    /// By default, the [global `host_key` option](https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key) is used.
+    /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
+    ///
+    /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     host_key: Option<String>,
 
     /// Overrides the name of the log field used to add the peer host's port to each event.
@@ -80,11 +84,11 @@ impl UdpConfig {
         &self.decoding
     }
 
-    pub(super) const fn address(&self) -> SocketAddr {
+    pub(super) const fn address(&self) -> SocketListenAddr {
         self.address
     }
 
-    pub fn from_address(address: SocketAddr) -> Self {
+    pub fn from_address(address: SocketListenAddr) -> Self {
         Self {
             address,
             max_length: crate::serde::default_max_length(),
@@ -105,9 +109,15 @@ pub(super) fn udp(
     mut out: SourceSender,
 ) -> Source {
     Box::pin(async move {
-        let socket = UdpSocket::bind(&config.address)
+        let listenfd = ListenFd::from_env();
+        let socket = try_bind_udp_socket(config.address, listenfd)
             .await
-            .expect("Failed to bind to udp listener socket");
+            .map_err(|error| {
+                emit!(SocketBindError {
+                    mode: SocketMode::Udp,
+                    error,
+                })
+            })?;
 
         if let Some(receive_buffer_bytes) = config.receive_buffer_bytes {
             if let Err(error) = udp::set_receive_buffer_size(&socket, receive_buffer_bytes) {
@@ -119,6 +129,8 @@ pub(super) fn udp(
             Some(receive_buffer_bytes) => std::cmp::min(config.max_length, receive_buffer_bytes),
             None => config.max_length,
         };
+
+        let bytes_received = register!(BytesReceived::from(Protocol::UDP));
 
         info!(message = "Listening.", address = %config.address);
 
@@ -138,21 +150,20 @@ pub(super) fn udp(
                                     warn!(
                                         message = "Discarding frame larger than max_length.",
                                         max_length = max_length,
-                                        internal_log_rate_secs = 30
+                                        internal_log_rate_limit = true
                                     );
                                     continue;
                                 }
                             }
 
-                            let error = codecs::decoding::Error::FramingError(error.into());
                             return Err(emit!(SocketReceiveError {
                                 mode: SocketMode::Udp,
-                                error: &error
+                                error
                             }));
                        }
                     };
 
-                    emit!(BytesReceived { byte_size, protocol: "udp" });
+                    bytes_received.emit(ByteSize(byte_size));
 
                     let payload = buf.split_to(byte_size);
                     let truncated = byte_size == max_length + 1;
@@ -169,7 +180,7 @@ pub(super) fn udp(
                                     warn!(
                                         message = "Discarding frame larger than max_length.",
                                         max_length = max_length,
-                                        internal_log_rate_secs = 30
+                                        internal_log_rate_limit = true
                                     );
                                 }
 

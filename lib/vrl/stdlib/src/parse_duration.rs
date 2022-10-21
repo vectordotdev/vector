@@ -80,14 +80,14 @@ impl Function for ParseDuration {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let unit = arguments.required("unit");
 
-        Ok(Box::new(ParseDurationFn { value, unit }))
+        Ok(ParseDurationFn { value, unit }.as_expr())
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -112,7 +112,7 @@ struct ParseDurationFn {
     unit: Box<dyn Expression>,
 }
 
-impl Expression for ParseDurationFn {
+impl FunctionExpression for ParseDurationFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?;
         let unit = self.unit.resolve(ctx)?;
@@ -120,7 +120,7 @@ impl Expression for ParseDurationFn {
         parse_duration(bytes, unit)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::float().fallible()
     }
 }
@@ -170,7 +170,7 @@ mod tests {
         s_ns {
             args: func_args![value: "1 s",
                              unit: "ns"],
-            want: Ok(1000000000.0),
+            want: Ok(1_000_000_000.0),
             tdef: TypeDef::float().fallible(),
         }
 

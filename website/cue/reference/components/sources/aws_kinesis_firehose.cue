@@ -139,6 +139,13 @@ components: sources: aws_kinesis_firehose: {
 						examples: ["arn:aws:firehose:us-east-1:111111111111:deliverystream/test"]
 					}
 				}
+				source_type: {
+					description: "The name of the source type."
+					required:    true
+					type: string: {
+						examples: ["aws_kinesis_firehose"]
+					}
+				}
 			}
 		}
 	}
@@ -165,10 +172,11 @@ components: sources: aws_kinesis_firehose: {
 				"""
 			output: [{
 				log: {
-					request_id: "ed1d787c-b9e2-4631-92dc-8e7c9d26d804"
-					source_arn: "arn:aws:firehose:us-east-1:111111111111:deliverystream/test"
-					timestamp:  "2020-09-14T19:12:40.138Z"
-					message:    "{\"messageType\":\"DATA_MESSAGE\",\"owner\":\"111111111111\",\"logGroup\":\"test\",\"logStream\":\"test\",\"subscriptionFilters\":[\"Destination\"],\"logEvents\":[{\"id\":\"35683658089614582423604394983260738922885519999578275840\",\"timestamp\":1600110569039,\"message\":\"{\\\"bytes\\\":26780,\\\"datetime\\\":\\\"14/Sep/2020:11:45:41 -0400\\\",\\\"host\\\":\\\"157.130.216.193\\\",\\\"method\\\":\\\"PUT\\\",\\\"protocol\\\":\\\"HTTP/1.0\\\",\\\"referer\\\":\\\"https://www.principalcross-platform.io/markets/ubiquitous\\\",\\\"request\\\":\\\"/expedite/convergence\\\",\\\"source_type\\\":\\\"stdin\\\",\\\"status\\\":301,\\\"user-identifier\\\":\\\"-\\\"}\"},{\"id\":\"35683658089659183914001456229543810359430816722590236673\",\"timestamp\":1600110569041,\"message\":\"{\\\"bytes\\\":17707,\\\"datetime\\\":\\\"14/Sep/2020:11:45:41 -0400\\\",\\\"host\\\":\\\"109.81.244.252\\\",\\\"method\\\":\\\"GET\\\",\\\"protocol\\\":\\\"HTTP/2.0\\\",\\\"referer\\\":\\\"http://www.investormission-critical.io/24/7/vortals\\\",\\\"request\\\":\\\"/scale/functionalities/optimize\\\",\\\"source_type\\\":\\\"stdin\\\",\\\"status\\\":502,\\\"user-identifier\\\":\\\"feeney1708\\\"}\"}]}"
+					request_id:  "ed1d787c-b9e2-4631-92dc-8e7c9d26d804"
+					source_arn:  "arn:aws:firehose:us-east-1:111111111111:deliverystream/test"
+					timestamp:   "2020-09-14T19:12:40.138Z"
+					source_type: "aws_kinesis_firehose"
+					message:     "{\"messageType\":\"DATA_MESSAGE\",\"owner\":\"111111111111\",\"logGroup\":\"test\",\"logStream\":\"test\",\"subscriptionFilters\":[\"Destination\"],\"logEvents\":[{\"id\":\"35683658089614582423604394983260738922885519999578275840\",\"timestamp\":1600110569039,\"message\":\"{\\\"bytes\\\":26780,\\\"datetime\\\":\\\"14/Sep/2020:11:45:41 -0400\\\",\\\"host\\\":\\\"157.130.216.193\\\",\\\"method\\\":\\\"PUT\\\",\\\"protocol\\\":\\\"HTTP/1.0\\\",\\\"referer\\\":\\\"https://www.principalcross-platform.io/markets/ubiquitous\\\",\\\"request\\\":\\\"/expedite/convergence\\\",\\\"source_type\\\":\\\"stdin\\\",\\\"status\\\":301,\\\"user-identifier\\\":\\\"-\\\"}\"},{\"id\":\"35683658089659183914001456229543810359430816722590236673\",\"timestamp\":1600110569041,\"message\":\"{\\\"bytes\\\":17707,\\\"datetime\\\":\\\"14/Sep/2020:11:45:41 -0400\\\",\\\"host\\\":\\\"109.81.244.252\\\",\\\"method\\\":\\\"GET\\\",\\\"protocol\\\":\\\"HTTP/2.0\\\",\\\"referer\\\":\\\"http://www.investormission-critical.io/24/7/vortals\\\",\\\"request\\\":\\\"/scale/functionalities/optimize\\\",\\\"source_type\\\":\\\"stdin\\\",\\\"status\\\":502,\\\"user-identifier\\\":\\\"feeney1708\\\"}\"}]}"
 				}
 			}]
 		},
@@ -185,8 +193,8 @@ components: sources: aws_kinesis_firehose: {
 
 				1. Deploy vector with a publicly exposed HTTP endpoint using
 				   this source. You will likely also want to use the
-				   [`aws_cloudwatch_logs_subscription_parser`](\(urls.vector_transform_aws_cloudwatch_logs_subscription_parser))
-				   transform to extract the log events. Make sure to set
+				   [`parse_aws_cloudwatch_log_subscription_message`](\(urls.vrl_functions)/#parse_aws_cloudwatch_log_subscription_message)
+				   function to extract the log events. Make sure to set
 				   the `access_key` to secure this endpoint. Your
 				   configuration might look something like:
 
@@ -198,8 +206,19 @@ components: sources: aws_kinesis_firehose: {
 					access_key = "secret"
 
 					[transforms.cloudwatch]
-					type = "aws_cloudwatch_logs_subscription_parser"
+					type = "remap"
 					inputs = ["firehose"]
+					drop_on_error = false
+					source = '''
+					parsed = parse_aws_cloudwatch_log_subscription_message!(.message)
+					. = unnest(parsed.log_events)
+					. = map_values(.) -> |value| {
+						event = del(value.log_events)
+						value |= event
+						message = del(.message)
+						. |= object!(parse_json!(message))
+					}
+					'''
 
 					[sinks.console]
 					type = "console"
@@ -207,7 +226,7 @@ components: sources: aws_kinesis_firehose: {
 					encoding.codec = "json"
 				   ```
 
-				2. Create a Kinesis Firewatch delivery stream in the region
+				2. Create a Kinesis Firehose delivery stream in the region
 				   where the CloudWatch Logs groups exist that you want to
 				   ingest.
 				3. Set the stream to forward to your Vector instance via its

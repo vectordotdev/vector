@@ -5,19 +5,19 @@ use std::{
     marker::PhantomData,
     pin::Pin,
     sync::Arc,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
     time::Duration,
 };
 
 use bytes::{Buf, Bytes};
-use futures::{future::BoxFuture, ready, Sink};
+use futures::{future::BoxFuture, Sink};
 use http::StatusCode;
 use hyper::{body, Body};
 use indexmap::IndexMap;
 use pin_project::pin_project;
-use serde::{Deserialize, Serialize};
 use tower::Service;
-use vector_core::{buffers::Acker, ByteSizeOf};
+use vector_config::configurable_component;
+use vector_core::ByteSizeOf;
 
 use super::{
     retries::{RetryAction, RetryLogic},
@@ -27,10 +27,11 @@ use super::{
 use crate::{
     event::Event,
     http::{HttpClient, HttpError},
-    internal_events::EndpointBytesSent,
+    internal_events::{EndpointBytesSent, SinkRequestBuildError},
 };
 
 pub trait HttpEventEncoder<Output> {
+    // The encoder handles internal event emission for Error and EventsDropped.
     fn encode_event(&mut self, event: Event) -> Option<Output>;
 }
 
@@ -57,6 +58,8 @@ pub trait HttpSink: Send + Sync + 'static {
 /// to be able to send it to the inner batch type and sink. Because of
 /// this we must provide a single buffer slot. To ensure the buffer is
 /// fully flushed make sure `poll_flush` returns ready.
+///
+/// Note: This has been deprecated, please do not use when creating new Sinks.
 #[pin_project]
 pub struct BatchedHttpSink<T, B, RL = HttpRetryLogic>
 where
@@ -91,7 +94,6 @@ where
         request_settings: TowerRequestSettings,
         batch_timeout: Duration,
         client: HttpClient,
-        acker: Acker,
     ) -> Self {
         Self::with_logic(
             sink,
@@ -100,7 +102,6 @@ where
             request_settings,
             batch_timeout,
             client,
-            acker,
         )
     }
 }
@@ -119,7 +120,6 @@ where
         request_settings: TowerRequestSettings,
         batch_timeout: Duration,
         client: HttpClient,
-        acker: Acker,
     ) -> Self {
         let sink = Arc::new(sink);
 
@@ -130,7 +130,7 @@ where
         };
 
         let svc = HttpBatchService::new(client, request_builder);
-        let inner = request_settings.batch_sink(retry_logic, svc, batch, batch_timeout, acker);
+        let inner = request_settings.batch_sink(retry_logic, svc, batch, batch_timeout);
         let encoder = sink.build_encoder();
 
         Self {
@@ -197,6 +197,7 @@ where
     }
 }
 
+/// Note: This has been deprecated, please do not use when creating new Sinks.
 #[pin_project]
 pub struct PartitionHttpSink<T, B, K, RL = HttpRetryLogic>
 where
@@ -233,7 +234,6 @@ where
         request_settings: TowerRequestSettings,
         batch_timeout: Duration,
         client: HttpClient,
-        acker: Acker,
     ) -> Self {
         Self::with_retry_logic(
             sink,
@@ -242,7 +242,6 @@ where
             request_settings,
             batch_timeout,
             client,
-            acker,
         )
     }
 }
@@ -263,7 +262,6 @@ where
         request_settings: TowerRequestSettings,
         batch_timeout: Duration,
         client: HttpClient,
-        acker: Acker,
     ) -> Self {
         let sink = Arc::new(sink);
 
@@ -274,7 +272,7 @@ where
         };
 
         let svc = HttpBatchService::new(client, request_builder);
-        let inner = request_settings.partition_sink(retry_logic, svc, batch, batch_timeout, acker);
+        let inner = request_settings.partition_sink(retry_logic, svc, batch, batch_timeout);
         let encoder = sink.build_encoder();
 
         Self {
@@ -384,11 +382,16 @@ where
         let mut http_client = self.inner.clone();
 
         Box::pin(async move {
-            let request = request_builder(body).await?;
+            let request = request_builder(body).await.map_err(|error| {
+                emit!(SinkRequestBuildError { error: &error });
+                error
+            })?;
             let byte_size = request.body().len();
             let request = request.map(Body::from);
             let (protocol, endpoint) = uri::protocol_endpoint(request.uri().clone());
 
+            // Any errors raised in `http_client.call` results in a `GotHttpWarning` event being emmited
+            // in `HttpClient::send`.
             let response = http_client.call(request).await?;
 
             if response.status().is_success() {
@@ -518,12 +521,14 @@ where
     }
 }
 
-/// A helper config struct
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
-#[serde(deny_unknown_fields)]
+/// Outbound HTTP request settings.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
 pub struct RequestConfig {
     #[serde(flatten)]
     pub tower: TowerRequestConfig,
+
+    /// Additional HTTP headers to add to every HTTP request.
     #[serde(default)]
     pub headers: IndexMap<String, String>,
 }

@@ -7,18 +7,16 @@ use std::{
 use bytes::{BufMut, BytesMut};
 use futures::{future, stream, SinkExt, TryFutureExt};
 use futures_util::FutureExt;
-use serde::{Deserialize, Serialize};
 use tokio_util::codec::Encoder;
 use tower::{Service, ServiceBuilder};
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use super::util::SinkBatchSettings;
 #[cfg(unix)]
 use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
-    config::{
-        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
-    },
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::{
         metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind},
         Event,
@@ -37,23 +35,43 @@ pub struct StatsdSvc {
     inner: UdpService,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
-// TODO: add back when serde-rs/serde#1358 is addressed
-// #[serde(deny_unknown_fields)]
+/// Configuration for the `statsd` sink.
+#[configurable_component(sink("statsd"))]
+#[derive(Clone, Debug)]
 pub struct StatsdSinkConfig {
+    /// Sets the default namespace for any metrics sent.
+    ///
+    /// This namespace is only used if a metric has no existing namespace. When a namespace is
+    /// present, it is used as a prefix to the metric name, and separated with a period (`.`).
     #[serde(alias = "namespace")]
     pub default_namespace: Option<String>,
+
     #[serde(flatten)]
     pub mode: Mode,
+
+    #[configurable(derived)]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Socket mode.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum Mode {
-    Tcp(TcpSinkConfig),
-    Udp(StatsdUdpConfig),
+    /// TCP.
+    Tcp(#[configurable(transparent)] TcpSinkConfig),
+
+    /// UDP.
+    Udp(#[configurable(transparent)] StatsdUdpConfig),
+
+    /// Unix Domain Socket.
     #[cfg(unix)]
-    Unix(UnixSinkConfig),
+    Unix(#[configurable(transparent)] UnixSinkConfig),
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -65,17 +83,16 @@ impl SinkBatchSettings for StatsdDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 1.0;
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// UDP configuration.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct StatsdUdpConfig {
     #[serde(flatten)]
     pub udp: UdpSinkConfig,
 
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<StatsdDefaultBatchSettings>,
-}
-
-inventory::submit! {
-    SinkDescription::new::<StatsdSinkConfig>("statsd")
 }
 
 fn default_address() -> SocketAddr {
@@ -90,22 +107,22 @@ impl GenerateConfig for StatsdSinkConfig {
                 batch: Default::default(),
                 udp: UdpSinkConfig::from_address(default_address().to_string()),
             }),
+            acknowledgements: Default::default(),
         })
         .unwrap()
     }
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "statsd")]
 impl SinkConfig for StatsdSinkConfig {
     async fn build(
         &self,
-        cx: SinkContext,
+        _cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let default_namespace = self.default_namespace.clone();
         let mut encoder = StatsdEncoder { default_namespace };
         match &self.mode {
-            Mode::Tcp(config) => config.build(cx, Default::default(), encoder),
+            Mode::Tcp(config) => config.build(Default::default(), encoder),
             Mode::Udp(config) => {
                 // 1432 bytes is a recommended packet size to fit into MTU
                 // https://github.com/statsd/statsd/blob/master/docs/metric_types.md#multi-metric-packets
@@ -113,19 +130,20 @@ impl SinkConfig for StatsdSinkConfig {
                 // Also one might keep an eye on server side limitations, like
                 // mentioned here https://github.com/DataDog/dd-agent/issues/2638
                 let batch = config.batch.into_batch_settings()?;
-                let (service, healthcheck) = config.udp.build_service(cx.clone())?;
+                let (service, healthcheck) = config.udp.build_service()?;
                 let service = StatsdSvc { inner: service };
                 let sink = BatchSink::new(
                     ServiceBuilder::new().service(service),
                     Buffer::new(batch.size, Compression::None),
                     batch.timeout,
-                    cx.acker(),
                 )
                 .sink_map_err(|error| error!(message = "Fatal statsd sink error.", %error))
                 .with_flat_map(move |event: Event| {
                     stream::iter({
                         let byte_size = event.size_of();
                         let mut bytes = BytesMut::new();
+
+                        // Errors are handled by `Encoder`.
                         encoder
                             .encode(event, &mut bytes)
                             .map(|_| Ok(EncodedEvent::new(bytes, byte_size)))
@@ -135,7 +153,7 @@ impl SinkConfig for StatsdSinkConfig {
                 Ok((super::VectorSink::from_event_sink(sink), healthcheck))
             }
             #[cfg(unix)]
-            Mode::Unix(config) => config.build(cx, Default::default(), encoder),
+            Mode::Unix(config) => config.build(Default::default(), encoder),
         }
     }
 
@@ -143,12 +161,8 @@ impl SinkConfig for StatsdSinkConfig {
         Input::metric()
     }
 
-    fn sink_type(&self) -> &'static str {
-        "statsd"
-    }
-
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        None
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
@@ -270,10 +284,12 @@ impl Service<BytesMut> for StatsdSvc {
     type Error = crate::Error;
     type Future = future::BoxFuture<'static, Result<(), Self::Error>>;
 
+    // Emission of Error internal event is handled upstream by the caller
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.inner.poll_ready(cx).map_err(Into::into)
     }
 
+    // Emission of Error internal event is handled upstream by the caller
     fn call(&mut self, frame: BytesMut) -> Self::Future {
         self.inner.call(frame).err_into().boxed()
     }
@@ -292,7 +308,7 @@ mod test {
     use crate::{
         event::Metric,
         test_util::{
-            components::{run_and_assert_sink_compliance, SINK_TAGS},
+            components::{assert_sink_compliance, SINK_TAGS},
             *,
         },
     };
@@ -483,10 +499,8 @@ mod test {
                 batch,
                 udp: UdpSinkConfig::from_address(addr.to_string()),
             }),
+            acknowledgements: Default::default(),
         };
-
-        let context = SinkContext::new_test();
-        let (sink, _healthcheck) = config.build(context).await.unwrap();
 
         let events = vec![
             Event::Metric(
@@ -512,18 +526,26 @@ mod test {
         ];
         let (mut tx, rx) = mpsc::channel(0);
 
-        let socket = UdpSocket::bind(addr).await.unwrap();
-        tokio::spawn(async move {
-            let mut stream = UdpFramed::new(socket, BytesCodec::new())
-                .map_err(|error| error!(message = "Error reading line.", %error))
-                .map_ok(|(bytes, _addr)| bytes.freeze());
+        let context = SinkContext::new_test();
+        assert_sink_compliance(&SINK_TAGS, async move {
+            let (sink, _healthcheck) = config.build(context).await.unwrap();
 
-            while let Some(Ok(item)) = stream.next().await {
-                tx.send(item).await.unwrap();
-            }
-        });
+            let socket = UdpSocket::bind(addr).await.unwrap();
+            tokio::spawn(async move {
+                let mut stream = UdpFramed::new(socket, BytesCodec::new())
+                    .map_err(|error| error!(message = "Error reading line.", %error))
+                    .map_ok(|(bytes, _addr)| bytes.freeze());
 
-        run_and_assert_sink_compliance(sink, stream::iter(events), &SINK_TAGS).await;
+                while let Some(Ok(item)) = stream.next().await {
+                    tx.send(item).await.unwrap();
+                }
+            });
+
+            sink.run(stream::iter(events).map(Into::into))
+                .await
+                .expect("Running sink failed")
+        })
+        .await;
 
         let messages = collect_n(rx, 1).await;
         assert_eq!(

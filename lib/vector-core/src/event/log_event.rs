@@ -1,3 +1,5 @@
+use bytes::Bytes;
+use chrono::Utc;
 use std::{
     collections::{BTreeMap, HashMap},
     convert::{TryFrom, TryInto},
@@ -8,10 +10,9 @@ use std::{
     sync::Arc,
 };
 
-use bytes::Bytes;
-use chrono::Utc;
 use crossbeam_utils::atomic::AtomicCell;
-use lookup::{lookup_v2::Path, LookupBuf};
+use lookup::lookup_v2::TargetPath;
+use lookup::PathPrefix;
 use serde::{Deserialize, Serialize, Serializer};
 use vector_common::EventDataEq;
 
@@ -20,7 +21,10 @@ use super::{
     metadata::EventMetadata,
     util, EventFinalizers, Finalizable, Value,
 };
-use crate::{config::log_schema, event::MaybeAsLogMut, ByteSizeOf};
+use crate::config::log_schema;
+use crate::config::LogNamespace;
+use crate::{event::MaybeAsLogMut, ByteSizeOf};
+use lookup::path;
 
 #[derive(Debug, Deserialize)]
 struct Inner {
@@ -110,6 +114,21 @@ pub struct LogEvent {
 }
 
 impl LogEvent {
+    /// This used to be the implementation for `LogEvent::from(&'str)`, but this is now only
+    /// valid for `LogNamespace::Legacy`
+    pub fn from_str_legacy(msg: impl Into<String>) -> Self {
+        let mut log = LogEvent::default();
+        log.insert(log_schema().message_key(), msg.into());
+        log.insert(log_schema().timestamp_key(), Utc::now());
+        log
+    }
+
+    /// This used to be the implementation for `LogEvent::from(Bytes)`, but this is now only
+    /// valid for `LogNamespace::Legacy`
+    pub fn from_bytes_legacy(msg: &Bytes) -> Self {
+        Self::from_str_legacy(String::from_utf8_lossy(msg.as_ref()).to_string())
+    }
+
     pub fn value(&self) -> &Value {
         self.inner.as_ref().as_value()
     }
@@ -128,6 +147,18 @@ impl LogEvent {
 
     pub fn metadata_mut(&mut self) -> &mut EventMetadata {
         &mut self.metadata
+    }
+
+    pub fn namespace(&self) -> LogNamespace {
+        // The (read-only) vector prefix on metadata is used to determine which namespace
+        // is being used. The user is prevented from modifying data here.
+        // This prefix should always exist for logs with the "Vector" namespace,
+        // and should never exist otherwise.
+        if self.metadata().value().contains(path!("vector")) {
+            LogNamespace::Vector
+        } else {
+            LogNamespace::Legacy
+        }
     }
 }
 
@@ -193,16 +224,12 @@ impl LogEvent {
         self.metadata.add_finalizer(finalizer);
     }
 
-    pub fn get<'a>(&self, key: impl Path<'a>) -> Option<&Value> {
-        self.inner.fields.get(key)
-    }
-
-    pub fn lookup(&self, path: &LookupBuf) -> Option<&Value> {
-        self.inner.fields.get_by_path(path)
-    }
-
-    pub fn lookup_mut(&mut self, path: &LookupBuf) -> Option<&mut Value> {
-        self.value_mut().get_by_path_mut(path)
+    #[allow(clippy::needless_pass_by_value)] // TargetPath is always a reference
+    pub fn get<'a>(&self, key: impl TargetPath<'a>) -> Option<&Value> {
+        match key.prefix() {
+            PathPrefix::Event => self.inner.fields.get(key.value_path()),
+            PathPrefix::Metadata => self.metadata.value().get(key.value_path()),
+        }
     }
 
     pub fn get_by_meaning(&self, meaning: impl AsRef<str>) -> Option<&Value> {
@@ -220,24 +247,39 @@ impl LogEvent {
             .map(std::string::ToString::to_string)
     }
 
-    pub fn get_mut<'a>(&mut self, path: impl Path<'a>) -> Option<&mut Value> {
-        self.value_mut().get_mut(path)
+    #[allow(clippy::needless_pass_by_value)] // TargetPath is always a reference
+    pub fn get_mut<'a>(&mut self, path: impl TargetPath<'a>) -> Option<&mut Value> {
+        match path.prefix() {
+            PathPrefix::Event => self.value_mut().get_mut(path.value_path()),
+            PathPrefix::Metadata => self.metadata.value_mut().get_mut(path.value_path()),
+        }
     }
 
-    pub fn contains<'a>(&self, path: impl Path<'a>) -> bool {
-        self.value().get(path).is_some()
+    #[allow(clippy::needless_pass_by_value)] // TargetPath is always a reference
+    pub fn contains<'a>(&self, path: impl TargetPath<'a>) -> bool {
+        match path.prefix() {
+            PathPrefix::Event => self.value().contains(path.value_path()),
+            PathPrefix::Metadata => self.metadata.value().contains(path.value_path()),
+        }
     }
 
+    #[allow(clippy::needless_pass_by_value)] // TargetPath is always a reference
     pub fn insert<'a>(
         &mut self,
-        path: impl Path<'a>,
-        value: impl Into<Value> + Debug,
+        path: impl TargetPath<'a>,
+        value: impl Into<Value>,
     ) -> Option<Value> {
-        self.value_mut().insert(path, value.into())
+        match path.prefix() {
+            PathPrefix::Event => self.value_mut().insert(path.value_path(), value.into()),
+            PathPrefix::Metadata => self
+                .metadata
+                .value_mut()
+                .insert(path.value_path(), value.into()),
+        }
     }
 
     // deprecated - using this means the schema is unknown
-    pub fn try_insert<'a>(&mut self, path: impl Path<'a>, value: impl Into<Value> + Debug) {
+    pub fn try_insert<'a>(&mut self, path: impl TargetPath<'a>, value: impl Into<Value>) {
         if !self.contains(path.clone()) {
             self.insert(path, value);
         }
@@ -246,18 +288,22 @@ impl LogEvent {
     /// Rename a key
     ///
     /// If `to_key` already exists in the structure its value will be overwritten.
-    pub fn rename_key<'a>(&mut self, from: impl Path<'a>, to: impl Path<'a>) {
+    pub fn rename_key<'a>(&mut self, from: impl TargetPath<'a>, to: impl TargetPath<'a>) {
         if let Some(val) = self.remove(from) {
             self.insert(to, val);
         }
     }
 
-    pub fn remove<'a>(&mut self, path: impl Path<'a>) -> Option<Value> {
+    pub fn remove<'a>(&mut self, path: impl TargetPath<'a>) -> Option<Value> {
         self.remove_prune(path, false)
     }
 
-    pub fn remove_prune<'a>(&mut self, path: impl Path<'a>, prune: bool) -> Option<Value> {
-        util::log::remove(self.value_mut(), path, prune)
+    #[allow(clippy::needless_pass_by_value)] // TargetPath is always a reference
+    pub fn remove_prune<'a>(&mut self, path: impl TargetPath<'a>, prune: bool) -> Option<Value> {
+        match path.prefix() {
+            PathPrefix::Event => self.value_mut().remove(path.value_path(), prune),
+            PathPrefix::Metadata => self.metadata.value_mut().remove(path.value_path(), prune),
+        }
     }
 
     pub fn keys(&self) -> Option<impl Iterator<Item = String> + '_> {
@@ -333,26 +379,37 @@ impl EventDataEq for LogEvent {
     }
 }
 
-impl From<Bytes> for LogEvent {
-    fn from(message: Bytes) -> Self {
-        let mut log = LogEvent::default();
+#[cfg(any(test, feature = "test"))]
+mod test_utils {
+    use super::*;
 
-        log.insert(log_schema().message_key(), message);
-        log.insert(log_schema().timestamp_key(), Utc::now());
+    // these rely on the global log schema, which is no longer supported when using the
+    // "LogNamespace::Vector" namespace.
+    // The tests that rely on this are testing the "Legacy" log namespace. As these
+    // tests are updated, they should be migrated away from using these implementations
+    // to make it more clear which namespace is being used
 
-        log
+    impl From<Bytes> for LogEvent {
+        fn from(message: Bytes) -> Self {
+            let mut log = LogEvent::default();
+
+            log.insert(log_schema().message_key(), message);
+            log.insert(log_schema().timestamp_key(), Utc::now());
+
+            log
+        }
     }
-}
 
-impl From<&str> for LogEvent {
-    fn from(message: &str) -> Self {
-        message.to_owned().into()
+    impl From<&str> for LogEvent {
+        fn from(message: &str) -> Self {
+            message.to_owned().into()
+        }
     }
-}
 
-impl From<String> for LogEvent {
-    fn from(message: String) -> Self {
-        Bytes::from(message).into()
+    impl From<String> for LogEvent {
+        fn from(message: String) -> Self {
+            Bytes::from(message).into()
+        }
     }
 }
 
@@ -508,7 +565,7 @@ impl tracing::field::Visit for LogEvent {
 mod test {
     use super::*;
     use crate::test_util::open_fixture;
-    use lookup::path;
+    use lookup::event_path;
     use vrl_lib::value;
 
     // The following two tests assert that renaming a key has no effect if the
@@ -521,7 +578,7 @@ mod test {
         });
 
         let mut base = LogEvent::from_parts(value.clone(), EventMetadata::default());
-        base.rename_key(path!("one"), path!("one"));
+        base.rename_key(event_path!("one"), event_path!("one"));
         let (actual_fields, _) = base.into_parts();
 
         assert_eq!(value, actual_fields);
@@ -534,7 +591,7 @@ mod test {
         });
 
         let mut base = LogEvent::from_parts(value.clone(), EventMetadata::default());
-        base.rename_key(path!("three"), path!("three"));
+        base.rename_key(event_path!("three"), event_path!("three"));
         let (actual_fields, _) = base.into_parts();
 
         assert_eq!(value, actual_fields);
@@ -549,7 +606,7 @@ mod test {
         });
 
         let mut base = LogEvent::from_parts(value.clone(), EventMetadata::default());
-        base.rename_key(path!("three"), path!("four"));
+        base.rename_key(event_path!("three"), event_path!("four"));
         let (actual_fields, _) = base.into_parts();
 
         assert_eq!(value, actual_fields);
@@ -568,7 +625,7 @@ mod test {
         expected_value.insert("three", one);
 
         let mut base = LogEvent::from_parts(value, EventMetadata::default());
-        base.rename_key(path!("one"), path!("three"));
+        base.rename_key(event_path!("one"), event_path!("three"));
         let (actual_fields, _) = base.into_parts();
 
         assert_eq!(expected_value, actual_fields);
@@ -588,7 +645,7 @@ mod test {
         expected_value.insert("two", val);
 
         let mut base = LogEvent::from_parts(value, EventMetadata::default());
-        base.rename_key(path!("one"), path!("two"));
+        base.rename_key(event_path!("one"), event_path!("two"));
         let (actual_value, _) = base.into_parts();
 
         assert_eq!(expected_value, actual_value);
@@ -641,7 +698,7 @@ mod test {
         log.try_insert("foo.bar", "foo");
 
         assert_eq!(log.get("foo.bar"), Some(&"foo".into()));
-        assert_eq!(log.get(path!("foo.bar")), None);
+        assert_eq!(log.get(event_path!("foo.bar")), None);
     }
 
     #[test]
@@ -652,46 +709,46 @@ mod test {
         log.try_insert("foo.bar", "bar");
 
         assert_eq!(log.get("foo.bar"), Some(&"foo".into()));
-        assert_eq!(log.get(path!("foo.bar")), None);
+        assert_eq!(log.get(event_path!("foo.bar")), None);
     }
 
     #[test]
     fn try_insert_flat() {
         let mut log = LogEvent::default();
 
-        log.try_insert(path!("foo"), "foo");
+        log.try_insert(event_path!("foo"), "foo");
 
-        assert_eq!(log.get(path!("foo")), Some(&"foo".into()));
+        assert_eq!(log.get(event_path!("foo")), Some(&"foo".into()));
     }
 
     #[test]
     fn try_insert_flat_existing() {
         let mut log = LogEvent::default();
-        log.insert(path!("foo"), "foo");
+        log.insert(event_path!("foo"), "foo");
 
-        log.try_insert(path!("foo"), "bar");
+        log.try_insert(event_path!("foo"), "bar");
 
-        assert_eq!(log.get(path!("foo")), Some(&"foo".into()));
+        assert_eq!(log.get(event_path!("foo")), Some(&"foo".into()));
     }
 
     #[test]
     fn try_insert_flat_dotted() {
         let mut log = LogEvent::default();
 
-        log.try_insert(path!("foo.bar"), "foo");
+        log.try_insert(event_path!("foo.bar"), "foo");
 
-        assert_eq!(log.get(path!("foo.bar")), Some(&"foo".into()));
+        assert_eq!(log.get(event_path!("foo.bar")), Some(&"foo".into()));
         assert_eq!(log.get("foo.bar"), None);
     }
 
     #[test]
     fn try_insert_flat_existing_dotted() {
         let mut log = LogEvent::default();
-        log.insert(path!("foo.bar"), "foo");
+        log.insert(event_path!("foo.bar"), "foo");
 
-        log.try_insert(path!("foo.bar"), "bar");
+        log.try_insert(event_path!("foo.bar"), "bar");
 
-        assert_eq!(log.get(path!("foo.bar")), Some(&"foo".into()));
+        assert_eq!(log.get(event_path!("foo.bar")), Some(&"foo".into()));
         assert_eq!(log.get("foo.bar"), None);
     }
 

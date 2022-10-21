@@ -7,12 +7,12 @@ use chrono::{DateTime, Utc};
 use futures::{sink::SinkExt, FutureExt};
 use goauth::scopes::Scope;
 use http::Uri;
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 use crate::{
-    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     event::{Event, Metric, MetricValue},
-    gcp::{GcpAuthConfig, GcpCredentials},
+    gcp::{GcpAuthConfig, GcpAuthenticator},
     http::HttpClient,
     sinks::{
         gcp,
@@ -35,19 +35,45 @@ impl SinkBatchSettings for StackdriverMetricsDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 1.0;
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+/// Configuration for the `gcp_stackdriver_metrics` sink.
+#[configurable_component(sink("gcp_stackdriver_metrics"))]
+#[derive(Clone, Debug, Default)]
 pub struct StackdriverConfig {
+    #[serde(skip, default = "default_endpoint")]
+    endpoint: String,
+
+    /// The project ID to which to publish metrics.
+    ///
+    /// See the [Google Cloud Platform project management documentation][project_docs] for more details.
+    ///
+    /// [project_docs]: https://cloud.google.com/resource-manager/docs/creating-managing-projects
     pub project_id: String,
+
+    /// The monitored resource to associate the metrics with.
     pub resource: gcp::GcpTypedResource,
+
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
+
+    /// The default namespace to use for metrics that do not have one.
+    ///
+    /// Metrics with the same name can only be differentiated by their namespace, and not all
+    /// metrics have their own namespace.
     #[serde(default = "default_metric_namespace_value")]
     pub default_namespace: String,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<StackdriverMetricsDefaultBatchSettings>,
+
+    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -60,17 +86,16 @@ fn default_metric_namespace_value() -> String {
     "namespace".to_string()
 }
 
-impl_generate_config_from_default!(StackdriverConfig);
-
-inventory::submit! {
-    SinkDescription::new::<StackdriverConfig>("gcp_stackdriver_metrics")
+fn default_endpoint() -> String {
+    "https://monitoring.googleapis.com".to_string()
 }
 
+impl_generate_config_from_default!(StackdriverConfig);
+
 #[async_trait::async_trait]
-#[typetag::serde(name = "gcp_stackdriver_metrics")]
 impl SinkConfig for StackdriverConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let creds = self.auth.make_credentials(Scope::MonitoringWrite).await?;
+        let auth = self.auth.build(Scope::MonitoringWrite).await?;
 
         let healthcheck = healthcheck().boxed();
         let started = chrono::Utc::now();
@@ -86,7 +111,7 @@ impl SinkConfig for StackdriverConfig {
         let sink = HttpEventSink {
             config: self.clone(),
             started,
-            creds,
+            auth,
         };
 
         let sink = BatchedHttpSink::new(
@@ -95,7 +120,6 @@ impl SinkConfig for StackdriverConfig {
             request,
             batch_settings.timeout,
             client,
-            cx.acker(),
         )
         .sink_map_err(
             |error| error!(message = "Fatal gcp_stackdriver_metrics sink error.", %error),
@@ -108,19 +132,15 @@ impl SinkConfig for StackdriverConfig {
         Input::metric()
     }
 
-    fn sink_type(&self) -> &'static str {
-        "gcp_stackdriver_metrics"
-    }
-
-    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        Some(&self.acknowledgements)
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
     }
 }
 
 struct HttpEventSink {
     config: StackdriverConfig,
     started: DateTime<Utc>,
-    creds: Option<GcpCredentials>,
+    auth: GcpAuthenticator,
 }
 
 struct StackdriverMetricsEncoder;
@@ -165,7 +185,7 @@ impl HttpSink for HttpEventSink {
             namespace, series.name.name
         );
 
-        let end_time = data.timestamp.unwrap_or_else(chrono::Utc::now);
+        let end_time = data.time.timestamp.unwrap_or_else(chrono::Utc::now);
 
         let (point_value, interval, metric_kind) = match &data.value {
             MetricValue::Counter { value } => {
@@ -217,18 +237,15 @@ impl HttpSink for HttpEventSink {
         let body = crate::serde::json::to_bytes(&series).unwrap().freeze();
 
         let uri: Uri = format!(
-            "https://monitoring.googleapis.com/v3/projects/{}/timeSeries",
-            self.config.project_id
+            "{}/v3/projects/{}/timeSeries",
+            self.config.endpoint, self.config.project_id
         )
         .parse()?;
 
         let mut request = hyper::Request::post(uri)
             .header("content-type", "application/json")
             .body(body)?;
-
-        if let Some(creds) = &self.creds {
-            creds.apply(&mut request);
-        }
+        self.auth.apply(&mut request);
 
         Ok(request)
     }
@@ -236,4 +253,49 @@ impl HttpSink for HttpEventSink {
 
 async fn healthcheck() -> crate::Result<()> {
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use futures::{future::ready, stream};
+    use vector_core::event::{MetricKind, MetricValue};
+
+    use super::*;
+    use crate::{
+        config::{GenerateConfig, SinkConfig, SinkContext},
+        test_util::{
+            components::{run_and_assert_sink_compliance, SINK_TAGS},
+            http::{always_200_response, spawn_blackhole_http_server},
+        },
+    };
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<StackdriverConfig>();
+    }
+
+    #[tokio::test]
+    async fn component_spec_compliance() {
+        let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
+
+        let config = StackdriverConfig::generate_config().to_string();
+        let mut config =
+            toml::from_str::<StackdriverConfig>(&config).expect("config should be valid");
+
+        // If we don't override the credentials path/API key, it tries to directly call out to the Google Instance
+        // Metadata API, which we clearly don't have in unit tests. :)
+        config.auth.credentials_path = None;
+        config.auth.api_key = Some("fake".to_string().into());
+        config.endpoint = mock_endpoint.to_string();
+
+        let context = SinkContext::new_test();
+        let (sink, _healthcheck) = config.build(context).await.unwrap();
+
+        let event = Event::Metric(Metric::new(
+            "gauge-test",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 1_f64 },
+        ));
+        run_and_assert_sink_compliance(sink, stream::once(ready(event)), &SINK_TAGS).await;
+    }
 }

@@ -1,8 +1,8 @@
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
-use super::prelude::{error_stage, error_type};
 use crate::sources::fluent::DecodeError;
+use vector_common::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct FluentMessageReceived {
@@ -29,9 +29,9 @@ impl<'a> InternalEvent for FluentMessageDecodeError<'a> {
             message = "Error decoding fluent message.",
             error = ?self.error,
             base64_encoded_message = %self.base64_encoded_message,
-            internal_log_rate_secs = 10,
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,

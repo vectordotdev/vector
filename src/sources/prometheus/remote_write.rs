@@ -4,29 +4,24 @@ use bytes::Bytes;
 use prometheus_parser::proto;
 use prost::Message;
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 use warp::http::{HeaderMap, StatusCode};
 
 use super::parser;
 use crate::{
-    config::{
-        self, AcknowledgementsConfig, GenerateConfig, Output, SourceConfig, SourceContext,
-        SourceDescription,
-    },
+    config::{self, AcknowledgementsConfig, GenerateConfig, Output, SourceConfig, SourceContext},
     event::Event,
     internal_events::PrometheusRemoteWriteParseError,
     serde::bool_or_struct,
     sources::{
         self,
-        http::HttpMethod,
-        util::{decode, ErrorMessage, HttpSource, HttpSourceAuthConfig},
+        util::{decode, http::HttpMethod, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     },
     tls::TlsEnableableConfig,
 };
 
-const SOURCE_NAME: &str = "prometheus_remote_write";
-
 /// Configuration for the `prometheus_remote_write` source.
-#[configurable_component(source)]
+#[configurable_component(source("prometheus_remote_write"))]
 #[derive(Clone, Debug)]
 pub struct PrometheusRemoteWriteConfig {
     /// The address to accept connections on.
@@ -45,8 +40,16 @@ pub struct PrometheusRemoteWriteConfig {
     acknowledgements: AcknowledgementsConfig,
 }
 
-inventory::submit! {
-    SourceDescription::new::<PrometheusRemoteWriteConfig>(SOURCE_NAME)
+impl PrometheusRemoteWriteConfig {
+    #[cfg(test)]
+    pub fn from_address(address: SocketAddr) -> Self {
+        Self {
+            address,
+            tls: None,
+            auth: None,
+            acknowledgements: false.into(),
+        }
+    }
 }
 
 impl GenerateConfig for PrometheusRemoteWriteConfig {
@@ -62,7 +65,6 @@ impl GenerateConfig for PrometheusRemoteWriteConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "prometheus_remote_write")]
 impl SourceConfig for PrometheusRemoteWriteConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let source = RemoteWriteSource;
@@ -78,12 +80,8 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
         )
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(config::DataType::Metric)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        SOURCE_NAME
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -148,6 +146,7 @@ mod test {
         test_util::{
             self,
             components::{assert_source_compliance, HTTP_PUSH_SOURCE_TAGS},
+            wait_for_tcp,
         },
         tls::MaybeTlsSettings,
         SourceSender,
@@ -187,6 +186,7 @@ mod test {
                 .await
                 .unwrap();
             tokio::spawn(source);
+            wait_for_tcp(address).await;
 
             let sink = RemoteWriteConfig {
                 endpoint: format!("{}://localhost:{}/", proto, address.port()),

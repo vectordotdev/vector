@@ -170,6 +170,13 @@ components: sources: syslog: {
 					examples: ["127.0.0.1"]
 				}
 			}
+			source_type: {
+				description: "The name of the source type."
+				required:    true
+				type: string: {
+					examples: ["syslog"]
+				}
+			}
 			timestamp: {
 				description: "The time extracted from the Syslog formatted line. If parsing fails, then the exact time the event was ingested into Vector is used."
 				required:    true
@@ -211,15 +218,16 @@ components: sources: syslog: {
 				<13>1 \(_timestamp) \(_hostname) \(_app_name) \(_procid) \(_msgid) [exampleSDID@32473 iut="\(_iut)" eventSource="\(_event_source)" eventID="\(_event_id)"] \(_message)
 				"""
 			output: log: {
-				severity:  "notice"
-				facility:  "user"
-				timestamp: _timestamp
-				host:      _values.local_host
-				source_ip: _values.remote_host
-				hostname:  _hostname
-				appname:   _app_name
-				procid:    _procid
-				msgid:     _msgid
+				severity:    "notice"
+				facility:    "user"
+				timestamp:   _timestamp
+				host:        _values.local_host
+				source_ip:   _values.remote_host
+				source_type: "syslog"
+				hostname:    _hostname
+				appname:     _app_name
+				procid:      _procid
+				msgid:       _msgid
 				"exampleSDID@32473": {
 					iut:         _iut
 					eventSource: _event_source
@@ -247,11 +255,11 @@ components: sources: syslog: {
 				Syslog style). It's unfortunate that the Syslog specification isn't more
 				accurately followed, but we hope that Vector insulates you from these deviations.
 
-				If parsing fails, Vector includes the entire Syslog line in the `message`
-				key. If you find this happening often, we recommend using the
-				[`socket` source](\(urls.vector_socket_source)) combined with
+				If parsing fails, Vector will raise an error. If you find this happening often,
+				we recommend using the [`socket` source](\(urls.vector_socket_source)) combined with
 				[regex parsing](\(urls.vrl_functions)/#parse_regex) to implement your own custom
-				ingestion and parsing scheme. Alternatively, you can [open an
+				ingestion and parsing scheme, or [syslog parsing](\(urls.vrl_functions)/#parse_syslog) and
+				manually handle any errors. Alternatively, you can [open an
 				issue](\(urls.new_feature_request)) to request support for your specific format.
 				"""
 		}

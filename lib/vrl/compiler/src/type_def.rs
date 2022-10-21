@@ -1,4 +1,4 @@
-//! TypeDefs
+//! `TypeDefs`
 //!
 //! The type definitions for typedefs record the various possible type definitions for the state
 //! that can be passed through a VRL program.
@@ -23,18 +23,11 @@
 //! `Field` can be a specifix field name of the object, or `Any` which represents any element found
 //! within that object.
 
-use std::{
-    borrow::Cow,
-    ops::{Deref, DerefMut},
-};
+use std::ops::{Deref, DerefMut};
 
-use lookup::Lookup;
+use lookup::LookupBuf;
 use value::{
-    kind::{
-        merge,
-        nest::{CoalescedPath, Strategy},
-        Collection, Field, Index,
-    },
+    kind::{merge, Collection, Field, Index},
     Kind, Value,
 };
 
@@ -67,140 +60,163 @@ impl DerefMut for TypeDef {
 }
 
 impl TypeDef {
+    #[must_use]
     pub fn kind(&self) -> &Kind {
         &self.kind
     }
 
-    pub fn at_path(&self, path: &Lookup<'_>) -> TypeDef {
-        let fallible = self.fallible;
-
-        let kind = self
-            .kind
-            .find_at_path(path)
-            .ok()
-            .flatten()
-            .map(Cow::into_owned)
-            .unwrap_or_else(Kind::any);
-
-        Self { fallible, kind }
+    #[must_use]
+    pub fn kind_mut(&mut self) -> &mut Kind {
+        &mut self.kind
     }
 
-    pub fn for_path(self, path: &Lookup<'_>) -> TypeDef {
+    #[must_use]
+    pub fn at_path(&self, path: &LookupBuf) -> TypeDef {
         let fallible = self.fallible;
-        let kind = self
-            .kind
-            .clone()
-            .nest_at_path(
-                path,
-                Strategy {
-                    coalesced_path: CoalescedPath::Reject,
-                },
-            )
-            .unwrap_or(self.kind);
+        let kind = self.kind.at_path(path);
 
         Self { fallible, kind }
     }
 
     #[inline]
+    #[must_use]
     pub fn fallible(mut self) -> Self {
         self.fallible = true;
         self
     }
 
     #[inline]
+    #[must_use]
     pub fn infallible(mut self) -> Self {
         self.fallible = false;
         self
     }
 
     #[inline]
+    #[must_use]
     pub fn with_fallibility(mut self, fallible: bool) -> Self {
         self.fallible = fallible;
         self
     }
 
     #[inline]
+    #[must_use]
     pub fn any() -> Self {
         Kind::any().into()
     }
 
     #[inline]
+    #[must_use]
     pub fn bytes() -> Self {
         Kind::bytes().into()
     }
 
     #[inline]
-    pub fn add_bytes(mut self) -> Self {
+    #[must_use]
+    pub fn or_bytes(mut self) -> Self {
         self.kind.add_bytes();
         self
     }
 
     #[inline]
+    #[must_use]
     pub fn integer() -> Self {
         Kind::integer().into()
     }
 
     #[inline]
-    pub fn add_integer(mut self) -> Self {
+    #[must_use]
+    pub fn or_integer(mut self) -> Self {
         self.kind.add_integer();
         self
     }
 
     #[inline]
+    #[must_use]
     pub fn float() -> Self {
         Kind::float().into()
     }
 
     #[inline]
-    pub fn add_float(mut self) -> Self {
+    #[must_use]
+    pub fn or_float(mut self) -> Self {
         self.kind.add_float();
         self
     }
 
     #[inline]
+    #[must_use]
     pub fn boolean() -> Self {
         Kind::boolean().into()
     }
 
     #[inline]
-    pub fn add_boolean(mut self) -> Self {
+    #[must_use]
+    pub fn or_boolean(mut self) -> Self {
         self.kind.add_boolean();
         self
     }
 
     #[inline]
+    #[must_use]
     pub fn timestamp() -> Self {
         Kind::timestamp().into()
     }
 
     #[inline]
-    pub fn add_timestamp(mut self) -> Self {
+    #[must_use]
+    pub fn or_timestamp(mut self) -> Self {
         self.kind.add_timestamp();
         self
     }
 
     #[inline]
+    #[must_use]
     pub fn regex() -> Self {
         Kind::regex().into()
     }
 
     #[inline]
-    pub fn add_regex(mut self) -> Self {
+    #[must_use]
+    pub fn or_regex(mut self) -> Self {
         self.kind.add_regex();
         self
     }
 
     #[inline]
+    #[must_use]
     pub fn null() -> Self {
         Kind::null().into()
     }
 
     #[inline]
+    #[must_use]
+    pub fn or_null(mut self) -> Self {
+        self.kind.add_null();
+        self
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn undefined() -> Self {
+        Kind::undefined().into()
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn or_undefined(mut self) -> Self {
+        self.kind.add_undefined();
+        self
+    }
+
+    #[inline]
+    #[must_use]
     pub fn never() -> Self {
         Kind::never().into()
     }
 
     #[inline]
+    #[must_use]
     pub fn add_null(mut self) -> Self {
         self.kind.add_null();
         self
@@ -212,7 +228,7 @@ impl TypeDef {
     }
 
     #[inline]
-    pub fn add_array(mut self, collection: impl Into<Collection<Index>>) -> Self {
+    pub fn or_array(mut self, collection: impl Into<Collection<Index>>) -> Self {
         self.kind.add_array(collection);
         self
     }
@@ -225,6 +241,7 @@ impl TypeDef {
     ///
     /// `TypeDef`s fallibility is kept unmodified.
     #[inline]
+    #[must_use]
     pub fn restrict_array(self) -> Self {
         let fallible = self.fallible;
         let collection = match self.kind.into_array() {
@@ -244,7 +261,7 @@ impl TypeDef {
     }
 
     #[inline]
-    pub fn add_object(mut self, collection: impl Into<Collection<Field>>) -> Self {
+    pub fn or_object(mut self, collection: impl Into<Collection<Field>>) -> Self {
         self.kind.add_object(collection);
         self
     }
@@ -257,6 +274,7 @@ impl TypeDef {
     ///
     /// `TypeDef`s fallibility is kept unmodified.
     #[inline]
+    #[must_use]
     pub fn restrict_object(self) -> Self {
         let fallible = self.fallible;
         let collection = match self.kind.into_object() {
@@ -271,6 +289,7 @@ impl TypeDef {
     }
 
     #[inline]
+    #[must_use]
     pub fn with_kind(mut self, kind: Kind) -> Self {
         self.kind = kind;
         self
@@ -281,13 +300,14 @@ impl TypeDef {
     ///
     /// Used for functions that cant determine which indexes of a collection have been used in the
     /// result.
+    #[must_use]
     pub fn collect_subtypes(mut self) -> Self {
         if let Some(object) = self.kind.as_object_mut() {
-            object.set_unknown(None);
+            object.set_unknown(Kind::undefined());
             object.anonymize();
         }
         if let Some(array) = self.kind.as_array_mut() {
-            array.set_unknown(None);
+            array.set_unknown(Kind::undefined());
             array.anonymize();
         }
 
@@ -296,10 +316,12 @@ impl TypeDef {
 
     // -------------------------------------------------------------------------
 
+    #[must_use]
     pub fn is_fallible(&self) -> bool {
         self.fallible
     }
 
+    #[must_use]
     pub fn is_infallible(&self) -> bool {
         !self.is_fallible()
     }
@@ -315,52 +337,40 @@ impl TypeDef {
         self
     }
 
-    pub fn merge_deep(mut self, other: Self) -> Self {
-        self.merge(
-            other,
-            merge::Strategy {
-                collisions: merge::CollisionStrategy::Union,
-                indices: merge::Indices::Keep,
-            },
-        );
+    #[must_use]
+    pub fn union(mut self, other: Self) -> Self {
+        self.fallible |= other.fallible;
+        self.kind = self.kind.union(other.kind);
         self
     }
 
-    /// Merge two type definitions.
-    ///
-    /// When merging arrays, the elements of `other` are *appended* to the elements of `self`.
-    /// Meaning, the indices of `other` are updated, to continue onward from the last index of
-    /// `self`.
-    pub fn merge_append(mut self, other: Self) -> Self {
-        self.merge(
-            other,
-            merge::Strategy {
-                collisions: merge::CollisionStrategy::Overwrite,
-                indices: merge::Indices::Append,
-            },
-        );
-        self
-    }
-
+    // deprecated
     pub fn merge(&mut self, other: Self, strategy: merge::Strategy) {
         self.fallible |= other.fallible;
         self.kind.merge(other.kind, strategy);
     }
 
-    pub fn with_type_set_at_path(self, path: &Lookup, other: Self) -> Self {
+    #[must_use]
+    pub fn with_type_inserted(self, path: &LookupBuf, other: Self) -> Self {
         if path.is_root() {
             other
         } else {
-            self.merge_overwrite(other.for_path(path))
+            let mut kind = self.kind;
+            kind.insert(path, other.kind);
+            Self {
+                fallible: self.fallible || other.fallible,
+                kind,
+            }
         }
     }
 
+    #[must_use]
+    // deprecated
     pub fn merge_overwrite(mut self, other: Self) -> Self {
         self.merge(
             other,
             merge::Strategy {
                 collisions: merge::CollisionStrategy::Overwrite,
-                indices: merge::Indices::Keep,
             },
         );
         self
@@ -392,7 +402,7 @@ impl Details {
     /// Returns the union of 2 possible states
     pub(crate) fn merge(self, other: Self) -> Self {
         Self {
-            type_def: self.type_def.merge_deep(other.type_def),
+            type_def: self.type_def.union(other.type_def),
             value: if self.value == other.value {
                 self.value
             } else {
@@ -419,7 +429,7 @@ mod test {
         assert_eq!(
             a.merge(b),
             Details {
-                type_def: TypeDef::integer().add_float(),
+                type_def: TypeDef::integer().or_float(),
                 value: Some(Value::from(5))
             }
         )

@@ -1,6 +1,7 @@
 use std::{collections::BTreeMap, fmt, sync::Arc};
 
 use ::value::Value;
+use vrl::state::TypeState;
 use vrl::{
     diagnostic::{Label, Span},
     prelude::*,
@@ -98,9 +99,9 @@ impl Function for ParseGrok {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
@@ -117,33 +118,7 @@ impl Function for ParseGrok {
                 Box::new(Error::InvalidGrokPattern(e)) as Box<dyn DiagnosticMessage>
             })?);
 
-        Ok(Box::new(ParseGrokFn { value, pattern }))
-    }
-
-    fn compile_argument(
-        &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        match (name, expr) {
-            ("pattern", Some(expr)) => {
-                let pattern = expr
-                    .as_literal("pattern")?
-                    .try_bytes_utf8_lossy()
-                    .expect("grok pattern not bytes")
-                    .into_owned();
-
-                let mut grok = grok::Grok::with_default_patterns();
-                let pattern = Arc::new(grok.compile(&pattern, true).map_err(|e| {
-                    Box::new(Error::InvalidGrokPattern(e)) as Box<dyn DiagnosticMessage>
-                })?);
-
-                Ok(Some(Box::new(pattern) as _))
-            }
-            _ => Ok(None),
-        }
+        Ok(ParseGrokFn { value, pattern }.as_expr())
     }
 }
 
@@ -155,7 +130,7 @@ struct ParseGrokFn {
     pattern: Arc<grok::Pattern>,
 }
 
-impl Expression for ParseGrokFn {
+impl FunctionExpression for ParseGrokFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let pattern = self.pattern.clone();
@@ -163,7 +138,7 @@ impl Expression for ParseGrokFn {
         parse_grok(value, pattern)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &TypeState) -> TypeDef {
         TypeDef::object(Collection::any()).fallible()
     }
 }

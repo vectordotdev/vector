@@ -6,17 +6,16 @@ use http::StatusCode;
 use snafu::Snafu;
 use tower::Service;
 use tracing::Instrument;
-use vector_common::internal_event::BytesSent;
 use vector_core::{
-    buffers::Ackable,
     event::{EventFinalizers, EventStatus, Finalizable},
-    internal_event::EventsSent,
+    internal_event::CountByteSize,
     stream::DriverResponse,
 };
 
+use crate::sinks::loki::config::{CompressionConfigAdapter, ExtendedCompression};
 use crate::{
     http::{get_http_scheme_from_uri, Auth, HttpClient},
-    sinks::util::{metadata::RequestMetadata, retries::RetryLogic, Compression, UriSerde},
+    sinks::util::{metadata::RequestMetadata, retries::RetryLogic, UriSerde},
 };
 
 #[derive(Clone)]
@@ -58,35 +57,25 @@ impl DriverResponse for LokiResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> EventsSent {
-        EventsSent {
-            count: self.metadata.event_count(),
-            byte_size: self.metadata.events_byte_size(),
-            output: None,
-        }
+    fn events_sent(&self) -> CountByteSize {
+        CountByteSize(
+            self.metadata.event_count(),
+            self.metadata.events_byte_size(),
+        )
     }
 
-    fn bytes_sent(&self) -> Option<BytesSent> {
-        Some(BytesSent {
-            byte_size: self.metadata.request_encoded_size(),
-            protocol: self.protocol,
-        })
+    fn bytes_sent(&self) -> Option<(usize, &str)> {
+        Some((self.metadata.request_encoded_size(), self.protocol))
     }
 }
 
 #[derive(Clone)]
 pub struct LokiRequest {
-    pub compression: Compression,
+    pub compression: CompressionConfigAdapter,
     pub finalizers: EventFinalizers,
     pub payload: Bytes,
     pub tenant_id: Option<String>,
     pub metadata: RequestMetadata,
-}
-
-impl Ackable for LokiRequest {
-    fn ack_size(&self) -> usize {
-        self.metadata.event_count()
-    }
 }
 
 impl Finalizable for LokiRequest {
@@ -119,8 +108,13 @@ impl Service<LokiRequest> for LokiService {
     }
 
     fn call(&mut self, request: LokiRequest) -> Self::Future {
-        let mut req =
-            http::Request::post(&self.endpoint.uri).header("Content-Type", "application/json");
+        let content_type = match request.compression {
+            CompressionConfigAdapter::Original(_) => "application/json",
+            CompressionConfigAdapter::Extended(ExtendedCompression::Snappy) => {
+                "application/x-protobuf"
+            }
+        };
+        let mut req = http::Request::post(&self.endpoint.uri).header("Content-Type", content_type);
         let protocol = get_http_scheme_from_uri(&self.endpoint.uri);
 
         if let Some(tenant_id) = request.tenant_id {

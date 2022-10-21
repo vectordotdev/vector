@@ -5,14 +5,12 @@ mod error;
 pub mod format;
 pub mod framing;
 
-use std::fmt::Debug;
-
 use bytes::{Bytes, BytesMut};
 pub use error::StreamDecodingError;
 pub use format::{
-    BoxedDeserializer, BytesDeserializer, BytesDeserializerConfig, JsonDeserializer,
-    JsonDeserializerConfig, NativeDeserializer, NativeDeserializerConfig, NativeJsonDeserializer,
-    NativeJsonDeserializerConfig,
+    BoxedDeserializer, BytesDeserializer, BytesDeserializerConfig, GelfDeserializer,
+    GelfDeserializerConfig, JsonDeserializer, JsonDeserializerConfig, NativeDeserializer,
+    NativeDeserializerConfig, NativeJsonDeserializer, NativeJsonDeserializerConfig,
 };
 #[cfg(feature = "syslog")]
 pub use format::{SyslogDeserializer, SyslogDeserializerConfig};
@@ -24,8 +22,13 @@ pub use framing::{
     OctetCountingDecoderConfig, OctetCountingDecoderOptions,
 };
 use smallvec::SmallVec;
+use std::fmt::Debug;
 use vector_config::configurable_component;
-use vector_core::{config::DataType, event::Event, schema};
+use vector_core::{
+    config::{DataType, LogNamespace},
+    event::Event,
+    schema,
+};
 
 /// An error that occurred while decoding structured events from a byte stream /
 /// byte messages.
@@ -35,7 +38,7 @@ pub enum Error {
     /// byte messages.
     FramingError(BoxedFramingError),
     /// The error occurred while parsing structured events from a byte frame.
-    ParsingError(vector_core::Error),
+    ParsingError(vector_common::Error),
 }
 
 impl std::fmt::Display for Error {
@@ -232,6 +235,8 @@ pub enum DeserializerConfig {
     Native,
     /// Configures the `NativeJsonDeserializer`.
     NativeJson,
+    /// Configures the `GelfDeserializer`.
+    Gelf,
 }
 
 impl From<BytesDeserializerConfig> for DeserializerConfig {
@@ -253,6 +258,12 @@ impl From<SyslogDeserializerConfig> for DeserializerConfig {
     }
 }
 
+impl From<GelfDeserializerConfig> for DeserializerConfig {
+    fn from(_: GelfDeserializerConfig) -> Self {
+        Self::Gelf
+    }
+}
+
 impl DeserializerConfig {
     /// Build the `Deserializer` from this configuration.
     pub fn build(&self) -> Deserializer {
@@ -265,6 +276,7 @@ impl DeserializerConfig {
             DeserializerConfig::NativeJson => {
                 Deserializer::NativeJson(NativeJsonDeserializerConfig.build())
             }
+            DeserializerConfig::Gelf => Deserializer::Gelf(GelfDeserializerConfig.build()),
         }
     }
 
@@ -274,6 +286,7 @@ impl DeserializerConfig {
             DeserializerConfig::Native => FramingConfig::LengthDelimited,
             DeserializerConfig::Bytes
             | DeserializerConfig::Json
+            | DeserializerConfig::Gelf
             | DeserializerConfig::NativeJson => FramingConfig::NewlineDelimited {
                 newline_delimited: Default::default(),
             },
@@ -293,18 +306,54 @@ impl DeserializerConfig {
             DeserializerConfig::Syslog => SyslogDeserializerConfig.output_type(),
             DeserializerConfig::Native => NativeDeserializerConfig.output_type(),
             DeserializerConfig::NativeJson => NativeJsonDeserializerConfig.output_type(),
+            DeserializerConfig::Gelf => GelfDeserializerConfig.output_type(),
         }
     }
 
     /// The schema produced by the deserializer.
-    pub fn schema_definition(&self) -> schema::Definition {
+    pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
         match self {
-            DeserializerConfig::Bytes => BytesDeserializerConfig.schema_definition(),
-            DeserializerConfig::Json => JsonDeserializerConfig.schema_definition(),
+            DeserializerConfig::Bytes => BytesDeserializerConfig.schema_definition(log_namespace),
+            DeserializerConfig::Json => JsonDeserializerConfig.schema_definition(log_namespace),
             #[cfg(feature = "syslog")]
-            DeserializerConfig::Syslog => SyslogDeserializerConfig.schema_definition(),
-            DeserializerConfig::Native => NativeDeserializerConfig.schema_definition(),
-            DeserializerConfig::NativeJson => NativeJsonDeserializerConfig.schema_definition(),
+            DeserializerConfig::Syslog => SyslogDeserializerConfig.schema_definition(log_namespace),
+            DeserializerConfig::Native => NativeDeserializerConfig.schema_definition(log_namespace),
+            DeserializerConfig::NativeJson => {
+                NativeJsonDeserializerConfig.schema_definition(log_namespace)
+            }
+            DeserializerConfig::Gelf => GelfDeserializerConfig.schema_definition(log_namespace),
+        }
+    }
+
+    /// Get the HTTP content type.
+    pub const fn content_type(&self, framer: &FramingConfig) -> &'static str {
+        match (&self, framer) {
+            (
+                DeserializerConfig::Json | DeserializerConfig::NativeJson,
+                FramingConfig::NewlineDelimited { .. },
+            ) => "application/x-ndjson",
+            (
+                DeserializerConfig::Gelf
+                | DeserializerConfig::Json
+                | DeserializerConfig::NativeJson,
+                FramingConfig::CharacterDelimited {
+                    character_delimited:
+                        CharacterDelimitedDecoderOptions {
+                            delimiter: b',',
+                            max_length: Some(usize::MAX),
+                        },
+                },
+            ) => "application/json",
+            (DeserializerConfig::Native, _) => "application/octet-stream",
+            (
+                DeserializerConfig::Json
+                | DeserializerConfig::NativeJson
+                | DeserializerConfig::Bytes
+                | DeserializerConfig::Gelf,
+                _,
+            ) => "text/plain",
+            #[cfg(feature = "syslog")]
+            (DeserializerConfig::Syslog, _) => "text/plain",
         }
     }
 }
@@ -325,18 +374,25 @@ pub enum Deserializer {
     NativeJson(NativeJsonDeserializer),
     /// Uses an opaque `Deserializer` implementation for deserialization.
     Boxed(BoxedDeserializer),
+    /// Uses a `GelfDeserializer` for deserialization.
+    Gelf(GelfDeserializer),
 }
 
 impl format::Deserializer for Deserializer {
-    fn parse(&self, bytes: Bytes) -> vector_core::Result<SmallVec<[Event; 1]>> {
+    fn parse(
+        &self,
+        bytes: Bytes,
+        log_namespace: LogNamespace,
+    ) -> vector_common::Result<SmallVec<[Event; 1]>> {
         match self {
-            Deserializer::Bytes(deserializer) => deserializer.parse(bytes),
-            Deserializer::Json(deserializer) => deserializer.parse(bytes),
+            Deserializer::Bytes(deserializer) => deserializer.parse(bytes, log_namespace),
+            Deserializer::Json(deserializer) => deserializer.parse(bytes, log_namespace),
             #[cfg(feature = "syslog")]
-            Deserializer::Syslog(deserializer) => deserializer.parse(bytes),
-            Deserializer::Native(deserializer) => deserializer.parse(bytes),
-            Deserializer::NativeJson(deserializer) => deserializer.parse(bytes),
-            Deserializer::Boxed(deserializer) => deserializer.parse(bytes),
+            Deserializer::Syslog(deserializer) => deserializer.parse(bytes, log_namespace),
+            Deserializer::Native(deserializer) => deserializer.parse(bytes, log_namespace),
+            Deserializer::NativeJson(deserializer) => deserializer.parse(bytes, log_namespace),
+            Deserializer::Boxed(deserializer) => deserializer.parse(bytes, log_namespace),
+            Deserializer::Gelf(deserializer) => deserializer.parse(bytes, log_namespace),
         }
     }
 }

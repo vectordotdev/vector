@@ -58,9 +58,9 @@ impl Function for ParseNginxLog {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let format = arguments
@@ -70,11 +70,12 @@ impl Function for ParseNginxLog {
 
         let timestamp_format = arguments.optional("timestamp_format");
 
-        Ok(Box::new(ParseNginxLogFn {
+        Ok(ParseNginxLogFn {
             value,
             format,
             timestamp_format,
-        }))
+        }
+        .as_expr())
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -94,25 +95,6 @@ impl Function for ParseNginxLog {
                 ),
             },
         ]
-    }
-
-    fn compile_argument(
-        &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        match (name, expr) {
-            ("format", Some(expr)) => {
-                let format = expr
-                    .as_enum("format", variants())?
-                    .try_bytes()
-                    .expect("format not bytes");
-                Ok(Some(Box::new(format) as _))
-            }
-            _ => Ok(None),
-        }
     }
 }
 
@@ -148,7 +130,7 @@ struct ParseNginxLogFn {
     timestamp_format: Option<Box<dyn Expression>>,
 }
 
-impl Expression for ParseNginxLogFn {
+impl FunctionExpression for ParseNginxLogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?;
         let timestamp_format = self
@@ -161,7 +143,7 @@ impl Expression for ParseNginxLogFn {
         parse_nginx_log(bytes, timestamp_format, format, ctx)
     }
 
-    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, _: &state::TypeState) -> TypeDef {
         TypeDef::object(match self.format.as_ref() {
             b"combined" => kind_combined(),
             b"error" => kind_error(),
@@ -258,7 +240,7 @@ mod tests {
 
         combined_line_valid_all_fields {
             args: func_args![
-                value: r#"172.17.0.1 alice - [01/Apr/2021:12:02:31 +0000] "POST /not-found HTTP/1.1" 404 153 "http://localhost/somewhere" "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/72.0.3626.119 Safari/537.36" "2.75""#,
+                value: r#"172.17.0.1 - alice [01/Apr/2021:12:02:31 +0000] "POST /not-found HTTP/1.1" 404 153 "http://localhost/somewhere" "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/72.0.3626.119 Safari/537.36" "2.75""#,
                 format: "combined"
             ],
             want: Ok(btreemap! {
@@ -327,8 +309,8 @@ mod tests {
             want: Ok(btreemap! {
                 "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2021-06-17T19:25:59Z").unwrap().into()),
                 "severity" => "notice",
-                "pid" => 133309,
-                "tid" => 133309,
+                "pid" => 133_309,
+                "tid" => 133_309,
                 "message" => "signal process started",
             }),
             tdef: TypeDef::object(kind_error()).fallible(),
@@ -364,7 +346,7 @@ mod tests {
                 "severity" => "error",
                 "pid" => 7164,
                 "tid" => 7164,
-                "cid" => 38068741,
+                "cid" => 38_068_741,
                 "message" => "limiting requests",
                 "excess" => 50.416,
                 "zone" => "api_access_token",

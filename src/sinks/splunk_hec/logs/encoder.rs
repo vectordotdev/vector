@@ -6,12 +6,10 @@ use tokio_util::codec::Encoder as _;
 
 use super::sink::HecProcessedEvent;
 use crate::{
+    codecs::Transformer,
     event::{Event, LogEvent},
     internal_events::SplunkEventEncodeError,
-    sinks::{
-        splunk_hec::common::EndpointTarget,
-        util::encoding::{Encoder, Transformer},
-    },
+    sinks::{splunk_hec::common::EndpointTarget, util::encoding::Encoder},
 };
 
 #[derive(Serialize, Debug)]
@@ -96,7 +94,9 @@ impl Encoder<Vec<HecProcessedEvent>> for HecLogsEncoder {
 
                         let mut hec_data =
                             HecData::new(hec_event, metadata.fields, metadata.timestamp);
-                        hec_data.host = metadata.host.map(|host| host.to_string_lossy());
+                        hec_data.host = metadata
+                            .host
+                            .map(|host| host.to_string_lossy().into_owned());
                         hec_data.index = metadata.index;
                         hec_data.source = metadata.source;
                         hec_data.sourcetype = metadata.sourcetype;
@@ -104,7 +104,9 @@ impl Encoder<Vec<HecProcessedEvent>> for HecLogsEncoder {
                         match serde_json::to_vec(&hec_data) {
                             Ok(value) => Some(value),
                             Err(error) => {
-                                emit!(SplunkEventEncodeError { error });
+                                emit!(SplunkEventEncodeError {
+                                    error: error.into()
+                                });
                                 None
                             }
                         }

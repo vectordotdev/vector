@@ -27,14 +27,11 @@ components: sinks: vector: {
 				max_bytes:    10_000_000
 				timeout_secs: 1.0
 			}
-			compression: enabled:       false
-			encoding: enabled:          false
-			send_buffer_bytes: enabled: true
-			keepalive: enabled:         true
+			compression: enabled: false
+			encoding: enabled:    false
 			request: {
-				enabled:       true
-				headers:       false
-				relevant_when: "version = \"2\""
+				enabled: true
+				headers: false
 			}
 
 			tls: {
@@ -42,6 +39,7 @@ components: sinks: vector: {
 				can_verify_certificate: true
 				can_verify_hostname:    true
 				enabled_default:        false
+				enabled_by_scheme:      false // sink allows both scheme or `enabled` to be used
 			}
 			to: {
 				service: services.vector
@@ -73,7 +71,7 @@ components: sinks: vector: {
 			summary:      true
 			set:          true
 		}
-		traces: false
+		traces: true
 	}
 
 	configuration: {
@@ -89,19 +87,6 @@ components: sinks: vector: {
 			common:      true
 			required:    false
 			type: bool: default: false
-		}
-		version: {
-			description: "Sink API version. Specifying this version ensures that Vector does not break backward compatibility."
-			common:      true
-			required:    false
-			warnings: ["Ensure you use the same version for both the sink and source."]
-			type: string: {
-				enum: {
-					"1": "Vector sink API version 1"
-					"2": "Vector sink API version 2"
-				}
-				default: "1"
-			}
 		}
 	}
 

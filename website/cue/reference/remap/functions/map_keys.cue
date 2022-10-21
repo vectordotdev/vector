@@ -67,5 +67,21 @@ remap: functions: map_keys: {
 				"""#
 			return: {"FOO": "foo", "BAR": "bar"}
 		},
+		{
+			title: "De-dot keys"
+			input: log: {
+				labels: {
+					"app.kubernetes.io/name": "mysql"
+				}
+			}
+			source: #"""
+				map_keys(., recursive: true) -> |key| { replace(key, ".", "_") }
+				"""#
+			return: {
+				labels: {
+					"app_kubernetes_io/name": "mysql"
+				}
+			}
+		},
 	]
 }

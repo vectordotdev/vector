@@ -1,5 +1,4 @@
 use std::{
-    collections::BTreeMap,
     future::ready,
     time::{Duration, Instant},
 };
@@ -11,17 +10,15 @@ use hyper::{Body, Request};
 use snafu::ResultExt;
 use tokio_stream::wrappers::IntervalStream;
 use vector_config::configurable_component;
-use vector_core::ByteSizeOf;
+use vector_core::{metric_tags, ByteSizeOf};
 
 use crate::{
-    config::{
-        self, GenerateConfig, Output, ProxyConfig, SourceConfig, SourceContext, SourceDescription,
-    },
+    config::{self, GenerateConfig, Output, ProxyConfig, SourceConfig, SourceContext},
     event::metric::{Metric, MetricKind, MetricValue},
     http::HttpClient,
     internal_events::{
         ApacheMetricsEventsReceived, ApacheMetricsHttpError, ApacheMetricsParseError,
-        ApacheMetricsResponseError, EndpointBytesReceived, RequestCompleted,
+        ApacheMetricsResponseError, EndpointBytesReceived, RequestCompleted, StreamClosedError,
     },
     shutdown::ShutdownSignal,
     SourceSender,
@@ -30,9 +27,10 @@ use crate::{
 mod parser;
 
 pub use parser::ParseError;
+use vector_core::config::LogNamespace;
 
 /// Configuration for the `apache_metrics` source.
-#[configurable_component(source)]
+#[configurable_component(source("apache_metrics"))]
 #[derive(Clone, Debug)]
 pub struct ApacheMetricsConfig {
     /// The list of `mod_status` endpoints to scrape metrics from.
@@ -57,10 +55,6 @@ pub fn default_namespace() -> String {
     "apache".to_string()
 }
 
-inventory::submit! {
-    SourceDescription::new::<ApacheMetricsConfig>("apache_metrics")
-}
-
 impl GenerateConfig for ApacheMetricsConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
@@ -73,7 +67,6 @@ impl GenerateConfig for ApacheMetricsConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "apache_metrics")]
 impl SourceConfig for ApacheMetricsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let urls = self
@@ -95,12 +88,8 @@ impl SourceConfig for ApacheMetricsConfig {
         ))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(config::DataType::Metric)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "apache_metrics"
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -171,9 +160,10 @@ fn apache_metrics(
                     .body(Body::empty())
                     .expect("error creating request");
 
-                let mut tags: BTreeMap<String, String> = BTreeMap::new();
-                tags.insert("endpoint".into(), sanitized_url.to_string());
-                tags.insert("host".into(), url.sanitized_authority());
+                let tags = metric_tags! {
+                    "endpoint" => sanitized_url.to_string(),
+                    "host" => url.sanitized_authority(),
+                };
 
                 let start = Instant::now();
                 let namespace = namespace.clone();
@@ -274,11 +264,12 @@ fn apache_metrics(
 
         match out.send_event_stream(&mut stream).await {
             Ok(()) => {
-                info!("Finished sending.");
+                debug!("Finished sending.");
                 Ok(())
             }
             Err(error) => {
-                error!(message = "Error sending metric.", %error);
+                let (count, _) = stream.size_hint();
+                emit!(StreamClosedError { error, count });
                 Err(())
             }
         }
@@ -392,9 +383,9 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     Some(tags) => {
                         assert_eq!(
                             tags.get("endpoint"),
-                            Some(&format!("http://{}/metrics", in_addr))
+                            Some(&format!("http://{}/metrics", in_addr)[..])
                         );
-                        assert_eq!(tags.get("host"), Some(&in_addr.to_string()));
+                        assert_eq!(tags.get("host"), Some(&in_addr.to_string()[..]));
                     }
                     None => error!(message = "No tags for metric.", metric = ?m),
                 }

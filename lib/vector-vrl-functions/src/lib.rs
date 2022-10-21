@@ -9,7 +9,7 @@ pub mod set_secret;
 pub mod set_semantic_meaning;
 
 use ::value::Value;
-use vrl::prelude::expression::Query;
+use lookup::OwnedTargetPath;
 use vrl::prelude::*;
 
 pub(crate) fn legacy_keys() -> Vec<Value> {
@@ -23,7 +23,7 @@ pub(crate) fn legacy_keys() -> Vec<Value> {
 #[derive(Clone, Debug)]
 pub enum MetadataKey {
     Legacy(String),
-    Query(Query),
+    Query(OwnedTargetPath),
 }
 
 pub const LEGACY_METADATA_KEYS: [&str; 2] = ["datadog_api_key", "splunk_hec_token"];
@@ -43,15 +43,18 @@ pub fn vrl_functions() -> Vec<Box<dyn vrl::Function>> {
 fn get_metadata_key(
     arguments: &mut ArgumentList,
 ) -> std::result::Result<MetadataKey, Box<dyn DiagnosticMessage>> {
-    let key = if let Ok(Some(query)) = arguments.optional_query("key") {
-        MetadataKey::Query(query)
-    } else {
-        let key = arguments.required_enum("key", &legacy_keys())?;
-        MetadataKey::Legacy(
-            key.try_bytes_utf8_lossy()
-                .expect("key not bytes")
-                .to_string(),
-        )
-    };
-    Ok(key)
+    if let Ok(Some(query)) = arguments.optional_query("key") {
+        if let vrl::query::Target::External(_) = query.target() {
+            // for backwards compatibility reasons, the query is forced to point at metadata
+            let target_path = OwnedTargetPath::metadata(query.path().clone());
+            return Ok(MetadataKey::Query(target_path));
+        }
+    }
+
+    let key = arguments.required_enum("key", &legacy_keys())?;
+    Ok(MetadataKey::Legacy(
+        key.try_bytes_utf8_lossy()
+            .expect("key not bytes")
+            .to_string(),
+    ))
 }

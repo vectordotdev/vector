@@ -3,7 +3,7 @@ use std::{collections::BTreeMap, fmt::Write as _};
 use chrono::Utc;
 use indexmap::map::IndexMap;
 use prometheus_parser::{proto, METRIC_NAME_LABEL};
-use vector_core::event::metric::{samples_to_buckets, MetricSketch, Quantile};
+use vector_core::event::metric::{samples_to_buckets, MetricSketch, MetricTags, Quantile};
 
 use crate::{
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
@@ -23,7 +23,7 @@ pub(super) trait MetricCollector {
         name: &str,
         suffix: &str,
         value: f64,
-        tags: Option<&BTreeMap<String, String>>,
+        tags: Option<&MetricTags>,
         extra: Option<(&str, String)>,
     );
 
@@ -244,7 +244,7 @@ impl MetricCollector for StringCollector {
         name: &str,
         suffix: &str,
         value: f64,
-        tags: Option<&BTreeMap<String, String>>,
+        tags: Option<&MetricTags>,
         extra: Option<(&str, String)>,
     ) {
         let result = self
@@ -267,11 +267,7 @@ impl MetricCollector for StringCollector {
 }
 
 impl StringCollector {
-    fn encode_tags(
-        result: &mut String,
-        tags: Option<&BTreeMap<String, String>>,
-        extra: Option<(&str, String)>,
-    ) {
+    fn encode_tags(result: &mut String, tags: Option<&MetricTags>, extra: Option<(&str, String)>) {
         match (tags, extra) {
             (None, None) => Ok(()),
             (None, Some(tag)) => write!(result, "{{{}}}", Self::format_tag(tag.0, &tag.1)),
@@ -328,7 +324,7 @@ pub(super) struct TimeSeries {
 
 impl TimeSeries {
     fn make_labels(
-        tags: Option<&BTreeMap<String, String>>,
+        tags: Option<&MetricTags>,
         name: &str,
         suffix: &str,
         extra: Option<(&str, String)>,
@@ -390,7 +386,7 @@ impl MetricCollector for TimeSeries {
         name: &str,
         suffix: &str,
         value: f64,
-        tags: Option<&BTreeMap<String, String>>,
+        tags: Option<&MetricTags>,
         extra: Option<(&str, String)>,
     ) {
         let timestamp = timestamp_millis.unwrap_or_else(|| self.default_timestamp());
@@ -444,6 +440,7 @@ mod tests {
     use chrono::{DateTime, TimeZone};
     use indoc::indoc;
     use pretty_assertions::assert_eq;
+    use vector_core::metric_tags;
 
     use super::{super::default_summary_quantiles, *};
     use crate::{
@@ -462,10 +459,8 @@ mod tests {
         s.finish()
     }
 
-    fn tags() -> BTreeMap<String, String> {
-        vec![("code".to_owned(), "200".to_owned())]
-            .into_iter()
-            .collect()
+    fn tags() -> MetricTags {
+        metric_tags!("code" => "200")
     }
 
     macro_rules! write_request {
@@ -922,14 +917,11 @@ mod tests {
 
     #[test]
     fn escapes_tags_text() {
-        let tags: BTreeMap<String, String> = [
-            ("code", "200"),
-            ("quoted", r#"host"1""#),
-            ("path", r#"c:\Windows"#),
-        ]
-        .iter()
-        .map(|(k, v)| (k.to_string(), v.to_string()))
-        .collect();
+        let tags = metric_tags!(
+            "code" => "200",
+            "quoted" => r#"host"1""#,
+            "path" => r#"c:\Windows"#,
+        );
         let metric = Metric::new(
             "something".to_owned(),
             MetricKind::Absolute,

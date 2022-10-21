@@ -16,7 +16,16 @@ releases: "0.22.0": {
 		},
 	]
 
-	known_issues: []
+	known_issues: [
+		"The `journald` source deadlocks almost immediately ([#12966](https://github.com/vectordotdev/vector/issues/12966)). Fixed in v0.22.1.",
+		"The `kubernetes_logs` source does not work with k3s/k3d ([#12989](https://github.com/vectordotdev/vector/issues/12989)). Fixed in v0.22.1.",
+		"Vector would panic when reloading configuration using the `compression` or `concurrency` options due to a deserialization failure ([#12919](https://github.com/vectordotdev/vector/issues/12919)). Fixed in v0.22.1.",
+		"When using a component that creates a unix socket, `vector validate` no longer creates the socket ([#13018](https://github.com/vectordotdev/vector/issues/13018)). This causes the default SystemD unit file to fail to start Vector since it runs `vector validate` before starting Vector. Fixed in v0.22.1.",
+		"VRL sometimes miscalculates type definitions when conditionals are used causing later usages of values assigned in conditionals to not require type coercion as they should ([#12948](https://github.com/vectordotdev/vector/issues/12948)). Fixed in v0.22.1.",
+		"Metrics from AWS components were tagged with an `endpoint` including the full path of the request. For the `aws_s3` sink this caused cardinality issues since the AWS S3 key is included in the URL. Fixed in v0.22.3.",
+		"The `gcp_pubsub` source would log errors due to attempting to fetch too quickly when it has no acknowledgements to pass along. Fixed in v0.22.3.",
+		"Vector shuts down when a configured source codec (`decoding.codec`) receives invalid data. Fixed in v0.23.1.",
+	]
 
 	description: """
 		The Vector team is pleased to announce version 0.22.0!
@@ -24,7 +33,7 @@ releases: "0.22.0": {
 		Be sure to check out the [upgrade guide](/highlights/2022-05-03-0-22-0-upgrade-guide) for breaking changes in
 		this release.
 
-		**Important**: as part of this release, we have promoted the new implemenation of disk buffers (`buffer.type
+		**Important**: as part of this release, we have promoted the new implementation of disk buffers (`buffer.type
 		= "disk_v2"`) to the default implementation (`buffer.type = "disk"`). Any existing disk buffers (`disk_v1`
 		or `disk`) will be automatically migrated. We have rigorously tested this migration, but recommend making
 		a back up of the disk buffers (in the configured `data_dir`, typically in `/var/lib/vector`) to roll back if

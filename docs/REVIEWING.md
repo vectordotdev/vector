@@ -19,20 +19,26 @@ Pull request reviews are required before merging code into Vector. This document
 will outline Vector's pull request review requirements. The following checklist
 should be used for all pull requests:
 
-- [ ] Are you the code owner for the files that have changed? If not, please involve the appropriate code owner(s). (see [Code Owners](#code-owners))
-- [ ] Is the code addressing a single purpose? If not, the pull request should be broken up. (see [Single Purpose](#single-purpose))
+- [ ] Is the code addressing a single purpose? If not, the pull request should be broken up. (see [Single Concern](#single-concern))
 - [ ] Is the code readable and maintainable? If not, suggest ways to improve this. (see [Readability](#readability))
 - [ ] Is the code reasonably tested? If not, tests should be improved. (see [Testing](#testing))
 - [ ] Is code marked as unsafe? If so, verify that this is necessary. (see [Safe Code](#safe-code))
-- [ ] Is backward compatibility broken? If so, can it be avoided or deprecated? (see [Backwards compatibility](#backwards-compatibility))
+- [ ] Is backward compatibility broken? If so, can it be avoided or deprecated? (see [Backward compatibility](#backward-compatibility))
 - [ ] Have dependencies changed? (see [Dependencies](#dependencies))
 - [ ] Has the code been explicitly reviewed for security issues? Dependencies included. (see [Security](#security))
 - [ ] Is there a risk of performance regressions? If so, have run the [Vector test harness](https://github.com/vectordotdev/vector-test-harness)? (see [Performance Testing](#performance-testing))
 - [ ] Should documentation be adjusted to reflect any of these changes? (see [Documentation](#documentation))
 
+For component changes, especially pull requests introducing new components, the
+following items should also be checked:
+
+- [ ] Does it comply with the [configuration spec](specs/configuration.md)?
+- [ ] Does it comply with [component spec](specs/component.md)?
+- [ ] Does it comply with the [instrumentation spec](specs/instrumentation.md)?
+
 ## Expectations
 
-We endeavour to review all PRs within 2 working days (Monday to Friday - broadly Eastern Time) of submission.
+We endeavour to review all PRs within 2 working days (Monday to Friday) of submission.
 
 ## Backward Compatibility
 
@@ -41,9 +47,11 @@ backward compatibility, it is much less likely to be approved. It is highly
 recommended you discuss this change with a Vector team member before investing
 development time.
 
+Any deprecations should follow our [deprecation policy](DEPRECATION.md).
+
 ## Code Of Conduct
 
-If you have not, please review Vector's [Code of Conduct](CODE_OF_CONDUCT.md)
+If you have not, please review Vector's [Code of Conduct](../CODE_OF_CONDUCT.md)
 to ensure reviews are welcoming, open, and respectful.
 
 ## Dependencies
@@ -65,13 +73,31 @@ Documentation is incredibly important to Vector; it is a feature and
 differentiator for Vector. Pull requests should not be merged without adequate
 documentation, nor should they be merged with "TODOs" opened for documentation.
 
+Ideally all modules should have module level documentation. Module level
+documentation can be omitted for modules where the purpose is obvious and covered
+by a general pattern. With the sinks there is typically a standard number of modules
+included (config.rs, request_builder.rs, service.rs, sink.rs, tests.rs),
+these modules don't need documentation as they will be covered with higher level
+documentation.
+
+All `pub` and `pub(crate)` functions, structs and macros must have documentation.
+
+Consider including examples for modules, structs, functions or macros that
+will be well used throughout Vector.
+
+See the [rustdoc](https://doc.rust-lang.org/rustdoc/how-to-write-documentation.html)
+book for more details on writing documentation.
+
 ## Performance Testing
 
 Vector currently offers 2 methods for performance testing:
 
-1. Internal benchmarks located in the [`/benches` folder](benches).
-2. A full end-to-end [test harness](https://github.com/vectordotdev/vector-test-harness)
-   for complex integration and performance testing.
+1. Internal benchmarks located in the [`/benches` folder](../benches).
+2. A full end-to-end [soak test
+   suite](https://github.com/vectordotdev/vector/tree/master/soaks) for complex
+   integration and performance testing.
+
+For new integrations, consider whether a new soak test should be added.
 
 ## Single Concern
 
@@ -94,7 +120,7 @@ marked as `unsafe`, a detailed comment should be added explaining why.
 
 Security is incredibly important to Vector. Users rely on Vector ship
 mission-critical and sensitive data. Please review the code explicitly for
-security issues. See [Vector's Security guide for more info](SECURITY.md).
+security issues. See [Vector's Security guide for more info](../SECURITY.md).
 
 ## Testing
 
@@ -103,3 +129,5 @@ We believe this level of coverage is unnecessary. As a general rule of thumb,
 we strive for 80% coverage, beyond this returns are diminishing. Please use
 your best judgment, some code requires more testing than others depending
 on its importance.
+
+For integrations, consider whether the code could be integration tested.

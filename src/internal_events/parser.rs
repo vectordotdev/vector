@@ -3,7 +3,11 @@ use std::borrow::Cow;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
-use super::prelude::{error_stage, error_type};
+use crate::{
+    emit,
+    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
+};
+use vector_common::internal_event::{error_stage, error_type};
 
 fn truncate_string_at(s: &str, maxlen: usize) -> Cow<str> {
     let ellipsis: &str = "[...]";
@@ -31,7 +35,7 @@ impl InternalEvent for ParserMatchError<'_> {
             error_type = error_type::CONDITION_FAILED,
             stage = error_stage::PROCESSING,
             field = &truncate_string_at(&String::from_utf8_lossy(self.value), 60)[..],
-            internal_log_rate_secs = 30
+            internal_log_rate_limit = true
         );
         counter!(
             "component_errors_total", 1,
@@ -44,20 +48,26 @@ impl InternalEvent for ParserMatchError<'_> {
     }
 }
 
+#[allow(dead_code)]
+pub const DROP_EVENT: bool = true;
+#[allow(dead_code)]
+pub const RETAIN_EVENT: bool = false;
+
 #[derive(Debug)]
-pub struct ParserMissingFieldError<'a> {
+pub struct ParserMissingFieldError<'a, const DROP_EVENT: bool> {
     pub field: &'a str,
 }
 
-impl InternalEvent for ParserMissingFieldError<'_> {
+impl<const DROP_EVENT: bool> InternalEvent for ParserMissingFieldError<'_, DROP_EVENT> {
     fn emit(self) {
+        let reason = "Field does not exist.";
         error!(
-            message = "Field does not exist.",
+            message = reason,
             field = %self.field,
             error_code = "field_not_found",
             error_type = error_type::CONDITION_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_secs = 10
+            internal_log_rate_limit = true
         );
         counter!(
             "component_errors_total", 1,
@@ -68,33 +78,10 @@ impl InternalEvent for ParserMissingFieldError<'_> {
         );
         // deprecated
         counter!("processing_errors_total", 1, "error_type" => "missing_field");
-    }
-}
 
-#[derive(Debug)]
-pub struct ParserTargetExistsError<'a> {
-    pub target_field: &'a str,
-}
-
-impl<'a> InternalEvent for ParserTargetExistsError<'a> {
-    fn emit(self) {
-        error!(
-            message = format!("Target field {:?} already exists.", self.target_field).as_str(),
-            error_code = "target_field_exists",
-            error_type = error_type::CONDITION_FAILED,
-            stage = error_stage::PROCESSING,
-            target_field = %self.target_field,
-            internal_log_rate_secs = 10
-        );
-        counter!(
-            "component_errors_total", 1,
-            "error_code" => "target_field_exists",
-            "error_type" => error_type::CONDITION_FAILED,
-            "stage" => error_stage::PROCESSING,
-            "target_field" => self.target_field.to_string(),
-        );
-        // deprecated
-        counter!("processing_errors_total", 1, "error_type" => "target_field_exists");
+        if DROP_EVENT {
+            emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
+        }
     }
 }
 
@@ -113,7 +100,7 @@ impl<'a> InternalEvent for ParserConversionError<'a> {
             error_code = "type_conversion",
             error_type = error_type::CONVERSION_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_secs = 30
+            internal_log_rate_limit = true
         );
         counter!(
             "component_errors_total", 1,

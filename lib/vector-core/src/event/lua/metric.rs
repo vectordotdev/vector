@@ -5,7 +5,7 @@ use mlua::prelude::*;
 use super::util::{table_to_timestamp, timestamp_to_table};
 use crate::{
     event::{
-        metric::{self, MetricSketch},
+        metric::{self, MetricSketch, MetricTags},
         Metric, MetricKind, MetricValue, StatisticKind,
     },
     metrics::AgentDDSketch,
@@ -64,6 +64,18 @@ impl<'a> FromLua<'a> for StatisticKind {
     }
 }
 
+impl<'a> FromLua<'a> for MetricTags {
+    fn from_lua(value: LuaValue<'a>, lua: &'a Lua) -> LuaResult<Self> {
+        Ok(Self(BTreeMap::from_lua(value, lua)?))
+    }
+}
+
+impl<'a> ToLua<'a> for MetricTags {
+    fn to_lua(self, lua: &'a Lua) -> LuaResult<LuaValue> {
+        self.0.to_lua(lua)
+    }
+}
+
 impl<'a> ToLua<'a> for Metric {
     #![allow(clippy::wrong_self_convention)] // this trait is defined by mlua
     fn to_lua(self, lua: &'a Lua) -> LuaResult<LuaValue> {
@@ -73,8 +85,11 @@ impl<'a> ToLua<'a> for Metric {
         if let Some(namespace) = self.namespace() {
             tbl.raw_set("namespace", namespace)?;
         }
-        if let Some(ts) = self.data.timestamp {
+        if let Some(ts) = self.data.time.timestamp {
             tbl.raw_set("timestamp", timestamp_to_table(lua, ts)?)?;
+        }
+        if let Some(i) = self.data.time.interval_ms {
+            tbl.raw_set("interval_ms", i.get())?;
         }
         if let Some(tags) = self.series.tags {
             tbl.raw_set("tags", tags)?;
@@ -179,8 +194,9 @@ impl<'a> FromLua<'a> for Metric {
             .raw_get::<_, Option<LuaTable>>("timestamp")?
             .map(table_to_timestamp)
             .transpose()?;
+        let interval_ms: Option<u32> = table.raw_get("interval_ms")?;
         let namespace: Option<String> = table.raw_get("namespace")?;
-        let tags: Option<BTreeMap<String, String>> = table.raw_get("tags")?;
+        let tags: Option<MetricTags> = table.raw_get("tags")?;
         let kind = table
             .raw_get::<_, Option<MetricKind>>("kind")?
             .unwrap_or(MetricKind::Absolute);
@@ -207,7 +223,7 @@ impl<'a> FromLua<'a> for Metric {
         } else if let Some(aggregated_histogram) =
             table.raw_get::<_, Option<LuaTable>>("aggregated_histogram")?
         {
-            let counts: Vec<u32> = aggregated_histogram.raw_get("counts")?;
+            let counts: Vec<u64> = aggregated_histogram.raw_get("counts")?;
             let buckets: Vec<f64> = aggregated_histogram.raw_get("buckets")?;
             let count = counts.iter().sum();
             MetricValue::AggregatedHistogram {
@@ -268,7 +284,8 @@ impl<'a> FromLua<'a> for Metric {
         Ok(Metric::new(name, kind, value)
             .with_namespace(namespace)
             .with_tags(tags)
-            .with_timestamp(timestamp))
+            .with_timestamp(timestamp)
+            .with_interval_ms(interval_ms.and_then(std::num::NonZeroU32::new)))
     }
 }
 

@@ -8,8 +8,11 @@ use futures::{stream, Stream};
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
 use vector_buffers::EventCount;
+use vector_common::finalization::{AddBatchNotifier, BatchNotifier, EventFinalizers, Finalizable};
 
-use super::{Event, EventDataEq, EventMutRef, EventRef, LogEvent, Metric, TraceEvent};
+use super::{
+    Event, EventDataEq, EventFinalizer, EventMutRef, EventRef, LogEvent, Metric, TraceEvent,
+};
 use crate::ByteSizeOf;
 
 /// The type alias for an array of `LogEvent` elements.
@@ -134,42 +137,29 @@ pub enum EventArray {
 }
 
 impl EventArray {
-    /// Call the given update function over each `LogEvent` in this array.
-    pub fn for_each_log(&mut self, update: impl FnMut(&mut LogEvent)) {
-        if let Self::Logs(logs) = self {
-            logs.iter_mut().for_each(update);
-        }
-    }
-
-    /// Call the given update function over each `Metric` in this array.
-    pub fn for_each_metric(&mut self, update: impl FnMut(&mut Metric)) {
-        if let Self::Metrics(metrics) = self {
-            metrics.iter_mut().for_each(update);
-        }
-    }
-
-    /// Run the given update function over each `Trace` in this array.
-    pub fn for_each_trace(&mut self, update: impl FnMut(&mut TraceEvent)) {
-        if let Self::Traces(traces) = self {
-            traces.iter_mut().for_each(update);
-        }
-    }
-
-    /// Call the given update function over each event in this array.
-    pub fn for_each_event(&mut self, mut update: impl FnMut(EventMutRef<'_>)) {
-        match self {
-            Self::Logs(array) => array.iter_mut().for_each(|log| update(log.into())),
-            Self::Metrics(array) => array.iter_mut().for_each(|metric| update(metric.into())),
-            Self::Traces(array) => array.iter_mut().for_each(|trace| update(trace.into())),
-        }
-    }
-
-    /// Iterate over this array's events.
+    /// Iterate over references to this array's events.
     pub fn iter_events(&self) -> impl Iterator<Item = EventRef> {
         match self {
             Self::Logs(array) => EventArrayIter::Logs(array.iter()),
             Self::Metrics(array) => EventArrayIter::Metrics(array.iter()),
             Self::Traces(array) => EventArrayIter::Traces(array.iter()),
+        }
+    }
+
+    /// Iterate over mutable references to this array's events.
+    pub fn iter_events_mut(&mut self) -> impl Iterator<Item = EventMutRef> {
+        match self {
+            Self::Logs(array) => EventArrayIterMut::Logs(array.iter_mut()),
+            Self::Metrics(array) => EventArrayIterMut::Metrics(array.iter_mut()),
+            Self::Traces(array) => EventArrayIterMut::Traces(array.iter_mut()),
+        }
+    }
+
+    /// Iterate over references to the logs in this array.
+    pub fn iter_logs_mut(&mut self) -> impl Iterator<Item = &mut LogEvent> {
+        match self {
+            Self::Logs(array) => TypedArrayIterMut(Some(array.iter_mut())),
+            _ => TypedArrayIterMut(None),
         }
     }
 }
@@ -211,6 +201,22 @@ impl From<LogArray> for EventArray {
 impl From<MetricArray> for EventArray {
     fn from(array: MetricArray) -> Self {
         Self::Metrics(array)
+    }
+}
+
+impl AddBatchNotifier for EventArray {
+    fn add_batch_notifier(&mut self, batch: BatchNotifier) {
+        match self {
+            Self::Logs(array) => array
+                .iter_mut()
+                .for_each(|item| item.add_finalizer(EventFinalizer::new(batch.clone()))),
+            Self::Metrics(array) => array
+                .iter_mut()
+                .for_each(|item| item.add_finalizer(EventFinalizer::new(batch.clone()))),
+            Self::Traces(array) => array
+                .iter_mut()
+                .for_each(|item| item.add_finalizer(EventFinalizer::new(batch.clone()))),
+        }
     }
 }
 
@@ -261,6 +267,16 @@ impl EventDataEq for EventArray {
             (Self::Metrics(a), Self::Metrics(b)) => a.event_data_eq(b),
             (Self::Traces(a), Self::Traces(b)) => a.event_data_eq(b),
             _ => false,
+        }
+    }
+}
+
+impl Finalizable for EventArray {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        match self {
+            Self::Logs(a) => a.iter_mut().map(Finalizable::take_finalizers).collect(),
+            Self::Metrics(a) => a.iter_mut().map(Finalizable::take_finalizers).collect(),
+            Self::Traces(a) => a.iter_mut().map(Finalizable::take_finalizers).collect(),
         }
     }
 }
@@ -319,6 +335,29 @@ impl<'a> Iterator for EventArrayIter<'a> {
     }
 }
 
+/// The iterator type for `EventArray::iter_events_mut`.
+#[derive(Debug)]
+pub enum EventArrayIterMut<'a> {
+    /// An iterator over type `LogEvent`.
+    Logs(slice::IterMut<'a, LogEvent>),
+    /// An iterator over type `Metric`.
+    Metrics(slice::IterMut<'a, Metric>),
+    /// An iterator over type `Trace`.
+    Traces(slice::IterMut<'a, TraceEvent>),
+}
+
+impl<'a> Iterator for EventArrayIterMut<'a> {
+    type Item = EventMutRef<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Logs(i) => i.next().map(EventMutRef::from),
+            Self::Metrics(i) => i.next().map(EventMutRef::from),
+            Self::Traces(i) => i.next().map(EventMutRef::from),
+        }
+    }
+}
+
 /// The iterator type for `EventArray::into_events`.
 #[derive(Debug)]
 pub enum EventArrayIntoIter {
@@ -339,6 +378,15 @@ impl Iterator for EventArrayIntoIter {
             Self::Metrics(i) => i.next().map(Into::into),
             Self::Traces(i) => i.next().map(Event::Trace),
         }
+    }
+}
+
+struct TypedArrayIterMut<'a, T>(Option<slice::IterMut<'a, T>>);
+
+impl<'a, T> Iterator for TypedArrayIterMut<'a, T> {
+    type Item = &'a mut T;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.as_mut().and_then(Iterator::next)
     }
 }
 

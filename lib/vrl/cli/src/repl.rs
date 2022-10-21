@@ -1,8 +1,9 @@
+use core::TargetValue;
 use std::borrow::Cow::{self, Borrowed, Owned};
 
 use ::value::Value;
-use core::TargetValue;
 use indoc::indoc;
+use lookup::{owned_value_path, OwnedTargetPath};
 use once_cell::sync::Lazy;
 use prettytable::{format, Cell, Row, Table};
 use regex::Regex;
@@ -16,10 +17,11 @@ use rustyline::{
 };
 use value::Secrets;
 use vector_common::TimeZone;
-
 use vector_vrl_functions::vrl_functions;
-use vrl::prelude::BTreeMap;
-use vrl::{diagnostic::Formatter, state, Runtime, Target, VrlRuntime};
+use vrl::state::TypeState;
+use vrl::{
+    diagnostic::Formatter, prelude::BTreeMap, state, CompileConfig, Runtime, Target, VrlRuntime,
+};
 
 // Create a list of all possible error values for potential docs lookup
 static ERRORS: Lazy<Vec<String>> = Lazy::new(|| {
@@ -29,7 +31,7 @@ static ERRORS: Lazy<Vec<String>> = Lazy::new(|| {
         601, 620, 630, 640, 650, 651, 652, 660, 701,
     ]
     .iter()
-    .map(|i| i.to_string())
+    .map(std::string::ToString::to_string)
     .collect()
 });
 
@@ -47,15 +49,19 @@ const RESERVED_TERMS: &[&str] = &[
     "help docs",
 ];
 
-pub(crate) fn run(mut objects: Vec<TargetValue>, timezone: &TimeZone, vrl_runtime: VrlRuntime) {
+pub(crate) fn run(
+    mut objects: Vec<TargetValue>,
+    timezone: TimeZone,
+    vrl_runtime: VrlRuntime,
+) -> Result<(), rustyline::error::ReadlineError> {
     let mut index = 0;
     let func_docs_regex = Regex::new(r"^help\sdocs\s(\w{1,})$").unwrap();
     let error_docs_regex = Regex::new(r"^help\serror\s(\w{1,})$").unwrap();
 
-    let mut external_state = state::ExternalEnv::default();
-    let mut local_state = state::LocalEnv::default();
+    let mut state = TypeState::default();
+
     let mut rt = Runtime::new(state::Runtime::default());
-    let mut rl = Editor::<Repl>::new();
+    let mut rl = Editor::<Repl>::new()?;
     rl.set_helper(Some(Repl::new()));
 
     #[allow(clippy::print_stdout)]
@@ -104,7 +110,7 @@ pub(crate) fn run(mut objects: Vec<TargetValue>, timezone: &TimeZone, vrl_runtim
 
                         // remove empty last object
                         if objects.last().map(|x| &x.value) == Some(&Value::Null) {
-                            let _ = objects.pop();
+                            let _last = objects.pop();
                         }
 
                         "."
@@ -113,17 +119,14 @@ pub(crate) fn run(mut objects: Vec<TargetValue>, timezone: &TimeZone, vrl_runtim
                     _ => line,
                 };
 
-                let (local, result) = resolve(
+                let result = resolve(
                     objects.get_mut(index).expect("object should exist"),
                     &mut rt,
                     command,
-                    &mut external_state,
-                    std::mem::take(&mut local_state),
+                    &mut state,
                     timezone,
                     vrl_runtime,
                 );
-
-                let _ = std::mem::replace(&mut local_state, local);
 
                 let string = match result {
                     Ok(v) => v.to_string(),
@@ -135,8 +138,7 @@ pub(crate) fn run(mut objects: Vec<TargetValue>, timezone: &TimeZone, vrl_runtim
                     println!("{}\n", string);
                 }
             }
-            Err(ReadlineError::Interrupted) => break,
-            Err(ReadlineError::Eof) => break,
+            Err(ReadlineError::Interrupted | ReadlineError::Eof) => break,
             Err(err) => {
                 #[allow(clippy::print_stdout)]
                 {
@@ -146,45 +148,45 @@ pub(crate) fn run(mut objects: Vec<TargetValue>, timezone: &TimeZone, vrl_runtim
             }
         }
     }
+    Ok(())
 }
 
 fn resolve(
     target: &mut TargetValue,
     runtime: &mut Runtime,
     program: &str,
-    external: &mut state::ExternalEnv,
-    local: state::LocalEnv,
-    timezone: &TimeZone,
+    state: &mut TypeState,
+    timezone: TimeZone,
     vrl_runtime: VrlRuntime,
-) -> (state::LocalEnv, Result<Value, String>) {
+) -> Result<Value, String> {
     let mut functions = stdlib::all();
     functions.extend(vector_vrl_functions::vrl_functions());
-    let program = match vrl::compile_for_repl(program, &functions, external, local.clone()) {
-        Ok(result) => result,
+
+    let mut config = CompileConfig::default();
+    // The CLI should be moved out of the "vrl" module, and then it can use the `vector-core::compile_vrl` function which includes this automatically
+    config.set_read_only_path(OwnedTargetPath::metadata(owned_value_path!("vector")), true);
+
+    let program = match vrl::compile_with_state(program, &functions, state, config) {
+        Ok(result) => result.program,
         Err(diagnostics) => {
-            return (
-                local,
-                Err(Formatter::new(program, diagnostics).colored().to_string()),
-            )
+            return Err(Formatter::new(program, diagnostics).colored().to_string());
         }
     };
 
-    (
-        program.local_env().clone(),
-        execute(runtime, program, target, timezone, vrl_runtime),
-    )
+    *state = program.final_type_state();
+    execute(runtime, &program, target, timezone, vrl_runtime)
 }
 
 fn execute(
     runtime: &mut Runtime,
-    program: vrl::Program,
+    program: &vrl::Program,
     object: &mut dyn Target,
-    timezone: &TimeZone,
+    timezone: TimeZone,
     vrl_runtime: VrlRuntime,
 ) -> Result<Value, String> {
     match vrl_runtime {
         VrlRuntime::Ast => runtime
-            .resolve(object, &program, timezone)
+            .resolve(object, program, &timezone)
             .map_err(|err| err.to_string()),
     }
 }
@@ -287,8 +289,7 @@ impl Validator for Repl {
         ctx: &mut validate::ValidationContext,
     ) -> rustyline::Result<ValidationResult> {
         let timezone = TimeZone::default();
-        let local_state = state::LocalEnv::default();
-        let mut external_state = state::ExternalEnv::default();
+        let mut state = TypeState::default();
         let mut rt = Runtime::new(state::Runtime::default());
         let mut target = TargetValue {
             value: Value::Null,
@@ -296,13 +297,12 @@ impl Validator for Repl {
             secrets: Secrets::new(),
         };
 
-        let (_, result) = resolve(
+        let result = resolve(
             &mut target,
             &mut rt,
             ctx.input(),
-            &mut external_state,
-            local_state,
-            &timezone,
+            &mut state,
+            timezone,
             VrlRuntime::Ast,
         );
 

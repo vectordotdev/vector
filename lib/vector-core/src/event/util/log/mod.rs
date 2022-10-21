@@ -1,10 +1,8 @@
 mod all_fields;
 mod keys;
-mod remove;
 
 pub use all_fields::{all_fields, all_fields_non_object_root};
 pub use keys::keys;
-pub use remove::remove;
 
 pub(self) use super::Value;
 

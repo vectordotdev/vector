@@ -48,6 +48,9 @@ impl ByteSizeOf for EventFinalizers {
 }
 
 impl EventFinalizers {
+    /// Default empty finalizer set for use in `const` contexts.
+    pub const DEFAULT: Self = Self(Vec::new());
+
     /// Creates a new `EventFinalizers` based on the given event finalizer.
     #[must_use]
     pub fn new(finalizer: EventFinalizer) -> Self {
@@ -95,6 +98,12 @@ impl EventFinalizers {
 impl Finalizable for EventFinalizers {
     fn take_finalizers(&mut self) -> EventFinalizers {
         mem::take(self)
+    }
+}
+
+impl std::iter::FromIterator<EventFinalizers> for EventFinalizers {
+    fn from_iter<T: IntoIterator<Item = EventFinalizers>>(iter: T) -> Self {
+        Self(iter.into_iter().flat_map(|f| f.0.into_iter()).collect())
     }
 }
 
@@ -208,20 +217,26 @@ impl BatchNotifier {
         }
     }
 
+    /// Creates a new `BatchNotifier` and attaches it to a group of events.
+    ///
+    /// The receiver used to await the finalization status of the batch is returned.
+    pub fn apply_to<T: AddBatchNotifier>(items: &mut [T]) -> BatchStatusReceiver {
+        let (batch, receiver) = Self::new_with_receiver();
+        for item in items {
+            item.add_batch_notifier(batch.clone());
+        }
+        receiver
+    }
+
     /// Optionally creates a new `BatchNotifier` and attaches it to a group of events.
     ///
-    /// If `enabled`, the receiver used to await the finalization status of the batch is returned. Otherwise, `None` is returned.
+    /// If `enabled`, the receiver used to await the finalization status of the batch is
+    /// returned. Otherwise, `None` is returned.
     pub fn maybe_apply_to<T: AddBatchNotifier>(
         enabled: bool,
         items: &mut [T],
     ) -> Option<BatchStatusReceiver> {
-        enabled.then(|| {
-            let (batch, receiver) = Self::new_with_receiver();
-            for item in items {
-                item.add_batch_notifier(batch.clone());
-            }
-            receiver
-        })
+        enabled.then(|| Self::apply_to(items))
     }
 
     /// Updates the status of the notifier.

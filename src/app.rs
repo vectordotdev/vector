@@ -24,7 +24,7 @@ use crate::{api, internal_events::ApiStarted};
 use crate::{
     cli::{handle_config_errors, Color, LogFormat, Opts, RootOpts, SubCommand},
     config::{self},
-    generate, graph, heartbeat, list,
+    generate, generate_schema, graph, heartbeat, list,
     signal::{self, SignalTo},
     topology::{self, RunningTopology},
     trace, unit_test, validate,
@@ -38,6 +38,8 @@ use crate::internal_events::{
     VectorConfigLoadError, VectorQuit, VectorRecoveryError, VectorReloadError, VectorReloaded,
     VectorStarted, VectorStopped,
 };
+
+use tokio::sync::broadcast::error::RecvError;
 
 pub struct ApplicationConfig {
     pub config_paths: Vec<config::ConfigPath>,
@@ -86,13 +88,13 @@ impl Application {
                     "tower_limit=trace".to_owned(),
                     format!("rdkafka={}", level),
                     format!("buffers={}", level),
+                    format!("lapin={}", level),
                     format!("kube={}", level),
                 ]
                 .join(","),
             });
 
         let root_opts = opts.root;
-
         let sub_command = opts.sub_command;
 
         let color = match root_opts.color {
@@ -135,7 +137,11 @@ impl Application {
             let require_healthy = root_opts.require_healthy;
 
             rt.block_on(async move {
-                trace::init(color, json, &level);
+                trace::init(color, json, &level, root_opts.internal_log_rate_limit);
+                info!(
+                    message = "Internal log rate limit configured.",
+                    internal_log_rate_secs = root_opts.internal_log_rate_limit
+                );
                 // Signal handler for OS and provider messages.
                 let (mut signal_handler, signal_rx) = signal::SignalHandler::new();
                 signal_handler.forever(signal::os_signals());
@@ -143,6 +149,7 @@ impl Application {
                 if let Some(s) = sub_command {
                     let code = match s {
                         SubCommand::Generate(g) => generate::cmd(&g),
+                        SubCommand::GenerateSchema => generate_schema::cmd(),
                         SubCommand::Graph(g) => graph::cmd(&g),
                         SubCommand::Config(c) => config::cmd(&c),
                         SubCommand::List(l) => list::cmd(&l),
@@ -292,9 +299,9 @@ impl Application {
 
             let signal = loop {
                 tokio::select! {
-                    Ok(signal) = signal_rx.recv() => {
+                    signal = signal_rx.recv() => {
                         match signal {
-                            SignalTo::ReloadFromConfigBuilder(config_builder) => {
+                            Ok(SignalTo::ReloadFromConfigBuilder(config_builder)) => {
                                 match config_builder.build().map_err(handle_config_errors) {
                                     Ok(mut new_config) => {
                                         new_config.healthchecks.set_require_healthy(opts.require_healthy);
@@ -343,7 +350,7 @@ impl Application {
                                     }
                                 }
                             }
-                            SignalTo::ReloadFromDisk => {
+                            Ok(SignalTo::ReloadFromDisk) => {
                                 // Reload paths
                                 config_paths = config::process_paths(&opts.config_paths_with_formats()).unwrap_or(config_paths);
 
@@ -395,8 +402,10 @@ impl Application {
                                 } else {
                                     emit!(VectorConfigLoadError);
                                 }
-                            }
-                            _ => break signal,
+                            },
+                            Err(RecvError::Lagged(amt)) => warn!("Overflow, dropped {} signals.", amt),
+                            Err(RecvError::Closed) => break SignalTo::Shutdown,
+                            Ok(signal) => break signal,
                         }
                     }
                     // Trigger graceful shutdown if a component crashed, or all sources have ended.

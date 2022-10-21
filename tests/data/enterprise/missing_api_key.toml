@@ -1,0 +1,14 @@
+[enterprise]
+configuration_key = "configuration_key"
+endpoint = "${MOCK_SERVER_ENDPOINT}"
+max_retries = 1
+
+[sources.in]
+type = "demo_logs"
+format = "syslog"
+count = 1
+interval = 0.0
+
+[sinks.out]
+type = "blackhole"
+inputs = ["*"]

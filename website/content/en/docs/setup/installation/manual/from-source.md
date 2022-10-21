@@ -66,6 +66,10 @@ target/<target>/release/vector --config config/vector.toml
 
 Install Rust using [`rustup`][rustup]. If you don't have VC++ build tools, the install will prompt you to install them.
 
+Install and add [CMake][cmake] to `PATH`.
+
+Install and add [Protoc][protoc] to `PATH`.
+
 Install [Perl for Windows][perl].
 
 Add Perl to your `PATH`. In a Rust/MSVC environment (for example using `x64 Native Tools Command Prompt`) add the binary directory of Perl installed on the previous step to `PATH`. For example, for default installation of Strawberry Perl it is
@@ -124,13 +128,13 @@ And then build Vector using [cross]:
 
 ```shell
 # Linux (x86_64)
-PASS_FEATURES=default-cmake make package-x86_64-unknown-linux-musl-all
+make package-x86_64-unknown-linux-musl-all
 
 # Linux (ARM64)
-PASS_FEATURES=default-cmake make package-aarch64-unknown-linux-musl-all
+make package-aarch64-unknown-linux-musl-all
 
 # Linux (ARMv7)
-PASS_FEATURES=default-cmake make package-armv7-unknown-linux-muslueabihf-all
+make package-armv7-unknown-linux-muslueabihf-all
 ```
 
 The command above builds a Docker image with a Rust toolchain for a Linux target for the corresponding architecture using `musl` as the C library, then starts a container from this image, and then builds inside the container. The target binary is located at `target/<target triple>/release/vector` as in the previous case.
@@ -198,6 +202,7 @@ all sources, transforms, and sinks are enabled. To view a complete list of featu
 under "[features]" [here](https://github.com/vectordotdev/vector/blob/master/Cargo.toml).
 
 [buffer]: /docs/reference/glossary/#buffer
+[cmake]: https://cmake.org/
 [configuration]: /docs/reference/configuration
 [cross]: https://github.com/rust-embedded/cross
 [data_dir]: /docs/reference/configuration/global-options/#data_dir
@@ -209,5 +214,6 @@ under "[features]" [here](https://github.com/vectordotdev/vector/blob/master/Car
 [librdkafka]: https://github.com/edenhill/librdkafka
 [openssl]: https://www.openssl.org
 [perl]: https://www.perl.org/get.html#win32
+[protoc]: https://github.com/protocolbuffers/protobuf
 [rustup]: https://rustup.rs
 [zlib]: https://www.zlib.net

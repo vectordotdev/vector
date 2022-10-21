@@ -93,4 +93,4 @@ As a general rule of thumb, agents should not hold onto data. Furthermore, proce
 
 ## Support
 
-For easy setup and maintenance of this architecture, consider the Vector’s [discussions](https://discussions.vector.dev) or [chat](https://chat.vector.dev). These are free best effort channels. For enterprise needs, consider Datadog Observability Pipelines, which comes with enterprise-level support. In addition, we offer Datadog Premier Support Services for expert architectural guidance. [Contact us for more information](https://www.datadoghq.com/about/contact/).
+For easy setup and maintenance of this architecture, consider the Vector’s [discussions](https://discussions.vector.dev) or [chat](https://chat.vector.dev). These are free best effort channels. For enterprise needs, consider Datadog Observability Pipelines, which comes with enterprise-level support.

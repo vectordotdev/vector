@@ -415,7 +415,6 @@ async fn tap_handler(
     test,
     feature = "sinks-blackhole",
     feature = "sources-demo_logs",
-    feature = "transforms-log_to_metric",
     feature = "transforms-remap",
 ))]
 mod tests {
@@ -429,7 +428,7 @@ mod tests {
     use crate::event::{LogEvent, Metric, MetricKind, MetricValue};
     use crate::sinks::blackhole::BlackholeConfig;
     use crate::sources::demo_logs::{DemoLogsConfig, OutputFormat};
-    use crate::test_util::start_topology;
+    use crate::test_util::{start_topology, trace_init};
     use crate::transforms::log_to_metric::{GaugeConfig, LogToMetricConfig, MetricConfig};
     use crate::transforms::remap::RemapConfig;
 
@@ -492,7 +491,7 @@ mod tests {
 
         // First two events should contain a notification that one pattern matched, and
         // one that didn't.
-        #[allow(clippy::eval_order_dependence)]
+        #[allow(clippy::mixed_read_write_in_expression)]
         let notifications = vec![sink_rx.recv().await, sink_rx.recv().await];
 
         for notification in notifications.into_iter() {
@@ -520,8 +519,14 @@ mod tests {
             MetricValue::Counter { value: 1.0 },
         );
 
-        let _ = fanout.send(vec![metric_event].into()).await;
-        let _ = fanout.send(vec![log_event].into()).await;
+        fanout
+            .send(vec![metric_event].into())
+            .await
+            .expect("should not fail");
+        fanout
+            .send(vec![log_event].into())
+            .await
+            .expect("should not fail");
 
         // 3rd payload should be the metric event
         assert!(matches!(
@@ -562,6 +567,8 @@ mod tests {
 
     #[tokio::test]
     async fn integration_test_source_log() {
+        trace_init();
+
         let mut config = Config::builder();
         config.add_source(
             "in",
@@ -602,6 +609,8 @@ mod tests {
 
     #[tokio::test]
     async fn integration_test_source_metric() {
+        trace_init();
+
         let mut config = Config::builder();
         config.add_source(
             "in",
@@ -620,7 +629,7 @@ mod tests {
             &["in"],
             LogToMetricConfig {
                 metrics: vec![MetricConfig::Gauge(GaugeConfig {
-                    field: "message".to_string(),
+                    field: "message".try_into().expect("Fixed template string"),
                     name: None,
                     namespace: None,
                     tags: None,
@@ -657,6 +666,8 @@ mod tests {
 
     #[tokio::test]
     async fn integration_test_transform() {
+        trace_init();
+
         let mut config = Config::builder();
         config.add_source(
             "in",
@@ -705,6 +716,8 @@ mod tests {
 
     #[tokio::test]
     async fn integration_test_transform_input() {
+        trace_init();
+
         let mut config = Config::builder();
         config.add_source(
             "in",
@@ -777,6 +790,8 @@ mod tests {
 
     #[tokio::test]
     async fn integration_test_sink() {
+        trace_init();
+
         let mut config = Config::builder();
         config.add_source(
             "in",
@@ -833,6 +848,8 @@ mod tests {
 
     #[tokio::test]
     async fn integration_test_tap_non_default_output() {
+        trace_init();
+
         let mut config = Config::builder();
         config.add_source(
             "in",
@@ -895,6 +912,8 @@ mod tests {
 
     #[tokio::test]
     async fn integration_test_tap_multiple_outputs() {
+        trace_init();
+
         let mut config = Config::builder();
         config.add_source(
             "in-test1",

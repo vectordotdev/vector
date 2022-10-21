@@ -46,7 +46,7 @@ impl RawMessageSerializer {
 }
 
 impl Encoder<Event> for RawMessageSerializer {
-    type Error = vector_core::Error;
+    type Error = vector_common::Error;
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let message_key = log_schema().message_key();
@@ -68,12 +68,13 @@ impl Encoder<Event> for RawMessageSerializer {
 #[cfg(test)]
 mod tests {
     use bytes::{Bytes, BytesMut};
+    use vector_core::event::LogEvent;
 
     use super::*;
 
     #[test]
     fn serialize_bytes() {
-        let input = Event::from("foo");
+        let input = Event::from(LogEvent::from_str_legacy("foo"));
         let mut serializer = RawMessageSerializer;
 
         let mut buffer = BytesMut::new();

@@ -3,7 +3,7 @@ use vector_common::conversion::Conversion;
 use vrl::prelude::*;
 
 fn to_int(value: Value) -> Resolved {
-    use Value::*;
+    use Value::{Boolean, Bytes, Float, Integer, Null, Timestamp};
 
     match value {
         Integer(_) => Ok(value),
@@ -104,13 +104,13 @@ impl Function for ToInt {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _state: &state::TypeState,
         _ctx: &mut FunctionCompileContext,
-        mut arguments: ArgumentList,
+        arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
-        Ok(Box::new(ToIntFn { value }))
+        Ok(ToIntFn { value }.as_expr())
     }
 }
 
@@ -119,14 +119,14 @@ struct ToIntFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ToIntFn {
+impl FunctionExpression for ToIntFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
 
         to_int(value)
     }
 
-    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+    fn type_def(&self, state: &state::TypeState) -> TypeDef {
         let td = self.value.type_def(state);
 
         TypeDef::integer().with_fallibility(
@@ -163,7 +163,7 @@ mod tests {
              args: func_args![value: DateTime::parse_from_rfc2822("Wed, 16 Oct 2019 12:00:00 +0000")
                             .unwrap()
                             .with_timezone(&Utc)],
-             want: Ok(1571227200),
+             want: Ok(1_571_227_200),
              tdef: TypeDef::integer().infallible(),
          }
     ];

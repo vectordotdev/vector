@@ -4,10 +4,7 @@ use diagnostic::{DiagnosticMessage, Label, Note};
 use dyn_clone::{clone_trait_object, DynClone};
 use value::Value;
 
-use crate::{
-    state::{ExternalEnv, LocalEnv},
-    Context, Span, TypeDef,
-};
+use crate::{Context, Span, TypeDef};
 
 #[cfg(feature = "expr-abort")]
 mod abort;
@@ -32,16 +29,19 @@ mod variable;
 pub(crate) mod assignment;
 pub(crate) mod container;
 #[cfg(feature = "expr-function_call")]
+pub(crate) mod function;
+#[cfg(feature = "expr-function_call")]
 pub(crate) mod function_call;
 #[cfg(feature = "expr-literal")]
 pub(crate) mod literal;
 #[cfg(feature = "expr-if_statement")]
 pub(crate) mod predicate;
 #[cfg(feature = "expr-query")]
-pub(crate) mod query;
+pub mod query;
 
 pub use core::{ExpressionError, Resolved};
 
+use crate::state::{TypeInfo, TypeState};
 #[cfg(feature = "expr-abort")]
 pub use abort::Abort;
 pub use array::Array;
@@ -49,6 +49,8 @@ pub use array::Array;
 pub use assignment::Assignment;
 pub use block::Block;
 pub use container::{Container, Variant};
+#[cfg(feature = "expr-function_call")]
+pub use function::FunctionExpression;
 pub use function_argument::FunctionArgument;
 #[cfg(feature = "expr-function_call")]
 pub use function_call::FunctionCall;
@@ -87,18 +89,27 @@ pub trait Expression: Send + Sync + fmt::Debug + DynClone {
     }
 
     /// Resolve an expression to its [`TypeDef`] type definition.
+    /// This must be called with the _initial_ `TypeState`.
     ///
-    /// This method is executed at compile-time.
-    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef;
+    /// Consider calling `type_info` instead if you want to capture changes in the type
+    /// state from side-effects.
+    fn type_def(&self, state: &TypeState) -> TypeDef {
+        self.type_info(state).result
+    }
 
-    /// Updates the state if necessary.
-    /// By default it does nothing.
-    fn update_state(
-        &mut self,
-        _local: &mut LocalEnv,
-        _external: &mut ExternalEnv,
-    ) -> Result<(), ExpressionError> {
-        Ok(())
+    /// Calculates the type state after an expression resolves, including the expression result itself.
+    /// This must be called with the _initial_ `TypeState`.
+    ///
+    /// Consider using `apply_type_info` instead if you want to just access
+    /// the expr result type, while updating an existing state.
+    fn type_info(&self, state: &TypeState) -> TypeInfo;
+
+    /// Applies state changes from the expression to the given state, and
+    /// returns the result type.
+    fn apply_type_info(&self, state: &mut TypeState) -> TypeDef {
+        let new_info = self.type_info(state);
+        *state = new_info.state;
+        new_info.result
     }
 
     /// Format the expression into a consistent style.
@@ -138,8 +149,11 @@ pub enum Expr {
 
 impl Expr {
     pub fn as_str(&self) -> &str {
-        use container::Variant::*;
-        use Expr::*;
+        use container::Variant::{Array, Block, Group, Object};
+        use Expr::{
+            Abort, Assignment, Container, FunctionCall, IfStatement, Literal, Noop, Op, Query,
+            Unary, Variable,
+        };
 
         match self {
             #[cfg(feature = "expr-literal")]
@@ -228,7 +242,10 @@ impl Expr {
 
 impl Expression for Expr {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        use Expr::*;
+        use Expr::{
+            Abort, Assignment, Container, FunctionCall, IfStatement, Literal, Noop, Op, Query,
+            Unary, Variable,
+        };
 
         match self {
             #[cfg(feature = "expr-literal")]
@@ -254,7 +271,10 @@ impl Expression for Expr {
     }
 
     fn as_value(&self) -> Option<Value> {
-        use Expr::*;
+        use Expr::{
+            Abort, Assignment, Container, FunctionCall, IfStatement, Literal, Noop, Op, Query,
+            Unary, Variable,
+        };
 
         match self {
             #[cfg(feature = "expr-literal")]
@@ -279,36 +299,42 @@ impl Expression for Expr {
         }
     }
 
-    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
-        use Expr::*;
+    fn type_info(&self, state: &TypeState) -> TypeInfo {
+        use Expr::{
+            Abort, Assignment, Container, FunctionCall, IfStatement, Literal, Noop, Op, Query,
+            Unary, Variable,
+        };
 
         match self {
             #[cfg(feature = "expr-literal")]
-            Literal(v) => v.type_def(state),
-            Container(v) => v.type_def(state),
+            Literal(v) => v.type_info(state),
+            Container(v) => v.type_info(state),
             #[cfg(feature = "expr-if_statement")]
-            IfStatement(v) => v.type_def(state),
+            IfStatement(v) => v.type_info(state),
             #[cfg(feature = "expr-op")]
-            Op(v) => v.type_def(state),
+            Op(v) => v.type_info(state),
             #[cfg(feature = "expr-assignment")]
-            Assignment(v) => v.type_def(state),
+            Assignment(v) => v.type_info(state),
             #[cfg(feature = "expr-query")]
-            Query(v) => v.type_def(state),
+            Query(v) => v.type_info(state),
             #[cfg(feature = "expr-function_call")]
-            FunctionCall(v) => v.type_def(state),
-            Variable(v) => v.type_def(state),
-            Noop(v) => v.type_def(state),
+            FunctionCall(v) => v.type_info(state),
+            Variable(v) => v.type_info(state),
+            Noop(v) => v.type_info(state),
             #[cfg(feature = "expr-unary")]
-            Unary(v) => v.type_def(state),
+            Unary(v) => v.type_info(state),
             #[cfg(feature = "expr-abort")]
-            Abort(v) => v.type_def(state),
+            Abort(v) => v.type_info(state),
         }
     }
 }
 
 impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Expr::*;
+        use Expr::{
+            Abort, Assignment, Container, FunctionCall, IfStatement, Literal, Noop, Op, Query,
+            Unary, Variable,
+        };
 
         match self {
             #[cfg(feature = "expr-literal")]
@@ -415,7 +441,7 @@ impl From<Value> for Expr {
     fn from(value: Value) -> Self {
         use std::collections::BTreeMap;
 
-        use value::Value::*;
+        use value::Value::{Array, Boolean, Bytes, Float, Integer, Null, Object, Regex, Timestamp};
 
         match value {
             Bytes(v) => Literal::from(v).into(),
@@ -465,7 +491,7 @@ pub enum Error {
 
 impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
-        use Error::*;
+        use Error::{Fallible, Missing};
 
         match self {
             Fallible { .. } => 100,
@@ -474,7 +500,7 @@ impl DiagnosticMessage for Error {
     }
 
     fn labels(&self) -> Vec<Label> {
-        use Error::*;
+        use Error::{Fallible, Missing};
 
         match self {
             Fallible { span } => vec![
@@ -492,7 +518,7 @@ impl DiagnosticMessage for Error {
     }
 
     fn notes(&self) -> Vec<Note> {
-        use Error::*;
+        use Error::{Fallible, Missing};
 
         match self {
             Fallible { .. } => vec![Note::SeeErrorDocs],

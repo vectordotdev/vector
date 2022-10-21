@@ -158,7 +158,7 @@ source = "del(.email)"
 healthcheck = true
 inputs = ["not_gdpr", "gdpr_stripped"]
 type = "console"
-encoding = "json"
+encoding.codec = "json"
 [sinks.console.buffer]
 type = "memory"
 max_events = 500
@@ -253,14 +253,6 @@ and a `last_name` field coming from a source, and we'd like to output a `name` f
   '''
 ```
 
-{{< info >}}
-What if you had to do this in reverse? Try using the [`regex_parser`][docs.transforms.regex_parser] or
-[`split`][docs.transforms.split] transforms.
-
-[docs.transforms.regex_parser]: /docs/reference/vrl/functions/#parse_regex
-[docs.transforms.split]: /docs/reference/vrl/functions/#split
-{{< /info >}}
-
 ## Coercing Data Types
 
 Occasionally services will provide you with data that is in the right shape, but the types are wrong. Perhaps a string
@@ -315,11 +307,11 @@ output format
   type = "console"
   inputs = ["source0"]
   target = "stdout"
-  encoding = "json"
+  encoding.codec = "json"
 ```
 
-You can also use a transform like [`json_parser`][docs.transforms.json_parser] or
-[`grok_parser`][docs.transforms.grok_parser] to parse out data in a given field.
+You can also use a transform like [`remap`][docs.transforms.remap] or to parse out
+data in a given field.
 
 ## Parting thoughts
 

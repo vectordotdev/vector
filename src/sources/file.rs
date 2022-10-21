@@ -1,6 +1,4 @@
-use std::{
-    collections::HashSet, convert::TryInto, path::PathBuf, sync::Arc, sync::Mutex, time::Duration,
-};
+use std::{convert::TryInto, path::PathBuf, time::Duration};
 
 use bytes::Bytes;
 use chrono::Utc;
@@ -15,26 +13,22 @@ use tokio::{sync::oneshot, task::spawn_blocking};
 use tracing::{Instrument, Span};
 use vector_common::finalizer::OrderedFinalizer;
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 
 use super::util::{EncodingConfig, MultilineConfig};
 use crate::{
-    config::{
-        log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext,
-        SourceDescription,
-    },
+    config::{log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext},
     encoding_transcode::{Decoder, Encoder},
     event::{BatchNotifier, BatchStatus, LogEvent},
     internal_events::{
-        FileBytesReceived, FileEventsReceived, FileNegativeAcknowledgementError, FileOpen,
-        FileSourceInternalEventsEmitter,
+        FileBytesReceived, FileEventsReceived, FileOpen, FileSourceInternalEventsEmitter,
+        StreamClosedError,
     },
     line_agg::{self, LineAgg},
     serde::bool_or_struct,
     shutdown::ShutdownSignal,
     SourceSender,
 };
-
-const POISONED_FAILED_LOCK: &str = "Poisoned lock on failed files set";
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -66,8 +60,8 @@ enum BuildError {
 }
 
 /// Configuration for the `file` source.
-#[configurable_component(source)]
-#[derive(Clone, Debug, PartialEq)]
+#[configurable_component(source("file"))]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[serde(deny_unknown_fields, default)]
 pub struct FileConfig {
     /// Array of file patterns to include. [Globbing](https://vector.dev/docs/reference/configuration/sources/file/#globbing) is supported.
@@ -103,7 +97,7 @@ pub struct FileConfig {
     #[serde(alias = "ignore_older")]
     pub ignore_older_secs: Option<u64>,
 
-    /// The maximum number of a bytes a line can contain before being discarded.
+    /// The maximum number of bytes a line can contain before being discarded.
     ///
     /// This protects against malformed lines or tailing incorrect files.
     #[serde(default = "default_max_line_bytes")]
@@ -113,13 +107,22 @@ pub struct FileConfig {
     ///
     /// The value will be the current hostname for wherever Vector is running.
     ///
-    /// By default, the [global `host_key` option](https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key) is used.
+    /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
+    ///
+    /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     pub host_key: Option<String>,
 
     /// The directory used to persist file checkpoint positions.
     ///
     /// By default, the global `data_dir` option is used. Please make sure the user Vector is running as has write permissions to this directory.
     pub data_dir: Option<PathBuf>,
+
+    /// Enables adding the file offset to each event and sets the name of the log field used.
+    ///
+    /// The value will be the byte offset of the start of the line within the file.
+    ///
+    /// Off by default, the offset is only added to the event if this is set.
+    pub offset_key: Option<String>,
 
     /// Delay between file discovery calls, in milliseconds.
     ///
@@ -180,7 +183,7 @@ pub struct FileConfig {
 ///
 /// This is important for `checkpointing` when file rotation is used.
 #[configurable_component]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[serde(tag = "strategy", rename_all = "snake_case")]
 pub enum FingerprintConfig {
     /// Read lines from the beginning of the file and compute a checksum over them.
@@ -213,7 +216,7 @@ pub enum FingerprintConfig {
 
 /// File position to use when reading a new file.
 #[configurable_component]
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ReadFromConfig {
     /// Read from the beginning of the file.
@@ -268,7 +271,6 @@ const fn default_lines() -> usize {
 
 #[derive(Debug)]
 pub(crate) struct FinalizerEntry {
-    pub(crate) file_name: String,
     pub(crate) file_id: FileFingerprint,
     pub(crate) offset: u64,
 }
@@ -291,6 +293,7 @@ impl Default for FileConfig {
             },
             ignore_not_found: false,
             host_key: None,
+            offset_key: None,
             data_dir: None,
             glob_minimum_cooldown_ms: 1000, // millis
             message_start_indicator: None,
@@ -306,14 +309,9 @@ impl Default for FileConfig {
     }
 }
 
-inventory::submit! {
-    SourceDescription::new::<FileConfig>("file")
-}
-
 impl_generate_config_from_default!(FileConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "file")]
 impl SourceConfig for FileConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         // add the source name as a subdir, so that multiple sources can
@@ -349,12 +347,8 @@ impl SourceConfig for FileConfig {
         ))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
-    }
-
-    fn source_type(&self) -> &'static str {
-        "file"
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -418,12 +412,15 @@ pub fn file_source(
         handle: tokio::runtime::Handle::current(),
     };
 
-    let file_key = config.file_key.clone();
-    let host_key = config
-        .host_key
-        .clone()
-        .unwrap_or_else(|| log_schema().host_key().to_string());
-    let hostname = crate::get_hostname().ok();
+    let event_metadata = EventMetadata {
+        host_key: config
+            .host_key
+            .clone()
+            .unwrap_or_else(|| log_schema().host_key().to_string()),
+        hostname: crate::get_hostname().ok(),
+        file_key: config.file_key.clone(),
+        offset_key: config.offset_key.clone(),
+    };
 
     let include = config.include.clone();
     let exclude = config.exclude.clone();
@@ -431,14 +428,6 @@ pub fn file_source(
     let message_start_indicator = config.message_start_indicator.clone();
     let multi_line_timeout = config.multi_line_timeout;
 
-    // The `failed_files` set contains `FileFingerprint`s, provided by
-    // the file server, of all files that have received a negative
-    // acknowledgements. This set is shared between the finalizer
-    // task, which both holds back checkpointer updates if an
-    // identifier is present and adds entries on negative
-    // acknowledgements, and the main file server handling task, which
-    // holds back further events from files in the set.
-    let failed_files: Arc<Mutex<HashSet<FileFingerprint>>> = Default::default();
     let (finalizer, shutdown_checkpointer) = if acknowledgements {
         // The shutdown sent in to the finalizer is the global
         // shutdown handle used to tell it to stop accepting new batch
@@ -450,21 +439,10 @@ pub fn file_source(
         // checkpoints until all the acks have come in.
         let (send_shutdown, shutdown2) = oneshot::channel::<()>();
         let checkpoints = checkpointer.view();
-        let failed_files = Arc::clone(&failed_files);
         tokio::spawn(async move {
             while let Some((status, entry)) = ack_stream.next().await {
-                // Don't update the checkpointer on file streams after failed acks
-                let mut failed_files = failed_files.lock().expect(POISONED_FAILED_LOCK);
-                // Hold back updates for failed files
-                if !failed_files.contains(&entry.file_id) {
-                    if status == BatchStatus::Delivered {
-                        checkpoints.update(entry.file_id, entry.offset);
-                    } else {
-                        emit!(FileNegativeAcknowledgementError {
-                            filename: &entry.file_name,
-                        });
-                        failed_files.insert(entry.file_id);
-                    }
+                if status == BatchStatus::Delivered {
+                    checkpoints.update(entry.file_id, entry.offset);
                 }
             }
             send_shutdown.send(())
@@ -492,21 +470,13 @@ pub fn file_source(
                     byte_size: line.text.len(),
                     file: &line.filename,
                 });
-                let failed = failed_files
-                    .lock()
-                    .expect(POISONED_FAILED_LOCK)
-                    .contains(&line.file_id);
-                // Drop the incoming data if the file received a negative acknowledgement.
-                (!failed).then(|| {
-                    // transcode each line from the file's encoding charset to utf8
-                    if let Some(d) = &mut encoding_decoder {
-                        line.text = d.decode_to_utf8(line.text);
-                    }
-                    line
-                })
-            })
-            .map(futures::stream::iter)
-            .flatten();
+                // transcode each line from the file's encoding charset to utf8
+                line.text = match encoding_decoder.as_mut() {
+                    Some(d) => d.decode_to_utf8(line.text),
+                    None => line.text,
+                };
+                line
+            });
 
         let messages: Box<dyn Stream<Item = Line> + Send + std::marker::Unpin> =
             if let Some(ref multiline_config) = multiline_config {
@@ -532,26 +502,40 @@ pub fn file_source(
         let span2 = span.clone();
         let mut messages = messages.map(move |line| {
             let _enter = span2.enter();
-            let mut event =
-                create_event(line.text, &line.filename, &host_key, &hostname, &file_key);
+            let mut event = create_event(
+                line.text,
+                line.start_offset,
+                &line.filename,
+                &event_metadata,
+            );
+
             if let Some(finalizer) = &finalizer {
                 let (batch, receiver) = BatchNotifier::new_with_receiver();
                 event = event.with_batch_notifier(&batch);
                 let entry = FinalizerEntry {
-                    file_name: line.filename,
                     file_id: line.file_id,
-                    offset: line.offset,
+                    offset: line.end_offset,
                 };
                 finalizer.add(entry, receiver);
             } else {
-                checkpoints.update(line.file_id, line.offset);
+                checkpoints.update(line.file_id, line.end_offset);
             }
             event
         });
         tokio::spawn(async move {
-            out.send_event_stream(&mut messages)
+            match out
+                .send_event_stream(&mut messages)
                 .instrument(span.or_current())
                 .await
+            {
+                Ok(()) => {
+                    debug!("Finished sending.");
+                }
+                Err(error) => {
+                    let (count, _) = messages.size_hint();
+                    emit!(StreamClosedError { error, count });
+                }
+            }
         });
 
         let span = info_span!("file_server");
@@ -599,42 +583,56 @@ fn wrap_with_line_agg(
     let logic = line_agg::Logic::new(config);
     Box::new(
         LineAgg::new(
-            rx.map(|line| (line.filename, line.text, (line.file_id, line.offset))),
+            rx.map(|line| {
+                (
+                    line.filename,
+                    line.text,
+                    (line.file_id, line.start_offset, line.end_offset),
+                )
+            }),
             logic,
         )
-        .map(|(filename, text, (file_id, offset))| Line {
-            text,
-            filename,
-            file_id,
-            offset,
-        }),
+        .map(
+            |(filename, text, (file_id, start_offset, end_offset))| Line {
+                text,
+                filename,
+                file_id,
+                start_offset,
+                end_offset,
+            },
+        ),
     )
 }
 
-fn create_event(
-    line: Bytes,
-    file: &str,
-    host_key: &str,
-    hostname: &Option<String>,
-    file_key: &Option<String>,
-) -> LogEvent {
+struct EventMetadata {
+    host_key: String,
+    hostname: Option<String>,
+    file_key: Option<String>,
+    offset_key: Option<String>,
+}
+
+fn create_event(line: Bytes, offset: u64, file: &str, meta: &EventMetadata) -> LogEvent {
     emit!(FileEventsReceived {
         count: 1,
         file,
         byte_size: line.len(),
     });
 
-    let mut event = LogEvent::from(line);
+    let mut event = LogEvent::from_bytes_legacy(&line);
 
     // Add source type
     event.insert(log_schema().source_type_key(), Bytes::from("file"));
 
-    if let Some(file_key) = &file_key {
+    if let Some(offset_key) = &meta.offset_key {
+        event.insert(offset_key.as_str(), offset);
+    }
+
+    if let Some(file_key) = &meta.file_key {
         event.insert(file_key.as_str(), file);
     }
 
-    if let Some(hostname) = &hostname {
-        event.insert(host_key, hostname.clone());
+    if let Some(hostname) = &meta.hostname {
+        event.insert(meta.host_key.as_str(), hostname.clone());
     }
 
     event
@@ -643,18 +641,15 @@ fn create_event(
 #[cfg(test)]
 mod tests {
     use std::{
-        cmp::{max, min},
         collections::HashSet,
         fs::{self, File},
         future::Future,
-        io::{Read, Seek, Write},
-        path::Path,
+        io::{Seek, Write},
     };
 
     use encoding_rs::UTF_16LE;
     use pretty_assertions::assert_eq;
-    use serde::Deserialize;
-    use tempfile::{tempdir, TempDir};
+    use tempfile::tempdir;
     use tokio::time::{sleep, timeout, Duration};
 
     use super::*;
@@ -671,7 +666,7 @@ mod tests {
         crate::test_util::test_generate_config::<FileConfig>();
     }
 
-    fn test_default_file_config(dir: &TempDir) -> file::FileConfig {
+    fn test_default_file_config(dir: &tempfile::TempDir) -> file::FileConfig {
         file::FileConfig {
             fingerprint: FingerprintConfig::Checksum {
                 bytes: Some(8),
@@ -782,14 +777,24 @@ mod tests {
     fn file_create_event() {
         let line = Bytes::from("hello world");
         let file = "some_file.rs";
+
         let host_key = "host".to_string();
         let hostname = Some("Some.Machine".to_string());
         let file_key = Some("file".to_string());
+        let offset_key = Some("offset".to_string());
+        let offset: u64 = 0;
 
-        let log = create_event(line, file, &host_key, &hostname, &file_key);
+        let meta = EventMetadata {
+            host_key,
+            hostname,
+            file_key,
+            offset_key,
+        };
+        let log = create_event(line, offset, file, &meta);
 
-        assert_eq!(log["file"], file.into());
+        assert_eq!(log["file"], "some_file.rs".into());
         assert_eq!(log["host"], "Some.Machine".into());
+        assert_eq!(log["offset"], 0.into());
         assert_eq!(log[log_schema().message_key()], "hello world".into());
         assert_eq!(log[log_schema().source_type_key()], "file".into());
     }
@@ -1243,95 +1248,6 @@ mod tests {
         let received = run_file_source(&config, false, Unfinalized, sleep_500_millis()).await;
         let lines = extract_messages_string(received);
         assert_eq!(lines, vec!["the line"]);
-    }
-
-    #[tokio::test]
-    async fn file_start_position_negative_acknowledgement() {
-        let dir = tempdir().unwrap();
-        let config = file::FileConfig {
-            include: vec![dir.path().join("*")],
-            ..test_default_file_config(&dir)
-        };
-
-        let path = dir.path().join("file");
-        let orig: Vec<String> = (0..10).map(|n| format!("line #{:03}", n)).collect();
-        let line_len = orig[0].len() as u64 + 1;
-
-        // First time server runs it picks up existing lines.
-        let received =
-            run_file_source(&config, false, Nack(2), slow_write(&path, &orig, 100, 1)).await;
-        let lines = extract_messages_string(received);
-        let checkpoints = read_checkpoints(&dir);
-        assert_eq!(checkpoints.len(), 1);
-        assert_eq!(checkpoints[0].position, line_len * 2);
-        assert_eq!(&lines, &orig[0..3]);
-    }
-
-    #[tokio::test]
-    async fn file_start_position_negative_acknowledgement_multi_file() {
-        let dir = tempdir().unwrap();
-        let config = file::FileConfig {
-            include: vec![dir.path().join("*")],
-            ..test_default_file_config(&dir)
-        };
-
-        let path = dir.path().join("file");
-        let orig: Vec<String> = (0..10).map(|n| format!("line #{:03}", n)).collect();
-        let line_len = orig[0].len() as u64 + 1;
-
-        // First time server runs it picks up existing lines.
-        let received =
-            run_file_source(&config, false, Nack(2), slow_write(&path, &orig, 100, 2)).await;
-        let lines = extract_messages_string(received);
-        let checkpoints = read_checkpoints(&dir);
-        assert_eq!(checkpoints.len(), 2);
-        assert_eq!(
-            min(checkpoints[0].position, checkpoints[1].position),
-            line_len * 2
-        );
-        assert_eq!(
-            max(checkpoints[0].position, checkpoints[1].position),
-            line_len * 5
-        );
-        assert_eq!(lines.len(), 8);
-        assert_eq!(&lines[..3], &orig[..3]);
-        assert_eq!(&lines[3..], &orig[5..]);
-    }
-
-    async fn slow_write(filename: &Path, lines: &[String], millis: u64, files: usize) {
-        let duration = Duration::from_millis(millis);
-        for lines in lines.chunks(lines.len() / files) {
-            let mut file = File::create(filename).unwrap();
-            for line in lines {
-                writeln!(&mut file, "{}", line).unwrap();
-                sleep(duration).await;
-            }
-        }
-        sleep_500_millis().await;
-    }
-
-    #[derive(Debug, Deserialize)]
-    struct Checkpoint {
-        // fingerprint: JsonValue,
-        // modified: String,
-        position: u64,
-    }
-
-    #[derive(Debug, Deserialize)]
-    struct Checkpoints {
-        version: String,
-        checkpoints: Vec<Checkpoint>,
-    }
-
-    fn read_checkpoints(dir: &TempDir) -> Vec<Checkpoint> {
-        let mut filename = dir.path().to_path_buf();
-        filename.push(file_source::CHECKPOINT_FILE_NAME);
-        let mut file = File::open(filename).unwrap();
-        let mut buf = String::new();
-        file.read_to_string(&mut buf).unwrap();
-        let checkpoints: Checkpoints = serde_json::from_str(&buf).unwrap();
-        assert_eq!(&checkpoints.version, "1");
-        checkpoints.checkpoints
     }
 
     #[tokio::test]
@@ -1887,7 +1803,6 @@ mod tests {
         NoAcks,      // No acknowledgement handling and no finalization
         Unfinalized, // Acknowledgement handling but no finalization
         Acks,        // Full acknowledgements and proper finalization
-        Nack(usize), // Error acknowledgement after N events
     }
     use AckingMode::*;
 
@@ -1898,50 +1813,40 @@ mod tests {
         inner: impl Future<Output = ()>,
     ) -> Vec<Event> {
         assert_source_compliance(&FILE_SOURCE_TAGS, async move {
-            let (tx, rx) = match acking_mode {
-                Acks => {
-                    let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
-                    (tx, rx.boxed())
-                }
-                NoAcks | Unfinalized => {
-                    let (tx, rx) = SourceSender::new_test();
-                    (tx, rx.boxed())
-                }
-                Nack(after) => {
-                    let (tx, rx) = SourceSender::new_test_error_after(after);
-                    (tx, rx.boxed())
-                }
+            let (tx, rx) = if acking_mode == Acks {
+                let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+                (tx, rx.boxed())
+            } else {
+                let (tx, rx) = SourceSender::new_test();
+                (tx, rx.boxed())
             };
 
             let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
             let data_dir = config.data_dir.clone().unwrap();
             let acks = !matches!(acking_mode, NoAcks);
 
-            // Run the collector concurrent to the file source, to execute finalizers.
-            let collector = if acking_mode == Unfinalized {
-                tokio::spawn(
-                rx.take_until(tokio::time::sleep(Duration::from_secs(5)))
-                    .collect::<Vec<_>>())
-            } else {
-                tokio::spawn(async {
-                    timeout(Duration::from_secs(5), rx.collect::<Vec<_>>())
-                        .await
-                        .expect(
-                            "Unclosed channel: may indicate file-server could not shutdown gracefully.",
-                        )
-                })
-            };
             tokio::spawn(file::file_source(config, data_dir, shutdown, tx, acks));
 
             inner.await;
 
             drop(trigger_shutdown);
 
+            let result = if acking_mode == Unfinalized {
+                rx.take_until(tokio::time::sleep(Duration::from_secs(5)))
+                    .collect::<Vec<_>>()
+                    .await
+            } else {
+                timeout(Duration::from_secs(5), rx.collect::<Vec<_>>())
+                    .await
+                    .expect(
+                        "Unclosed channel: may indicate file-server could not shutdown gracefully.",
+                    )
+            };
             if wait_shutdown {
                 shutdown_done.await;
             }
 
-            collector.await.expect("Collector task failed")
+            result
         })
         .await
     }
@@ -1950,7 +1855,11 @@ mod tests {
         received
             .into_iter()
             .map(Event::into_log)
-            .map(|log| log[log_schema().message_key()].to_string_lossy())
+            .map(|log| {
+                log[log_schema().message_key()]
+                    .to_string_lossy()
+                    .into_owned()
+            })
             .collect()
     }
 

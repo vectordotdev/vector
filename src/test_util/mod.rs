@@ -12,13 +12,11 @@ use std::{
         atomic::{AtomicUsize, Ordering},
         Arc,
     },
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
 };
 
 use flate2::read::MultiGzDecoder;
-use futures::{
-    ready, stream, task::noop_waker_ref, FutureExt, SinkExt, Stream, StreamExt, TryStreamExt,
-};
+use futures::{stream, task::noop_waker_ref, FutureExt, SinkExt, Stream, StreamExt, TryStreamExt};
 use openssl::ssl::{SslConnector, SslFiletype, SslMethod, SslVerifyMode};
 use portpicker::pick_unused_port;
 use rand::{thread_rng, Rng};
@@ -37,6 +35,8 @@ use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::{Encoder, FramedRead, FramedWrite, LinesCodec};
 use vector_buffers::topology::channel::LimitedReceiver;
 use vector_core::event::{BatchNotifier, Event, EventArray, LogEvent};
+#[cfg(test)]
+use zstd::Decoder as ZstdDecoder;
 
 use crate::{
     config::{Config, ConfigDiff, GenerateConfig},
@@ -56,6 +56,10 @@ pub mod http;
 
 #[cfg(test)]
 pub mod metrics;
+
+#[cfg(test)]
+pub mod mock;
+
 pub mod stats;
 
 #[macro_export]
@@ -73,7 +77,7 @@ macro_rules! log_event {
     ($($key:expr => $value:expr),*  $(,)?) => {
         #[allow(unused_variables)]
         {
-            let mut event = crate::event::Event::Log(crate::event::LogEvent::default());
+            let mut event = $crate::event::Event::Log($crate::event::LogEvent::default());
             let log = event.as_mut_log();
             $(
                 log.insert($key, $value);
@@ -123,7 +127,10 @@ pub fn trace_init() {
 
     let levels = std::env::var("TEST_LOG").unwrap_or_else(|_| "error".to_string());
 
-    trace::init(color, false, &levels);
+    trace::init(color, false, &levels, 10);
+
+    // Initialize metrics as well
+    vector_core::metrics::init_test();
 }
 
 pub async fn send_lines(
@@ -235,7 +242,10 @@ pub fn generate_lines_with_stream<Gen: FnMut(usize) -> String>(
     batch: Option<BatchNotifier>,
 ) -> (Vec<String>, impl Stream<Item = EventArray>) {
     let lines = (0..count).map(generator).collect::<Vec<_>>();
-    let stream = map_batch_stream(stream::iter(lines.clone()).map(LogEvent::from), batch);
+    let stream = map_batch_stream(
+        stream::iter(lines.clone()).map(LogEvent::from_str_legacy),
+        batch,
+    );
     (lines, stream)
 }
 
@@ -267,7 +277,7 @@ pub fn random_events_with_stream(
     batch: Option<BatchNotifier>,
 ) -> (Vec<Event>, impl Stream<Item = EventArray>) {
     let events = (0..count)
-        .map(|_| Event::from(random_string(len)))
+        .map(|_| Event::from(LogEvent::from_str_legacy(random_string(len))))
         .collect::<Vec<_>>();
     let stream = map_batch_stream(
         stream::iter(events.clone()).map(|event| event.into_log()),
@@ -283,12 +293,13 @@ pub fn random_updated_events_with_stream<F>(
     update_fn: F,
 ) -> (Vec<Event>, impl Stream<Item = EventArray>)
 where
-    F: Fn((usize, Event)) -> Event,
+    F: Fn((usize, LogEvent)) -> LogEvent,
 {
     let events = (0..count)
-        .map(|_| Event::from(random_string(len)))
+        .map(|_| LogEvent::from_str_legacy(random_string(len)))
         .enumerate()
         .map(update_fn)
+        .map(Event::Log)
         .collect::<Vec<_>>();
     let stream = map_batch_stream(
         stream::iter(events.clone()).map(|event| event.into_log()),
@@ -326,7 +337,7 @@ pub fn random_maps(
 
 pub async fn collect_n<S>(rx: S, n: usize) -> Vec<S::Item>
 where
-    S: Stream + Unpin,
+    S: Stream,
 {
     rx.take(n).collect().await
 }
@@ -391,6 +402,18 @@ pub fn lines_from_gzip_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     file.read_to_end(&mut gzip_bytes).unwrap();
     let mut output = String::new();
     MultiGzDecoder::new(&gzip_bytes[..])
+        .read_to_string(&mut output)
+        .unwrap();
+    output.lines().map(|s| s.to_owned()).collect()
+}
+
+#[cfg(test)]
+pub fn lines_from_zstd_file<P: AsRef<Path>>(path: P) -> Vec<String> {
+    trace!(message = "Reading zstd file.", path = %path.as_ref().display());
+    let file = File::open(path).unwrap();
+    let mut output = String::new();
+    ZstdDecoder::new(file)
+        .unwrap()
         .read_to_string(&mut output)
         .unwrap();
     output.lines().map(|s| s.to_owned()).collect()
@@ -673,7 +696,7 @@ pub async fn start_topology(
 pub async fn spawn_collect_n<F, S>(future: F, stream: S, n: usize) -> Vec<Event>
 where
     F: Future<Output = ()> + Send + 'static,
-    S: Stream<Item = Event> + Unpin,
+    S: Stream<Item = Event>,
 {
     // TODO: Switch to using `select!` so that we can drive `future` to completion while also driving `collect_n`,
     // such that if `future` panics, we break out and don't continue driving `collect_n`. In most cases, `future`

@@ -1,18 +1,16 @@
 use std::{error::Error, fmt};
 
 use compiler::ExpressionError;
-use lookup::LookupBuf;
+use lookup::OwnedTargetPath;
 use value::Value;
-use vector_common::TimeZone;
 
-use crate::{state, Context, Program, Target};
+use crate::{state, Context, Program, Target, TimeZone};
 
 pub type RuntimeResult = Result<Value, Terminate>;
 
 #[derive(Debug, Default)]
 pub struct Runtime {
     state: state::Runtime,
-    root_lookup: LookupBuf,
 }
 
 /// The error raised if the runtime is terminated.
@@ -46,15 +44,7 @@ impl Error for Terminate {
 
 impl Runtime {
     pub fn new(state: state::Runtime) -> Self {
-        Self {
-            state,
-
-            // `LookupBuf` uses a `VecDeque` internally, which always allocates, even
-            // when it's empty (for `LookupBuf::root()`), so we do the
-            // allocation on initialization of the runtime, instead of on every
-            // `resolve` run.
-            root_lookup: LookupBuf::root(),
-        }
+        Self { state }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -74,7 +64,7 @@ impl Runtime {
         timezone: &TimeZone,
     ) -> RuntimeResult {
         // Validate that the path is a value.
-        match target.target_get(&self.root_lookup) {
+        match target.target_get(&OwnedTargetPath::event_root()) {
             Ok(Some(_)) => {}
             Ok(None) => {
                 return Err(Terminate::Error(

@@ -65,7 +65,7 @@ impl fmt::Debug for FileInner {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct TestFile {
     inner: Arc<Mutex<FileInner>>,
     is_writable: bool,
@@ -92,6 +92,17 @@ impl TestFile {
     fn as_mmap(&self) -> TestMmap {
         let inner = Arc::clone(&self.inner);
         inner.into()
+    }
+}
+
+impl fmt::Debug for TestFile {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let inner = self.inner.lock();
+        f.debug_struct("TestFile")
+            .field("data", &inner)
+            .field("writable", &self.is_writable)
+            .field("read_pos", &self.read_pos)
+            .finish()
     }
 }
 
@@ -198,6 +209,7 @@ impl AsyncWrite for TestFile {
 
 #[async_trait]
 impl AsyncFile for TestFile {
+    #[instrument(skip(self), level = "debug")]
     async fn metadata(&self) -> io::Result<Metadata> {
         let len = {
             let inner = self.inner.lock();
@@ -219,6 +231,7 @@ struct FilesystemInner {
 }
 
 impl FilesystemInner {
+    #[instrument(skip(self), level = "debug")]
     fn open_file_writable(&mut self, path: &Path) -> TestFile {
         let file = self
             .files
@@ -230,6 +243,7 @@ impl FilesystemInner {
         new_file
     }
 
+    #[instrument(skip(self), level = "debug")]
     fn open_file_writable_atomic(&mut self, path: &Path) -> Option<TestFile> {
         if self.files.contains_key(path) {
             None
@@ -264,9 +278,17 @@ impl FilesystemInner {
 }
 
 /// A `Filesystem` that tracks files in memory and allows introspection from the outside.
-#[derive(Debug)]
 pub struct TestFilesystem {
     inner: Arc<Mutex<FilesystemInner>>,
+}
+
+impl fmt::Debug for TestFilesystem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let inner = self.inner.lock();
+        f.debug_struct("TestFilesystem")
+            .field("files", &inner.files)
+            .finish()
+    }
 }
 
 impl Clone for TestFilesystem {

@@ -6,10 +6,4 @@ pub mod sink;
 #[cfg(test)]
 mod tests;
 
-use config::DatadogEventsConfig;
-
-use crate::config::SinkDescription;
-
-inventory::submit! {
-    SinkDescription::new::<DatadogEventsConfig>("datadog_events")
-}
+pub use self::config::DatadogEventsConfig;

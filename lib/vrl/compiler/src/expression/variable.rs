@@ -2,14 +2,15 @@ use diagnostic::{DiagnosticMessage, Label};
 use std::fmt;
 use value::Value;
 
+use crate::state::{TypeInfo, TypeState};
 use crate::{
     expression::{levenstein, Resolved},
     parser::ast::Ident,
-    state::{ExternalEnv, LocalEnv},
+    state::LocalEnv,
     Context, Expression, Span, TypeDef,
 };
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Variable {
     ident: Ident,
     value: Option<Value>,
@@ -17,16 +18,15 @@ pub struct Variable {
 
 impl Variable {
     pub(crate) fn new(span: Span, ident: Ident, local: &LocalEnv) -> Result<Self, Error> {
-        let value = match local.variable(&ident) {
-            Some(variable) => variable.value.as_ref().cloned(),
-            None => {
-                let idents = local
-                    .variable_idents()
-                    .map(|s| s.to_owned())
-                    .collect::<Vec<_>>();
+        let value = if let Some(variable) = local.variable(&ident) {
+            variable.value.as_ref().cloned()
+        } else {
+            let idents = local
+                .variable_idents()
+                .map(std::clone::Clone::clone)
+                .collect::<Vec<_>>();
 
-                return Err(Error::undefined(ident, span, idents));
-            }
+            return Err(Error::undefined(ident, span, idents));
         };
 
         Ok(Self { ident, value })
@@ -50,12 +50,13 @@ impl Expression for Variable {
             .unwrap_or(Value::Null))
     }
 
-    fn type_def(&self, (local, _): (&LocalEnv, &ExternalEnv)) -> TypeDef {
-        local
+    fn type_info(&self, state: &TypeState) -> TypeInfo {
+        let result = state
+            .local
             .variable(&self.ident)
-            .cloned()
-            .map(|d| d.type_def)
-            .unwrap_or_else(|| TypeDef::null().infallible())
+            .map_or_else(|| TypeDef::undefined().infallible(), |d| d.type_def.clone());
+
+        TypeInfo::new(state, result)
     }
 }
 
@@ -102,7 +103,7 @@ impl std::error::Error for Error {
 
 impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
-        use ErrorVariant::*;
+        use ErrorVariant::Undefined;
 
         match &self.variant {
             Undefined { .. } => 701,
@@ -110,7 +111,7 @@ impl DiagnosticMessage for Error {
     }
 
     fn labels(&self) -> Vec<Label> {
-        use ErrorVariant::*;
+        use ErrorVariant::Undefined;
 
         match &self.variant {
             Undefined { idents } => {

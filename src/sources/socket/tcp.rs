@@ -9,7 +9,7 @@ use crate::{
     config::log_schema,
     event::Event,
     serde::default_decoding,
-    sources::util::{SocketListenAddr, TcpNullAcker, TcpSource},
+    sources::util::net::{SocketListenAddr, TcpNullAcker, TcpSource},
     tcp::TcpKeepaliveConfig,
     tls::TlsSourceConfig,
 };
@@ -37,7 +37,9 @@ pub struct TcpConfig {
     ///
     /// The value will be the peer host's address, including the port i.e. `1.2.3.4:9000`.
     ///
-    /// By default, the [global `host_key` option](https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key) is used.
+    /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
+    ///
+    /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     host_key: Option<String>,
 
     /// Overrides the name of the log field used to add the peer host's port to each event.

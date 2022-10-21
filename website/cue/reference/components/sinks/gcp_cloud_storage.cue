@@ -32,8 +32,8 @@ components: sinks: gcp_cloud_storage: {
 				enabled: true
 				codec: {
 					enabled: true
-					batched: true
-					enum: ["ndjson", "text"]
+					framing: true
+					enum: ["json", "text"]
 				}
 			}
 			proxy: enabled: true
@@ -46,7 +46,8 @@ components: sinks: gcp_cloud_storage: {
 				enabled:                true
 				can_verify_certificate: true
 				can_verify_hostname:    true
-				enabled_default:        false
+				enabled_default:        true
+				enabled_by_scheme:      true
 			}
 			to: {
 				service: services.gcp_cloud_storage
@@ -90,6 +91,7 @@ components: sinks: gcp_cloud_storage: {
 				}
 			}
 		}
+		api_key: configuration._gcp_api_key
 		bucket: {
 			description: "The GCS bucket name."
 			required:    true

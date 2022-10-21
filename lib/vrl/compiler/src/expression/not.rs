@@ -2,12 +2,11 @@ use std::fmt;
 
 use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 
-use crate::value::VrlValueConvert;
+use crate::state::{TypeInfo, TypeState};
 use crate::{
     expression::{Expr, Resolved},
     parser::Node,
-    state::{ExternalEnv, LocalEnv},
-    value::Kind,
+    value::{Kind, VrlValueConvert},
     Context, Expression, Span, TypeDef,
 };
 
@@ -19,9 +18,9 @@ pub struct Not {
 }
 
 impl Not {
-    pub fn new(node: Node<Expr>, not_span: Span, state: (&LocalEnv, &ExternalEnv)) -> Result {
+    pub fn new(node: Node<Expr>, not_span: Span, state: &TypeState) -> Result {
         let (expr_span, expr) = node.take();
-        let type_def = expr.type_def(state);
+        let type_def = expr.type_info(state).result;
 
         if !type_def.is_boolean() {
             return Err(Error {
@@ -42,10 +41,13 @@ impl Expression for Not {
         Ok((!self.inner.resolve(ctx)?.try_boolean()?).into())
     }
 
-    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
-        let fallible = self.inner.type_def(state).is_fallible();
-
-        TypeDef::boolean().with_fallibility(fallible)
+    fn type_info(&self, state: &TypeState) -> TypeInfo {
+        let mut state = state.clone();
+        let result = self.inner.apply_type_info(&mut state);
+        TypeInfo::new(
+            state,
+            TypeDef::boolean().with_fallibility(result.is_fallible()),
+        )
     }
 }
 
@@ -85,7 +87,7 @@ impl std::error::Error for Error {
 
 impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
-        use ErrorVariant::*;
+        use ErrorVariant::NonBoolean;
 
         match &self.variant {
             NonBoolean(..) => 660,
@@ -93,7 +95,7 @@ impl DiagnosticMessage for Error {
     }
 
     fn labels(&self) -> Vec<Label> {
-        use ErrorVariant::*;
+        use ErrorVariant::NonBoolean;
 
         match &self.variant {
             NonBoolean(kind) => vec![
@@ -107,7 +109,7 @@ impl DiagnosticMessage for Error {
     }
 
     fn notes(&self) -> Vec<Note> {
-        use ErrorVariant::*;
+        use ErrorVariant::NonBoolean;
 
         match &self.variant {
             NonBoolean(..) => {

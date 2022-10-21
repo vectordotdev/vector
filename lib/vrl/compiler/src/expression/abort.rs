@@ -6,9 +6,8 @@ use parser::ast::Node;
 use super::Expr;
 use crate::{
     expression::{ExpressionError, Resolved},
-    state::{ExternalEnv, LocalEnv},
-    value::Kind,
-    value::VrlValueConvert,
+    state::{TypeInfo, TypeState},
+    value::{Kind, VrlValueConvert},
     Context, Expression, Span, TypeDef,
 };
 
@@ -19,15 +18,15 @@ pub struct Abort {
 }
 
 impl Abort {
-    pub fn new(
-        span: Span,
-        message: Option<Node<Expr>>,
-        state: (&LocalEnv, &ExternalEnv),
-    ) -> Result<Self, Error> {
+    /// # Errors
+    ///
+    /// * The optional message is fallible.
+    /// * The optional message does not resolve to a string.
+    pub fn new(span: Span, message: Option<Node<Expr>>, state: &TypeState) -> Result<Self, Error> {
         let message = message
             .map(|node| {
                 let (expr_span, expr) = node.take();
-                let type_def = expr.type_def(state);
+                let type_def = expr.type_info(state).result;
 
                 if type_def.is_fallible() {
                     Err(Error {
@@ -65,8 +64,8 @@ impl Expression for Abort {
         })
     }
 
-    fn type_def(&self, _: (&LocalEnv, &ExternalEnv)) -> TypeDef {
-        TypeDef::never().infallible()
+    fn type_info(&self, state: &TypeState) -> TypeInfo {
+        TypeInfo::new(state, TypeDef::never())
     }
 }
 
@@ -106,7 +105,7 @@ impl std::error::Error for Error {
 
 impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
-        use ErrorVariant::*;
+        use ErrorVariant::{FallibleExpr, NonString};
 
         match self.variant {
             FallibleExpr => 631,

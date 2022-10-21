@@ -1,8 +1,8 @@
 use std::path::{Path, PathBuf};
 
 use rdkafka::{consumer::ConsumerContext, ClientConfig, ClientContext, Statistics};
-use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
 use crate::{internal_events::KafkaStatisticsReceived, tls::TlsEnableableConfig};
@@ -13,22 +13,33 @@ enum KafkaError {
     InvalidPath { path: PathBuf },
 }
 
-#[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
+/// Supported compression types for Kafka.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(rename_all = "lowercase")]
-pub(crate) enum KafkaCompression {
+pub enum KafkaCompression {
+    /// No compression.
     #[derivative(Default)]
     None,
+
+    /// Gzip.
     Gzip,
+
+    /// Snappy.
     Snappy,
+
+    /// LZ4.
     Lz4,
+
+    /// Zstandard.
     Zstd,
 }
 
 /// Kafka authentication configuration.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
-pub(crate) struct KafkaAuthConfig {
+pub struct KafkaAuthConfig {
     #[configurable(derived)]
     pub(crate) sasl: Option<KafkaSaslConfig>,
 
@@ -39,7 +50,7 @@ pub(crate) struct KafkaAuthConfig {
 /// Configuration for SASL authentication when interacting with Kafka.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
-pub(crate) struct KafkaSaslConfig {
+pub struct KafkaSaslConfig {
     /// Enables SASL authentication.
     ///
     /// Only `PLAIN` and `SCRAM`-based mechanisms are supported when configuring SASL authentication via `sasl.*`. For
@@ -55,7 +66,7 @@ pub(crate) struct KafkaSaslConfig {
     pub(crate) username: Option<String>,
 
     /// The SASL password.
-    pub(crate) password: Option<String>,
+    pub(crate) password: Option<SensitiveString>,
 
     /// The SASL mechanism to use.
     pub(crate) mechanism: Option<String>,
@@ -77,10 +88,10 @@ impl KafkaAuthConfig {
         if sasl_enabled {
             let sasl = self.sasl.as_ref().unwrap();
             if let Some(username) = &sasl.username {
-                client.set("sasl.username", username);
+                client.set("sasl.username", username.as_str());
             }
             if let Some(password) = &sasl.password {
-                client.set("sasl.password", password);
+                client.set("sasl.password", password.inner());
             }
             if let Some(mechanism) = &sasl.mechanism {
                 client.set("sasl.mechanism", mechanism);
@@ -112,6 +123,7 @@ fn pathbuf_to_string(path: &Path) -> crate::Result<&str> {
         .ok_or_else(|| KafkaError::InvalidPath { path: path.into() }.into())
 }
 
+#[derive(Default)]
 pub(crate) struct KafkaStatisticsContext;
 
 impl ClientContext for KafkaStatisticsContext {

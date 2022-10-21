@@ -1,13 +1,12 @@
 use chrono::Utc;
-use lookup::path;
-use serde::{Deserialize, Serialize};
+use lookup::event_path;
 use serde_json::Value;
 use vector_common::TimeZone;
+use vector_config::configurable_component;
 
 use crate::{
     config::{
         log_schema, DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
-        TransformDescription,
     },
     event::{self, Event, LogEvent, Metric},
     internal_events::MetricToLogSerializeError,
@@ -16,15 +15,28 @@ use crate::{
     types::Conversion,
 };
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+/// Configuration for the `metric_to_log` transform.
+#[configurable_component(transform("metric_to_log"))]
+#[derive(Clone, Debug, Default)]
 #[serde(default, deny_unknown_fields)]
 pub struct MetricToLogConfig {
+    /// Name of the tag in the metric to use for the source host.
+    ///
+    /// If present, the value of the tag is set on the generated log event in the "host" field,
+    /// where the field key will use the [global `host_key` option][global_log_schema_host_key].
+    ///
+    /// [global_log_schema_host_key]: https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key
     pub host_tag: Option<String>,
-    pub timezone: Option<TimeZone>,
-}
 
-inventory::submit! {
-    TransformDescription::new::<MetricToLogConfig>("metric_to_log")
+    /// The name of the timezone to apply to timestamp conversions that do not contain an explicit
+    /// time zone.
+    ///
+    /// This overrides the [global `timezone`][global_timezone] option. The time zone name may be
+    /// any name in the [TZ database][tz_database], or `local` to indicate system local time.
+    ///
+    /// [global_timezone]: https://vector.dev/docs/reference/configuration//global-options#timezone
+    /// [tz_database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+    pub timezone: Option<TimeZone>,
 }
 
 impl GenerateConfig for MetricToLogConfig {
@@ -38,7 +50,6 @@ impl GenerateConfig for MetricToLogConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "metric_to_log")]
 impl TransformConfig for MetricToLogConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(MetricToLog::new(
@@ -57,10 +68,6 @@ impl TransformConfig for MetricToLogConfig {
 
     fn enable_concurrency(&self) -> bool {
         true
-    }
-
-    fn transform_type(&self) -> &'static str {
-        "metric_to_log"
     }
 }
 
@@ -93,7 +100,7 @@ impl MetricToLog {
                     let mut log = LogEvent::new_with_metadata(metric.metadata().clone());
 
                     for (key, value) in object {
-                        log.insert(path!(&key), value);
+                        log.insert(event_path!(&key), value);
                     }
 
                     let timestamp = log
@@ -128,47 +135,61 @@ impl FunctionTransform for MetricToLog {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
-
     use chrono::{offset::TimeZone, DateTime, Utc};
     use pretty_assertions::assert_eq;
+    use tokio::sync::mpsc;
+    use tokio_stream::wrappers::ReceiverStream;
+    use vector_core::metric_tags;
 
     use super::*;
-    use crate::{
-        event::{
-            metric::{MetricKind, MetricValue, StatisticKind},
-            Metric, Value,
-        },
-        transforms::test::transform_one,
+    use crate::event::{
+        metric::{MetricKind, MetricTags, MetricValue, StatisticKind},
+        Metric, Value,
     };
+    use crate::test_util::components::assert_transform_compliance;
+    use crate::transforms::test::create_topology;
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<MetricToLogConfig>();
     }
 
-    fn do_transform(metric: Metric) -> Option<LogEvent> {
-        let event = Event::Metric(metric);
-        let mut transform = MetricToLog::new(Some("host".into()), Default::default());
+    async fn do_transform(metric: Metric) -> Option<LogEvent> {
+        assert_transform_compliance(async move {
+            let config = MetricToLogConfig {
+                host_tag: Some("host".into()),
+                timezone: None,
+            };
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
 
-        transform_one(&mut transform, event).map(|event| event.into_log())
+            tx.send(metric.into()).await.unwrap();
+
+            let result = out.recv().await;
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+
+            result
+        })
+        .await
+        .map(|e| e.into_log())
     }
 
     fn ts() -> DateTime<Utc> {
         Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
     }
 
-    fn tags() -> BTreeMap<String, String> {
-        vec![
-            ("host".to_owned(), "localhost".to_owned()),
-            ("some_tag".to_owned(), "some_value".to_owned()),
-        ]
-        .into_iter()
-        .collect()
+    fn tags() -> MetricTags {
+        metric_tags! {
+            "host" => "localhost",
+            "some_tag" => "some_value",
+        }
     }
 
-    #[test]
-    fn transform_counter() {
+    #[tokio::test]
+    async fn transform_counter() {
         let counter = Metric::new(
             "counter",
             MetricKind::Absolute,
@@ -178,7 +199,7 @@ mod tests {
         .with_timestamp(Some(ts()));
         let metadata = counter.metadata().clone();
 
-        let log = do_transform(counter).unwrap();
+        let log = do_transform(counter).await.unwrap();
         let collected: Vec<_> = log.all_fields().unwrap().collect();
 
         assert_eq!(
@@ -195,8 +216,8 @@ mod tests {
         assert_eq!(log.metadata(), &metadata);
     }
 
-    #[test]
-    fn transform_gauge() {
+    #[tokio::test]
+    async fn transform_gauge() {
         let gauge = Metric::new(
             "gauge",
             MetricKind::Absolute,
@@ -205,7 +226,7 @@ mod tests {
         .with_timestamp(Some(ts()));
         let metadata = gauge.metadata().clone();
 
-        let log = do_transform(gauge).unwrap();
+        let log = do_transform(gauge).await.unwrap();
         let collected: Vec<_> = log.all_fields().unwrap().collect();
 
         assert_eq!(
@@ -220,8 +241,8 @@ mod tests {
         assert_eq!(log.metadata(), &metadata);
     }
 
-    #[test]
-    fn transform_set() {
+    #[tokio::test]
+    async fn transform_set() {
         let set = Metric::new(
             "set",
             MetricKind::Absolute,
@@ -232,7 +253,7 @@ mod tests {
         .with_timestamp(Some(ts()));
         let metadata = set.metadata().clone();
 
-        let log = do_transform(set).unwrap();
+        let log = do_transform(set).await.unwrap();
         let collected: Vec<_> = log.all_fields().unwrap().collect();
 
         assert_eq!(
@@ -248,8 +269,8 @@ mod tests {
         assert_eq!(log.metadata(), &metadata);
     }
 
-    #[test]
-    fn transform_distribution() {
+    #[tokio::test]
+    async fn transform_distribution() {
         let distro = Metric::new(
             "distro",
             MetricKind::Absolute,
@@ -261,7 +282,7 @@ mod tests {
         .with_timestamp(Some(ts()));
         let metadata = distro.metadata().clone();
 
-        let log = do_transform(distro).unwrap();
+        let log = do_transform(distro).await.unwrap();
         let collected: Vec<_> = log.all_fields().unwrap().collect();
 
         assert_eq!(
@@ -295,8 +316,8 @@ mod tests {
         assert_eq!(log.metadata(), &metadata);
     }
 
-    #[test]
-    fn transform_histogram() {
+    #[tokio::test]
+    async fn transform_histogram() {
         let histo = Metric::new(
             "histo",
             MetricKind::Absolute,
@@ -309,7 +330,7 @@ mod tests {
         .with_timestamp(Some(ts()));
         let metadata = histo.metadata().clone();
 
-        let log = do_transform(histo).unwrap();
+        let log = do_transform(histo).await.unwrap();
         let collected: Vec<_> = log.all_fields().unwrap().collect();
 
         assert_eq!(
@@ -341,8 +362,8 @@ mod tests {
         assert_eq!(log.metadata(), &metadata);
     }
 
-    #[test]
-    fn transform_summary() {
+    #[tokio::test]
+    async fn transform_summary() {
         let summary = Metric::new(
             "summary",
             MetricKind::Absolute,
@@ -355,7 +376,7 @@ mod tests {
         .with_timestamp(Some(ts()));
         let metadata = summary.metadata().clone();
 
-        let log = do_transform(summary).unwrap();
+        let log = do_transform(summary).await.unwrap();
         let collected: Vec<_> = log.all_fields().unwrap().collect();
 
         assert_eq!(

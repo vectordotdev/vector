@@ -1,0 +1,14 @@
+[enterprise]
+api_key = "${DD_API_KEY}"
+configuration_key = "${DD_CONFIGURATION_KEY}"
+endpoint = "${MOCK_SERVER_ENDPOINT}"
+max_retries = 1
+
+[sources.in]
+type = "demo_logs"
+format = "syslog"
+count = 3
+
+[sinks.out]
+type = "blackhole"
+inputs = ["*"]

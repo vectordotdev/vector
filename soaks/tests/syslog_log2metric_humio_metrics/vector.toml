@@ -21,9 +21,12 @@ mode = "tcp"
 type = "log_to_metric"
 inputs = ["syslog"]
 
-    [[transforms.log2metric.metrics]]
-    type = "gauge"
-    field = "procid"
+  [[transforms.log2metric.metrics]]
+  type = "gauge"
+  field = "procid"
+  tags.hostname = "{{ hostname }}"
+  tags.facility = "{{ facility }}"
+  tags.severity = "{{ severity }}"
 
 ##
 ## Sinks
@@ -38,6 +41,5 @@ address = "0.0.0.0:9090"
 type = "humio_metrics"
 inputs = ["log2metric"]
 endpoint = "http://localhost:8080"
-encoding = "json"
 token = "humio_token"
 healthcheck.enabled = false

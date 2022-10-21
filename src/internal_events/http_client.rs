@@ -8,7 +8,7 @@ use hyper::{body::HttpBody, Error};
 use metrics::{counter, histogram};
 use vector_core::internal_event::InternalEvent;
 
-use super::prelude::{error_stage, error_type};
+use vector_common::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct AboutToSendHttpRequest<'a, T> {
@@ -66,18 +66,19 @@ impl<'a, T: HttpBody> InternalEvent for GotHttpResponse<'a, T> {
 }
 
 #[derive(Debug)]
-pub struct GotHttpError<'a> {
+pub struct GotHttpWarning<'a> {
     pub error: &'a Error,
     pub roundtrip: Duration,
 }
 
-impl<'a> InternalEvent for GotHttpError<'a> {
+impl<'a> InternalEvent for GotHttpWarning<'a> {
     fn emit(self) {
-        error!(
+        warn!(
             message = "HTTP error.",
             error = %self.error,
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,

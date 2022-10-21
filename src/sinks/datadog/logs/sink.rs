@@ -1,19 +1,13 @@
-use std::{
-    fmt::Debug,
-    io::{self, Write},
-    num::NonZeroUsize,
-    sync::Arc,
-};
+use std::{fmt::Debug, io, num::NonZeroUsize, sync::Arc};
 
 use async_trait::async_trait;
 use bytes::Bytes;
 use codecs::{encoding::Framer, CharacterDelimitedEncoder, JsonSerializer};
 use futures::{stream::BoxStream, StreamExt};
-use lookup::path;
+use lookup::event_path;
 use snafu::Snafu;
 use tower::Service;
 use vector_core::{
-    buffers::Acker,
     config::{log_schema, LogSchema},
     event::{Event, EventFinalizers, Finalizable, Value},
     partition::Partitioner,
@@ -24,10 +18,10 @@ use vector_core::{
 
 use super::{config::MAX_PAYLOAD_BYTES, service::LogApiRequest};
 use crate::{
-    codecs::Encoder,
-    config::SinkContext,
+    codecs::{Encoder, Transformer},
+    internal_events::SinkRequestBuildError,
     sinks::util::{
-        encoding::{Encoder as _, Transformer},
+        encoding::{write_all, Encoder as _},
         request_builder::EncodeResult,
         Compression, Compressor, RequestBuilder, SinkBuilderExt,
     },
@@ -48,7 +42,6 @@ impl Partitioner for EventPartitioner {
 pub struct LogSinkBuilder<S> {
     encoding: JsonEncoding,
     service: S,
-    context: SinkContext,
     batch_settings: BatcherSettings,
     compression: Option<Compression>,
     default_api_key: Arc<str>,
@@ -58,14 +51,12 @@ impl<S> LogSinkBuilder<S> {
     pub fn new(
         transformer: Transformer,
         service: S,
-        context: SinkContext,
         default_api_key: Arc<str>,
         batch_settings: BatcherSettings,
     ) -> Self {
         Self {
             encoding: JsonEncoding::new(transformer),
             service,
-            context,
             default_api_key,
             batch_settings,
             compression: None,
@@ -82,7 +73,6 @@ impl<S> LogSinkBuilder<S> {
             default_api_key: self.default_api_key,
             encoding: self.encoding,
             schema_enabled: false,
-            acker: self.context.acker(),
             service: self.service,
             batch_settings: self.batch_settings,
             compression: self.compression.unwrap_or_default(),
@@ -98,8 +88,6 @@ pub struct LogSink<S> {
     /// otherwise we will see `Event` instances with no associated key. In that
     /// case we batch them by this default.
     default_api_key: Arc<str>,
-    /// The ack system for this sink to vector's buffer mechanism
-    acker: Acker,
     /// The API service
     service: S,
     /// The encoding of payloads
@@ -145,10 +133,13 @@ impl crate::sinks::util::encoding::Encoder<Vec<Event>> for JsonEncoding {
     fn encode_input(&self, mut input: Vec<Event>, writer: &mut dyn io::Write) -> io::Result<usize> {
         for event in input.iter_mut() {
             let log = event.as_mut_log();
-            log.rename_key(self.log_schema.message_key(), path!("message"));
-            log.rename_key(self.log_schema.host_key(), path!("host"));
+            log.rename_key(self.log_schema.message_key(), event_path!("message"));
+            log.rename_key(self.log_schema.host_key(), event_path!("host"));
             if let Some(Value::Timestamp(ts)) = log.remove(self.log_schema.timestamp_key()) {
-                log.insert(path!("timestamp"), Value::Integer(ts.timestamp_millis()));
+                log.insert(
+                    event_path!("timestamp"),
+                    Value::Integer(ts.timestamp_millis()),
+                );
             }
         }
 
@@ -165,13 +156,13 @@ impl crate::sinks::util::encoding::Encoder<Vec<Event>> for SemanticJsonEncoding 
             let message_key = log
                 .find_key_by_meaning("message")
                 .expect("enforced by schema");
-            log.rename_key(message_key.as_str(), path!("message"));
+            log.rename_key(message_key.as_str(), event_path!("message"));
 
             // host
             let host_key = log
                 .find_key_by_meaning("host")
                 .unwrap_or_else(|| self.log_schema.host_key().into());
-            log.rename_key(host_key.as_str(), path!("host"));
+            log.rename_key(host_key.as_str(), event_path!("host"));
 
             // timestamp
             let ts = log
@@ -179,7 +170,7 @@ impl crate::sinks::util::encoding::Encoder<Vec<Event>> for SemanticJsonEncoding 
                 .expect("enforced by schema")
                 .as_timestamp_unwrap();
             let ms = ts.timestamp_millis();
-            log.insert(path!("timestamp"), Value::Integer(ms));
+            log.insert(event_path!("timestamp"), Value::Integer(ms));
         }
 
         self.encoder.encode_input(input, writer)
@@ -248,6 +239,7 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
         // sink to incremental encoding and simply put up with suboptimal batch sizes if we need to end up splitting due
         // to (un)compressed size limitations.
         let mut buf = Vec::new();
+        let n_events = events.len();
         let uncompressed_size = self.encoder().encode_input(events, &mut buf)?;
         if uncompressed_size > MAX_PAYLOAD_BYTES {
             return Err(RequestBuildError::PayloadTooBig);
@@ -255,7 +247,7 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
 
         // Now just compress it like normal.
         let mut compressor = Compressor::from(self.compression);
-        let _ = compressor.write_all(&buf)?;
+        write_all(&mut compressor, n_events, &buf)?;
         let bytes = compressor.into_inner().freeze();
 
         if self.compression.is_compressed() {
@@ -332,6 +324,7 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for SemanticLogRequestBuilde
         // sink to incremental encoding and simply put up with suboptimal batch sizes if we need to end up splitting due
         // to (un)compressed size limitations.
         let mut buf = Vec::new();
+        let n_events = events.len();
         let uncompressed_size = self.encoder().encode_input(events, &mut buf)?;
         if uncompressed_size > MAX_PAYLOAD_BYTES {
             return Err(RequestBuildError::PayloadTooBig);
@@ -339,7 +332,7 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for SemanticLogRequestBuilde
 
         // Now just compress it like normal.
         let mut compressor = Compressor::from(self.compression);
-        let _ = compressor.write_all(&buf)?;
+        write_all(&mut compressor, n_events, &buf)?;
         let bytes = compressor.into_inner().freeze();
 
         if self.compression.is_compressed() {
@@ -397,14 +390,14 @@ where
                 )
                 .filter_map(|request| async move {
                     match request {
-                        Err(e) => {
-                            error!("Failed to build Datadog Logs request: {:?}.", e);
+                        Err(error) => {
+                            emit!(SinkRequestBuildError { error });
                             None
                         }
                         Ok(req) => Some(req),
                     }
                 })
-                .into_driver(self.service, self.acker);
+                .into_driver(self.service);
 
             sink.run().await
         } else {
@@ -420,14 +413,14 @@ where
                 )
                 .filter_map(|request| async move {
                     match request {
-                        Err(e) => {
-                            error!("Failed to build Datadog Logs request: {:?}.", e);
+                        Err(error) => {
+                            emit!(SinkRequestBuildError { error });
                             None
                         }
                         Ok(req) => Some(req),
                     }
                 })
-                .into_driver(self.service, self.acker);
+                .into_driver(self.service);
 
             sink.run().await
         }

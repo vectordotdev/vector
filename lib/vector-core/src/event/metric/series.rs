@@ -1,15 +1,19 @@
 use core::fmt;
 use std::collections::btree_map;
 
-use serde::{Deserialize, Serialize};
 use vector_common::byte_size_of::ByteSizeOf;
+use vector_config::configurable_component;
 
 use super::{write_list, write_word, MetricTags};
 
-#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, PartialOrd, Ord, Serialize)]
+/// Metrics series.
+#[configurable_component]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct MetricSeries {
     #[serde(flatten)]
     pub name: MetricName,
+
+    #[configurable(derived)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tags: Option<MetricTags>,
 }
@@ -42,6 +46,11 @@ impl MetricSeries {
         (self.tags.get_or_insert_with(Default::default)).insert(key, value)
     }
 
+    /// Removes all the tags.
+    pub fn remove_tags(&mut self) {
+        self.tags = None;
+    }
+
     /// Removes the tag entry for the named key, if it exists, and returns the old value.
     ///
     /// *Note:* This will drop the tags map if the tag was the last entry in it.
@@ -72,9 +81,24 @@ impl ByteSizeOf for MetricSeries {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, PartialOrd, Ord, Serialize)]
+/// Metric name.
+#[configurable_component]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct MetricName {
+    /// The name of the metric.
+    ///
+    /// This would typically be a name for the metric itself, unrelated to where the metric
+    /// originates from. For example, if the metric represented the amount of used system memory, it
+    /// may be called `memory.used`.
     pub name: String,
+
+    /// The namespace of the metric.
+    ///
+    /// Namespace represents a grouping for a metric where the name itself may otherwise be too
+    /// generic. For example, while the name of a metric may be `memory.used` for the amount of used
+    /// system memory, the namespace could differentiate that by being `system` for the total amount
+    /// of used memory across the system, or `vector` for the amount of used system memory specific
+    /// to Vector, and so on.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub namespace: Option<String>,
 }

@@ -1,16 +1,15 @@
-use std::collections::BTreeMap;
-
-use chrono::Utc;
-use futures::{stream, StreamExt};
+use futures::StreamExt;
 #[cfg(target_os = "linux")]
 use heim::net::os::linux::IoCountersExt;
 #[cfg(target_os = "windows")]
 use heim::net::os::windows::IoCountersExt;
 use heim::units::information::byte;
 use vector_config::configurable_component;
+use vector_core::event::MetricTags;
+
+use crate::internal_events::HostMetricsScrapeDetailError;
 
 use super::{filter_result, FilterList, HostMetrics};
-use crate::event::metric::Metric;
 
 /// Options for the “network” metrics collector.
 #[configurable_component]
@@ -22,10 +21,11 @@ pub struct NetworkConfig {
 }
 
 impl HostMetrics {
-    pub async fn network_metrics(&self) -> Vec<Metric> {
+    pub async fn network_metrics(&self, output: &mut super::MetricsBuffer) {
+        output.name = "network";
         match heim::net::io_counters().await {
             Ok(counters) => {
-                counters
+                for counter in counters
                     .filter_map(|result| {
                         filter_result(result, "Failed to load/parse network data.")
                     })
@@ -37,90 +37,57 @@ impl HostMetrics {
                             .network
                             .devices
                             .contains_str(Some(counter.interface()))
-                            .then(|| counter)
+                            .then_some(counter)
                     })
                     .filter_map(|counter| async { counter })
-                    .map(|counter| {
-                        let timestamp = Utc::now();
-                        let interface = counter.interface();
-                        stream::iter(
-                            vec![
-                                self.counter(
-                                    "network_receive_bytes_total",
-                                    timestamp,
-                                    counter.bytes_recv().get::<byte>() as f64,
-                                    BTreeMap::from([(
-                                        String::from("device"),
-                                        interface.to_string(),
-                                    )]),
-                                ),
-                                self.counter(
-                                    "network_receive_errs_total",
-                                    timestamp,
-                                    counter.errors_recv() as f64,
-                                    BTreeMap::from([(
-                                        String::from("device"),
-                                        interface.to_string(),
-                                    )]),
-                                ),
-                                self.counter(
-                                    "network_receive_packets_total",
-                                    timestamp,
-                                    counter.packets_recv() as f64,
-                                    BTreeMap::from([(
-                                        String::from("device"),
-                                        interface.to_string(),
-                                    )]),
-                                ),
-                                self.counter(
-                                    "network_transmit_bytes_total",
-                                    timestamp,
-                                    counter.bytes_sent().get::<byte>() as f64,
-                                    BTreeMap::from([(
-                                        String::from("device"),
-                                        interface.to_string(),
-                                    )]),
-                                ),
-                                self.counter(
-                                    "network_transmit_errs_total",
-                                    timestamp,
-                                    counter.errors_sent() as f64,
-                                    BTreeMap::from([(
-                                        String::from("device"),
-                                        interface.to_string(),
-                                    )]),
-                                ),
-                                #[cfg(any(target_os = "linux", target_os = "windows"))]
-                                self.counter(
-                                    "network_transmit_packets_drop_total",
-                                    timestamp,
-                                    counter.drop_sent() as f64,
-                                    BTreeMap::from([(
-                                        String::from("device"),
-                                        interface.to_string(),
-                                    )]),
-                                ),
-                                #[cfg(any(target_os = "linux", target_os = "windows"))]
-                                self.counter(
-                                    "network_transmit_packets_total",
-                                    timestamp,
-                                    counter.packets_sent() as f64,
-                                    BTreeMap::from([(
-                                        String::from("device"),
-                                        interface.to_string(),
-                                    )]),
-                                ),
-                            ]
-                            .into_iter(),
-                        )
-                    })
-                    .flatten()
                     .collect::<Vec<_>>()
                     .await
+                {
+                    let interface = counter.interface();
+                    output.counter(
+                        "network_receive_bytes_total",
+                        counter.bytes_recv().get::<byte>() as f64,
+                        MetricTags::from([(String::from("device"), interface.to_string())]),
+                    );
+                    output.counter(
+                        "network_receive_errs_total",
+                        counter.errors_recv() as f64,
+                        MetricTags::from([(String::from("device"), interface.to_string())]),
+                    );
+                    output.counter(
+                        "network_receive_packets_total",
+                        counter.packets_recv() as f64,
+                        MetricTags::from([(String::from("device"), interface.to_string())]),
+                    );
+                    output.counter(
+                        "network_transmit_bytes_total",
+                        counter.bytes_sent().get::<byte>() as f64,
+                        MetricTags::from([(String::from("device"), interface.to_string())]),
+                    );
+                    output.counter(
+                        "network_transmit_errs_total",
+                        counter.errors_sent() as f64,
+                        MetricTags::from([(String::from("device"), interface.to_string())]),
+                    );
+                    #[cfg(any(target_os = "linux", target_os = "windows"))]
+                    output.counter(
+                        "network_transmit_packets_drop_total",
+                        counter.drop_sent() as f64,
+                        MetricTags::from([(String::from("device"), interface.to_string())]),
+                    );
+                    #[cfg(any(target_os = "linux", target_os = "windows"))]
+                    output.counter(
+                        "network_transmit_packets_total",
+                        counter.packets_sent() as f64,
+                        MetricTags::from([(String::from("device"), interface.to_string())]),
+                    );
+                }
             }
             Err(error) => {
-                error!(message = "Failed to load network I/O counters.", %error, internal_log_rate_secs = 60);
-                vec![]
+                emit!(HostMetricsScrapeDetailError {
+                    message: "Failed to load network I/O counters.",
+                    error,
+                });
             }
         }
     }
@@ -133,16 +100,18 @@ mod tests {
     use super::{
         super::{
             tests::{all_counters, assert_filtered_metrics, count_tag},
-            HostMetrics, HostMetricsConfig,
+            HostMetrics, HostMetricsConfig, MetricsBuffer,
         },
         NetworkConfig,
     };
 
     #[tokio::test]
     async fn generates_network_metrics() {
-        let metrics = HostMetrics::new(HostMetricsConfig::default())
-            .network_metrics()
+        let mut buffer = MetricsBuffer::new(None);
+        HostMetrics::new(HostMetricsConfig::default())
+            .network_metrics(&mut buffer)
             .await;
+        let metrics = buffer.metrics;
         assert!(!metrics.is_empty());
         assert!(all_counters(&metrics));
 
@@ -157,13 +126,15 @@ mod tests {
 
     #[tokio::test]
     async fn network_metrics_filters_on_device() {
-        assert_filtered_metrics("device", |devices| async {
+        assert_filtered_metrics("device", |devices| async move {
+            let mut buffer = MetricsBuffer::new(None);
             HostMetrics::new(HostMetricsConfig {
                 network: NetworkConfig { devices },
                 ..Default::default()
             })
-            .network_metrics()
-            .await
+            .network_metrics(&mut buffer)
+            .await;
+            buffer.metrics
         })
         .await;
     }

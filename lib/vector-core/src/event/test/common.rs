@@ -8,7 +8,10 @@ use quickcheck::{empty_shrinker, Arbitrary, Gen};
 
 use crate::{
     event::{
-        metric::{Bucket, MetricData, MetricName, MetricSeries, MetricSketch, Quantile, Sample},
+        metric::{
+            Bucket, MetricData, MetricName, MetricSeries, MetricSketch, MetricTags, MetricTime,
+            Quantile, Sample,
+        },
         Event, EventMetadata, LogEvent, Metric, MetricKind, MetricValue, StatisticKind, TraceEvent,
         Value,
     },
@@ -191,12 +194,12 @@ impl Arbitrary for MetricValue {
             },
             4 => MetricValue::AggregatedHistogram {
                 buckets: Vec::arbitrary(g),
-                count: u32::arbitrary(g),
+                count: u64::arbitrary(g),
                 sum: f64::arbitrary(g) % MAX_F64_SIZE,
             },
             5 => MetricValue::AggregatedSummary {
                 quantiles: Vec::arbitrary(g),
-                count: u32::arbitrary(g),
+                count: u64::arbitrary(g),
                 sum: f64::arbitrary(g) % MAX_F64_SIZE,
             },
             6 => {
@@ -425,7 +428,7 @@ impl Arbitrary for Bucket {
     fn arbitrary(g: &mut Gen) -> Self {
         Bucket {
             upper_limit: f64::arbitrary(g) % MAX_F64_SIZE,
-            count: u32::arbitrary(g),
+            count: u64::arbitrary(g),
         }
     }
 
@@ -471,7 +474,7 @@ impl Arbitrary for StatisticKind {
 impl Arbitrary for MetricSeries {
     fn arbitrary(g: &mut Gen) -> Self {
         let tags = if bool::arbitrary(g) {
-            let mut map: BTreeMap<String, String> = BTreeMap::new();
+            let mut map = MetricTags::default();
             for _ in 0..(usize::arbitrary(g) % MAX_MAP_SIZE) {
                 let key = String::from(Name::arbitrary(g));
                 let value = String::from(Name::arbitrary(g));
@@ -560,8 +563,15 @@ impl Arbitrary for MetricData {
             None
         };
 
+        let interval_ms = bool::arbitrary(g)
+            .then(|| u32::arbitrary(g))
+            .and_then(std::num::NonZeroU32::new);
+
         MetricData {
-            timestamp: dt,
+            time: MetricTime {
+                timestamp: dt,
+                interval_ms,
+            },
             kind: MetricKind::arbitrary(g),
             value: MetricValue::arbitrary(g),
         }
@@ -591,7 +601,9 @@ impl Arbitrary for MetricData {
 }
 
 impl Arbitrary for EventMetadata {
-    fn arbitrary(_g: &mut Gen) -> Self {
-        EventMetadata::default()
+    fn arbitrary(g: &mut Gen) -> Self {
+        let mut metadata = EventMetadata::default();
+        *metadata.value_mut() = Value::arbitrary(g);
+        metadata
     }
 }

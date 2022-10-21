@@ -62,7 +62,8 @@ region          = "us-east-1"
 bucket          = "my-log-archives"
 key_prefix      = "date=%Y-%m-%d"      # daily partitions, hive friendly format
 compression     = "gzip"               # compress final objects
-encoding        = "ndjson"             # new line delimited JSON
+framing.method  = "newline_delimited"  # new line delimited...
+encoding.codec  = "json"               # ...JSON
 batch.max_bytes = 10000000             # 10mb uncompressed
 ```
 
@@ -104,7 +105,10 @@ sinks:
     bucket: my-log-archives
     key_prefix: date=%Y-%m-%d
     compression: gzip
-    encoding: ndjson
+    framing:
+      method: newline_delimited
+    encoding:
+      codec: json
     batch:
       max_bytes: 10000000
 ```
@@ -158,7 +162,12 @@ sinks:
       "bucket": "my-log-archives",
       "key_prefix": "date=%Y-%m-%d",
       "compression": "gzip",
-      "encoding": "ndjson",
+      "framing": {
+        "method": "newline_delimited"
+      },
+      "encoding": {
+        "codec": "json"
+      },
       "batch": {
         "max_bytes": 10000000
       }
@@ -219,12 +228,17 @@ the following syntax:
 
 ```toml
 [transforms.add_host]
-type = "add_fields"
+type = "remap"
+source = '''
+# Basic usage. "$HOSTNAME" also works.
+.host = "${HOSTNAME}" # or "$HOSTNAME"
 
-[transforms.add_host.fields]
-host = "${HOSTNAME}" # or "$HOSTNAME"
-environment = "${ENV:-development}" # default value when not present
-tenant = "${TENANT:?tenant must be supplied}" # required environment variable
+# Setting a default value when not present.
+.environment = "${ENV:-development}"
+
+# Requiring an environment variable to be present.
+.tenant = "${TENANT:?tenant must be supplied}"
+'''
 ```
 
 #### Default values
@@ -324,7 +338,7 @@ source = '''
 ```toml
 # Sample the data to save on cost
 inputs = ["apache_parser"]
-type   = "sampler"
+type   = "sample"
 rate   = 50                   # only keep 50%
 . = parse_apache_log(.message)
 ```
@@ -351,7 +365,8 @@ region          = "us-east-1"
 bucket          = "my-log-archives"
 key_prefix      = "date=%Y-%m-%d"      # daily partitions, hive friendly format
 compression     = "gzip"               # compress final objects
-encoding        = "ndjson"             # new line delimited JSON
+framing.method  = "newline_delimited"  # new line delimited...
+encoding.codec  = "json"               # ...JSON
 batch.max_bytes = 10000000             # 10mb uncompressed
 ```
 
@@ -364,7 +379,7 @@ Vector then needs to be started using the `--config-dir` argument to specify the
 vector --config-dir /etc/vector
 ```
 
-#### Wilcards in component IDs
+#### Wildcards in component IDs
 
 Vector supports wildcards (`*`) in component IDs when building your topology.
 For example:

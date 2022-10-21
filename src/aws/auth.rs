@@ -4,6 +4,7 @@ use aws_config::{
     default_provider::credentials::DefaultCredentialsChain, sts::AssumeRoleProviderBuilder,
 };
 use aws_types::{credentials::SharedCredentialsProvider, region::Region, Credentials};
+use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
 
 // matches default load timeout from the SDK as of 0.10.1, but lets us confidently document the
@@ -17,12 +18,12 @@ const DEFAULT_LOAD_TIMEOUT: Duration = Duration::from_secs(5);
 #[serde(deny_unknown_fields, untagged)]
 pub enum AwsAuthentication {
     /// Authenticate using a fixed access key and secret pair.
-    Static {
+    AccessKey {
         /// The AWS access key ID.
-        access_key_id: String,
+        access_key_id: SensitiveString,
 
         /// The AWS secret access key.
-        secret_access_key: String,
+        secret_access_key: SensitiveString,
     },
 
     /// Authenticate using credentials stored in a file.
@@ -43,6 +44,12 @@ pub enum AwsAuthentication {
 
         /// Timeout for assuming the role, in seconds.
         load_timeout_secs: Option<u64>,
+
+        /// The AWS region to send STS requests to.
+        ///
+        /// If not set, this will default to the configured region
+        /// for the service itself.
+        region: Option<String>,
     },
 
     /// Default authentication strategy which tries a variety of substrategies in a one-after-the-other fashion.
@@ -56,15 +63,15 @@ pub enum AwsAuthentication {
 impl AwsAuthentication {
     pub async fn credentials_provider(
         &self,
-        region: Region,
+        service_region: Region,
     ) -> crate::Result<SharedCredentialsProvider> {
         match self {
-            Self::Static {
+            Self::AccessKey {
                 access_key_id,
                 secret_access_key,
             } => Ok(SharedCredentialsProvider::new(Credentials::from_keys(
-                access_key_id,
-                secret_access_key,
+                access_key_id.inner(),
+                secret_access_key.inner(),
                 None,
             ))),
             AwsAuthentication::File { .. } => {
@@ -73,24 +80,26 @@ impl AwsAuthentication {
             AwsAuthentication::Role {
                 assume_role,
                 load_timeout_secs,
+                region,
             } => {
+                let auth_region = region.clone().map(Region::new).unwrap_or(service_region);
                 let provider = AssumeRoleProviderBuilder::new(assume_role)
-                    .region(region.clone())
-                    .build(default_credentials_provider(region, *load_timeout_secs).await);
+                    .region(auth_region.clone())
+                    .build(default_credentials_provider(auth_region, *load_timeout_secs).await);
 
                 Ok(SharedCredentialsProvider::new(provider))
             }
             AwsAuthentication::Default { load_timeout_secs } => Ok(SharedCredentialsProvider::new(
-                default_credentials_provider(region, *load_timeout_secs).await,
+                default_credentials_provider(service_region, *load_timeout_secs).await,
             )),
         }
     }
 
     #[cfg(test)]
     pub fn test_auth() -> AwsAuthentication {
-        AwsAuthentication::Static {
-            access_key_id: "dummy".to_string(),
-            secret_access_key: "dummy".to_string(),
+        AwsAuthentication::AccessKey {
+            access_key_id: "dummy".to_string().into(),
+            secret_access_key: "dummy".to_string().into(),
         }
     }
 }
@@ -182,6 +191,7 @@ mod tests {
             assume_role = "root"
             auth.assume_role = "auth.root"
             auth.load_timeout_secs = 10
+            auth.region = "us-west-2"
         "#,
         )
         .unwrap();
@@ -190,9 +200,11 @@ mod tests {
             AwsAuthentication::Role {
                 assume_role,
                 load_timeout_secs,
+                region,
             } => {
                 assert_eq!(&assume_role, "auth.root");
                 assert_eq!(load_timeout_secs, Some(10));
+                assert_eq!(region.unwrap(), "us-west-2");
             }
             _ => panic!(),
         }
@@ -208,7 +220,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(matches!(config.auth, AwsAuthentication::Static { .. }));
+        assert!(matches!(config.auth, AwsAuthentication::AccessKey { .. }));
     }
 
     #[test]

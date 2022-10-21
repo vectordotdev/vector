@@ -50,7 +50,7 @@ impl TextSerializer {
 }
 
 impl Encoder<Event> for TextSerializer {
-    type Error = vector_core::Error;
+    type Error = vector_common::Error;
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let message_key = log_schema().message_key();
@@ -79,13 +79,13 @@ impl Encoder<Event> for TextSerializer {
 #[cfg(test)]
 mod tests {
     use bytes::{Bytes, BytesMut};
-    use vector_core::event::{Metric, MetricKind, MetricValue};
+    use vector_core::event::{LogEvent, Metric, MetricKind, MetricValue};
 
     use super::*;
 
     #[test]
     fn serialize_bytes_event() {
-        let input = Event::from("foo");
+        let input = Event::from(LogEvent::from_str_legacy("foo"));
         let mut serializer = TextSerializer;
 
         let mut buffer = BytesMut::new();

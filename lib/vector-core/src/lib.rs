@@ -37,12 +37,19 @@ pub mod serde;
 pub mod sink;
 pub mod source;
 pub mod stream;
+pub mod tcp;
 #[cfg(test)]
 mod test_util;
 pub mod time;
+pub mod tls;
 pub mod transform;
+#[cfg(feature = "vrl")]
+mod vrl;
 
 use std::path::PathBuf;
+
+#[cfg(feature = "vrl")]
+pub use vrl::compile_vrl;
 
 pub use vector_buffers as buffers;
 #[cfg(any(test, feature = "test"))]
@@ -56,10 +63,4 @@ pub fn default_data_dir() -> Option<PathBuf> {
     Some(PathBuf::from("/var/lib/vector/"))
 }
 
-/// Vector's basic error type, dynamically dispatched and safe to send across
-/// threads.
-pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
-
-/// Vector's basic result type, defined in terms of [`Error`] and generic over
-/// `T`.
-pub type Result<T> = std::result::Result<T, Error>;
+pub(crate) use vector_common::{Error, Result};

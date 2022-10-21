@@ -1,9 +1,6 @@
 use std::collections::HashMap;
-use std::time::SystemTime;
 
-use aws_sigv4::http_request::{SignableRequest, SigningSettings};
-use aws_sigv4::SigningParams;
-use aws_types::credentials::{ProvideCredentials, SharedCredentialsProvider};
+use aws_types::credentials::SharedCredentialsProvider;
 use aws_types::region::Region;
 use bytes::Bytes;
 use http::{StatusCode, Uri};
@@ -25,7 +22,7 @@ use crate::{
     transforms::metric_to_log::MetricToLog,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ElasticsearchCommon {
     pub base_url: String,
     pub bulk_uri: Uri,
@@ -41,15 +38,15 @@ pub struct ElasticsearchCommon {
 }
 
 impl ElasticsearchCommon {
-    pub async fn parse_config(config: &ElasticsearchConfig) -> crate::Result<Self> {
+    pub async fn parse_config(config: &ElasticsearchConfig, endpoint: &str) -> crate::Result<Self> {
         // Test the configured host, but ignore the result
-        let uri = format!("{}/_test", &config.endpoint);
-        let uri = uri.parse::<Uri>().with_context(|_| InvalidHostSnafu {
-            host: &config.endpoint,
-        })?;
+        let uri = format!("{}/_test", endpoint);
+        let uri = uri
+            .parse::<Uri>()
+            .with_context(|_| InvalidHostSnafu { host: endpoint })?;
         if uri.host().is_none() {
             return Err(ParseError::HostMustIncludeHostname {
-                host: config.endpoint.clone(),
+                host: endpoint.to_string(),
             }
             .into());
         }
@@ -61,7 +58,7 @@ impl ElasticsearchCommon {
             }),
             _ => None,
         };
-        let uri = config.endpoint.parse::<UriSerde>()?;
+        let uri = endpoint.parse::<UriSerde>()?;
         let http_auth = authorization.choose_one(&uri.auth)?;
         let base_url = uri.uri.to_string().trim_end_matches('/').to_owned();
 
@@ -140,12 +137,45 @@ impl ElasticsearchCommon {
         })
     }
 
+    /// Parses endpoints into a vector of ElasticsearchCommons. The resulting vector is guaranteed to not be empty.
+    pub async fn parse_many(config: &ElasticsearchConfig) -> crate::Result<Vec<Self>> {
+        if let Some(endpoint) = config.endpoint.as_ref() {
+            warn!(message = "DEPRECATION, use of deprecated option `endpoint`. Please use `endpoints` option instead.");
+            if config.endpoints.is_empty() {
+                Ok(vec![Self::parse_config(config, endpoint).await?])
+            } else {
+                Err(ParseError::EndpointsExclusive.into())
+            }
+        } else if config.endpoints.is_empty() {
+            Err(ParseError::EndpointRequired.into())
+        } else {
+            let mut commons = Vec::new();
+            for endpoint in config.endpoints.iter() {
+                commons.push(Self::parse_config(config, endpoint).await?);
+            }
+            Ok(commons)
+        }
+    }
+
+    /// Parses a single endpoint, else panics.
+    #[cfg(test)]
+    pub async fn parse_single(config: &ElasticsearchConfig) -> crate::Result<Self> {
+        let mut commons = Self::parse_many(config).await?;
+        assert!(commons.len() == 1);
+        Ok(commons.remove(0))
+    }
+
     pub async fn healthcheck(self, client: HttpClient) -> crate::Result<()> {
         let mut builder = Request::get(format!("{}/_cluster/health", self.base_url));
 
         if let Some(authorization) = &self.http_auth {
             builder = authorization.apply_builder(builder);
         }
+
+        for (header, value) in &self.request.headers {
+            builder = builder.header(&header[..], &value[..]);
+        }
+
         let mut request = builder.body(Bytes::new())?;
 
         if let Some(credentials_provider) = &self.aws_auth {
@@ -165,22 +195,5 @@ pub async fn sign_request(
     credentials_provider: &SharedCredentialsProvider,
     region: &Option<Region>,
 ) -> crate::Result<()> {
-    let signable_request = SignableRequest::from(&*request);
-    let credentials = credentials_provider.provide_credentials().await?;
-    let mut signing_params_builder = SigningParams::builder()
-        .access_key(credentials.access_key_id())
-        .secret_key(credentials.secret_access_key())
-        .region(region.as_ref().map(|r| r.as_ref()).unwrap_or(""))
-        .service_name("es")
-        .time(SystemTime::now())
-        .settings(SigningSettings::default());
-
-    signing_params_builder.set_security_token(credentials.session_token());
-
-    let (signing_instructions, _signature) =
-        aws_sigv4::http_request::sign(signable_request, &signing_params_builder.build()?)?
-            .into_parts();
-    signing_instructions.apply_to_request(request);
-
-    Ok(())
+    crate::aws::sign_request("es", request, credentials_provider, region).await
 }
