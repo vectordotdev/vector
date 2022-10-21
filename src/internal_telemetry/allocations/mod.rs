@@ -67,10 +67,7 @@ impl Tracer for MainTracer {
     }
 
     #[inline(always)]
-    fn trace_deallocation(&self, wrapped_size: usize, source_group_id: AllocationGroupId) {
-        GROUP_MEM_METRICS[source_group_id.as_usize().get()]
-            .fetch_sub(wrapped_size, Ordering::Relaxed);
-    }
+    fn trace_deallocation(&self, _wrapped_size: usize, _source_group_id: AllocationGroupId) {}
 }
 
 /// Initializes allocation tracing.
