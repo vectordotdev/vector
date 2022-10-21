@@ -26,7 +26,7 @@ pub struct KinesisService<C, T, E> {
 
 impl<C, T, E> Clone for KinesisService<C, T, E>
 where
-    C: std::clone::Clone,
+    C: Clone,
 {
     fn clone(&self) -> Self {
         Self {
@@ -56,10 +56,10 @@ impl DriverResponse for KinesisResponse {
 
 impl<R, C, T, E> Service<BatchKinesisRequest<R>> for KinesisService<C, T, E>
 where
-    R: Record<T = T> + std::clone::Clone,
-    C: SendRecord + std::clone::Clone + std::marker::Sync + std::marker::Send + 'static,
-    std::vec::Vec<<C as SendRecord>::T>: FromIterator<T>,
-    <C as SendRecord>::T: std::marker::Send,
+    R: Record<T = T> + Clone,
+    C: SendRecord + Clone + Sync + Send + 'static,
+    Vec<<C as SendRecord>::T>: FromIterator<T>,
+    <C as SendRecord>::T: Send,
 {
     type Response = KinesisResponse;
     type Error = SdkError<<C as SendRecord>::E>;

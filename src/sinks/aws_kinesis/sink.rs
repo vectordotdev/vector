@@ -1,4 +1,4 @@
-use std::{fmt, marker::PhantomData, num::NonZeroUsize};
+use std::{fmt::Debug, marker::PhantomData, num::NonZeroUsize};
 
 use async_trait::async_trait;
 use futures::{future, stream::BoxStream, StreamExt};
@@ -45,8 +45,8 @@ where
     S: Service<BatchKinesisRequest<R>> + Send + 'static,
     S::Future: Send + 'static,
     S::Response: DriverResponse + Send + 'static,
-    S::Error: fmt::Debug + Into<crate::Error> + Send,
-    R: Record + Send + std::marker::Sync + std::marker::Unpin + std::clone::Clone + 'static,
+    S::Error: Debug + Into<crate::Error> + Send,
+    R: Record + Send + Sync + Unpin + Clone + 'static,
 {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let request_builder_concurrency_limit = NonZeroUsize::new(50);
@@ -101,8 +101,8 @@ where
     S: Service<BatchKinesisRequest<R>> + Send + 'static,
     S::Future: Send + 'static,
     S::Response: DriverResponse + Send + 'static,
-    S::Error: fmt::Debug + Into<crate::Error> + Send,
-    R: Record + Send + std::marker::Sync + std::marker::Unpin + std::clone::Clone + 'static,
+    S::Error: Debug + Into<crate::Error> + Send,
+    R: Record + Send + Sync + Unpin + Clone + 'static,
 {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
@@ -148,7 +148,7 @@ fn gen_partition_key() -> String {
 
 pub struct BatchKinesisRequest<R>
 where
-    R: Record + std::clone::Clone,
+    R: Record + Clone,
 {
     pub key: KinesisKey,
     pub events: Vec<KinesisRequest<R>>,
@@ -157,7 +157,7 @@ where
 
 impl<R> Clone for BatchKinesisRequest<R>
 where
-    R: Record + std::clone::Clone,
+    R: Record + Clone,
 {
     fn clone(&self) -> Self {
         Self {
@@ -172,7 +172,7 @@ where
 
 impl<R> Finalizable for BatchKinesisRequest<R>
 where
-    R: Record + std::clone::Clone,
+    R: Record + Clone,
 {
     fn take_finalizers(&mut self) -> EventFinalizers {
         self.events.take_finalizers()
@@ -181,7 +181,7 @@ where
 
 impl<R> MetaDescriptive for BatchKinesisRequest<R>
 where
-    R: Record + std::clone::Clone,
+    R: Record + Clone,
 {
     fn get_metadata(&self) -> &RequestMetadata {
         &self.metadata
