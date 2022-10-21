@@ -121,7 +121,7 @@ impl AllocationGroupToken {
 
     /// Attaches this allocation group to a tracing [`Span`][tracing::Span].
     ///
-    /// When the span is entered or exited, the allocation group will also transition from inactive to active, and vise
+    /// When the span is entered or exited, the allocation group will also transition from inactive to active, and vice
     /// versa.  In effect, all allocations that occur while the span is entered will be associated with the allocation
     /// group.
     pub fn attach_to_span(self, span: &tracing::Span) {
