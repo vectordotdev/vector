@@ -166,9 +166,13 @@ impl Function for ParseGroks {
 
         for src in alias_sources {
             let path = Path::new(&src);
-            let file = File::open(&path).unwrap();
+            let file = File::open(&path).map_err(|_| {
+                vrl::function::Error::InvalidAliasSource { path: path.to_owned() }
+            })?;
             let reader = BufReader::new(file);
-            let mut src_aliases = serde_json::from_reader(reader).unwrap();
+            let mut src_aliases = serde_json::from_reader(reader).map_err(|_| {
+                vrl::function::Error::InvalidAliasSource { path: path.to_owned() }
+            })?;
 
             aliases.append(&mut src_aliases);
         }
