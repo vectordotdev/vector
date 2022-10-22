@@ -278,6 +278,31 @@ mod test {
             tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
+        presence_of_alias_sources_argument {
+            args: func_args![
+                value: r##"2020-10-02T23:22:12.223222Z info 200 hello world"##,
+                patterns: Value::Array(vec![
+                    "%{common_prefix} %{_status} %{_message}".into(),
+                    "%{common_prefix} %{_message}".into(),
+                    ]),
+                aliases: value!({
+                    "common_prefix": "%{_timestamp} %{_loglevel}",
+                    "_timestamp": "%{TIMESTAMP_ISO8601:timestamp}",
+                    "_loglevel": "%{LOGLEVEL:level}",
+                    "_status": "%{POSINT:status}",
+                    "_message": "%{GREEDYDATA:message}"
+                }),
+                alias_sources: Value::Array(vec![]),
+            ],
+            want: Ok(Value::from(btreemap! {
+                "timestamp" => "2020-10-02T23:22:12.223222Z",
+                "level" => "info",
+                "status" => "200",
+                "message" => "hello world"
+            })),
+            tdef: TypeDef::object(Collection::any()).fallible(),
+        }
+
         multiple_patterns_and_aliases_second_pattern_matches {
             args: func_args![
                 value: r##"2020-10-02T23:22:12.223222Z info hello world"##,
