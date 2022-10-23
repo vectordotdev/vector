@@ -206,6 +206,25 @@ async fn structures_events_correctly() {
 }
 
 #[tokio::test]
+async fn auto_version() {
+    trace_init();
+
+    let config = ElasticsearchConfig {
+        endpoints: vec![http_server()],
+        doc_type: Some("log_lines".into()),
+        compression: Compression::None,
+        api_version: ElasticsearchApiVersion::Auto,
+        ..config()
+    };
+    let common = ElasticsearchCommon::parse_single(config)
+        .await
+        .expect("Config error");
+
+    let client = create_http_client();
+    let _version = common.api_version(&client).expect("Fetch version failed");
+}
+
+#[tokio::test]
 async fn insert_events_over_http() {
     trace_init();
 
@@ -409,10 +428,9 @@ async fn run_insert_tests_with_config(
     break_events: bool,
     batch_status: BatchStatus,
 ) {
-    let common = ElasticsearchCommon::parse_many(config)
+    let common = ElasticsearchCommon::parse_single(config)
         .await
-        .expect("Config error")
-        .remove(0);
+        .expect("Config error");
     let index = match config.mode {
         // Data stream mode uses an index name generated from the event.
         ElasticsearchMode::DataStream => format!(

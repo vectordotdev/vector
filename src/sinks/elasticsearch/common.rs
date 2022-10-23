@@ -2,13 +2,13 @@ use std::collections::HashMap;
 
 use aws_types::credentials::SharedCredentialsProvider;
 use aws_types::region::Region;
-use bytes::Bytes;
-use http::{StatusCode, Uri};
+use bytes::{Buf, Bytes};
+use http::{Response, StatusCode, Uri};
+use hyper::{body, Body};
+use serde::Deserialize;
 use snafu::ResultExt;
 
-use super::{
-    request_builder::ElasticsearchRequestBuilder, ElasticsearchEncoder, InvalidHostSnafu, Request,
-};
+use super::{ElasticsearchApiVersion, InvalidHostSnafu, Request};
 use crate::{
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
@@ -29,12 +29,12 @@ pub struct ElasticsearchCommon {
     pub http_auth: Option<Auth>,
     pub aws_auth: Option<SharedCredentialsProvider>,
     pub mode: ElasticsearchCommonMode,
-    pub request_builder: ElasticsearchRequestBuilder,
     pub tls_settings: TlsSettings,
     pub region: Option<Region>,
     pub request: RequestConfig,
     pub query_params: HashMap<String, String>,
     pub metric_to_log: MetricToLog,
+    pub api_version: ElasticsearchApiVersion,
 }
 
 impl ElasticsearchCommon {
@@ -78,16 +78,6 @@ impl ElasticsearchCommon {
 
         let mode = config.common_mode()?;
 
-        let doc_type = config.doc_type.clone().unwrap_or_else(|| "_doc".into());
-        let request_builder = ElasticsearchRequestBuilder {
-            compression: config.compression,
-            encoder: ElasticsearchEncoder {
-                transformer: config.encoding.clone(),
-                doc_type,
-                suppress_type_name: config.suppress_type_name,
-            },
-        };
-
         let tower_request = config
             .request
             .tower
@@ -128,12 +118,12 @@ impl ElasticsearchCommon {
             bulk_uri,
             aws_auth,
             mode,
-            request_builder,
             query_params,
             request,
             region,
             tls_settings,
             metric_to_log,
+            api_version: config.api_version.clone(),
         })
     }
 
@@ -166,7 +156,42 @@ impl ElasticsearchCommon {
     }
 
     pub async fn healthcheck(self, client: HttpClient) -> crate::Result<()> {
-        let mut builder = Request::get(format!("{}/_cluster/health", self.base_url));
+        match self.get(client, "/_cluster/health").await?.status() {
+            StatusCode::OK => Ok(()),
+            status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
+        }
+    }
+
+    /// Returns major api version. May fetch from Elasticsearch.
+    pub async fn api_version(&self, client: &HttpClient) -> crate::Result<usize> {
+        match self.api_version {
+            ElasticsearchApiVersion::V6 => Ok(6),
+            ElasticsearchApiVersion::V7 => Ok(7),
+            ElasticsearchApiVersion::V8 => Ok(8),
+            ElasticsearchApiVersion::Auto => self
+                .clone()
+                .get_api_version(client.clone())
+                .await
+                .map_err(|error| {
+                    format!("Failed to get Elasticsearch API version: {}", error).into()
+                }),
+        }
+    }
+
+    /// Fetches version from Elasticsearch.
+    async fn get_api_version(self, client: HttpClient) -> crate::Result<usize> {
+        let response = self.get(client, "/_cluster/state/version").await?;
+
+        let (_, body) = response.into_parts();
+        let mut body = body::aggregate(body).await?;
+        let body = body.copy_to_bytes(body.remaining());
+        let ClusterState { version } = serde_json::from_slice(&body)?;
+
+        Ok(version)
+    }
+
+    async fn get(self, client: HttpClient, path: &str) -> crate::Result<Response<Body>> {
+        let mut builder = Request::get(format!("{}{}", self.base_url, path));
 
         if let Some(authorization) = &self.http_auth {
             builder = authorization.apply_builder(builder);
@@ -181,12 +206,10 @@ impl ElasticsearchCommon {
         if let Some(credentials_provider) = &self.aws_auth {
             sign_request(&mut request, credentials_provider, &self.region).await?;
         }
-        let response = client.send(request.map(hyper::Body::from)).await?;
-
-        match response.status() {
-            StatusCode::OK => Ok(()),
-            status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
-        }
+        client
+            .send(request.map(hyper::Body::from))
+            .await
+            .map_err(Into::into)
     }
 }
 
@@ -196,4 +219,9 @@ pub async fn sign_request(
     region: &Option<Region>,
 ) -> crate::Result<()> {
     crate::aws::sign_request("es", request, credentials_provider, region).await
+}
+
+#[derive(Deserialize)]
+struct ClusterState {
+    version: usize,
 }

@@ -55,13 +55,14 @@ impl<S> ElasticsearchSink<S> {
     pub fn new(
         common: &ElasticsearchCommon,
         config: &ElasticsearchConfig,
+        request_builder: ElasticsearchRequestBuilder,
         service: S,
     ) -> crate::Result<Self> {
         let batch_settings = config.batch.into_batcher_settings()?;
 
         Ok(ElasticsearchSink {
             batch_settings,
-            request_builder: common.request_builder.clone(),
+            request_builder,
             transformer: config.encoding.clone(),
             service,
             metric_to_log: common.metric_to_log.clone(),
