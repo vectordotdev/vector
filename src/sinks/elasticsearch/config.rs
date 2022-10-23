@@ -20,8 +20,8 @@ use crate::{
             retry::ElasticsearchRetryLogic,
             service::{ElasticsearchService, HttpRequestBuilder},
             sink::ElasticsearchSink,
-            BatchActionTemplateSnafu, ElasticsearchAuth, ElasticsearchCommon,
-            ElasticsearchCommonMode, ElasticsearchMode, IndexTemplateSnafu,
+            BatchActionTemplateSnafu, ElasticsearchApiVersion, ElasticsearchAuth,
+            ElasticsearchCommon, ElasticsearchCommonMode, ElasticsearchMode, IndexTemplateSnafu,
         },
         util::{
             http::RequestConfig, service::HealthConfig, BatchConfig, Compression,
@@ -34,6 +34,8 @@ use crate::{
     transforms::metric_to_log::MetricToLogConfig,
 };
 use lookup::event_path;
+
+use super::request_builder::ElasticsearchRequestBuilder;
 
 /// The field name for the timestamp required by data stream mode
 pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
@@ -61,12 +63,17 @@ pub struct ElasticsearchConfig {
     /// set this option since Elasticsearch has removed it.
     pub doc_type: Option<String>,
 
+    /// The api version of Elasticsearch.
+    #[serde(default)]
+    pub api_version: ElasticsearchApiVersion,
+
     /// Whether or not to send the `type` field to Elasticsearch.
     ///
     /// `type` field was deprecated in Elasticsearch 7.x and removed in Elasticsearch 8.x.
     ///
     /// If enabled, the `doc_type` option will be ignored.
     #[serde(default)]
+    #[configurable(deprecated)]
     pub suppress_type_name: bool,
 
     /// The name of the event key that should map to Elasticsearch’s [`_id` field][es_id].
@@ -388,6 +395,10 @@ impl SinkConfig for ElasticsearchConfig {
             .tower
             .unwrap_with(&TowerRequestConfig::default());
 
+        let version = common.api_version(&client).await?;
+
+        let request_builder = ElasticsearchRequestBuilder::new(self, version);
+
         let health_config = self.distribution.clone().unwrap_or_default();
 
         let services = commons
@@ -410,7 +421,7 @@ impl SinkConfig for ElasticsearchConfig {
             ElasticsearchHealthLogic,
         );
 
-        let sink = ElasticsearchSink::new(&common, self, service)?;
+        let sink = ElasticsearchSink::new(&common, self, request_builder, service)?;
 
         let stream = VectorSink::from_event_streamsink(sink);
 
@@ -485,5 +496,31 @@ mod tests {
         "#,
         )
         .unwrap();
+    }
+
+    #[test]
+    fn parse_version() {
+        let config = toml::from_str::<ElasticsearchConfig>(
+            r#"
+            endpoints = [""]
+            api_version = "v7"
+        "#,
+        )
+        .unwrap();
+        assert!(matches!(config.mode, ElasticsearchMode::DataStream));
+        assert!(config.data_stream.is_some());
+    }
+
+    #[test]
+    fn parse_version_auto() {
+        let config = toml::from_str::<ElasticsearchConfig>(
+            r#"
+            endpoints = [""]
+            api_version = "auto"
+        "#,
+        )
+        .unwrap();
+        assert!(matches!(config.mode, ElasticsearchMode::DataStream));
+        assert!(config.data_stream.is_some());
     }
 }
