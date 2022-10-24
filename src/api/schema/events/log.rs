@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use async_graphql::Object;
 use chrono::{DateTime, Utc};
 use vector_common::encode_logfmt;
@@ -19,7 +21,7 @@ impl Log {
         Self { output, event }
     }
 
-    pub fn get_message(&self) -> Option<String> {
+    pub fn get_message(&self) -> Option<Cow<'_, str>> {
         Some(self.event.get("message")?.to_string_lossy())
     }
 
@@ -48,7 +50,7 @@ impl Log {
 
     /// Log message
     async fn message(&self) -> Option<String> {
-        self.get_message()
+        self.get_message().map(Into::into)
     }
 
     /// Log timestamp

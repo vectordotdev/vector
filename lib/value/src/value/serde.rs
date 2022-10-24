@@ -1,5 +1,4 @@
-use std::collections::BTreeMap;
-use std::fmt;
+use std::{borrow::Cow, collections::BTreeMap, fmt};
 
 use bytes::Bytes;
 use ordered_float::NotNan;
@@ -29,19 +28,22 @@ impl Value {
         }
     }
 
-    // TODO: return Cow 🐄
     /// Converts self into a `String` representation, using JSON for `Map`/`Array`.
-    pub fn to_string_lossy(&self) -> String {
+    pub fn to_string_lossy(&self) -> Cow<'_, str> {
         match self {
-            Self::Bytes(bytes) => String::from_utf8_lossy(bytes).into_owned(),
-            Self::Regex(regex) => regex.as_str().to_string(),
-            Self::Timestamp(timestamp) => timestamp_to_string(timestamp),
-            Self::Integer(num) => num.to_string(),
-            Self::Float(num) => num.to_string(),
-            Self::Boolean(b) => b.to_string(),
-            Self::Object(map) => serde_json::to_string(map).expect("Cannot serialize map"),
-            Self::Array(arr) => serde_json::to_string(arr).expect("Cannot serialize array"),
-            Self::Null => "<null>".to_string(),
+            Self::Bytes(bytes) => String::from_utf8_lossy(bytes),
+            Self::Regex(regex) => regex.as_str().into(),
+            Self::Timestamp(timestamp) => timestamp_to_string(timestamp).into(),
+            Self::Integer(num) => num.to_string().into(),
+            Self::Float(num) => num.to_string().into(),
+            Self::Boolean(b) => b.to_string().into(),
+            Self::Object(map) => serde_json::to_string(map)
+                .expect("Cannot serialize map")
+                .into(),
+            Self::Array(arr) => serde_json::to_string(arr)
+                .expect("Cannot serialize array")
+                .into(),
+            Self::Null => "<null>".into(),
         }
     }
 }

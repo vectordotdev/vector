@@ -62,7 +62,7 @@ pub struct NatsSinkConfig {
     connection_name: String,
 
     /// The NATS subject to publish messages to.
-    #[configurable(metadata(templateable))]
+    #[configurable(metadata(docs::templateable))]
     subject: String,
 
     /// The NATS URL to connect to.

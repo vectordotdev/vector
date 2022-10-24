@@ -1,3 +1,4 @@
+use crate::kind::collection::CollectionRemove;
 use crate::kind::Collection;
 
 /// An `index` type that can be used in `Collection<Index>`
@@ -22,7 +23,35 @@ impl Collection<Index> {
     /// Returns the largest known index, or None if no known indices exist.
     #[must_use]
     pub fn largest_known_index(&self) -> Option<usize> {
-        self.known().keys().map(|i| i.to_usize()).max()
+        self.known()
+            .iter()
+            .filter_map(|(i, kind)| {
+                if kind.contains_any_defined() {
+                    Some(i.to_usize())
+                } else {
+                    None
+                }
+            })
+            .max()
+    }
+
+    /// Converts a negative index to a positive index (only if the exact positive index is known).
+    #[must_use]
+    pub fn get_positive_index(&self, index: isize) -> Option<usize> {
+        if self.unknown_kind().contains_any_defined() {
+            // positive index can't be known if there are unknown values
+            return None;
+        }
+
+        let negative_index = (-index) as usize;
+        if let Some(largest_known_index) = self.largest_known_index() {
+            if largest_known_index >= negative_index - 1 {
+                // The exact index to remove is known.
+                return Some(((largest_known_index as isize) + 1 + index) as usize);
+            }
+        }
+        // Removing a non-existing index
+        None
     }
 
     /// The minimum possible length an array could be given the type information.
@@ -40,6 +69,26 @@ impl Collection<Index> {
             // there are no defined unknown values, so all indices must be known
             Some(self.min_length())
         }
+    }
+
+    /// Removes the known value at the given index and shifts the
+    /// elements to the left.
+    pub fn remove_shift(&mut self, index: usize) {
+        let min_length = self.min_length();
+        self.known_mut().remove(&index.into());
+        for i in index..min_length {
+            if let Some(value) = self.known_mut().remove(&(index + 1).into()) {
+                self.known_mut().insert(index.into(), value);
+            }
+        }
+    }
+}
+
+impl CollectionRemove for Collection<Index> {
+    type Key = Index;
+
+    fn remove_known(&mut self, key: &Index) {
+        self.remove_shift(key.0);
     }
 }
 

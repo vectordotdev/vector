@@ -185,7 +185,7 @@ tower = { version = "0.4.13", default-features = false, features = ["buffer", "l
 serde = { version = "1.0.145", default-features = false, features = ["derive"] }
 serde-toml-merge = { version = "0.3.0", default-features = false }
 serde_bytes = { version = "0.11.7", default-features = false, features = ["std"], optional = true }
-serde_json = { version = "1.0.86", default-features = false, features = ["raw_value"] }
+serde_json = { version = "1.0.87", default-features = false, features = ["raw_value"] }
 serde_with = { version = "2.0.1", default-features = false, features = ["macros", "std"], optional = true }
 serde_yaml = { version = "0.9.13", default-features = false }
 
@@ -227,7 +227,7 @@ vrl-stdlib = { path = "lib/vrl/stdlib" }
 
 # External libs
 arc-swap = { version = "1.5", default-features = false, optional = true }
-async-compression = { version = "0.3.12", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
+async-compression = { version = "0.3.15", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
 avro-rs = { version = "0.13.0", default-features = false, optional = true }
 axum = { version = "0.5.16", default-features = false }
 base64 = { version = "0.13.0", default-features = false, optional = true }
@@ -237,7 +237,7 @@ bytes = { version = "1.2.1", default-features = false, features = ["serde"] }
 bytesize = { version = "1.1.0", default-features = false }
 chrono = { version = "0.4.22", default-features = false, features = ["serde"] }
 cidr-utils = { version = "0.5.7", default-features = false }
-clap = { version = "4.0.15", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
+clap = { version = "4.0.18", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
 colored = { version = "2.0.0", default-features = false }
 csv = { version = "1.1", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
@@ -247,7 +247,7 @@ encoding_rs = { version = "0.8.31", default-features = false, features = ["serde
 enum_dispatch = { version = "0.3.8", default-features = false }
 exitcode = { version = "1.1.2", default-features = false }
 flate2 = { version = "1.0.24", default-features = false, features = ["default"] }
-futures-util = { version = "0.3.21", default-features = false }
+futures-util = { version = "0.3.25", default-features = false }
 glob = { version = "0.3.0", default-features = false }
 governor = { version = "0.5.0", default-features = false, features = ["dashmap", "jitter", "std"], optional = true }
 grok = { version = "2.0.0", default-features = false, optional = true }
@@ -287,8 +287,8 @@ postgres-openssl = { version = "0.5.0", default-features = false, features = ["r
 pulsar = { version = "4.1.3", default-features = false, features = ["tokio-runtime", "auth-oauth2"], optional = true }
 rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
 rand_distr = { version = "0.4.3", default-features = false }
-rdkafka = { version = "0.28.0", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
-redis = { version = "0.21.6", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
+rdkafka = { git = "https://github.com/fede1024/rust-rdkafka", tag = "v0.29.0", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
+redis = { version = "0.22.1", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
 regex = { version = "1.6.0", default-features = false, features = ["std", "perf"] }
 roaring = { version = "0.10.1", default-features = false, optional = true }
 seahash = { version = "4.1.0", default-features = false }
@@ -337,30 +337,31 @@ approx = "0.5.1"
 assert_cmd = { version = "2.0.4", default-features = false }
 azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, features = ["enable_reqwest", "azurite_workaround"] }
 azure_identity = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, features = ["enable_reqwest"] }
-azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, features = ["azurite_workaround"] }
 azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, features = ["azurite_workaround"] }
+azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, features = ["azurite_workaround"] }
 base64 = "0.13.0"
 criterion = { version = "0.4.0", features = ["html_reports", "async_tokio"] }
+itertools = { version = "0.10.5", default-features = false }
 libc = "0.2.135"
 pretty_assertions = "1.3.0"
 proptest = "1.0"
 quickcheck = "1.0.3"
 reqwest = { version = "0.11", features = ["json"] }
 tempfile = "3.3.0"
-tokio = { version = "1.21.2", features = ["test-util"] }
 tokio-test = "0.4.2"
+tokio = { version = "1.21.2", features = ["test-util"] }
 tower-test = "0.4.0"
 value = { path = "lib/value", features = ["test"] }
 vector-core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
 wiremock = "0.5.15"
-zstd = { version = "0.10.2", default-features = false }
+zstd = { version = "0.11.2", default-features = false }
 
 [patch.crates-io]
 # A patch for lib/vector-core/buffers, addresses Issue 7514
 leveldb-sys = { git = "https://github.com/vectordotdev/leveldb-sys.git", branch = "leveldb_mmap_limit" }
 # Removes dependency on `time` v0.1
 # https://github.com/chronotope/chrono/pull/578
-chrono = { git = "https://github.com/vectordotdev/chrono.git", branch = "no-default-time-v0.4.22" }
+chrono = { git = "https://github.com/vectordotdev/chrono.git", branch = "no-default-time-v0.4.22-1" }
 # Adds `Status::is_reset` test, remove after the next version is released.
 h2 = { git = "https://github.com/hyperium/h2.git", rev = "f6aa3be6719270cd7b4094ee1940751b5f4ec88e" }
 # Enables OpenSSL ENGINE support during cross compilation to musl

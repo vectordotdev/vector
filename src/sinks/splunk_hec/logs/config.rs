@@ -59,13 +59,11 @@ pub struct HecLogsSinkConfig {
     /// The name of the index where to send the events to.
     ///
     /// If not specified, the default index is used.
-    #[configurable(metadata(templateable))]
     pub index: Option<Template>,
 
     /// The sourcetype of events sent to this sink.
     ///
     /// If unset, Splunk will default to `httpevent`.
-    #[configurable(metadata(templateable))]
     pub sourcetype: Option<Template>,
 
     /// The source of events sent to this sink.
@@ -73,7 +71,6 @@ pub struct HecLogsSinkConfig {
     /// This is typically the filename the logs originated from.
     ///
     /// If unset, the Splunk collector will set it.
-    #[configurable(metadata(templateable))]
     pub source: Option<Template>,
 
     #[configurable(derived)]

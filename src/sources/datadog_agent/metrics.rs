@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, num::NonZeroU32, sync::Arc};
+use std::{num::NonZeroU32, sync::Arc};
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
@@ -13,7 +13,7 @@ use crate::{
     config::log_schema,
     event::{
         metric::{Metric, MetricValue},
-        Event, MetricKind,
+        Event, MetricKind, MetricTags,
     },
     internal_events::EventsReceived,
     schema,
@@ -254,7 +254,7 @@ pub(crate) fn decode_ddseries_v2(
         .into_iter()
         .flat_map(|serie| {
             let (namespace, name) = namespace_name_from_dd_metric(&serie.metric);
-            let mut tags: BTreeMap<String, String> = serie
+            let mut tags: MetricTags = serie
                 .tags
                 .iter()
                 .map(|tag| {
@@ -398,7 +398,7 @@ fn into_vector_metric(
     api_key: Option<Arc<str>>,
     schema_definition: &Arc<schema::Definition>,
 ) -> Vec<Event> {
-    let mut tags: BTreeMap<String, String> = dd_metric
+    let mut tags: MetricTags = dd_metric
         .tags
         .unwrap_or_default()
         .iter()
@@ -508,7 +508,7 @@ pub(crate) fn decode_ddsketch(
         .into_iter()
         .flat_map(|sketch_series| {
             // sketch_series.distributions is also always empty from payload coming from dd agents
-            let mut tags: BTreeMap<String, String> = sketch_series
+            let mut tags: MetricTags = sketch_series
                 .tags
                 .iter()
                 .map(|tag| {
