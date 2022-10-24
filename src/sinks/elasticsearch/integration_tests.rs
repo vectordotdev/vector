@@ -110,7 +110,7 @@ async fn ensure_pipeline_in_params() {
     let pipeline = String::from("test-pipeline");
 
     let config = ElasticsearchConfig {
-        endpoints: vec!["http://localhost:9200".to_string()],
+        endpoints: vec![http_server()],
         bulk: Some(BulkConfig {
             index: Some(index),
             action: None,
@@ -274,6 +274,7 @@ async fn insert_events_on_aws() {
             })),
             endpoints: vec![aws_server()],
             aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
+            api_version: ElasticsearchApiVersion::V6,
             ..config()
         },
         false,
@@ -294,6 +295,7 @@ async fn insert_events_on_aws_with_compression() {
             endpoints: vec![aws_server()],
             aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
             compression: Compression::gzip_default(),
+            api_version: ElasticsearchApiVersion::V6,
             ..config()
         },
         false,
@@ -379,18 +381,22 @@ async fn distributed_insert_events() {
 async fn distributed_insert_events_failover() {
     trace_init();
 
-    run_insert_tests(
-        ElasticsearchConfig {
-            // A valid endpoint and some random non elasticsearch endpoint
-            endpoints: vec![http_server(), "http://localhost:2347".into()],
-            doc_type: Some("log_lines".into()),
-            compression: Compression::None,
-            ..config()
-        },
-        false,
-        BatchStatus::Delivered,
-    )
-    .await;
+    let mut config = ElasticsearchConfig {
+        // A valid endpoint and some random non elasticsearch endpoint
+        endpoints: vec![
+            http_server(),
+            "http://localhost:2347".into(),
+            https_server(),
+        ],
+        doc_type: Some("log_lines".into()),
+        compression: Compression::None,
+        ..config()
+    };
+    config.bulk = Some(BulkConfig {
+        index: Some(gen_index()),
+        action: None,
+    });
+    run_insert_tests_with_multiple_endpoints(&config).await;
 }
 
 async fn run_insert_tests(
@@ -563,7 +569,7 @@ async fn run_insert_tests_with_multiple_endpoints(config: &ElasticsearchConfig) 
 
     // make sure writes all all visible
     for common in commons {
-        flush(common).await.expect("Flushing writes failed");
+        let _ = flush(common).await;
     }
 
     let client = create_http_client();
