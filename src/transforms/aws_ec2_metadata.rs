@@ -53,7 +53,7 @@ static ROLE_NAME: Lazy<PathAndQuery> =
 static MAC: Lazy<PathAndQuery> = Lazy::new(|| PathAndQuery::from_static("/latest/meta-data/mac"));
 static DYNAMIC_DOCUMENT: Lazy<PathAndQuery> =
     Lazy::new(|| PathAndQuery::from_static("/latest/dynamic/instance-identity/document"));
-static DEFAULT_FIELD_ALLOWLIST: &[&'static str] = &[
+static DEFAULT_FIELD_ALLOWLIST: &[&str] = &[
     AMI_ID_KEY,
     AVAILABILITY_ZONE_KEY,
     INSTANCE_ID_KEY,
@@ -695,12 +695,12 @@ mod integration_tests {
     #[tokio::test]
     async fn enrich_log() {
         assert_transform_compliance(async {
-            let mut fields = DEFAULT_FIELD_WHITELIST.clone();
+            let mut fields = default_fields();
             fields.extend(vec![String::from(ACCOUNT_ID_KEY)].into_iter());
 
             let transform_config = Ec2Metadata {
-                endpoint: Some(ec2_metadata_address()),
-                fields: Some(fields),
+                endpoint: ec2_metadata_address(),
+                fields,
                 ..Default::default()
             };
 
@@ -743,8 +743,8 @@ mod integration_tests {
         let _server = tokio::spawn(server);
 
         let config = Ec2Metadata {
-            endpoint: Some(format!("http://{}", addr)),
-            refresh_timeout_secs: Some(1),
+            endpoint: format!("http://{}", addr),
+            refresh_timeout_secs: Duration::from_secs(1),
             ..Default::default()
         };
 
@@ -774,9 +774,9 @@ mod integration_tests {
         let _server = tokio::spawn(server);
 
         let config = Ec2Metadata {
-            endpoint: Some(format!("http://{}", addr)),
-            refresh_timeout_secs: Some(1),
-            required: Some(false),
+            endpoint: format!("http://{}", addr),
+            refresh_timeout_secs: Duration::from_secs(1),
+            required: false,
             ..Default::default()
         };
 
@@ -789,12 +789,12 @@ mod integration_tests {
     #[tokio::test]
     async fn enrich_metric() {
         assert_transform_compliance(async {
-            let mut fields = DEFAULT_FIELD_WHITELIST.clone();
+            let mut fields = default_fields();
             fields.extend(vec![String::from(ACCOUNT_ID_KEY)].into_iter());
 
             let transform_config = Ec2Metadata {
-                endpoint: Some(ec2_metadata_address()),
-                fields: Some(fields),
+                endpoint: ec2_metadata_address(),
+                fields,
                 ..Default::default()
             };
 
@@ -827,8 +827,8 @@ mod integration_tests {
     async fn fields_log() {
         assert_transform_compliance(async {
             let transform_config = Ec2Metadata {
-                endpoint: Some(ec2_metadata_address()),
-                fields: Some(vec![PUBLIC_IPV4_KEY.into(), REGION_KEY.into()]),
+                endpoint: ec2_metadata_address(),
+                fields: vec![PUBLIC_IPV4_KEY.into(), REGION_KEY.into()],
                 ..Default::default()
             };
 
@@ -860,8 +860,8 @@ mod integration_tests {
     async fn fields_metric() {
         assert_transform_compliance(async {
             let transform_config = Ec2Metadata {
-                endpoint: Some(ec2_metadata_address()),
-                fields: Some(vec![PUBLIC_IPV4_KEY.into(), REGION_KEY.into()]),
+                endpoint: ec2_metadata_address(),
+                fields: vec![PUBLIC_IPV4_KEY.into(), REGION_KEY.into()],
                 ..Default::default()
             };
 
@@ -894,7 +894,7 @@ mod integration_tests {
         {
             assert_transform_compliance(async {
                 let transform_config = Ec2Metadata {
-                    endpoint: Some(ec2_metadata_address()),
+                    endpoint: ec2_metadata_address(),
                     namespace: Some("ec2.metadata".into()),
                     ..Default::default()
                 };
@@ -928,7 +928,7 @@ mod integration_tests {
             assert_transform_compliance(async {
                 // Set an empty namespace to ensure we don't prepend one.
                 let transform_config = Ec2Metadata {
-                    endpoint: Some(ec2_metadata_address()),
+                    endpoint: ec2_metadata_address(),
                     namespace: Some("".into()),
                     ..Default::default()
                 };
@@ -963,7 +963,7 @@ mod integration_tests {
         {
             assert_transform_compliance(async {
                 let transform_config = Ec2Metadata {
-                    endpoint: Some(ec2_metadata_address()),
+                    endpoint: ec2_metadata_address(),
                     namespace: Some("ec2.metadata".into()),
                     ..Default::default()
                 };
@@ -998,7 +998,7 @@ mod integration_tests {
             assert_transform_compliance(async {
                 // Set an empty namespace to ensure we don't prepend one.
                 let transform_config = Ec2Metadata {
-                    endpoint: Some(ec2_metadata_address()),
+                    endpoint: ec2_metadata_address(),
                     namespace: Some("".into()),
                     ..Default::default()
                 };
