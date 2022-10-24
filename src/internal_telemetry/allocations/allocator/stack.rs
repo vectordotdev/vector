@@ -9,7 +9,7 @@ use super::token::AllocationGroupId;
 /// This implementation is uses an array to represent the stack to avoid thread local destructor registration issues.
 #[derive(Copy, Clone)]
 pub(crate) struct GroupStack {
-    slots: [AllocationGroupId; 512],
+    slots: [AllocationGroupId; 256],
     current_top: usize,
 }
 
@@ -18,7 +18,7 @@ impl GroupStack {
     pub const fn new() -> Self {
         Self {
             current_top: 0,
-            slots: [AllocationGroupId::ROOT; 512],
+            slots: [AllocationGroupId::ROOT; 256],
         }
     }
 
