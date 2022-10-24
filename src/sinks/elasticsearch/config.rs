@@ -497,8 +497,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        assert!(matches!(config.mode, ElasticsearchMode::DataStream));
-        assert!(config.data_stream.is_some());
+        assert_eq!(config.api_version, ElasticsearchApiVersion::V7);
     }
 
     #[test]
@@ -510,7 +509,6 @@ mod tests {
         "#,
         )
         .unwrap();
-        assert!(matches!(config.mode, ElasticsearchMode::DataStream));
-        assert!(config.data_stream.is_some());
+        assert_eq!(config.api_version, ElasticsearchApiVersion::Auto);
     }
 }

@@ -220,7 +220,7 @@ impl ElasticsearchCommon {
     pub async fn parse_single(config: &ElasticsearchConfig) -> crate::Result<Self> {
         let mut commons =
             Self::parse_many(config, crate::config::SinkContext::new_test().proxy()).await?;
-        assert!(commons.len() == 1);
+        assert_eq!(commons.len(), 1);
         Ok(commons.remove(0))
     }
 
