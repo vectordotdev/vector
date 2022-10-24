@@ -29,7 +29,7 @@ impl TryFrom<String> for OptionalTargetPath {
 }
 
 impl From<OptionalTargetPath> for String {
-    fn from(optional_path: Self) -> Self {
+    fn from(optional_path: OptionalTargetPath) -> Self {
         match optional_path.path {
             Some(path) => String::from(path),
             None => String::new(),
