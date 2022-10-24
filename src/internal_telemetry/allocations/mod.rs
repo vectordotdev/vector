@@ -28,10 +28,10 @@ pub struct MainTracer;
 
 impl Tracer for MainTracer {
     #[inline(always)]
-    fn trace_allocation(&self, _wrapped_size: usize, _group_id: AllocationGroupId) {}
+    fn trace_allocation(&self, _object_size: usize, _group_id: AllocationGroupId) {}
 
     #[inline(always)]
-    fn trace_deallocation(&self, _wrapped_size: usize, _source_group_id: AllocationGroupId) {}
+    fn trace_deallocation(&self, _object_size: usize, _source_group_id: AllocationGroupId) {}
 }
 
 /// Initializes allocation tracing.
