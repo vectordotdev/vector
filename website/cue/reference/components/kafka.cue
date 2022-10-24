@@ -88,8 +88,8 @@ components: _kafka: {
 		azure_event_hubs: {
 			title: "Azure Event Hubs"
 			body: """
-				It is possible to use the `kafka` source and sink with Azure Event Hubs for all
-				tiers other than the [Basic tier](\(urls.azure_event_hubs_tiers)). More details
+				It is possible to use the `kafka` source and sink with [Azure Event Hubs](/(urls.azure_event_hubs))
+				for all tiers other than the [Basic tier](\(urls.azure_event_hubs_tiers)). More details
 				can be found [here](\(urls.azure_event_hubs_kafka)). To configure the source and 
 				sink to connect to Azure Event Hubs set the following options:
 				- `bootstrap_servers` - `<namespace name>.servicebus.windows.net:9093`
