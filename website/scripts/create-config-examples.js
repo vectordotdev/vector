@@ -276,8 +276,6 @@ const main = () => {
 
       // Specific components
       for (const componentType in componentsOfKind) {
-        console.log(chalk.blue(`  - Creating examples for ${componentType}...`));
-
         const component = componentsOfKind[componentType];
         const configuration = component.configuration;
 
@@ -299,7 +297,6 @@ const main = () => {
 
         // Sinks and transforms are treated differently because they need an `inputs` field
         if (['sinks', 'transforms'].includes(kind)) {
-          console.log(chalk.blue(`  is sink or transform!`));
           commonExampleConfig = {
             [kind]: {
               [keyName]: {
