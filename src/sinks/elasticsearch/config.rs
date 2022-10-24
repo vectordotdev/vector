@@ -35,8 +35,6 @@ use crate::{
 };
 use lookup::event_path;
 
-use super::request_builder::ElasticsearchRequestBuilder;
-
 /// The field name for the timestamp required by data stream mode
 pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
 
@@ -72,9 +70,8 @@ pub struct ElasticsearchConfig {
     /// `type` field was deprecated in Elasticsearch 7.x and removed in Elasticsearch 8.x.
     ///
     /// If enabled, the `doc_type` option will be ignored.
-    #[serde(default)]
     #[configurable(deprecated)]
-    pub suppress_type_name: bool,
+    pub suppress_type_name: Option<bool>,
 
     /// The name of the event key that should map to Elasticsearch’s [`_id` field][es_id].
     ///
@@ -382,7 +379,7 @@ impl DataStreamConfig {
 #[async_trait::async_trait]
 impl SinkConfig for ElasticsearchConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let commons = ElasticsearchCommon::parse_many(self).await?;
+        let commons = ElasticsearchCommon::parse_many(self, cx.proxy()).await?;
         let common = commons[0].clone();
 
         let client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
@@ -391,10 +388,6 @@ impl SinkConfig for ElasticsearchConfig {
             .request
             .tower
             .unwrap_with(&TowerRequestConfig::default());
-
-        let version = common.api_version(&client).await?;
-
-        let request_builder = ElasticsearchRequestBuilder::new(self, version);
 
         let health_config = self.distribution.clone().unwrap_or_default();
 
@@ -418,7 +411,7 @@ impl SinkConfig for ElasticsearchConfig {
             ElasticsearchHealthLogic,
         );
 
-        let sink = ElasticsearchSink::new(&common, self, request_builder, service)?;
+        let sink = ElasticsearchSink::new(&common, self, service)?;
 
         let stream = VectorSink::from_event_streamsink(sink);
 
