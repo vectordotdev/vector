@@ -12,6 +12,7 @@ default = [
   "conversion",
   "tokenize",
   "encoding",
+  "estimated_json_encoded_size_of",
   "sensitive_string"
 ]
 
@@ -23,6 +24,8 @@ aws_cloudwatch_logs_subscription = [
 btreemap = []
 
 byte_size_of = ["dep:bytes", "dep:chrono"]
+
+estimated_json_encoded_size_of = ["serde", "dep:bytes", "dep:chrono"]
 
 conversion = [
   "dep:bytes",
@@ -57,6 +60,7 @@ metrics = "0.20.1"
 nom = { version = "7", optional = true }
 ordered-float = { version = "3.2.0", default-features = false }
 pin-project = { version = "1.0.12", default-features = false }
+ryu = { version = "1", default-features = false }
 serde_json = { version = "1.0.87", default-features = false, features = ["std", "raw_value"] }
 serde = { version = "1.0.145", optional = true, features = ["derive"] }
 smallvec = { version = "1", default-features = false }
@@ -64,7 +68,7 @@ snafu = { version = "0.7", optional = true }
 stream-cancel = { version = "0.8.1", default-features = false }
 tokio = { version = "1.21.2", default-features = false, features = ["macros", "time"] }
 tracing = { version = "0.1.34", default-features = false }
-value = { path = "../value", features = ["json"] }
+value = { path = "../value", features = ["json", "arbitrary"] }
 vector-config = { path = "../vector-config" }
 vector-config-common = { path = "../vector-config-common" }
 vector-config-macros = { path = "../vector-config-macros" }
@@ -72,3 +76,5 @@ vector-config-macros = { path = "../vector-config-macros" }
 [dev-dependencies]
 futures = { version = "0.3.24", default-features = false, features = ["async-await", "std"] }
 tokio = { version = "1.21.2", default-features = false, features = ["rt", "time"] }
+quickcheck = "1"
+quickcheck_macros = "1"
