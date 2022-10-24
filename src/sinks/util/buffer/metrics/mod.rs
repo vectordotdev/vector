@@ -126,14 +126,12 @@ pub fn compress_distribution(samples: &mut Vec<Sample>) -> Vec<Sample> {
 
 #[cfg(test)]
 pub(self) mod tests {
-    use std::collections::BTreeMap;
-
     use pretty_assertions::assert_eq;
+    use vector_core::event::metric::{MetricKind::*, MetricTags, MetricValue, StatisticKind};
     use vector_core::event::MetricKind;
 
     use super::*;
     use crate::{
-        event::metric::{MetricKind::*, MetricValue, StatisticKind},
         sinks::util::BatchSettings,
         test_util::metrics::{AbsoluteMetricNormalizer, IncrementalMetricNormalizer},
     };
@@ -212,10 +210,8 @@ pub(self) mod tests {
         )
     }
 
-    fn tag(name: &str) -> BTreeMap<String, String> {
-        vec![(name.to_owned(), "true".to_owned())]
-            .into_iter()
-            .collect()
+    fn tag(name: &str) -> MetricTags {
+        MetricTags::from([(name.to_owned(), "true".to_owned())])
     }
 
     fn rebuffer<State: MetricNormalize + Default>(metrics: Vec<Metric>) -> Buffer {

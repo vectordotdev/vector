@@ -5,6 +5,8 @@ pub struct RequestMetadata {
     event_count: usize,
     /// Size, in bytes, of the in-memory representation of all events in this batch request.
     events_byte_size: usize,
+    /// Size, in bytes, of the estimated JSON-encoded representation of all events in this batch request.
+    events_estimated_json_encoded_byte_size: usize,
     /// Uncompressed size, in bytes, of the encoded events in this batch request.
     request_encoded_size: usize,
     /// On-the-wire size, in bytes, of the batch request itself after compression, etc.
@@ -21,10 +23,12 @@ impl RequestMetadata {
         events_byte_size: usize,
         request_encoded_size: usize,
         request_wire_size: usize,
+        events_estimated_json_encoded_byte_size: usize,
     ) -> Self {
         Self {
             event_count,
             events_byte_size,
+            events_estimated_json_encoded_byte_size,
             request_encoded_size,
             request_wire_size,
         }
@@ -38,6 +42,11 @@ impl RequestMetadata {
     #[must_use]
     pub const fn events_byte_size(&self) -> usize {
         self.events_byte_size
+    }
+
+    #[must_use]
+    pub const fn events_estimated_json_encoded_byte_size(&self) -> usize {
+        self.events_estimated_json_encoded_byte_size
     }
 
     #[must_use]
@@ -56,17 +65,21 @@ impl RequestMetadata {
         let mut events_byte_size = 0;
         let mut request_encoded_size = 0;
         let mut request_wire_size = 0;
+        let mut events_estimated_json_encoded_byte_size = 0;
 
         for m in metadata_vec {
             event_count += m.event_count();
             events_byte_size += m.events_byte_size();
             request_encoded_size += m.request_encoded_size();
             request_wire_size += m.request_wire_size();
+            request_wire_size += m.request_wire_size();
+            events_estimated_json_encoded_byte_size += m.events_estimated_json_encoded_byte_size();
         }
 
         Self {
             event_count,
             events_byte_size,
+            events_estimated_json_encoded_byte_size,
             request_encoded_size,
             request_wire_size,
         }

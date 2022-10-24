@@ -216,7 +216,11 @@ impl IncrementalRequestBuilder<((Option<Arc<str>>, DatadogMetricsEndpoint), Vec<
                             finalizers,
                             raw_bytes: raw_bytes_written,
                         };
-                        let builder = RequestMetadataBuilder::new(metrics.len(), raw_bytes_written);
+                        let builder = RequestMetadataBuilder::new(
+                            metrics.len(),
+                            raw_bytes_written,
+                            raw_bytes_written,
+                        );
                         let bytes_len = NonZeroUsize::new(payload.len())
                             .expect("payload should never be zero length");
                         let request_metadata = builder.with_request_size(bytes_len);
@@ -332,7 +336,8 @@ fn encode_now_or_never(
                 finalizers,
                 raw_bytes: raw_bytes_written,
             };
-            let builder = RequestMetadataBuilder::new(metrics_len, raw_bytes_written);
+            let builder =
+                RequestMetadataBuilder::new(metrics_len, raw_bytes_written, raw_bytes_written);
             let bytes_len =
                 NonZeroUsize::new(payload.len()).expect("payload should never be zero length");
             let request_metadata = builder.with_request_size(bytes_len);

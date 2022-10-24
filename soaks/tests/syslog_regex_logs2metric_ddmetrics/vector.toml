@@ -29,6 +29,9 @@ inputs = ["remap"]
   [[transforms.log2metric.metrics]]
   type = "gauge"
   field = "procid"
+  tags.hostname = "{{ hostname }}"
+  tags.facility = "{{ facility }}"
+  tags.severity = "{{ severity }}"
 
 ##
 ## Sinks

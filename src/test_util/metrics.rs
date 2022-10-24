@@ -155,7 +155,7 @@ macro_rules! series {
 				name: $name.into(),
 				namespace: None,
 			},
-			tags: Some(vector_core::event::metric::MetricTags::from_iter(
+			tags: Some(vector_core::event::MetricTags::from_iter(
 				vec![$(($tk.into(), $tv.into())),*]
 			)),
 		}

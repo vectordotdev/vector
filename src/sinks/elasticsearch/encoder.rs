@@ -1,5 +1,6 @@
 use std::{io, io::Write};
 
+use serde::Serialize;
 use vector_buffers::EventCount;
 use vector_core::{event::Event, ByteSizeOf};
 
@@ -12,6 +13,7 @@ use crate::{
     },
 };
 
+#[derive(Serialize)]
 pub struct ProcessedEvent {
     pub index: String,
     pub bulk_action: BulkAction,

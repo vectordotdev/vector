@@ -327,7 +327,7 @@ mod tests {
         let body = Bytes::from("test-message");
         let events_byte_size = body.len();
 
-        let builder = RequestMetadataBuilder::new(1, events_byte_size);
+        let builder = RequestMetadataBuilder::new(1, events_byte_size, events_byte_size);
         let bytes_len =
             NonZeroUsize::new(events_byte_size).expect("payload should never be zero length");
         let metadata = builder.with_request_size(bytes_len);

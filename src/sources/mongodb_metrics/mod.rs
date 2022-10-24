@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, time::Instant};
+use std::time::Instant;
 
 use chrono::Utc;
 use futures::{
@@ -15,11 +15,11 @@ use snafu::{ResultExt, Snafu};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
 use vector_config::configurable_component;
-use vector_core::ByteSizeOf;
+use vector_core::{metric_tags, ByteSizeOf};
 
 use crate::{
     config::{self, Output, SourceConfig, SourceContext},
-    event::metric::{Metric, MetricKind, MetricValue},
+    event::metric::{Metric, MetricKind, MetricTags, MetricValue},
     internal_events::{
         CollectionCompleted, EndpointBytesReceived, MongoDbMetricsBsonParseError,
         MongoDbMetricsEventsReceived, MongoDbMetricsRequestError, StreamClosedError,
@@ -101,7 +101,7 @@ struct MongoDbMetrics {
     client: Client,
     endpoint: String,
     namespace: Option<String>,
-    tags: BTreeMap<String, String>,
+    tags: MetricTags,
 }
 
 pub const fn default_scrape_interval_secs() -> u64 {
@@ -164,16 +164,16 @@ impl MongoDbMetrics {
     /// Works only with Standalone connection-string. Collect metrics only from specified instance.
     /// https://docs.mongodb.com/manual/reference/connection-string/#standard-connection-string-format
     async fn new(endpoint: &str, namespace: Option<String>) -> Result<MongoDbMetrics, BuildError> {
-        let mut tags: BTreeMap<String, String> = BTreeMap::new();
-
         let mut client_options = ClientOptions::parse(endpoint)
             .await
             .context(InvalidEndpointSnafu)?;
         client_options.direct_connection = Some(true);
 
         let endpoint = sanitize_endpoint(endpoint, &client_options);
-        tags.insert("endpoint".into(), endpoint.clone());
-        tags.insert("host".into(), client_options.hosts[0].to_string());
+        let tags = metric_tags!(
+            "endpoint" => endpoint.clone(),
+            "host" => client_options.hosts[0].to_string(),
+        );
 
         Ok(Self {
             client: Client::with_options(client_options).context(InvalidClientOptionsSnafu)?,
@@ -227,12 +227,7 @@ impl MongoDbMetrics {
         Ok(())
     }
 
-    fn create_metric(
-        &self,
-        name: &str,
-        value: MetricValue,
-        tags: BTreeMap<String, String>,
-    ) -> Metric {
+    fn create_metric(&self, name: &str, value: MetricValue, tags: MetricTags) -> Metric {
         Metric::new(name, MetricKind::Absolute, value)
             .with_namespace(self.namespace.clone())
             .with_tags(Some(tags))
@@ -1162,8 +1157,8 @@ mod integration_tests {
                 assert!((timestamp - Utc::now()).num_seconds() < 1);
                 // validate basic tags
                 let tags = metric.tags().expect("existed tags");
-                assert_eq!(tags.get("endpoint"), Some(&clean_endpoint));
-                assert_eq!(tags.get("host"), Some(&host));
+                assert_eq!(tags.get("endpoint"), Some(&clean_endpoint[..]));
+                assert_eq!(tags.get("host"), Some(&host[..]));
             }
         })
         .await;

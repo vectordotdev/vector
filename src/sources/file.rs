@@ -1855,7 +1855,11 @@ mod tests {
         received
             .into_iter()
             .map(Event::into_log)
-            .map(|log| log[log_schema().message_key()].to_string_lossy())
+            .map(|log| {
+                log[log_schema().message_key()]
+                    .to_string_lossy()
+                    .into_owned()
+            })
             .collect()
     }
 

@@ -6,11 +6,11 @@ use tokio::{
     fs::{self, File},
     io::AsyncReadExt,
 };
-use vector_common::btreemap;
 use vector_config::configurable_component;
+use vector_core::metric_tags;
 
 use super::{filter_result_sync, FilterList, HostMetrics, MetricsBuffer};
-use crate::event::metric::MetricTags;
+use crate::event::MetricTags;
 
 const MICROSECONDS: f64 = 1.0 / 1_000_000.0;
 
@@ -300,7 +300,7 @@ impl CGroup {
     }
 
     fn tags(&self) -> MetricTags {
-        btreemap! {
+        metric_tags! {
             "cgroup" => self.name.to_string_lossy(),
             "collector" => "cgroups",
         }

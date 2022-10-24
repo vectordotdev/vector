@@ -124,13 +124,17 @@ mod tests {
             let event = stream.next().await;
             assert_eq!(
                 Some("hello world".into()),
-                event.map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
+                event.map(|event| event.as_log()[log_schema().message_key()]
+                    .to_string_lossy()
+                    .into_owned())
             );
 
             let event = stream.next().await;
             assert_eq!(
                 Some("hello world again".into()),
-                event.map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
+                event.map(|event| event.as_log()[log_schema().message_key()]
+                    .to_string_lossy()
+                    .into_owned())
             );
 
             let event = stream.next().await;

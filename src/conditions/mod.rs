@@ -2,7 +2,6 @@ use vector_config::configurable_component;
 
 use crate::event::Event;
 
-mod check_fields;
 pub(self) mod datadog_search;
 pub(crate) mod is_log;
 pub(crate) mod is_metric;
@@ -11,7 +10,6 @@ mod vrl;
 
 pub use self::vrl::VrlConfig;
 use self::{
-    check_fields::{CheckFields, CheckFieldsConfig},
     datadog_search::{DatadogSearchConfig, DatadogSearchRunner},
     is_log::{check_is_log, check_is_log_with_context},
     is_metric::{check_is_metric, check_is_metric_with_context},
@@ -33,9 +31,6 @@ pub enum Condition {
 
     /// Matches an event with a [Vector Remap Language](https://vector.dev/docs/reference/vrl) (VRL) [boolean expression](https://vector.dev/docs/reference/vrl#boolean-expressions).
     Vrl(Vrl),
-
-    /// Matches an event against an arbitrary set of predicate/value combinations.
-    CheckFields(CheckFields),
 
     /// Matches an event with a [Datadog Search](https://docs.datadoghq.com/logs/explorer/search_syntax/) query.
     DatadogSearch(DatadogSearchRunner),
@@ -62,7 +57,6 @@ impl Condition {
             Condition::IsMetric => check_is_metric(e),
             Condition::IsTrace => check_is_trace(e),
             Condition::Vrl(x) => x.check(e),
-            Condition::CheckFields(x) => x.check(e),
             Condition::DatadogSearch(x) => x.check(e),
             Condition::AlwaysPass => (true, e),
             Condition::AlwaysFail => (false, e),
@@ -79,7 +73,6 @@ impl Condition {
             Condition::IsMetric => check_is_metric_with_context(e),
             Condition::IsTrace => check_is_trace_with_context(e),
             Condition::Vrl(x) => x.check_with_context(e),
-            Condition::CheckFields(x) => x.check_with_context(e),
             Condition::DatadogSearch(x) => x.check_with_context(e),
             Condition::AlwaysPass => (Ok(()), e),
             Condition::AlwaysFail => (Ok(()), e),
@@ -95,8 +88,8 @@ impl Condition {
 /// They can specified with an enum-style notation:
 ///
 /// ```toml
-/// condition.type = 'check_fields'
-/// condition."message.equals" = 'hooray'
+/// condition.type = 'datadog_search'
+/// condition.source = 'NOT "foo"'
 /// ```
 #[configurable_component]
 #[derive(Clone, Debug)]
@@ -114,9 +107,6 @@ pub enum ConditionConfig {
     /// Matches an event with a [Vector Remap Language](https://vector.dev/docs/reference/vrl) (VRL) [boolean expression](https://vector.dev/docs/reference/vrl#boolean-expressions).
     Vrl(#[configurable(derived)] VrlConfig),
 
-    /// Matches an event against an arbitrary set of predicate/value combinations.
-    CheckFields(#[configurable(derived)] CheckFieldsConfig),
-
     /// Matches an event with a [Datadog Search](https://docs.datadoghq.com/logs/explorer/search_syntax/) query.
     DatadogSearch(#[configurable(derived)] DatadogSearchConfig),
 }
@@ -128,7 +118,6 @@ impl ConditionConfig {
             ConditionConfig::IsMetric => Ok(Condition::IsMetric),
             ConditionConfig::IsTrace => Ok(Condition::IsTrace),
             ConditionConfig::Vrl(x) => x.build(enrichment_tables),
-            ConditionConfig::CheckFields(x) => x.build(enrichment_tables),
             ConditionConfig::DatadogSearch(x) => x.build(enrichment_tables),
         }
     }
@@ -175,8 +164,8 @@ dyn_clone::clone_trait_object!(ConditionalConfig);
 /// When other condition types are required, they can specified with an enum-style notation:
 ///
 /// ```toml
-/// condition.type = 'check_fields'
-/// condition."message.equals" = 'hooray'
+/// condition.type = 'datadog_search'
+/// condition.source = 'NOT "foo"'
 /// ```
 #[configurable_component]
 #[derive(Clone, Debug)]
@@ -227,20 +216,6 @@ mod tests {
         let conf: Test = toml::from_str(r#"condition = ".nork == false""#).unwrap();
         assert_eq!(
             r#"String(".nork == false")"#,
-            format!("{:?}", conf.condition)
-        )
-    }
-
-    #[test]
-    fn deserialize_anycondition_check_fields() {
-        let conf: Test = toml::from_str(indoc! {r#"
-            condition.type = "check_fields"
-            condition."norg.equals" = "nork"
-        "#})
-        .unwrap();
-
-        assert_eq!(
-            r#"Map(CheckFields(CheckFieldsConfig { predicates: {"norg.equals": "nork"} }))"#,
             format!("{:?}", conf.condition)
         )
     }

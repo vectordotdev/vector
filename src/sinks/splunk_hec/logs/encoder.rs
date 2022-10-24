@@ -94,7 +94,9 @@ impl Encoder<Vec<HecProcessedEvent>> for HecLogsEncoder {
 
                         let mut hec_data =
                             HecData::new(hec_event, metadata.fields, metadata.timestamp);
-                        hec_data.host = metadata.host.map(|host| host.to_string_lossy());
+                        hec_data.host = metadata
+                            .host
+                            .map(|host| host.to_string_lossy().into_owned());
                         hec_data.index = metadata.index;
                         hec_data.source = metadata.source;
                         hec_data.sourcetype = metadata.sourcetype;

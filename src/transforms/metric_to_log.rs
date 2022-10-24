@@ -135,16 +135,15 @@ impl FunctionTransform for MetricToLog {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
-
     use chrono::{offset::TimeZone, DateTime, Utc};
     use pretty_assertions::assert_eq;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
+    use vector_core::metric_tags;
 
     use super::*;
     use crate::event::{
-        metric::{MetricKind, MetricValue, StatisticKind},
+        metric::{MetricKind, MetricTags, MetricValue, StatisticKind},
         Metric, Value,
     };
     use crate::test_util::components::assert_transform_compliance;
@@ -182,13 +181,11 @@ mod tests {
         Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
     }
 
-    fn tags() -> BTreeMap<String, String> {
-        vec![
-            ("host".to_owned(), "localhost".to_owned()),
-            ("some_tag".to_owned(), "some_value".to_owned()),
-        ]
-        .into_iter()
-        .collect()
+    fn tags() -> MetricTags {
+        metric_tags! {
+            "host" => "localhost",
+            "some_tag" => "some_value",
+        }
     }
 
     #[tokio::test]
