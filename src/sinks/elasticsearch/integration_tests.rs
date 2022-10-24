@@ -216,7 +216,7 @@ async fn auto_version() {
         api_version: ElasticsearchApiVersion::Auto,
         ..config()
     };
-    let _ = ElasticsearchCommon::parse_single(config)
+    let _ = ElasticsearchCommon::parse_single(&config)
         .await
         .expect("Config error");
 }
