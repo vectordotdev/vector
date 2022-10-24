@@ -1,6 +1,6 @@
 package metadata
 
-//import "strings"
+import "strings"
 
 _values: {
 	current_timestamp: "2020-10-10T17:07:36.452332Z"
@@ -291,9 +291,9 @@ _values: {
 	// read.
 	category?: string
 
-	//if type.object != _|_ {
-	//	category: strings.ToTitle(name)
-	//}
+	if type.object != _|_ {
+		category: strings.ToTitle(name)
+	}
 
 	// `description` describes the option in a succinct fashion. Usually 1 to
 	// 2 sentences.
@@ -328,12 +328,12 @@ _values: {
 	// reduced security if the option is disabled.
 	warnings: [...string] | *[]
 
-	//if !required {
+	if !required {
 		// `common` specifes that the option is commonly used. It will bring the
 		// option to the top of the documents, surfacing it from other
 		// less common, options.
 		common?: bool
-	//}
+	}
 
 	// `sort` sorts the option, otherwise options will be sorted alphabetically.
 	sort?: int8
@@ -486,7 +486,7 @@ _values: {
 
 	if !Args.required {
 		// `default` sets the default value.
-		default: [...] | null | *[]
+		default: [...] | null
 	}
 
 	examples?: [...[...Type.items.type]]
@@ -502,7 +502,7 @@ _values: {
 
 	if !Args.required {
 		// `default` sets the default value.
-		default: bool | null | *false
+		default: bool | null
 	}
 }
 
@@ -512,7 +512,7 @@ _values: {
 
 	if !Args.required {
 		// `default` sets the default value.
-		default: float | null | *0.0
+		default: float | null
 	}
 
 	// `examples` clarify values through examples. This should be used
@@ -522,7 +522,7 @@ _values: {
 
 	// `unit` clarifies the value's unit. While this should be included
 	// as the suffix in the name, this helps to explicitly clarify that.
-	unit?: #Unit | *null
+	unit?: #Unit | null
 }
 
 #TypeObject: {
@@ -573,7 +573,7 @@ _values: {
 
 	if !Args.required {
 		// `default` sets the default value.
-		default: string | null | *""
+		default: string | null
 	}
 
 	examples?: [string, ...string]
@@ -585,7 +585,7 @@ _values: {
 
 	if !Args.required {
 		// `default` sets the default value.
-		default: #Timestamp | null | *null
+		default: #Timestamp | null
 	}
 
 	// `examples` clarify values through examples. This should be used
@@ -610,7 +610,7 @@ _values: {
 
 	// `unit` clarifies the value's unit. While this should be included
 	// as the suffix in the name, this helps to explicitly clarify that.
-	unit?: #Unit | *null
+	unit?: #Unit | null
 }
 
 #Unit: "bytes" | "events" | "milliseconds" | "nanoseconds" | "requests" | "seconds" | "lines" | "concurrency"

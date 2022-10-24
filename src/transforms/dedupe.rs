@@ -33,11 +33,13 @@ use crate::{
 pub enum FieldMatchConfig {
     /// Matches events using only the specified fields.
     #[serde(rename = "match")]
-    
     MatchFields(
-        #[configurable(metadata(docs::examples = "field1", docs::examples = "parent.child_field"))]
+        #[configurable(metadata(
+            docs::examples = "field1",
+            docs::examples = "parent.child_field"
+        ))]
         #[configurable(transparent)]
-        Vec<String>
+        Vec<String>,
     ),
 
     /// Matches events using all fields except for the ignored ones.
@@ -50,7 +52,7 @@ pub enum FieldMatchConfig {
             docs::examples = "hostname"
         ))]
         #[configurable(transparent)]
-        Vec<String>
+        Vec<String>,
     ),
 }
 
