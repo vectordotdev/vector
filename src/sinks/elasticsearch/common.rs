@@ -39,7 +39,6 @@ pub struct ElasticsearchCommon {
     pub request: RequestConfig,
     pub query_params: HashMap<String, String>,
     pub metric_to_log: MetricToLog,
-    pub api_version: ElasticsearchApiVersion,
 }
 
 impl ElasticsearchCommon {
@@ -186,7 +185,6 @@ impl ElasticsearchCommon {
             region,
             tls_settings,
             metric_to_log,
-            api_version: config.api_version.clone(),
         })
     }
 
