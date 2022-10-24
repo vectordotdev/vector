@@ -236,7 +236,7 @@ def apply_object_property_fields!(parent_schema, property_schema, property_name,
   required_properties = parent_schema['required'] || []
   has_self_default_value = !property_schema['default'].nil?
   has_parent_default_value = !parent_schema.dig('default', property_name).nil?
-  has_default_value = has_self_default_value || has_parent_default_value 
+  has_default_value = has_self_default_value || has_parent_default_value
   is_required = required_properties.include?(property_name)
 
   if has_self_default_value
@@ -303,7 +303,7 @@ def get_reduced_resolved_schema(schema)
 
   allowed_types = ['condition', 'object', 'array', 'enum', 'const', 'string', 'bool', 'float', 'int', 'uint']
   allowed_fields = []
-  
+
   # Clear out anything not related to the type definitions first.
   schema.delete_if { |key, _value| key != 'type' }
   type_defs = schema['type']
@@ -843,13 +843,13 @@ def resolve_enum_schema(root_schema, schema)
     unique_type_def_kinds = type_def_kinds.flatten.uniq
     if unique_type_def_kinds.length == 1 && fixed_subschemas >= 1 && freeform_subschemas == 1
       @logger.debug "Resolved as 'untagged with narrowed free-form' enum schema."
-  
+
       type_def_kind = unique_type_def_kinds[0]
 
       # TODO: It would be nice to forward along the fixed values so they could be enumerated in the
       # documentation, and we could have a boilerplate blurb about "these values are fixed/reserved,
       # but any other value than these can be passed", etc.
-  
+
       return { '_resolved' => { 'type' => { type_def_kind => {} } }, 'annotations' => 'narrowed_free_form' }
     end
   end

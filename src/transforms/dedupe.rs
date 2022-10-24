@@ -22,11 +22,14 @@ use crate::{
 /// the global [`log schema`][global_log_schema] configuration.
 ///
 /// [global_log_schema]: https://vector.dev/docs/reference/configuration/global-options/#log_schema
-// TODO: This enum renders as an object with two fields that are seemingly both able to specified...
-// which is not in fact possible. We need to add a new enum schema matching pattern in
-// `generate-components-docs.rb` that can correctly render externally tagged enums as enums
-// (mutual exclusivity) so that we don't have to frontload the doc comments for every single variant
-// to call it out.
+// TODO: This enum renders correctly in terms of providing equivalent Cue output when using the
+// machine-generated stuff vs the previously-hand-written Cue... but what it _doesn't_ have in the
+// machine-generated output is any sort of blurb that these "fields" (`match` and `ignore`) are
+// actually mutually exclusive.
+//
+// We know that to be the case when we're generating the output from the configuration schema, so we
+// need to emit something in that output to indicate as much, and further, actually use it on the
+// Cue side to add some sort of boilerplate about them being mutually exclusive, etc.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
