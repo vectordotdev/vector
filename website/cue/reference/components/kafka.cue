@@ -90,11 +90,11 @@ components: _kafka: {
 			body: """
 				It is possible to use the `kafka` source and sink with [Azure Event Hubs](/(urls.azure_event_hubs))
 				for all tiers other than the [Basic tier](\(urls.azure_event_hubs_tiers)). More details
-				can be found [here](\(urls.azure_event_hubs_kafka)). To configure the source and 
+				can be found [here](\(urls.azure_event_hubs_kafka)). To configure the source and
 				sink to connect to Azure Event Hubs set the following options:
 				- `bootstrap_servers` - `<namespace name>.servicebus.windows.net:9093`
-				- `group_id` - The consumer group. Note that if the default group (`$Default`) is used it must 
-				  be specified as `$$Default` to escape the `$` used for environment variables.				
+				- `group_id` - The consumer group. Note that if the default group (`$Default`) is used it must
+				  be specified as `$$Default` to escape the `$` used for environment variables.
 				- `topics` - The event hub name.
 				- `sasl.enabled` - Set to `true`.
 				- `sasl.mechanism` - Set to `PLAIN`.
