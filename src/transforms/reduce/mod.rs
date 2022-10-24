@@ -358,8 +358,8 @@ mod test {
 group_by = [ "request_id" ]
 
 [ends_when]
-  type = "check_fields"
-  "test_end.exists" = true
+  type = "vrl"
+  source = "exists(.test_end)"
 "#,
         )
         .unwrap();
@@ -426,8 +426,8 @@ merge_strategies.bar = "array"
 merge_strategies.baz = "max"
 
 [ends_when]
-  type = "check_fields"
-  "test_end.exists" = true
+  type = "vrl"
+  source = "exists(.test_end)"
 "#,
         )
         .unwrap();
@@ -483,8 +483,8 @@ merge_strategies.baz = "max"
 group_by = [ "request_id" ]
 
 [ends_when]
-  type = "check_fields"
-  "test_end.exists" = true
+  type = "vrl"
+  source = "exists(.test_end)"
 "#,
         )
         .unwrap();
@@ -549,8 +549,8 @@ merge_strategies.foo = "array"
 merge_strategies.bar = "concat"
 
 [ends_when]
-  type = "check_fields"
-  "test_end.exists" = true
+  type = "vrl"
+  source = "exists(.test_end)"
 "#,
         )
         .unwrap();

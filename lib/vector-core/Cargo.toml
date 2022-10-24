@@ -18,7 +18,7 @@ enrichment = { path = "../enrichment", optional = true }
 enumflags2 = { version = "0.7.5", default-features = false }
 float_eq = { version = "1.0", default-features = false }
 futures = { version = "0.3.24", default-features = false, features = ["std"] }
-futures-util = { version = "0.3.21", default-features = false, features = ["std"] }
+futures-util = { version = "0.3.25", default-features = false, features = ["std"] }
 headers = { version = "0.3.8", default-features = false }
 http = { version = "0.2.8", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
@@ -31,7 +31,7 @@ mlua = { version = "0.8.4", default-features = false, features = ["lua54", "send
 no-proxy = { version  = "0.3.2", default-features = false, features = ["serialize"] }
 once_cell = { version = "1.15", default-features = false }
 openssl = { version = "0.10.42", default-features = false, features = ["vendored"] }
-ordered-float = { version = "3.2.0", default-features = false }
+ordered-float = { version = "3.3.0", default-features = false }
 parking_lot = { version = "0.12.1", default-features = false }
 pin-project = { version = "1.0.12", default-features = false }
 proptest = { version = "1.0", optional = true }
@@ -40,7 +40,7 @@ prost = { version = "0.11.0", default-features = false, features = ["std"] }
 quanta = { version = "0.10.1", default-features = false }
 regex = { version = "1.6.0", default-features = false, features = ["std", "perf"] }
 serde = { version = "1.0.145", default-features = false, features = ["derive", "rc"] }
-serde_json = { version = "1.0.86", default-features = false }
+serde_json = { version = "1.0.87", default-features = false }
 serde_with = { version = "2.0.1", default-features = false, features = ["std", "macros"] }
 snafu = { version = "0.7.2", default-features = false }
 socket2 = { version = "0.4.7", default-features = false }
