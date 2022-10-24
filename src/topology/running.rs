@@ -812,7 +812,7 @@ impl RunningTopology {
                 component_kind = "sink",
                 component_type = task.typetag(),
                 component_id = task.id(),
-                group_id = group_id.id().as_usize().to_string()
+                group_id = group_id.as_raw().to_string()
             );
             group_id.attach_to_span(&task_span);
         }
@@ -845,7 +845,7 @@ impl RunningTopology {
                 component_kind = "transform",
                 component_type = task.typetag(),
                 component_id = task.id(),
-                group_id = group_id.id().as_usize().to_string()
+                group_id = group_id.as_raw().to_string()
             );
             group_id.attach_to_span(&task_span);
         }
@@ -879,7 +879,7 @@ impl RunningTopology {
                 component_kind = "source",
                 component_type = task.typetag(),
                 component_id = task.id(),
-                group_id = group_id.id().as_usize().to_string()
+                group_id = group_id.as_raw().to_string()
             );
             group_id.attach_to_span(&task_span);
         }

@@ -3,10 +3,10 @@ use std::{any::TypeId, marker::PhantomData, ptr::addr_of};
 use tracing::{Dispatch, Id, Subscriber};
 use tracing_subscriber::{layer::Context, registry::LookupSpan, Layer};
 
-use super::token::UnsafeAllocationGroupToken;
+use super::AllocationGroupToken;
 
 pub(crate) struct WithAllocationGroup {
-    with_allocation_group: fn(&Dispatch, &Id, UnsafeAllocationGroupToken),
+    with_allocation_group: fn(&Dispatch, &Id, AllocationGroupToken),
 }
 
 impl WithAllocationGroup {
@@ -14,7 +14,7 @@ impl WithAllocationGroup {
         &self,
         dispatch: &Dispatch,
         id: &Id,
-        unsafe_token: UnsafeAllocationGroupToken,
+        unsafe_token: AllocationGroupToken,
     ) {
         (self.with_allocation_group)(dispatch, id, unsafe_token);
     }
@@ -48,11 +48,7 @@ where
         }
     }
 
-    fn with_allocation_group(
-        dispatch: &Dispatch,
-        id: &Id,
-        unsafe_token: UnsafeAllocationGroupToken,
-    ) {
+    fn with_allocation_group(dispatch: &Dispatch, id: &Id, unsafe_token: AllocationGroupToken) {
         let subscriber = dispatch
             .downcast_ref::<S>()
             .expect("subscriber should downcast to expected type; this is a bug!");
@@ -70,10 +66,7 @@ where
 {
     fn on_enter(&self, id: &Id, ctx: Context<'_, S>) {
         if let Some(span_ref) = ctx.span(id) {
-            if let Some(token) = span_ref
-                .extensions_mut()
-                .get_mut::<UnsafeAllocationGroupToken>()
-            {
+            if let Some(token) = span_ref.extensions_mut().get_mut::<AllocationGroupToken>() {
                 token.enter();
             }
         }
@@ -81,10 +74,7 @@ where
 
     fn on_exit(&self, id: &Id, ctx: Context<'_, S>) {
         if let Some(span_ref) = ctx.span(id) {
-            if let Some(token) = span_ref
-                .extensions_mut()
-                .get_mut::<UnsafeAllocationGroupToken>()
-            {
+            if let Some(token) = span_ref.extensions_mut().get_mut::<AllocationGroupToken>() {
                 token.exit();
             }
         }

@@ -12,9 +12,7 @@ use arr_macro::arr;
 
 use self::allocator::{without_allocation_tracing, Tracer};
 
-pub(crate) use self::allocator::{
-    AllocationGroupId, AllocationGroupToken, AllocationLayer, GroupedTraceableAllocator,
-};
+pub(crate) use self::allocator::{AllocationGroupId, AllocationLayer, GroupedTraceableAllocator};
 
 static GROUP_MEM_METRICS: [AtomicU64; 256] = arr![AtomicU64::new(0); 256];
 
@@ -66,12 +64,12 @@ pub fn init_allocation_tracing() {
 /// a [`tracing::Span`] to achieve this" we utilize the logical invariants provided by spans --
 /// entering, exiting, and how spans exist as a stack -- in order to handle keeping the "current
 /// allocation group" accurate across all threads.
-pub fn acquire_allocation_group_id() -> AllocationGroupToken {
+pub fn acquire_allocation_group_id() -> AllocationGroupId {
     let group_id =
-        AllocationGroupToken::register().expect("failed to register allocation group token");
+        AllocationGroupId::register().expect("failed to register allocation group token");
     // We default to the root group in case of overflow
-    if group_id.id().as_usize().get() >= GROUP_MEM_METRICS.len() {
-        AllocationGroupToken(AllocationGroupId::ROOT)
+    if group_id.as_raw() >= GROUP_MEM_METRICS.len() {
+        AllocationGroupId::ROOT
     } else {
         group_id
     }

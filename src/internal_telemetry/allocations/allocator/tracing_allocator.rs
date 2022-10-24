@@ -66,7 +66,7 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
                 // If we never trace the allocation, tracing the deallocation will only produce incorrect numbers,
                 // and that includes even if we just used the rule of "always attribute allocations to the root
                 // allocation group by default".
-                group_id_ptr.write(group_id.as_usize().get());
+                group_id_ptr.write(group_id.as_raw());
                 self.tracer.trace_allocation(object_size, group_id);
             },
         );
