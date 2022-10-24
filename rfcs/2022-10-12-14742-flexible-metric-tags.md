@@ -83,29 +83,38 @@ Both the Lua and VRL scripting languages will be given a new configuration optio
 same as they are now. Tags with multiple values will show the last assigned value, and null values
 will be ignored. When set to the latter, all tags will be exposed as arrays of either string or null
 values.  This control will initially default to the former setting, providing for backwards
-compatibility, but that default will later be deprecated and change to the latter. In both cases,
+compatibility, but that default will later be deprecated and change to the latter.
+
+For VRL, the allowable assignments will follow the tag value mode. That is, only single value
+assignments will be allowed in "single" mode, and only array value assignments will be allowed in
+"full" mode. These types will be enforced with VRL's integrated type definitions, causing programs
+that make the wrong assignment a config-level error instead of a run-time error. In both cases,
 assignment to a tag will overwrite all other values for the tag, and deleting a tag name or
-assigning an empty array will remove all tag values with that name.
+assigning an empty array (in "full" mode) will remove all tag values with that name.
 
-Assignments to tags will follow the data schema outlined above for the native JSON codec, without
-regard to how the values are exposed. When the `"single"` setting is deprecated, single value
-assignments will also produce a deprecation warning. Since tags cannot have multiple identical
-values, and both scripting languages lack first-class support for sets, assignments and
-modifications that result in duplicate values will cause the duplicates to be dropped and a warning
-issued.
+Since tags cannot have multiple identical values, and both scripting languages lack first-class
+support for sets, assignments and modifications that result in duplicate values will cause the
+duplicates to be dropped and a warning issued.
 
-VRL assignment example:
+Examples:
 
 ```coffee
+# With metric_tag_values = "single"
 .tags.single_value = "value" # Replace the tag with a single value
 .tags.bare_tag = null        # Replace the tag with a bare tag
-.tags.multi_valued_tag = ["value1", "value2"]
-.tags.complex_tag = ["value3", null]
 
 # With metric_tag_values = "full":
+.tags.multi_valued_tag = ["value1", "value2"]
+.tags.complex_tag = ["value3", null]
 .tags.modified = push(.tags.modified, "value4")
 .tags.modified = filter(.tags.modified) -> |_, v| { v != "remove" }
 ```
+
+In contrast, we don't control what assignments are allowed in Lua transforms, but rather convert
+event data into Lua structures on input and convert back when the script `emit`s a value. As such, assignments
+to tags will follow the data schema outlined above for the native JSON codec, without regard to how
+the values are exposed. When the `"single"` setting is deprecated, single value assignments will
+also produce a deprecation warning.
 
 #### `log_to_metric` Transform
 
@@ -204,9 +213,17 @@ The use of an `IndexSet` for the tag value provides us with two useful invariant
 
 ## Drawbacks
 
-Metrics sinks that only support a single value per tag will need to be reworked accordingly for the
-new value type. Additionally, these sinks may change their behavior for sources that have been
-producing multiple tag values.
+The data model changes may cause observable behavior changes in sinks in the presence of data that
+now has multi-valued tags, ie when receiving data from sources that produce multi-valued tags.
+
+There is no way to support multi-valued tags in Lua or VRL scripts without introducing breakage of
+one form or another. Exposing tags as multi-valued will break scripts. The proposed scheme avoids
+breaking existing scripts, but will cause Lua scripts in "single" mode to reduce all multi-valued
+tags to a single value, even if there are no modifications to tags.
+
+Additionally, accepting either single- or multi-valued tags in Lua as proposed above could
+potentially cause metrics that would formerly fail to convert into the Vector data model when they
+are emitted to now be allowed, causing extraneous data emission.
 
 ## Prior Art
 
@@ -237,6 +254,13 @@ which will cause problems for users:
 1. Unconditionally expose the tags as arrays of values using the existing naming, but still accept
    assignments using either single values or arrays of values. This will cause breakage to existing
    scripts that relies on the existing single value tag values.
+1. For VRL, conditionally expose the tags as single values or arrays, as described in the proposal,
+   but accept assignments following the native JSON codec scheme. This would create headaches for
+   VRL's type definitions, at best preventing proper validation of programs.
+1. For Lua, conditionally expose the tags as single values or arrays, as described in the proposal,
+   but accept assignments only using the named tags schema. This has the best consistency with
+   existing scripts, avoiding the extraneous emission problem described above, at the cost of
+   requiring more complicated internals for converting the data back to Vector's metric model.
 1. Expose the tags as single values using the existing naming, picking some arbitrary value when a
    tag has multiple values, and set up a secondary tags structure that exposes the arrays. This will
    lead to all kinds of confusion and conflicts when the same tag is assigned through different
@@ -244,9 +268,6 @@ which will cause problems for users:
 1. Add functions specficially for manipulating tag sets. This continues to make metrics management
    look like a second-class afterthought, and doesn't ease any compatibility problems for existing
    scripts.
-1. For Lua, set up a new version 3 API that exposes the arrays, while leaving version 2 with single
-   values. This will result in metrics with multi-valued tags being reduced to a single value even
-   when there is no modifications to the tags.
 
 ### Internal Representation
 
@@ -315,11 +336,27 @@ Incremental steps to execute this change. These will be converted to issues afte
 
 ## Future Improvements
 
-As referenced above, once the initial implementation is complete, we could rework the storage based
-on `BTreeMap<String>`. This would allow us to avoid splitting tag strings in two pieces, reducing
-allocations and overhead, at the cost of increased complexity when accessing a particular named tag.
+Most often, tags will only have a single value instead of an array. This suggests that an
+implementation that stores tag values as an enum switching between a simple `TagValue` and the above
+`IndexMap` would be more efficient for memory consumption and likely be more efficient for CPU time.
+
+We could also investigate reworking the storage based on `BTreeMap<String>`. This would allow us to
+avoid splitting tag strings in two pieces, reducing allocations and overhead, at the cost of
+increased complexity when accessing a particular named tag.
 
 Metric tag sets are most often repeated a great number of times across different metrics. This
 suggests that a shared copy-on-write storage scheme where the individual metrics would contain just
 a handle to the shared value. This would improve Vector's memory efficience at least, and possibly
 run-time performance as well.
+
+The schema definitions that are already present on sinks could be enhanced to add support for what
+types of tags sources and sinks support. This would be used in any intermediate scripting transform
+(Lua or VRL) to set the tag mode exposed by that transform, instead of requiring users to manually
+set `metric_tags_values` appropriately for their topology. For VRL this would have the benefit of
+turning the run-time problem of overwriting a multi-valued tag with a single value into a
+startup-time error, thus preventing data loss.
+
+It may be useful to add functions to VRL to improve the ergonomics of manipulating tag arrays. In
+particular, removing a tag value from a set of tags, if present, is awkward at best without a
+helper. The best form of such helpers is best left for future work based on how such tags are
+actually used.
