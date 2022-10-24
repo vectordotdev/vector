@@ -216,12 +216,9 @@ async fn auto_version() {
         api_version: ElasticsearchApiVersion::Auto,
         ..config()
     };
-    let common = ElasticsearchCommon::parse_single(config)
+    let _ = ElasticsearchCommon::parse_single(config)
         .await
         .expect("Config error");
-
-    let client = create_http_client();
-    let _version = common.api_version(&client).expect("Fetch version failed");
 }
 
 #[tokio::test]
@@ -529,7 +526,8 @@ async fn run_insert_tests_with_config(
 }
 
 async fn run_insert_tests_with_multiple_endpoints(config: &ElasticsearchConfig) {
-    let commons = ElasticsearchCommon::parse_many(config)
+    let cx = SinkContext::new_test();
+    let commons = ElasticsearchCommon::parse_many(config, cx.proxy())
         .await
         .expect("Config error");
     let index = match config.mode {
@@ -545,7 +543,6 @@ async fn run_insert_tests_with_multiple_endpoints(config: &ElasticsearchConfig) 
             .unwrap(),
     };
 
-    let cx = SinkContext::new_test();
     let (sink, healthcheck) = config
         .build(cx.clone())
         .await

@@ -12,29 +12,10 @@ use crate::{
     },
 };
 
-use super::ElasticsearchConfig;
-
 #[derive(Debug, Clone)]
 pub struct ElasticsearchRequestBuilder {
     pub compression: Compression,
     pub encoder: ElasticsearchEncoder,
-}
-
-impl ElasticsearchRequestBuilder {
-    pub fn new(config: &ElasticsearchConfig, version: usize) -> Self {
-        let doc_type = config.doc_type.clone().unwrap_or_else(|| "_doc".into());
-
-        let suppress_type_name = version <= 6;
-
-        ElasticsearchRequestBuilder {
-            compression: config.compression,
-            encoder: ElasticsearchEncoder {
-                transformer: config.encoding.clone(),
-                doc_type,
-                suppress_type_name,
-            },
-        }
-    }
 }
 
 pub struct Metadata {
