@@ -5,10 +5,12 @@ use quickcheck::{Arbitrary, Gen};
 use vector_common::byte_size_of::ByteSizeOf;
 use vector_config::configurable_component;
 
+pub type TagValue = String;
+
 /// Tags for a metric series.
 #[configurable_component]
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq, PartialOrd, Ord)]
-pub struct MetricTags(#[configurable(transparent)] pub(in crate::event) BTreeMap<String, String>);
+pub struct MetricTags(#[configurable(transparent)] pub(in crate::event) BTreeMap<String, TagValue>);
 
 #[macro_export]
 macro_rules! metric_tags {
@@ -32,7 +34,7 @@ impl MetricTags {
         (!self.is_empty()).then_some(self)
     }
 
-    pub fn iter(&self) -> btree_map::Iter<'_, String, String> {
+    pub fn iter(&self) -> btree_map::Iter<'_, String, TagValue> {
         self.0.iter()
     }
 
@@ -44,15 +46,15 @@ impl MetricTags {
         self.0.get(name).map(String::as_str)
     }
 
-    pub fn entry(&mut self, name: String) -> btree_map::Entry<String, String> {
+    pub fn entry(&mut self, name: String) -> btree_map::Entry<String, TagValue> {
         self.0.entry(name)
     }
 
-    pub fn insert(&mut self, name: String, value: String) -> Option<String> {
+    pub fn insert(&mut self, name: String, value: TagValue) -> Option<TagValue> {
         self.0.insert(name, value)
     }
 
-    pub fn remove(&mut self, name: &str) -> Option<String> {
+    pub fn remove(&mut self, name: &str) -> Option<TagValue> {
         self.0.remove(name)
     }
 
@@ -60,7 +62,7 @@ impl MetricTags {
         self.0.keys().map(String::as_str)
     }
 
-    pub fn extend(&mut self, tags: impl Iterator<Item = (String, String)>) {
+    pub fn extend(&mut self, tags: impl Iterator<Item = (String, TagValue)>) {
         self.0.extend(tags);
     }
 
@@ -69,16 +71,16 @@ impl MetricTags {
     }
 }
 
-impl From<BTreeMap<String, String>> for MetricTags {
-    fn from(tags: BTreeMap<String, String>) -> Self {
+impl From<BTreeMap<String, TagValue>> for MetricTags {
+    fn from(tags: BTreeMap<String, TagValue>) -> Self {
         Self(tags)
     }
 }
 
 impl IntoIterator for MetricTags {
-    type Item = (String, String);
+    type Item = (String, TagValue);
 
-    type IntoIter = btree_map::IntoIter<String, String>;
+    type IntoIter = btree_map::IntoIter<String, TagValue>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
@@ -95,7 +97,7 @@ impl<'a> IntoIterator for &'a MetricTags {
     }
 }
 
-pub struct Iter<'a>(btree_map::Iter<'a, String, String>);
+pub struct Iter<'a>(btree_map::Iter<'a, String, TagValue>);
 
 impl<'a> Iterator for Iter<'a> {
     type Item = (&'a str, &'a str);
@@ -105,14 +107,14 @@ impl<'a> Iterator for Iter<'a> {
     }
 }
 
-impl FromIterator<(String, String)> for MetricTags {
-    fn from_iter<T: IntoIterator<Item = (String, String)>>(iter: T) -> Self {
+impl FromIterator<(String, TagValue)> for MetricTags {
+    fn from_iter<T: IntoIterator<Item = (String, TagValue)>>(iter: T) -> Self {
         Self(BTreeMap::from_iter(iter))
     }
 }
 
-impl<const N: usize> From<[(String, String); N]> for MetricTags {
-    fn from(tags: [(String, String); N]) -> Self {
+impl<const N: usize> From<[(String, TagValue); N]> for MetricTags {
+    fn from(tags: [(String, TagValue); N]) -> Self {
         Self(BTreeMap::from(tags))
     }
 }
