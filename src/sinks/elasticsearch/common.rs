@@ -218,7 +218,8 @@ impl ElasticsearchCommon {
     /// Parses a single endpoint, else panics.
     #[cfg(test)]
     pub async fn parse_single(config: &ElasticsearchConfig) -> crate::Result<Self> {
-        let mut commons = Self::parse_many(config, SinkContext::new_test().proxy()).await?;
+        let mut commons =
+            Self::parse_many(config, crate::config::SinkContext::new_test().proxy()).await?;
         assert!(commons.len() == 1);
         Ok(commons.remove(0))
     }
