@@ -115,7 +115,13 @@ mod tests {
     "sinks": {}
 }"#;
         let errors = check_sensitive_fields(config).unwrap_err();
-        assert_eq!(errors[0], "{\"api_key\":\"aaaaa\",\"configuration_key\":\"bbbbb\"} is not valid under any of the given schemas at instance path /enterprise");
+        assert!(!errors.is_empty());
+
+        let expected = format!(
+            "\"aaaaa\" does not match \"{}\" at instance path /enterprise/api_key",
+            super::SECRET_AND_VARIABLES_REGEX
+        );
+        assert_eq!(errors[0], expected);
     }
 
     #[test]

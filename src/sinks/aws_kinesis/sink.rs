@@ -1,4 +1,4 @@
-use std::{fmt::Debug, marker::PhantomData, num::NonZeroUsize};
+use std::{borrow::Cow, fmt::Debug, marker::PhantomData, num::NonZeroUsize};
 
 use async_trait::async_trait;
 use futures::{future, stream::BoxStream, StreamExt};
@@ -123,12 +123,12 @@ pub fn process_log(
             return None;
         }
     } else {
-        gen_partition_key()
+        Cow::Owned(gen_partition_key())
     };
     let partition_key = if partition_key.len() >= 256 {
         partition_key[..256].to_string()
     } else {
-        partition_key
+        partition_key.into_owned()
     };
 
     Some(KinesisProcessedEvent {

@@ -934,8 +934,8 @@ mod tests {
                           [[tests.outputs]]
                             extract_from = "foo"
                             [[tests.outputs.conditions]]
-                              type = "check_fields"
-                              "message.equals" = "Sorry, I'm busy this week Cecil"
+                              type = "vrl"
+                              source = ".message == \"Sorry, I'm busy this week Cecil\""
                     "#},
                     Format::Toml,
                 )

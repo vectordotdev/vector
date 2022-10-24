@@ -1,7 +1,7 @@
 pub mod logs;
 pub mod metrics;
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 
 use bytes::{BufMut, BytesMut};
 use chrono::{DateTime, Utc};
@@ -11,6 +11,7 @@ use snafu::{ResultExt, Snafu};
 use tower::Service;
 use vector_common::sensitive_string::SensitiveString;
 use vector_config::configurable_component;
+use vector_core::event::MetricTags;
 
 use crate::http::HttpClient;
 
@@ -212,7 +213,7 @@ fn healthcheck(
 pub(in crate::sinks) fn influx_line_protocol(
     protocol_version: ProtocolVersion,
     measurement: &str,
-    tags: Option<BTreeMap<String, String>>,
+    tags: Option<MetricTags>,
     fields: Option<HashMap<String, Field>>,
     timestamp: i64,
     line_protocol: &mut BytesMut,
@@ -242,7 +243,7 @@ pub(in crate::sinks) fn influx_line_protocol(
     Ok(())
 }
 
-fn encode_tags(tags: BTreeMap<String, String>, output: &mut BytesMut) {
+fn encode_tags(tags: MetricTags, output: &mut BytesMut) {
     let original_len = output.len();
     // `tags` is already sorted
     for (key, value) in tags {
@@ -375,7 +376,7 @@ pub mod test_util {
         Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
     }
 
-    pub(crate) fn tags() -> BTreeMap<String, String> {
+    pub(crate) fn tags() -> MetricTags {
         vec![
             ("normal_tag".to_owned(), "value".to_owned()),
             ("true_tag".to_owned(), "true".to_owned()),

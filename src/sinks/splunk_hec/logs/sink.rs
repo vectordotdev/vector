@@ -2,6 +2,7 @@ use std::{fmt, num::NonZeroUsize, sync::Arc};
 
 use async_trait::async_trait;
 use futures_util::{stream::BoxStream, StreamExt};
+use serde::Serialize;
 use tower::Service;
 use vector_buffers::EventCount;
 use vector_core::{
@@ -205,7 +206,7 @@ impl Partitioner for EventPartitioner {
     }
 }
 
-#[derive(PartialEq, Default, Clone, Debug)]
+#[derive(PartialEq, Default, Clone, Debug, Serialize)]
 pub struct HecLogsProcessedEventMetadata {
     pub event_byte_size: usize,
     pub sourcetype: Option<String>,

@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, convert::TryFrom, time::Instant};
+use std::{convert::TryFrom, time::Instant};
 
 use bytes::Bytes;
 use chrono::Utc;
@@ -9,11 +9,11 @@ use snafu::{ResultExt, Snafu};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
 use vector_config::configurable_component;
-use vector_core::ByteSizeOf;
+use vector_core::{metric_tags, ByteSizeOf};
 
 use crate::{
     config::{DataType, Output, SourceConfig, SourceContext},
-    event::metric::{Metric, MetricKind, MetricValue},
+    event::metric::{Metric, MetricKind, MetricTags, MetricValue},
     http::{Auth, HttpClient},
     internal_events::{
         CollectionCompleted, EndpointBytesReceived, NginxMetricsEventsReceived,
@@ -151,7 +151,7 @@ struct NginxMetrics {
     endpoint: String,
     auth: Option<Auth>,
     namespace: Option<String>,
-    tags: BTreeMap<String, String>,
+    tags: MetricTags,
 }
 
 impl NginxMetrics {
@@ -161,9 +161,10 @@ impl NginxMetrics {
         auth: Option<Auth>,
         namespace: Option<String>,
     ) -> crate::Result<Self> {
-        let mut tags = BTreeMap::new();
-        tags.insert("endpoint".into(), endpoint.clone());
-        tags.insert("host".into(), Self::get_endpoint_host(&endpoint)?);
+        let tags = metric_tags!(
+            "endpoint" => endpoint.clone(),
+            "host" => Self::get_endpoint_host(&endpoint)?,
+        );
 
         Ok(Self {
             http_client,

@@ -589,9 +589,7 @@ mod test {
                 assert_eq!(m.namespace(), Some("awsecs"));
 
                 match m.tags() {
-                    Some(tags) => {
-                        assert_eq!(tags.get("device"), Some(&"eth1".to_string()));
-                    }
+                    Some(tags) => assert_eq!(tags.get("device"), Some("eth1")),
                     None => panic!("No tags for metric. {:?}", m),
                 }
             }
