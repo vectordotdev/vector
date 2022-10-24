@@ -1,0 +1,44 @@
+# Regression Detection
+#
+# This workflow runs our regression detection experiments, which are relative
+# evaluations of the base SHA for the PR to whatever SHA was just pushed into
+# the project (unless that SHA happens to be master branch HEAD). The goal is to
+# give quick-ish feedback on all-up Vector for a variety of configs as to
+# whether throughput performance has gone down, gotten more variable in the
+# pushed SHA.
+#
+# Regression detection is always done relative to the pushed SHA, meaning any
+# changes you introduce to the experiment will be picked up both for the base
+# SHA variant and your current SHA. Tags are SHA-SHA. The first SHA is the one
+# that triggered this workflow, the second is the one of the Vector being
+# tested. For comparison images the two SHAs are identical.
+
+name: Regression Detector
+
+on:
+  pull_request:
+    paths-ignore:
+      - "docs/**"
+      - "rfcs/**"
+      - "website/**"
+
+jobs:
+  cancel-previous:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 3
+    steps:
+      - uses: styfle/cancel-workflow-action@0.11.0
+        with:
+          access_token: ${{ secrets.GITHUB_TOKEN }}
+          all_but_latest: true # can cancel workflows scheduled later
+
+  confirm-valid-credentials:
+    name: Confirm AWS credentials are minimally valid
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY }}
+          aws-region: us-west-2
