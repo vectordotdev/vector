@@ -11,8 +11,8 @@ pub struct OptionalTargetPath {
 }
 
 impl OptionalTargetPath {
-    pub fn none() -> OptionalTargetPath {
-        OptionalTargetPath { path: None }
+    pub fn none() -> Self {
+        Self { path: None }
     }
 }
 
@@ -29,7 +29,7 @@ impl TryFrom<String> for OptionalTargetPath {
 }
 
 impl From<OptionalTargetPath> for String {
-    fn from(optional_path: OptionalTargetPath) -> Self {
+    fn from(optional_path: Self) -> Self {
         match optional_path.path {
             Some(path) => String::from(path),
             None => String::new(),

@@ -116,24 +116,26 @@ pub trait ValuePath<'a>: Clone {
     }
 
     fn can_start_with(&self, prefix: impl ValuePath<'a>) -> bool {
-        if let (Ok(self_path), Ok(prefix_path)) =
+        let (self_path, prefix_path) = if let (Ok(self_path), Ok(prefix_path)) =
             (self.to_owned_value_path(), prefix.to_owned_value_path())
         {
-            let mut self_segments = self_path.segments.into_iter();
-            for prefix_segment in prefix_path.segments.iter() {
-                match self_segments.next() {
-                    None => return false,
-                    Some(self_segment) => {
-                        if !self_segment.can_start_with(prefix_segment) {
-                            return false;
-                        }
+            (self_path, prefix_path)
+        } else {
+            return false;
+        };
+
+        let mut self_segments = self_path.segments.into_iter();
+        for prefix_segment in prefix_path.segments.iter() {
+            match self_segments.next() {
+                None => return false,
+                Some(self_segment) => {
+                    if !self_segment.can_start_with(prefix_segment) {
+                        return false;
                     }
                 }
             }
-            true
-        } else {
-            false
         }
+        true
     }
 
     #[allow(clippy::result_unit_err)]

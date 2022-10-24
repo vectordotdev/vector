@@ -515,6 +515,7 @@ impl MetadataClient {
 // This creates a simplified string from the namespace. Since the namespace is technically
 // a target path, it can contain syntax that is undesirable for a metric tag (such as prefix, quotes, etc)
 // This is mainly used for backwards compatibility.
+// see: https://github.com/vectordotdev/vector/issues/14931
 fn create_metric_namespace(namespace: &OwnedTargetPath) -> String {
     let mut output = String::new();
     for segment in &namespace.path.segments {

@@ -942,10 +942,7 @@ impl ContainerLogInfo {
 
             // Labels.
             if !self.metadata.labels.is_empty() {
-                // let prefix_path = path!("label");
                 for (key, value) in self.metadata.labels.iter() {
-                    // let mut path = prefix_path.clone().segments;
-                    // path.push(OwnedSegment::Field(key.clone()));
                     log_event.insert(
                         (PathPrefix::Event, path!("label").concat(path!(key))),
                         value.clone(),
