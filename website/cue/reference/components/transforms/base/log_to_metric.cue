@@ -5,9 +5,9 @@ base: components: transforms: log_to_metric: configuration: metrics: {
 	required:    true
 	type: array: items: type: object: options: {
 		field: {
-			description: "Name of the field in the event to generate the counter."
+			description: "Name of the field in the event to generate the metric."
 			required:    true
-			type: string: syntax: "literal"
+			type: string: syntax: "template"
 		}
 		increment_by_value: {
 			description:   "Increments the counter by the value in `field`, instead of only by `1`."
@@ -41,23 +41,23 @@ base: components: transforms: log_to_metric: configuration: metrics: {
 			description: """
 				Overrides the name of the counter.
 
-				If not specified, `field` is used as the name of the counter.
+				If not specified, `field` is used as the name of the metric.
 				"""
 			required: false
-			type: string: syntax: "literal"
+			type: string: syntax: "template"
 		}
 		namespace: {
-			description: "Sets the namespace for the counter."
+			description: "Sets the namespace for the metric."
 			required:    false
-			type: string: syntax: "literal"
+			type: string: syntax: "template"
 		}
 		tags: {
-			description: "Tags to apply to the counter."
+			description: "Tags to apply to the metric."
 			required:    false
 			type: object: options: "*": {
-				description: "Tags to apply to the counter."
+				description: "Tags to apply to the metric."
 				required:    true
-				type: string: syntax: "literal"
+				type: string: syntax: "template"
 			}
 		}
 		type: {
