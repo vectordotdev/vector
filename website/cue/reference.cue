@@ -328,12 +328,12 @@ _values: {
 	// reduced security if the option is disabled.
 	warnings: [...string] | *[]
 
-	if !required {
+	//if !required {
 		// `common` specifes that the option is commonly used. It will bring the
 		// option to the top of the documents, surfacing it from other
 		// less common, options.
 		common?: bool
-	}
+	//}
 
 	// `sort` sorts the option, otherwise options will be sorted alphabetically.
 	sort?: int8

@@ -2,6 +2,7 @@ package metadata
 
 components: sinks: [Name=string]: {
 	kind: "sink"
+
 	features: _
 
 	configuration: {

@@ -2,6 +2,7 @@ package metadata
 
 components: sources: [Name=string]: {
 	kind: "source"
+
 	features: _
 
 	configuration: {
