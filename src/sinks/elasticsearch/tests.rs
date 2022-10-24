@@ -3,12 +3,9 @@ use std::{collections::BTreeMap, convert::TryFrom};
 use crate::{
     codecs::Transformer,
     event::{LogEvent, Metric, MetricKind, MetricValue, Value},
-    sinks::{
-        elasticsearch::{
-            sink::process_log, BulkAction, BulkConfig, DataStreamConfig, ElasticsearchCommon,
-            ElasticsearchConfig, ElasticsearchMode,
-        },
-        util::encoding::Encoder,
+    sinks::elasticsearch::{
+        sink::process_log, BulkAction, BulkConfig, DataStreamConfig, ElasticsearchCommon,
+        ElasticsearchConfig, ElasticsearchMode,
     },
     template::Template,
 };
