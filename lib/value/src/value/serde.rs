@@ -57,9 +57,8 @@ impl Serialize for Value {
             Self::Integer(i) => serializer.serialize_i64(*i),
             Self::Float(f) => serializer.serialize_f64(f.into_inner()),
             Self::Boolean(b) => serializer.serialize_bool(*b),
-            Self::Bytes(_) | Self::Timestamp(_) => {
-                serializer.serialize_str(&self.to_string_lossy())
-            }
+            Self::Bytes(b) => serializer.serialize_str(String::from_utf8_lossy(b).as_ref()),
+            Self::Timestamp(ts) => serializer.serialize_str(&timestamp_to_string(ts)),
             Self::Regex(regex) => serializer.serialize_str(regex.as_str()),
             Self::Object(m) => serializer.collect_map(m),
             Self::Array(a) => serializer.collect_seq(a),

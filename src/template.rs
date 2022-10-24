@@ -6,7 +6,7 @@ use chrono::{
     Utc,
 };
 use once_cell::sync::Lazy;
-use regex::{Captures, Regex};
+use regex::Regex;
 use snafu::Snafu;
 use vector_config::{configurable_component, ConfigurableString};
 
@@ -41,24 +41,20 @@ pub enum TemplateRenderingError {
 /// look something like `my-file.log`, a template string could look something like `my-file-{{key}}.log`, and the `key`
 /// field of the event being processed would serve as the value when rendering the template into a string.
 #[configurable_component]
-#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 #[configurable(metadata(docs::templateable, docs::no_description))]
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 #[serde(try_from = "String", into = "String")]
 pub struct Template {
     src: String,
 
     #[serde(skip)]
-    has_ts: bool,
+    parts: Vec<Part>,
 
     #[serde(skip)]
-    has_fields: bool,
-}
+    is_static: bool,
 
-impl Template {
-    /// Returns `true` if this template string has a length of zero, and `false` otherwise.
-    pub fn is_empty(&self) -> bool {
-        self.src.is_empty()
-    }
+    #[serde(skip)]
+    reserve_size: usize,
 }
 
 impl TryFrom<&str> for Template {
@@ -89,19 +85,31 @@ impl TryFrom<Cow<'_, str>> for Template {
     type Error = TemplateParseError;
 
     fn try_from(src: Cow<'_, str>) -> Result<Self, Self::Error> {
-        let (has_error, is_dynamic) = StrftimeItems::new(&src)
-            .fold((false, false), |(error, dynamic), item| {
-                (error || is_error(&item), dynamic || is_dynamic(&item))
-            });
-        if has_error {
-            Err(TemplateParseError::StrftimeError)
-        } else {
-            Ok(Template {
-                has_fields: RE.is_match(&src),
+        parse_template(&src).map(|parts| {
+            let is_static =
+                parts.is_empty() || (parts.len() == 1 && matches!(parts[0], Part::Literal(..)));
+
+            // Calculate a minimum size to reserve for rendered string. This doesn't have to be
+            // exact, and can't be because of references and time format specifiers. We just want a
+            // better starting number than 0 to avoid the first reallocations if possible.
+            let reserve_size = parts
+                .iter()
+                .map(|part| match part {
+                    Part::Literal(lit) => lit.len(),
+                    // We can't really put a useful number here, assume at least one byte will come
+                    // from the input event.
+                    Part::Reference(_path) => 1,
+                    Part::Strftime(parsed) => parsed.reserve_size(),
+                })
+                .sum();
+
+            Template {
+                parts,
                 src: src.into_owned(),
-                has_ts: is_dynamic,
-            })
-        }
+                is_static,
+                reserve_size,
+            }
+        })
     }
 }
 
@@ -120,20 +128,6 @@ impl fmt::Display for Template {
 // This is safe because we literally defer to `String` for the schema of `Template`.
 impl ConfigurableString for Template {}
 
-const fn is_error(item: &Item) -> bool {
-    matches!(item, Item::Error)
-}
-
-const fn is_dynamic(item: &Item) -> bool {
-    match item {
-        Item::Fixed(_) => true,
-        Item::Numeric(_, _) => true,
-        Item::Error => false,
-        Item::Space(_) | Item::OwnedSpace(_) => false,
-        Item::Literal(_) | Item::OwnedLiteral(_) => false,
-    }
-}
-
 impl Template {
     pub fn render<'a>(
         &self,
@@ -146,81 +140,184 @@ impl Template {
         &self,
         event: impl Into<EventRef<'a>>,
     ) -> Result<String, TemplateRenderingError> {
-        let event = event.into();
-        match (self.has_fields, self.has_ts) {
-            (false, false) => Ok(self.src.clone()),
-            (true, false) => render_fields(&self.src, event),
-            (false, true) => Ok(render_timestamp(&self.src, event)),
-            (true, true) => {
-                let tmp = render_fields(&self.src, event)?;
-                Ok(render_timestamp(&tmp, event))
+        if self.is_static {
+            Ok(self.src.clone())
+        } else {
+            self.render_event(event.into())
+        }
+    }
+
+    fn render_event(&self, event: EventRef<'_>) -> Result<String, TemplateRenderingError> {
+        let mut missing_keys = Vec::new();
+        let mut out = String::with_capacity(self.reserve_size);
+        for part in &self.parts {
+            match part {
+                Part::Literal(lit) => out.push_str(lit),
+                Part::Strftime(items) => out.push_str(&render_timestamp(items, event)),
+                Part::Reference(key) => {
+                    out.push_str(
+                        &match event {
+                            EventRef::Log(log) => log.get(&**key).map(Value::to_string_lossy),
+                            EventRef::Metric(metric) => {
+                                render_metric_field(key, metric).map(Cow::Borrowed)
+                            }
+                            EventRef::Trace(trace) => trace.get(&key).map(Value::to_string_lossy),
+                        }
+                        .unwrap_or_else(|| {
+                            missing_keys.push(key.to_owned());
+                            Cow::Borrowed("")
+                        }),
+                    );
+                }
             }
+        }
+        if missing_keys.is_empty() {
+            Ok(out)
+        } else {
+            Err(TemplateRenderingError::MissingKeys { missing_keys })
         }
     }
 
     pub fn get_fields(&self) -> Option<Vec<String>> {
-        if self.has_fields {
-            RE.captures_iter(&self.src)
-                .map(|c| {
-                    c.get(1)
-                        .map(|s| s.as_str().trim().to_string())
-                        .expect("src should match regex")
-                })
-                .collect::<Vec<_>>()
-                .into()
-        } else {
-            None
-        }
-    }
-
-    pub const fn is_dynamic(&self) -> bool {
-        self.has_fields || self.has_ts
+        let parts: Vec<_> = self
+            .parts
+            .iter()
+            .filter_map(|part| {
+                if let Part::Reference(r) = part {
+                    Some(r.to_owned())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        (!parts.is_empty()).then_some(parts)
     }
 
     pub fn get_ref(&self) -> &str {
         &self.src
     }
-}
 
-fn render_fields(src: &str, event: EventRef<'_>) -> Result<String, TemplateRenderingError> {
-    let mut missing_keys = Vec::new();
-    let out = RE
-        .replace_all(src, |caps: &Captures<'_>| {
-            let key = caps
-                .get(1)
-                .map(|s| s.as_str().trim())
-                .expect("src should match regex");
-            match event {
-                EventRef::Log(log) => log.get(key).map(|val| val.to_string_lossy()),
-                EventRef::Metric(metric) => render_metric_field(key, metric).map(Into::into),
-                EventRef::Trace(trace) => trace.get(&key).map(|val| val.to_string_lossy()),
-            }
-            .unwrap_or_else(|| {
-                missing_keys.push(key.to_owned());
-                "".into()
-            })
-        })
-        .into_owned();
-    if missing_keys.is_empty() {
-        Ok(out)
-    } else {
-        Err(TemplateRenderingError::MissingKeys { missing_keys })
+    /// Returns `true` if this template string has a length of zero, and `false` otherwise.
+    pub fn is_empty(&self) -> bool {
+        self.src.is_empty()
+    }
+
+    pub const fn is_dynamic(&self) -> bool {
+        !self.is_static
     }
 }
 
-fn render_metric_field(key: &str, metric: &Metric) -> Option<String> {
+/// One part of the template string after parsing.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+enum Part {
+    /// A literal piece of text to be copied verbatim into the output.
+    Literal(String),
+    /// A literal piece of text containing a time format string.
+    Strftime(ParsedStrftime),
+    /// A reference to the source event, to be copied from the relevant field or tag.
+    Reference(String),
+}
+
+// Wrap the parsed time formatter in order to provide `impl Hash` and some convenience functions.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct ParsedStrftime(Box<[Item<'static>]>);
+
+impl ParsedStrftime {
+    fn parse(fmt: &str) -> Result<Self, TemplateParseError> {
+        Ok(Self(
+            StrftimeItems::new(fmt)
+                .map(|item| match item {
+                    // Box the references so they outlive the reference
+                    Item::Space(space) => Item::OwnedSpace(space.into()),
+                    Item::Literal(lit) => Item::OwnedLiteral(lit.into()),
+                    // And copy all the others
+                    Item::Fixed(f) => Item::Fixed(f),
+                    Item::Numeric(num, pad) => Item::Numeric(num, pad),
+                    Item::Error => Item::Error,
+                    Item::OwnedSpace(space) => Item::OwnedSpace(space),
+                    Item::OwnedLiteral(lit) => Item::OwnedLiteral(lit),
+                })
+                .map(|item| {
+                    matches!(item, Item::Error)
+                        .then(|| Err(TemplateParseError::StrftimeError))
+                        .unwrap_or(Ok(item))
+                })
+                .collect::<Result<Vec<_>, _>>()?
+                .into(),
+        ))
+    }
+
+    fn is_dynamic(&self) -> bool {
+        self.0.iter().any(|item| match item {
+            Item::Fixed(_) => true,
+            Item::Numeric(_, _) => true,
+            Item::Error
+            | Item::Space(_)
+            | Item::OwnedSpace(_)
+            | Item::Literal(_)
+            | Item::OwnedLiteral(_) => false,
+        })
+    }
+
+    fn as_items(&self) -> impl Iterator<Item = &Item<'static>> + Clone {
+        self.0.iter()
+    }
+
+    fn reserve_size(&self) -> usize {
+        self.0
+            .iter()
+            .map(|item| match item {
+                Item::Literal(lit) => lit.len(),
+                Item::OwnedLiteral(lit) => lit.len(),
+                Item::Space(space) => space.len(),
+                Item::OwnedSpace(space) => space.len(),
+                Item::Error => 0,
+                Item::Numeric(_, _) => 2,
+                Item::Fixed(_) => 2,
+            })
+            .sum()
+    }
+}
+
+fn parse_literal(src: &str) -> Result<Part, TemplateParseError> {
+    let parsed = ParsedStrftime::parse(src)?;
+    Ok(if parsed.is_dynamic() {
+        Part::Strftime(parsed)
+    } else {
+        Part::Literal(src.to_string())
+    })
+}
+
+// Pre-parse the template string into a series of parts to be filled in at render time.
+fn parse_template(src: &str) -> Result<Vec<Part>, TemplateParseError> {
+    let mut last_end = 0;
+    let mut parts = Vec::new();
+    for cap in RE.captures_iter(src) {
+        let all = cap.get(0).expect("Capture 0 is always defined");
+        if all.start() > last_end {
+            parts.push(parse_literal(&src[last_end..all.start()])?);
+        }
+        parts.push(Part::Reference(cap[1].trim().to_owned()));
+        last_end = all.end();
+    }
+    if src.len() > last_end {
+        parts.push(parse_literal(&src[last_end..])?);
+    }
+
+    Ok(parts)
+}
+
+fn render_metric_field<'a>(key: &str, metric: &'a Metric) -> Option<&'a str> {
     match key {
-        "name" => Some(metric.name().into()),
+        "name" => Some(metric.name()),
         "namespace" => metric.namespace().map(Into::into),
-        _ if key.starts_with("tags.") => metric
-            .tags()
-            .and_then(|tags| tags.get(&key[5..]).map(ToOwned::to_owned)),
+        _ if key.starts_with("tags.") => metric.tags().and_then(|tags| tags.get(&key[5..])),
         _ => None,
     }
 }
 
-fn render_timestamp(src: &str, event: EventRef<'_>) -> String {
-    let timestamp = match event {
+fn render_timestamp(items: &ParsedStrftime, event: EventRef<'_>) -> String {
+    match event {
         EventRef::Log(log) => log
             .get(log_schema().timestamp_key())
             .and_then(Value::as_timestamp)
@@ -230,12 +327,10 @@ fn render_timestamp(src: &str, event: EventRef<'_>) -> String {
             .get(log_schema().timestamp_key())
             .and_then(Value::as_timestamp)
             .copied(),
-    };
-    if let Some(ts) = timestamp {
-        ts.format(src).to_string()
-    } else {
-        Utc::now().format(src).to_string()
     }
+    .unwrap_or_else(Utc::now)
+    .format_with_items(items.as_items())
+    .to_string()
 }
 
 #[cfg(test)]
@@ -416,7 +511,7 @@ mod tests {
         let template = Template::try_from("nested {{ format }} %T").unwrap();
 
         assert_eq!(
-            Ok(Bytes::from("nested 2001-02-03 04:05:06")),
+            Ok(Bytes::from("nested %F 04:05:06")),
             template.render(&event)
         )
     }
