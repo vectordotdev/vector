@@ -87,7 +87,7 @@ components: _kafka: {
 		}
 		azure_event_hubs: {
 			title: "Azure Event Hubs"
-			body: """
+			body:  """
 				It is possible to use the `kafka` source and sink with [Azure Event Hubs](/(urls.azure_event_hubs))
 				for all tiers other than the [Basic tier](\(urls.azure_event_hubs_tiers)). More details
 				can be found [here](\(urls.azure_event_hubs_kafka)). To configure the source and
