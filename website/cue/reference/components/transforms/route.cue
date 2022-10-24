@@ -3,8 +3,6 @@ package metadata
 components: transforms: route: {
 	title: "Route"
 
-	alias: "swimlanes"
-
 	description: """
 		Splits a stream of events into multiple sub-streams based on a set of
 		conditions.

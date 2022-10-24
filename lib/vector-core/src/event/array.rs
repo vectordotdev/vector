@@ -8,7 +8,10 @@ use futures::{stream, Stream};
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
 use vector_buffers::EventCount;
-use vector_common::finalization::{AddBatchNotifier, BatchNotifier, EventFinalizers, Finalizable};
+use vector_common::{
+    estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf,
+    finalization::{AddBatchNotifier, BatchNotifier, EventFinalizers, Finalizable},
+};
 
 use super::{
     Event, EventDataEq, EventFinalizer, EventMutRef, EventRef, LogEvent, Metric, TraceEvent,
@@ -28,7 +31,7 @@ pub type MetricArray = Vec<Metric>;
 /// of events. This is effectively the same as the standard
 /// `IntoIterator<Item = Event>` implementations, but that would
 /// conflict with the base implementation for the type aliases below.
-pub trait EventContainer: ByteSizeOf {
+pub trait EventContainer: ByteSizeOf + EstimatedJsonEncodedSizeOf {
     /// The type of `Iterator` used to turn this container into events.
     type IntoIter: Iterator<Item = Event>;
 
@@ -226,6 +229,24 @@ impl ByteSizeOf for EventArray {
             Self::Logs(a) => a.allocated_bytes(),
             Self::Metrics(a) => a.allocated_bytes(),
             Self::Traces(a) => a.allocated_bytes(),
+        }
+    }
+}
+
+impl EstimatedJsonEncodedSizeOf for EventArray {
+    fn estimated_json_encoded_size_of(&self) -> usize {
+        match self {
+            Self::Logs(a) => a.iter().map(LogEvent::estimated_json_encoded_size_of).sum(),
+
+            Self::Traces(a) => a
+                .iter()
+                .map(TraceEvent::estimated_json_encoded_size_of)
+                .sum(),
+
+            Self::Metrics(a) => a
+                .iter()
+                .map(EstimatedJsonEncodedSizeOf::estimated_json_encoded_size_of)
+                .sum(),
         }
     }
 }
