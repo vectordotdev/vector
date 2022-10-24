@@ -32,6 +32,10 @@ where
     /// [sources]: https://vector.dev/docs/reference/configuration/sources/
     /// [transforms]: https://vector.dev/docs/reference/configuration/transforms/
     /// [configuration]: https://vector.dev/docs/reference/configuration/
+    #[configurable(metadata(
+        docs::examples = "my-source-or-transform-id",
+        docs::examples = "prefix-*"
+    ))]
     pub inputs: Vec<T>,
 
     #[configurable(metadata(docs::hidden))]

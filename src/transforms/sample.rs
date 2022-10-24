@@ -26,6 +26,7 @@ pub struct SampleConfig {
     /// Consistently samples the same events. Actual rate of sampling may differ from the configured
     /// one if values in the field are not uniformly distributed. If left unspecified, or if the
     /// event doesn’t have `key_field`, events will be count rated.
+    #[configurable(metadata(docs::examples = "message",))]
     pub key_field: Option<String>,
 
     /// A logical condition used to exclude events from sampling.

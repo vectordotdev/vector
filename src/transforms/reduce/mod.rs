@@ -8,6 +8,7 @@ use std::{
 use async_stream::stream;
 use futures::{stream, Stream, StreamExt};
 use indexmap::IndexMap;
+use serde_with::serde_as;
 use vector_config::configurable_component;
 
 use crate::{
@@ -25,16 +26,24 @@ use crate::event::Value;
 pub use merge_strategy::*;
 
 /// Configuration for the `reduce` transform.
+#[serde_as]
 #[configurable_component(transform("reduce"))]
-#[derive(Clone, Debug, Default)]
-#[serde(deny_unknown_fields, default)]
+#[derive(Clone, Debug, Derivative)]
+#[derivative(Default)]
+#[serde(deny_unknown_fields)]
 pub struct ReduceConfig {
     /// The maximum period of time to wait after the last event is received, in milliseconds, before
     /// a combined event should be considered complete.
-    pub expire_after_ms: Option<u64>,
+    #[serde(default = "default_expire_after_ms")]
+    #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
+    #[derivative(Default(value = "default_expire_after_ms()"))]
+    pub expire_after_ms: Duration,
 
     /// The interval to check for and flush any expired events, in milliseconds.
-    pub flush_period_ms: Option<u64>,
+    #[serde(default = "default_flush_period_ms")]
+    #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
+    #[derivative(Default(value = "default_flush_period_ms()"))]
+    pub flush_period_ms: Duration,
 
     /// An ordered list of fields by which to group events.
     ///
@@ -45,6 +54,11 @@ pub struct ReduceConfig {
     /// For example, if `group_by = ["host", "region"]`, then all incoming events that have the same
     /// host and region will be grouped together before being reduced.
     #[serde(default)]
+    #[configurable(metadata(
+        docs::examples = "request_id",
+        docs::examples = "user_id",
+        docs::examples = "transaction_id",
+    ))]
     pub group_by: Vec<String>,
 
     /// A map of field names to custom merge strategies.
@@ -72,6 +86,14 @@ pub struct ReduceConfig {
     /// If this condition resolves to `true` for an event, the previous transaction is flushed
     /// (without this event) and a new transaction is started.
     pub starts_when: Option<AnyCondition>,
+}
+
+const fn default_expire_after_ms() -> Duration {
+    Duration::from_millis(30000)
+}
+
+const fn default_flush_period_ms() -> Duration {
+    Duration::from_millis(1000)
 }
 
 impl_generate_config_from_default!(ReduceConfig);
@@ -210,8 +232,8 @@ impl Reduce {
         let group_by = config.group_by.clone().into_iter().collect();
 
         Ok(Reduce {
-            expire_after: Duration::from_millis(config.expire_after_ms.unwrap_or(30000)),
-            flush_period: Duration::from_millis(config.flush_period_ms.unwrap_or(1000)),
+            expire_after: config.expire_after_ms,
+            flush_period: config.flush_period_ms,
             group_by,
             merge_strategies: config.merge_strategies.clone(),
             reduce_merge_states: HashMap::new(),

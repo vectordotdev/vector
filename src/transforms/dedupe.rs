@@ -15,23 +15,35 @@ use crate::{
     transforms::{TaskTransform, Transform},
 };
 
-/// Configuration for controlling what fields to match against.
+/// Options to control what fields to match against.
 ///
 /// When no field matching configuration is specified, events are matched using the `timestamp`,
 /// `host`, and `message` fields from an event. The specific field names used will be those set in
 /// the global [`log schema`][global_log_schema] configuration.
 ///
 /// [global_log_schema]: https://vector.dev/docs/reference/configuration/global-options/#log_schema
+// TODO: This enum renders as an object with two fields that are seemingly both able to specified...
+// which is not in fact possible. We need to add a new enum schema matching pattern in
+// `generate-components-docs.rb` that can correctly render externally tagged enums as enums
+// (mutual exclusivity) so that we don't have to frontload the doc comments for every single variant
+// to call it out.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub enum FieldMatchConfig {
     /// Matches events using only the specified fields.
     #[serde(rename = "match")]
+    #[configurable(metadata(docs::examples = "field1", docs::examples = "parent.child_field"))]
     MatchFields(#[configurable(transparent)] Vec<String>),
 
     /// Matches events using all fields except for the ignored ones.
     #[serde(rename = "ignore")]
+    #[configurable(metadata(
+        docs::examples = "field1",
+        docs::examples = "parent.child_field",
+        docs::examples = "host",
+        docs::examples = "hostname"
+    ))]
     IgnoreFields(#[configurable(transparent)] Vec<String>),
 }
 
@@ -64,19 +76,33 @@ fn default_cache_config() -> CacheConfig {
     }
 }
 
+// TODO: Add support to the `configurable(metadata(..))` helper attribute for passing an expression
+// that will provide the value for the metadata attribute's value, as well as letting all metadata
+// attributes have whatever value they want, so long as it can be serialized by `serde_json`.
+//
+// Once we have that, we could curry these default values (and others) via a metadata attribute
+// instead of via `serde(default = "...")` to allow for displaying default values in the
+// configuration schema _without_ actually changing how a field is populated during deserialization.
+//
+// See the comment in `fill_default_fields_match` for more information on why this is required.
+fn default_match_fields() -> Vec<String> {
+    vec![
+        log_schema().timestamp_key().into(),
+        log_schema().host_key().into(),
+        log_schema().message_key().into(),
+    ]
+}
+
 impl DedupeConfig {
-    /// We cannot rely on Serde to populate the default since we want it to be
-    /// based on the user's configured log_schema, which we only know about
-    /// after we've already parsed the config.
     pub fn fill_default_fields_match(&self) -> FieldMatchConfig {
+        // We provide a default value on `fields`, based on `default_match_fields`, in order to
+        // drive the configuration schema and documentation. Since we're getting the values from the
+        // configured log schema, though, the default field values shown in the configuration
+        // schema/documentation may not be the same as an actual user's Vector configuration.
         match &self.fields {
             Some(FieldMatchConfig::MatchFields(x)) => FieldMatchConfig::MatchFields(x.clone()),
             Some(FieldMatchConfig::IgnoreFields(y)) => FieldMatchConfig::IgnoreFields(y.clone()),
-            None => FieldMatchConfig::MatchFields(vec![
-                log_schema().timestamp_key().into(),
-                log_schema().host_key().into(),
-                log_schema().message_key().into(),
-            ]),
+            None => FieldMatchConfig::MatchFields(default_match_fields()),
         }
     }
 }
