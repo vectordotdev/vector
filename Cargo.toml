@@ -253,6 +253,7 @@ governor = { version = "0.5.0", default-features = false, features = ["dashmap",
 grok = { version = "2.0.0", default-features = false, optional = true }
 h2 = { version = "0.3.13", default-features = false, optional = true }
 hash_hasher = { version = "2.0.0", default-features = false }
+hashbrown = { version = "0.12.3", default-features = false, optional = true }
 headers = { version = "0.3.8", default-features = false }
 hostname = { version = "0.3.1", default-features = false }
 http = { version = "0.2.8", default-features = false }
@@ -586,7 +587,7 @@ transforms-reduce = []
 transforms-remap = []
 transforms-route = []
 transforms-sample = []
-transforms-tag_cardinality_limit = ["dep:bloom"]
+transforms-tag_cardinality_limit = ["dep:bloom", "dep:hashbrown"]
 transforms-throttle = ["dep:governor"]
 
 # Sinks
