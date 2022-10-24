@@ -121,6 +121,20 @@ impl<T: Ord + Clone> Collection<T> {
         self.unknown.is_exact()
     }
 
+    /// Returns an enum describing if the collection is empty.
+    #[must_use]
+    pub fn is_empty(&self) -> EmptyState {
+        if self.known.is_empty() {
+            if self.unknown_kind().contains_any_defined() {
+                EmptyState::Maybe
+            } else {
+                EmptyState::Always
+            }
+        } else {
+            EmptyState::Never
+        }
+    }
+
     /// Set all "unknown" collection elements to the given kind.
     pub fn set_unknown(&mut self, unknown: impl Into<Kind>) {
         self.unknown = unknown.into().into();
@@ -264,6 +278,25 @@ impl<T: Ord + Clone> Collection<T> {
             .unwrap_or_else(Kind::never)
             .union(self.unknown_kind().without_undefined())
     }
+}
+
+pub trait CollectionRemove {
+    type Key: Ord;
+
+    fn remove_known(&mut self, key: &Self::Key);
+}
+
+/// Collections have an "unknown" component, so it can't know in all cases if the value this
+/// collection represents is actually empty/not empty, so the state is represented with 3 variants.
+#[derive(Debug)]
+pub enum EmptyState {
+    // The collection is guaranteed to be empty.
+    Always,
+    // The collection may or may not actually be empty. There is not enough type information to
+    // determine. (There are unknown fields/indices that may exist, but there are no known values.)
+    Maybe,
+    // The collection is guaranteed to NOT be empty.
+    Never,
 }
 
 impl<T: Ord> From<BTreeMap<T, Kind>> for Collection<T> {

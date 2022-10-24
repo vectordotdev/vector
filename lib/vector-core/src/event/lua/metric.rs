@@ -5,7 +5,7 @@ use mlua::prelude::*;
 use super::util::{table_to_timestamp, timestamp_to_table};
 use crate::{
     event::{
-        metric::{self, MetricSketch},
+        metric::{self, MetricSketch, MetricTags},
         Metric, MetricKind, MetricValue, StatisticKind,
     },
     metrics::AgentDDSketch,
@@ -61,6 +61,18 @@ impl<'a> FromLua<'a> for StatisticKind {
                 ),
             }),
         }
+    }
+}
+
+impl<'a> FromLua<'a> for MetricTags {
+    fn from_lua(value: LuaValue<'a>, lua: &'a Lua) -> LuaResult<Self> {
+        Ok(Self(BTreeMap::from_lua(value, lua)?))
+    }
+}
+
+impl<'a> ToLua<'a> for MetricTags {
+    fn to_lua(self, lua: &'a Lua) -> LuaResult<LuaValue> {
+        self.0.to_lua(lua)
     }
 }
 
@@ -184,7 +196,7 @@ impl<'a> FromLua<'a> for Metric {
             .transpose()?;
         let interval_ms: Option<u32> = table.raw_get("interval_ms")?;
         let namespace: Option<String> = table.raw_get("namespace")?;
-        let tags: Option<BTreeMap<String, String>> = table.raw_get("tags")?;
+        let tags: Option<MetricTags> = table.raw_get("tags")?;
         let kind = table
             .raw_get::<_, Option<MetricKind>>("kind")?
             .unwrap_or(MetricKind::Absolute);

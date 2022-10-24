@@ -1,7 +1,11 @@
 use metrics::counter;
+use vector_common::internal_event::{error_stage, error_type};
 use vector_core::internal_event::InternalEvent;
 
-use vector_common::internal_event::{error_stage, error_type};
+use crate::{
+    emit,
+    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
+};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 #[allow(dead_code)] // some features only use some variants
@@ -169,8 +173,9 @@ pub struct SocketSendError<E> {
 impl<E: std::fmt::Display> InternalEvent for SocketSendError<E> {
     fn emit(self) {
         let mode = self.mode.as_str();
+        let reason = "Error sending data.";
         error!(
-            message = "Error sending data.",
+            message = reason,
             error = %self.error,
             error_code = "socket_send",
             error_type = error_type::WRITER_FAILED,
@@ -187,5 +192,7 @@ impl<E: std::fmt::Display> InternalEvent for SocketSendError<E> {
         );
         // deprecated
         counter!("connection_errors_total", 1, "mode" => mode);
+
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }

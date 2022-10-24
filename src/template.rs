@@ -42,6 +42,7 @@ pub enum TemplateRenderingError {
 /// field of the event being processed would serve as the value when rendering the template into a string.
 #[configurable_component]
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+#[configurable(metadata(docs::templateable, docs::no_description))]
 #[serde(try_from = "String", into = "String")]
 pub struct Template {
     src: String,
@@ -191,12 +192,12 @@ fn render_fields(src: &str, event: EventRef<'_>) -> Result<String, TemplateRende
                 .expect("src should match regex");
             match event {
                 EventRef::Log(log) => log.get(key).map(|val| val.to_string_lossy()),
-                EventRef::Metric(metric) => render_metric_field(key, metric),
+                EventRef::Metric(metric) => render_metric_field(key, metric).map(Into::into),
                 EventRef::Trace(trace) => trace.get(&key).map(|val| val.to_string_lossy()),
             }
             .unwrap_or_else(|| {
                 missing_keys.push(key.to_owned());
-                String::new()
+                "".into()
             })
         })
         .into_owned();
@@ -211,9 +212,9 @@ fn render_metric_field(key: &str, metric: &Metric) -> Option<String> {
     match key {
         "name" => Some(metric.name().into()),
         "namespace" => metric.namespace().map(Into::into),
-        _ if key.starts_with("tags.") => {
-            metric.tags().and_then(|tags| tags.get(&key[5..]).cloned())
-        }
+        _ if key.starts_with("tags.") => metric
+            .tags()
+            .and_then(|tags| tags.get(&key[5..]).map(ToOwned::to_owned)),
         _ => None,
     }
 }
@@ -239,12 +240,10 @@ fn render_timestamp(src: &str, event: EventRef<'_>) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
-
     use chrono::TimeZone;
 
     use super::*;
-    use crate::event::{Event, LogEvent, MetricKind, MetricValue};
+    use crate::event::{Event, LogEvent, MetricKind, MetricTags, MetricValue};
     use lookup::metadata_path;
 
     #[test]
@@ -451,7 +450,7 @@ mod tests {
     #[test]
     fn render_metric_with_tags() {
         let template = Template::try_from("name={{name}} component={{tags.component}}").unwrap();
-        let metric = sample_metric().with_tags(Some(BTreeMap::from([
+        let metric = sample_metric().with_tags(Some(MetricTags::from([
             (String::from("test"), String::from("true")),
             (String::from("component"), String::from("template")),
         ])));

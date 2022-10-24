@@ -217,10 +217,7 @@ impl ComponentTester {
                     .map(|m| {
                         let tags = m
                             .tags()
-                            .map(|t| {
-                                let tag_keys = t.keys().cloned().collect::<Vec<_>>();
-                                format!("{{{}}}", tag_keys.join(","))
-                            })
+                            .map(|t| format!("{{{}}}", itertools::join(t.keys(), ",")))
                             .unwrap_or_default();
                         format!("\n    -> Found similar metric `{}{}`", m.name(), tags)
                     })
