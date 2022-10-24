@@ -319,7 +319,7 @@ heim = { git = "https://github.com/vectordotdev/heim.git", branch = "update-nix"
 mlua = { version = "0.8.4", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 
 # enterprise related dependencies
-jsonschema = { version = "0.16.0", default-features = false }
+jsonschema = { version = "0.16.1", default-features = false }
 
 [target.'cfg(windows)'.dependencies]
 windows-service = "0.5.0"
