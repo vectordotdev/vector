@@ -85,12 +85,13 @@ will be ignored. When set to the latter, all tags will be exposed as arrays of e
 values.  This control will initially default to the former setting, providing for backwards
 compatibility, but that default will later be deprecated and change to the latter.
 
-For VRL, the allowable assignments will follow the tag value mode. That is, only single value
-assignments will be allowed in "single" mode, and only array value assignments will be allowed in
-"full" mode. These types will be enforced with VRL's integrated type definitions, causing programs
-that make the wrong assignment a config-level error instead of a run-time error. In both cases,
-assignment to a tag will overwrite all other values for the tag, and deleting a tag name or
-assigning an empty array (in "full" mode) will remove all tag values with that name.
+Tag assignments will also follow the tag value mode. That is, only single value assignments will be
+allowed in "single" mode, and only array value assignments will be allowed in "full" mode. In Lua,
+emitted events with incompatible tag values will be dropped with an error as they are now. In VRL,
+these types will be enforced with integrated type definitions, causing programs that make the wrong
+assignment a config-level error instead of a run-time error. In any case, assignment to a tag will
+overwrite all other values for the tag, and deleting a tag name or assigning an empty array (in
+"full" mode) will remove all tag values with that name.
 
 Since tags cannot have multiple identical values, and both scripting languages lack first-class
 support for sets, assignments and modifications that result in duplicate values will cause the
@@ -109,12 +110,6 @@ Examples:
 .tags.modified = push(.tags.modified, "value4")
 .tags.modified = filter(.tags.modified) -> |_, v| { v != "remove" }
 ```
-
-In contrast, we don't control what assignments are allowed in Lua transforms, but rather convert
-event data into Lua structures on input and convert back when the script `emit`s a value. As such, assignments
-to tags will follow the data schema outlined above for the native JSON codec, without regard to how
-the values are exposed. When the `"single"` setting is deprecated, single value assignments will
-also produce a deprecation warning.
 
 #### `log_to_metric` Transform
 
@@ -146,11 +141,13 @@ warning when doing so. The latter will be upgraded to encode multi-valued tags a
 
 ### Implementation
 
-Simply put, the tags representation will change from an alias into a newtype wrapper using an
-`indexmap` set to store the tag values. This newtype will hide the implementation details of the
-underlying storage from the callers. It will also add separate methods for inserting a new tag and
-replacing a tag set with a single value. The callers of the existing `insert` function will need to
-be audited to determine which use is intended at each call site. The tag values themselves are
+#### Representation
+
+The tags representation will change from an alias into a newtype wrapper. This newtype will hide the
+implementation details of the underlying storage from the callers.  This wrapper will use an
+`indexmap` set to store the tag values. It will also add separate methods for inserting a new tag
+and replacing a tag set with a single value. The callers of the existing `insert` function will need
+to be audited to determine which use is intended at each call site. The tag values themselves are
 stored as optional strings, in which the `None` value represents a bare tag.
 
 ```rust
@@ -178,6 +175,16 @@ impl MetricTags {
     fn remove_all(&mut self, name: &str) -> Option<TagValueSet>;
 }
 ```
+
+#### Lua Type Conversion
+
+Converting from Vector types to Lua, to be able to pass data into Lua functions, is controlled by
+the `ToLua` trait. This trait works similar to the standard Rust `Into` and `From` traits. The
+functions of these traits are passed a reference to the Lua interpreter object, of which we create a
+unique instance for each transform. This interpreter object can store user-defined data via a set of
+["app data"](https://docs.rs/mlua/latest/mlua/struct.Lua.html#method.set_app_data) interfaces. We
+will use these interfaces to store the state of the `metric_tags_values` flag for the particular
+transform, and use the value to inform which conversion mode to use on tags.
 
 ## Rationale
 
@@ -221,10 +228,6 @@ one form or another. Exposing tags as multi-valued will break scripts. The propo
 breaking existing scripts, but will cause Lua scripts in "single" mode to reduce all multi-valued
 tags to a single value, even if there are no modifications to tags.
 
-Additionally, accepting either single- or multi-valued tags in Lua as proposed above could
-potentially cause metrics that would formerly fail to convert into the Vector data model when they
-are emitted to now be allowed, causing extraneous data emission.
-
 ## Prior Art
 
 The Datadog agent stores metric tags as a simple set of strings, equivalent to `HashSet<String>`. It
@@ -254,13 +257,11 @@ which will cause problems for users:
 1. Unconditionally expose the tags as arrays of values using the existing naming, but still accept
    assignments using either single values or arrays of values. This will cause breakage to existing
    scripts that relies on the existing single value tag values.
-1. For VRL, conditionally expose the tags as single values or arrays, as described in the proposal,
-   but accept assignments following the native JSON codec scheme. This would create headaches for
-   VRL's type definitions, at best preventing proper validation of programs.
-1. For Lua, conditionally expose the tags as single values or arrays, as described in the proposal,
-   but accept assignments only using the named tags schema. This has the best consistency with
-   existing scripts, avoiding the extraneous emission problem described above, at the cost of
-   requiring more complicated internals for converting the data back to Vector's metric model.
+1. For Lua or VRL scripts, conditionally expose the tags as single values or arrays, as described in
+   the proposal, but accept assignments following the native JSON codec scheme. In Lua, this could
+   cause a breaking change where scripts that emit metrics that have the wrong tabs type to be
+   accepted for transmission. In VRL, this would create headaches for type definitions, at best
+   preventing proper validation of programs.
 1. Expose the tags as single values using the existing naming, picking some arbitrary value when a
    tag has multiple values, and set up a secondary tags structure that exposes the arrays. This will
    lead to all kinds of confusion and conflicts when the same tag is assigned through different
