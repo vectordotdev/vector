@@ -373,7 +373,7 @@ impl PartialEq for MetricValue {
         match (self, other) {
             (Self::Counter { value: l_value }, Self::Counter { value: r_value })
             | (Self::Gauge { value: l_value }, Self::Gauge { value: r_value }) => {
-                float_eq(l_value, r_value)
+                float_eq(*l_value, *r_value)
             }
             (Self::Set { values: l_values }, Self::Set { values: r_values }) => {
                 l_values == r_values
@@ -399,7 +399,7 @@ impl PartialEq for MetricValue {
                     count: r_count,
                     sum: r_sum,
                 },
-            ) => l_buckets == r_buckets && l_count == r_count && float_eq(l_sum, r_sum),
+            ) => l_buckets == r_buckets && l_count == r_count && float_eq(*l_sum, *r_sum),
             (
                 Self::AggregatedSummary {
                     quantiles: l_quantiles,
@@ -411,7 +411,7 @@ impl PartialEq for MetricValue {
                     count: r_count,
                     sum: r_sum,
                 },
-            ) => l_quantiles == r_quantiles && l_count == r_count && float_eq(l_sum, r_sum),
+            ) => l_quantiles == r_quantiles && l_count == r_count && float_eq(*l_sum, *r_sum),
             (Self::Sketch { sketch: l_sketch }, Self::Sketch { sketch: r_sketch }) => {
                 l_sketch == r_sketch
             }
@@ -420,11 +420,11 @@ impl PartialEq for MetricValue {
     }
 }
 
-fn float_eq(l_value: &f64, r_value: &f64) -> bool {
+fn float_eq(l_value: f64, r_value: f64) -> bool {
     if l_value.is_nan() && r_value.is_nan() {
         true
     } else {
-        l_value.eq_ulps(r_value, &1)
+        l_value.eq_ulps(&r_value, &1)
     }
 }
 
@@ -596,7 +596,7 @@ pub struct Sample {
 
 impl PartialEq for Sample {
     fn eq(&self, other: &Self) -> bool {
-        self.rate == other.rate && float_eq(&self.value, &other.value)
+        self.rate == other.rate && float_eq(self.value, other.value)
     }
 }
 
@@ -655,7 +655,7 @@ pub struct Quantile {
 
 impl PartialEq for Quantile {
     fn eq(&self, other: &Self) -> bool {
-        float_eq(&self.quantile, &other.quantile) && float_eq(&self.value, &other.value)
+        float_eq(self.quantile, other.quantile) && float_eq(self.value, other.value)
     }
 }
 
